@@ -1211,6 +1211,57 @@ class ConsistencyValidator:
                 self.world_model.model_version += 0.1
 
 
+# --- Start Production LLM Client Integration ---
+# This class implements the actual integration logic for the LLM API (e.g., OpenAI).
+# This is a production wrapper.
+
+class CodeLLMClient:
+    """Production wrapper for the LLM API, using OpenAI's structure."""
+    
+    def __init__(self, api_key: str):
+        if not api_key:
+            logger.error("VULCAN_LLM_API_KEY is missing. LLM calls will fail.")
+            # Set API key to MagicMock to prevent initialization error, but calls will likely fail.
+            self.api_key = api_key 
+        else:
+            openai.api_key = api_key
+        
+        self.last_tokens_used = 0
+        self.model_name = "gpt-4" # Recommended model for complex coding tasks
+
+    def generate_code(self, prompt: str) -> str:
+        """Makes a real API call to generate structured code based on the prompt."""
+        
+        if not self.api_key:
+            raise RuntimeError("LLM API key is not configured. Cannot generate code.")
+
+        try:
+            response = openai.ChatCompletion.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1, # Keep generation focused and deterministic
+                max_tokens=4096, # Set a reasonable limit for file generation
+            )
+            
+            # Extract token usage for cost tracking
+            if response.usage:
+                self.last_tokens_used = response.usage.total_tokens
+            
+            return response.choices[0].message.content
+            
+        except openai.error.AuthenticationError as e:
+            logger.error(f"LLM Authentication Failed: {e}")
+            raise RuntimeError("LLM Authentication Failed.") from e
+        except openai.error.OpenAIError as e:
+            logger.error(f"LLM API Error: {e}")
+            raise RuntimeError(f"LLM API Error: {e}") from e
+        except Exception as e:
+            logger.error(f"Unexpected LLM generation error: {e}")
+            raise
+
+# --- End Production LLM Client Integration ---
+
+
 class WorldModel:
     """Main world model orchestrator - FULLY INTEGRATED with autonomous self-improvement"""
     
@@ -1784,59 +1835,7 @@ class WorldModel:
         except Exception as e:
             logger.error(f"Critical error during file application or Git: {e}")
             raise
-            
-# --- Start Production LLM Client Integration ---
-# This class implements the actual integration logic for the LLM API (e.g., OpenAI).
-# This is a production wrapper.
-
-class CodeLLMClient:
-    """Production wrapper for the LLM API, using OpenAI's structure."""
     
-    def __init__(self, api_key: str):
-        if not api_key:
-            logger.error("VULCAN_LLM_API_KEY is missing. LLM calls will fail.")
-            # Set API key to MagicMock to prevent initialization error, but calls will likely fail.
-            self.api_key = api_key 
-        else:
-            openai.api_key = api_key
-        
-        self.last_tokens_used = 0
-        self.model_name = "gpt-4" # Recommended model for complex coding tasks
-
-    def generate_code(self, prompt: str) -> str:
-        """Makes a real API call to generate structured code based on the prompt."""
-        
-        if not self.api_key:
-            raise RuntimeError("LLM API key is not configured. Cannot generate code.")
-
-        try:
-            response = openai.ChatCompletion.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1, # Keep generation focused and deterministic
-                max_tokens=4096, # Set a reasonable limit for file generation
-            )
-            
-            # Extract token usage for cost tracking
-            if response.usage:
-                self.last_tokens_used = response.usage.total_tokens
-            
-            return response.choices[0].message.content
-            
-        except openai.error.AuthenticationError as e:
-            logger.error(f"LLM Authentication Failed: {e}")
-            raise RuntimeError("LLM Authentication Failed.") from e
-        except openai.error.OpenAIError as e:
-            logger.error(f"LLM API Error: {e}")
-            raise RuntimeError(f"LLM API Error: {e}") from e
-        except Exception as e:
-            logger.error(f"Unexpected LLM generation error: {e}")
-            raise
-
-# --- End Production LLM Client Integration ---
-
-
-    # The actual execution function is now centralized here.
     def _execute_improvement(self, improvement_action: Dict[str, Any]):
         """
         Execute an improvement action using the full LLM -> AST -> Diff -> Git pipeline.
