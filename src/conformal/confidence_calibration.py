@@ -19,6 +19,7 @@ from pathlib import Path
 import json
 import pickle
 import time
+from .security_fixes import safe_pickle_load
 
 # Make seaborn optional since it's not actually used in the code
 try:
@@ -727,7 +728,7 @@ class CalibratedDecisionMaker:
         calibrators_file = load_path / 'calibrators.pkl'
         if calibrators_file.exists():
             with open(calibrators_file, 'rb') as f:
-                self.calibrators = defaultdict(dict, pickle.load(f))
+                self.calibrators = defaultdict(dict, safe_pickle_load(f))
         
         # Load metrics
         metrics_file = load_path / 'metrics.json'
