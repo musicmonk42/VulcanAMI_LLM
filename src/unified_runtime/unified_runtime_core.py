@@ -116,7 +116,7 @@ except ImportError:
     LEARNER_AVAILABLE = False
 
 try:
-    from safety_validator import SafetyValidator
+    from vulcan.safety.safety_validator import SafetyValidator
     SAFETY_AVAILABLE = True
 except ImportError:
     SafetyValidator = None
