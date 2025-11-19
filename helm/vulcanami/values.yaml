@@ -1,0 +1,121 @@
+# Default values for vulcanami.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/musicmonk42/vulcanami_llm-api
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  metricsPort: 9148
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: api.vulcanami.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+   - secretName: vulcanami-tls
+     hosts:
+       - api.vulcanami.example.com
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Application configuration
+config:
+  environment: production
+  logLevel: INFO
+  pythonUnbuffered: "1"
+
+# Database configuration
+postgres:
+  enabled: true
+  host: postgres-service
+  port: 5432
+  database: vulcanami
+  user: vulcanami
+  # Password should be set via secrets
+
+# Redis configuration
+redis:
+  enabled: true
+  host: redis-service
+  port: 6379
+  # Password should be set via secrets
+
+# MinIO configuration
+minio:
+  enabled: true
+  endpoint: http://minio-service:9000
+  accessKey: minioadmin
+  # Secret key should be set via secrets
+
+# Secrets (set via --set-string or external secret management)
+secrets:
+  jwtSecretKey: ""
+  bootstrapKey: ""
+  postgresPassword: ""
+  redisPassword: ""
+  minioSecretKey: ""
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
