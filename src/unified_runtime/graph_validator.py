@@ -711,7 +711,9 @@ class GraphValidator:
                         try:
                             params_str = json.dumps(params, separators=(',', ':'), ensure_ascii=False, default=str)
                             total_params_size_bytes += len(params_str.encode('utf-8'))
-                        except:
+                        except (TypeError, ValueError) as e:
+                            # If params can't be serialized, estimate conservatively
+                            logger.warning(f"Could not serialize params for size estimation: {e}")
                             total_params_size_bytes += 1024
 
         params_mb = total_params_size_bytes / (1024 * 1024)
