@@ -1,1266 +1,1627 @@
-"""Memory retrieval, search, and indexing"""
+"""Memory persistence, compression, and versioning"""
 
 import numpy as np
-import time
-import logging
-from typing import Any, Dict, List, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field
-import threading
 import pickle
 import json
-from collections import defaultdict, deque
-import heapq
-from pathlib import Path
-import re
-import math
-
-# FAISS for vector search - CRITICAL: Initialize to None first
+import lz4.frame
+import time
 import logging
-logger = logging.getLogger(__name__)
-faiss = None
-FAISS_AVAILABLE = False
-try:
-    import faiss
-    FAISS_AVAILABLE = True
-    logger.info("FAISS loaded successfully")
-except Exception as e:
-    faiss = None
-    FAISS_AVAILABLE = False
-    logger.warning(f"FAISS not available ({type(e).__name__}: {e}), using numpy-based search")
+import os
+import copy
+from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from dataclasses import dataclass, field, asdict
+import threading
+import hashlib
+import shutil
+import sqlite3
+from datetime import datetime, timedelta
 
-# Additional indexing libraries
+from .base import Memory, MemoryType, CompressionType
+
+# Try to import advanced libraries
 try:
-    import whoosh
-    from whoosh.index import create_in, open_dir
-    from whoosh.fields import Schema, TEXT, ID, NUMERIC, DATETIME
-    from whoosh.qparser import QueryParser
-    from whoosh.writing import AsyncWriter
-    WHOOSH_AVAILABLE = True
+    from cryptography.fernet import Fernet
+    ENCRYPTION_AVAILABLE = True
 except ImportError:
-    WHOOSH_AVAILABLE = False
-    logging.warning("Whoosh not available, text search limited")
+    ENCRYPTION_AVAILABLE = False
+    logging.warning("Cryptography library not available, encryption disabled.")
 
-# PyTorch for learned attention
 try:
     import torch
     import torch.nn as nn
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+    logging.warning("PyTorch not available, neural compression disabled")
 
-from .base import Memory, MemoryQuery
-from ..security_fixes import safe_pickle_load
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    logging.warning("Sentence transformers not available, semantic compression limited")
 
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# RESULT CLASSES
+# NEURAL COMPRESSION MODELS
+# ============================================================
+
+class NeuralCompressor(nn.Module):
+    """Neural network for memory compression."""
+    
+    def __init__(self, input_dim: int = 1024, latent_dim: int = 128):
+        super().__init__()
+        self.input_dim = input_dim
+        self.latent_dim = latent_dim
+        
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 512),
+            nn.ReLU(),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Linear(256, latent_dim),
+            nn.Tanh()
+        )
+        
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim, 256),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Linear(256, 512),
+            nn.ReLU(),
+            nn.BatchNorm1d(512),
+            nn.Linear(512, input_dim),
+            nn.Sigmoid()
+        )
+    
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        """Encode to latent space."""
+        return self.encoder(x)
+    
+    def decode(self, z: torch.Tensor) -> torch.Tensor:
+        """Decode from latent space."""
+        return self.decoder(z)
+    
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Forward pass returns reconstruction and latent."""
+        z = self.encode(x)
+        x_recon = self.decode(z)
+        return x_recon, z
+
+class SemanticCompressor:
+    """Semantic compression using language models."""
+    
+    def __init__(self):
+        self.model = None
+        if SENTENCE_TRANSFORMERS_AVAILABLE:
+            try:
+                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+        
+        # Compression strategies
+        self.strategies = {
+            'summary': self._compress_summary,
+            'keywords': self._compress_keywords,
+            'embedding': self._compress_embedding
+        }
+    
+    def compress(self, content: Any, strategy: str = 'embedding') -> Dict[str, Any]:
+        """Compress content using semantic understanding."""
+        if strategy not in self.strategies:
+            strategy = 'embedding'
+        
+        return self.strategies[strategy](content)
+    
+    def _compress_summary(self, content: Any) -> Dict[str, Any]:
+        """Compress by generating summary."""
+        text = str(content)
+        
+        # Simple extractive summarization
+        sentences = text.split('.')
+        if len(sentences) <= 3:
+            summary = text
+        else:
+            # Take first, middle, and last sentences
+            summary = '. '.join([
+                sentences[0],
+                sentences[len(sentences)//2],
+                sentences[-1]
+            ])
+        
+        return {
+            'type': 'summary',
+            'compressed': summary,
+            'original_length': len(text),
+            'compressed_length': len(summary),
+            'compression_ratio': len(text) / max(1, len(summary))
+        }
+    
+    def _compress_keywords(self, content: Any) -> Dict[str, Any]:
+        """Compress by extracting keywords."""
+        text = str(content)
+        
+        # Simple keyword extraction (TF-IDF would be better)
+        words = text.lower().split()
+        word_freq = {}
+        for word in words:
+            if len(word) > 3:  # Skip short words
+                word_freq[word] = word_freq.get(word, 0) + 1
+        
+        # Get top keywords
+        keywords = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        return {
+            'type': 'keywords',
+            'keywords': [k for k, v in keywords],
+            'frequencies': dict(keywords),
+            'original_length': len(text),
+            'compressed_size': len(keywords) * 10  # Approximate
+        }
+    
+    def _compress_embedding(self, content: Any) -> Dict[str, Any]:
+        """Compress to semantic embedding."""
+        text = str(content)
+        
+        if self.model:
+            # Generate embedding
+            embedding = self.model.encode(text[:512])  # Truncate for model limits
+            
+            # Quantize to reduce size
+            quantized = (embedding * 127).astype(np.int8)
+            
+            return {
+                'type': 'embedding',
+                'embedding': quantized,
+                'original_length': len(text),
+                'embedding_dim': len(quantized),
+                'compression_ratio': len(text) / len(quantized)
+            }
+        else:
+            # Fallback: hash-based pseudo-embedding
+            hash_val = hashlib.sha256(text.encode()).digest()
+            embedding = np.frombuffer(hash_val, dtype=np.uint8).astype(np.int8)
+            
+            return {
+                'type': 'hash_embedding',
+                'embedding': embedding,
+                'original_length': len(text),
+                'embedding_dim': len(embedding)
+            }
+    
+    def decompress(self, compressed_data: Dict[str, Any], original_hint: Optional[str] = None) -> str:
+        """Decompress semantic data."""
+        comp_type = compressed_data.get('type')
+        
+        if comp_type == 'summary':
+            # Summary is already readable
+            return compressed_data['compressed']
+        
+        elif comp_type == 'keywords':
+            # Reconstruct from keywords
+            keywords = compressed_data['keywords']
+            return f"Content about: {', '.join(keywords)}"
+        
+        elif comp_type in ['embedding', 'hash_embedding']:
+            # Can't fully reconstruct from embedding
+            # Return a placeholder or use original hint
+            if original_hint:
+                return f"[Compressed content similar to: {original_hint[:100]}...]"
+            return "[Compressed semantic content - embedding only]"
+        
+        return "[Unknown compression type]"
+
+# ============================================================
+# ENHANCED MEMORY COMPRESSION
+# ============================================================
+
+class MemoryCompressor:
+    """Handles memory compression and decompression."""
+    
+    def __init__(self):
+        self.neural_compressor = None
+        self.semantic_compressor = None
+        
+        # Initialize neural compressor if available
+        if TORCH_AVAILABLE:
+            self.neural_compressor = NeuralCompressor()
+            self.neural_compressor.eval()  # Set to evaluation mode
+        
+        # Initialize semantic compressor
+        self.semantic_compressor = SemanticCompressor()
+        
+        # Cache for neural models
+        self.compression_cache = {}
+        self.cache_lock = threading.Lock()
+    
+    @staticmethod
+    def compress(memory: Memory, compression_type: CompressionType) -> bytes:
+        """Compress memory content."""
+        # Serialize memory content for base compression
+        serialized = pickle.dumps(memory.content)
+        
+        if compression_type == CompressionType.NONE:
+            return serialized
+        
+        elif compression_type == CompressionType.LZ4:
+            return lz4.frame.compress(serialized)
+        
+        elif compression_type == CompressionType.ZSTD:
+            try:
+                import zstandard as zstd
+                cctx = zstd.ZstdCompressor(level=3)
+                return cctx.compress(serialized)
+            except ImportError:
+                logger.warning("zstd not available, using lz4")
+                return lz4.frame.compress(serialized)
+        
+        elif compression_type == CompressionType.NEURAL:
+            return MemoryCompressor._neural_compress(memory)
+        
+        elif compression_type == CompressionType.SEMANTIC:
+            return MemoryCompressor._semantic_compress(memory)
+        
+        else:
+            return serialized
+    
+    @staticmethod
+    def _neural_compress(memory: Memory) -> bytes:
+        """Neural compression using autoencoder."""
+        if not TORCH_AVAILABLE:
+            # Fallback to LZ4
+            return lz4.frame.compress(pickle.dumps(memory.content))
+        
+        try:
+            # Get or create compressor
+            compressor = MemoryCompressor._get_neural_compressor()
+            
+            # Prepare input
+            if isinstance(memory.content, str):
+                # Convert text to embedding
+                text_bytes = memory.content.encode('utf-8')
+                # Pad or truncate to fixed size
+                fixed_size = 1024
+                if len(text_bytes) < fixed_size:
+                    text_bytes = text_bytes + b'\0' * (fixed_size - len(text_bytes))
+                else:
+                    text_bytes = text_bytes[:fixed_size]
+                
+                input_array = np.frombuffer(text_bytes, dtype=np.uint8).astype(np.float32) / 255.0
+            
+            elif isinstance(memory.content, np.ndarray):
+                # Use array directly
+                input_array = memory.content.flatten()[:1024]
+                if len(input_array) < 1024:
+                    input_array = np.pad(input_array, (0, 1024 - len(input_array)))
+                input_array = input_array.astype(np.float32)
+            
+            else:
+                # Serialize and treat as bytes
+                serialized = pickle.dumps(memory.content)
+                fixed_size = 1024
+                if len(serialized) < fixed_size:
+                    serialized = serialized + b'\0' * (fixed_size - len(serialized))
+                else:
+                    serialized = serialized[:fixed_size]
+                
+                input_array = np.frombuffer(serialized, dtype=np.uint8).astype(np.float32) / 255.0
+            
+            # Convert to tensor
+            input_tensor = torch.tensor(input_array).unsqueeze(0)
+            
+            # Compress
+            with torch.no_grad():
+                _, latent = compressor(input_tensor)
+            
+            # Package compressed data
+            compressed_data = {
+                'latent': latent.numpy(),
+                'original_type': type(memory.content).__name__,
+                'original_shape': input_array.shape,
+                'memory_metadata': {
+                    'id': memory.id,
+                    'type': memory.type.value,
+                    'timestamp': memory.timestamp
+                }
+            }
+            
+            return pickle.dumps(compressed_data)
+            
+        except Exception as e:
+            logger.error(f"Neural compression failed: {e}")
+            # Fallback to LZ4
+            return lz4.frame.compress(pickle.dumps(memory.content))
+    
+    @staticmethod
+    def _semantic_compress(memory: Memory) -> bytes:
+        """Semantic compression for text content."""
+        try:
+            compressor = SemanticCompressor()
+            
+            # Compress based on content type
+            if isinstance(memory.content, str):
+                compressed = compressor.compress(memory.content, strategy='embedding')
+            elif isinstance(memory.content, dict) and 'text' in memory.content:
+                compressed = compressor.compress(memory.content['text'], strategy='embedding')
+            else:
+                # For non-text, use summary strategy
+                compressed = compressor.compress(str(memory.content)[:1000], strategy='summary')
+            
+            # Package with metadata
+            result = {
+                'compressed': compressed,
+                'original_type': type(memory.content).__name__,
+                'memory_metadata': {
+                    'id': memory.id,
+                    'type': memory.type.value,
+                    'timestamp': memory.timestamp,
+                    'importance': memory.importance
+                }
+            }
+            
+            return pickle.dumps(result)
+            
+        except Exception as e:
+            logger.error(f"Semantic compression failed: {e}")
+            # Fallback to LZ4
+            return lz4.frame.compress(pickle.dumps(memory.content))
+    
+    @staticmethod
+    def decompress(data: bytes, compression_type: CompressionType) -> Any:
+        """Decompress memory content."""
+        if compression_type == CompressionType.NONE:
+            return pickle.loads(data)
+        
+        elif compression_type == CompressionType.LZ4:
+            decompressed = lz4.frame.decompress(data)
+            return pickle.loads(decompressed)
+        
+        elif compression_type == CompressionType.ZSTD:
+            try:
+                import zstandard as zstd
+                dctx = zstd.ZstdDecompressor()
+                decompressed = dctx.decompress(data)
+                return pickle.loads(decompressed)
+            except ImportError:
+                decompressed = lz4.frame.decompress(data)
+                return pickle.loads(decompressed)
+        
+        elif compression_type == CompressionType.NEURAL:
+            return MemoryCompressor._neural_decompress(data)
+        
+        elif compression_type == CompressionType.SEMANTIC:
+            return MemoryCompressor._semantic_decompress(data)
+        
+        else:
+            return pickle.loads(data)
+    
+    @staticmethod
+    def _neural_decompress(data: bytes) -> Any:
+        """Decompress neural compressed data."""
+        if not TORCH_AVAILABLE:
+            # Try to extract original from fallback
+            try:
+                decompressed = lz4.frame.decompress(data)
+                return pickle.loads(decompressed)
+            except Exception as e:                return None
+        
+        try:
+            compressed_data = pickle.loads(data)
+            
+            # Check if it's neural compressed
+            if 'latent' not in compressed_data:
+                # Fallback format
+                return compressed_data
+            
+            # Get compressor
+            compressor = MemoryCompressor._get_neural_compressor()
+            
+            # Reconstruct from latent
+            latent_tensor = torch.tensor(compressed_data['latent'])
+            
+            with torch.no_grad():
+                reconstructed = compressor.decode(latent_tensor)
+            
+            # Convert back to original format
+            reconstructed_array = reconstructed.numpy().squeeze()
+            
+            if compressed_data['original_type'] == 'str':
+                # Reconstruct string
+                bytes_array = (reconstructed_array * 255).astype(np.uint8).tobytes()
+                try:
+                    result = bytes_array.decode('utf-8').rstrip('\0')
+                except Exception as e:                    result = f"[Neural reconstruction - metadata: {compressed_data['memory_metadata']}]"
+            
+            elif compressed_data['original_type'] == 'ndarray':
+                result = reconstructed_array
+            
+            else:
+                # Try to unpickle
+                bytes_array = (reconstructed_array * 255).astype(np.uint8).tobytes()
+                try:
+                    result = pickle.loads(bytes_array)
+                except Exception as e:                    # Return reconstruction with metadata
+                    result = {
+                        'reconstructed': reconstructed_array,
+                        'metadata': compressed_data['memory_metadata']
+                    }
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Neural decompression failed: {e}")
+            return None
+    
+    @staticmethod
+    def _semantic_decompress(data: bytes) -> Any:
+        """Decompress semantic compressed data."""
+        try:
+            result = pickle.loads(data)
+            
+            if 'compressed' not in result:
+                # Not semantic format
+                return result
+            
+            compressed = result['compressed']
+            metadata = result['memory_metadata']
+            
+            # Reconstruct based on compression type
+            compressor = SemanticCompressor()
+            
+            if compressed['type'] == 'summary':
+                # Summary is directly usable
+                content = compressed['compressed']
+            
+            elif compressed['type'] == 'keywords':
+                # Reconstruct from keywords
+                keywords = compressed['keywords']
+                content = f"[Keywords: {', '.join(keywords)}] - Memory {metadata['id']}"
+            
+            elif compressed['type'] in ['embedding', 'hash_embedding']:
+                # Can't fully reconstruct, provide metadata
+                content = (f"[Semantic embedding - Memory {metadata['id']}, "
+                          f"Type: {metadata['type']}, "
+                          f"Importance: {metadata.get('importance', 'N/A')}]")
+            
+            else:
+                content = f"[Compressed content - {metadata}]"
+            
+            return content
+            
+        except Exception as e:
+            logger.error(f"Semantic decompression failed: {e}")
+            try:
+                # Try LZ4 fallback
+                decompressed = lz4.frame.decompress(data)
+                return pickle.loads(decompressed)
+            except Exception as e:                return None
+    
+    @staticmethod
+    def _get_neural_compressor():
+        """Get or create neural compressor instance."""
+        # Simple singleton pattern
+        if not hasattr(MemoryCompressor, '_neural_instance'):
+            MemoryCompressor._neural_instance = NeuralCompressor()
+            MemoryCompressor._neural_instance.eval()
+        return MemoryCompressor._neural_instance
+    
+    @staticmethod
+    def estimate_compression_ratio(memory: Memory, 
+                                  compression_type: CompressionType) -> float:
+        """Estimate compression ratio."""
+        original_size = len(pickle.dumps(memory.content))
+        compressed = MemoryCompressor.compress(memory, compression_type)
+        compressed_size = len(compressed)
+        
+        if compressed_size > 0:
+            return original_size / compressed_size
+        return 1.0
+
+# ============================================================
+# MEMORY VERSION CONTROL
 # ============================================================
 
 @dataclass
-class RetrievalResult:
-    """Result from memory retrieval operation."""
+class MemoryVersion:
+    """Version of a memory."""
+    version_id: str
     memory_id: str
-    score: float
-    memory: Optional[Memory] = None
-    metadata: Optional[Dict[str, Any]] = None
-    relevance: Optional[float] = None
-    context: Optional[Dict[str, Any]] = None
+    timestamp: float
+    content_hash: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    parent_version: Optional[str] = None
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            'memory_id': self.memory_id,
-            'score': self.score,
-            'memory': self.memory.to_dict() if self.memory and hasattr(self.memory, 'to_dict') else str(self.memory),
-            'metadata': self.metadata,
-            'relevance': self.relevance,
-            'context': self.context
-        }
+    # Additional version info
+    author: str = "system"
+    message: str = ""
+    tags: List[str] = field(default_factory=list)
 
-# ============================================================
-# NUMPY FALLBACK INDEX
-# ============================================================
-
-class NumpyIndex:
-    """Numpy-based vector index as FAISS fallback."""
+class MemoryVersionControl:
+    """Git-like version control for memories."""
     
-    def __init__(self, dimension: int = 512):
-        self.dimension = dimension
-        self.embeddings = []
-        self.memory_ids = []
+    def __init__(self, storage_path: str = "./memory_versions"):
+        self.storage_path = Path(storage_path)
+        self.storage_path.mkdir(parents=True, exist_ok=True)
+        
+        # Version database
+        self.db_path = self.storage_path / "versions.db"
+        self._init_database()
+        
+        # In-memory cache
+        self.versions: Dict[str, List[MemoryVersion]] = {}
+        self.current_versions: Dict[str, str] = {}
+        self.branches: Dict[str, Dict[str, str]] = {"main": {}}
+        self.current_branch = "main"
+        
         self.lock = threading.RLock()
     
-    def add(self, memory_id: str, embedding: np.ndarray) -> bool:
-        """Add embedding to index."""
+    def _init_database(self):
+        """Initialize SQLite database for version tracking."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS versions (
+                version_id TEXT PRIMARY KEY,
+                memory_id TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                content_hash TEXT NOT NULL,
+                parent_version TEXT,
+                author TEXT,
+                message TEXT,
+                branch TEXT,
+                metadata TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_memory_id ON versions(memory_id)
+        """)
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS branches (
+                name TEXT PRIMARY KEY,
+                head_version TEXT,
+                created_at REAL
+            )
+        """)
+        
+        conn.commit()
+        conn.close()
+    
+    def create_version(self, memory: Memory, 
+                      message: str = "",
+                      author: str = "system",
+                      parent_version: Optional[str] = None) -> str:
+        """Create new version of memory with commit message."""
         with self.lock:
-            if embedding.ndim == 1:
-                embedding = embedding.reshape(1, -1)
+            # Generate version ID
+            version_id = self._generate_version_id(memory)
             
-            # Normalize
-            embedding = embedding / (np.linalg.norm(embedding) + 1e-10)
+            # Compute content hash
+            content_hash = self._compute_content_hash(memory.content)
             
-            self.embeddings.append(embedding.squeeze())
-            self.memory_ids.append(memory_id)
+            # Check if content changed
+            if memory.id in self.versions:
+                last_version = self.versions[memory.id][-1]
+                if last_version.content_hash == content_hash:
+                    logger.debug(f"No changes in memory {memory.id}, skipping version")
+                    return last_version.version_id
+            
+            # Create version record
+            version = MemoryVersion(
+                version_id=version_id,
+                memory_id=memory.id,
+                timestamp=time.time(),
+                content_hash=content_hash,
+                metadata=memory.metadata.copy(),
+                parent_version=parent_version or self.current_versions.get(memory.id),
+                author=author,
+                message=message or f"Update memory {memory.id}"
+            )
+            
+            # Store in memory
+            if memory.id not in self.versions:
+                self.versions[memory.id] = []
+            self.versions[memory.id].append(version)
+            self.current_versions[memory.id] = version_id
+            
+            # Store in database
+            self._save_version_to_db(version)
+            
+            # Update branch head
+            self.branches[self.current_branch][memory.id] = version_id
+            
+            return version_id
+    
+    def _save_version_to_db(self, version: MemoryVersion):
+        """Save version to database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT OR REPLACE INTO versions 
+            (version_id, memory_id, timestamp, content_hash, parent_version, 
+             author, message, branch, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            version.version_id,
+            version.memory_id,
+            version.timestamp,
+            version.content_hash,
+            version.parent_version,
+            version.author,
+            version.message,
+            self.current_branch,
+            json.dumps(version.metadata)
+        ))
+        
+        conn.commit()
+        conn.close()
+    
+    def get_version(self, memory_id: str, version_id: Optional[str] = None) -> Optional[MemoryVersion]:
+        """Get specific version or current version."""
+        with self.lock:
+            if version_id is None:
+                # Get current version for branch
+                version_id = self.branches[self.current_branch].get(memory_id)
+                if not version_id:
+                    version_id = self.current_versions.get(memory_id)
+            
+            # Check cache
+            if memory_id in self.versions:
+                for version in self.versions[memory_id]:
+                    if version.version_id == version_id:
+                        return version
+            
+            # Check database
+            return self._load_version_from_db(version_id)
+    
+    def _load_version_from_db(self, version_id: str) -> Optional[MemoryVersion]:
+        """Load version from database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM versions WHERE version_id = ?
+        """, (version_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return MemoryVersion(
+                version_id=row[0],
+                memory_id=row[1],
+                timestamp=row[2],
+                content_hash=row[3],
+                parent_version=row[4],
+                author=row[5],
+                message=row[6],
+                metadata=json.loads(row[8]) if row[8] else {}
+            )
+        
+        return None
+    
+    def get_history(self, memory_id: str, limit: int = 100) -> List[MemoryVersion]:
+        """Get version history for memory."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM versions 
+            WHERE memory_id = ? 
+            ORDER BY timestamp DESC 
+            LIMIT ?
+        """, (memory_id, limit))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        history = []
+        for row in rows:
+            history.append(MemoryVersion(
+                version_id=row[0],
+                memory_id=row[1],
+                timestamp=row[2],
+                content_hash=row[3],
+                parent_version=row[4],
+                author=row[5],
+                message=row[6],
+                metadata=json.loads(row[8]) if row[8] else {}
+            ))
+        
+        return history
+    
+    def create_branch(self, branch_name: str, from_branch: Optional[str] = None) -> bool:
+        """Create new branch."""
+        with self.lock:
+            if branch_name in self.branches:
+                return False
+            
+            from_branch = from_branch or self.current_branch
+            self.branches[branch_name] = self.branches[from_branch].copy()
+            
+            # Save to database
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO branches (name, created_at) VALUES (?, ?)
+            """, (branch_name, time.time()))
+            conn.commit()
+            conn.close()
+            
             return True
     
-    def search(self, query_embedding: np.ndarray, k: int = 10) -> List[Tuple[str, float]]:
-        """Search using cosine similarity."""
+    def switch_branch(self, branch_name: str) -> bool:
+        """Switch to different branch."""
         with self.lock:
-            if not self.embeddings:
-                return []
-            
-            if query_embedding.ndim == 1:
-                query_embedding = query_embedding.reshape(1, -1)
-            
-            # Normalize
-            query_embedding = query_embedding / (np.linalg.norm(query_embedding) + 1e-10)
-            query_embedding = query_embedding.squeeze()
-            
-            # Compute similarities
-            embeddings_matrix = np.array(self.embeddings)
-            similarities = np.dot(embeddings_matrix, query_embedding)
-            
-            # Get top k
-            top_indices = np.argsort(similarities)[-k:][::-1]
-            
-            results = []
-            for idx in top_indices:
-                if idx < len(self.memory_ids):
-                    results.append((self.memory_ids[idx], float(similarities[idx])))
-            
-            return results
-    
-    def remove(self, memory_id: str) -> bool:
-        """Remove from index."""
-        with self.lock:
-            try:
-                idx = self.memory_ids.index(memory_id)
-                del self.embeddings[idx]
-                del self.memory_ids[idx]
-                return True
-            except ValueError:
+            if branch_name not in self.branches:
                 return False
+            
+            self.current_branch = branch_name
+            self.current_versions = self.branches[branch_name].copy()
+            return True
     
-    def clear(self):
-        """Clear the index."""
+    def merge_branches(self, from_branch: str, to_branch: Optional[str] = None) -> Dict[str, Any]:
+        """Merge branches."""
         with self.lock:
-            self.embeddings.clear()
-            self.memory_ids.clear()
-    
-    def save(self, path: str):
-        """Save NumPy index to disk."""
-        with self.lock:
-            data = {
-                'embeddings': self.embeddings,
-                'memory_ids': self.memory_ids,
-                'dimension': self.dimension
+            to_branch = to_branch or self.current_branch
+            
+            if from_branch not in self.branches or to_branch not in self.branches:
+                return {'success': False, 'error': 'Branch not found'}
+            
+            conflicts = []
+            merged = 0
+            
+            for memory_id, version_id in self.branches[from_branch].items():
+                if memory_id not in self.branches[to_branch]:
+                    # Fast-forward
+                    self.branches[to_branch][memory_id] = version_id
+                    merged += 1
+                elif self.branches[to_branch][memory_id] != version_id:
+                    # Conflict
+                    conflicts.append(memory_id)
+            
+            return {
+                'success': True,
+                'merged': merged,
+                'conflicts': conflicts
             }
-            with open(f"{path}.numpy", 'wb') as f:
-                pickle.dump(data, f)
     
-    def load(self, path: str):
-        """Load NumPy index from disk."""
+    def rollback(self, memory_id: str, version_id: str) -> bool:
+        """Rollback to specific version."""
         with self.lock:
-            numpy_file = f"{path}.numpy"
-            if Path(numpy_file).exists():
-                with open(numpy_file, 'rb') as f:
-                    data = safe_pickle_load(f)
-                    self.embeddings = data['embeddings']
-                    self.memory_ids = data['memory_ids']
-                    self.dimension = data.get('dimension', 512)
-
-# ============================================================
-# ENHANCED MEMORY INDEX
-# ============================================================
-
-class MemoryIndex:
-    """Vector index for fast similarity search with multiple backend support."""
-    
-    def __init__(self, dimension: int = 512, index_type: str = "flat", 
-                 use_gpu: bool = False):
-        self.dimension = dimension
-        self.index_type = index_type
-        self.use_gpu = use_gpu and FAISS_AVAILABLE
-        
-        # FIXED: Check both FAISS_AVAILABLE and faiss is not None before using FAISS
-        if FAISS_AVAILABLE and faiss is not None:
-            try:
-                self.index = self._create_faiss_index()
-                self.is_faiss = True
-                logger.info(f"Created FAISS index: type={index_type}, dimension={dimension}")
-            except Exception as e:
-                logger.error(f"Failed to create FAISS index: {e}, falling back to NumPy")
-                self.index = NumpyIndex(dimension)
-                self.is_faiss = False
-        else:
-            self.index = NumpyIndex(dimension)
-            self.is_faiss = False
-            logger.info(f"Using NumPy index (FAISS not available): dimension={dimension}")
-        
-        # Mapping from index position to memory ID
-        self.id_map: List[str] = []
-        self.reverse_map: Dict[str, int] = {}
-        
-        # Track deleted indices for periodic cleanup
-        self.deleted_indices: Set[int] = set()
-        self.rebuild_threshold = 100  # Rebuild after this many deletions
-        
-        self.lock = threading.RLock()
-    
-    def _create_faiss_index(self):
-        """Create FAISS index based on type."""
-        # FIXED: Check both FAISS_AVAILABLE flag AND that faiss module is not None
-        if not FAISS_AVAILABLE or faiss is None:
-            raise ImportError("FAISS is not available")
-        
-        if self.index_type == "flat":
-            index = faiss.IndexFlatIP(self.dimension)  # Inner product
-        elif self.index_type == "hnsw":
-            index = faiss.IndexHNSWFlat(self.dimension, 32)
-            index.hnsw.efConstruction = 40
-        elif self.index_type == "ivf":
-            quantizer = faiss.IndexFlatIP(self.dimension)
-            index = faiss.IndexIVFFlat(quantizer, self.dimension, 100)
-            index.nprobe = 10
-        elif self.index_type == "lsh":
-            index = faiss.IndexLSH(self.dimension, self.dimension * 2)
-        elif self.index_type == "pq":
-            # Product quantization for compression
-            index = faiss.IndexPQ(self.dimension, 16, 8)
-        else:
-            index = faiss.IndexFlatIP(self.dimension)
-        
-        # Move to GPU if requested and available
-        if self.use_gpu:
-            try:
-                import faiss.contrib.torch_utils
-                res = faiss.StandardGpuResources()
-                index = faiss.index_cpu_to_gpu(res, 0, index)
-                logger.info("Using GPU for FAISS index")
-            except Exception as e:
-                logger.warning(f"GPU not available for FAISS: {e}")
-        
-        return index
-    
-    def add(self, memory_id: str, embedding: np.ndarray) -> bool:
-        """Add embedding to index."""
-        with self.lock:
-            try:
-                if not self.is_faiss:
-                    return self.index.add(memory_id, embedding)
-                
-                # FAISS implementation
-                if embedding.ndim == 1:
-                    embedding = embedding.reshape(1, -1)
-                
-                # Normalize for cosine similarity
-                norm = np.linalg.norm(embedding)
-                if norm > 0:
-                    embedding = embedding / norm
-                
-                # Check if memory already exists
-                if memory_id in self.reverse_map:
-                    # Update existing
-                    idx = self.reverse_map[memory_id]
-                    # FAISS doesn't support update, so mark for rebuild
-                    self.deleted_indices.add(idx)
-                
-                # Add to index
-                self.index.add(embedding.astype(np.float32))
-                
-                # Update mappings
-                idx = len(self.id_map)
-                self.id_map.append(memory_id)
-                self.reverse_map[memory_id] = idx
-                
-                # Check if rebuild needed
-                if len(self.deleted_indices) >= self.rebuild_threshold:
-                    self._rebuild_index()
-                
+            version = self.get_version(memory_id, version_id)
+            if version:
+                self.current_versions[memory_id] = version_id
+                self.branches[self.current_branch][memory_id] = version_id
                 return True
-                
-            except Exception as e:
-                logger.error(f"Failed to add to index: {e}")
-                return False
-    
-    def search(self, query_embedding: np.ndarray, k: int = 10) -> List[Tuple[str, float]]:
-        """Search for similar embeddings."""
-        with self.lock:
-            try:
-                if not self.is_faiss:
-                    return self.index.search(query_embedding, k)
-                
-                # FAISS implementation
-                if len(self.id_map) == 0:
-                    return []
-                
-                # Ensure correct shape
-                if query_embedding.ndim == 1:
-                    query_embedding = query_embedding.reshape(1, -1)
-                
-                # Normalize
-                norm = np.linalg.norm(query_embedding)
-                if norm > 0:
-                    query_embedding = query_embedding / norm
-                
-                # Search for more than k to account for deleted items
-                search_k = min(k + len(self.deleted_indices), len(self.id_map))
-                
-                distances, indices = self.index.search(
-                    query_embedding.astype(np.float32), search_k
-                )
-                
-                # Filter out deleted indices and convert to memory IDs
-                results = []
-                for i, idx in enumerate(indices[0]):
-                    if (0 <= idx < len(self.id_map) and 
-                        idx not in self.deleted_indices and
-                        self.id_map[idx] is not None):
-                        memory_id = self.id_map[idx]
-                        score = float(distances[0][i])
-                        results.append((memory_id, score))
-                        
-                        if len(results) >= k:
-                            break
-                
-                return results
-                
-            except Exception as e:
-                logger.error(f"Failed to search index: {e}")
-                return []
-    
-    def remove(self, memory_id: str) -> bool:
-        """Remove from index."""
-        with self.lock:
-            if not self.is_faiss:
-                return self.index.remove(memory_id)
-            
-            if memory_id in self.reverse_map:
-                idx = self.reverse_map[memory_id]
-                
-                # Mark as deleted
-                self.deleted_indices.add(idx)
-                self.id_map[idx] = None
-                del self.reverse_map[memory_id]
-                
-                # Rebuild if too many deletions
-                if len(self.deleted_indices) >= self.rebuild_threshold:
-                    self._rebuild_index()
-                
-                return True
-            
             return False
     
-    def _rebuild_index(self):
-        """Rebuild index without deleted items."""
-        if not self.is_faiss:
-            return
+    def diff_versions(self, version_id1: str, version_id2: str) -> Dict[str, Any]:
+        """Compare two versions."""
+        v1 = self._load_version_from_db(version_id1)
+        v2 = self._load_version_from_db(version_id2)
         
-        logger.info(f"Rebuilding index (removed {len(self.deleted_indices)} items)")
+        if not v1 or not v2:
+            return {'error': 'Version not found'}
         
-        # Collect valid embeddings
-        valid_embeddings = []
-        new_id_map = []
-        new_reverse_map = {}
-        
-        for i, memory_id in enumerate(self.id_map):
-            if i not in self.deleted_indices and memory_id is not None:
-                # Reconstruct embedding (would need to store them)
-                # For now, skip rebuild if we can't reconstruct
-                pass
-        
-        # Clear deleted indices
-        self.deleted_indices.clear()
+        return {
+            'version1': version_id1,
+            'version2': version_id2,
+            'hash_changed': v1.content_hash != v2.content_hash,
+            'metadata_diff': self._diff_metadata(v1.metadata, v2.metadata),
+            'time_diff': v2.timestamp - v1.timestamp
+        }
     
-    def rebuild(self, memories: List[Tuple[str, np.ndarray]]):
-        """Rebuild index from scratch."""
-        with self.lock:
-            # FIXED: Check both FAISS_AVAILABLE and faiss before using FAISS methods
-            if self.is_faiss and FAISS_AVAILABLE and faiss is not None:
-                # Clear existing
-                self.index.reset()
-                self.id_map = []
-                self.reverse_map = {}
-                self.deleted_indices.clear()
-            else:
-                self.index.clear()
-            
-            # Add all memories
-            for memory_id, embedding in memories:
-                self.add(memory_id, embedding)
+    def _diff_metadata(self, meta1: Dict, meta2: Dict) -> Dict[str, Any]:
+        """Compare metadata dictionaries."""
+        added = {k: v for k, v in meta2.items() if k not in meta1}
+        removed = {k: v for k, v in meta1.items() if k not in meta2}
+        changed = {k: (meta1[k], meta2[k]) for k in meta1 if k in meta2 and meta1[k] != meta2[k]}
+        
+        return {
+            'added': added,
+            'removed': removed,
+            'changed': changed
+        }
     
-    def save(self, path: str):
-        """Save index to disk."""
-        with self.lock:
-            # FIXED: Check both FAISS_AVAILABLE and faiss before saving FAISS index
-            if self.is_faiss and FAISS_AVAILABLE and faiss is not None:
-                try:
-                    faiss.write_index(self.index, f"{path}.index")
-                    logger.info(f"FAISS index saved to {path}.index")
-                except Exception as e:
-                    logger.error(f"Failed to save FAISS index: {e}")
-            else:
-                # Save NumPy index
-                try:
-                    self.index.save(path)
-                    logger.info(f"NumPy index saved to {path}.numpy")
-                except Exception as e:
-                    logger.error(f"Failed to save NumPy index: {e}")
-            
-            # Save mappings
-            with open(f"{path}.map", 'wb') as f:
-                pickle.dump({
-                    'id_map': self.id_map,
-                    'reverse_map': self.reverse_map,
-                    'deleted_indices': self.deleted_indices,
-                    'is_faiss': self.is_faiss,
-                    'dimension': self.dimension
-                }, f)
+    def _generate_version_id(self, memory: Memory) -> str:
+        """Generate unique version ID."""
+        content = f"{memory.id}_{time.time()}_{id(memory)}_{self.current_branch}"
+        return hashlib.sha256(content.encode()).hexdigest()[:16]
     
-    def load(self, path: str):
-        """Load index from disk."""
-        with self.lock:
-            # Load mappings
-            map_file = f"{path}.map"
-            if Path(map_file).exists():
-                with open(map_file, 'rb') as f:
-                    data = safe_pickle_load(f)
-                    self.id_map = data['id_map']
-                    self.reverse_map = data['reverse_map']
-                    self.deleted_indices = data.get('deleted_indices', set())
-                    self.dimension = data.get('dimension', 512)
-                    was_faiss = data.get('is_faiss', False)
-            
-            # FIXED: Check both FAISS_AVAILABLE and faiss before loading FAISS index
-            if self.is_faiss and FAISS_AVAILABLE and faiss is not None and Path(f"{path}.index").exists():
-                try:
-                    self.index = faiss.read_index(f"{path}.index")
-                    logger.info(f"FAISS index loaded from {path}.index")
-                except Exception as e:
-                    logger.error(f"Failed to load FAISS index: {e}")
-                    # Fallback to NumPy
-                    self.index = NumpyIndex(self.dimension)
-                    self.is_faiss = False
-            else:
-                # Load NumPy index
-                try:
-                    if not self.is_faiss and hasattr(self.index, 'load'):
-                        self.index.load(path)
-                        logger.info(f"NumPy index loaded from {path}.numpy")
-                except Exception as e:
-                    logger.error(f"Failed to load NumPy index: {e}")
+    def _compute_content_hash(self, content: Any) -> str:
+        """Compute hash of content."""
+        serialized = pickle.dumps(content, protocol=pickle.HIGHEST_PROTOCOL)
+        return hashlib.sha256(serialized).hexdigest()
 
 # ============================================================
-# TEXT SEARCH INDEX
+# MEMORY PERSISTENCE
 # ============================================================
 
-class TextSearchIndex:
-    """Full-text search index for memory content."""
+class MemoryPersistence:
+    """Handles persistence of memories to disk with advanced features."""
     
-    def __init__(self, index_dir: str = "./text_index"):
-        self.index_dir = Path(index_dir)
-        self.index_dir.mkdir(parents=True, exist_ok=True)
-        
-        if WHOOSH_AVAILABLE:
-            self._init_whoosh()
-        else:
-            self._init_simple_index()
-    
-    def _init_whoosh(self):
-        """Initialize Whoosh full-text search."""
-        self.schema = Schema(
-            memory_id=ID(stored=True, unique=True),
-            content=TEXT(stored=False),
-            type=ID(stored=True),
-            timestamp=NUMERIC(stored=True),
-            importance=NUMERIC(stored=True)
-        )
-        
-        if not self.index_dir.exists() or not any(self.index_dir.iterdir()):
-            self.index = create_in(str(self.index_dir), self.schema)
-        else:
-            self.index = open_dir(str(self.index_dir))
-    
-    def _init_simple_index(self):
-        """Initialize simple inverted index."""
-        self.inverted_index = defaultdict(set)
-        self.documents = {}
-        self.lock = threading.Lock()
-    
-    def add(self, memory: Memory):
-        """Add memory to text index."""
-        if WHOOSH_AVAILABLE:
-            self._add_whoosh(memory)
-        else:
-            self._add_simple(memory)
-    
-    def _add_whoosh(self, memory: Memory):
-        """Add using Whoosh."""
-        writer = AsyncWriter(self.index)
-        writer.update_document(
-            memory_id=memory.id,
-            content=str(memory.content),
-            type=memory.type.value,
-            timestamp=memory.timestamp,
-            importance=memory.importance
-        )
-        writer.commit()
-    
-    def _add_simple(self, memory: Memory):
-        """Add using simple inverted index."""
-        with self.lock:
-            # Tokenize content
-            content = str(memory.content).lower()
-            tokens = re.findall(r'\w+', content)
-            
-            # Update inverted index
-            for token in tokens:
-                self.inverted_index[token].add(memory.id)
-            
-            # Store document with both list and set of tokens
-            self.documents[memory.id] = {
-                'content': content,
-                'tokens': tokens,  # Store as list for counting
-                'tokens_set': set(tokens),  # Keep set for fast lookup
-                'memory': memory
-            }
-    
-    def search(self, query: str, limit: int = 10) -> List[Tuple[Memory, float]]:
-        """Search for memories containing query text."""
-        if WHOOSH_AVAILABLE:
-            return self._search_whoosh(query, limit)
-        else:
-            return self._search_simple(query, limit)
-    
-    def _search_whoosh(self, query: str, limit: int) -> List[Tuple[Memory, float]]:
-        """Search using Whoosh."""
-        results = []
-        
-        with self.index.searcher() as searcher:
-            query_obj = QueryParser("content", self.index.schema).parse(query)
-            search_results = searcher.search(query_obj, limit=limit)
-            
-            for hit in search_results:
-                # Would need to retrieve memory object
-                # For now, return memory_id and score
-                results.append((hit['memory_id'], hit.score))
-        
-        return results
-    
-    def _search_simple(self, query: str, limit: int) -> List[Tuple[Memory, float]]:
-        """Search using simple inverted index."""
-        with self.lock:
-            # Tokenize query
-            query_tokens = set(re.findall(r'\w+', query.lower()))
-            
-            # Find matching documents
-            matches = []
-            for token in query_tokens:
-                if token in self.inverted_index:
-                    for doc_id in self.inverted_index[token]:
-                        if doc_id in self.documents:
-                            doc = self.documents[doc_id]
-                            # Use token list for counting
-                            # Calculate simple TF-IDF score
-                            token_count = doc['tokens'].count(token)  # Count occurrences in list
-                            tf = token_count / max(1, len(doc['tokens']))  # Term frequency
-                            idf = math.log(len(self.documents) / max(1, len(self.inverted_index[token])))
-                            score = tf * idf
-                            matches.append((doc['memory'], score))
-            
-            # Aggregate scores by document
-            doc_scores = defaultdict(float)
-            doc_memories = {}
-            for memory, score in matches:
-                doc_scores[memory.id] += score
-                doc_memories[memory.id] = memory
-            
-            # Sort by score
-            sorted_results = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
-            
-            results = []
-            for doc_id, score in sorted_results[:limit]:
-                results.append((doc_memories[doc_id], score))
-            
-            return results
-    
-    def remove(self, memory_id: str):
-        """Remove memory from index."""
-        if WHOOSH_AVAILABLE:
-            writer = AsyncWriter(self.index)
-            writer.delete_by_term('memory_id', memory_id)
-            writer.commit()
-        else:
-            with self.lock:
-                if memory_id in self.documents:
-                    doc = self.documents[memory_id]
-                    # Remove from inverted index using tokens_set
-                    for token in doc['tokens_set']:
-                        self.inverted_index[token].discard(memory_id)
-                    # Remove document
-                    del self.documents[memory_id]
-
-# ============================================================
-# TEMPORAL INDEX
-# ============================================================
-
-class TemporalIndex:
-    """Temporal indexing for efficient time-based queries."""
-    
-    def __init__(self):
-        self.time_index = []  # Sorted list of (timestamp, memory_id)
-        self.memory_map = {}  # memory_id -> memory
-        self.lock = threading.RLock()
-        
-        # Time buckets for faster range queries
-        self.hourly_buckets = defaultdict(list)
-        self.daily_buckets = defaultdict(list)
-        self.monthly_buckets = defaultdict(list)
-    
-    def add(self, memory: Memory):
-        """Add memory to temporal index."""
-        with self.lock:
-            # Add to sorted list
-            import bisect
-            bisect.insort(self.time_index, (memory.timestamp, memory.id))
-            
-            # Add to map
-            self.memory_map[memory.id] = memory
-            
-            # Add to time buckets
-            from datetime import datetime
-            dt = datetime.fromtimestamp(memory.timestamp)
-            
-            hour_key = dt.strftime("%Y-%m-%d-%H")
-            day_key = dt.strftime("%Y-%m-%d")
-            month_key = dt.strftime("%Y-%m")
-            
-            self.hourly_buckets[hour_key].append(memory.id)
-            self.daily_buckets[day_key].append(memory.id)
-            self.monthly_buckets[month_key].append(memory.id)
-    
-    def search_range(self, start_time: float, end_time: float, 
-                    limit: Optional[int] = None) -> List[Memory]:
-        """Search memories within time range."""
-        with self.lock:
-            # Binary search for start and end positions
-            import bisect
-            start_idx = bisect.bisect_left(self.time_index, (start_time, ''))
-            end_idx = bisect.bisect_right(self.time_index, (end_time, 'zzz'))
-            
-            # Get memories in range
-            results = []
-            for i in range(start_idx, min(end_idx, len(self.time_index))):
-                _, memory_id = self.time_index[i]
-                if memory_id in self.memory_map:
-                    results.append(self.memory_map[memory_id])
-                    
-                    if limit and len(results) >= limit:
-                        break
-            
-            return results
-    
-    def search_recent(self, hours: float = 24, limit: Optional[int] = None) -> List[Memory]:
-        """Search recent memories."""
-        end_time = time.time()
-        start_time = end_time - (hours * 3600)
-        return self.search_range(start_time, end_time, limit)
-    
-    def search_by_bucket(self, bucket_type: str, bucket_key: str) -> List[Memory]:
-        """Search by time bucket (hour, day, month)."""
-        with self.lock:
-            if bucket_type == 'hour':
-                memory_ids = self.hourly_buckets.get(bucket_key, [])
-            elif bucket_type == 'day':
-                memory_ids = self.daily_buckets.get(bucket_key, [])
-            elif bucket_type == 'month':
-                memory_ids = self.monthly_buckets.get(bucket_key, [])
-            else:
-                return []
-            
-            results = []
-            for memory_id in memory_ids:
-                if memory_id in self.memory_map:
-                    results.append(self.memory_map[memory_id])
-            
-            return results
-    
-    def remove(self, memory_id: str):
-        """Remove memory from temporal index."""
-        with self.lock:
-            if memory_id not in self.memory_map:
-                return
-            
-            memory = self.memory_map[memory_id]
-            
-            # Remove from sorted list
-            self.time_index = [(t, mid) for t, mid in self.time_index if mid != memory_id]
-            
-            # Remove from map
-            del self.memory_map[memory_id]
-            
-            # Remove from buckets
-            from datetime import datetime
-            dt = datetime.fromtimestamp(memory.timestamp)
-            
-            hour_key = dt.strftime("%Y-%m-%d-%H")
-            day_key = dt.strftime("%Y-%m-%d")
-            month_key = dt.strftime("%Y-%m")
-            
-            if hour_key in self.hourly_buckets:
-                self.hourly_buckets[hour_key] = [
-                    mid for mid in self.hourly_buckets[hour_key] if mid != memory_id
-                ]
-            if day_key in self.daily_buckets:
-                self.daily_buckets[day_key] = [
-                    mid for mid in self.daily_buckets[day_key] if mid != memory_id
-                ]
-            if month_key in self.monthly_buckets:
-                self.monthly_buckets[month_key] = [
-                    mid for mid in self.monthly_buckets[month_key] if mid != memory_id
-                ]
-
-# ============================================================
-# LEARNED ATTENTION MECHANISM
-# ============================================================
-
-class LearnedAttention(nn.Module):
-    """Learned attention mechanism using neural network."""
-    
-    def __init__(self, input_dim: int = 512, hidden_dim: int = 256, num_heads: int = 8):
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.num_heads = num_heads
-        self.head_dim = hidden_dim // num_heads
-        
-        # Multi-head attention layers
-        self.W_q = nn.Linear(input_dim, hidden_dim)
-        self.W_k = nn.Linear(input_dim, hidden_dim)
-        self.W_v = nn.Linear(input_dim, hidden_dim)
-        
-        # Output projection
-        self.W_o = nn.Linear(hidden_dim, input_dim)
-        
-        # Layer normalization
-        self.layer_norm = nn.LayerNorm(input_dim)
-        
-        # Feed-forward network
-        self.ffn = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim * 4),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(hidden_dim * 4, input_dim)
-        )
-    
-    def forward(self, query: torch.Tensor, keys: torch.Tensor) -> torch.Tensor:
-        """Compute multi-head attention."""
-        batch_size = query.size(0)
-        seq_len = keys.size(1)
-        
-        # Compute Q, K, V
-        Q = self.W_q(query).view(batch_size, 1, self.num_heads, self.head_dim)
-        K = self.W_k(keys).view(batch_size, seq_len, self.num_heads, self.head_dim)
-        V = self.W_v(keys).view(batch_size, seq_len, self.num_heads, self.head_dim)
-        
-        # Transpose for attention computation
-        Q = Q.transpose(1, 2)  # [batch, heads, 1, head_dim]
-        K = K.transpose(1, 2)  # [batch, heads, seq_len, head_dim]
-        V = V.transpose(1, 2)  # [batch, heads, seq_len, head_dim]
-        
-        # Compute attention scores
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.head_dim)
-        attention_weights = torch.softmax(scores, dim=-1)
-        
-        # Apply attention to values
-        context = torch.matmul(attention_weights, V)
-        
-        # Reshape and project
-        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.hidden_dim)
-        output = self.W_o(context)
-        
-        # Add residual and normalize
-        output = self.layer_norm(output + query.unsqueeze(1))
-        
-        # Feed-forward network
-        output = output + self.ffn(output)
-        
-        return output.squeeze(1), attention_weights.mean(dim=1).squeeze(1)
-
-class AttentionMechanism:
-    """Enhanced attention mechanism for memory retrieval."""
-    
-    def __init__(self, hidden_dim: int = 256, input_dim: int = 512):
-        self.hidden_dim = hidden_dim
-        self.input_dim = input_dim
-        
-        if TORCH_AVAILABLE:
-            self.learned_attention = LearnedAttention(input_dim, hidden_dim)
-            self.learned_attention.eval()  # Set to evaluation mode
-            
-            # Load pre-trained weights if available
-            self._load_pretrained_weights()
-        else:
-            # Fallback to simple parameterized attention
-            np.random.seed(42)  # For reproducibility
-            self.W_q = np.random.randn(input_dim, hidden_dim) * 0.01
-            self.W_k = np.random.randn(input_dim, hidden_dim) * 0.01
-            self.W_v = np.random.randn(input_dim, hidden_dim) * 0.01
-            
-            # Learned temperature parameter
-            self.temperature = 1.0
-    
-    def _load_pretrained_weights(self):
-        """Load pre-trained attention weights if available."""
-        weights_path = Path("./models/attention_weights.pt")
-        if weights_path.exists():
-            try:
-                state_dict = torch.load(weights_path, map_location='cpu')
-                self.learned_attention.load_state_dict(state_dict)
-                logger.info("Loaded pre-trained attention weights")
-            except Exception as e:
-                logger.warning(f"Failed to load pre-trained attention weights: {e}")
-    
-    def compute_attention(self, query: np.ndarray, 
-                         memories: List[np.ndarray],
-                         mask: Optional[np.ndarray] = None) -> np.ndarray:
-        """Compute attention weights for memories."""
-        if not memories:
-            return np.array([])
-        
-        # Ensure proper shapes
-        if isinstance(memories[0], np.ndarray):
-            memory_matrix = np.stack(memories)
-        else:
-            memory_matrix = np.array(memories)
-        
-        if query.ndim == 1:
-            query = query.reshape(1, -1)
-        
-        if TORCH_AVAILABLE:
-            return self._compute_learned_attention(query, memory_matrix, mask)
-        else:
-            return self._compute_simple_attention(query, memory_matrix, mask)
-    
-    def _compute_learned_attention(self, query: np.ndarray, 
-                                  keys: np.ndarray,
-                                  mask: Optional[np.ndarray]) -> np.ndarray:
-        """Compute attention using learned neural network."""
-        # Convert to tensors
-        query_tensor = torch.tensor(query, dtype=torch.float32)
-        keys_tensor = torch.tensor(keys, dtype=torch.float32).unsqueeze(0)
-        
-        # Forward pass
-        with torch.no_grad():
-            _, attention_weights = self.learned_attention(query_tensor, keys_tensor)
-        
-        # Convert back to numpy
-        weights = attention_weights.numpy().squeeze()
-        
-        # Apply mask if provided
-        if mask is not None:
-            weights = weights * mask
-            weights = weights / (weights.sum() + 1e-10)
-        
-        return weights
-    
-    def _compute_simple_attention(self, query: np.ndarray, 
-                                 keys: np.ndarray,
-                                 mask: Optional[np.ndarray]) -> np.ndarray:
-        """Compute attention using parameterized matrices."""
-        # Project query and keys
-        Q = np.dot(query, self.W_q)
-        K = np.dot(keys, self.W_k.T)
-        
-        # Compute scaled dot-product attention
-        scores = np.dot(K, Q.T).squeeze() / np.sqrt(self.hidden_dim)
-        
-        # Apply temperature scaling
-        scores = scores / self.temperature
-        
-        # Apply mask if provided
-        if mask is not None:
-            scores = scores + (1 - mask) * -1e9
-        
-        # Softmax
-        exp_scores = np.exp(scores - np.max(scores))
-        attention_weights = exp_scores / (np.sum(exp_scores) + 1e-10)
-        
-        return attention_weights
-    
-    def apply_attention(self, memories: List[Memory], 
-                       weights: np.ndarray,
-                       threshold: float = 0.01) -> List[Memory]:
-        """Apply attention weights to memories."""
-        if len(memories) != len(weights):
-            return memories
-        
-        # Filter out low-attention memories
-        filtered_pairs = [
-            (m, w) for m, w in zip(memories, weights) 
-            if w >= threshold
-        ]
-        
-        # Sort by attention weight
-        filtered_pairs.sort(key=lambda x: x[1], reverse=True)
-        
-        return [m for m, _ in filtered_pairs]
-    
-    def train_on_feedback(self, queries: List[np.ndarray], 
-                         memories: List[List[np.ndarray]],
-                         relevance_scores: List[List[float]]):
-        """Train attention mechanism on user feedback."""
-        if not TORCH_AVAILABLE:
-            logger.warning("Training requires PyTorch")
-            return
-        
-        # Prepare training data
-        optimizer = torch.optim.Adam(self.learned_attention.parameters(), lr=0.001)
-        criterion = nn.MSELoss()
-        
-        self.learned_attention.train()
-        
-        for query, mems, scores in zip(queries, memories, relevance_scores):
-            query_tensor = torch.tensor(query, dtype=torch.float32).unsqueeze(0)
-            keys_tensor = torch.tensor(np.array(mems), dtype=torch.float32).unsqueeze(0)
-            target_scores = torch.tensor(scores, dtype=torch.float32)
-            
-            # Forward pass
-            _, attention_weights = self.learned_attention(query_tensor, keys_tensor)
-            
-            # Compute loss
-            loss = criterion(attention_weights.squeeze(), target_scores)
-            
-            # Backward pass
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        
-        self.learned_attention.eval()
-        
-        # Save trained weights
-        self._save_weights()
-    
-    def _save_weights(self):
-        """Save trained attention weights."""
-        if TORCH_AVAILABLE:
-            weights_path = Path("./models")
-            weights_path.mkdir(exist_ok=True)
-            torch.save(
-                self.learned_attention.state_dict(),
-                weights_path / "attention_weights.pt"
-            )
-
-# ============================================================
-# MEMORY SEARCH
-# ============================================================
-
-class MemorySearch:
-    """Advanced memory search with multiple index types."""
-    
-    def __init__(self, base_path: str = "./search_indices"):
+    def __init__(self, base_path: str = "./memory_store"):
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
         
-        # Vector indices for different embedding types
-        self.indices: Dict[str, MemoryIndex] = {}
+        # Paths for different storage
+        self.memories_path = self.base_path / "memories"
+        self.index_path = self.base_path / "indices"
+        self.metadata_path = self.base_path / "metadata"
+        self.backups_path = self.base_path / "backups"
         
-        # Text search
-        self.text_index = TextSearchIndex(str(self.base_path / "text"))
+        for path in [self.memories_path, self.index_path, 
+                      self.metadata_path, self.backups_path]:
+            path.mkdir(exist_ok=True)
         
-        # Temporal index
-        self.temporal_index = TemporalIndex()
+        self.compressor = MemoryCompressor()
+        self.version_control = MemoryVersionControl(str(self.base_path / "versions"))
         
-        # Metadata index
-        self.metadata_index = defaultdict(lambda: defaultdict(set))
+        # FIX 628: Stricter encryption key handling
+        self.cipher = None
+        self.encryption_key = None  # Store key for persistence across instances
         
-        # Graph index for relationships
-        self.graph_index = defaultdict(set)
-        
-        # Cache for search results
-        self.cache = {}
-        self.cache_size = 100
-        
-        self.lock = threading.RLock()
-    
-    def create_index(self, index_name: str, dimension: int = 512, 
-                    index_type: str = "flat") -> MemoryIndex:
-        """Create new search index."""
-        index = MemoryIndex(dimension, index_type)
-        self.indices[index_name] = index
-        return index
-    
-    def add_memory(self, memory: Memory, index_name: str = "default"):
-        """Add memory to all relevant indices."""
-        with self.lock:
-            # Add to vector index
-            if memory.embedding is not None:
-                if index_name not in self.indices:
-                    dim = len(memory.embedding)
-                    self.indices[index_name] = MemoryIndex(dim)
+        if ENCRYPTION_AVAILABLE:
+            key = os.getenv('MEMORY_ENCRYPT_KEY')
+            if key:
+                try:
+                    self.cipher = Fernet(key.encode())
+                    self.encryption_key = key.encode()
+                    logger.info("✓ Encryption enabled with provided key")
+                except Exception as e:
+                    logger.error(f"✗ Invalid encryption key: {e}")
+                    raise ValueError("MEMORY_ENCRYPT_KEY is malformed or invalid")
+            else:
+                # FIX 628: Make ephemeral key mode explicit opt-in
+                allow_ephemeral = os.getenv('ALLOW_EPHEMERAL_KEY', 'false').lower() == 'true'
                 
-                self.indices[index_name].add(memory.id, memory.embedding)
-            
-            # Add to text index
-            self.text_index.add(memory)
-            
-            # Add to temporal index
-            self.temporal_index.add(memory)
-            
-            # Add to metadata index
-            for key, value in memory.metadata.items():
-                self.metadata_index[key][str(value)].add(memory.id)
-            
-            # Clear cache
-            self.cache.clear()
-    
-    def semantic_search(self, query_embedding: np.ndarray, 
-                       memories: Dict[str, Memory],
-                       k: int = 10,
-                       index_name: str = "default") -> List[Tuple[Memory, float]]:
-        """Semantic similarity search."""
-        # Check cache
-        cache_key = f"semantic_{hash(query_embedding.tobytes())}_{k}"
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        
-        # Get or create index
-        if index_name not in self.indices:
-            dim = len(query_embedding)
-            self.indices[index_name] = MemoryIndex(dim)
-        
-        index = self.indices[index_name]
-        
-        # Add memories to index if needed
-        for memory_id, memory in memories.items():
-            if memory.embedding is not None and memory_id not in index.reverse_map:
-                index.add(memory_id, memory.embedding)
-        
-        # Search
-        results = index.search(query_embedding, k)
-        
-        # Convert to memories
-        memory_results = []
-        for memory_id, score in results:
-            if memory_id in memories:
-                memory_results.append((memories[memory_id], score))
-        
-        # Cache result
-        self._update_cache(cache_key, memory_results)
-        
-        return memory_results
-    
-    def text_search(self, query: str, memories: Dict[str, Memory],
-                   limit: int = 10) -> List[Tuple[Memory, float]]:
-        """Full-text search."""
-        # Ensure memories are in text index
-        for memory in memories.values():
-            # Check if already indexed (would need tracking)
-            self.text_index.add(memory)
-        
-        return self.text_index.search(query, limit)
-    
-    def temporal_search(self, memories: Dict[str, Memory],
-                       time_range: Optional[Tuple[float, float]] = None,
-                       hours_back: Optional[float] = None,
-                       limit: int = 10) -> List[Memory]:
-        """Search memories by time."""
-        if hours_back is not None:
-            return self.temporal_index.search_recent(hours_back, limit)
-        elif time_range is not None:
-            start_time, end_time = time_range
-            return self.temporal_index.search_range(start_time, end_time, limit)
+                if allow_ephemeral:
+                    # Store ephemeral key to disk for this session
+                    key_file = self.base_path / ".ephemeral_key"
+                    if key_file.exists():
+                        # Reuse existing ephemeral key
+                        with open(key_file, 'rb') as f:
+                            self.encryption_key = f.read()
+                        self.cipher = Fernet(self.encryption_key)
+                        logger.info("Reusing ephemeral encryption key from this session")
+                    else:
+                        # Generate new ephemeral key
+                        self.encryption_key = Fernet.generate_key()
+                        self.cipher = Fernet(self.encryption_key)
+                        # Save for reuse within same session
+                        with open(key_file, 'wb') as f:
+                            f.write(self.encryption_key)
+                        logger.warning("=" * 70)
+                        logger.warning("⚠  USING EPHEMERAL ENCRYPTION KEY")
+                        logger.warning("⚠  Memories will NOT be readable after process restart")
+                        logger.warning("⚠  Set MEMORY_ENCRYPT_KEY environment variable for persistence")
+                        logger.warning("=" * 70)
+                else:
+                    logger.info("Encryption disabled. Set MEMORY_ENCRYPT_KEY to enable.")
+                    logger.info("Or set ALLOW_EPHEMERAL_KEY=true for session-only encryption.")
+                    self.cipher = None
         else:
-            # Return most recent
-            return self.temporal_index.search_recent(24, limit)
-    
-    def metadata_search(self, memories: Dict[str, Memory],
-                       metadata_filters: Dict[str, Any]) -> List[Memory]:
-        """Search by metadata attributes."""
-        matching_ids = None
+            logger.warning("cryptography library not available - encryption disabled")
         
-        for key, value in metadata_filters.items():
-            value_str = str(value)
-            if key in self.metadata_index and value_str in self.metadata_index[key]:
-                ids = self.metadata_index[key][value_str]
+        # Write buffer for batch operations
+        self.write_buffer: List[Tuple[Memory, CompressionType]] = []
+        self.buffer_lock = threading.Lock()
+        self.buffer_size = 100
+        self.flush_interval = 10.0  # seconds
+        
+        # FIX 629: Add shutdown event
+        self._shutdown_event = threading.Event()
+        
+        # Background flushing
+        self.flush_thread = threading.Thread(target=self._flush_loop, daemon=True)
+        self.flush_thread.start()
+        
+        # Checkpoint info
+        self.last_checkpoint = time.time()
+        self.checkpoint_interval = 300.0  # 5 minutes
+        
+        # Statistics
+        self.stats = {
+            'total_saves': 0,
+            'total_loads': 0,
+            'compression_ratio_avg': 1.0,
+            'last_backup': None
+        }
+    
+    def _flush_loop(self):
+        """Background thread to flush write buffer."""
+        # FIX 629: Check shutdown event in loop
+        while not self._shutdown_event.is_set():
+            # Wait with timeout instead of sleep
+            self._shutdown_event.wait(timeout=self.flush_interval)
+            
+            if not self._shutdown_event.is_set():
+                try:
+                    self.flush_buffer()
+                except Exception as e:
+                    logger.error(f"Flush error: {e}")
+        
+        # FIX 629: Final flush on shutdown
+        logger.info("Performing final buffer flush before shutdown...")
+        try:
+            self.flush_buffer()
+        except Exception as e:
+            logger.error(f"Final flush error: {e}")
+        logger.info("Flush thread terminated")
+    
+    def flush_buffer(self):
+        """Flush write buffer to disk."""
+        with self.buffer_lock:
+            if not self.write_buffer:
+                return
+            
+            to_flush = self.write_buffer.copy()
+            self.write_buffer.clear()
+        
+        # Write all buffered memories
+        for memory, compression_type in to_flush:
+            self._save_memory_immediate(memory, compression_type)
+    
+    def shutdown(self):
+        """FIX 629: Graceful shutdown of persistence system."""
+        logger.info("Shutting down MemoryPersistence...")
+        
+        # Signal shutdown to background thread
+        self._shutdown_event.set()
+        
+        # Wait for flush thread to complete
+        if self.flush_thread and self.flush_thread.is_alive():
+            self.flush_thread.join(timeout=5.0)
+            if self.flush_thread.is_alive():
+                logger.warning("Flush thread did not terminate in time")
+        
+        # Ensure all pending writes are flushed
+        try:
+            self.flush_buffer()
+        except Exception as e:
+            logger.error(f"Shutdown flush error: {e}")
+        
+        # Clean up ephemeral key file if it exists
+        if ENCRYPTION_AVAILABLE:
+            allow_ephemeral = os.getenv('ALLOW_EPHEMERAL_KEY', 'false').lower() == 'true'
+            if allow_ephemeral:
+                key_file = self.base_path / ".ephemeral_key"
+                if key_file.exists():
+                    try:
+                        key_file.unlink()
+                        logger.debug("Removed ephemeral key file")
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+        
+        logger.info("MemoryPersistence shutdown complete")
+    
+    def save_memory(self, memory: Memory, 
+                   compress: bool = True,
+                   compression_type: CompressionType = CompressionType.LZ4,
+                   immediate: bool = False) -> bool:
+        """Save memory to disk with buffering."""
+        try:
+            # Validate input
+            if not isinstance(memory, Memory):
+                logger.error(f"Invalid memory object type: {type(memory)}")
+                return False
+            
+            # Create version
+            try:
+                version_id = self.version_control.create_version(memory)
+                memory.metadata['version_id'] = version_id
+            except Exception as e:
+                logger.warning(f"Failed to create version for {memory.id}: {e}")
+                # Continue without versioning
+            
+            if immediate or len(self.write_buffer) >= self.buffer_size:
+                # Write immediately
+                self.flush_buffer()
+                return self._save_memory_immediate(
+                    memory, 
+                    compression_type if compress else CompressionType.NONE
+                )
+            else:
+                # Add to buffer
+                with self.buffer_lock:
+                    self.write_buffer.append((
+                        copy.deepcopy(memory),
+                        compression_type if compress else CompressionType.NONE
+                    ))
+                return True
+            
+        except Exception as e:
+            logger.error(f"Failed to save memory {getattr(memory, 'id', 'unknown')}: {e}")
+            return False
+    
+    def _save_memory_immediate(self, memory: Memory, 
+                               compression_type: CompressionType) -> bool:
+        """Save memory immediately to disk with Windows-compatible atomic writes."""
+        try:
+            # Prepare data: compress then encrypt
+            if compression_type != CompressionType.NONE:
+                data = self.compressor.compress(memory, compression_type)
+                memory.compressed = True
+                memory.compression_type = compression_type
+            else:
+                data = pickle.dumps(memory)
+
+            # Encrypt if cipher is available
+            if self.cipher:
+                data = self.cipher.encrypt(data)
+            
+            # Get file paths
+            file_path = self._get_memory_path(memory.id)
+            
+            # Ensure parent directory exists
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Use different strategy for Windows vs Unix
+            import platform
+            if platform.system() == 'Windows':
+                # Windows: Direct write with retry (fsync not reliable on Windows)
+                success = self._atomic_write_windows(file_path, data, memory.id)
+            else:
+                # Unix: Proper atomic write with fsync
+                success = self._atomic_write_unix(file_path, data, memory.id)
+            
+            if not success:
+                return False
+
+            # Save metadata
+            self._save_metadata(memory, memory.metadata.get('version_id', 'unknown'))
+            
+            # Update stats
+            self.stats['total_saves'] += 1
+            if compression_type != CompressionType.NONE:
+                ratio = len(pickle.dumps(memory)) / max(1, len(data))
+                self.stats['compression_ratio_avg'] = (
+                    self.stats['compression_ratio_avg'] * 0.9 + ratio * 0.1
+                )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to save memory {memory.id}: {e}", exc_info=True)
+            return False
+    
+    def _atomic_write_windows(self, file_path: Path, data: bytes, memory_id: str) -> bool:
+        """Atomic write for Windows systems."""
+        import tempfile
+        
+        try:
+            # Write to temp file in same directory (important for atomic move)
+            temp_fd, temp_path = tempfile.mkstemp(
+                dir=file_path.parent, 
+                prefix='.tmp_', 
+                suffix='.mem'
+            )
+            temp_path = Path(temp_path)
+            
+            try:
+                # Write data
+                with os.fdopen(temp_fd, 'wb') as f:
+                    f.write(data)
+                    f.flush()
                 
-                if matching_ids is None:
-                    matching_ids = ids.copy()
-                else:
-                    matching_ids &= ids
-        
-        if matching_ids is None:
-            return []
-        
-        results = []
-        for memory_id in matching_ids:
-            if memory_id in memories:
-                results.append(memories[memory_id])
-        
-        return results
+                # Backup existing file if present
+                backup_path = None
+                if file_path.exists():
+                    backup_path = file_path.with_suffix('.bak')
+                    try:
+                        if backup_path.exists():
+                            backup_path.unlink()
+                        shutil.copy2(file_path, backup_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to create backup: {e}")
+                
+                # Atomic move (replace)
+                shutil.move(str(temp_path), str(file_path))
+                
+                # Remove backup on success
+                if backup_path and backup_path.exists():
+                    try:
+                        backup_path.unlink()
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+                
+                return True
+                
+            except Exception as e:
+                logger.error(f"Write failed: {e}")
+                # Clean up temp file
+                try:
+                    if temp_path.exists():
+                        temp_path.unlink()
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Atomic write failed for memory {memory_id}: {e}")
+            return False
     
-    def causal_search(self, memories: Dict[str, Memory],
-                     cause_memory: Memory,
-                     max_time_delta: float = 3600,
-                     similarity_threshold: float = 0.7) -> List[Memory]:
-        """Find causally related memories."""
-        related = []
+    def _atomic_write_unix(self, file_path: Path, data: bytes, memory_id: str) -> bool:
+        """Atomic write for Unix systems with fsync."""
+        temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
+        backup_path = file_path.with_suffix(file_path.suffix + '.bak')
         
-        for memory in memories.values():
-            if memory.id == cause_memory.id:
-                continue
+        try:
+            # Create backup of existing file
+            if file_path.exists():
+                shutil.copy2(file_path, backup_path)
             
-            # Check temporal proximity (effect after cause)
-            time_delta = memory.timestamp - cause_memory.timestamp
-            if 0 < time_delta < max_time_delta:
-                # Check semantic similarity
-                if memory.embedding is not None and cause_memory.embedding is not None:
-                    # Normalize embeddings
-                    mem_norm = memory.embedding / (np.linalg.norm(memory.embedding) + 1e-10)
-                    cause_norm = cause_memory.embedding / (np.linalg.norm(cause_memory.embedding) + 1e-10)
-                    
-                    similarity = np.dot(mem_norm, cause_norm)
-                    if similarity > similarity_threshold:
-                        related.append(memory)
+            # Write to temp file with fsync
+            with open(temp_path, 'wb') as f:
+                f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
+            
+            # Atomic rename
+            temp_path.replace(file_path)
+            
+            # Fsync directory for durability
+            try:
+                dir_fd = os.open(file_path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(dir_fd)
+                finally:
+                    os.close(dir_fd)
+            except (OSError, AttributeError):
+                # Not all systems support directory fsync
+                pass
+            
+            # Remove backup on success
+            if backup_path.exists():
+                backup_path.unlink()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Atomic write failed for memory {memory_id}: {e}")
+            
+            # Restore from backup
+            if backup_path.exists():
+                try:
+                    shutil.copy2(backup_path, file_path)
+                    logger.info(f"Restored memory {memory_id} from backup")
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+                try:
+                    backup_path.unlink()
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+            
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+            
+            return False
+    
+    def load_memory(self, memory_id: str, 
+                   version_id: Optional[str] = None) -> Optional[Memory]:
+        """Load memory from disk, optionally at specific version."""
+        try:
+            # Check if specific version requested
+            if version_id:
+                version = self.version_control.get_version(memory_id, version_id)
+                if not version:
+                    return None
+                
+                # Load version file if it exists
+                version_path = self.base_path / "versions" / f"{version_id}.mem"
+                if version_path.exists():
+                    file_path = version_path
                 else:
-                    # Fallback to metadata matching
-                    shared_keys = set(memory.metadata.keys()) & set(cause_memory.metadata.keys())
-                    if len(shared_keys) > len(cause_memory.metadata) * 0.5:
-                        related.append(memory)
-        
-        # Sort by timestamp (causal order)
-        related.sort(key=lambda m: m.timestamp)
-        
-        return related
+                    file_path = self._get_memory_path(memory_id)
+            else:
+                file_path = self._get_memory_path(memory_id)
+            
+            if not file_path.exists():
+                return None
+            
+            # Load data from disk
+            with open(file_path, 'rb') as f:
+                data = f.read()
+
+            # Decrypt if cipher is available
+            if self.cipher:
+                try:
+                    data = self.cipher.decrypt(data)
+                except Exception as e:
+                    logger.error(f"Failed to decrypt memory {memory_id}: {e}. Incorrect key or corrupted data.")
+                    return None
+            
+            # Load metadata
+            metadata = self._load_metadata(memory_id)
+            
+            # Decompress if needed
+            if metadata and metadata.get('compressed'):
+                compression_type = CompressionType(metadata.get('compression_type', 'lz4'))
+                content = self.compressor.decompress(data, compression_type)
+                
+                # Reconstruct memory
+                memory = Memory(
+                    id=memory_id,
+                    type=MemoryType(metadata['type']),
+                    content=content,
+                    timestamp=metadata['timestamp'],
+                    importance=metadata.get('importance', 0.5),
+                    metadata=metadata.get('metadata', {})
+                )
+            else:
+                memory = pickle.loads(data)
+            
+            # Update stats
+            self.stats['total_loads'] += 1
+            
+            return memory
+            
+        except Exception as e:
+            logger.error(f"Failed to load memory {memory_id}: {e}")
+            return None
     
-    def pattern_search(self, memories: Dict[str, Memory],
-                      pattern: Dict[str, Any]) -> List[Memory]:
-        """Search for memories matching a complex pattern."""
-        matching = []
+    def save_batch(self, memories: List[Memory], 
+                  compress: bool = True,
+                  compression_type: CompressionType = CompressionType.LZ4,
+                  immediate: bool = False) -> int:
+        """Save batch of memories efficiently."""
+        if immediate:
+            # Force immediate flush
+            saved_count = 0
+            for memory in memories:
+                if self._save_memory_immediate(
+                    memory, 
+                    compression_type if compress else CompressionType.NONE
+                ):
+                    saved_count += 1
+            return saved_count
         
-        for memory in memories.values():
-            if self._matches_pattern(memory, pattern):
-                matching.append(memory)
+        # Use buffering
+        saved_count = 0
+        with self.buffer_lock:
+            for memory in memories:
+                self.write_buffer.append((
+                    copy.deepcopy(memory),
+                    compression_type if compress else CompressionType.NONE
+                ))
+                saved_count += 1
         
-        return matching
+        # Flush if buffer is full
+        if len(self.write_buffer) >= self.buffer_size * 2:
+            self.flush_buffer()
+        
+        return saved_count
     
-    def hybrid_search(self, query: MemoryQuery,
-                     memories: Dict[str, Memory],
-                     weights: Dict[str, float] = None) -> List[Tuple[Memory, float]]:
-        """Hybrid search combining multiple search types."""
-        if weights is None:
-            weights = {
-                'semantic': 0.4,
-                'text': 0.2,
-                'temporal': 0.2,
-                'metadata': 0.2
+    def load_batch(self, memory_ids: List[str]) -> List[Memory]:
+        """Load batch of memories with parallel loading."""
+        memories = []
+        
+        # Use thread pool for parallel loading
+        from concurrent.futures import ThreadPoolExecutor
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(self.load_memory, mid) for mid in memory_ids]
+            
+            for future in futures:
+                memory = future.result()
+                if memory:
+                    memories.append(memory)
+        
+        return memories
+    
+    def delete_memory(self, memory_id: str, permanent: bool = False) -> bool:
+        """Delete memory from disk."""
+        try:
+            if not permanent:
+                # Move to trash instead of deleting
+                trash_path = self.base_path / "trash"
+                trash_path.mkdir(exist_ok=True)
+                
+                file_path = self._get_memory_path(memory_id)
+                if file_path.exists():
+                    trash_file = trash_path / f"{memory_id}_{int(time.time())}.mem"
+                    shutil.move(str(file_path), str(trash_file))
+            else:
+                # Permanent deletion
+                file_path = self._get_memory_path(memory_id)
+                if file_path.exists():
+                    file_path.unlink()
+                
+                # Delete metadata
+                metadata_path = self._get_metadata_path(memory_id)
+                if metadata_path.exists():
+                    metadata_path.unlink()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to delete memory {memory_id}: {e}")
+            return False
+    
+    def list_memories(self, pattern: Optional[str] = None) -> List[str]:
+        """List all persisted memory IDs with optional pattern matching."""
+        memory_ids = []
+        
+        if pattern:
+            # Search in subdirectories for pattern
+            glob_pattern = f"**/{pattern}*.mem"
+        else:
+            # Get all memories from all subdirectories
+            glob_pattern = "**/*.mem"
+        
+        for file_path in self.memories_path.glob(glob_pattern):
+            memory_id = file_path.stem
+            memory_ids.append(memory_id)
+        
+        return memory_ids
+    
+    def checkpoint(self, memories: Dict[str, Memory], 
+                  name: Optional[str] = None) -> bool:
+        """Create named checkpoint of all memories."""
+        try:
+            # Flush buffer first
+            self.flush_buffer()
+            
+            # Generate checkpoint name
+            if name:
+                checkpoint_name = f"checkpoint_{name}_{int(time.time())}"
+            else:
+                checkpoint_name = f"checkpoint_{int(time.time())}"
+            
+            checkpoint_path = self.base_path / f"{checkpoint_name}.pkl"
+            
+            # Prepare checkpoint data
+            checkpoint_data = {
+                'name': checkpoint_name,
+                'timestamp': time.time(),
+                'memory_count': len(memories),
+                'version': '1.0',
+                'memories': {}
             }
-        
-        all_scores = defaultdict(float)
-        
-        # Semantic search
-        if query.embedding is not None and weights.get('semantic', 0) > 0:
-            semantic_results = self.semantic_search(
-                query.embedding, memories, query.limit * 2
-            )
-            for memory, score in semantic_results:
-                all_scores[memory.id] += score * weights['semantic']
-        
-        # Text search
-        if query.content and weights.get('text', 0) > 0:
-            text_results = self.text_search(
-                str(query.content), memories, query.limit * 2
-            )
-            for memory, score in text_results:
-                # Normalize text scores to [0, 1]
-                normalized_score = min(1.0, score / 10.0)
-                all_scores[memory.id] += normalized_score * weights['text']
-        
-        # Temporal scoring
-        if weights.get('temporal', 0) > 0:
-            current_time = time.time()
-            for memory in memories.values():
-                # Recency score
-                age = current_time - memory.timestamp
-                recency_score = np.exp(-age / (7 * 24 * 3600))  # Decay over week
-                all_scores[memory.id] += recency_score * weights['temporal']
-        
-        # Metadata matching
-        if query.filters and weights.get('metadata', 0) > 0:
-            metadata_matches = self.metadata_search(memories, query.filters)
-            for memory in metadata_matches:
-                all_scores[memory.id] += weights['metadata']
-        
-        # Sort by combined score
-        sorted_results = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
-        
-        # Convert to memory objects
-        final_results = []
-        for memory_id, score in sorted_results[:query.limit]:
-            if memory_id in memories:
-                final_results.append((memories[memory_id], score))
-        
-        return final_results
+            
+            # FIX: Save entire Memory objects, not just content
+            for memory_id, memory in memories.items():
+                # Verify we have a Memory object
+                if not isinstance(memory, Memory):
+                    logger.error(f"Checkpoint requires Memory objects, got {type(memory)} for {memory_id}")
+                    continue
+                
+                # Pickle the ENTIRE Memory object
+                serialized_memory = pickle.dumps(memory, protocol=pickle.HIGHEST_PROTOCOL)
+                
+                # Then compress it
+                compressed = lz4.frame.compress(serialized_memory)
+                
+                checkpoint_data['memories'][memory_id] = compressed
+            
+            # Serialize and encrypt checkpoint
+            serialized_data = pickle.dumps(checkpoint_data, protocol=pickle.HIGHEST_PROTOCOL)
+            if self.cipher:
+                serialized_data = self.cipher.encrypt(serialized_data)
+            
+            # Save checkpoint atomically
+            temp_path = checkpoint_path.with_suffix(checkpoint_path.suffix + '.tmp')
+            with open(temp_path, 'wb') as f:
+                f.write(serialized_data)
+            temp_path.replace(checkpoint_path)
+
+            self.last_checkpoint = time.time()
+            logger.info(f"Created checkpoint '{checkpoint_name}' with {len(checkpoint_data['memories'])} memories")
+            
+            # Create backup
+            self._create_backup(checkpoint_path)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to create checkpoint: {e}")
+            return False
     
-    def _matches_pattern(self, memory: Memory, pattern: Dict[str, Any]) -> bool:
-        """Check if memory matches pattern."""
-        for key, value in pattern.items():
-            if key == 'type' and memory.type != value:
-                return False
+    def restore_from_checkpoint(self, checkpoint_file: Optional[str] = None) -> Dict[str, Memory]:
+        """Restore memories from checkpoint."""
+        try:
+            if checkpoint_file is None:
+                # Find latest checkpoint
+                checkpoints = list(self.base_path.glob("checkpoint_*.pkl"))
+                if not checkpoints:
+                    # Check backups
+                    checkpoints = list(self.backups_path.glob("checkpoint_*.pkl"))
+                    if not checkpoints:
+                        return {}
+                
+                checkpoint_path = max(checkpoints, key=lambda p: p.stat().st_mtime)
+            else:
+                checkpoint_path = self.base_path / checkpoint_file
+                if not checkpoint_path.exists():
+                    # Check in backups
+                    checkpoint_path = self.backups_path / checkpoint_file
+                    if not checkpoint_path.exists():
+                        return {}
             
-            elif key == 'min_importance' and memory.importance < value:
-                return False
+            # Load and decrypt checkpoint
+            with open(checkpoint_path, 'rb') as f:
+                data = f.read()
+
+            if self.cipher:
+                try:
+                    data = self.cipher.decrypt(data)
+                except Exception as e:
+                    logger.error(f"Failed to decrypt checkpoint {checkpoint_path}. Trying as unencrypted. Error: {e}")
             
-            elif key == 'max_importance' and memory.importance > value:
-                return False
+            checkpoint_data = pickle.loads(data)
             
-            elif key == 'metadata':
-                for meta_key, meta_value in value.items():
-                    if memory.metadata.get(meta_key) != meta_value:
-                        return False
+            # FIX: Decompress to get complete Memory objects
+            memories = {}
+            for memory_id, compressed_data in checkpoint_data['memories'].items():
+                try:
+                    # Decompress the LZ4 data
+                    decompressed_bytes = lz4.frame.decompress(compressed_data)
+                    
+                    # Unpickle to get the Memory object
+                    memory = pickle.loads(decompressed_bytes)
+                    
+                    # Verify it's actually a Memory object
+                    if isinstance(memory, Memory):
+                        memories[memory_id] = memory
+                    else:
+                        logger.error(f"Checkpoint contained non-Memory object for {memory_id}: {type(memory)}")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to restore memory {memory_id}: {e}")
+                    continue
             
-            elif key == 'content_contains':
-                if value not in str(memory.content):
-                    return False
+            logger.info(f"Restored {len(memories)} memories from checkpoint")
+            return memories
             
-            elif key == 'content_regex':
-                import re
-                if not re.search(value, str(memory.content)):
-                    return False
-        
-        return True
+        except Exception as e:
+            logger.error(f"Failed to restore from checkpoint: {e}")
+            return {}
     
-    def _update_cache(self, key: str, value: Any):
-        """Update search cache with LRU eviction."""
-        self.cache[key] = value
-        
-        # Evict oldest if cache too large
-        if len(self.cache) > self.cache_size:
-            # Simple FIFO eviction (could use LRU)
-            oldest = next(iter(self.cache))
-            del self.cache[oldest]
+    def _create_backup(self, source_path: Path):
+        """Create backup of file."""
+        try:
+            backup_name = f"{source_path.stem}_backup_{int(time.time())}{source_path.suffix}"
+            backup_path = self.backups_path / backup_name
+            shutil.copy2(str(source_path), str(backup_path))
+            
+            self.stats['last_backup'] = time.time()
+            
+            # Clean old backups (keep last 10)
+            backups = sorted(self.backups_path.glob("*_backup_*"), 
+                           key=lambda p: p.stat().st_mtime)
+            if len(backups) > 10:
+                for old_backup in backups[:-10]:
+                    old_backup.unlink()
+                    
+        except Exception as e:
+            logger.warning(f"Failed to create backup: {e}")
     
-    def save_indices(self):
-        """Save all indices to disk."""
-        for name, index in self.indices.items():
-            index.save(str(self.base_path / name))
+    def _get_memory_path(self, memory_id: str) -> Path:
+        """Get file path for memory with robust subdirectory handling."""
+        # Ensure memory_id is valid
+        if not memory_id or len(memory_id) < 3:
+            # Don't use subdirs for very short IDs
+            return self.memories_path / f"{memory_id}.mem"
         
-        # Save metadata index
-        with open(self.base_path / "metadata_index.pkl", 'wb') as f:
-            pickle.dump(dict(self.metadata_index), f)
+        # Use first 2 chars as subdirectory (ensure alphanumeric)
+        subdir = ''.join(c for c in memory_id[:2] if c.isalnum())
+        if not subdir:
+            subdir = "misc"
+        
+        subdir_path = self.memories_path / subdir
+        
+        # Create subdirectory with proper error handling
+        try:
+            subdir_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Failed to create subdir {subdir}: {e}, using flat structure")
+            return self.memories_path / f"{memory_id}.mem"
+        
+        return subdir_path / f"{memory_id}.mem"
     
-    def load_indices(self):
-        """Load indices from disk."""
-        # Load vector indices
-        for index_file in self.base_path.glob("*.map"):
-            name = index_file.stem
-            index = MemoryIndex()
-            index.load(str(self.base_path / name))
-            self.indices[name] = index
+    def _get_metadata_path(self, memory_id: str) -> Path:
+        """Get metadata file path with robust subdirectory handling."""
+        if not memory_id or len(memory_id) < 3:
+            return self.metadata_path / f"{memory_id}.json"
         
-        # Load metadata index
-        metadata_file = self.base_path / "metadata_index.pkl"
-        if metadata_file.exists():
-            with open(metadata_file, 'rb') as f:
-                self.metadata_index = defaultdict(lambda: defaultdict(set), safe_pickle_load(f))
+        subdir = ''.join(c for c in memory_id[:2] if c.isalnum())
+        if not subdir:
+            subdir = "misc"
+        
+        subdir_path = self.metadata_path / subdir
+        
+        try:
+            subdir_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Failed to create metadata subdir: {e}")
+            return self.metadata_path / f"{memory_id}.json"
+        
+        return subdir_path / f"{memory_id}.json"
+    
+    def _save_metadata(self, memory: Memory, version_id: str):
+        """Save memory metadata."""
+        metadata = {
+            'id': memory.id,
+            'type': memory.type.value,
+            'timestamp': memory.timestamp,
+            'importance': memory.importance,
+            'compressed': memory.compressed,
+            'compression_type': memory.compression_type.value if memory.compression_type else None,
+            'version_id': version_id,
+            'metadata': memory.metadata,
+            'last_modified': time.time()
+        }
+        
+        metadata_path = self._get_metadata_path(memory.id)
+        
+        # Ensure parent directory exists
+        metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        temp_path = metadata_path.with_suffix(metadata_path.suffix + '.tmp')
+        with open(temp_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        temp_path.replace(metadata_path)
+
+    def _load_metadata(self, memory_id: str) -> Optional[Dict]:
+        """Load memory metadata."""
+        metadata_path = self._get_metadata_path(memory_id)
+        
+        if not metadata_path.exists():
+            return None
+        
+        with open(metadata_path, 'r') as f:
+            return json.load(f)
+    
+    def cleanup_old_versions(self, max_age_days: int = 30) -> int:
+        """Clean up old memory versions."""
+        current_time = time.time()
+        max_age_seconds = max_age_days * 24 * 3600
+        
+        cleaned = 0
+        
+        # Clean version files
+        versions_path = self.base_path / "versions"
+        if versions_path.exists():
+            for version_file in versions_path.glob("*.mem"):
+                if current_time - version_file.stat().st_mtime > max_age_seconds:
+                    version_file.unlink()
+                    cleaned += 1
+        
+        # Clean trash
+        trash_path = self.base_path / "trash"
+        if trash_path.exists():
+            for trash_file in trash_path.glob("*.mem"):
+                if current_time - trash_file.stat().st_mtime > max_age_seconds:
+                    trash_file.unlink()
+                    cleaned += 1
+        
+        logger.info(f"Cleaned up {cleaned} old files")
+        return cleaned
+    
+    def get_storage_stats(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+        total_size = 0
+        file_count = 0
+        
+        for path in [self.memories_path, self.metadata_path, 
+                     self.base_path / "versions", self.backups_path]:
+            if path.exists():
+                for file in path.rglob("*"):
+                    if file.is_file():
+                        total_size += file.stat().st_size
+                        file_count += 1
+        
+        return {
+            'total_files': file_count,
+            'total_size_mb': total_size / (1024 * 1024),
+            'memories_count': len(list(self.memories_path.glob("**/*.mem"))),
+            'checkpoints_count': len(list(self.base_path.glob("checkpoint_*.pkl"))),
+            'backups_count': len(list(self.backups_path.glob("*"))),
+            **self.stats
+        }
