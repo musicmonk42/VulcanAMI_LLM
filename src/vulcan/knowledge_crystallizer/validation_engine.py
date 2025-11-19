@@ -1029,8 +1029,7 @@ class KnowledgeValidator:
                     return 'unknown_error'
             
             return None
-        except:
-            return 'analysis_error'
+        except Exception as e:            return 'analysis_error'
     
     def _suggest_fixes(self, test_result: Dict[str, Any], domain: str) -> List[str]:
         """Suggest fixes for test failure"""
@@ -1516,8 +1515,7 @@ class DomainValidator:
             import shutil
             try:
                 shutil.rmtree(sandbox_dir, ignore_errors=True)
-            except:
-                pass  # Best effort cleanup
+            except Exception as e:                pass  # Best effort cleanup
     
     def _create_test_script(self, principle, test_case: DomainTestCase, 
                           sandbox_dir: str) -> str:
@@ -1738,8 +1736,7 @@ if __name__ == '__main__':
                 process.kill()
                 try:
                     process.communicate(timeout=1)
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 return {
                     'exit_code': -1,
                     'output': None,
@@ -1777,8 +1774,7 @@ if __name__ == '__main__':
                 process.kill()
                 try:
                     process.communicate(timeout=1)
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 return {
                     'exit_code': -1,
                     'output': None,
