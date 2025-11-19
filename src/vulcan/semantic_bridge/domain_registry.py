@@ -19,6 +19,7 @@ from enum import Enum
 from pathlib import Path
 import pickle
 import threading
+from ..security_fixes import safe_pickle_load
 
 # Import safety validator
 try:
@@ -749,8 +750,7 @@ class DomainRegistry:
                         path_length = self._find_shortest_path_length(undirected, domain_a, domain_b)
                         graph_distance = min(1.0, path_length / 5)  # Normalize to [0, 1]
                         distances.append(graph_distance)
-                    except:
-                        distances.append(1.0)
+                    except Exception as e:                        distances.append(1.0)
                 
                 # Calculate weighted average
                 if distances:
@@ -1074,7 +1074,7 @@ class DomainRegistry:
         if domains_file.exists():
             try:
                 with open(domains_file, 'rb') as f:
-                    loaded_domains = pickle.load(f)
+                    loaded_domains = safe_pickle_load(f)
                     for name, profile in loaded_domains.items():
                         self.register_domain(name, profile)
             except Exception as e:

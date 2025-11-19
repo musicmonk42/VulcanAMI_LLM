@@ -17,6 +17,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 from .learning_types import LearningConfig
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -823,7 +824,7 @@ class CurriculumLearner:
             raise FileNotFoundError(f"State file not found: {filepath}")
         
         with open(path, 'rb') as f:
-            state = pickle.load(f)
+            state = safe_pickle_load(f)
         
         self.curriculum_stages = state['curriculum_stages']
         self.current_stage = state['current_stage']

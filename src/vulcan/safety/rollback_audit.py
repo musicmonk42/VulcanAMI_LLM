@@ -91,8 +91,7 @@ class MemoryBoundedDeque:
                 # Rough estimate: JSON size
                 return len(json.dumps(item, default=str))
             return sys.getsizeof(item)
-        except:
-            return 1024  # Default 1KB if estimation fails
+        except Exception as e:            return 1024  # Default 1KB if estimation fails
     
     def get_memory_usage_mb(self) -> float:
         """Get current memory usage in MB."""
@@ -418,8 +417,7 @@ class RollbackManager:
                 if file_path.exists():
                     try:
                         file_path.unlink()
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 raise
     
     def rollback(self, snapshot_id: Optional[str] = None, 
@@ -768,8 +766,7 @@ class RollbackManager:
                 'action_log': snapshot.action_log
             })
             return len(data)
-        except:
-            return 0
+        except Exception as e:            return 0
     
     def _send_quarantine_notification(self, quarantine_id: str, 
                                      action: Dict[str, Any], reason: str):
@@ -1078,8 +1075,7 @@ class AuditLogger:
                     if last_line:
                         entry = json.loads(last_line)
                         return entry.get('hash', '')
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         return hashlib.sha256(b'genesis').hexdigest()
     
     def _initialize_redaction_patterns(self) -> List[Dict[str, Any]]:

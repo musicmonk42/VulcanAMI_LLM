@@ -25,6 +25,7 @@ from pathlib import Path
 from enum import Enum
 import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -363,8 +364,7 @@ class AdvancedRewardModel:
                     try:
                         pred = model.predict(features_scaled)[0]
                         predictions.append(pred)
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             if not predictions:
                 return 0.5, 1.0
@@ -712,8 +712,7 @@ class ContextualBandit:
         try:
             discretized = np.round(context.features * 10) / 10
             return str(discretized.tobytes())
-        except:
-            return "default_context"
+        except Exception as e:            return "default_context"
     
     def _get_tool_name(self, action_id: int) -> str:
         """Map action to tool"""
@@ -733,8 +732,7 @@ class ContextualBandit:
                     return self.exploration_rate / self.n_actions
             else:
                 return 1.0 / self.n_actions
-        except:
-            return 1.0 / self.n_actions
+        except Exception as e:            return 1.0 / self.n_actions
 
 
 class LinUCBBandit:
@@ -1283,7 +1281,7 @@ class AdaptiveBanditOrchestrator:
                     state_file = load_path / f"{name}_state.pkl"
                     if state_file.exists():
                         with open(state_file, 'rb') as f:
-                            state = pickle.load(f)
+                            state = safe_pickle_load(f)
                             if hasattr(bandit, 'q_values'):
                                 bandit.q_values = defaultdict(lambda: np.zeros(self.n_actions), state['q_values'])
                             if hasattr(bandit, 'action_counts'):
@@ -1294,7 +1292,7 @@ class AdaptiveBanditOrchestrator:
             meta_file = load_path / "meta_bandit.pkl"
             if meta_file.exists():
                 with open(meta_file, 'rb') as f:
-                    meta_state = pickle.load(f)
+                    meta_state = safe_pickle_load(f)
                     self.performance_window = defaultdict(
                         lambda: deque(maxlen=100),
                         {k: deque(v, maxlen=100) for k, v in meta_state['performance_window'].items()}

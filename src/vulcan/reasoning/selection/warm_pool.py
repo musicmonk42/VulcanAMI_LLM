@@ -612,8 +612,7 @@ class WarmStartPool:
                             # Try creating with no args to test
                             test = tool_class()
                             factory = lambda cls=tool_class: cls()
-                        except:
-                            # Can't instantiate - use as singleton (not ideal but safe)
+                        except Exception as e:                            # Can't instantiate - use as singleton (not ideal but safe)
                             logger.warning(f"Using {tool_name} as singleton - factory creation failed")
                             factory = lambda inst=tool_instance: inst
                 

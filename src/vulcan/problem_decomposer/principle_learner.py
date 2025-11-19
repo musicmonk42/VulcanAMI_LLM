@@ -110,15 +110,13 @@ def ensure_json_serializable(obj: Any) -> Any:
     if hasattr(obj, 'to_dict') and callable(obj.to_dict):
         try:
             return ensure_json_serializable(obj.to_dict())
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     # Handle objects with __dict__
     if hasattr(obj, '__dict__'):
         try:
             return ensure_json_serializable(obj.__dict__)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     # Last resort: convert to string
     return str(obj)
@@ -598,8 +596,7 @@ class PrinciplePromoter:
         # Safely convert validation results
         try:
             validation_dict = candidate.validation_results.to_dict()
-        except:
-            validation_dict = {
+        except Exception as e:            validation_dict = {
                 'success_rate': candidate.validation_results.success_rate,
                 'overall_confidence': candidate.validation_results.overall_confidence,
                 'successful_domains': candidate.validation_results.successful_domains
@@ -613,8 +610,7 @@ class PrinciplePromoter:
                 if hasattr(principle.core_pattern, 'to_dict') and callable(principle.core_pattern.to_dict):
                     try:
                         pattern = principle.core_pattern.to_dict()
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 
                 # If pattern is still not set or might contain non-serializable objects
                 if pattern == {'pattern_type': 'unknown'} or not isinstance(pattern, dict):
@@ -641,8 +637,7 @@ class PrinciplePromoter:
                             try:
                                 json.dumps(val)
                                 pattern_dict[attr] = val
-                            except:
-                                # Convert to string if not serializable
+                            except Exception as e:                                # Convert to string if not serializable
                                 if isinstance(val, (list, tuple)):
                                     pattern_dict[attr] = [str(v) for v in val]
                                 elif isinstance(val, dict):
@@ -685,8 +680,7 @@ class PrinciplePromoter:
             if hasattr(value, '__iter__') and not isinstance(value, (str, bytes, dict)):
                 try:
                     return list(value)
-                except:
-                    return default
+                except Exception as e:                    return default
             return default
         
         # Get contraindicated domains safely
@@ -724,8 +718,7 @@ class PrinciplePromoter:
                     try:
                         json.dumps(exec_logic)
                         library_principle['execution_logic'] = exec_logic
-                    except:
-                        library_principle['execution_logic'] = str(exec_logic)
+                    except Exception as e:                        library_principle['execution_logic'] = str(exec_logic)
                 else:
                     library_principle['execution_logic'] = str(exec_logic)
                 

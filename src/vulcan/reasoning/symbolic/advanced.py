@@ -3206,8 +3206,7 @@ class ProofLearner:
             diff = abs(count1 - count2)
             
             return 1.0 - (diff / max_count)
-        except:
-            return 0.0
+        except Exception as e:            return 0.0
     
     def _compute_similarity_basic(self, goal1: str, goal2: str) -> float:
         """

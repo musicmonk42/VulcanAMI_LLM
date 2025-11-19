@@ -23,6 +23,7 @@ import json
 import pickle
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from ...security_fixes import safe_pickle_load
 
 # CRITICAL FIX: Define logger BEFORE any imports that might fail
 logger = logging.getLogger(__name__)
@@ -210,7 +211,7 @@ class StochasticCostModel:
         model_path = Path(path) / 'cost_model.pkl'
         if model_path.exists():
             with open(model_path, 'rb') as f:
-                self.models = pickle.load(f)
+                self.models = safe_pickle_load(f)
 
 # ==============================================================================
 # 2. Full Implementation for MultiTierFeatureExtractor
@@ -371,7 +372,7 @@ class CalibratedDecisionMaker:
         calib_path = Path(path) / 'calibration.pkl'
         if calib_path.exists():
             with open(calib_path, 'rb') as f:
-                self.calibrators = pickle.load(f)
+                self.calibrators = safe_pickle_load(f)
 
 # ==============================================================================
 # 4. Full Implementation for ValueOfInformationGate
@@ -653,7 +654,7 @@ class ToolSelectionBandit:
             stats_path = Path(path) / 'bandit_statistics.pkl'
             if stats_path.exists():
                 with open(stats_path, 'rb') as f:
-                    self.statistics = pickle.load(f)
+                    self.statistics = safe_pickle_load(f)
 
     def increase_exploration(self):
         """Increase exploration rate (delegated)."""

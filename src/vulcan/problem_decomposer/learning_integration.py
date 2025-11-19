@@ -1083,20 +1083,17 @@ class UnifiedDecomposerLearner:
         if self.continual_learner:
             try:
                 self.continual_learner.shutdown()
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         if self.rlhf_manager:
             try:
                 self.rlhf_manager.shutdown()
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         if self.meta_learner:
             try:
                 self.meta_learner.shutdown()
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         logger.info("UnifiedDecomposerLearner shutdown complete")
 

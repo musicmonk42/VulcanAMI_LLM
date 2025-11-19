@@ -121,8 +121,7 @@ def shutdown_executor_with_timeout(executor, executor_name: str, timeout: float 
         # Try force shutdown as last resort
         try:
             executor.shutdown(wait=False)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 
 # ============================================================

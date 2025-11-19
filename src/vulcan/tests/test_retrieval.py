@@ -871,8 +871,7 @@ class TestEdgeCases:
         try:
             index.add("test", embedding)
             # NaN will be normalized to 0
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     def test_very_large_k_search(self, sample_embeddings):
         """Test searching with k larger than index size."""

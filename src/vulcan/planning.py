@@ -476,8 +476,7 @@ class MonteCarloTreeSearch:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 # ============================================================
 # ENHANCED HIERARCHICAL GOAL SYSTEM
@@ -1044,8 +1043,7 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 # ============================================================
 # PLANNING STATE
@@ -1132,8 +1130,7 @@ class PlanLibrary:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 # ============================================================
 # PLAN MONITOR
@@ -1597,8 +1594,7 @@ class DistributedCoordinator:
                     if self._shutdown_event.wait(timeout=5): # CHANGED
                         break # Shutdown signaled
                     self._check_agent_health()
-                except:
-                    break
+                except Exception as e:                    break
         
         self.heartbeat_thread = threading.Thread(target=monitor, daemon=True)
         self.heartbeat_thread.start()
@@ -1737,8 +1733,7 @@ class DistributedCoordinator:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 # ============================================================
 # CONSENSUS PROTOCOL

@@ -793,8 +793,7 @@ class HierarchicalMemory(BaseMemorySystem):
                             model = SentenceTransformer(fallback)
                             logger.info(f"Loaded fallback embedding model: {fallback}")
                             return model
-                        except:
-                            continue
+                        except Exception as e:                            continue
                 
                 logger.warning("No sentence transformer models available, using fallback")
         
@@ -1409,8 +1408,7 @@ class HierarchicalMemory(BaseMemorySystem):
             self.shutdown() # ADDED
             if hasattr(super(), 'cleanup'):
                 super().cleanup()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 
 # ============================================================

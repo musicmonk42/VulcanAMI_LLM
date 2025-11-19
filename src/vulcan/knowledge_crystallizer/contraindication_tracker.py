@@ -15,6 +15,7 @@ from enum import Enum
 import threading
 import pickle
 import hashlib
+from ..security_fixes import safe_pickle_load
 
 # Optional imports with fallbacks
 try:
@@ -877,8 +878,7 @@ class ContraindicationGraph:
                 else:
                     descendants = self.graph.descendants(principle_id)
                 return set(descendants)
-            except:
-                return set()
+            except Exception as e:                return set()
     
     def get_upstream_principles(self, principle_id: str) -> Set[str]:
         """
@@ -901,8 +901,7 @@ class ContraindicationGraph:
                 else:
                     ancestors = self.graph.ancestors(principle_id)
                 return set(ancestors)
-            except:
-                return set()
+            except Exception as e:                return set()
     
     def get_impact_path(self, source_id: str, target_id: str) -> Tuple[List[str], float]:
         """
@@ -933,8 +932,7 @@ class ContraindicationGraph:
                     total_impact *= impact
                 
                 return path, total_impact
-            except:
-                return [], 0.0
+            except Exception as e:                return [], 0.0
     
     def find_critical_nodes(self, threshold: float = 0.7) -> List[str]:
         """
@@ -1026,7 +1024,7 @@ class ContraindicationGraph:
                 # Load principle objects
                 if load_path.with_suffix('.pkl').exists():
                     with open(load_path.with_suffix('.pkl'), 'rb') as f:
-                        self.principle_nodes = pickle.load(f)
+                        self.principle_nodes = safe_pickle_load(f)
                 
                 # Rebuild graph
                 for node_id in data['nodes']:

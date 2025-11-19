@@ -1898,7 +1898,7 @@ class MotivationalIntrospection:
             return reasoning
         try:
             return str(reasoning) # Handle mocks
-        except:
+        except Exception as e:
             return None
 
 
@@ -1941,7 +1941,7 @@ class MotivationalIntrospection:
                 elif type(val_a) != type(val_b): # Handle type mismatches
                      try: # Try string comparison
                          if str(val_a) == str(val_b): matching_values += 1
-                     except:
+                     except Exception as e:
                          pass # Cannot compare
                 elif val_a == val_b:
                     matching_values += 1

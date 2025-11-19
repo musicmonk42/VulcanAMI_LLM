@@ -35,6 +35,7 @@ import json
 from functools import lru_cache, wraps
 from contextlib import contextmanager
 import warnings
+from .security_fixes import safe_pickle_load
 
 # ==================== LOGGING CONFIGURATION ====================
 
@@ -1523,7 +1524,7 @@ class VulcanCandidateScorer:
     def load_state(self, path: str):
         """Load scorer state from disk."""
         with open(path, 'rb') as f:
-            state = pickle.load(f)
+            state = safe_pickle_load(f)
         
         self.metrics = state['metrics']
         self.tokenizer.word_to_id = state['tokenizer_vocab']

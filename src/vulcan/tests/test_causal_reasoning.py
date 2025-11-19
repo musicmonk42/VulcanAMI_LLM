@@ -930,8 +930,7 @@ class TestThreadSafety:
             for i in range(10):
                 try:
                     engine.add_causal_relationship(f'X_{start}_{i}', f'Y_{start}_{i}')
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(add_edges, i) for i in range(5)]

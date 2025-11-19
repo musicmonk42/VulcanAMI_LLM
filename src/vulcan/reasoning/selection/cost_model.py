@@ -27,6 +27,7 @@ from enum import Enum
 import threading
 import math
 import numpy as np
+from ...security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -831,13 +832,13 @@ class StochasticCostModel:
                 model_path = self.model_save_path / f"cost_model_{name}.pkl"
                 if model_path.exists():
                     with open(model_path, 'rb') as f:
-                        self.models[name] = pickle.load(f)
+                        self.models[name] = safe_pickle_load(f)
             
             # Load EWMA statistics
             ewma_path = self.model_save_path / "cost_model_ewma.pkl"
             if ewma_path.exists():
                 with open(ewma_path, 'rb') as f:
-                    loaded_ewma = pickle.load(f)
+                    loaded_ewma = safe_pickle_load(f)
                     self.ewma_stats.update(loaded_ewma)
             
             # Load calibrators
@@ -845,7 +846,7 @@ class StochasticCostModel:
                 cal_path = self.model_save_path / f"cost_model_cal_{name}.pkl"
                 if cal_path.exists():
                     with open(cal_path, 'rb') as f:
-                        self.calibrators[name] = pickle.load(f)
+                        self.calibrators[name] = safe_pickle_load(f)
             
             logger.info(f"Loaded cost models from {self.model_save_path}")
         except Exception as e:

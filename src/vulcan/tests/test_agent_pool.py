@@ -110,8 +110,7 @@ class TestAgentPoolManagerInit(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)  # Give time for cleanup
     
     def test_initialization(self):
@@ -163,8 +162,7 @@ class TestAgentSpawning(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_spawn_agent_success(self):
@@ -271,8 +269,7 @@ class TestAgentRetirement(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_retire_agent_success(self):
@@ -347,8 +344,7 @@ class TestAgentRecovery(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_recover_agent_success(self):
@@ -413,8 +409,7 @@ class TestJobSubmission(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_submit_job_success(self):
@@ -514,8 +509,7 @@ class TestPoolStatus(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_get_pool_status(self):
@@ -672,8 +666,7 @@ class TestAutoScaler(unittest.TestCase):
         try:
             if hasattr(self, 'pool'):
                 self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_autoscaler_initialization(self):
@@ -716,8 +709,7 @@ class TestRecoveryManager(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_recovery_manager_initialization(self):
@@ -771,8 +763,7 @@ class TestIntegrationScenarios(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_full_job_lifecycle(self):
@@ -840,8 +831,7 @@ class TestErrorHandling(unittest.TestCase):
         """Clean up after tests"""
         try:
             self.pool.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         time.sleep(0.1)
     
     def test_handle_invalid_agent_id(self):

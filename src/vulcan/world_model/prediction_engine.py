@@ -902,8 +902,8 @@ class OptimizedPathClusterer:
                 if score > best_score:
                     best_score = score
                     best_k = k
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Operation failed: {e}")
         
         # Final clustering with best k
         clustering = KMeans(

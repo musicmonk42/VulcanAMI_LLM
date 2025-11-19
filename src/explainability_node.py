@@ -716,8 +716,7 @@ if __name__ == "__main__":
                 'params': {'method': 'saliency'}
             }
             dispatch_explainability_node(node, context4)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     print(f"   Audit entries: {len(context4['audit_log'])}")
     print(f"   All have timestamp: {all('timestamp' in e for e in context4['audit_log'])}")

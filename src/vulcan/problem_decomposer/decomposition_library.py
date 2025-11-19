@@ -16,6 +16,7 @@ from pathlib import Path
 from enum import Enum
 import hashlib
 import heapq
+from ..security_fixes import safe_pickle_load
 
 # Optional imports with fallbacks
 try:
@@ -648,8 +649,7 @@ class DecompositionLibrary:
                 if features['is_dag']:
                     try:
                         features['longest_path'] = nx.dag_longest_path_length(graph)
-                    except:
-                        features['longest_path'] = 1
+                    except Exception as e:                        features['longest_path'] = 1
             
             # Degree statistics
             degrees = dict(graph.degree())
@@ -721,8 +721,7 @@ class DecompositionLibrary:
         try:
             nodes1 = len(list(graph1.nodes()))
             nodes2 = len(list(graph2.nodes()))
-        except:
-            return 0.0
+        except Exception as e:            return 0.0
         
         if nodes1 == 0 and nodes2 == 0:
             return 1.0
@@ -811,7 +810,7 @@ class DecompositionLibrary:
                         return
                     
                     with open(patterns_file, 'rb') as f:
-                        data = pickle.load(f)
+                        data = safe_pickle_load(f)
                         
                         # Validate loaded data
                         if not isinstance(data, dict):
@@ -840,7 +839,7 @@ class DecompositionLibrary:
                         return
                     
                     with open(principles_file, 'rb') as f:
-                        data = pickle.load(f)
+                        data = safe_pickle_load(f)
                         
                         # Validate loaded data
                         if not isinstance(data, dict):

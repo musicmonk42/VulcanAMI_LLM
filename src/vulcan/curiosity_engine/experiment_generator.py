@@ -1708,8 +1708,7 @@ class IterativeExperimentDesigner:
                     if value == int(value):
                         value = int(value)
                     return key, value, 'set'
-                except:
-                    return key, value_str, 'set'
+                except Exception as e:                    return key, value_str, 'set'
             
         except Exception as e:
             logger.warning("Failed to parse adjustment '%s': %s", adjustment, e)

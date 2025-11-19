@@ -17,6 +17,7 @@ from scipy.optimize import minimize_scalar
 import json
 from pathlib import Path
 import pickle
+from .security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -834,6 +835,6 @@ class ValueOfInformationGate:
         cost_file = load_path / 'cost_history.pkl'
         if cost_file.exists():
             with open(cost_file, 'rb') as f:
-                self.cost_estimator.historical_costs = defaultdict(list, pickle.load(f))
+                self.cost_estimator.historical_costs = defaultdict(list, safe_pickle_load(f))
         
         logger.info(f"VOI state loaded from {load_path}")

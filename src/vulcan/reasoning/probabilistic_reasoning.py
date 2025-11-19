@@ -59,6 +59,7 @@ except ImportError:
 
 from .reasoning_types import ReasoningStep, ReasoningType, ReasoningResult
 from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+from ..security_fixes import safe_pickle_load
 
 
 class FeatureExtractor:
@@ -190,8 +191,7 @@ class FeatureExtractor:
             try:
                 arr = np.array(data, dtype=float)
                 return arr.flatten().reshape(1, -1)
-            except:
-                return self._extract_fallback(data)
+            except Exception as e:                return self._extract_fallback(data)
         elif isinstance(data, dict):
             values = [v for v in data.values() if isinstance(v, (int, float))]
             if values:
@@ -404,8 +404,7 @@ class FeatureExtractor:
         """Compute cache key for data"""
         try:
             return hashlib.md5(str(data).encode()).hexdigest()
-        except:
-            return str(id(data))
+        except Exception as e:            return str(id(data))
 
 
 class KernelParameterOptimizer:
@@ -571,8 +570,7 @@ class KernelParameterOptimizer:
                 gp_copy.kernel_.theta = params
                 gp_copy.fit(X, y)
                 return -gp_copy.log_marginal_likelihood_value_
-            except:
-                return 1e10
+            except Exception as e:                return 1e10
         
         bounds = gp.kernel_.bounds
         
@@ -628,8 +626,7 @@ class MaxValueEntropySearch:
             try:
                 mean, std = gp.predict(x.reshape(1, -1), return_std=True)
                 predictions.append((mean[0], std[0]))
-            except:
-                predictions.append((0.0, 1.0))
+            except Exception as e:                predictions.append((0.0, 1.0))
         
         if not predictions:
             return 0.0
@@ -703,8 +700,7 @@ class MaxValueEntropySearch:
                     # Sample function values
                     f_sample = np.random.normal(mean, np.maximum(std, 1e-6))
                     sample_values.append(f_sample)
-                except:
-                    sample_values.append(np.zeros(len(X_candidates)))
+                except Exception as e:                    sample_values.append(np.zeros(len(X_candidates)))
             
             # Average over ensemble
             avg_sample = np.mean(sample_values, axis=0)
@@ -1521,7 +1517,7 @@ class EnhancedProbabilisticReasoner:
         
         try:
             with open(filepath, 'rb') as f:
-                model_data = pickle.load(f)
+                model_data = safe_pickle_load(f)
             
             self.gp_ensemble = model_data['gp_ensemble']
             self.ensemble = self.gp_ensemble

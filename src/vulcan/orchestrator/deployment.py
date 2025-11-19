@@ -38,6 +38,7 @@ from .variants import ParallelOrchestrator, AdaptiveOrchestrator, FaultTolerantO
 from .dependencies import EnhancedCollectiveDeps, validate_dependencies, print_dependency_report
 from .metrics import EnhancedMetricsCollector
 from .agent_lifecycle import AgentState
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -1205,7 +1206,7 @@ class ProductionDeployment:
         """
         try:
             with open(checkpoint_path, 'rb') as f:
-                checkpoint = pickle.load(f)
+                checkpoint = safe_pickle_load(f)
             
             # Restore system state
             self.collective.sys = checkpoint['system_state']

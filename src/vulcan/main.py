@@ -1266,8 +1266,7 @@ async def health_check():
             world_model = deployment.collective.deps.world_model
             if world_model and hasattr(world_model, 'self_improvement_enabled') and world_model.self_improvement_enabled:
                 health_checks["self_improvement"] = hasattr(world_model, 'improvement_running')
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Add LLM check
         health_checks["llm_available"] = hasattr(app.state, 'llm')

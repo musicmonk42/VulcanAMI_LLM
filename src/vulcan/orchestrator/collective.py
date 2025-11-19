@@ -450,8 +450,7 @@ class VULCANAGICollective:
                     experiment.experiment_id,
                     {'success': False, 'error': str(e)}
                 )
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             try:
                 self.deps.self_improvement_drive.record_outcome(
@@ -459,8 +458,7 @@ class VULCANAGICollective:
                     False,
                     {'error': str(e)}
                 )
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     def _execute_improvement_direct(self, improvement_action: Dict[str, Any]):
         """

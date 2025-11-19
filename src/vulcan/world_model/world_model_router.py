@@ -32,6 +32,7 @@ import logging
 from pathlib import Path
 import json
 import pickle
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -1829,7 +1830,7 @@ class WorldModelRouter:
             return
         
         with open(load_path, 'rb') as f:
-            state = pickle.load(f)
+            state = safe_pickle_load(f)
         
         self.metrics = defaultdict(int, state['metrics'])
         self.pattern_learner.rules = state['pattern_rules']

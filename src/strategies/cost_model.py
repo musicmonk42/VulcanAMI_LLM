@@ -19,6 +19,7 @@ import json
 from pathlib import Path
 import pickle
 import threading
+from .security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -660,13 +661,13 @@ class StochasticCostModel:
             obs_file = load_path / 'observations.pkl'
             if obs_file.exists():
                 with open(obs_file, 'rb') as f:
-                    self.observations = defaultdict(lambda: defaultdict(list), pickle.load(f))
+                    self.observations = defaultdict(lambda: defaultdict(list), safe_pickle_load(f))
             
             # Load predictor
             pred_file = load_path / 'predictor.pkl'
             if pred_file.exists():
                 with open(pred_file, 'rb') as f:
-                    self.predictor = pickle.load(f)
+                    self.predictor = safe_pickle_load(f)
             
             # Load health metrics (skip computed properties like health_score)
             health_file = load_path / 'health.json'

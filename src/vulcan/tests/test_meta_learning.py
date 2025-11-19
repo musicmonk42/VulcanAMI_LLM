@@ -613,8 +613,7 @@ class TestMetaLearner:
         # Should handle gracefully (not crash)
         try:
             adapted_model, stats = meta_learner.adapt(support_set, num_steps=1)
-        except:
-            pass  # Expected to fail, but shouldn't crash
+        except Exception as e:            pass  # Expected to fail, but shouldn't crash
 
 
 if __name__ == "__main__":

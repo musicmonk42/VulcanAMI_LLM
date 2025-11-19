@@ -685,8 +685,7 @@ class TransferEngine:
         if hasattr(self.world_model.causal_graph, 'remove_edge'):
             try:
                 self.world_model.causal_graph.remove_edge(domain_node, concept_id)
-            except:
-                pass  # Edge might not exist
+            except Exception as e:                pass  # Edge might not exist
     
     def _update_world_model_for_transfer(self, original_concept, transferred_concept, 
                                         target_domain: str, decision: TransferDecision):

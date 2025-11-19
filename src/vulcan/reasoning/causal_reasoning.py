@@ -74,6 +74,7 @@ except ImportError:
 
 from .reasoning_types import ReasoningStep, ReasoningChain, ReasoningType, ReasoningResult
 from .reasoning_explainer import ReasoningExplainer
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -661,8 +662,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                             mechanism = self.mechanisms[(current_var, successor)]
                             try:
                                 effect_value = mechanism(current_val)
-                            except:
-                                effect_value = current_val
+                            except Exception as e:                                effect_value = current_val
                         else:
                             # Default linear mechanism
                             edge_data = intervened_dag.get_edge_data(current_var, successor)
@@ -838,17 +838,14 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             # CRITICAL FIX: Check paths exist, not just direct edges
             try:
                 has_path_to_treatment = nx.has_path(self.causal_dag, node, treatment)
-            except:
-                has_path_to_treatment = False
+            except Exception as e:                has_path_to_treatment = False
                 
             try:
                 has_path_to_outcome = nx.has_path(self.causal_dag, node, outcome)
-            except:
-                has_path_to_outcome = False
+            except Exception as e:                has_path_to_outcome = False
             
             return has_path_to_treatment and has_path_to_outcome
-        except:
-            return False
+        except Exception as e:            return False
     
     def compute_causal_effect(self, treatment: str, outcome: str,
                             data: Optional[pd.DataFrame] = None,
@@ -960,8 +957,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             descendants = set()
             try:
                 descendants = nx.descendants(self.causal_dag, treatment)
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             # If adjustment set contains any descendants, it's invalid
             if adjustment_set & descendants:
@@ -1293,7 +1289,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
         
         try:
             with open(model_file, 'rb') as f:
-                model_data = pickle.load(f)
+                model_data = safe_pickle_load(f)
             
             self.causal_graph = defaultdict(dict, model_data['causal_graph'])
             self.variable_types = model_data['variable_types']
@@ -1437,8 +1433,7 @@ class CounterfactualReasoner:
             counter_val = counterfactual_state.get(var, 0)
             try:
                 differences[var] = float(counter_val - fact_val)
-            except:
-                differences[var] = 0.0
+            except Exception as e:                differences[var] = 0.0
         
         # Estimate probability of counterfactual
         probability = self._estimate_counterfactual_probability(
@@ -1477,8 +1472,7 @@ class CounterfactualReasoner:
         for var in counterfactual_state:
             try:
                 differences[var] = float(counterfactual_state[var] - factual_state.get(var, 0))
-            except:
-                differences[var] = 0.0
+            except Exception as e:                differences[var] = 0.0
         
         return CounterfactualResult(
             factual=factual_state,
@@ -1525,8 +1519,7 @@ class CounterfactualReasoner:
                                                for p in eq_info['parents']]
                                 try:
                                     result[desc] = eq_info['equation'](*parent_values, 0)
-                                except:
-                                    result[desc] = twin_network.get(f"{desc}_factual", 0)
+                                except Exception as e:                                    result[desc] = twin_network.get(f"{desc}_factual", 0)
                             else:
                                 result[desc] = twin_network.get(f"{desc}_factual", 0)
             except Exception as e:
@@ -1585,8 +1578,7 @@ class CounterfactualReasoner:
         if self.causal_model.causal_dag and NETWORKX_AVAILABLE:
             try:
                 ordered_vars = list(nx.topological_sort(self.causal_model.causal_dag))
-            except:
-                ordered_vars = list(model.keys())
+            except Exception as e:                ordered_vars = list(model.keys())
         else:
             ordered_vars = list(model.keys())
         

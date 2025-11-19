@@ -23,6 +23,7 @@ import numpy as np
 import logging
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import struct
+from .security_fixes import safe_pickle_load
 
 # Performance tracking
 try:
@@ -262,7 +263,7 @@ class HybridExecutor:
         if profile_file.exists():
             try:
                 with open(profile_file, 'rb') as f:
-                    self.profiles = pickle.load(f)
+                    self.profiles = safe_pickle_load(f)
                 self.logger.info(f"Loaded {len(self.profiles)} profiles from disk")
             except Exception as e:
                 self.logger.error(f"Failed to load profiles: {e}")

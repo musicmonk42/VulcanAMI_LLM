@@ -1089,5 +1089,4 @@ class PortfolioExecutor:
         try:
             if not self._is_shutdown:
                 self.shutdown(timeout=5.0)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")

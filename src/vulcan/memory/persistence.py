@@ -102,8 +102,7 @@ class SemanticCompressor:
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             try:
                 self.model = SentenceTransformer('all-MiniLM-L6-v2')
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Compression strategies
         self.strategies = {
@@ -409,8 +408,7 @@ class MemoryCompressor:
             try:
                 decompressed = lz4.frame.decompress(data)
                 return pickle.loads(decompressed)
-            except:
-                return None
+            except Exception as e:                return None
         
         try:
             compressed_data = pickle.loads(data)
@@ -437,8 +435,7 @@ class MemoryCompressor:
                 bytes_array = (reconstructed_array * 255).astype(np.uint8).tobytes()
                 try:
                     result = bytes_array.decode('utf-8').rstrip('\0')
-                except:
-                    result = f"[Neural reconstruction - metadata: {compressed_data['memory_metadata']}]"
+                except Exception as e:                    result = f"[Neural reconstruction - metadata: {compressed_data['memory_metadata']}]"
             
             elif compressed_data['original_type'] == 'ndarray':
                 result = reconstructed_array
@@ -448,8 +445,7 @@ class MemoryCompressor:
                 bytes_array = (reconstructed_array * 255).astype(np.uint8).tobytes()
                 try:
                     result = pickle.loads(bytes_array)
-                except:
-                    # Return reconstruction with metadata
+                except Exception as e:                    # Return reconstruction with metadata
                     result = {
                         'reconstructed': reconstructed_array,
                         'metadata': compressed_data['memory_metadata']
@@ -503,8 +499,7 @@ class MemoryCompressor:
                 # Try LZ4 fallback
                 decompressed = lz4.frame.decompress(data)
                 return pickle.loads(decompressed)
-            except:
-                return None
+            except Exception as e:                return None
     
     @staticmethod
     def _get_neural_compressor():
@@ -1004,8 +999,7 @@ class MemoryPersistence:
                     try:
                         key_file.unlink()
                         logger.debug("Removed ephemeral key file")
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         logger.info("MemoryPersistence shutdown complete")
     
@@ -1136,8 +1130,7 @@ class MemoryPersistence:
                 if backup_path and backup_path.exists():
                     try:
                         backup_path.unlink()
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 
                 return True
                 
@@ -1147,8 +1140,7 @@ class MemoryPersistence:
                 try:
                     if temp_path.exists():
                         temp_path.unlink()
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 return False
                 
         except Exception as e:
@@ -1199,18 +1191,15 @@ class MemoryPersistence:
                 try:
                     shutil.copy2(backup_path, file_path)
                     logger.info(f"Restored memory {memory_id} from backup")
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 try:
                     backup_path.unlink()
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             if temp_path.exists():
                 try:
                     temp_path.unlink()
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             return False
     

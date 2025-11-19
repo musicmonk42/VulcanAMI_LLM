@@ -30,6 +30,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 # Core reasoning imports
 from .reasoning_types import ReasoningType, ReasoningStep, ReasoningChain, ReasoningResult
 from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -566,8 +567,7 @@ class UnifiedReasoner:
             for thread in self.executor._threads:
                 try:
                     thread.daemon = True
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Configuration
         self.confidence_threshold = config.get('confidence_threshold', 0.5)
@@ -580,8 +580,7 @@ class UnifiedReasoner:
         if 'SelectionMode' in selection_components:
             try:
                 self.default_selection_mode = selection_components['SelectionMode'][default_mode]
-            except:
-                self.default_selection_mode = None
+            except Exception as e:                self.default_selection_mode = None
         
         # Model persistence
         self.model_path = Path("unified_models")
@@ -623,8 +622,7 @@ class UnifiedReasoner:
                     for thread in component.executor._threads:
                         try:
                             thread.daemon = True
-                        except:
-                            pass
+                        except Exception as e:                            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         except Exception as e:
             logger.debug(f"Could not daemonize all threads in component: {e}")
     
@@ -1458,8 +1456,7 @@ class UnifiedReasoner:
                 arr = np.array(input_data)
                 if np.issubdtype(arr.dtype, np.number):
                     scores[ReasoningType.PROBABILISTIC] += 0.6  # Increased from 0.4
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # FIX: Reduced symbolic preference for plain strings
         if isinstance(input_data, str):
@@ -2444,7 +2441,7 @@ class UnifiedReasoner:
                 return
             
             with open(state_file, 'rb') as f:
-                state = pickle.load(f)
+                state = safe_pickle_load(f)
             
             self.performance_metrics = state['performance_metrics']
             self.confidence_threshold = state['confidence_threshold']

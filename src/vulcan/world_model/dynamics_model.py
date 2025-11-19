@@ -1051,15 +1051,15 @@ class TimeSeriesAnalyzer:
                 peaks, _ = signal.find_peaks(autocorr, height=0.3)
                 if len(peaks) > 0:
                     return False
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Operation failed: {e}")
         
         if STATSMODELS_AVAILABLE:
             try:
                 result = adfuller(values)
                 return result[1] < p_value_threshold
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"Operation failed: {e}")
         
         mid = len(values) // 2
         var1 = np.var(values[:mid])
@@ -1124,8 +1124,8 @@ class TimeSeriesAnalyzer:
                     'rate': slope,
                     'confidence': abs(r_value)
                 }
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Operation failed: {e}")
         
         return None
 
@@ -1323,8 +1323,8 @@ class ModelFitter:
             score = model.score(X, y)
             if score > self.min_score:
                 return model
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Operation failed: {e}")
         
         return None
     
@@ -1343,8 +1343,8 @@ class ModelFitter:
                 return lambda x, dt: model.predict(
                     poly_features.transform([[x, dt]])
                 )[0]
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Operation failed: {e}")
         
         return None
     
@@ -1362,15 +1362,15 @@ class ModelFitter:
         try:
             slope, intercept, r_value, _, _ = stats.linregress(times_array, values_array)
             models.append(('linear', abs(r_value), {'slope': slope, 'intercept': intercept}))
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Operation failed: {e}")
         
         try:
             log_values = np.log(np.abs(values_array) + 1e-10)
             slope, intercept, r_value, _, _ = stats.linregress(times_array, log_values)
             models.append(('exponential', abs(r_value), {'rate': slope, 'initial': np.exp(intercept)}))
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Operation failed: {e}")
         
         if models:
             best_model = max(models, key=lambda x: x[1])

@@ -20,6 +20,7 @@ import threading
 from scipy.spatial.distance import cosine, euclidean
 from scipy.stats import beta, dirichlet
 import json
+from ...security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -211,8 +212,7 @@ class MemoryIndex:
             if self.use_faiss and self.faiss_index is not None:
                 del self.faiss_index
                 self.faiss_index = None
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 
 class BayesianMemoryPrior:
@@ -350,8 +350,7 @@ class BayesianMemoryPrior:
         # CRITICAL FIX: Check cache with proper key generation
         try:
             cache_key = f"{features.tobytes()}_{str(sorted(available_tools))}"
-        except:
-            cache_key = f"{hash(str(features))}_{hash(str(sorted(available_tools)))}"
+        except Exception as e:            cache_key = f"{hash(str(features))}_{hash(str(sorted(available_tools)))}"
         
         current_time = time.time()
         
@@ -914,7 +913,7 @@ class BayesianMemoryPrior:
                 return
             
             with open(load_path, 'rb') as f:
-                state = pickle.load(f)
+                state = safe_pickle_load(f)
             
             self.tool_stats = defaultdict(
                 lambda: {'successes': 1, 'failures': 1, 'total_time': 0.0, 'total_energy': 0.0, 'count': 0},
@@ -951,8 +950,7 @@ class BayesianMemoryPrior:
             # Cleanup index
             if hasattr(self, 'memory_index'):
                 del self.memory_index
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 
 class AdaptivePriorSelector:
@@ -1084,5 +1082,4 @@ class AdaptivePriorSelector:
             for prior in self.priors.values():
                 del prior
             self.priors.clear()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")

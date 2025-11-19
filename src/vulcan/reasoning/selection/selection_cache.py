@@ -24,6 +24,7 @@ from pathlib import Path
 import zlib
 import heapq
 import weakref
+from ...security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -423,7 +424,7 @@ class MultiLevelCache:
             
             try:
                 with open(file_path, 'rb') as f:
-                    return pickle.load(f)
+                    return safe_pickle_load(f)
             except Exception as e:
                 logger.error(f"Disk cache read failed: {e}")
                 return None

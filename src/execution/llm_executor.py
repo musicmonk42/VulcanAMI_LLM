@@ -619,8 +619,7 @@ class LayerExecutor:
             outputs = [r.output for r in results]
             try:
                 return torch.cat(outputs, dim=-1)
-            except:
-                # Fallback to mean
+            except Exception as e:                # Fallback to mean
                 return torch.stack(outputs).mean(dim=0)
         else:
             # Fallback: return first output
@@ -652,8 +651,7 @@ class LayerExecutor:
         if TORCH_AVAILABLE and isinstance(output, torch.Tensor):
             try:
                 return output + residual
-            except:
-                return output
+            except Exception as e:                return output
         else:
             return output
 

@@ -1465,8 +1465,7 @@ class TestErrorHandling:
                 action = {'type': ActionType.OPTIMIZE, 'confidence': 0.8}
                 try:
                     validator.validate_action_comprehensive(action, {'state': {}})
-                except:
-                    pass  # Ignore errors during shutdown
+                except Exception as e:                    pass  # Ignore errors during shutdown
                 time.sleep(0.1)
         
         thread = threading.Thread(target=background_validation)

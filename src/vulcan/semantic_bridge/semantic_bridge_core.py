@@ -833,8 +833,7 @@ class SemanticBridge:
                         try:
                             var_paths = self.world_model.causal_graph.find_all_paths(var, concept_vars)
                             paths.extend(var_paths)
-                        except:
-                            pass
+                        except Exception as e:                            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                     
                     insights['causal_paths'] = len(paths)
                     insights['causal_depth'] = max([len(p.nodes) if hasattr(p, 'nodes') else 0 for p in paths], default=0)

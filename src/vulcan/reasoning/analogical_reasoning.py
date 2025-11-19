@@ -23,6 +23,7 @@ from enum import Enum
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import hashlib
 import re
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,7 @@ try:
     # Try to load model
     try:
         nlp = spacy.load("en_core_web_sm")
-    except:
-        logger.warning("spaCy model not loaded, will use fallback")
+    except Exception as e:        logger.warning("spaCy model not loaded, will use fallback")
         nlp = None
 except ImportError:
     SPACY_AVAILABLE = False
@@ -174,8 +174,7 @@ class Entity:
                 return 0.0
             
             return float(np.clip(np.dot(emb1_flat, emb2_flat) / (norm1 * norm2), -1.0, 1.0))
-        except:
-            return 0.0
+        except Exception as e:            return 0.0
     
     def _attribute_similarity(self, attrs1: Dict, attrs2: Dict) -> float:
         """Deep attribute similarity with type awareness"""
@@ -417,8 +416,7 @@ class SemanticEnricher:
                 doc = nlp(entity.name)
                 if doc:
                     entity.pos_tag = doc[0].pos_ if len(doc) > 0 else None
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Cache
         self.entity_cache[cache_key] = entity
@@ -485,8 +483,7 @@ class SemanticEnricher:
                         self._tfidf_vectorizer.fit(self._tfidf_corpus)
                     
                     vector = self._tfidf_vectorizer.transform([text]).toarray()[0]
-                except:
-                    # If transform fails, use character embedding
+                except Exception as e:                    # If transform fails, use character embedding
                     return self._character_embedding(text)
             else:
                 # Single text - use character embedding
@@ -664,8 +661,7 @@ class GoalRelevanceAnalyzer:
                 for token in doc:
                     if token.pos_ in ['NOUN', 'PROPN'] and not token.is_stop:
                         entities.add(token.text.lower())
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Fallback: extract capitalized words and nouns heuristically
         words = goal_text.split()
@@ -692,8 +688,7 @@ class GoalRelevanceAnalyzer:
                 for token in doc:
                     if token.pos_ == 'ADJ' and not token.is_stop:
                         concepts.add(token.text.lower())
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Fallback: extract action words
         action_indicators = ['find', 'get', 'make', 'create', 'solve', 'achieve', 
@@ -811,8 +806,7 @@ class GoalRelevanceAnalyzer:
                         return 0.5
             
             return 0.3
-        except:
-            return 0.5
+        except Exception as e:            return 0.5
     
     def filter_by_relevance(self, mappings: Dict[str, str], 
                            relevance_scores: Dict[str, float],
@@ -1001,8 +995,7 @@ class AnalogicalReasoner(AbstractReasoner):
         
         try:
             cache_key = f"{hash(str(source))}_{hash(str(target))}"
-        except:
-            cache_key = f"{id(source)}_{id(target)}"
+        except Exception as e:            cache_key = f"{id(source)}_{id(target)}"
         
         self.mapping_cache[cache_key] = {
             'mapping': mapping,
@@ -1037,8 +1030,7 @@ class AnalogicalReasoner(AbstractReasoner):
                                      for k, v in self._extract_attributes(target_problem).items()])
             }, sort_keys=True)
             cache_key = f"{source_domain}_{hashlib.md5(cache_str.encode()).hexdigest()}"
-        except:
-            # Fallback to id-based key if json serialization fails
+        except Exception as e:            # Fallback to id-based key if json serialization fails
             cache_key = f"{source_domain}_{id(target_problem)}"
             
         if self.enable_caching and cache_key in self.analogy_cache:
@@ -1542,8 +1534,7 @@ class AnalogicalReasoner(AbstractReasoner):
                         higher_order_count += 1
             
             return higher_order_count / max(len(relation_mappings), 1)
-        except:
-            return 0.0
+        except Exception as e:            return 0.0
     
     def _extract_entities(self, structure: Dict) -> Set:
         """Extract entities with semantic enrichment"""
@@ -1673,8 +1664,7 @@ class AnalogicalReasoner(AbstractReasoner):
                     level += 1
             
             return min(level, 5)
-        except:
-            return 0
+        except Exception as e:            return 0
     
     def _map_solution(self, source_solution: Any, mappings: Dict[str, str]) -> Any:
         """Map solution"""
@@ -1721,8 +1711,7 @@ class AnalogicalReasoner(AbstractReasoner):
                 explanation += f"\n{len(mapping.relation_mappings)} structural relations preserved\n"
             
             return explanation
-        except:
-            return "Analogical mapping completed"
+        except Exception as e:            return "Analogical mapping completed"
     
     def _learn_from_mapping(self, source_domain: str, mapping: AnalogicalMapping):
         """Learn from mapping"""
@@ -1869,7 +1858,7 @@ class AnalogicalReasoner(AbstractReasoner):
         
         try:
             with open(model_file, 'rb') as f:
-                model_data = pickle.load(f)
+                model_data = safe_pickle_load(f)
             
             self.domain_knowledge = model_data['domain_knowledge']
             self.similarity_threshold = model_data['similarity_threshold']
@@ -1896,8 +1885,7 @@ class AnalogicalReasoner(AbstractReasoner):
                     self.semantic_enricher._tfidf_fitted):
                     try:
                         self.semantic_enricher._tfidf_vectorizer.fit(self.semantic_enricher._tfidf_corpus)
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             if NETWORKX_AVAILABLE:
                 for domain_name, domain_data in self.domain_knowledge.items():

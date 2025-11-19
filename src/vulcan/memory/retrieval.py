@@ -49,6 +49,7 @@ except ImportError:
     TORCH_AVAILABLE = False
 
 from .base import Memory, MemoryQuery
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,7 @@ class NumpyIndex:
             numpy_file = f"{path}.numpy"
             if Path(numpy_file).exists():
                 with open(numpy_file, 'rb') as f:
-                    data = pickle.load(f)
+                    data = safe_pickle_load(f)
                     self.embeddings = data['embeddings']
                     self.memory_ids = data['memory_ids']
                     self.dimension = data.get('dimension', 512)
@@ -424,7 +425,7 @@ class MemoryIndex:
             map_file = f"{path}.map"
             if Path(map_file).exists():
                 with open(map_file, 'rb') as f:
-                    data = pickle.load(f)
+                    data = safe_pickle_load(f)
                     self.id_map = data['id_map']
                     self.reverse_map = data['reverse_map']
                     self.deleted_indices = data.get('deleted_indices', set())
@@ -1262,4 +1263,4 @@ class MemorySearch:
         metadata_file = self.base_path / "metadata_index.pkl"
         if metadata_file.exists():
             with open(metadata_file, 'rb') as f:
-                self.metadata_index = defaultdict(lambda: defaultdict(set), pickle.load(f))
+                self.metadata_index = defaultdict(lambda: defaultdict(set), safe_pickle_load(f))

@@ -492,8 +492,7 @@ class AgentPoolManager:
                         process.join(timeout=1)
                 try:
                     process.close()
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                 del self.agent_processes[agent_id]
             
             # Respawn agent based on location

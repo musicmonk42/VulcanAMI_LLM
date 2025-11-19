@@ -20,6 +20,7 @@ from scipy import stats
 import networkx as nx
 
 from ..config import EMBEDDING_DIM, HIDDEN_DIM
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -773,7 +774,7 @@ class MetaCognitiveMonitor:
     def load_state(self, filepath: str):
         """Load metacognitive state"""
         with open(filepath, 'rb') as f:
-            state = pickle.load(f)
+            state = safe_pickle_load(f)
         
         with self._lock:
             self.self_model = state['self_model']

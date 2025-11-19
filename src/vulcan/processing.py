@@ -39,6 +39,7 @@ import PIL.Image
 
 # FIXED: Import from src.vulcan.config instead of config
 from src.vulcan.config import ModalityType, EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM
+from .security_fixes import safe_pickle_load
 
 # --- Graphix Module Imports ---
 try:
@@ -347,7 +348,7 @@ class VersionedDataLogger:
         # Find file with hash prefix
         for file in self.data_store.glob(f"*_{data_hash[:8]}.pkl"):
             with open(file, 'rb') as f:
-                return pickle.load(f)
+                return safe_pickle_load(f)
         return None
     
     def _cleanup_loop(self):
@@ -732,8 +733,8 @@ class DynamicModelManager:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup error in {self.__class__.__name__}: {e}")
 
 # ============================================================
 # WORKLOAD MANAGER (FIXED)
@@ -1014,8 +1015,8 @@ class WorkloadManager:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup error in {self.__class__.__name__}: {e}")
 
 # ============================================================
 # BASE EMBEDDING CACHE
@@ -2044,8 +2045,8 @@ class AdaptiveMultimodalProcessor(nn.Module):
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup error in {self.__class__.__name__}: {e}")
 
 # ============================================================
 # STREAMING PROCESSOR
@@ -2136,8 +2137,8 @@ class StreamingProcessor:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup error in {self.__class__.__name__}: {e}")
 
 # ============================================================
 # MULTIMODAL PROCESSOR (Main Interface - Enhanced)
@@ -2318,5 +2319,5 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup error in {self.__class__.__name__}: {e}")

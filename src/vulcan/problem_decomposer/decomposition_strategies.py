@@ -106,8 +106,7 @@ except ImportError:
                         if has_cycle(node):
                             return False
                 return True
-            except:
-                return True  # Fallback
+            except Exception as e:                return True  # Fallback
             
         @staticmethod
         def density(graph):
@@ -528,8 +527,7 @@ class ExactDecomposition(DecompositionStrategy):
                 from networkx.algorithms import isomorphism
                 matcher = isomorphism.DiGraphMatcher(G, pattern)
                 return matcher.subgraph_is_isomorphic()
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Fallback to simple check
         if hasattr(pattern, 'nodes') and hasattr(G, 'nodes'):
@@ -1080,8 +1078,7 @@ class StructuralDecomposition(DecompositionStrategy):
                         'confidence': min(1.0, len(cycles) / len(nodes_list)),
                         'cycles': cycles
                     }
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         return None
     

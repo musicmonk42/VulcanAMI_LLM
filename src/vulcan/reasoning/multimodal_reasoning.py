@@ -1536,8 +1536,7 @@ class MultiModalReasoningEngine:
                 'mapping': {},
                 'confidence': float(score)
             }
-        except:
-            return {'score': 0.0, 'mapping': {}, 'confidence': 0.0}
+        except Exception as e:            return {'score': 0.0, 'mapping': {}, 'confidence': 0.0}
     
     def _apply_alignments(self, features: Dict, alignments: List[CrossModalAlignment]) -> Dict:
         """Apply cross-modal alignments to features"""
@@ -2038,8 +2037,7 @@ class MultiModalReasoningEngine:
             if chain and chain.total_confidence:
                 explanation += f"Confidence: {chain.total_confidence:.2f}"
             return explanation
-        except:
-            return f"Multimodal reasoning completed with {strategy} fusion"
+        except Exception as e:            return f"Multimodal reasoning completed with {strategy} fusion"
     
     def _learn_from_fusion(self, modalities: List[ModalityType], 
                            strategy: str, confidence: float):

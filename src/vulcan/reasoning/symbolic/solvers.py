@@ -1265,8 +1265,7 @@ class BayesianNetworkReasoner:
             variance = np.var(y - predictions)
             
             self.set_gaussian_cpd(var_name, coefficients, intercept, max(variance, 1e-10))
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     def _compute_log_likelihood(self, data: List[Dict[str, Any]]) -> float:
         """Compute log-likelihood of data."""
@@ -1404,8 +1403,7 @@ class BayesianNetworkReasoner:
             try:
                 chi2, p_value, dof, expected = chi2_contingency(matrix)
                 return p_value > alpha
-            except:
-                return True
+            except Exception as e:                return True
         
         # Conditional test (stratified)
         # For simplicity, return False (assume dependent)

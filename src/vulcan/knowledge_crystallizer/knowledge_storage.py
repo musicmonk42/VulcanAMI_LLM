@@ -21,6 +21,7 @@ import threading
 import gzip
 import shutil
 import difflib
+from ..security_fixes import safe_pickle_load
 
 # Optional imports with fallbacks
 try:
@@ -106,8 +107,7 @@ class PrincipleVersion:
         try:
             # This is a simplified reconstruction - proper implementation would use difflib.patch
             return base_principle
-        except:
-            return base_principle
+        except Exception as e:            return base_principle
 
 
 @dataclass
@@ -979,8 +979,7 @@ class VersionedKnowledgeBase:
                     # Determine format from decompressed content
                     try:
                         data = json.loads(content)
-                    except:
-                        data = pickle.loads(content)
+                    except Exception as e:                        data = pickle.loads(content)
                 else:
                     # Load based on extension
                     if path.suffix == '.json':
@@ -988,7 +987,7 @@ class VersionedKnowledgeBase:
                             data = json.load(f)
                     else:
                         with open(path, 'rb') as f:
-                            data = pickle.load(f)
+                            data = safe_pickle_load(f)
                 
                 # Import principles
                 for pid, principle_data in data.get('principles', {}).items():
@@ -1060,8 +1059,7 @@ class VersionedKnowledgeBase:
                 for idx in range(len(self.conn_pool)):
                     try:
                         self.conn_pool[idx].commit()
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             elif self.backend == StorageBackend.FILE:
                 # Save all principles to files
                 for pid, principle in self.principles.items():
@@ -1301,7 +1299,7 @@ class VersionedKnowledgeBase:
                 if "_v" not in path.stem:  # Skip version files
                     try:
                         with open(path, 'rb') as f:
-                            principle = pickle.load(f)
+                            principle = safe_pickle_load(f)
                             principle_id = path.stem
                             self.principles[principle_id] = principle
                     except Exception as e:
@@ -1316,7 +1314,7 @@ class VersionedKnowledgeBase:
                         version_num = int(parts[1])
                         
                         with open(path, 'rb') as f:
-                            version_data = pickle.load(f)
+                            version_data = safe_pickle_load(f)
                             
                         if isinstance(version_data, PrincipleVersion):
                             self.versions[principle_id].append(version_data)
@@ -1451,8 +1449,7 @@ class VersionedKnowledgeBase:
         # For other objects, try equality comparison
         try:
             return val1 != val2
-        except:
-            # If comparison fails, try string comparison
+        except Exception as e:            # If comparison fails, try string comparison
             return str(val1) != str(val2)
     
     def _calculate_similarity(self, p1, p2) -> float:
@@ -1504,8 +1501,7 @@ class VersionedKnowledgeBase:
                 if parts1[i] != parts2[i]:
                     return False
             return True
-        except:
-            return False
+        except Exception as e:            return False
     
     def _get_most_accessed(self, n: int) -> List[Tuple[str, int]]:
         """Get most accessed principles"""
@@ -1513,8 +1509,7 @@ class VersionedKnowledgeBase:
             sorted_access = sorted(self.access_counts.items(), 
                                   key=lambda x: x[1], reverse=True)
             return sorted_access[:n]
-        except:
-            return []
+        except Exception as e:            return []
     
     def __del__(self):
         """Cleanup on destruction"""
@@ -1522,8 +1517,7 @@ class VersionedKnowledgeBase:
         for conn in self.conn_pool:
             try:
                 conn.close()
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 
 
 class KnowledgeIndex:
@@ -1968,8 +1962,7 @@ class KnowledgeIndex:
             
             # Check for common parts
             return len(set(parts1) & set(parts2)) > 0
-        except:
-            return False
+        except Exception as e:            return False
     
     def _get_embedding(self, obj: Any) -> np.ndarray:
         """Get embedding for object"""
@@ -2379,7 +2372,7 @@ class KnowledgePruner:
                 for archive_file in self.archive_path.glob(f"{principle_id}_*.pkl"):
                     try:
                         with open(archive_file, 'rb') as f:
-                            entry = pickle.load(f)
+                            entry = safe_pickle_load(f)
                         
                         knowledge_base.store(entry['principle'],
                                            author="system",

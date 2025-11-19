@@ -1058,16 +1058,14 @@ class ProblemDecomposer:
                 is_dag = nx.is_directed_acyclic_graph(G)
                 if is_dag:
                     max_depth = nx.dag_longest_path_length(G)
-            except:
-                is_dag = False
+            except Exception as e:                is_dag = False
         
         # Check connectivity
         is_connected = True
         if NETWORKX_AVAILABLE and node_count > 0:
             try:
                 is_connected = nx.is_weakly_connected(G)
-            except:
-                is_connected = True
+            except Exception as e:                is_connected = True
         
         # Calculate average degree
         avg_degree = 0.0
@@ -1076,8 +1074,7 @@ class ProblemDecomposer:
                 degrees = [d for n, d in G.degree()]
                 if degrees:
                     avg_degree = np.mean(degrees)
-            except:
-                avg_degree = 0.0
+            except Exception as e:                avg_degree = 0.0
         
         # Calculate branching factor
         branching_factor = 0.0
@@ -1086,8 +1083,7 @@ class ProblemDecomposer:
                 descendants = nx.descendants(G, problem_graph.root)
                 if node_count > 1:
                     branching_factor = len(descendants) / (node_count - 1)
-            except:
-                branching_factor = 0.0
+            except Exception as e:                branching_factor = 0.0
         
         # Detect structural patterns
         has_hierarchy = is_dag and max_depth > 2
@@ -1380,8 +1376,7 @@ class ProblemDecomposer:
                 longest_path = nx.dag_longest_path_length(G)
                 depth_factor = min(1.0, longest_path / 10)
                 factors.append(depth_factor)
-            except:
-                # Not a DAG, use average degree
+            except Exception as e:                # Not a DAG, use average degree
                 if hasattr(G, 'degree'):
                     degrees = [d for n, d in G.degree()]
                     if degrees:
@@ -1555,8 +1550,7 @@ class ProblemDecomposer:
                     path_length = nx.dag_longest_path_length(G)
                     if path_length > 10:
                         return 'deep_hierarchy_handling'
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             else:
                 return 'cycle_handling'
         

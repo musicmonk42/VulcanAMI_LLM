@@ -1988,8 +1988,7 @@ class Skill:
             else:
                 # Simple existence check
                 return context is not None
-        except:
-            # Default to true if can't evaluate
+        except Exception as e:            # Default to true if can't evaluate
             return True
     
     def _execute_string_step(self, step: str, context: Any) -> Any:

@@ -97,8 +97,7 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
     for flag in ['_is_shutdown', '_shutdown', 'shutdown_flag']:
         try:
             setattr(reasoner, flag, True)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     # Daemonize executor threads IMMEDIATELY
     if hasattr(reasoner, 'executor') and reasoner.executor:
@@ -106,17 +105,14 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
             for t in list(reasoner.executor._threads):
                 try:
                     t.daemon = True
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             try:
                 reasoner.executor._threads.clear()
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         try:
             reasoner.executor.shutdown(wait=False, cancel_futures=True)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         reasoner.executor = None
     
     # Daemonize all component threads
@@ -131,8 +127,7 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
             for flag in ['_shutdown', '_is_shutdown', 'shutdown_flag']:
                 try:
                     setattr(comp, flag, True)
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             # Find and daemonize all threads
             thread_attrs = ['monitor_thread', 'scaling_thread', 'health_check_thread',
@@ -145,21 +140,18 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
                 if thread and hasattr(thread, 'daemon'):
                     try:
                         thread.daemon = True
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             # Try shutdown with minimal timeout
             if hasattr(comp, 'shutdown'):
                 try:
                     comp.shutdown(timeout=0.01)
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             # Nullify component reference
             try:
                 setattr(reasoner, comp_name, None)
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     # Force garbage collection
     gc.collect()
