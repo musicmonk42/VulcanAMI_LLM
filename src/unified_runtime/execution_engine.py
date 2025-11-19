@@ -1159,8 +1159,10 @@ class ExecutionEngine:
                  # Simple representation: hash the JSON string
                  try:
                       input_repr = hashlib.md5(json.dumps(input_val, sort_keys=True, default=str).encode()).hexdigest()[:8]
-                 except:
-                      input_repr = f"unhashable_{type(input_val)}"
+                 except (TypeError, ValueError) as e:
+                      # If value can't be hashed, use type representation
+                      logger.debug(f"Could not hash input value: {e}")
+                      input_repr = f"unhashable_{type(input_val).__name__}"
                  input_values_for_key[dep_id] = input_repr
             # else: Dependency output not ready - shouldn't happen if called correctly
 
