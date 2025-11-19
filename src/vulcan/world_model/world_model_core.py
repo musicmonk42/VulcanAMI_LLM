@@ -9,6 +9,7 @@ FULLY INTEGRATED: All real components, removed all mocks, comprehensive error ha
 INTEGRATED: Autonomous self-improvement drive as core functionality
 FIXED: Circular import with dynamics_model resolved via lazy loading
 FIXED: Deque slicing and CorrelationEntry attribute issues
+FIXED: Initialization order for Meta-reasoning components to prevent MagicMock fallback
 
 **EXECUTION ENGINE REPLACEMENT (2025-11-19):**
 - Replaced mock handlers (_perform_improvement, _fix_circular_imports, etc.) with a single,
@@ -1398,26 +1399,27 @@ class WorldModel:
         if META_REASONING_AVAILABLE and config.get('enable_meta_reasoning', True):
             design_spec = config.get('design_spec', {})
             try:
-                self.motivational_introspection = MotivationalIntrospection(
+                # Step 1: Create motivational_introspection first
+                motivational_introspection = MotivationalIntrospection(
                     world_model=self,
                     design_spec=design_spec,
                     config_path=config.get('meta_reasoning_config', "configs/intrinsic_drives.json")
                 )
+                # Step 2: Assign attribute on self
+                self.motivational_introspection = motivational_introspection
+                
                 logger.info("✓ MotivationalIntrospection initialized")
 
-                # ---- Meta-reasoning (optional) ----
                 # Wire optional meta-reasoning utilities
                 
-                # --- START FIX: Pass 'world_model=self' to ValidationTracker ---
+                # ValidationTracker
                 self.validation_tracker = ValidationTracker(world_model=self) if ValidationTracker else None
-                # --- END FIX ---
-                
                 if self.validation_tracker: 
                     logger.info("✓ ValidationTracker initialized")
                 else:
                     logger.warning("⚠ ValidationTracker failed to initialize (is class missing or MagicMock?)")
 
-                
+                # Step 3: Construct TransparencyInterface only after the attribute is set
                 self.transparency_interface = TransparencyInterface(world_model=self) if TransparencyInterface else None
                 if self.transparency_interface: logger.info("✓ TransparencyInterface initialized")
 
