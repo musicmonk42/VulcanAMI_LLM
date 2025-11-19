@@ -155,8 +155,11 @@ class TransparencyInterface:
         
         # --- Infer introspection_engine and self_improvement_drive from world_model ---
         if world_model and hasattr(world_model, 'motivational_introspection'):
-            self.introspection_engine = world_model.motivational_introspection
+            mi = getattr(world_model, 'motivational_introspection', None)
+            logger.debug(f"TransparencyInterface: motivational_introspection found, type={type(mi).__name__}")
+            self.introspection_engine = mi
         else:
+            logger.debug(f"TransparencyInterface: world_model={world_model is not None}, hasattr={hasattr(world_model, 'motivational_introspection') if world_model else False}")
             logger.warning("TransparencyInterface: world_model or motivational_introspection not provided. Using MagicMock.")
             self.introspection_engine = MagicMock()
 
