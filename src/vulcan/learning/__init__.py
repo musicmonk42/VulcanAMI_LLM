@@ -198,8 +198,7 @@ class UnifiedLearningSystem:
                 if self._loop:
                     try:
                         self._loop.close()
-                    except:
-                        pass
+                    except Exception as e:                        logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Check if we're already in an async context
         try:
@@ -272,8 +271,7 @@ class UnifiedLearningSystem:
                     # Try to convert to tensor
                     try:
                         embedding = torch.tensor(embedding, dtype=torch.float32)
-                    except:
-                        embedding = None
+                    except Exception as e:                        embedding = None
                 
                 if embedding is not None:
                     # Update world model with transition
