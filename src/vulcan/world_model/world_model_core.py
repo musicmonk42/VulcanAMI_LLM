@@ -1397,12 +1397,11 @@ class WorldModel:
         
         # Meta-reasoning layer
         if META_REASONING_AVAILABLE and config.get('enable_meta_reasoning', True):
-            design_spec = config.get('design_spec', {})
             try:
                 # Step 1: Create motivational_introspection first
+                # Don't pass design_spec - let it load from config_path to avoid empty dict triggering legacy mode
                 motivational_introspection = MotivationalIntrospection(
                     world_model=self,
-                    design_spec=design_spec,
                     config_path=config.get('meta_reasoning_config', "configs/intrinsic_drives.json")
                 )
                 # Step 2: Assign attribute on self

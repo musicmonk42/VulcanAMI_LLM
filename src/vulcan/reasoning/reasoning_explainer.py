@@ -18,12 +18,17 @@ logger = logging.getLogger(__name__)
 
 # Try to import SafetyValidator if available
 try:
-    from safety import SafetyValidator
+    from ..safety.safety_validator import SafetyValidator
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
-    SafetyValidator = None
-    SAFETY_VALIDATOR_AVAILABLE = False
-    logger.warning("SafetyValidator not available, using built-in safety checks")
+    try:
+        # Fallback: try absolute import
+        from vulcan.safety.safety_validator import SafetyValidator
+        SAFETY_VALIDATOR_AVAILABLE = True
+    except ImportError:
+        SafetyValidator = None
+        SAFETY_VALIDATOR_AVAILABLE = False
+        logger.warning("SafetyValidator not available, using built-in safety checks")
 
 
 class ReasoningExplainer:
