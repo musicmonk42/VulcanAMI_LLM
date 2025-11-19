@@ -113,7 +113,7 @@ class GraphValidator:
     """Validates Graphix IR graphs for correctness, safety, and compatibility"""
 
     def __init__(self,
-                 ontology_path: str = 'D:/Graphix/configs/graphix_core_ontology.json',
+                 ontology_path: str = None,
                  manifest_node_types: Dict[str, Any] = None,
                  max_memory_mb: int = ResourceLimits.MAX_MEMORY_MB,  # Keep optional params from previous version
                  max_node_count: int = ResourceLimits.MAX_NODE_COUNT,
@@ -123,6 +123,13 @@ class GraphValidator:
                  enable_resource_checking: bool = True,
                  enable_security_validation: bool = True):
 
+        # Security fix: Don't hardcode paths, use environment variable or relative path
+        if ontology_path is None:
+            ontology_path = os.environ.get(
+                'GRAPHIX_ONTOLOGY_PATH',
+                os.path.join(os.path.dirname(__file__), '..', '..', 'configs', 'graphix_core_ontology.json')
+            )
+        
         self.ontology_path = ontology_path
         self.manifest_node_types = manifest_node_types or {}
         self.resource_limits = ResourceLimits()  # Use internal class
@@ -855,8 +862,17 @@ class GraphValidator:
 _global_validator: Optional[GraphValidator] = None
 
 
-def get_global_validator(ontology_path: str = 'D:/Graphix/configs/graphix_core_ontology.json', manifest_node_types: Dict[str, Any] = None) -> GraphValidator:
-    """Get or create global validator instance"""
+def get_global_validator(ontology_path: str = None, manifest_node_types: Dict[str, Any] = None) -> GraphValidator:
+    """
+    Get or create global validator instance.
+    
+    Args:
+        ontology_path: Path to ontology file (defaults to environment or relative path)
+        manifest_node_types: Optional manifest node types
+        
+    Returns:
+        GraphValidator instance
+    """
     global _global_validator
     if _global_validator is None:
         _global_validator = GraphValidator(ontology_path, manifest_node_types)
@@ -864,7 +880,7 @@ def get_global_validator(ontology_path: str = 'D:/Graphix/configs/graphix_core_o
     elif manifest_node_types is not None:
         _global_validator.manifest_node_types = manifest_node_types
     # Update ontology path if provided later and different
-    elif ontology_path != _global_validator.ontology_path:
+    elif ontology_path and ontology_path != _global_validator.ontology_path:
         _global_validator.ontology_path = ontology_path
         _global_validator.ontology = _global_validator._load_ontology()  # Reload ontology
 
