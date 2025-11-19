@@ -805,8 +805,7 @@ class AgentRegistry:
                 if hasattr(runtime, 'vulcan_bridge') and runtime.vulcan_bridge:
                     self.vulcan_bridge = runtime.vulcan_bridge
                     logger.info("VULCAN integration enabled for agent registry")
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
         
         # Initialize database with connection pool
         self._init_database()
