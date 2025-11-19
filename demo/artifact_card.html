@@ -1,0 +1,108 @@
+<!doctype html>
+<meta charset="utf-8"/>
+<title>Transparency Artifact Viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+  :root { color-scheme: dark; }
+  body { background:#0b1220; color:#e5e7eb; font-family: ui-sans-serif,system-ui; margin:0; padding:24px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; }
+  input, select, button { padding:8px 10px; border:1px solid #334155; border-radius:8px; background:#0b1220; color:#e5e7eb; }
+  button { cursor:pointer; }
+  .card { border:1px solid #1f2937; border-radius:12px; padding:14px; margin-top:16px; }
+  pre { background:#0b1220; border:1px solid #1f2937; border-radius:8px; padding:12px; overflow:auto; }
+  .badge { display:inline-block; padding:2px 8px; border:1px solid #334155; border-radius:999px; font-size:12px; margin-right:6px; }
+  .ok { color:#86efac; border-color:#14532d; }
+  .warn { color:#fde68a; border-color:#713f12; }
+  .block { color:#fca5a5; border-color:#7f1d1d; }
+</style>
+<h2>Transparency Artifact Viewer</h2>
+<div class="row">
+  <label>
+    VULCAN Base
+    <input id="base" size="40" value="http://127.0.0.1:8080/vulcan"/>
+  </label>
+  <label>
+    Query
+    <select id="query">
+      <option value="latest">Latest</option>
+      <option value="by_objective">By Objective</option>
+      <option value="by_time">Last 15 min</option>
+    </select>
+  </label>
+  <input id="objective" placeholder="objective id (optional)"/>
+  <button id="load">Load</button>
+</div>
+
+<div id="summary" class="card" hidden></div>
+<div id="raw" class="card" hidden>
+  <h3>Raw Artifact</h3>
+  <pre id="json"></pre>
+</div>
+
+<script>
+async function fetchArtifact(base, query, objective) {
+  const u = new URL(base.replace(/\/$/, '') + '/audit');
+  if (query === 'latest') u.searchParams.set('limit', '1');
+  if (query === 'by_objective' && objective) u.searchParams.set('objective', objective);
+  if (query === 'by_time') u.searchParams.set('since', new Date(Date.now()-15*60*1000).toISOString());
+  const r = await fetch(u.toString());
+  const ct = r.headers.get('content-type') || '';
+  const j = ct.includes('application/json') ? await r.json() : { raw: await r.text() };
+  if (Array.isArray(j) && j.length) return j[0];
+  return j;
+}
+
+function pill(status) {
+  if (!status) return '';
+  const cls = status === 'GREEN' ? 'ok' : status === 'WARN' ? 'warn' : 'block';
+  return `<span class="badge ${cls}">${status}</span>`;
+}
+
+function summarize(a) {
+  const m = a || {};
+  const p = m.proposal || m.decision || {};
+  const policy = p.policy_gates || m.policy || {};
+  const ethics = (p.ethical_boundary_monitor || m.ethics || {}).status || 'UNKNOWN';
+  const sel = p.selected_counterfactual || m.selected_cf || '—';
+  const model = (m.applied_change && m.applied_change.frontier_model) || m.model_id || 'n/a';
+  const change = (m.applied_change && m.applied_change.diff_hash) || '—';
+  const outcome = m.outcome || {};
+  const before = (outcome.before && outcome.before.p95_latency_ms) || '—';
+  const after  = (outcome.after && outcome.after.p95_latency_ms) || '—';
+  return `
+    <div>
+      ${pill(ethics)}
+      <span class="badge">CF: ${sel}</span>
+      <span class="badge">Model: ${model}</span>
+      <span class="badge">Change: ${String(change).slice(0,18)}…</span>
+    </div>
+    <div style="margin-top:8px;">
+      <strong>Objectives:</strong> ${JSON.stringify(p.objective_graph?.priority_order || m.objectives || [])}
+    </div>
+    <div style="margin-top:8px;">
+      <strong>Policy gates:</strong>
+      tests=${policy.tests?.pytest || policy.tests_ok}, static=${policy.static_checks ? 'ok' : policy.budgets_ok}, nso=${policy.nso_risk_score ?? policy.nso_ok}
+    </div>
+    <div style="margin-top:8px;">
+      <strong>Latency p95:</strong> ${before} → ${after}
+    </div>
+  `;
+}
+
+document.getElementById('load').onclick = async () => {
+  const base = document.getElementById('base').value;
+  const query = document.getElementById('query').value;
+  const objective = document.getElementById('objective').value.trim();
+  try {
+    const art = await fetchArtifact(base, query, objective);
+    document.getElementById('summary').innerHTML = summarize(art);
+    document.getElementById('summary').hidden = false;
+    document.getElementById('json').textContent = JSON.stringify(art, null, 2);
+    document.getElementById('raw').hidden = false;
+  } catch (e) {
+    document.getElementById('summary').innerHTML = '<span class="badge block">ERROR</span> ' + e;
+    document.getElementById('summary').hidden = false;
+    document.getElementById('raw').hidden = true;
+  }
+};
+</script>

@@ -1,0 +1,103 @@
+VULCAN-AGI Problem Decomposer Module
+Overview
+The Problem Decomposer Module in VULCAN-AGI is responsible for breaking down complex problems into manageable sub-problems, generating executable plans, and integrating with learning and execution systems. It uses stratified libraries of patterns and principles, adaptive strategies, fallback chains, and safety validation to handle novel and familiar problems efficiently. The module closes the learning loop by extracting principles from executions, validating them, and promoting reusable knowledge.
+Integrated with VULCAN's learning systems (continual, curriculum, meta-learning, RLHF) and knowledge crystallizer, it enables autonomous improvement through gap detection and principle promotion. Designed for robustness with thread-safety, bounded data structures, and fallbacks for optional libraries.
+Key Features
+
+Problem Decomposition: Strategies like exact, semantic, structural, synthetic bridging, analogical, and brute-force.
+Pattern/Principle Library: Stratified storage with performance tracking, domain categorization, and cross-domain transfer.
+Fallback Chain: Sequential/parallel/conditional execution with failure analysis and recovery.
+Adaptive Thresholds: Dynamic adjustment of confidence/complexity/performance based on history and feedback.
+Execution: Converts plans to code, executes safely, and produces outcomes with metrics.
+Principle Learning: Extracts, validates, and promotes principles from executions to the library.
+Learning Integration: Bridges to continual learning, curriculum progression, meta-learning, RLHF, and metacognition.
+Safety Integration: Optional validation for ethical, secure, and robust decompositions/executions.
+Bootstrap: Factory for initializing decomposers with strategies and libraries.
+
+Architecture and Components
+The module is composed of interconnected classes, with __init__.py exporting key components:
+
+problem_decomposer_core.py: Core ProblemDecomposer orchestrator, ProblemGraph for representations, DecompositionPlan for outputs, ExecutionOutcome for results.
+decomposition_strategies.py: Abstract DecompositionStrategy with implementations (ExactDecomposition, SemanticDecomposition, etc.).
+decomposition_library.py: StratifiedDecompositionLibrary for patterns/principles, with Pattern, DecompositionPrinciple, and domain management.
+fallback_chain.py: FallbackChain for resilient decomposition, with DecompositionComponent and failure types.
+adaptive_thresholds.py: AdaptiveThresholds for dynamic tuning, StrategyProfiler for performance tracking.
+problem_executor.py: ProblemExecutor for plan execution, with solver generation and safety checks.
+principle_learner.py: PrincipleLearner bridges to knowledge crystallizer for extraction/validation/promotion.
+learning_integration.py: LearningIntegrator connects to VULCAN learning systems for feedback-driven improvement.
+decomposer_bootstrap.py: Factories (create_decomposer) and validation (validate_decomposer_setup).
+__init__.py: Exports all classes; includes module info and tests.
+technical_documentation.md: Internal technical details (not exported).
+
+Supports thread-safety via locks, bounded histories (deques), caching, and optional libs (NetworkX, sklearn, torch) with fallbacks.
+Installation and Dependencies
+This module is part of the VULCAN-AGI project. To use it:
+
+Clone the repository (or integrate into your project).
+Install required dependencies:
+textpip install numpy torch networkx scikit-learn
+
+Core: numpy, logging, threading, typing, dataclasses, collections, time, json, pathlib, enum, hashlib, heapq, copy, abc, traceback.
+Optional: networkx (graphs), sklearn (similarity/clustering), torch (neural/learning).
+Fallbacks: Mock implementations for missing optionals (e.g., simple graphs for NetworkX).
+
+
+Import the module:
+pythonfrom vulcan.problem_decomposer import ProblemDecomposer, create_decomposer
+
+
+Usage Example
+pythonimport logging
+from vulcan.problem_decomposer import create_decomposer, ProblemGraph
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+
+# Create decomposer (bootstraps all components)
+decomposer = create_decomposer()
+
+# Define a problem graph
+problem = ProblemGraph(
+    nodes={'A': {}, 'B': {}, 'C': {}},
+    edges=[('A', 'B', {}), ('B', 'C', {})],
+    root='A',
+    metadata={'domain': 'optimization'}
+)
+problem.complexity_score = 3.0
+
+# Decompose the problem
+plan = decomposer.decompose_novel_problem(problem)
+print("Plan Steps:", [step.description for step in plan.steps])
+
+# Execute the plan (if executor integrated)
+from vulcan.problem_decomposer import ProblemExecutor
+executor = ProblemExecutor()
+outcome = executor.execute_plan(problem, plan)
+print("Outcome Success:", outcome.success)
+
+# Learn from outcome (if learner integrated)
+from vulcan.problem_decomposer import PrincipleLearner
+learner = PrincipleLearner(decomposer.library)
+learner.extract_and_promote(problem, plan, outcome)
+
+# Get statistics
+stats = decomposer.get_statistics()
+print("Decomposition Stats:", stats)
+Configuration
+
+Thresholds: Tune adjustment_rate, min_value in ThresholdConfig.
+Library: Set max_patterns_per_layer, max_history in StratifiedDecompositionLibrary.
+Fallback: Configure strategies and modes in FallbackChain.
+Executor: Adjust max_iterations, timeout_seconds in ProblemExecutor.
+Learning: Set learning_rate, replay_buffer_size in LearningConfig for integrators.
+Safety: Provide SafetyConfig for validation (optional).
+
+Notes
+
+Thread Safety: All operations locked; supports concurrent decomposition/learning.
+Error Handling: Custom enums (FailureType, StrategyStatus) and fallbacks (e.g., trivial decompositions).
+Performance: Bounded caches/histories prevent OOM; tracks success rates, latencies, and domain coverage.
+Extensibility: Extend DecompositionStrategy, add to fallback chains, or subclass PrincipleLearner.
+Limitations: Safety/learning require external modules; fallbacks ensure basic operation without optionals.
+
+For contributions or issues, refer to the VULCAN-AGI project repository.

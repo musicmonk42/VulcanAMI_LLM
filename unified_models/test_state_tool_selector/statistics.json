@@ -1,0 +1,138 @@
+{
+  "performance_metrics": {},
+  "cache_stats": {
+    "feature_cache": {
+      "overall": {
+        "hits": 0,
+        "misses": 0,
+        "hit_rate": 0.0,
+        "avg_access_time_ms": 0.0
+      },
+      "l1": {
+        "entries": 0,
+        "size_bytes": 0,
+        "max_size": 100,
+        "max_bytes": 10485760,
+        "utilization": 0.0
+      },
+      "l2": {
+        "entries": 0,
+        "size_bytes": 0,
+        "max_size": 1000,
+        "max_bytes": 104857600,
+        "utilization": 0.0
+      },
+      "l3": {
+        "enabled": false,
+        "entries": 0
+      }
+    },
+    "selection_cache": {
+      "overall": {
+        "hits": 0,
+        "misses": 0,
+        "hit_rate": 0.0,
+        "avg_access_time_ms": 0.0
+      },
+      "l1": {
+        "entries": 0,
+        "size_bytes": 0,
+        "max_size": 100,
+        "max_bytes": 10485760,
+        "utilization": 0.0
+      },
+      "l2": {
+        "entries": 0,
+        "size_bytes": 0,
+        "max_size": 1000,
+        "max_bytes": 104857600,
+        "utilization": 0.0
+      },
+      "l3": {
+        "enabled": false,
+        "entries": 0
+      }
+    },
+    "result_cache": {
+      "overall": {
+        "hits": 0,
+        "misses": 0,
+        "hit_rate": 0.0,
+        "avg_access_time_ms": 0.0
+      },
+      "l1": {
+        "entries": 0,
+        "size_bytes": 0,
+        "max_size": 100,
+        "max_bytes": 10485760,
+        "utilization": 0.0
+      },
+      "l2": {
+        "entries": 0,
+        "size_bytes": 0,
+        "max_size": 1000,
+        "max_bytes": 104857600,
+        "utilization": 0.0
+      },
+      "l3": {
+        "enabled": false,
+        "entries": 0
+      }
+    },
+    "similarity_cache": {
+      "entries": 0,
+      "size_bytes": 0,
+      "max_size": 1000,
+      "max_bytes": 52428800,
+      "utilization": 0.0
+    },
+    "precomputed_entries": 0,
+    "warm_entries": 0
+  },
+  "safety_stats": {
+    "total_violations": 0,
+    "violations_by_tool": {},
+    "recent_violations": [],
+    "audit_trail_size": 0,
+    "cache_size": 0
+  },
+  "executor_stats": {
+    "strategy_performance": {},
+    "total_executions": 0,
+    "recent_executions": []
+  },
+  "bandit_stats": {
+    "active_bandit": "epsilon_greedy",
+    "bandit_performance": {
+      "epsilon_greedy": {
+        "total_actions": 0,
+        "total_reward": 0.0,
+        "exploration_actions": 0,
+        "exploitation_actions": 0,
+        "average_reward": 0.0
+      },
+      "ucb": {
+        "total_actions": 0,
+        "total_reward": 0.0,
+        "exploration_actions": 0,
+        "exploitation_actions": 0,
+        "average_reward": 0.0
+      },
+      "thompson": {
+        "total_actions": 0,
+        "total_reward": 0.0,
+        "exploration_actions": 0,
+        "exploitation_actions": 0,
+        "average_reward": 0.0
+      },
+      "linucb": {},
+      "neural": {}
+    }
+  },
+  "voi_stats": {
+    "probes": 0,
+    "value_gained": 0.0
+  },
+  "total_executions": 0,
+  "recent_executions": []
+}

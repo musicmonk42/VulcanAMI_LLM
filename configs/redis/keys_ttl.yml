@@ -1,0 +1,830 @@
+# ==============================================================================
+# REDIS KEYS TTL AND EVICTION CONFIGURATION
+# ==============================================================================
+# Vulcan LLM Redis Key Lifecycle Management
+# Version: 4.6.0
+# Last Updated: 2025-11-14
+# Aligned with: Milvus Collections v4.6
+# ==============================================================================
+
+version: "4.6.0"
+schema_version: "2.0"
+configuration_name: "vulcan_redis_ttl_policies"
+
+# ==============================================================================
+# METADATA AND DOCUMENTATION
+# ==============================================================================
+metadata:
+  project: "Vulcan LLM Redis Storage"
+  owner: "VulcanAMI Team"
+  environment: "production"
+  purpose: |
+    This configuration defines TTL (Time To Live) and eviction policies for all
+    Redis key patterns used in the Vulcan LLM system. It ensures optimal memory
+    usage, performance, and data lifecycle management.
+  
+  documentation_url: "https://docs.vulcanami.io/redis-ttl"
+  support_contact: "redis-support@vulcanami.io"
+  last_reviewed: "2025-11-14"
+
+# ==============================================================================
+# GLOBAL DEFAULTS
+# ==============================================================================
+defaults:
+  ttl_seconds: 3600
+  eviction_policy: "allkeys-lfu"
+  monitoring_enabled: true
+  alerts_enabled: true
+  compression_enabled: true
+  backup_enabled: true
+
+# ==============================================================================
+# POLICY RECOMMENDATIONS
+# ==============================================================================
+policy_recommendations:
+  maxmemory_policy: "allkeys-lfu"
+  maxmemory: "2gb"
+  
+  pinned_keys:
+    strategy: "Use separate Redis instance or database with 'noeviction' policy for pinned keys"
+    instance: "redis-pinned:6380"
+    database: 1
+    maxmemory_policy: "noeviction"
+    
+  hot_keys:
+    strategy: "Keep frequently accessed keys in memory with LFU eviction"
+    cache_tier: "memory"
+    monitoring: "track access patterns"
+    
+  cold_keys:
+    strategy: "Use TTL-based expiration for infrequently accessed keys"
+    cache_tier: "disk-backed"
+    
+  telemetry:
+    exporter: "redis_exporter"
+    metrics_port: 9121
+    scrape_interval: "30s"
+    scrape_by: "keyspace"
+    dashboards:
+      - "grafana-redis-overview"
+      - "grafana-redis-keys"
+      - "grafana-redis-performance"
+
+# ==============================================================================
+# KEY PATTERN DEFINITIONS
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# TIER 0: PINNED KEYS (NO EVICTION, NO TTL)
+# ------------------------------------------------------------------------------
+tier_0_pinned:
+  description: "Critical data that must never be evicted or expire"
+  keys:
+    - pattern: "pack:pack-*"
+      ttl_seconds: 0
+      eviction: "no-evict"
+      purpose: "Pinned packs (Lory + KQS) - Core embedding packs"
+      priority: "critical"
+      estimated_count: 50000
+      avg_size_bytes: 8192
+      total_memory_mb: 400
+      compression: false
+      replication: true
+      backup_frequency: "hourly"
+      monitoring:
+        track_access: true
+        alert_on_missing: true
+        alert_on_corruption: true
+      metadata:
+        source: "Lory indexing pipeline"
+        update_frequency: "continuous"
+        importance: "critical"
+        retention_policy: "permanent"
+        
+    - pattern: "pin:shard:*"
+      ttl_seconds: 0
+      eviction: "no-evict"
+      purpose: "Pinned shard pack IDs (top 5% by KQS)"
+      priority: "critical"
+      estimated_count: 2500
+      avg_size_bytes: 256
+      total_memory_mb: 1
+      compression: false
+      replication: true
+      backup_frequency: "hourly"
+      monitoring:
+        track_access: true
+        alert_on_missing: true
+      metadata:
+        source: "KQS scoring system"
+        update_frequency: "daily"
+        importance: "critical"
+        retention_policy: "permanent"
+        
+    - pattern: "config:*"
+      ttl_seconds: 0
+      eviction: "no-evict"
+      purpose: "System configuration keys"
+      priority: "critical"
+      estimated_count: 100
+      avg_size_bytes: 1024
+      compression: false
+      replication: true
+      backup_frequency: "hourly"
+      
+    - pattern: "model:embeddings:*"
+      ttl_seconds: 0
+      eviction: "no-evict"
+      purpose: "Cached embedding model metadata"
+      priority: "high"
+      estimated_count: 50
+      avg_size_bytes: 4096
+      compression: true
+      replication: true
+
+# ------------------------------------------------------------------------------
+# TIER 1: HOT CACHE (SHORT TTL, LFU EVICTION)
+# ------------------------------------------------------------------------------
+tier_1_hot:
+  description: "Frequently accessed data with short TTL"
+  keys:
+    - pattern: "pack_bloom:pack-*"
+      ttl_seconds: 3600
+      ttl_variation_percent: 10
+      eviction: "volatile-lfu"
+      purpose: "Pack-level Bloom filters (128-byte) for fast negative lookups"
+      priority: "high"
+      estimated_count: 50000
+      avg_size_bytes: 128
+      total_memory_mb: 6
+      compression: false
+      replication: true
+      backup_frequency: "daily"
+      monitoring:
+        track_access: true
+        track_hit_rate: true
+        alert_on_low_hit_rate: true
+        min_hit_rate: 0.85
+      performance:
+        expected_hit_rate: 0.95
+        expected_false_positive_rate: 0.01
+      metadata:
+        source: "Bloom filter generation pipeline"
+        update_frequency: "hourly"
+        importance: "high"
+        retention_policy: "regenerable"
+        
+    - pattern: "manifest:sha256:*"
+      ttl_seconds: 3600
+      ttl_variation_percent: 10
+      eviction: "volatile-lfu"
+      purpose: "Pack manifests with ETag support for cache validation"
+      priority: "high"
+      estimated_count: 50000
+      avg_size_bytes: 2048
+      total_memory_mb: 100
+      compression: true
+      compression_ratio: 0.4
+      replication: true
+      backup_frequency: "daily"
+      monitoring:
+        track_access: true
+        track_etag_validation: true
+      metadata:
+        source: "Manifest generation service"
+        etag_enabled: true
+        update_frequency: "continuous"
+        importance: "high"
+        
+    - pattern: "query:cache:*"
+      ttl_seconds: 1800
+      ttl_variation_percent: 15
+      eviction: "volatile-lfu"
+      purpose: "Cached query results"
+      priority: "medium"
+      estimated_count: 100000
+      avg_size_bytes: 4096
+      total_memory_mb: 400
+      compression: true
+      compression_ratio: 0.5
+      monitoring:
+        track_access: true
+        track_hit_rate: true
+        min_hit_rate: 0.70
+        
+    - pattern: "embedding:cache:*"
+      ttl_seconds: 7200
+      eviction: "volatile-lfu"
+      purpose: "Cached embeddings to avoid recomputation"
+      priority: "high"
+      estimated_count: 500000
+      avg_size_bytes: 6144
+      total_memory_mb: 3000
+      compression: true
+      compression_ratio: 0.3
+      monitoring:
+        track_access: true
+        track_hit_rate: true
+        min_hit_rate: 0.80
+
+# ------------------------------------------------------------------------------
+# TIER 2: WARM CACHE (MEDIUM TTL, LFU EVICTION)
+# ------------------------------------------------------------------------------
+tier_2_warm:
+  description: "Moderately accessed data with medium TTL"
+  keys:
+    - pattern: "ids:*:*:sig-*"
+      ttl_seconds: 180
+      ttl_seconds_range:
+        min: 60
+        max: 300
+      eviction: "allkeys-lfu"
+      purpose: "Short-lived IDs lookup cache for signature-based retrieval"
+      priority: "medium"
+      estimated_count: 1000000
+      avg_size_bytes: 512
+      total_memory_mb: 500
+      compression: false
+      replication: false
+      monitoring:
+        track_access: true
+        track_hit_rate: true
+      metadata:
+        source: "ID resolution service"
+        update_frequency: "continuous"
+        importance: "medium"
+        retention_policy: "ephemeral"
+        
+    - pattern: "doc:sha256:*"
+      ttl_seconds: 75
+      ttl_seconds_range:
+        min: 30
+        max: 120
+      eviction: "allkeys-lfu"
+      purpose: "Document cache for content retrieval"
+      priority: "medium"
+      estimated_count: 2000000
+      avg_size_bytes: 16384
+      total_memory_mb: 32000
+      compression: true
+      compression_ratio: 0.6
+      replication: false
+      monitoring:
+        track_access: true
+        track_hit_rate: true
+        track_size: true
+        alert_on_size_spike: true
+      metadata:
+        source: "Document storage service"
+        update_frequency: "continuous"
+        importance: "medium"
+        retention_policy: "ephemeral"
+        
+    - pattern: "metadata:doc:*"
+      ttl_seconds: 600
+      eviction: "volatile-lfu"
+      purpose: "Document metadata cache"
+      priority: "medium"
+      estimated_count: 2000000
+      avg_size_bytes: 1024
+      compression: true
+      
+    - pattern: "user:session:*"
+      ttl_seconds: 1800
+      eviction: "volatile-ttl"
+      purpose: "User session data"
+      priority: "medium"
+      estimated_count: 10000
+      avg_size_bytes: 2048
+      compression: false
+
+# ------------------------------------------------------------------------------
+# TIER 3: COLD CACHE (LONG TTL OR NEGATIVE CACHE)
+# ------------------------------------------------------------------------------
+tier_3_cold:
+  description: "Infrequently accessed data or negative cache entries"
+  keys:
+    - pattern: "neg:sha256:*"
+      ttl_seconds: 3
+      eviction: "allkeys-lfu"
+      purpose: "Negative cache for non-existent documents (prevent repeated lookups)"
+      priority: "low"
+      estimated_count: 100000
+      avg_size_bytes: 64
+      total_memory_mb: 6
+      compression: false
+      replication: false
+      monitoring:
+        track_access: true
+        track_hit_rate: true
+        alert_on_high_hit_rate: true
+        max_hit_rate: 0.30
+      metadata:
+        source: "Document lookup service"
+        update_frequency: "continuous"
+        importance: "low"
+        retention_policy: "ephemeral"
+        notes: "High hit rate indicates potential issues with upstream systems"
+        
+    - pattern: "archive:*"
+      ttl_seconds: 86400
+      eviction: "volatile-ttl"
+      purpose: "Archived data for historical reference"
+      priority: "low"
+      estimated_count: 50000
+      avg_size_bytes: 4096
+      compression: true
+      compression_ratio: 0.7
+      
+    - pattern: "stats:daily:*"
+      ttl_seconds: 604800
+      eviction: "volatile-ttl"
+      purpose: "Daily statistics (7-day retention)"
+      priority: "low"
+      estimated_count: 1000
+      avg_size_bytes: 8192
+      compression: true
+      
+    - pattern: "backup:snapshot:*"
+      ttl_seconds: 2592000
+      eviction: "volatile-ttl"
+      purpose: "Backup snapshots (30-day retention)"
+      priority: "low"
+      estimated_count: 30
+      avg_size_bytes: 1048576
+      compression: true
+
+# ------------------------------------------------------------------------------
+# TIER 4: TEMPORARY/EPHEMERAL KEYS
+# ------------------------------------------------------------------------------
+tier_4_temporary:
+  description: "Temporary keys for transient operations"
+  keys:
+    - pattern: "lock:*"
+      ttl_seconds: 30
+      eviction: "volatile-ttl"
+      purpose: "Distributed locks"
+      priority: "high"
+      estimated_count: 1000
+      avg_size_bytes: 128
+      monitoring:
+        track_access: true
+        alert_on_stuck_locks: true
+        stuck_threshold_seconds: 60
+        
+    - pattern: "task:queue:*"
+      ttl_seconds: 3600
+      eviction: "volatile-ttl"
+      purpose: "Task queue entries"
+      priority: "high"
+      estimated_count: 10000
+      avg_size_bytes: 1024
+      
+    - pattern: "rate_limit:*"
+      ttl_seconds: 60
+      eviction: "volatile-ttl"
+      purpose: "Rate limiting counters"
+      priority: "high"
+      estimated_count: 100000
+      avg_size_bytes: 64
+      
+    - pattern: "temp:*"
+      ttl_seconds: 300
+      eviction: "allkeys-lru"
+      purpose: "Temporary scratch space"
+      priority: "low"
+      estimated_count: 5000
+      avg_size_bytes: 2048
+
+# ------------------------------------------------------------------------------
+# TIER 5: PUBSUB AND STREAMING
+# ------------------------------------------------------------------------------
+tier_5_streaming:
+  description: "Real-time messaging and streaming data"
+  keys:
+    - pattern: "stream:events:*"
+      ttl_seconds: 3600
+      eviction: "volatile-ttl"
+      purpose: "Event streams"
+      priority: "medium"
+      type: "stream"
+      max_length: 10000
+      trim_strategy: "maxlen"
+      
+    - pattern: "pubsub:channel:*"
+      ttl_seconds: 0
+      eviction: "no-evict"
+      purpose: "Pub/Sub channels"
+      priority: "high"
+      type: "pubsub"
+      
+    - pattern: "stream:logs:*"
+      ttl_seconds: 86400
+      eviction: "volatile-ttl"
+      purpose: "Log streams (24-hour retention)"
+      priority: "low"
+      type: "stream"
+      max_length: 100000
+      trim_strategy: "maxlen"
+
+# ------------------------------------------------------------------------------
+# TIER 6: ANALYTICS AND METRICS
+# ------------------------------------------------------------------------------
+tier_6_analytics:
+  description: "Analytics data and metrics"
+  keys:
+    - pattern: "metric:*"
+      ttl_seconds: 3600
+      eviction: "volatile-lfu"
+      purpose: "Application metrics"
+      priority: "medium"
+      estimated_count: 50000
+      avg_size_bytes: 256
+      
+    - pattern: "counter:*"
+      ttl_seconds: 86400
+      eviction: "volatile-ttl"
+      purpose: "Counters and aggregations"
+      priority: "medium"
+      estimated_count: 10000
+      avg_size_bytes: 64
+      
+    - pattern: "histogram:*"
+      ttl_seconds: 3600
+      eviction: "volatile-lfu"
+      purpose: "Histogram data"
+      priority: "medium"
+      estimated_count: 5000
+      avg_size_bytes: 1024
+
+# ==============================================================================
+# LIFECYCLE MANAGEMENT
+# ==============================================================================
+lifecycle:
+  enabled: true
+  
+  automatic_ttl_extension:
+    enabled: true
+    extension_threshold: 0.1
+    max_extensions: 3
+    extension_multiplier: 1.5
+    
+  automatic_eviction:
+    enabled: true
+    check_interval_seconds: 60
+    batch_size: 1000
+    
+  key_migration:
+    enabled: true
+    hot_to_warm_threshold_days: 7
+    warm_to_cold_threshold_days: 30
+    
+  cleanup:
+    enabled: true
+    orphaned_keys_cleanup: true
+    expired_keys_cleanup: true
+    cleanup_interval_hours: 1
+
+# ==============================================================================
+# MONITORING AND ALERTING
+# ==============================================================================
+monitoring:
+  enabled: true
+  
+  metrics:
+    collection_interval_seconds: 30
+    retention_days: 90
+    
+    tracked_metrics:
+      - key_count_by_pattern
+      - memory_usage_by_pattern
+      - access_frequency
+      - hit_rate
+      - eviction_rate
+      - ttl_distribution
+      - key_size_distribution
+      - replication_lag
+      
+  alerting:
+    enabled: true
+    
+    alerts:
+      - name: "high_eviction_rate"
+        condition: "eviction_rate > 1000/sec"
+        severity: "warning"
+        notification_channels: ["slack", "email"]
+        
+      - name: "low_hit_rate"
+        condition: "cache_hit_rate < 0.70"
+        severity: "warning"
+        notification_channels: ["slack"]
+        
+      - name: "memory_pressure"
+        condition: "memory_usage > 0.90"
+        severity: "critical"
+        notification_channels: ["slack", "pagerduty"]
+        
+      - name: "missing_pinned_keys"
+        condition: "pinned_key_count < expected"
+        severity: "critical"
+        notification_channels: ["pagerduty", "email"]
+        
+      - name: "high_negative_cache_hit_rate"
+        condition: "neg_cache_hit_rate > 0.30"
+        severity: "warning"
+        notification_channels: ["slack"]
+        description: "High negative cache hit rate may indicate upstream issues"
+        
+      - name: "stuck_locks"
+        condition: "lock_age > 60s"
+        severity: "warning"
+        notification_channels: ["slack"]
+        
+      - name: "key_size_anomaly"
+        condition: "key_size > avg_size * 10"
+        severity: "warning"
+        notification_channels: ["slack"]
+
+# ==============================================================================
+# OPTIMIZATION STRATEGIES
+# ==============================================================================
+optimization:
+  enabled: true
+  
+  compression:
+    enabled: true
+    algorithm: "lzf"
+    min_size_bytes: 1024
+    patterns:
+      - "manifest:*"
+      - "doc:*"
+      - "query:cache:*"
+      - "embedding:cache:*"
+      
+  deduplication:
+    enabled: true
+    hash_algorithm: "sha256"
+    patterns:
+      - "doc:*"
+      - "embedding:cache:*"
+      
+  memory_optimization:
+    enabled: true
+    strategies:
+      - name: "use_efficient_encodings"
+        description: "Use ziplist/intset for small collections"
+        enabled: true
+        
+      - name: "lazy_free"
+        description: "Asynchronous key deletion"
+        enabled: true
+        
+      - name: "active_defrag"
+        description: "Active memory defragmentation"
+        enabled: true
+        
+  access_pattern_analysis:
+    enabled: true
+    analysis_interval_hours: 24
+    optimize_based_on_patterns: true
+
+# ==============================================================================
+# BACKUP AND RECOVERY
+# ==============================================================================
+backup:
+  enabled: true
+  
+  schedules:
+    - name: "pinned_keys_hourly"
+      frequency_hours: 1
+      patterns:
+        - "pack:pack-*"
+        - "pin:shard:*"
+        - "config:*"
+      retention_count: 168
+      
+    - name: "hot_cache_daily"
+      frequency_hours: 24
+      patterns:
+        - "pack_bloom:*"
+        - "manifest:*"
+      retention_count: 7
+      
+    - name: "full_backup_weekly"
+      frequency_hours: 168
+      patterns: ["*"]
+      retention_count: 4
+      
+  storage:
+    provider: "s3"
+    bucket: "vulcan-redis-backups"
+    encryption: true
+    
+  recovery:
+    automated: true
+    priority_order:
+      - "pack:pack-*"
+      - "pin:shard:*"
+      - "config:*"
+      - "pack_bloom:*"
+      - "manifest:*"
+
+# ==============================================================================
+# SECURITY AND COMPLIANCE
+# ==============================================================================
+security:
+  encryption_at_rest: true
+  encryption_in_transit: true
+  
+  access_control:
+    enabled: true
+    patterns:
+      - pattern: "pack:*"
+        required_role: "read_packs"
+        
+      - pattern: "config:*"
+        required_role: "admin"
+        
+      - pattern: "user:*"
+        required_role: "user_data_access"
+        
+  audit:
+    enabled: true
+    log_key_access: true
+    log_key_mutations: true
+    retention_days: 365
+    
+  compliance:
+    gdpr_enabled: true
+    pii_patterns:
+      - "user:*"
+      - "session:*"
+    pii_encryption: true
+    pii_anonymization: true
+
+# ==============================================================================
+# PERFORMANCE TUNING
+# ==============================================================================
+performance:
+  pipelining:
+    enabled: true
+    batch_size: 100
+    
+  connection_pooling:
+    enabled: true
+    min_connections: 10
+    max_connections: 100
+    
+  read_replicas:
+    enabled: true
+    count: 2
+    load_balancing: "round_robin"
+    
+  write_optimization:
+    batch_writes: true
+    async_writes: true
+    
+  cache_warming:
+    enabled: true
+    patterns:
+      - "pack:pack-*"
+      - "pin:shard:*"
+    on_startup: true
+    on_deployment: true
+
+# ==============================================================================
+# COST OPTIMIZATION
+# ==============================================================================
+cost_optimization:
+  enabled: true
+  
+  strategies:
+    - name: "aggressive_ttl"
+      description: "Use shorter TTLs for regenerable data"
+      enabled: true
+      
+    - name: "compression"
+      description: "Compress large values"
+      enabled: true
+      
+    - name: "tiered_storage"
+      description: "Move cold data to cheaper storage"
+      enabled: false
+      
+    - name: "right_sizing"
+      description: "Optimize memory allocation"
+      enabled: true
+      
+  monitoring:
+    track_cost_per_key_pattern: true
+    optimize_based_on_cost: true
+
+# ==============================================================================
+# TESTING AND VALIDATION
+# ==============================================================================
+testing:
+  enabled: true
+  
+  validation_rules:
+    - name: "ttl_consistency"
+      description: "Ensure TTLs are set correctly"
+      check_interval_hours: 1
+      
+    - name: "eviction_policy_compliance"
+      description: "Verify eviction policies are applied"
+      check_interval_hours: 6
+      
+    - name: "memory_limits"
+      description: "Check memory usage against limits"
+      check_interval_minutes: 5
+      
+  load_testing:
+    enabled: false
+    scenarios:
+      - name: "peak_load"
+        duration_minutes: 60
+        target_qps: 100000
+        
+      - name: "sustained_load"
+        duration_hours: 24
+        target_qps: 50000
+
+# ==============================================================================
+# MIGRATION AND ROLLBACK
+# ==============================================================================
+migration:
+  enabled: true
+  
+  version_history:
+    - version: "4.5.0"
+      changes: ["Added Bloom filter keys", "Updated manifest TTL"]
+      rollback_supported: true
+      
+    - version: "4.6.0"
+      changes: ["Comprehensive TTL overhaul", "Added lifecycle management"]
+      rollback_supported: true
+      
+  rollback_plan:
+    automated: true
+    backup_before_migration: true
+    validation_after_migration: true
+
+# ==============================================================================
+# DOCUMENTATION AND METADATA
+# ==============================================================================
+documentation:
+  key_naming_conventions: |
+    Key Naming Standards:
+    - pack:pack-{id}: Embedding pack data
+    - pack_bloom:pack-{id}: Bloom filter for pack
+    - manifest:sha256:{hash}: Pack manifest
+    - pin:shard:{id}: Pinned shard reference
+    - ids:{type}:{subtype}:sig-{signature}: ID lookup
+    - doc:sha256:{hash}: Document content
+    - neg:sha256:{hash}: Negative cache entry
+    
+  best_practices: |
+    Best Practices:
+    1. Always set TTL on non-pinned keys
+    2. Use appropriate eviction policies per tier
+    3. Monitor cache hit rates
+    4. Compress large values
+    5. Use pipelining for bulk operations
+    6. Implement proper error handling
+    7. Regular backup of pinned keys
+    8. Monitor memory usage
+    9. Review slow queries
+    10. Audit security settings
+    
+  troubleshooting: |
+    Common Issues:
+    - High eviction rate: Increase memory or reduce TTLs
+    - Low hit rate: Review cache warming strategy
+    - Memory pressure: Enable compression, adjust TTLs
+    - Missing keys: Check backup and replication
+    - Slow queries: Use pipelining, optimize patterns
+    
+  change_log:
+    - version: "4.6.0"
+      date: "2025-11-14"
+      changes:
+        - "Comprehensive tier-based organization"
+        - "Enhanced monitoring and alerting"
+        - "Lifecycle management policies"
+        - "Security and compliance features"
+        - "Performance optimization strategies"
+        - "Cost optimization guidelines"
+        - "Detailed documentation"
+
+# ==============================================================================
+# SUPPORT AND CONTACT
+# ==============================================================================
+support:
+  email: "redis-support@vulcanami.io"
+  slack: "#redis-support"
+  documentation: "https://docs.vulcanami.io/redis-ttl"
+  on_call: "redis-oncall@vulcanami.io"
+
+# ==============================================================================
+# END OF CONFIGURATION
+# ==============================================================================

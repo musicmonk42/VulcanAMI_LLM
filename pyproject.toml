@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graphix"
+version = "0.0.0"
+description = "Graphix / Vulcan platform"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "cryptography>=41.0.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-timeout>=2.3.0",
+    "pytest-cov>=4.0.0",
+    "hypothesis>=6.98.0",
+    "faker>=24.0.0",
+]
+
+[tool.setuptools]
+# Treat `src` as the package root
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["*"]                # include all packages discovered under src
+namespaces = true              # support PEP 420 implicit namespace packages
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = [
+    "-q",
+    "--disable-warnings",      # Disable all warnings including coverage warnings
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = [
+    "ignore::coverage.exceptions.CoverageWarning",  # Ignore coverage warnings
+]
+
+[tool.coverage.run]
+source = ["src/vulcan", "src/graphix"]  # Only these packages, not archive
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/archive/*",
+    "archive/*",
+    "**/archive/**",
+    "*/.venv/*",
+    "*/venv/*",
+    "*/.tox/*",
+]
+parallel = true
+concurrency = ["thread", "multiprocessing"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+ignore_errors = true
+skip_empty = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"

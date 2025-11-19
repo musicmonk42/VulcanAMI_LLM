@@ -1,0 +1,1980 @@
+[
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import os",
+      "-os.system('ls')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import sys",
+      "-sys.exit()",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_sys.exit\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-eval('2+2')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_eval\"\"\""
+    ]
+  },
+  {
+    "rationale": "AST transformer test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,13 +1,12 @@",
+      "-",
+      "-import os",
+      "-import sys",
+      " import math",
+      " ",
+      "+",
+      " def harmful():",
+      "-    os.system('rm -rf /')",
+      "-    sys.exit()",
+      "-    eval('dangerous')",
+      "-    exec('more danger')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_sys.exit\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_eval\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_exec\"\"\"",
+      "+",
+      " ",
+      " def safe():",
+      "     return math.sqrt(2)"
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import os",
+      "-os.system('ls')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import sys",
+      "-sys.exit()",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_sys.exit\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-eval('2+2')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_eval\"\"\""
+    ]
+  },
+  {
+    "rationale": "AST transformer test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,13 +1,12 @@",
+      "-",
+      "-import os",
+      "-import sys",
+      " import math",
+      " ",
+      "+",
+      " def harmful():",
+      "-    os.system('rm -rf /')",
+      "-    sys.exit()",
+      "-    eval('dangerous')",
+      "-    exec('more danger')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_sys.exit\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_eval\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_exec\"\"\"",
+      "+",
+      " ",
+      " def safe():",
+      "     return math.sqrt(2)"
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "NSO safe self-modification",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1 @@",
+      "-",
+      "-import os",
+      "-os.system('test')",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os.system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import os",
+      "-os.system('ls')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import sys",
+      "-sys.exit()",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_sys_exit\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-eval('2+2')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_eval\"\"\""
+    ]
+  },
+  {
+    "rationale": "AST transformer test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,13 +1,12 @@",
+      "-",
+      "-import os",
+      "-import sys",
+      " import math",
+      " ",
+      "+",
+      " def harmful():",
+      "-    os.system('rm -rf /')",
+      "-    sys.exit()",
+      "-    eval('dangerous')",
+      "-    exec('more danger')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_sys_exit\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_eval\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_exec\"\"\"",
+      "+",
+      " ",
+      " def safe():",
+      "     return math.sqrt(2)"
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "NSO safe self-modification",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1 @@",
+      "-",
+      "-import os",
+      "-os.system('test')",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import os",
+      "-os.system('ls')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import sys",
+      "-sys.exit()",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_sys_exit\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-eval('2+2')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_eval\"\"\""
+    ]
+  },
+  {
+    "rationale": "AST transformer test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,13 +1,12 @@",
+      "-",
+      "-import os",
+      "-import sys",
+      " import math",
+      " ",
+      "+",
+      " def harmful():",
+      "-    os.system('rm -rf /')",
+      "-    sys.exit()",
+      "-    eval('dangerous')",
+      "-    exec('more danger')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_sys_exit\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_eval\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_exec\"\"\"",
+      "+",
+      " ",
+      " def safe():",
+      "     return math.sqrt(2)"
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "NSO safe self-modification",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1 @@",
+      "-",
+      "-import os",
+      "-os.system('test')",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_0():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_20():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_40():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_60():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "test batch NSO",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,6 @@",
+      " def main():",
+      "     print('start')",
+      "+",
+      "+",
+      " def dangerous_80():",
+      "-    os.system('rm -rf /')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import os",
+      "-os.system('ls')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,4 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-import sys",
+      "-sys.exit()",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_sys_exit\"\"\""
+    ]
+  },
+  {
+    "rationale": "Batch test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1,5 @@",
+      " def main():",
+      "     pass",
+      "-eval('2+2')",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_eval\"\"\""
+    ]
+  },
+  {
+    "rationale": "AST transformer test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,13 +1,12 @@",
+      "-",
+      "-import os",
+      "-import sys",
+      " import math",
+      " ",
+      "+",
+      " def harmful():",
+      "-    os.system('rm -rf /')",
+      "-    sys.exit()",
+      "-    eval('dangerous')",
+      "-    exec('more danger')",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_sys_exit\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_eval\"\"\"",
+      "+    \"\"\"NSO_REDACTED_CALL_TO_exec\"\"\"",
+      "+",
+      " ",
+      " def safe():",
+      "     return math.sqrt(2)"
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "concurrent test",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,2 +1,5 @@",
+      "-def f(): pass",
+      "-os.system('test')",
+      "+def f():",
+      "+    pass",
+      "+",
+      "+",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  },
+  {
+    "rationale": "NSO safe self-modification",
+    "diff": [
+      "--- before.py",
+      "+++ after.py",
+      "@@ -1,3 +1 @@",
+      "-",
+      "-import os",
+      "-os.system('test')",
+      "+\"\"\"NSO_REDACTED_CALL_TO_os_system\"\"\""
+    ]
+  }
+]

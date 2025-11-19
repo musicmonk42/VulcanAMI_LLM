@@ -1,0 +1,166 @@
+{
+  "id": "fitness_classification_v2",
+  "type": "Graph",
+  "grammar_version": "1.2.0",
+  "metadata": {
+    "author_agent": "OptimizerAgent_v3",
+    "creation_timestamp": "2025-08-26T21:07:33Z",
+    "description": "A parameterized fitness function for classification tasks. It calculates a score based on accuracy, token usage, and compute cycles. The penalty weights for tokens and cycles are configurable via the 'token_penalty_weight' and 'cycle_penalty_weight' nodes.",
+    "formula": "Fitness = accuracy + (tokens * token_penalty) + (cycles * cycle_penalty)"
+  },
+  "nodes": [
+    {
+      "id": "accuracy_metric",
+      "type": "LOAD",
+      "params": {
+        "addr": "metrics.accuracy"
+      }
+    },
+    {
+      "id": "tokens_metric",
+      "type": "LOAD",
+      "params": {
+        "addr": "metrics.tokens"
+      }
+    },
+    {
+      "id": "cycles_metric",
+      "type": "LOAD",
+      "params": {
+        "addr": "metrics.cycles"
+      }
+    },
+    {
+      "id": "token_penalty_weight",
+      "type": "CONST",
+      "params": {
+        "value": -0.0001
+      },
+      "metadata": {
+        "description": "Configurable input: The penalty applied per token used. Set to a negative value."
+      }
+    },
+    {
+      "id": "cycle_penalty_weight",
+      "type": "CONST",
+      "params": {
+        "value": -0.01
+      },
+      "metadata": {
+        "description": "Configurable input: The penalty applied per compute cycle. Set to a negative value."
+      }
+    },
+    {
+      "id": "token_penalty_calc",
+      "type": "MUL"
+    },
+    {
+      "id": "cycle_penalty_calc",
+      "type": "MUL"
+    },
+    {
+      "id": "sum_accuracy_and_token_penalty",
+      "type": "ADD"
+    },
+    {
+      "id": "final_sum",
+      "type": "ADD"
+    },
+    {
+      "id": "fitness_output",
+      "type": "HALT"
+    }
+  ],
+  "edges": [
+    {
+      "from": {
+        "node": "tokens_metric",
+        "port": "data_out"
+      },
+      "to": {
+        "node": "token_penalty_calc",
+        "port": "val1"
+      }
+    },
+    {
+      "from": {
+        "node": "token_penalty_weight",
+        "port": "value"
+      },
+      "to": {
+        "node": "token_penalty_calc",
+        "port": "val2"
+      }
+    },
+    {
+      "from": {
+        "node": "cycles_metric",
+        "port": "data_out"
+      },
+      "to": {
+        "node": "cycle_penalty_calc",
+        "port": "val1"
+      }
+    },
+    {
+      "from": {
+        "node": "cycle_penalty_weight",
+        "port": "value"
+      },
+      "to": {
+        "node": "cycle_penalty_calc",
+        "port": "val2"
+      }
+    },
+    {
+      "from": {
+        "node": "accuracy_metric",
+        "port": "data_out"
+      },
+      "to": {
+        "node": "sum_accuracy_and_token_penalty",
+        "port": "val1"
+      }
+    },
+    {
+      "from": {
+        "node": "token_penalty_calc",
+        "port": "product"
+      },
+      "to": {
+        "node": "sum_accuracy_and_token_penalty",
+        "port": "val2"
+      }
+    },
+    {
+      "from": {
+        "node": "sum_accuracy_and_token_penalty",
+        "port": "sum"
+      },
+      "to": {
+        "node": "final_sum",
+        "port": "val1"
+      }
+    },
+    {
+      "from": {
+        "node": "cycle_penalty_calc",
+        "port": "product"
+      },
+      "to": {
+        "node": "final_sum",
+        "port": "val2"
+      }
+    },
+    {
+      "from": {
+        "node": "final_sum",
+        "port": "sum"
+      },
+      "to": {
+        "node": "fitness_output",
+        "port": "final_in"
+      }
+    }
+  ]
+}

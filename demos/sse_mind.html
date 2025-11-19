@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VULCAN Mind Stream Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .control-group input {
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            min-width: 300px;
+        }
+
+        .control-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button.connect {
+            background: #28a745;
+            color: white;
+        }
+
+        button.connect:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+        }
+
+        button.disconnect {
+            background: #dc3545;
+            color: white;
+        }
+
+        button.disconnect:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+        }
+
+        button.clear {
+            background: #6c757d;
+            color: white;
+        }
+
+        button.clear:hover {
+            background: #5a6268;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .status {
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-badge {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .counter {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .counter-value {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 18px;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .stream-container {
+            padding: 30px;
+            height: 500px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .stream-container::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .stream-container::-webkit-scrollbar-track {
+            background: #e9ecef;
+        }
+
+        .stream-container::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 5px;
+        }
+
+        .stream-container::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+
+        .event {
+            background: white;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .event-number {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .event-time {
+            color: #6c757d;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .event-data {
+            color: #495057;
+            line-height: 1.6;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .auto-scroll-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .auto-scroll-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 VULCAN Mind Stream Viewer</h1>
+            <p>Real-time Server-Sent Events (SSE) Monitor</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="baseUrl">Base URL:</label>
+                <input type="text" id="baseUrl" placeholder="e.g., http://127.0.0.1:8080/vulcan">
+            </div>
+            <button id="connectBtn" class="connect">🔌 Connect</button>
+            <button id="disconnectBtn" class="disconnect" disabled>⛔ Disconnect</button>
+            <button id="clearBtn" class="clear">🗑️ Clear</button>
+            <div class="auto-scroll-toggle">
+                <input type="checkbox" id="autoScroll" checked>
+                <label for="autoScroll">Auto-scroll</label>
+            </div>
+        </div>
+
+        <div class="status">
+            <div class="status-item">
+                <span>Status:</span>
+                <span id="statusBadge" class="status-badge disconnected">Disconnected</span>
+            </div>
+            <div class="counter">
+                <span>Events:</span>
+                <span id="eventCounter" class="counter-value">0</span>
+            </div>
+        </div>
+
+        <div class="stream-container" id="streamContainer">
+            <div class="empty-state">
+                <div class="empty-state-icon">📡</div>
+                <h3>No Events Yet</h3>
+                <p>Connect to the VULCAN stream to start receiving events</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Graphix/VULCAN Demo Enhancement · SSE Mind Stream Viewer · <a href="https://github.com/musicmonk42/graphix_vulcan" target="_blank">GitHub</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const MAX_EVENTS = 100; // Maximum number of events to display
+        let eventSource = null;
+        let eventCount = 0;
+        let events = [];
+
+        // DOM elements
+        const baseUrlInput = document.getElementById('baseUrl');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const autoScrollCheckbox = document.getElementById('autoScroll');
+        const statusBadge = document.getElementById('statusBadge');
+        const eventCounter = document.getElementById('eventCounter');
+        const streamContainer = document.getElementById('streamContainer');
+
+        // Get base URL from query parameter or default to "/vulcan"
+        function getBaseUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('base') || '/vulcan';
+        }
+
+        // Initialize base URL input
+        baseUrlInput.value = getBaseUrl();
+
+        // Format timestamp
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit',
+                fractionalSecondDigits: 3
+            });
+        }
+
+        // Update status badge
+        function updateStatus(status) {
+            statusBadge.className = `status-badge ${status}`;
+            statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        // Create event element
+        function createEventElement(eventNumber, timestamp, data) {
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event';
+            
+            eventDiv.innerHTML = `
+                <div class="event-header">
+                    <span class="event-number">#${eventNumber}</span>
+                    <span class="event-time">${formatTime(timestamp)}</span>
+                </div>
+                <div class="event-data">${escapeHtml(data)}</div>
+            `;
+            
+            return eventDiv;
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Add event to display
+        function addEvent(data) {
+            eventCount++;
+            const timestamp = new Date();
+            
+            events.push({ number: eventCount, timestamp, data });
+            
+            // Keep only last MAX_EVENTS
+            if (events.length > MAX_EVENTS) {
+                events.shift();
+            }
+            
+            renderEvents();
+            updateCounter();
+        }
+
+        // Render all events
+        function renderEvents() {
+            // Clear empty state if it exists
+            if (streamContainer.querySelector('.empty-state')) {
+                streamContainer.innerHTML = '';
+            }
+            
+            // Clear and re-render all events
+            streamContainer.innerHTML = '';
+            events.forEach(event => {
+                const eventElement = createEventElement(event.number, event.timestamp, event.data);
+                streamContainer.appendChild(eventElement);
+            });
+            
+            // Auto-scroll to bottom if enabled
+            if (autoScrollCheckbox.checked) {
+                streamContainer.scrollTop = streamContainer.scrollHeight;
+            }
+        }
+
+        // Update event counter
+        function updateCounter() {
+            eventCounter.textContent = eventCount;
+        }
+
+        // Connect to SSE stream
+        function connect() {
+            const baseUrl = baseUrlInput.value.trim();
+            if (!baseUrl) {
+                alert('Please enter a base URL');
+                return;
+            }
+
+            // Ensure base URL doesn't end with slash
+            const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+            const streamUrl = `${cleanBaseUrl}/v1/stream`;
+
+            console.log('Connecting to:', streamUrl);
+            updateStatus('connecting');
+
+            try {
+                eventSource = new EventSource(streamUrl);
+
+                eventSource.onopen = () => {
+                    console.log('Connected to stream');
+                    updateStatus('connected');
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    baseUrlInput.disabled = true;
+                };
+
+                eventSource.onmessage = (event) => {
+                    console.log('Received event:', event.data);
+                    addEvent(event.data);
+                };
+
+                eventSource.onerror = (error) => {
+                    console.error('Stream error:', error);
+                    updateStatus('disconnected');
+                    disconnect();
+                    alert('Connection error. Please check the URL and try again.');
+                };
+
+            } catch (error) {
+                console.error('Failed to connect:', error);
+                updateStatus('disconnected');
+                alert('Failed to connect: ' + error.message);
+            }
+        }
+
+        // Disconnect from SSE stream
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            updateStatus('disconnected');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            baseUrlInput.disabled = false;
+        }
+
+        // Clear all events
+        function clearEvents() {
+            events = [];
+            eventCount = 0;
+            streamContainer.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📡</div>
+                    <h3>No Events Yet</h3>
+                    <p>Connect to the VULCAN stream to start receiving events</p>
+                </div>
+            `;
+            updateCounter();
+        }
+
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        clearBtn.addEventListener('click', clearEvents);
+
+        // Allow Enter key to connect
+        baseUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !connectBtn.disabled) {
+                connect();
+            }
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>

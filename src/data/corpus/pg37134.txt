@@ -1,0 +1,2757 @@
+﻿The Project Gutenberg eBook of The Elements of Style
+    
+This ebook is for the use of anyone anywhere in the United States and
+most other parts of the world at no cost and with almost no restrictions
+whatsoever. You may copy it, give it away or re-use it under the terms
+of the Project Gutenberg License included with this ebook or online
+at www.gutenberg.org. If you are not located in the United States,
+you will have to check the laws of the country where you are located
+before using this eBook.
+
+Title: The Elements of Style
+
+Author: William Strunk
+
+Release date: August 18, 2011 [eBook #37134]
+
+Language: English
+
+Credits: Produced by Jana Srna and the Online Distributed
+        Proofreading Team at http://www.pgdp.net (This file was
+        produced from images generously made available by The
+        Internet Archive/American Libraries.)
+
+
+*** START OF THE PROJECT GUTENBERG EBOOK THE ELEMENTS OF STYLE ***
+
+
+
+
+Produced by Jana Srna and the Online Distributed
+Proofreading Team at http://www.pgdp.net (This file was
+produced from images generously made available by The
+Internet Archive/American Libraries.)
+
+
+
+
+
+
+  [ Transcriber's Notes:
+
+    Every effort has been made to replicate this text as faithfully
+    as possible, including inconsistencies in spelling and hyphenation.
+    Some corrections of spelling and punctuation have been made. They
+    are listed at the end of the text.
+
+    Where examples were printed in two columns in the original, the left
+    column has been indented by two spaces, the right one by four.
+
+    Italic text has been marked with _underscores_.
+    Bold text has been marked with =equals signs=.
+  ]
+
+
+
+
+  THE ELEMENTS OF STYLE
+
+  BY
+  WILLIAM STRUNK, Jr.
+
+  PROFESSOR OF ENGLISH
+  IN
+  CORNELL UNIVERSITY
+
+  NEW YORK
+  HARCOURT, BRACE AND COMPANY
+
+
+  COPYRIGHT, 1918, 1919, BY
+  WILLIAM STRUNK, JR.
+
+  COPYRIGHT, 1920, BY
+  HARCOURT, BRACE AND HOWE, INC.
+
+
+  THE MAPLE PRESS YORK PA
+
+
+
+
+CONTENTS
+
+
+                                                                     Page
+
+    I. Introductory                                                     5
+
+   II. Elementary Rules of Usage                                        7
+
+       1. Form the possessive singular of nouns by adding _'s_          7
+
+       2. In a series of three or more terms with a single
+          conjunction, use a comma after each term except the last      7
+
+       3. Enclose parenthetic expressions between commas                8
+
+       4. Place a comma before a conjunction introducing a
+          co-ordinate clause                                           10
+
+       5. Do not join independent clauses by a comma                   11
+
+       6. Do not break sentences in two                                12
+
+       7. A participial phrase at the beginning of a sentence must
+          refer to the grammatical subject                             13
+
+  III. Elementary Principles of Composition                            15
+
+       8. Make the paragraph the unit of composition: one paragraph
+          to each topic                                                15
+
+       9. As a rule, begin each paragraph with a topic sentence; end
+          it in conformity with the beginning                          17
+
+      10. Use the active voice                                         19
+
+      11. Put statements in positive form                              21
+
+      12. Use definite, specific, concrete language                    22
+
+      13. Omit needless words                                          24
+
+      14. Avoid a succession of loose sentences                        25
+
+      15. Express co-ordinate ideas in similar form                    26
+
+      16. Keep related words together                                  28
+
+      17. In summaries, keep to one tense                              29
+
+      18. Place the emphatic words of a sentence at the end            31
+
+   IV. A Few Matters of Form                                           33
+
+    V. Words and Expressions Commonly Misused                          36
+
+   VI. Spelling                                                        48
+
+  VII. Exercises on Chapters II and III                                50
+
+
+
+
+I. INTRODUCTORY
+
+
+This book aims to give in brief space the principal requirements of
+plain English style. It aims to lighten the task of instructor and
+student by concentrating attention (in Chapters II and III) on a few
+essentials, the rules of usage and principles of composition most
+commonly violated. In accordance with this plan it lays down three rules
+for the use of the comma, instead of a score or more, and one for the
+use of the semicolon, in the belief that these four rules provide for
+all the internal punctuation that is required by nineteen sentences out
+of twenty. Similarly, it gives in Chapter III only those principles of
+the paragraph and the sentence which are of the widest application. The
+book thus covers only a small portion of the field of English style. The
+experience of its writer has been that once past the essentials,
+students profit most by individual instruction based on the problems of
+their own work, and that each instructor has his own body of theory,
+which he may prefer to that offered by any textbook.
+
+The numbers of the sections may be used as references in correcting
+manuscript.
+
+The writer's colleagues in the Department of English in Cornell
+University have greatly helped him in the preparation of his manuscript.
+Mr. George McLane Wood has kindly consented to the inclusion under
+Rule 10 of some material from his _Suggestions to Authors_.
+
+The following books are recommended for reference or further study: in
+connection with Chapters II and IV, F. Howard Collins, _Author and
+Printer_ (Henry Frowde); Chicago University Press, _Manual of Style_;
+T. L. De Vinne, _Correct Composition_ (The Century Company); Horace
+Hart, _Rules for Compositors and Printers_ (Oxford University Press);
+George McLane Wood, _Extracts from the Style-Book of the Government
+Printing Office_ (United States Geological Survey); in connection with
+Chapters III and V, _The King's English_ (Oxford University Press); Sir
+Arthur Quiller-Couch, _The Art of Writing_ (Putnam), especially the
+chapter, Interlude on Jargon; George McLane Wood, _Suggestions to
+Authors_ (United States Geological Survey); John Lesslie Hall, _English
+Usage_ (Scott, Foresman and Co.); James P. Kelley, _Workmanship in
+Words_ (Little, Brown and Co.). In these will be found full discussions
+of many points here briefly treated and an abundant store of
+illustrations to supplement those given in this book.
+
+It is an old observation that the best writers sometimes disregard the
+rules of rhetoric. When they do so, however, the reader will usually
+find in the sentence some compensating merit, attained at the cost of
+the violation. Unless he is certain of doing as well, he will probably
+do best to follow the rules. After he has learned, by their guidance, to
+write plain English adequate for everyday uses, let him look, for the
+secrets of style, to the study of the masters of literature.
+
+
+
+
+II. ELEMENTARY RULES OF USAGE
+
+
+1. Form the possessive singular of nouns by adding 's.
+
+Follow this rule whatever the final consonant. Thus write,
+
+  Charles's friend
+
+  Burns's poems
+
+  the witch's malice
+
+This is the usage of the United States Government Printing Office and of
+the Oxford University Press.
+
+Exceptions are the possessive of ancient proper names in _-es_ and
+_-is_, the possessive _Jesus'_, and such forms as _for conscience'
+sake_, _for righteousness' sake_. But such forms as _Achilles' heel_,
+_Moses' laws_, _Isis' temple_ are commonly replaced by
+
+  the heel of Achilles
+
+  the laws of Moses
+
+  the temple of Isis
+
+The pronominal possessives _hers_, _its_, _theirs_, _yours_, and
+_oneself_ have no apostrophe.
+
+
+2. In a series of three or more terms with a single conjunction, use a
+comma after each term except the last.
+
+Thus write,
+
+  red, white, and blue
+
+  gold, silver, or copper
+
+  He opened the letter, read it, and made a note of its contents.
+
+This is also the usage of the Government Printing Office and of the
+Oxford University Press.
+
+In the names of business firms the last comma is omitted, as,
+
+  Brown, Shipley & Co.
+
+
+3. Enclose parenthetic expressions between commas.
+
+  The best way to see a country, unless you are pressed for time, is to
+  travel on foot.
+
+This rule is difficult to apply; it is frequently hard to decide whether
+a single word, such as _however_, or a brief phrase, is or is not
+parenthetic. If the interruption to the flow of the sentence is but
+slight, the writer may safely omit the commas. But whether the
+interruption be slight or considerable, he must never insert one comma
+and omit the other. Such punctuation as
+
+  Marjorie's husband, Colonel Nelson paid us a visit yesterday,
+
+or
+
+  My brother you will be pleased to hear, is now in perfect health,
+
+is indefensible.
+
+If a parenthetic expression is preceded by a conjunction, place the
+first comma before the conjunction, not after it.
+
+  He saw us coming, and unaware that we had learned of his treachery,
+  greeted us with a smile.
+
+Always to be regarded as parenthetic and to be enclosed between commas
+(or, at the end of the sentence, between comma and period) are the
+following:
+
+(1) the year, when forming part of a date, and the day of the month,
+when following the day of the week:
+
+  February to July, 1916.
+
+  April 6, 1917.
+
+  Monday, November 11, 1918.
+
+(2) the abbreviations _etc._ and _jr._
+
+(3) non-restrictive relative clauses, that is, those which do not serve
+to identify or define the antecedent noun, and similar clauses
+introduced by conjunctions indicating time or place.
+
+  The audience, which had at first been indifferent, became more and
+  more interested.
+
+In this sentence the clause introduced by _which_ does not serve to tell
+which of several possible audiences is meant; what audience is in
+question is supposed to be already known. The clause adds,
+parenthetically, a statement supplementing that in the main clause. The
+sentence is virtually a combination of two statements which might have
+been made independently:
+
+  The audience had at first been indifferent. It became more and more
+  interested.
+
+Compare the restrictive relative clause, not set off by commas, in the
+sentence,
+
+  The candidate who best meets these requirements will obtain the place.
+
+Here the clause introduced by _who_ does serve to tell which of several
+possible candidates is meant; the sentence cannot be split up into two
+independent statements.
+
+The difference in punctuation in the two sentences following is based on
+the same principle:
+
+  Nether Stowey, where Coleridge wrote _The Rime of the Ancient
+  Mariner_, is a few miles from Bridgewater.
+
+  The day will come when you will admit your mistake.
+
+Nether Stowey is completely identified by its name; the statement about
+Coleridge is therefore supplementary and parenthetic. The _day_ spoken
+of is identified only by the dependent clause, which is therefore
+restrictive.
+
+Similar in principle to the enclosing of parenthetic expressions between
+commas is the setting off by commas of phrases or dependent clauses
+preceding or following the main clause of a sentence.
+
+  Partly by hard fighting, partly by diplomatic skill, they enlarged
+  their dominions to the east, and rose to royal rank with the
+  possession of Sicily, exchanged afterwards for Sardinia.
+
+Other illustrations may be found in sentences quoted under Rules 4, 5,
+6, 7, 16, and 18.
+
+The writer should be careful not to set off independent clauses by
+commas: see under Rule 5.
+
+
+4. Place a comma before a conjunction introducing a co-ordinate clause.
+
+  The early records of the city have disappeared, and the story of its
+  first years can no longer be reconstructed.
+
+  The situation is perilous, but there is still one chance of escape.
+
+Sentences of this type, isolated from their context, may seem to be in
+need of rewriting. As they make complete sense when the comma is
+reached, the second clause has the appearance of an afterthought.
+Further, _and_ is the least specific of connectives. Used between
+independent clauses, it indicates only that a relation exists between
+them without defining that relation. In the example above, the relation
+is that of cause and result. The two sentences might be rewritten:
+
+  As the early records of the city have disappeared, the story of its
+  first years can no longer be reconstructed.
+
+  Although the situation is perilous, there is still one chance of
+  escape.
+
+Or the subordinate clauses might be replaced by phrases:
+
+  Owing to the disappearance of the early records of the city, the story
+  of its first years can no longer be reconstructed.
+
+  In this perilous situation, there is still one chance of escape.
+
+But a writer may err by making his sentences too uniformly compact and
+periodic, and an occasional loose sentence prevents the style from
+becoming too formal and gives the reader a certain relief. Consequently,
+loose sentences of the type first quoted are common in easy, unstudied
+writing. But a writer should be careful not to construct too many of his
+sentences after this pattern (see Rule 14).
+
+Two-part sentences of which the second member is introduced by _as_ (in
+the sense of _because_), _for_, _or_, _nor_, and _while_ (in the sense
+of _and at the same time_) likewise require a comma before the
+conjunction.
+
+If the second member is introduced by an adverb, a semicolon, not a
+comma, is required (see Rule 5). The connectives _so_ and _yet_ may be
+used either as adverbs or as conjunctions, accordingly as the second
+clause is felt to be co-ordinate or subordinate; consequently either
+mark of punctuation may be justified. But these uses of _so_ (equivalent
+to _accordingly_ or to _so that_) are somewhat colloquial and should, as
+a rule, be avoided in writing. A simple correction, usually serviceable,
+is to omit the word _so_ and begin the first clause with _as_ or
+_since_:
+
+  I had never been in the place before; so I had difficulty in finding
+  my way about.
+
+    As I had never been in the place before, I had difficulty in finding
+    my way about.
+
+If a dependent clause, or an introductory phrase requiring to be set off
+by a comma, precedes the second independent clause, no comma is needed
+after the conjunction.
+
+  The situation is perilous, but if we are prepared to act promptly,
+  there is still one chance of escape.
+
+When the subject is the same for both clauses and is expressed only
+once, a comma is required if the connective is _but_. If the connective
+is _and_, the comma should be omitted if the relation between the two
+statements is close or immediate.
+
+  I have heard his arguments, but am still unconvinced.
+
+  He has had several years' experience and is thoroughly competent.
+
+
+5. Do not join independent clauses by a comma.
+
+If two or more clauses, grammatically complete and not joined by a
+conjunction, are to form a single compound sentence, the proper mark of
+punctuation is a semicolon.
+
+  Stevenson's romances are entertaining; they are full of exciting
+  adventures.
+
+  It is nearly half past five; we cannot reach town before dark.
+
+It is of course equally correct to write the above as two sentences
+each, replacing the semicolons by periods.
+
+  Stevenson's romances are entertaining. They are full of exciting
+  adventures.
+
+  It is nearly half past five. We cannot reach town before dark.
+
+If a conjunction is inserted the proper mark is a comma (Rule 4).
+
+  Stevenson's romances are entertaining, for they are full of exciting
+  adventures.
+
+  It is nearly half past five, and we cannot reach town before dark.
+
+A comparison of the three forms given above will show clearly the
+advantage of the first. It is, at least in the examples given, better
+than the second form, because it suggests the close relationship between
+the two statements in a way that the second does not attempt, and better
+than the third, because briefer and therefore more forcible. Indeed it
+may be said that this simple method of indicating relationship between
+statements is one of the most useful devices of composition. The
+relationship, as above, is commonly one of cause or of consequence.
+
+Note that if the second clause is preceded by an adverb, such as
+_accordingly_, _besides_, _then_, _therefore_, or _thus_, and not by a
+conjunction, the semicolon is still required.
+
+Two exceptions to the rule may be admitted. If the clauses are very
+short, and are alike in form, a comma is usually permissible:
+
+  Man proposes, God disposes.
+
+  The gate swung apart, the bridge fell, the portcullis was drawn up.
+
+Note that in these examples the relation is not one of cause or
+consequence. Also in the colloquial form of expression,
+
+  I hardly knew him, he was so changed,
+
+a comma, not a semicolon, is required. But this form of expression is
+inappropriate in writing, except in the dialogue of a story or play, or
+perhaps in a familiar letter.
+
+
+6. Do not break sentences in two.
+
+In other words, do not use periods for commas.
+
+  I met them on a Cunard liner several years ago. Coming home from
+  Liverpool to New York.
+
+  He was an interesting talker. A man who had traveled all over the
+  world and lived in half a dozen countries.
+
+In both these examples, the first period should be replaced by a comma,
+and the following word begun with a small letter.
+
+It is permissible to make an emphatic word or expression serve the
+purpose of a sentence and to punctuate it accordingly:
+
+  Again and again he called out. No reply.
+
+The writer must, however, be certain that the emphasis is warranted, and
+that he will not be suspected of a mere blunder in syntax or in
+punctuation.
+
+Rules 3, 4, 5, and 6 cover the most important principles in the
+punctuation of ordinary sentences; they should be so thoroughly mastered
+that their application becomes second nature.
+
+
+7. A participial phrase at the beginning of a sentence must refer to the
+grammatical subject.
+
+  Walking slowly down the road, he saw a woman accompanied by two
+  children.
+
+The word _walking_ refers to the subject of the sentence, not to the
+woman. If the writer wishes to make it refer to the woman, he must
+recast the sentence:
+
+  He saw a woman accompanied by two children, walking slowly down the
+  road.
+
+Participial phrases preceded by a conjunction or by a preposition, nouns
+in apposition, adjectives, and adjective phrases come under the same
+rule if they begin the sentence.
+
+  On arriving in Chicago, his friends met him at the station.
+
+    When he arrived (or, On his arrival) in Chicago, his friends met him
+    at the station.
+
+  A soldier of proved valor, they entrusted him with the defence of the
+  city.
+
+    A soldier of proved valor, he was entrusted with the defence of the
+    city.
+
+  Young and inexperienced, the task seemed easy to me.
+
+    Young and inexperienced, I thought the task easy.
+
+  Without a friend to counsel him, the temptation proved irresistible.
+
+    Without a friend to counsel him, he found the temptation
+    irresistible.
+
+Sentences violating this rule are often ludicrous.
+
+  Being in a dilapidated condition, I was able to buy the house very
+  cheap.
+
+  Wondering irresolutely what to do next, the clock struck twelve.
+
+
+
+
+III. ELEMENTARY PRINCIPLES OF COMPOSITION
+
+
+8. Make the paragraph the unit of composition: one paragraph to each
+topic.
+
+If the subject on which you are writing is of slight extent, or if you
+intend to treat it very briefly, there may be no need of subdividing it
+into topics. Thus a brief description, a brief summary of a literary
+work, a brief account of a single incident, a narrative merely outlining
+an action, the setting forth of a single idea, any one of these is best
+written in a single paragraph. After the paragraph has been written,
+examine it to see whether subdivision will not improve it.
+
+Ordinarily, however, a subject requires subdivision into topics, each of
+which should be made the subject of a paragraph. The object of treating
+each topic in a paragraph by itself is, of course, to aid the reader.
+The beginning of each paragraph is a signal to him that a new step in
+the development of the subject has been reached.
+
+The extent of subdivision will vary with the length of the composition.
+For example, a short notice of a book or poem might consist of a single
+paragraph. One slightly longer might consist of two paragraphs:
+
+  A. Account of the work.
+  B. Critical discussion.
+
+A report on a poem, written for a class in literature, might consist of
+seven paragraphs:
+
+  A. Facts of composition and publication.
+  B. Kind of poem; metrical form.
+  C. Subject.
+  D. Treatment of subject.
+  E. For what chiefly remarkable.
+  F. Wherein characteristic of the writer.
+  G. Relationship to other works.
+
+The contents of paragraphs C and D would vary with the poem. Usually,
+paragraph C would indicate the actual or imagined circumstances of the
+poem (the situation), if these call for explanation, and would then
+state the subject and outline its development. If the poem is a
+narrative in the third person throughout, paragraph C need contain no
+more than a concise summary of the action. Paragraph D would indicate
+the leading ideas and show how they are made prominent, or would
+indicate what points in the narrative are chiefly emphasized.
+
+A novel might be discussed under the heads:
+
+  A. Setting.
+  B. Plot.
+  C. Characters.
+  D. Purpose.
+
+An historical event might be discussed under the heads:
+
+  A. What led up to the event.
+  B. Account of the event.
+  C. What the event led up to.
+
+In treating either of these last two subjects, the writer would probably
+find it necessary to subdivide one or more of the topics here given.
+
+As a rule, single sentences should not be written or printed as
+paragraphs. An exception may be made of sentences of transition,
+indicating the relation between the parts of an exposition or argument.
+Frequent exceptions are also necessary in textbooks, guidebooks, and
+other works in which many topics are treated briefly.
+
+In dialogue, each speech, even if only a single word, is a paragraph by
+itself; that is, a new paragraph begins with each change of speaker. The
+application of this rule, when dialogue and narrative are combined, is
+best learned from examples in well-printed works of fiction.
+
+
+9. As a rule, begin each paragraph with a topic sentence, end it in
+conformity with the beginning.
+
+Again, the object is to aid the reader. The practice here recommended
+enables him to discover the purpose of each paragraph as he begins to
+read it, and to retain this purpose in mind as he ends it. For this
+reason, the most generally useful kind of paragraph, particularly in
+exposition and argument, is that in which
+
+(a) the topic sentence comes at or near the beginning;
+
+(b) the succeeding sentences explain or establish or develop the
+statement made in the topic sentence; and
+
+(c) the final sentence either emphasizes the thought of the topic
+sentence or states some important consequence.
+
+Ending with a digression, or with an unimportant detail, is particularly
+to be avoided.
+
+If the paragraph forms part of a larger composition, its relation to
+what precedes, or its function as a part of the whole, may need to be
+expressed. This can sometimes be done by a mere word or phrase (_again_;
+_therefore_; _for the same reason_) in the topic sentence. Sometimes,
+however, it is expedient to precede the topic sentence by one or more
+sentences of introduction or transition. If more than one such sentence
+is required, it is generally better to set apart the transitional
+sentences as a separate paragraph.
+
+According to the writer's purpose, he may, as indicated above, relate
+the body of the paragraph to the topic sentence in one or more of
+several different ways. He may make the meaning of the topic sentence
+clearer by restating it in other forms, by defining its terms, by
+denying the contrary, by giving illustrations or specific instances; he
+may establish it by proofs; or he may develop it by showing its
+implications and consequences. In a long paragraph, he may carry out
+several of these processes.
+
+  1 Now, to be properly enjoyed, a walking tour should be gone upon
+  alone. 2 If you go in a company, or even in pairs, it is no longer a
+  walking tour in anything but name; it is something else and more in
+  the nature of a picnic. 3 A walking tour should be gone upon alone,
+  because freedom is of the essence; because you should be able to stop
+  and go on, and follow this way or that, as the freak takes you; and
+  because you must have your own pace, and neither trot alongside a
+  champion walker, nor mince in time with a girl. 4 And you must be open
+  to all impressions and let your thoughts take colour from what you
+  see. 5 You should be as a pipe for any wind to play upon. 6 "I cannot
+  see the wit," says Hazlitt, "of walking and talking at the same time.
+  7 When I am in the country, I wish to vegetate like the country,"
+  which is the gist of all that can be said upon the matter. 8 There
+  should be no cackle of voices at your elbow, to jar on the meditative
+  silence of the morning. 9 And so long as a man is reasoning he cannot
+  surrender himself to that fine intoxication that comes of much motion
+  in the open air, that begins in a sort of dazzle and sluggishness of
+  the brain, and ends in a peace that passes comprehension.--Stevenson,
+  _Walking Tours_.
+
+  1 Topic sentence. 2 The meaning made clearer by denial of the
+  contrary. 3 The topic sentence repeated, in abridged form, and
+  supported by three reasons; the meaning of the third ("you must have
+  your own pace") made clearer by denying the contrary. 4 A fourth
+  reason, stated in two forms. 5 The same reason, stated in still
+  another form. 6-7 The same reason as stated by Hazlitt. 8 Repetition,
+  in paraphrase, of the quotation from Hazlitt. 9 Final statement of the
+  fourth reason, in language amplified and heightened to form a strong
+  conclusion.
+
+  1 It was chiefly in the eighteenth century that a very different
+  conception of history grew up. 2 Historians then came to believe that
+  their task was not so much to paint a picture as to solve a problem;
+  to explain or illustrate the successive phases of national growth,
+  prosperity, and adversity. 3 The history of morals, of industry, of
+  intellect, and of art; the changes that take place in manners or
+  beliefs; the dominant ideas that prevailed in successive periods; the
+  rise, fall, and modification of political constitutions; in a word,
+  all the conditions of national well-being became the subject of their
+  works. 4 They sought rather to write a history of peoples than a
+  history of kings. 5 They looked especially in history for the chain of
+  causes and effects. 6 They undertook to study in the past the
+  physiology of nations, and hoped by applying the experimental method
+  on a large scale to deduce some lessons of real value about the
+  conditions on which the welfare of society mainly depend.--Lecky, _The
+  Political Value of History_.
+
+  1 Topic sentence. 2 The meaning of the topic sentence made clearer;
+  the new conception of history defined. 3 The definition expanded. 4
+  The definition explained by contrast. 5 The definition supplemented:
+  another element in the new conception of history. 6 Conclusion: an
+  important consequence of the new conception of history.
+
+In narration and description the paragraph sometimes begins with a
+concise, comprehensive statement serving to hold together the details
+that follow.
+
+  The breeze served us admirably.
+
+  The campaign opened with a series of reverses.
+
+  The next ten or twelve pages were filled with a curious set of
+  entries.
+
+But this device, if too often used, would become a mannerism. More
+commonly the opening sentence simply indicates by its subject with what
+the paragraph is to be principally concerned.
+
+  At length I thought I might return towards the stockade.
+
+  He picked up the heavy lamp from the table and began to explore.
+
+  Another flight of steps, and they emerged on the roof.
+
+The brief paragraphs of animated narrative, however, are often without
+even this semblance of a topic sentence. The break between them serves
+the purpose of a rhetorical pause, throwing into prominence some detail
+of the action.
+
+
+10. Use the active voice.
+
+The active voice is usually more direct and vigorous than the passive:
+
+  I shall always remember my first visit to Boston.
+
+This is much better than
+
+  My first visit to Boston will always be remembered by me.
+
+The latter sentence is less direct, less bold, and less concise. If the
+writer tries to make it more concise by omitting "by me,"
+
+  My first visit to Boston will always be remembered,
+
+it becomes indefinite: is it the writer, or some person undisclosed, or
+the world at large, that will always remember this visit?
+
+This rule does not, of course, mean that the writer should entirely
+discard the passive voice, which is frequently convenient and sometimes
+necessary.
+
+  The dramatists of the Restoration are little esteemed to-day.
+
+  Modern readers have little esteem for the dramatists of the
+  Restoration.
+
+The first would be the right form in a paragraph on the dramatists of
+the Restoration; the second, in a paragraph on the tastes of modern
+readers. The need of making a particular word the subject of the
+sentence will often, as in these examples, determine which voice is to
+be used.
+
+As a rule, avoid making one passive depend directly upon another.
+
+  Gold was not allowed to be exported.
+
+    It was forbidden to export gold (The export of gold was prohibited).
+
+  He has been proved to have been seen entering the building.
+
+    It has been proved that he was seen to enter the building.
+
+In both the examples above, before correction, the word properly related
+to the second passive is made the subject of the first.
+
+A common fault is to use as the subject of a passive construction a noun
+which expresses the entire action, leaving to the verb no function
+beyond that of completing the sentence.
+
+  A survey of this region was made in 1900.
+
+    This region was surveyed in 1900.
+
+  Mobilization of the army was rapidly effected.
+
+    The army was rapidly mobilized.
+
+  Confirmation of these reports cannot be obtained.
+
+    These reports cannot be confirmed.
+
+Compare the sentence, "The export of gold was prohibited," in which the
+predicate "was prohibited" expresses something not implied in "export."
+
+The habitual use of the active voice makes for forcible writing. This is
+true not only in narrative principally concerned with action, but in
+writing of any kind. Many a tame sentence of description or exposition
+can be made lively and emphatic by substituting a verb in the active
+voice for some such perfunctory expression as _there is_, or _could be
+heard_.
+
+  There were a great number of dead leaves lying on the ground.
+
+    Dead leaves covered the ground.
+
+  The sound of a guitar somewhere in the house could be heard.
+
+    Somewhere in the house a guitar hummed sleepily.
+
+  The reason that he left college was that his health became impaired.
+
+    Failing health compelled him to leave college.
+
+  It was not long before he was very sorry that he had said what he had.
+
+    He soon repented his words.
+
+
+11. Put statements in positive form.
+
+Make definite assertions. Avoid tame, colorless, hesitating,
+non-committal language. Use the word _not_ as a means of denial or in
+antithesis, never as a means of evasion.
+
+  He was not very often on time.
+
+    He usually came late.
+
+  He did not think that studying Latin was much use.
+
+    He thought the study of Latin useless.
+
+  _The Taming of the Shrew_ is rather weak in spots. Shakespeare does
+  not portray Katharine as a very admirable character, nor does Bianca
+  remain long in memory as an important character in Shakespeare's works.
+
+    The women in _The Taming of the Shrew_ are unattractive. Katharine
+    is disagreeable, Bianca insignificant.
+
+The last example, before correction, is indefinite as well as negative.
+The corrected version, consequently, is simply a guess at the writer's
+intention.
+
+All three examples show the weakness inherent in the word _not_.
+Consciously or unconsciously, the reader is dissatisfied with being told
+only what is not; he wishes to be told what is. Hence, as a rule, it is
+better to express even a negative in positive form.
+
+  not honest
+
+    dishonest
+
+  not important
+
+    trifling
+
+  did not remember
+
+    forgot
+
+  did not pay any attention to
+
+    ignored
+
+  did not have much confidence in
+
+    distrusted
+
+The antithesis of negative and positive is strong:
+
+  Not charity, but simple justice.
+
+  Not that I loved Caesar less, but Rome the more.
+
+Negative words other than _not_ are usually strong:
+
+  The sun never sets upon the British flag.
+
+
+12. Use definite, specific, concrete language.
+
+Prefer the specific to the general, the definite to the vague, the
+concrete to the abstract.
+
+  A period of unfavorable weather set in.
+
+    It rained every day for a week.
+
+  He showed satisfaction as he took possession of his well-earned
+  reward.
+
+    He grinned as he pocketed the coin.
+
+  There is a general agreement among those who have enjoyed the
+  experience that surf-riding is productive of great exhilaration.
+
+    All who have tried surf-riding agree that it is most exhilarating.
+
+If those who have studied the art of writing are in accord on any one
+point, it is on this, that the surest method of arousing and holding the
+attention of the reader is by being specific, definite, and concrete.
+Critics have pointed out how much of the effectiveness of the greatest
+writers, Homer, Dante, Shakespeare, results from their constant
+definiteness and concreteness. Browning, to cite a more modern author,
+affords many striking examples. Take, for instance, the lines from _My
+Last Duchess_,
+
+  Sir, 'twas all one! My favour at her breast,
+  The dropping of the daylight in the west,
+  The bough of cherries some officious fool
+  Broke in the orchard for her, the white mule
+  She rode with round the terrace--all and each
+  Would draw from her alike the approving speech,
+  Or blush, at least,
+
+and those which end the poem,
+
+      Notice Neptune, though,
+  Taming a sea-horse, thought a rarity,
+  Which Claus of Innsbruck cast in bronze for me.
+
+These words call up pictures. Recall how in _The Bishop Orders his Tomb
+in St. Praxed's Church_ "the Renaissance spirit--its worldliness,
+inconsistency, pride, hypocrisy, ignorance of itself, love of art, of
+luxury, of good Latin," to quote Ruskin's comment on the poem, is made
+manifest in specific details and in concrete terms.
+
+Prose, in particular narrative and descriptive prose, is made vivid by
+the same means. If the experiences of Jim Hawkins and of David Balfour,
+of Kim, of Nostromo, have seemed for the moment real to countless
+readers, if in reading Carlyle we have almost the sense of being
+physically present at the taking of the Bastille, it is because of the
+definiteness of the details and the concreteness of the terms used. It
+is not that every detail is given; that would be impossible, as well as
+to no purpose; but that all the significant details are given, and not
+vaguely, but with such definiteness that the reader, in imagination, can
+project himself into the scene.
+
+In exposition and in argument, the writer must likewise never lose his
+hold upon the concrete, and even when he is dealing with general
+principles, he must give particular instances of their application.
+
+"This superiority of specific expressions is clearly due to the effort
+required to translate words into thoughts. As we do not think in
+generals, but in particulars--as whenever any class of things is
+referred to, we represent it to ourselves by calling to mind individual
+members of it, it follows that when an abstract word is used, the hearer
+or reader has to choose, from his stock of images, one or more by which
+he may figure to himself the genus mentioned. In doing this, some delay
+must arise, some force be expended; and if by employing a specific term
+an appropriate image can be at once suggested, an economy is achieved,
+and a more vivid impression produced."
+
+Herbert Spencer, from whose _Philosophy of Style_ the preceding
+paragraph is quoted, illustrates the principle by the sentences:
+
+  In proportion as the manners, customs, and amusements of a nation are
+  cruel and barbarous, the regulations of their penal code will be
+  severe.
+
+    In proportion as men delight in battles, bull-fights, and combats of
+    gladiators, will they punish by hanging, burning, and the rack.
+
+
+13. Omit needless words.
+
+Vigorous writing is concise. A sentence should contain no unnecessary
+words, a paragraph no unnecessary sentences, for the same reason that a
+drawing should have no unnecessary lines and a machine no unnecessary
+parts. This requires not that the writer make all his sentences short,
+or that he avoid all detail and treat his subjects only in outline, but
+that he make every word tell.
+
+Many expressions in common use violate this principle:
+
+  the question as to whether
+
+    whether (the question whether)
+
+  there is no doubt but that
+
+    no doubt (doubtless)
+
+  used for fuel purposes
+
+    used for fuel
+
+  he is a man who
+
+    he
+
+  in a hasty manner
+
+    hastily
+
+  this is a subject which
+
+    this subject
+
+  His story is a strange one.
+
+    His story is strange.
+
+In especial the expression _the fact that_ should be revised out of
+every sentence in which it occurs.
+
+  owing to the fact that
+
+    since (because)
+
+  in spite of the fact that
+
+    though (although)
+
+  call your attention to the fact that
+
+    remind you (notify you)
+
+  I was unaware of the fact that
+
+    I was unaware that (did not know)
+
+  the fact that he had not succeeded
+
+    his failure
+
+  the fact that I had arrived
+
+    my arrival
+
+See also under _case_, _character_, _nature_, _system_ in Chapter V.
+
+_Who is_, _which was_, and the like are often superfluous.
+
+  His brother, who is a member of the same firm
+
+    His brother, a member of the same firm
+
+  Trafalgar, which was Nelson's last battle
+
+    Trafalgar, Nelson's last battle
+
+As positive statement is more concise than negative, and the active
+voice more concise than the passive, many of the examples given under
+Rules 11 and 12 illustrate this rule as well.
+
+A common violation of conciseness is the presentation of a single
+complex idea, step by step, in a series of sentences or independent
+clauses which might to advantage be combined into one.
+
+  Macbeth was very ambitious. This led him to wish to become king of
+  Scotland. The witches told him that this wish of his would come true.
+  The king of Scotland at this time was Duncan. Encouraged by his wife,
+  Macbeth murdered Duncan. He was thus enabled to succeed Duncan as
+  king. (51 words.)
+
+    Encouraged by his wife, Macbeth achieved his ambition and realized
+    the prediction of the witches by murdering Duncan and becoming king
+    of Scotland in his place. (26 words.)
+
+  There were several less important courses, but these were the most
+  important, and although they did not come every day, they came often
+  enough to keep you in such a state of mind that you never knew what
+  your next move would be. (43 words.)
+
+    These, the most important courses of all, came, if not daily, at
+    least often enough to keep one under constant strain. (21 words.)
+
+
+14. Avoid a succession of loose sentences:
+
+This rule refers especially to loose sentences of a particular type,
+those consisting of two co-ordinate clauses, the second introduced by a
+conjunction or relative. Although single sentences of this type may be
+unexceptionable (see under Rule 4), a series soon becomes monotonous and
+tedious.
+
+An unskilful writer will sometimes construct a whole paragraph of
+sentences of this kind, using as connectives _and_, _but_, _so_, and
+less frequently, _who_, _which_, _when_, _where_, and _while_, these
+last in non-restrictive senses (see under Rule 3).
+
+  The third concert of the subscription series was given last evening,
+  and a large audience was in attendance. Mr. Edward Appleton was the
+  soloist, and the Boston Symphony Orchestra furnished the instrumental
+  music. The former showed himself to be an artist of the first rank,
+  while the latter proved itself fully deserving of its high reputation.
+  The interest aroused by the series has been very gratifying to the
+  Committee, and it is planned to give a similar series annually
+  hereafter. The fourth concert will be given on Tuesday, May 10, when
+  an equally attractive programme will be presented.
+
+Apart from its triteness and emptiness, the paragraph above is weak
+because of the structure of its sentences, with their mechanical
+symmetry and sing-song. Contrast with them the sentences in the
+paragraphs quoted under Rule 9, or in any piece of good English prose,
+as the preface (Before the Curtain) to _Vanity Fair_.
+
+If the writer finds that he has written a series of sentences of the
+type described, he should recast enough of them to remove the monotony,
+replacing them by simple sentences, by sentences of two clauses joined
+by a semicolon, by periodic sentences of two clauses, by sentences,
+loose or periodic, of three clauses--whichever best represent the real
+relations of the thought.
+
+
+15. Express co-ordinate ideas in similar form.
+
+This principle, that of parallel construction, requires that expressions
+of similar content and function should be outwardly similar. The
+likeness of form enables the reader to recognize more readily the
+likeness of content and function. Familiar instances from the Bible are
+the Ten Commandments, the Beatitudes, and the petitions of the Lord's
+Prayer.
+
+The unskillful writer often violates this principle, from a mistaken
+belief that he should constantly vary the form of his expressions. It is
+true that in repeating a statement in order to emphasize it he may have
+need to vary its form. For illustration, see the paragraph from
+Stevenson quoted under Rule 9. But apart from this, he should follow the
+principle of parallel construction.
+
+  Formerly, science was taught by the textbook method, while now the
+  laboratory method is employed.
+
+    Formerly, science was taught by the textbook method; now it is
+    taught by the laboratory method.
+
+The left-hand version gives the impression that the writer is undecided
+or timid; he seems unable or afraid to choose one form of expression and
+hold to it. The right-hand version shows that the writer has at least
+made his choice and abided by it.
+
+By this principle, an article or a preposition applying to all the
+members of a series must either be used only before the first term or
+else be repeated before each term.
+
+  The French, the Italians, Spanish, and Portuguese
+
+    The French, the Italians, the Spanish, and the Portuguese
+
+  In spring, summer, or in winter
+
+    In spring, summer, or winter (In spring, in summer, or in winter)
+
+Correlative expressions (_both, and_; _not, but_; _not only, but also_;
+_either, or_; _first, second, third_; and the like) should be followed
+by the same grammatical construction, that is, virtually, by the same
+part of speech. (Such combinations as "both Henry and I," "not silk, but
+a cheap substitute," are obviously within the rule.) Many violations of
+this rule (as the first three below) arise from faulty arrangement;
+others (as the last) from the use of unlike constructions.
+
+  It was both a long ceremony and very tedious.
+
+    The ceremony was both long and tedious.
+
+  A time not for words, but action.
+
+    A time not for words, but for action.
+
+  Either you must grant his request or incur his ill will.
+
+    You must either grant his request or incur his ill will.
+
+  My objections are, first, the injustice of the measure; second, that
+  it is unconstitutional.
+
+    My objections are, first, that the measure is unjust; second, that
+    it is unconstitutional.
+
+See also the third example under Rule 12 and the last under Rule 13.
+
+It may be asked, what if a writer needs to express a very large number
+of similar ideas, say twenty? Must he write twenty consecutive sentences
+of the same pattern? On closer examination he will probably find that
+the difficulty is imaginary, that his twenty ideas can be classified in
+groups, and that he need apply the principle only within each group.
+Otherwise he had best avoid difficulty by putting his statements in the
+form of a table.
+
+
+16. Keep related words together.
+
+The position of the words in a sentence is the principal means of
+showing their relationship. The writer must therefore, so far as
+possible, bring together the words, and groups of words, that are
+related in thought, and keep apart those which are not so related.
+
+The subject of a sentence and the principal verb should not, as a rule,
+be separated by a phrase or clause that can be transferred to the
+beginning.
+
+  Wordsworth, in the fifth book of _The Excursion_, gives a
+  minute description of this church.
+
+    In the fifth book of _The Excursion_, Wordsworth gives a
+    minute description of this church.
+
+  Cast iron, when treated in a Bessemer converter, is changed into
+  steel.
+
+    By treatment in a Bessemer converter, cast iron is changed into
+    steel.
+
+The objection is that the interposed phrase or clause needlessly
+interrupts the natural order of the main clause. Usually, however, this
+objection does not hold when the order is interrupted only by a relative
+clause or by an expression in apposition. Nor does it hold in periodic
+sentences in which the interruption is a deliberately used means of
+creating suspense (see examples under Rule 18).
+
+The relative pronoun should come, as a rule, immediately after its
+antecedent.
+
+  There was a look in his eye that boded mischief.
+
+    In his eye was a look that boded mischief.
+
+  He wrote three articles about his adventures in Spain, which were
+  published in _Harper's Magazine_.
+
+    He published in _Harper's Magazine_ three articles about
+    his adventures in Spain.
+
+  This is a portrait of Benjamin Harrison, grandson of William Henry
+  Harrison, who became President in 1889.
+
+    This is a portrait of Benjamin Harrison, grandson of William Henry
+    Harrison. He became President in 1889.
+
+If the antecedent consists of a group of words, the relative comes at
+the end of the group, unless this would cause ambiguity.
+
+  The Superintendent of the Chicago Division, who
+
+  A proposal to amend the Sherman Act, which has been variously judged.
+
+    A proposal, which has been variously judged, to amend the Sherman
+    Act.
+
+    A proposal to amend the much-debated Sherman Act.
+
+  The grandson of William Henry Harrison, who
+
+    William Henry Harrison's grandson, who
+
+A noun in apposition may come between antecedent and relative, because
+in such a combination no real ambiguity can arise.
+
+  The Duke of York, his brother, who was regarded with hostility by the
+  Whigs
+
+Modifiers should come, if possible, next to the word they modify. If
+several expressions modify the same word, they should be so arranged
+that no wrong relation is suggested.
+
+  All the members were not present.
+
+    Not all the members were present.
+
+  He only found two mistakes.
+
+    He found only two mistakes.
+
+  Major R. E. Joyce will give a lecture on Tuesday evening in Bailey
+  Hall, to which the public is invited, on "My Experiences in
+  Mesopotamia" at eight P. M.
+
+    On Tuesday evening at eight P. M., Major R. E. Joyce will
+    give in Bailey Hall a lecture on "My Experiences in Mesopotamia."
+    The public is invited.
+
+
+17. In summaries, keep to one tense.
+
+In summarizing the action of a drama, the writer should always use the
+present tense. In summarizing a poem, story, or novel, he should
+preferably use the present, though he may use the past if he prefers. If
+the summary is in the present tense, antecedent action should be
+expressed by the perfect; if in the past, by the past perfect.
+
+  An unforeseen chance prevents Friar John from delivering Friar
+  Lawrence's letter to Romeo. Meanwhile, owing to her father's arbitrary
+  change of the day set for her wedding, Juliet has been compelled to
+  drink the potion on Tuesday night, with the result that Balthasar
+  informs Romeo of her supposed death before Friar Lawrence learns of
+  the non-delivery of the letter.
+
+But whichever tense be used in the summary, a past tense in indirect
+discourse or in indirect question remains unchanged.
+
+  The Friar confesses that it was he who married them.
+
+Apart from the exceptions noted, whichever tense the writer chooses, he
+should use throughout. Shifting from one tense to the other gives the
+appearance of uncertainty and irresolution (compare Rule 15).
+
+In presenting the statements or the thought of some one else, as in
+summarizing an essay or reporting a speech, the writer should avoid
+intercalating such expressions as "he said," "he stated," "the speaker
+added," "the speaker then went on to say," "the author also thinks," or
+the like. He should indicate clearly at the outset, once for all, that
+what follows is summary, and then waste no words in repeating the
+notification.
+
+In notebooks, in newspapers, in handbooks of literature, summaries of
+one kind or another may be indispensable, and for children in primary
+schools it is a useful exercise to retell a story in their own words.
+But in the criticism or interpretation of literature the writer should
+be careful to avoid dropping into summary. He may find it necessary to
+devote one or two sentences to indicating the subject, or the opening
+situation, of the work he is discussing; he may cite numerous details to
+illustrate its qualities. But he should aim to write an orderly
+discussion supported by evidence, not a summary with occasional comment.
+Similarly, if the scope of his discussion includes a number of works, he
+will as a rule do better not to take them up singly in chronological
+order, but to aim from the beginning at establishing general
+conclusions.
+
+
+18. Place the emphatic words of a sentence at the end.
+
+The proper place in the sentence for the word, or group of words, which
+the writer desires to make most prominent is usually the end.
+
+  Humanity has hardly advanced in fortitude since that time, though it
+  has advanced in many other ways.
+
+    Humanity, since that time, has advanced in many other ways, but it
+    has hardly advanced in fortitude.
+
+  This steel is principally used for making razors, because of its
+  hardness.
+
+    Because of its hardness, this steel is principally used in making
+    razors.
+
+The word or group of words entitled to this position of prominence is
+usually the logical predicate, that is, the _new_ element in the
+sentence, as it is in the second example.
+
+The effectiveness of the periodic sentence arises from the prominence
+which it gives to the main statement.
+
+  Four centuries ago, Christopher Columbus, one of the Italian mariners
+  whom the decline of their own republics had put at the service of the
+  world and of adventure, seeking for Spain a westward passage to the
+  Indies as a set-off against the achievements of Portuguese
+  discoverers, lighted on America.
+
+  With these hopes and in this belief I would urge you, laying aside all
+  hindrance, thrusting away all private aims, to devote yourself
+  unswervingly and unflinchingly to the vigorous and successful
+  prosecution of this war.
+
+The other prominent position in the sentence is the beginning. Any
+element in the sentence, other than the subject, may become emphatic
+when placed first.
+
+  Deceit or treachery he could never forgive.
+
+  So vast and rude, fretted by the action of nearly three thousand
+  years, the fragments of this architecture may often seem, at first
+  sight, like works of nature.
+
+A subject coming first in its sentence may be emphatic, but hardly by
+its position alone. In the sentence,
+
+  Great kings worshipped at his shrine,
+
+the emphasis upon _kings_ arises largely from its meaning and from the
+context. To receive special emphasis, the subject of a sentence must
+take the position of the predicate.
+
+  Through the middle of the valley flowed a winding stream.
+
+The principle that the proper place for what is to be made most
+prominent is the end applies equally to the words of a sentence, to the
+sentences of a paragraph, and to the paragraphs of a composition.
+
+
+
+
+IV. A FEW MATTERS OF FORM
+
+
+=Headings.= Leave a blank line, or its equivalent in space, after the
+title or heading of a manuscript. On succeeding pages, if using ruled
+paper, begin on the first line.
+
+=Numerals.= Do not spell out dates or other serial numbers. Write them
+in figures or in Roman notation, as may be appropriate.
+
+  August 9, 1918 (9 August 1918)
+
+  Rule 3
+
+  Chapter XII
+
+  352nd Infantry
+
+=Parentheses.= A sentence containing an expression in parenthesis is
+punctuated, outside of the marks of parenthesis, exactly as if the
+expression in parenthesis were absent. The expression within is
+punctuated as if it stood by itself, except that the final stop is
+omitted unless it is a question mark or an exclamation point.
+
+  I went to his house yesterday (my third attempt to see him), but he
+  had left town.
+
+  He declares (and why should we doubt his good faith?) that he is now
+  certain of success.
+
+(When a wholly detached expression or sentence is parenthesized, the
+final stop comes before the last mark of parenthesis.)
+
+=Quotations.= Formal quotations, cited as documentary evidence, are
+introduced by a colon and enclosed in quotation marks.
+
+  The provision of the Constitution is: "No tax or duty shall be laid on
+  articles exported from any state."
+
+Quotations grammatically in apposition or the direct objects of verbs
+are preceded by a comma and enclosed in quotation marks.
+
+  I recall the maxim of La Rochefoucauld, "Gratitude is a lively sense
+  of benefits to come."
+
+  Aristotle says, "Art is an imitation of nature."
+
+Quotations of an entire line, or more, of verse, are begun on a fresh
+line and centered, but need not be enclosed in quotation marks.
+
+  Wordsworth's enthusiasm for the Revolution was at first unbounded:
+
+    Bliss was it in that dawn to be alive,
+    But to be young was very heaven!
+
+Quotations introduced by _that_ are regarded as in indirect discourse
+and not enclosed in quotation marks.
+
+  Keats declares that beauty is truth, truth beauty.
+
+Proverbial expressions and familiar phrases of literary origin require
+no quotation marks.
+
+  These are the times that try men's souls.
+
+  He lives far from the madding crowd.
+
+The same is true of colloquialisms and slang.
+
+=References.= In scholarly work requiring exact references, abbreviate
+titles that occur frequently, giving the full forms in an alphabetical
+list at the end. As a general practice, give the references in
+parenthesis or in footnotes, not in the body of the sentence. Omit the
+words _act_, _scene_, _line_, _book_, _volume_, _page_, except when
+referring by only one of them. Punctuate as indicated below.
+
+  In the second scene of the third act
+
+    In III.ii (still better, simply insert III.ii in
+    parenthesis at the proper place in the sentence)
+
+  After the killing of Polonius, Hamlet is placed under guard (IV.ii.
+  14).
+
+  _2 Samuel_ i:17-27
+
+  _Othello_ II.iii. 264-267, III.iii. 155-161.
+
+=Syllabication.= If there is room at the end of a line for one or more
+syllables of a word, but not for the whole word, divide the word, unless
+this involves cutting off only a single letter, or cutting off only two
+letters of a long word. No hard and fast rule for all words can be laid
+down. The principles most frequently applicable are:
+
+(a) Divide the word according to its formation:
+
+  know-ledge (not knowl-edge); Shake-speare (not Shakes-peare);
+  de-scribe (not des-cribe); atmo-sphere (not atmos-phere);
+
+(b) Divide "on the vowel:"
+
+  edi-ble (not ed-ible); propo-sition; ordi-nary; espe-cial; reli-gious;
+  oppo-nents; regu-lar; classi-fi-ca-tion (three divisions allowable);
+  deco-rative; presi-dent;
+
+(c) Divide between double letters, unless they come at the end of the
+simple form of the word:
+
+  Apen-nines; Cincin-nati; refer-ring; but tell-ing.
+
+(d) Do not divide before final _-ed_ if the _e_ is silent:
+
+  treat-ed (but not roam-ed or nam-ed).
+
+The treatment of consonants in combination is best shown from examples:
+
+  for-tune; pic-ture; sin-gle; presump-tuous; illus-tration;
+  sub-stan-tial (either division); indus-try; instruc-tion;
+  sug-ges-tion; incen-diary.
+
+The student will do well to examine the syllable-division in a number of
+pages of any carefully printed book.
+
+=Titles.= For the titles of literary works, scholarly usage prefers
+italics with capitalized initials. The usage of editors and publishers
+varies, some using italics with capitalized initials, others using Roman
+with capitalized initials and with or without quotation marks. Use
+italics (indicated in manuscript by underscoring), except in writing for
+a periodical that follows a different practice. Omit initial _A_ or
+_The_ from titles when you place the possessive before them.
+
+  The _Iliad_; the _Odyssey_; _As You Like It_; _To a Skylark_; _The
+  Newcomes_; _A Tale of Two Cities_; Dickens's _Tale of Two Cities_.
+
+
+
+
+V. WORDS AND EXPRESSIONS COMMONLY MISUSED
+
+
+(Some of the forms here listed, as _like I did_, are downright bad
+English; others, as the split infinitive, have their defenders, but are
+in such general disfavor that it is at least inadvisable to use them;
+still others, as _case_, _factor_, _feature_, _interesting_, _one of the
+most_, are good in their place, but are constantly obtruding themselves
+into places where they have no right to be. If the writer will make it
+his purpose from the beginning to express accurately his own individual
+thought, and will refuse to be satisfied with a ready-made formula that
+saves him the trouble of doing so, this last set of expressions will
+cause him little trouble. But if he finds that in a moment of
+inadvertence he has used one of them, his proper course will probably be
+not to patch up the sentence by substituting one word or set of words
+for another, but to recast it completely, as illustrated in a number of
+examples below and in others under Rules 12 and 13.)
+
+=All right.= Idiomatic in familiar speech as a detached phrase in the
+sense, "Agreed," or "Go ahead." In other uses better avoided. Always
+written as two words.
+
+=As good or better than.= Expressions of this type should be corrected
+by rearranging the sentence.
+
+  My opinion is as good or better than his.
+
+    My opinion is as good as his, or better (if not better).
+
+=As to whether.= _Whether_ is sufficient; see under Rule 13.
+
+=Bid.= Takes the infinitive without _to_. The past tense in the sense,
+"ordered," is _bade_.
+
+=But.= Unnecessary after _doubt_ and _help_.
+
+  I have no doubt but that
+
+    I have no doubt that
+
+  He could not help see but that
+
+    He could not help seeing that
+
+The too frequent use of _but_ as a conjunction leads to the fault
+discussed under Rule 14. A loose sentence formed with _but_ can always
+be converted into a periodic sentence formed with _although_, as
+illustrated under Rule 4.
+
+Particularly awkward is the following of one _but_ by another, making a
+contrast to a contrast or a reservation to a reservation. This is easily
+corrected by re-arrangement.
+
+  America had vast resources, but she seemed almost wholly unprepared
+  for war. But within a year she had created an army of four million
+  men.
+
+    America seemed almost wholly unprepared for war, but she had vast
+    resources. Within a year she had created an army of four million
+    men.
+
+=Can.= Means _am (is, are) able_. Not to be used as a substitute for
+_may_.
+
+=Case.= The _Concise Oxford Dictionary_ begins its definition of this
+word: "instance of a thing's occurring; usual state of affairs." In
+these two senses, the word is usually unnecessary.
+
+  In many cases, the rooms were poorly ventilated.
+
+    Many of the rooms were poorly ventilated.
+
+  It has rarely been the case that any mistake has been made.
+
+    Few mistakes have been made.
+
+See Wood, _Suggestions to Authors_, pp. 68-71, and Quiller-Couch, _The
+Art of Writing_, pp. 103-106.
+
+=Certainly.= Used indiscriminately by some writers, much as others use
+_very_, to intensify any and every statement. A mannerism of this kind,
+bad in speech, is even worse in writing.
+
+=Character.= Often simply redundant, used from a mere habit of
+wordiness.
+
+  Acts of a hostile character
+
+    Hostile acts
+
+=Claim, vb.= With object-noun, means _lay claim to_. May be used with a
+dependent clause if this sense is clearly involved: "He claimed that he
+was the sole surviving heir." (But even here, "claimed to be" would be
+better.) Not to be used as a substitute for _declare_, _maintain_, or
+_charge_.
+
+=Clever.= This word has been greatly overused; it is best restricted to
+ingenuity displayed in small matters.
+
+=Compare.= To _compare to_ is to point out or imply resemblances,
+between objects regarded as essentially of different order; to _compare
+with_ is mainly to point out differences, between objects regarded as
+essentially of the same order. Thus life has been compared to a
+pilgrimage, to a drama, to a battle; Congress may be compared with the
+British Parliament. Paris has been compared to ancient Athens; it may be
+compared with modern London.
+
+=Consider.= Not followed by _as_ when it means "believe to be." "I
+consider him thoroughly competent." Compare, "The lecturer considered
+Cromwell first as soldier and second as administrator," where
+"considered" means "examined" or "discussed."
+
+=Data.= A plural, like _phenomena_ and _strata_.
+
+  These data were tabulated.
+
+=Dependable.= A needless substitute for _reliable_, _trustworthy_.
+
+=Different than.= Not permissible. Substitute _different from_, _other
+than_, or _unlike_.
+
+=Divided into.= Not to be misused for _composed of_. The line is
+sometimes difficult to draw; doubtless plays are divided into acts, but
+poems are composed of stanzas.
+
+=Don't.= Contraction of _do not_. The contraction of _does not_ is
+_doesn't_.
+
+=Due to.= Incorrectly used for _through_, _because of_, or _owing to_,
+in adverbial phrases: "He lost the first game, due to carelessness." In
+correct use related as predicate or as modifier to a particular noun:
+"This invention is due to Edison;" "losses due to preventable fires."
+
+=Folk.= A collective noun, equivalent to _people_. Use the singular form
+only.
+
+=Effect.= As noun, means _result_; as verb, means _to bring about_,
+_accomplish_ (not to be confused with _affect_, which means "to
+influence").
+
+As noun, often loosely used in perfunctory writing about fashions,
+music, painting, and other arts: "an Oriental effect;" "effects in pale
+green;" "very delicate effects;" "broad effects;" "subtle effects;" "a
+charming effect was produced by." The writer who has a definite meaning
+to express will not take refuge in such vagueness.
+
+=Etc.= Equivalent to _and the rest_, _and so forth_, and hence not to be
+used if one of these would be insufficient, that is, if the reader would
+be left in doubt as to any important particulars. Least open to
+objection when it represents the last terms of a list already given in
+full, or immaterial words at the end of a quotation.
+
+At the end of a list introduced by _such as_, _for example_, or any
+similar expression, _etc._ is incorrect.
+
+=Fact.= Use this word only of matters of a kind capable of direct
+verification, not of matters of judgment. That a particular event
+happened on a given date, that lead melts at a certain temperature, are
+facts. But such conclusions as that Napoleon was the greatest of modern
+generals, or that the climate of California is delightful, however
+incontestable they may be, are not properly facts.
+
+On the formula _the fact that_, see under Rule 13.
+
+=Factor.= A hackneyed word; the expressions of which it forms part can
+usually be replaced by something more direct and idiomatic.
+
+  His superior training was the great factor in his winning the match.
+
+    He won the match by being better trained.
+
+  Heavy artillery has become an increasingly important factor in
+  deciding battles.
+
+    Heavy artillery has played a constantly larger part in deciding
+    battles.
+
+=Feature.= Another hackneyed word; like _factor_ it usually adds nothing
+to the sentence in which it occurs.
+
+  A feature of the entertainment especially worthy of mention was the
+  singing of Miss A.
+
+    (Better use the same number of words to tell what Miss A. sang, or
+    if the programme has already been given, to tell how she sang.)
+
+As a verb, in the advertising sense of _offer as a special attraction_,
+to be avoided.
+
+=Fix.= Colloquial in America for _arrange_, _prepare_, _mend_. In
+writing restrict it to its literary senses, _fasten_, _make firm or
+immovable_, etc.
+
+=Get.= The colloquial _have got_ for _have_ should not be used in
+writing. The preferable form of the participle is _got_.
+
+=He is a man who.= A common type of redundant expression; see Rule 13.
+
+  He is a man who is very ambitious.
+
+    He is very ambitious.
+
+  Spain is a country which I have always wanted to visit.
+
+    I have always wanted to visit Spain.
+
+=Help.= See under =But=.
+
+=However.= In the meaning _nevertheless_, not to come first in its
+sentence or clause.
+
+  The roads were almost impassable. However, we at last succeeded in
+  reaching camp.
+
+    The roads were almost impassable. At last, however, we succeeded in
+    reaching camp.
+
+When _however_ comes first, it means _in whatever way_ or _to whatever
+extent_.
+
+  However you advise him, he will probably do as he thinks best.
+
+  However discouraging the prospect, he never lost heart.
+
+=Interesting.= Avoid this word as a perfunctory means of introduction.
+Instead of announcing that what you are about to tell is interesting,
+make it so.
+
+  An interesting story is told of
+
+    (Tell the story without preamble.)
+
+  In connection with the anticipated visit of Mr. B. to America, it is
+  interesting to recall that he
+
+    Mr. B., who it is expected will soon visit America
+
+=Kind of.= Not to be used as a substitute for _rather_ (before
+adjectives and verbs), or except in familiar style, for _something like_
+(before nouns). Restrict it to its literal sense: "Amber is a kind of
+fossil resin;" "I dislike that kind of notoriety." The same holds true
+of _sort of_.
+
+=Less.= Should not be misused for _fewer_.
+
+  He had less men than in the previous campaign
+
+    He had fewer men than in the previous campaign
+
+_Less_ refers to quantity, _fewer_ to number. "His troubles are less
+than mine" means "His troubles are not so great as mine." "His troubles
+are fewer than mine" means "His troubles are not so numerous as mine."
+It is, however, correct to say, "The signers of the petition were less
+than a hundred," where the round number _a hundred_ is something like a
+collective noun, and _less_ is thought of as meaning a less quantity or
+amount.
+
+=Like.= Not to be misused for _as_. _Like_ governs nouns and pronouns;
+before phrases and clauses the equivalent word is _as_.
+
+  We spent the evening like in the old days.
+
+    We spent the evening as in the old days.
+
+  He thought like I did.
+
+    He thought as I did (like me).
+
+=Line, along these lines.= _Line_ in the sense of _course of procedure_,
+_conduct_, _thought_, is allowable, but has been so much overworked,
+particularly in the phrase _along these lines_, that a writer who aims
+at freshness or originality had better discard it entirely.
+
+  Mr. B. also spoke along the same lines.
+
+    Mr. B. also spoke, to the same effect.
+
+  He is studying along the line of French literature.
+
+    He is studying French literature.
+
+=Literal, literally.= Often incorrectly used in support of exaggeration
+or violent metaphor.
+
+  A literal flood of abuse.
+
+    A flood of abuse.
+
+  Literally dead with fatigue
+
+    Almost dead with fatigue (dead tired)
+
+=Lose out.= Meant to be more emphatic than _lose_, but actually less so,
+because of its commonness. The same holds true of _try out_, _win out_,
+_sign up_, _register up_. With a number of verbs, _out_ and _up_ form
+idiomatic combinations: _find out_, _run out_, _turn out_, _cheer up_,
+_dry up_, _make up_, and others, each distinguishable in meaning from
+the simple verb. _Lose out_ is not.
+
+=Most.= Not to be used for _almost_.
+
+  Most everybody
+
+    Almost everybody
+
+  Most all the time
+
+    Almost all the time
+
+=Nature.= Often simply redundant, used like _character_.
+
+  Acts of a hostile nature
+
+    Hostile acts
+
+Often vaguely used in such expressions as a "lover of nature;" "poems
+about nature." Unless more specific statements follow, the reader cannot
+tell whether the poems have to do with natural scenery, rural life, the
+sunset, the untracked wilderness, or the habits of squirrels.
+
+=Near by.= Adverbial phrase, not yet fully accepted as good English,
+though the analogy of _close by_ and _hard by_ seems to justify it.
+_Near_, or _near at hand_, is as good, if not better.
+
+Not to be used as an adjective; use _neighboring_.
+
+=Oftentimes, ofttimes.= Archaic forms, no longer in good use. The modern
+word is _often_.
+
+=One hundred and one.= Retain the _and_ in this and similar expressions,
+in accordance with the unvarying usage of English prose from Old English
+times.
+
+=One of the most.= Avoid beginning essays or paragraphs with this
+formula, as, "One of the most interesting developments of modern science
+is, etc.;" "Switzerland is one of the most interesting countries of
+Europe." There is nothing wrong in this; it is simply threadbare and
+forcible-feeble.
+
+A common blunder is to use a singular verb in a relative clause
+following this or a similar expression, when the relative is the
+subject.
+
+  One of the ablest men that has attacked this problem.
+
+    One of the ablest men that have attacked this problem.
+
+=Participle for verbal noun.=
+
+  Do you mind me asking a question?
+
+    Do you mind my asking a question?
+
+  There was little prospect of the Senate accepting even this
+  compromise.
+
+    There was little prospect of the Senate's accepting even this
+    compromise.
+
+In the left-hand column, _asking_ and _accepting_ are present
+participles; in the right-hand column, they are verbal nouns (gerunds).
+The construction shown in the left-hand column is occasionally found,
+and has its defenders. Yet it is easy to see that the second sentence
+has to do not with a prospect of the Senate, but with a prospect of
+accepting. In this example, at least, the construction is plainly
+illogical.
+
+As the authors of _The King's English_ point out, there are sentences
+apparently, but not really, of this type, in which the possessive is not
+called for.
+
+  I cannot imagine Lincoln refusing his assent to this measure.
+
+In this sentence, what the writer cannot imagine is Lincoln himself, in
+the act of refusing his assent. Yet the meaning would be virtually the
+same, except for a slight loss of vividness, if he had written,
+
+  I cannot imagine Lincoln's refusing his assent to this measure.
+
+By using the possessive, the writer will always be on the safe side.
+
+In the examples above, the subject of the action is a single, unmodified
+term, immediately preceding the verbal noun, and the construction is as
+good as any that could be used. But in any sentence in which it is a
+mere clumsy substitute for something simpler, or in which the use of the
+possessive is awkward or impossible, should of course be recast.
+
+  In the event of a reconsideration of the whole matter's becoming
+  necessary
+
+    If it should become necessary to reconsider the whole matter
+
+  There was great dissatisfaction with the decision of the arbitrators
+  being favorable to the company.
+
+    There was great dissatisfaction that the arbitrators should have
+    decided in favor of the company.
+
+=People.= _The people_ is a political term, not to be confused with _the
+public_. From the people comes political support or opposition; from the
+public comes artistic appreciation or commercial patronage.
+
+=Phase.= Means a stage of transition or development: "the phases of the
+moon;" "the last phase." Not to be used for _aspect_ or _topic_.
+
+  Another phase of the subject
+
+    Another point (another question)
+
+=Possess.= Not to be used as a mere substitute for _have_ or _own_.
+
+  He possessed great courage.
+
+    He had great courage (was very brave).
+
+  He was the fortunate possessor of
+
+    He owned
+
+=Prove.= The past participle is _proved_.
+
+=Respective, respectively.= These words may usually be omitted with
+advantage.
+
+  Works of fiction are listed under the names of their respective
+  authors.
+
+    Works of fiction are listed under the names of their authors.
+
+  The one mile and two mile runs were won by Jones and Cummings
+  respectively.
+
+    The one mile and two mile runs were won by Jones and by Cummings.
+
+In some kinds of formal writing, as geometrical proofs, it may be
+necessary to use _respectively_, but it should not appear in writing on
+ordinary subjects.
+
+=Shall, Will.= The future tense requires _shall_ for the first person,
+_will_ for the second and third. The formula to express the speaker's
+belief regarding his future action or state is _I shall_; _I will_
+expresses his determination or his consent.
+
+=Should.= See under =Would=.
+
+=So.= Avoid, in writing, the use of _so_ as an intensifier: "so good;"
+"so warm;" "so delightful."
+
+On the use of _so_ to introduce clauses, see Rule 4.
+
+=Sort of.= See under =Kind of=.
+
+=Split Infinitive.= There is precedent from the fourteenth century
+downward for interposing an adverb between _to_ and the infinitive which
+it governs, but the construction is in disfavor and is avoided by nearly
+all careful writers.
+
+  To diligently inquire
+
+    To inquire diligently
+
+=State.= Not to be used as a mere substitute for _say_, _remark_.
+Restrict it to the sense of _express fully or clearly_, as, "He refused
+to state his objections."
+
+=Student Body.= A needless and awkward expression meaning no more than
+the simple word _students_.
+
+  A member of the student body
+
+    A student
+
+  Popular with the student body
+
+    Liked by the students
+
+  The student body passed resolutions.
+
+    The students passed resolutions.
+
+=System.= Frequently used without need.
+
+  Dayton has adopted the commission system of government.
+
+    Dayton has adopted government by commission.
+
+  The dormitory system
+
+    Dormitories
+
+=Thanking You in Advance.= This sounds as if the writer meant, "It will
+not be worth my while to write to you again." In making your request,
+write, "Will you please," or "I shall be obliged," and if anything
+further seems necessary write a letter of acknowledgment later.
+
+=They.= A common inaccuracy is the use of the plural pronoun when the
+antecedent is a distributive expression such as _each_, _each one_,
+_everybody_, _every one_, _many a man_, which, though implying more than
+one person, requires the pronoun to be in the singular. Similar to this,
+but with even less justification, is the use of the plural pronoun with
+the antecedent _anybody_, _any one_, _somebody_, _some one_, the
+intention being either to avoid the awkward "he or she," or to avoid
+committing oneself to either. Some bashful speakers even say, "A friend
+of mine told me that they, etc."
+
+Use _he_ with all the above words, unless the antecedent is or must be
+feminine.
+
+=Very.= Use this word sparingly. Where emphasis is necessary, use words
+strong in themselves.
+
+=Viewpoint.= Write _point of view_, but do not misuse this, as many do,
+for _view_ or _opinion_.
+
+=While.= Avoid the indiscriminate use of this word for _and_, _but_, and
+_although_. Many writers use it frequently as a substitute for _and_ or
+_but_, either from a mere desire to vary the connective, or from
+uncertainty which of the two connectives is the more appropriate. In
+this use it is best replaced by a semicolon.
+
+  The office and salesrooms are on the ground floor, while the rest of
+  the building is devoted to manufacturing.
+
+    The office and salesrooms are on the ground floor; the rest of the
+    building is devoted to manufacturing.
+
+Its use as a virtual equivalent of _although_ is allowable in sentences
+where this leads to no ambiguity or absurdity.
+
+  While I admire his energy, I wish it were employed in a better cause.
+
+This is entirely correct, as shown by the paraphrase,
+
+  I admire his energy; at the same time I wish it were employed in a
+  better cause.
+
+Compare:
+
+  While the temperature reaches 90 or 95 degrees in the daytime, the
+  nights are often chilly.
+
+    Although the temperature reaches 90 or 95 degrees in the daytime,
+    the nights are often chilly.
+
+The paraphrase,
+
+  The temperature reaches 90 or 95 degrees in the daytime; at the same
+  time the nights are often chilly,
+
+shows why the use of _while_ is incorrect.
+
+In general, the writer will do well to use _while_ only with strict
+literalness, in the sense of _during the time that_.
+
+=Whom.= Often incorrectly used for _who_ before _he said_ or similar
+expressions, when it is really the subject of a following verb.
+
+  His brother, whom he said would send him the money
+
+    His brother, who he said would send him the money
+
+  The man whom he thought was his friend
+
+    The man who (that) he thought was his friend (whom he thought his
+    friend)
+
+=Worth while.= Overworked as a term of vague approval and (with _not_)
+of disapproval. Strictly applicable only to actions: "Is it worth while
+to telegraph?"
+
+  His books are not worth while.
+
+    His books are not worth reading (are not worth one's while to read;
+    do not repay reading; are worthless).
+
+The use of _worth while_ before a noun ("a worth while story") is
+indefensible.
+
+=Would.= A conditional statement in the first person requires _should_,
+not _would_.
+
+  I should not have succeeded without his help.
+
+The equivalent of _shall_ in indirect quotation after a verb in the past
+tense is _should_, not _would_.
+
+  He predicted that before long we should have a great surprise.
+
+To express habitual or repeated action, the past tense, without _would_,
+is usually sufficient, and from its brevity, more emphatic.
+
+  Once a year he would visit the old mansion.
+
+    Once a year he visited the old mansion.
+
+
+
+
+VI. SPELLING
+
+
+The spelling of English words is not fixed and invariable, nor does it
+depend on any other authority than general agreement. At the present day
+there is practically unanimous agreement as to the spelling of most
+words. In the list below, for example, _rime_ for _rhyme_ is the only
+allowable variation; all the other forms are co-extensive with the
+English language. At any given moment, however, a relatively small
+number of words may be spelled in more than one way. Gradually, as a
+rule, one of these forms comes to be generally preferred, and the less
+customary form comes to look obsolete and is discarded. From time to
+time new forms, mostly simplifications, are introduced by innovators,
+and either win their place or die of neglect.
+
+The practical objection to unaccepted and over-simplified spellings is
+the disfavor with which they are received by the reader. They distract
+his attention and exhaust his patience. He reads the form _though_
+automatically, without thought of its needless complexity; he reads the
+abbreviation _tho_ and mentally supplies the missing letters, at the
+cost of a fraction of his attention. The writer has defeated his own
+purpose.
+
+
+WORDS OFTEN MISSPELLED
+
+  accidentally
+  advice
+  affect
+  believe
+  benefit
+  challenge
+  coarse
+  course
+  criticize
+  deceive
+  definite
+  describe
+  despise
+  develop
+  disappoint
+  dissipate
+  duel
+  ecstasy
+  effect
+  embarrass
+  existence
+  fascinate
+  fiery
+  formerly
+  humorous
+  hypocrisy
+  immediately
+  impostor
+  incident
+  incidentally
+  latter
+  led
+  lose
+  marriage
+  mischief
+  murmur
+  necessary
+  occurred
+  opportunity
+  parallel
+  Philip
+  playwright
+  preceding
+  prejudice
+  principal
+  principle
+  privilege
+  pursue
+  repetition
+  rhyme
+  rhythm
+  ridiculous
+  sacrilegious
+  seize
+  separate
+  shepherd
+  siege
+  similar
+  simile
+  too
+  tragedy
+  tries
+  undoubtedly
+  until
+  villain
+
+Note that a single consonant (other than _v_) preceded by a stressed
+short vowel is doubled before _-ed_ and _-ing_: _planned_, _letting_,
+_beginning_. (_Coming_ is an exception.)
+
+Write _to-day_, _to-night_, _to-morrow_ (but not _together_) with a
+hyphen.
+
+Write _any one_, _every one_, _some one_, _some time_ (except in the
+sense of _formerly_) as two words.
+
+
+
+
+VII. EXERCISES ON CHAPTERS II AND III
+
+
+I. Punctuate:
+
+  1. In 1788 the King's advisers warned him that the nation was facing
+  bankruptcy therefore he summoned a body called the States-General
+  believing that it would authorize him to levy new taxes. The people of
+  France however were suffering from burdensome taxation oppressive
+  social injustice and acute scarcity of food and their representatives
+  refused to consider projects of taxation until social and economic
+  reforms should be granted. The King who did not realize the gravity of
+  the situation tried to overawe them collecting soldiers in and about
+  Versailles where the sessions were being held. The people of Paris
+  seeing the danger organized militia companies to defend their
+  representatives. In order to supply themselves with arms they attacked
+  the Invalides and the Bastille which contained the principal supplies
+  of arms and munitions in Paris.
+
+  2. On his first continental tour begun in 1809 Byron visited Portugal
+  Spain Albania Greece and Turkey. Of this tour he composed a poetical
+  journal Childe Harold's Pilgrimage in which he ascribed his
+  experiences and reflections not to himself but to a fictitious
+  character Childe Harold described as a melancholy young nobleman
+  prematurely familiar with evil sated with pleasures and embittered
+  against humanity. The substantial merits of the work however lay not
+  in this shadowy and somewhat theatrical figure but in Byron's spirited
+  descriptions of wild or picturesque scenes and in his eloquent
+  championing of Spain and Greece against their oppressors. On his
+  return to England in 1811 he was persuaded rather against his own
+  judgment into allowing the work to be published. Its success was
+  almost unprecedented in his own words he awoke and found himself
+  famous.
+
+
+II. Explain the difference in meaning:
+
+  3. 'God save thee, ancyent Marinere!
+     'From the fiends that plague thee thus--
+
+  _Lyrical Ballads_, 1798.
+
+     'God save thee, ancient Mariner!
+     From the fiends, that plague thee thus!--
+
+  _Lyrical Ballads_, 1800.
+
+
+III. Explain and correct the errors in punctuation:
+
+  4. This course is intended for Freshmen, who in the opinion of the
+  Department are not qualified for military drill.
+
+  5. A restaurant, not a cafeteria where good meals are served at
+  popular prices.--_Advt._
+
+  6. The poets of _The Nation_, for all their intensity of patriotic
+  feeling, followed the English rather than the Celtic tradition, their
+  work has a political rather than a literary value and bears little
+  upon the development of modern Irish verse.
+
+  7. We were in one of the strangest places imaginable. A long and
+  narrow passage overhung on either side by a stupendous barrier of
+  black and threatening rocks.
+
+  8. Only a few years ago after a snow storm in the passes not far north
+  of Jerusalem no less than twenty-six Russian pilgrims perished amidst
+  the snow. One cannot help thinking largely because they made little
+  attempt to save themselves.
+
+
+IV. Point out and correct the faults in the following sentences:
+
+  9. During childhood his mother had died.
+
+  10. Any language study is good mind training while acquiring
+  vocabulary.
+
+  11. My farm consisted of about twenty acres of excellent land, having
+  given a hundred pounds for my predecessor's lease.
+
+  12. Prepared to encounter a woman of disordered mind, the appearance
+  presented by Mrs. Taylor at his entrance greatly astonished him.
+
+  13. Pale and swooning, with two broken legs, they carried him into the
+  house.
+
+  14. Count Cassini, the Russian plenipotentiary, had several long and
+  intimate conversations during the tedious weeks of the conference with
+  his British colleague, Sir Arthur Nicholson.
+
+  15. But though they had been victorious in the land engagements, they
+  were so little decisive as to lead to no important results.
+
+  16. Knowing nothing of the rules of the college or of its customs, it
+  was with the greatest difficulty that the Dean could make me
+  comprehend wherein my wrong-doing lay.
+
+  17. Fire, therefore, was the first object of my search. Happily, some
+  embers were found upon the hearth, together with potato-stalks and dry
+  chips. Of these, with much difficulty, I kindled a fire, by which some
+  warmth was imparted to our shivering limbs.
+
+  18. In this connection a great deal of historic fact is introduced
+  into the novel about the past history of the cathedral and of Spain.
+
+  19. Over the whole scene hung the haze of twilight that is so
+  peaceful.
+
+  20. Compared with Italy, living is more expensive.
+
+  21. It is a fundamental principle of law to believe a man innocent
+  until he is proved guilty, and once proved guilty, to remain so until
+  proved to the contrary.
+
+  22. Not only had the writer entree to the titled families of Italy in
+  whose villas she was hospitably entertained, but by royalty also.
+
+  23. It is not a strange sight to catch a glimpse of deer along the
+  shore.
+
+  24. Earnings from other sources are of such a favorable character as
+  to enable a splendid showing to be made by the company.
+
+  25. But while earnings have mounted amazingly, the status of affairs
+  is such as to make it impossible to predict the course events may
+  take, with any degree of accuracy.
+
+
+
+
+  [ Transcriber's Note:
+
+    The following is a list of corrections made to the original.
+    The first line is the original line, the second the corrected one.
+
+  University have greatly helped him in the preparation of his manuscript
+  University have greatly helped him in the preparation of his manuscript.
+
+  Compare the sentence. "The export of gold was prohibited," in which the
+  Compare the sentence, "The export of gold was prohibited," in which the
+
+  Stevenson quoted under Rule 10. But apart from this, he should follow the
+  Stevenson quoted under Rule 9. But apart from this, he should follow the
+
+  "ordered") is _bade_.
+  "ordered," is _bade_.
+
+  =Effect.= As noun, means _result_; as verb, means t_o bring about_,
+  =Effect.= As noun, means _result_; as verb, means _to bring about_,
+
+  incontestable they ma ybe, are not properly facts.
+  incontestable they may be, are not properly facts.
+
+    Acts of a hostile nature.
+    Acts of a hostile nature
+
+    Dayton has adopted the commission system of government
+    Dayton has adopted the commission system of government.
+
+    embarass
+    embarrass
+
+  ]
+
+
+
+
+
+
+
+
+*** END OF THE PROJECT GUTENBERG EBOOK THE ELEMENTS OF STYLE ***
+
+
+    
+
+Updated editions will replace the previous one—the old editions will
+be renamed.
+
+Creating the works from print editions not protected by U.S. copyright
+law means that no one owns a United States copyright in these works,
+so the Foundation (and you!) can copy and distribute it in the United
+States without permission and without paying copyright
+royalties. Special rules, set forth in the General Terms of Use part
+of this license, apply to copying and distributing Project
+Gutenberg™ electronic works to protect the PROJECT GUTENBERG™
+concept and trademark. Project Gutenberg is a registered trademark,
+and may not be used if you charge for an eBook, except by following
+the terms of the trademark license, including paying royalties for use
+of the Project Gutenberg trademark. If you do not charge anything for
+copies of this eBook, complying with the trademark license is very
+easy. You may use this eBook for nearly any purpose such as creation
+of derivative works, reports, performances and research. Project
+Gutenberg eBooks may be modified and printed and given away—you may
+do practically ANYTHING in the United States with eBooks not protected
+by U.S. copyright law. Redistribution is subject to the trademark
+license, especially commercial redistribution.
+
+
+START: FULL LICENSE
+
+THE FULL PROJECT GUTENBERG LICENSE
+
+PLEASE READ THIS BEFORE YOU DISTRIBUTE OR USE THIS WORK
+
+To protect the Project Gutenberg™ mission of promoting the free
+distribution of electronic works, by using or distributing this work
+(or any other work associated in any way with the phrase “Project
+Gutenberg”), you agree to comply with all the terms of the Full
+Project Gutenberg™ License available with this file or online at
+www.gutenberg.org/license.
+
+Section 1. General Terms of Use and Redistributing Project Gutenberg™
+electronic works
+
+1.A. By reading or using any part of this Project Gutenberg™
+electronic work, you indicate that you have read, understand, agree to
+and accept all the terms of this license and intellectual property
+(trademark/copyright) agreement. If you do not agree to abide by all
+the terms of this agreement, you must cease using and return or
+destroy all copies of Project Gutenberg™ electronic works in your
+possession. If you paid a fee for obtaining a copy of or access to a
+Project Gutenberg™ electronic work and you do not agree to be bound
+by the terms of this agreement, you may obtain a refund from the person
+or entity to whom you paid the fee as set forth in paragraph 1.E.8.
+
+1.B. “Project Gutenberg” is a registered trademark. It may only be
+used on or associated in any way with an electronic work by people who
+agree to be bound by the terms of this agreement. There are a few
+things that you can do with most Project Gutenberg™ electronic works
+even without complying with the full terms of this agreement. See
+paragraph 1.C below. There are a lot of things you can do with Project
+Gutenberg™ electronic works if you follow the terms of this
+agreement and help preserve free future access to Project Gutenberg™
+electronic works. See paragraph 1.E below.
+
+1.C. The Project Gutenberg Literary Archive Foundation (“the
+Foundation” or PGLAF), owns a compilation copyright in the collection
+of Project Gutenberg™ electronic works. Nearly all the individual
+works in the collection are in the public domain in the United
+States. If an individual work is unprotected by copyright law in the
+United States and you are located in the United States, we do not
+claim a right to prevent you from copying, distributing, performing,
+displaying or creating derivative works based on the work as long as
+all references to Project Gutenberg are removed. Of course, we hope
+that you will support the Project Gutenberg™ mission of promoting
+free access to electronic works by freely sharing Project Gutenberg™
+works in compliance with the terms of this agreement for keeping the
+Project Gutenberg™ name associated with the work. You can easily
+comply with the terms of this agreement by keeping this work in the
+same format with its attached full Project Gutenberg™ License when
+you share it without charge with others.
+
+1.D. The copyright laws of the place where you are located also govern
+what you can do with this work. Copyright laws in most countries are
+in a constant state of change. If you are outside the United States,
+check the laws of your country in addition to the terms of this
+agreement before downloading, copying, displaying, performing,
+distributing or creating derivative works based on this work or any
+other Project Gutenberg™ work. The Foundation makes no
+representations concerning the copyright status of any work in any
+country other than the United States.
+
+1.E. Unless you have removed all references to Project Gutenberg:
+
+1.E.1. The following sentence, with active links to, or other
+immediate access to, the full Project Gutenberg™ License must appear
+prominently whenever any copy of a Project Gutenberg™ work (any work
+on which the phrase “Project Gutenberg” appears, or with which the
+phrase “Project Gutenberg” is associated) is accessed, displayed,
+performed, viewed, copied or distributed:
+
+    This eBook is for the use of anyone anywhere in the United States and most
+    other parts of the world at no cost and with almost no restrictions
+    whatsoever. You may copy it, give it away or re-use it under the terms
+    of the Project Gutenberg License included with this eBook or online
+    at www.gutenberg.org. If you
+    are not located in the United States, you will have to check the laws
+    of the country where you are located before using this eBook.
+  
+1.E.2. If an individual Project Gutenberg™ electronic work is
+derived from texts not protected by U.S. copyright law (does not
+contain a notice indicating that it is posted with permission of the
+copyright holder), the work can be copied and distributed to anyone in
+the United States without paying any fees or charges. If you are
+redistributing or providing access to a work with the phrase “Project
+Gutenberg” associated with or appearing on the work, you must comply
+either with the requirements of paragraphs 1.E.1 through 1.E.7 or
+obtain permission for the use of the work and the Project Gutenberg™
+trademark as set forth in paragraphs 1.E.8 or 1.E.9.
+
+1.E.3. If an individual Project Gutenberg™ electronic work is posted
+with the permission of the copyright holder, your use and distribution
+must comply with both paragraphs 1.E.1 through 1.E.7 and any
+additional terms imposed by the copyright holder. Additional terms
+will be linked to the Project Gutenberg™ License for all works
+posted with the permission of the copyright holder found at the
+beginning of this work.
+
+1.E.4. Do not unlink or detach or remove the full Project Gutenberg™
+License terms from this work, or any files containing a part of this
+work or any other work associated with Project Gutenberg™.
+
+1.E.5. Do not copy, display, perform, distribute or redistribute this
+electronic work, or any part of this electronic work, without
+prominently displaying the sentence set forth in paragraph 1.E.1 with
+active links or immediate access to the full terms of the Project
+Gutenberg™ License.
+
+1.E.6. You may convert to and distribute this work in any binary,
+compressed, marked up, nonproprietary or proprietary form, including
+any word processing or hypertext form. However, if you provide access
+to or distribute copies of a Project Gutenberg™ work in a format
+other than “Plain Vanilla ASCII” or other format used in the official
+version posted on the official Project Gutenberg™ website
+(www.gutenberg.org), you must, at no additional cost, fee or expense
+to the user, provide a copy, a means of exporting a copy, or a means
+of obtaining a copy upon request, of the work in its original “Plain
+Vanilla ASCII” or other form. Any alternate format must include the
+full Project Gutenberg™ License as specified in paragraph 1.E.1.
+
+1.E.7. Do not charge a fee for access to, viewing, displaying,
+performing, copying or distributing any Project Gutenberg™ works
+unless you comply with paragraph 1.E.8 or 1.E.9.
+
+1.E.8. You may charge a reasonable fee for copies of or providing
+access to or distributing Project Gutenberg™ electronic works
+provided that:
+
+    • You pay a royalty fee of 20% of the gross profits you derive from
+        the use of Project Gutenberg™ works calculated using the method
+        you already use to calculate your applicable taxes. The fee is owed
+        to the owner of the Project Gutenberg™ trademark, but he has
+        agreed to donate royalties under this paragraph to the Project
+        Gutenberg Literary Archive Foundation. Royalty payments must be paid
+        within 60 days following each date on which you prepare (or are
+        legally required to prepare) your periodic tax returns. Royalty
+        payments should be clearly marked as such and sent to the Project
+        Gutenberg Literary Archive Foundation at the address specified in
+        Section 4, “Information about donations to the Project Gutenberg
+        Literary Archive Foundation.”
+    
+    • You provide a full refund of any money paid by a user who notifies
+        you in writing (or by e-mail) within 30 days of receipt that s/he
+        does not agree to the terms of the full Project Gutenberg™
+        License. You must require such a user to return or destroy all
+        copies of the works possessed in a physical medium and discontinue
+        all use of and all access to other copies of Project Gutenberg™
+        works.
+    
+    • You provide, in accordance with paragraph 1.F.3, a full refund of
+        any money paid for a work or a replacement copy, if a defect in the
+        electronic work is discovered and reported to you within 90 days of
+        receipt of the work.
+    
+    • You comply with all other terms of this agreement for free
+        distribution of Project Gutenberg™ works.
+    
+
+1.E.9. If you wish to charge a fee or distribute a Project
+Gutenberg™ electronic work or group of works on different terms than
+are set forth in this agreement, you must obtain permission in writing
+from the Project Gutenberg Literary Archive Foundation, the manager of
+the Project Gutenberg™ trademark. Contact the Foundation as set
+forth in Section 3 below.
+
+1.F.
+
+1.F.1. Project Gutenberg volunteers and employees expend considerable
+effort to identify, do copyright research on, transcribe and proofread
+works not protected by U.S. copyright law in creating the Project
+Gutenberg™ collection. Despite these efforts, Project Gutenberg™
+electronic works, and the medium on which they may be stored, may
+contain “Defects,” such as, but not limited to, incomplete, inaccurate
+or corrupt data, transcription errors, a copyright or other
+intellectual property infringement, a defective or damaged disk or
+other medium, a computer virus, or computer codes that damage or
+cannot be read by your equipment.
+
+1.F.2. LIMITED WARRANTY, DISCLAIMER OF DAMAGES - Except for the “Right
+of Replacement or Refund” described in paragraph 1.F.3, the Project
+Gutenberg Literary Archive Foundation, the owner of the Project
+Gutenberg™ trademark, and any other party distributing a Project
+Gutenberg™ electronic work under this agreement, disclaim all
+liability to you for damages, costs and expenses, including legal
+fees. YOU AGREE THAT YOU HAVE NO REMEDIES FOR NEGLIGENCE, STRICT
+LIABILITY, BREACH OF WARRANTY OR BREACH OF CONTRACT EXCEPT THOSE
+PROVIDED IN PARAGRAPH 1.F.3. YOU AGREE THAT THE FOUNDATION, THE
+TRADEMARK OWNER, AND ANY DISTRIBUTOR UNDER THIS AGREEMENT WILL NOT BE
+LIABLE TO YOU FOR ACTUAL, DIRECT, INDIRECT, CONSEQUENTIAL, PUNITIVE OR
+INCIDENTAL DAMAGES EVEN IF YOU GIVE NOTICE OF THE POSSIBILITY OF SUCH
+DAMAGE.
+
+1.F.3. LIMITED RIGHT OF REPLACEMENT OR REFUND - If you discover a
+defect in this electronic work within 90 days of receiving it, you can
+receive a refund of the money (if any) you paid for it by sending a
+written explanation to the person you received the work from. If you
+received the work on a physical medium, you must return the medium
+with your written explanation. The person or entity that provided you
+with the defective work may elect to provide a replacement copy in
+lieu of a refund. If you received the work electronically, the person
+or entity providing it to you may choose to give you a second
+opportunity to receive the work electronically in lieu of a refund. If
+the second copy is also defective, you may demand a refund in writing
+without further opportunities to fix the problem.
+
+1.F.4. Except for the limited right of replacement or refund set forth
+in paragraph 1.F.3, this work is provided to you ‘AS-IS’, WITH NO
+OTHER WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY PURPOSE.
+
+1.F.5. Some states do not allow disclaimers of certain implied
+warranties or the exclusion or limitation of certain types of
+damages. If any disclaimer or limitation set forth in this agreement
+violates the law of the state applicable to this agreement, the
+agreement shall be interpreted to make the maximum disclaimer or
+limitation permitted by the applicable state law. The invalidity or
+unenforceability of any provision of this agreement shall not void the
+remaining provisions.
+
+1.F.6. INDEMNITY - You agree to indemnify and hold the Foundation, the
+trademark owner, any agent or employee of the Foundation, anyone
+providing copies of Project Gutenberg™ electronic works in
+accordance with this agreement, and any volunteers associated with the
+production, promotion and distribution of Project Gutenberg™
+electronic works, harmless from all liability, costs and expenses,
+including legal fees, that arise directly or indirectly from any of
+the following which you do or cause to occur: (a) distribution of this
+or any Project Gutenberg™ work, (b) alteration, modification, or
+additions or deletions to any Project Gutenberg™ work, and (c) any
+Defect you cause.
+
+Section 2. Information about the Mission of Project Gutenberg™
+
+Project Gutenberg™ is synonymous with the free distribution of
+electronic works in formats readable by the widest variety of
+computers including obsolete, old, middle-aged and new computers. It
+exists because of the efforts of hundreds of volunteers and donations
+from people in all walks of life.
+
+Volunteers and financial support to provide volunteers with the
+assistance they need are critical to reaching Project Gutenberg™’s
+goals and ensuring that the Project Gutenberg™ collection will
+remain freely available for generations to come. In 2001, the Project
+Gutenberg Literary Archive Foundation was created to provide a secure
+and permanent future for Project Gutenberg™ and future
+generations. To learn more about the Project Gutenberg Literary
+Archive Foundation and how your efforts and donations can help, see
+Sections 3 and 4 and the Foundation information page at www.gutenberg.org.
+
+Section 3. Information about the Project Gutenberg Literary Archive Foundation
+
+The Project Gutenberg Literary Archive Foundation is a non-profit
+501(c)(3) educational corporation organized under the laws of the
+state of Mississippi and granted tax exempt status by the Internal
+Revenue Service. The Foundation’s EIN or federal tax identification
+number is 64-6221541. Contributions to the Project Gutenberg Literary
+Archive Foundation are tax deductible to the full extent permitted by
+U.S. federal laws and your state’s laws.
+
+The Foundation’s business office is located at 809 North 1500 West,
+Salt Lake City, UT 84116, (801) 596-1887. Email contact links and up
+to date contact information can be found at the Foundation’s website
+and official page at www.gutenberg.org/contact
+
+Section 4. Information about Donations to the Project Gutenberg
+Literary Archive Foundation
+
+Project Gutenberg™ depends upon and cannot survive without widespread
+public support and donations to carry out its mission of
+increasing the number of public domain and licensed works that can be
+freely distributed in machine-readable form accessible by the widest
+array of equipment including outdated equipment. Many small donations
+($1 to $5,000) are particularly important to maintaining tax exempt
+status with the IRS.
+
+The Foundation is committed to complying with the laws regulating
+charities and charitable donations in all 50 states of the United
+States. Compliance requirements are not uniform and it takes a
+considerable effort, much paperwork and many fees to meet and keep up
+with these requirements. We do not solicit donations in locations
+where we have not received written confirmation of compliance. To SEND
+DONATIONS or determine the status of compliance for any particular state
+visit www.gutenberg.org/donate.
+
+While we cannot and do not solicit contributions from states where we
+have not met the solicitation requirements, we know of no prohibition
+against accepting unsolicited donations from donors in such states who
+approach us with offers to donate.
+
+International donations are gratefully accepted, but we cannot make
+any statements concerning tax treatment of donations received from
+outside the United States. U.S. laws alone swamp our small staff.
+
+Please check the Project Gutenberg web pages for current donation
+methods and addresses. Donations are accepted in a number of other
+ways including checks, online payments and credit card donations. To
+donate, please visit: www.gutenberg.org/donate.
+
+Section 5. General Information About Project Gutenberg™ electronic works
+
+Professor Michael S. Hart was the originator of the Project
+Gutenberg™ concept of a library of electronic works that could be
+freely shared with anyone. For forty years, he produced and
+distributed Project Gutenberg™ eBooks with only a loose network of
+volunteer support.
+
+Project Gutenberg™ eBooks are often created from several printed
+editions, all of which are confirmed as not protected by copyright in
+the U.S. unless a copyright notice is included. Thus, we do not
+necessarily keep eBooks in compliance with any particular paper
+edition.
+
+Most people start at our website which has the main PG search
+facility: www.gutenberg.org.
+
+This website includes information about Project Gutenberg™,
+including how to make donations to the Project Gutenberg Literary
+Archive Foundation, how to help produce our new eBooks, and how to
+subscribe to our email newsletter to hear about new eBooks.
+
+

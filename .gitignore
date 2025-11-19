@@ -1,0 +1,154 @@
+# Environment files (do NOT commit secrets)
+.env
+.env.*
+!.env.example
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Testing artifacts
+continual_learning_checkpoints/
+generated_graphs/
+meta_params/
+parameter_history/
+processing_logs/
+shutdown_state/
+unified_learning_state/
+world_model_params/
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.hypothesis/
+pytest_report.xml
+test_results/
+coverage.xml
+*.coverage
+*.cover
+*.py,cover
+
+# Flask specific files
+instance/
+.webassets-cache
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Log & audit files
+*.log
+*.jsonl
+*.audit.json
+audit_*.json
+
+# Temporary / Generated Files
+*.tmp
+shutdown_checkpoint_*.pkl.tmp
+final_metrics.json
+stress_test_report.json
+proposal.json
+registry.json
+
+# Windows / Misc binaries
+jq.exe
+
+# IDE / Editor specific
+.idea/
+.vscode/
+*.swp
+
+# Cache / build helpers
+pip-wheel-metadata/
+__pypackages__/
+.mypy_cache/
+.pyre/
+.dmypy.json
+.pytype/
+ruff_cache/
+
+# Node / Frontend (if any auxiliary UI)
+node_modules/
+*.tsbuildinfo
+
+# Docker & Compose overrides
+docker-compose.override.yml
+
+# Secrets / keys (generic patterns)
+*.pem
+*.key
+*.crt
+*.der
+*.pfx
+*.p12
+
+# IP data / Large model artifacts (custom)
+model_checkpoints/
+weights/
+artifacts/
+scratch/
+
+# Avoid committing large dumps
+dump_*.sql
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Ignore local build configs
+local.settings.json
+
+# Allow listing files explicitly tracked despite patterns:
+!LICENSE
+!README.md

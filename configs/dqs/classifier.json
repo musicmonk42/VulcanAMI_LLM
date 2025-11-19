@@ -1,0 +1,934 @@
+{
+  "version": "3.0.0",
+  "metadata": {
+    "name": "DQS Advanced Classifier Configuration",
+    "description": "Enterprise-grade configuration for VulcanAMI Data Quality Classifier with all enhancements",
+    "lastModified": "2025-11-15T00:00:00Z",
+    "environment": "production",
+    "schema_version": "3.0.0",
+    "configuration_id": "dqs-classifier-prod-v3",
+    "deployment_region": "global",
+    "compliance": ["GDPR", "CCPA", "HIPAA", "SOC2"]
+  },
+  
+  "dimensions": {
+    "pii_detection": {
+      "enabled": true,
+      "priority": 1,
+      "models": {
+        "spacy": {
+          "model_name": "en_core_web_trf",
+          "fallback": "en_core_web_lg",
+          "entities": ["PERSON", "ORG", "GPE", "LOC", "DATE", "NORP", "FAC", "PRODUCT"],
+          "custom_patterns": {
+            "ssn": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+            "credit_card": "\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b",
+            "phone": "\\+?[1-9]\\d{1,14}",
+            "email": "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+            "ip_address": "\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b",
+            "passport": "[A-Z]{1,2}[0-9]{6,9}",
+            "driver_license": "[A-Z]{1,2}[0-9]{5,8}",
+            "bank_account": "[0-9]{8,17}",
+            "medical_record": "MRN[0-9]{6,10}",
+            "employee_id": "EMP[0-9]{5,8}"
+          }
+        },
+        "transformer": {
+          "model": "dslim/bert-base-NER-uncased",
+          "alternate_models": [
+            "microsoft/deberta-v3-base",
+            "xlm-roberta-large-finetuned-conll03-english"
+          ],
+          "confidence_threshold": 0.85,
+          "batch_size": 32,
+          "max_length": 512,
+          "use_gpu": true,
+          "cache_embeddings": true
+        },
+        "custom_ner": {
+          "enabled": true,
+          "model_path": "/opt/vulcanami/models/custom_ner",
+          "update_frequency": "weekly",
+          "active_learning": true
+        },
+        "ensemble": {
+          "enabled": true,
+          "voting_method": "weighted",
+          "weights": {
+            "spacy": 0.3,
+            "transformer": 0.5,
+            "custom_ner": 0.2
+          },
+          "agreement_threshold": 0.7
+        }
+      },
+      "sensitivity_levels": {
+        "critical": ["ssn", "credit_card", "bank_account", "medical_record"],
+        "high": ["email", "phone", "driver_license", "passport"],
+        "medium": ["name", "address", "employee_id"],
+        "low": ["ip_address", "user_agent"]
+      },
+      "remediation": {
+        "auto_mask": true,
+        "mask_patterns": {
+          "ssn": "XXX-XX-####",
+          "credit_card": "****-****-****-####",
+          "email": "****@domain.com"
+        },
+        "encryption": {
+          "enabled": true,
+          "algorithm": "AES-256-GCM",
+          "key_rotation": "monthly"
+        }
+      }
+    },
+    
+    "semantic_validity": {
+      "enabled": true,
+      "priority": 2,
+      "models": {
+        "sentence_transformer": {
+          "model": "sentence-transformers/all-mpnet-base-v2",
+          "alternate_models": [
+            "sentence-transformers/all-MiniLM-L12-v2",
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+          ],
+          "similarity_threshold": 0.75,
+          "embedding_cache_size": 50000,
+          "normalize_embeddings": true
+        },
+        "language_model": {
+          "model": "bert-base-uncased",
+          "perplexity_threshold": 100,
+          "coherence_scoring": true
+        },
+        "topic_modeling": {
+          "enabled": true,
+          "algorithm": "LDA",
+          "num_topics": 50,
+          "update_frequency": "daily"
+        }
+      },
+      "validation_rules": {
+        "min_sentence_length": 3,
+        "max_sentence_length": 500,
+        "language_detection": true,
+        "supported_languages": ["en", "es", "fr", "de", "zh", "ja"],
+        "profanity_check": true,
+        "spam_detection": true,
+        "duplicate_detection": {
+          "enabled": true,
+          "similarity_threshold": 0.95,
+          "use_minhash": true
+        }
+      },
+      "context_validation": {
+        "enabled": true,
+        "check_consistency": true,
+        "validate_references": true,
+        "fact_checking": {
+          "enabled": false,
+          "api_endpoint": "https://factcheck.vulcanami.io/v1"
+        }
+      }
+    },
+    
+    "completeness_score": {
+      "enabled": true,
+      "priority": 3,
+      "null_penalty": 0.1,
+      "empty_penalty": 0.05,
+      "placeholder_patterns": [
+        "N/A", "NA", "n/a", "TBD", "TBC", "TODO", "UNKNOWN", 
+        "NULL", "None", "nil", "undefined", "PENDING", "PLACEHOLDER",
+        "XXX", "???", "...", "----", "____", "temp", "test"
+      ],
+      "field_importance": {
+        "critical": ["id", "name", "email", "created_at"],
+        "high": ["phone", "address", "status"],
+        "medium": ["description", "notes", "tags"],
+        "low": ["metadata", "comments", "optional_fields"]
+      },
+      "scoring_algorithm": "weighted",
+      "minimum_required_fields": 0.7,
+      "deep_validation": {
+        "check_nested_objects": true,
+        "max_depth": 10,
+        "array_validation": true,
+        "validate_data_types": true
+      },
+      "auto_completion": {
+        "enabled": false,
+        "strategies": ["default_values", "historical_average", "ml_prediction"],
+        "confidence_threshold": 0.9
+      }
+    },
+    
+    "data_freshness": {
+      "enabled": true,
+      "priority": 4,
+      "thresholds": {
+        "real_time": 1,
+        "excellent": 7,
+        "good": 30,
+        "fair": 90,
+        "poor": 180,
+        "stale": 365,
+        "archived": 730
+      },
+      "unit": "days",
+      "time_fields": [
+        "created_at", "updated_at", "modified_at", "last_accessed",
+        "timestamp", "date", "datetime", "published_at", "expires_at"
+      ],
+      "decay_function": "exponential",
+      "decay_rate": 0.1,
+      "timezone_aware": true,
+      "business_hours_only": false,
+      "exclude_weekends": false,
+      "data_type_specific": {
+        "news": {"excellent": 1, "good": 3, "fair": 7},
+        "financial": {"excellent": 1, "good": 1, "fair": 7},
+        "reference": {"excellent": 365, "good": 730, "fair": 1095},
+        "user_data": {"excellent": 30, "good": 90, "fair": 180}
+      }
+    },
+    
+    "source_credibility": {
+      "enabled": true,
+      "priority": 5,
+      "trusted_sources": [
+        "arxiv.org", "pubmed.gov", "*.edu", "*.gov", "*.ac.uk",
+        "reuters.com", "bloomberg.com", "wsj.com", "nature.com",
+        "sciencedirect.com", "ieee.org", "acm.org", "springer.com"
+      ],
+      "untrusted_sources": [
+        "unknown-site.com", "spam-domain.net", "*.tk", "*.ml",
+        "bit.ly", "tinyurl.com", "suspicious-domain.xyz"
+      ],
+      "default_score": 0.5,
+      "domain_reputation": {
+        "enabled": true,
+        "api_endpoint": "https://reputation.vulcanami.io/v1",
+        "cache_duration": 86400,
+        "check_ssl": true,
+        "check_domain_age": true,
+        "minimum_domain_age_days": 180
+      },
+      "content_verification": {
+        "check_author": true,
+        "check_publication_date": true,
+        "check_citations": true,
+        "minimum_citations": 2
+      },
+      "dynamic_scoring": {
+        "enabled": true,
+        "factors": {
+          "domain_authority": 0.3,
+          "ssl_certificate": 0.1,
+          "content_quality": 0.3,
+          "update_frequency": 0.2,
+          "user_feedback": 0.1
+        }
+      }
+    },
+    
+    "syntactic_completeness": {
+      "enabled": true,
+      "priority": 6,
+      "validators": {
+        "json": {
+          "enabled": true,
+          "strict_mode": true,
+          "schema_validation": true,
+          "schema_registry": "https://schema.vulcanami.io/v1"
+        },
+        "xml": {
+          "enabled": true,
+          "dtd_validation": true,
+          "xsd_validation": true,
+          "namespace_aware": true
+        },
+        "csv": {
+          "enabled": true,
+          "delimiter_detection": true,
+          "header_validation": true,
+          "encoding_detection": true
+        },
+        "yaml": {
+          "enabled": true,
+          "safe_load": true,
+          "anchor_validation": true
+        },
+        "html": {
+          "enabled": true,
+          "w3c_validation": false,
+          "sanitize": true
+        },
+        "markdown": {
+          "enabled": true,
+          "gfm_compatible": true,
+          "link_validation": true
+        },
+        "sql": {
+          "enabled": true,
+          "syntax_check": true,
+          "injection_detection": true
+        },
+        "regex": {
+          "enabled": true,
+          "pcre_compatible": true,
+          "performance_check": true
+        }
+      },
+      "encoding_validation": {
+        "detect_encoding": true,
+        "preferred_encoding": "UTF-8",
+        "fix_encoding_issues": true
+      },
+      "size_limits": {
+        "max_file_size_mb": 100,
+        "max_field_length": 1000000,
+        "max_array_size": 10000,
+        "max_nesting_depth": 20
+      }
+    },
+    
+    "data_consistency": {
+      "enabled": true,
+      "priority": 7,
+      "cross_field_validation": true,
+      "referential_integrity": true,
+      "business_rules": {
+        "enabled": true,
+        "rules_engine": "drools",
+        "rules_path": "/opt/vulcanami/rules/"
+      },
+      "duplicate_detection": {
+        "enabled": true,
+        "algorithms": ["exact_match", "fuzzy_match", "semantic_similarity"],
+        "threshold": 0.9
+      }
+    },
+    
+    "anomaly_detection": {
+      "enabled": true,
+      "priority": 8,
+      "algorithms": {
+        "isolation_forest": {
+          "enabled": true,
+          "contamination": 0.1,
+          "n_estimators": 100
+        },
+        "local_outlier_factor": {
+          "enabled": true,
+          "n_neighbors": 20,
+          "contamination": 0.1
+        },
+        "autoencoder": {
+          "enabled": false,
+          "model_path": "/opt/vulcanami/models/autoencoder",
+          "threshold": 0.5
+        }
+      },
+      "time_series_analysis": {
+        "enabled": true,
+        "seasonality_detection": true,
+        "trend_analysis": true
+      }
+    },
+    
+    "compliance_validation": {
+      "enabled": true,
+      "priority": 9,
+      "standards": {
+        "gdpr": {
+          "enabled": true,
+          "check_consent": true,
+          "check_retention": true
+        },
+        "ccpa": {
+          "enabled": true,
+          "check_opt_out": true
+        },
+        "hipaa": {
+          "enabled": true,
+          "check_phi": true,
+          "encryption_required": true
+        }
+      }
+    }
+  },
+  
+  "weights": {
+    "pii_detection": {
+      "weight": 0.20,
+      "enabled": true,
+      "critical": true,
+      "adaptive": true
+    },
+    "semantic_validity": {
+      "weight": 0.15,
+      "enabled": true,
+      "critical": false,
+      "adaptive": true
+    },
+    "completeness_score": {
+      "weight": 0.15,
+      "enabled": true,
+      "critical": false,
+      "adaptive": true
+    },
+    "data_freshness": {
+      "weight": 0.10,
+      "enabled": true,
+      "critical": false,
+      "adaptive": true
+    },
+    "source_credibility": {
+      "weight": 0.10,
+      "enabled": true,
+      "critical": false,
+      "adaptive": true
+    },
+    "syntactic_completeness": {
+      "weight": 0.10,
+      "enabled": true,
+      "critical": false,
+      "adaptive": true
+    },
+    "data_consistency": {
+      "weight": 0.08,
+      "enabled": true,
+      "critical": false,
+      "adaptive": true
+    },
+    "anomaly_detection": {
+      "weight": 0.07,
+      "enabled": true,
+      "critical": false,
+      "adaptive": true
+    },
+    "compliance_validation": {
+      "weight": 0.05,
+      "enabled": true,
+      "critical": true,
+      "adaptive": true
+    }
+  },
+  
+  "adaptive_weights": {
+    "enabled": true,
+    "learning_rate": 0.01,
+    "update_frequency": "daily",
+    "min_samples": 1000,
+    "algorithm": "gradient_boost",
+    "validation_split": 0.2,
+    "max_weight_change": 0.05,
+    "feedback_incorporation": true
+  },
+  
+  "thresholds": {
+    "excellent": {
+      "min": 0.95,
+      "max": 1.00,
+      "action": "accept",
+      "category": "excellent",
+      "cache_ttl": 86400,
+      "skip_revalidation": false
+    },
+    "very_good": {
+      "min": 0.85,
+      "max": 0.94,
+      "action": "accept",
+      "category": "very_good",
+      "cache_ttl": 43200,
+      "skip_revalidation": false
+    },
+    "good": {
+      "min": 0.75,
+      "max": 0.84,
+      "action": "accept",
+      "category": "good",
+      "cache_ttl": 21600,
+      "skip_revalidation": false
+    },
+    "fair": {
+      "min": 0.60,
+      "max": 0.74,
+      "action": "warn",
+      "category": "fair",
+      "cache_ttl": 10800,
+      "require_review": true
+    },
+    "poor": {
+      "min": 0.40,
+      "max": 0.59,
+      "action": "quarantine",
+      "category": "poor",
+      "cache_ttl": 3600,
+      "require_remediation": true
+    },
+    "very_poor": {
+      "min": 0.20,
+      "max": 0.39,
+      "action": "reject",
+      "category": "very_poor",
+      "cache_ttl": 1800,
+      "alert_on_detection": true
+    },
+    "unacceptable": {
+      "min": 0.00,
+      "max": 0.19,
+      "action": "block",
+      "category": "unacceptable",
+      "cache_ttl": 900,
+      "immediate_alert": true
+    }
+  },
+  
+  "performance": {
+    "caching": {
+      "enabled": true,
+      "multi_tier": true,
+      "l1_cache": {
+        "type": "memory",
+        "max_size": 1000,
+        "ttl_seconds": 300,
+        "eviction_policy": "lru"
+      },
+      "l2_cache": {
+        "type": "redis",
+        "redis_host": "redis",
+        "redis_port": 6379,
+        "redis_db": 1,
+        "redis_password": "${REDIS_PASSWORD}",
+        "ttl_seconds": 3600,
+        "max_cache_size": 100000,
+        "compression": true,
+        "serialization": "msgpack"
+      },
+      "l3_cache": {
+        "type": "disk",
+        "path": "/var/cache/dqs",
+        "max_size_gb": 10,
+        "ttl_seconds": 86400
+      },
+      "cache_warming": {
+        "enabled": true,
+        "strategy": "predictive",
+        "preload_count": 1000
+      }
+    },
+    "batching": {
+      "enabled": true,
+      "dynamic_sizing": true,
+      "min_batch_size": 10,
+      "max_batch_size": 1000,
+      "optimal_batch_size": 100,
+      "max_workers": 8,
+      "timeout_seconds": 300,
+      "queue_size": 10000,
+      "priority_queues": true
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "algorithm": "token_bucket",
+      "max_requests_per_second": 1000,
+      "burst_size": 2000,
+      "per_client_limits": true,
+      "adaptive_limits": true
+    },
+    "async_processing": {
+      "enabled": true,
+      "executor": "thread_pool",
+      "max_threads": 16,
+      "queue_type": "priority",
+      "timeout": 60
+    },
+    "gpu_acceleration": {
+      "enabled": true,
+      "cuda_devices": "auto",
+      "batch_size_multiplier": 4,
+      "mixed_precision": true
+    }
+  },
+  
+  "database": {
+    "primary": {
+      "host": "${DB_HOST:-postgres}",
+      "port": "${DB_PORT:-5432}",
+      "database": "${DB_NAME:-vulcanami}",
+      "schema": "dqs",
+      "ssl_mode": "require",
+      "connection_pool": {
+        "min_size": 5,
+        "max_size": 50,
+        "max_overflow": 10,
+        "timeout": 30,
+        "recycle": 3600,
+        "pre_ping": true
+      }
+    },
+    "read_replicas": [
+      {
+        "host": "${DB_REPLICA1_HOST:-postgres-replica1}",
+        "port": 5432,
+        "weight": 1
+      },
+      {
+        "host": "${DB_REPLICA2_HOST:-postgres-replica2}",
+        "port": 5432,
+        "weight": 1
+      }
+    ],
+    "sharding": {
+      "enabled": false,
+      "strategy": "hash",
+      "shard_count": 4
+    },
+    "query_optimization": {
+      "use_prepared_statements": true,
+      "batch_inserts": true,
+      "async_commits": true
+    }
+  },
+  
+  "monitoring": {
+    "logging": {
+      "level": "${LOG_LEVEL:-INFO}",
+      "format": "json",
+      "structured": true,
+      "destination": "/var/log/dqs/classifier.log",
+      "error_log": "/var/log/dqs/classifier-error.log",
+      "audit_log": "/var/log/dqs/classifier-audit.log",
+      "rotation": {
+        "enabled": true,
+        "max_size": "100MB",
+        "max_age": 30,
+        "max_backups": 10,
+        "compress": true
+      },
+      "remote_logging": {
+        "enabled": true,
+        "protocol": "syslog",
+        "host": "logs.vulcanami.io",
+        "port": 514
+      }
+    },
+    "metrics": {
+      "enabled": true,
+      "collection_interval": 10,
+      "prometheus": {
+        "enabled": true,
+        "port": 9145,
+        "path": "/metrics",
+        "include_histograms": true,
+        "include_summaries": true
+      },
+      "statsd": {
+        "enabled": true,
+        "host": "statsd.vulcanami.io",
+        "port": 8125,
+        "prefix": "dqs.classifier"
+      },
+      "cloudwatch": {
+        "enabled": false,
+        "region": "us-east-1",
+        "namespace": "VulcanAMI/DQS"
+      }
+    },
+    "health_check": {
+      "enabled": true,
+      "port": 9146,
+      "path": "/health",
+      "checks": [
+        "database", "redis", "models", "disk_space", 
+        "memory", "cpu", "queue_depth", "error_rate"
+      ],
+      "thresholds": {
+        "disk_space_gb": 1,
+        "memory_percent": 90,
+        "cpu_percent": 80,
+        "queue_depth": 5000,
+        "error_rate": 0.05
+      },
+      "liveness_probe": "/health/live",
+      "readiness_probe": "/health/ready"
+    },
+    "tracing": {
+      "enabled": true,
+      "provider": "opentelemetry",
+      "endpoint": "http://jaeger:4317",
+      "sample_rate": 0.1,
+      "propagation": "w3c"
+    },
+    "profiling": {
+      "enabled": false,
+      "continuous": false,
+      "cpu_profile_rate": 100,
+      "heap_profile_rate": 524288,
+      "output_path": "/var/log/dqs/profiles/"
+    }
+  },
+  
+  "features": {
+    "auto_remediation": {
+      "enabled": true,
+      "strategies": [
+        "trim_whitespace", "normalize_dates", "fix_encoding",
+        "remove_duplicates", "fill_defaults", "standardize_formats",
+        "validate_references", "fix_inconsistencies"
+      ],
+      "confidence_threshold": 0.95,
+      "require_approval": false,
+      "audit_changes": true
+    },
+    "data_lineage": {
+      "enabled": true,
+      "track_transformations": true,
+      "track_sources": true,
+      "track_consumers": true,
+      "retention_days": 90,
+      "storage": "graph_db"
+    },
+    "ml_pipeline": {
+      "enabled": true,
+      "auto_retrain": true,
+      "retrain_frequency": "weekly",
+      "model_versioning": true,
+      "a_b_testing": true,
+      "feature_store": {
+        "enabled": true,
+        "backend": "feast",
+        "update_frequency": "hourly"
+      }
+    },
+    "explanation": {
+      "enabled": true,
+      "include_dimension_scores": true,
+      "include_recommendations": true,
+      "include_confidence": true,
+      "include_alternatives": true,
+      "explanation_depth": "detailed",
+      "visualizations": true
+    },
+    "feedback_loop": {
+      "enabled": true,
+      "collection_method": "api",
+      "incorporate_feedback": true,
+      "feedback_weight": 0.1,
+      "minimum_feedback_count": 10
+    },
+    "data_synthesis": {
+      "enabled": false,
+      "generate_test_data": true,
+      "augmentation": true,
+      "privacy_preserving": true
+    },
+    "real_time_streaming": {
+      "enabled": true,
+      "kafka": {
+        "enabled": true,
+        "brokers": ["kafka1:9092", "kafka2:9092"],
+        "topic": "dqs-scores",
+        "consumer_group": "dqs-classifier"
+      }
+    },
+    "api_gateway": {
+      "enabled": true,
+      "rate_limiting": true,
+      "authentication": "oauth2",
+      "versioning": "header",
+      "documentation": "openapi"
+    }
+  },
+  
+  "security": {
+    "encryption": {
+      "at_rest": {
+        "enabled": true,
+        "algorithm": "AES-256-GCM",
+        "key_management": "aws_kms",
+        "key_rotation": "quarterly"
+      },
+      "in_transit": {
+        "enabled": true,
+        "tls_version": "1.3",
+        "cipher_suites": [
+          "TLS_AES_256_GCM_SHA384",
+          "TLS_AES_128_GCM_SHA256"
+        ],
+        "certificate_validation": true
+      }
+    },
+    "authentication": {
+      "enabled": true,
+      "methods": ["jwt", "oauth2", "api_key", "mtls"],
+      "token_expiry": 3600,
+      "refresh_token_expiry": 86400,
+      "mfa_required": false,
+      "session_management": true
+    },
+    "authorization": {
+      "enabled": true,
+      "rbac": true,
+      "abac": true,
+      "policy_engine": "opa",
+      "default_deny": true
+    },
+    "audit": {
+      "enabled": true,
+      "log_all_classifications": true,
+      "log_access": true,
+      "log_changes": true,
+      "include_data_samples": false,
+      "retention_days": 365,
+      "tamper_proof": true,
+      "compliance_reporting": true
+    },
+    "data_masking": {
+      "enabled": true,
+      "mask_pii": true,
+      "mask_pattern": "****",
+      "reversible": false,
+      "techniques": ["tokenization", "redaction", "hashing"],
+      "preserve_format": true
+    },
+    "vulnerability_scanning": {
+      "enabled": true,
+      "frequency": "daily",
+      "dependency_check": true,
+      "static_analysis": true,
+      "runtime_protection": true
+    },
+    "network_security": {
+      "firewall_rules": true,
+      "ip_whitelist": [],
+      "ip_blacklist": [],
+      "ddos_protection": true,
+      "intrusion_detection": true
+    }
+  },
+  
+  "integrations": {
+    "data_catalog": {
+      "enabled": true,
+      "provider": "apache_atlas",
+      "sync_frequency": "hourly"
+    },
+    "workflow_orchestration": {
+      "enabled": true,
+      "provider": "airflow",
+      "dag_location": "/opt/airflow/dags/"
+    },
+    "notification_channels": {
+      "email": {
+        "enabled": true,
+        "smtp_host": "smtp.vulcanami.io",
+        "smtp_port": 587
+      },
+      "slack": {
+        "enabled": true,
+        "webhook_url": "${SLACK_WEBHOOK_URL}"
+      },
+      "pagerduty": {
+        "enabled": true,
+        "integration_key": "${PAGERDUTY_KEY}"
+      },
+      "webhook": {
+        "enabled": true,
+        "endpoints": [
+          "https://webhook.vulcanami.io/dqs"
+        ]
+      }
+    },
+    "external_apis": {
+      "enrichment": {
+        "enabled": true,
+        "providers": [
+          {
+            "name": "clearbit",
+            "endpoint": "https://api.clearbit.com/v2",
+            "rate_limit": 100
+          }
+        ]
+      }
+    }
+  },
+  
+  "deployment": {
+    "environment_variables": [
+      "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD",
+      "REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD",
+      "LOG_LEVEL", "SLACK_WEBHOOK_URL", "PAGERDUTY_KEY"
+    ],
+    "health_checks": {
+      "startup": {
+        "initial_delay": 30,
+        "period": 10,
+        "timeout": 5,
+        "success_threshold": 1,
+        "failure_threshold": 3
+      },
+      "liveness": {
+        "period": 30,
+        "timeout": 5,
+        "failure_threshold": 3
+      },
+      "readiness": {
+        "period": 10,
+        "timeout": 5,
+        "success_threshold": 1,
+        "failure_threshold": 3
+      }
+    },
+    "resource_limits": {
+      "cpu": "4000m",
+      "memory": "8Gi",
+      "ephemeral_storage": "10Gi"
+    },
+    "resource_requests": {
+      "cpu": "1000m",
+      "memory": "2Gi",
+      "ephemeral_storage": "5Gi"
+    },
+    "auto_scaling": {
+      "enabled": true,
+      "min_replicas": 2,
+      "max_replicas": 10,
+      "target_cpu_utilization": 70,
+      "target_memory_utilization": 80,
+      "scale_down_stabilization": 300
+    },
+    "update_strategy": {
+      "type": "RollingUpdate",
+      "max_surge": 1,
+      "max_unavailable": 0
+    }
+  },
+  
+  "maintenance": {
+    "backup": {
+      "enabled": true,
+      "frequency": "daily",
+      "retention_days": 30,
+      "storage": "s3://vulcanami-backups/dqs/"
+    },
+    "cleanup": {
+      "enabled": true,
+      "old_scores_retention_days": 90,
+      "cache_cleanup_frequency": "daily",
+      "log_cleanup_frequency": "weekly"
+    },
+    "updates": {
+      "auto_update": false,
+      "check_frequency": "daily",
+      "maintenance_window": {
+        "day": "sunday",
+        "start_hour": 2,
+        "duration_hours": 4
+      }
+    }
+  }
+}

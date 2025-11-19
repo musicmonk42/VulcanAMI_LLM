@@ -1,0 +1,10 @@
+VulcanAMI is a project that explores governed training for language models.
+It integrates a consensus engine to review and approve weight updates.
+The training loop includes safety checks, rollback, and checkpointing.
+Graphiix IR provides a foundation for model representation and execution.
+Retrieval augmented generation can add documents at question time without retraining.
+Small datasets are useful for quick experiments and debugging the training pipeline.
+Cosine learning rate scheduling with warmup is common for transformer models.
+Evaluation on a validation split helps detect overfitting and plateaus early.
+Curriculum strategies can start easier and gradually increase difficulty.
+This tiny corpus is only for demonstration and wiring tests, not for real accuracy.

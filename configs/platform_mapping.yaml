@@ -1,0 +1,46 @@
+# Platform mapping for the Adapter Demo (technical audience)
+# -----------------------------------------------------------------------------
+# HOW TO USE:
+# - These are sensible defaults that match the existing Graphix/Vulcan demo.
+# - If your API differs, change base/method/path here first.
+# - If your request bodies differ (field names), tweak scripts/platform_adapter.py
+#
+# BASES:
+#   platform -> typically the unified platform gateway (e.g., http://127.0.0.1:8080)
+#   arena    -> Arena service (if running standalone)
+#   vulcan   -> Vulcan service (or platform /vulcan sub-path)
+#
+# AUTH:
+# - By default, the adapter sends header: X-API-Key: <API_KEY>
+# - To use Authorization: Bearer <token>, edit PlatformAdapter._headers()
+# -----------------------------------------------------------------------------
+
+submit_run:
+  base: platform
+  method: POST
+  path: /api/arena/run/generator
+
+submit_feedback:
+  base: platform
+  method: POST
+  path: /api/arena/feedback_dispatch
+
+improve:
+  base: vulcan
+  method: POST
+  path: /improve
+
+sse_stream:
+  base: vulcan
+  method: GET
+  path: /v1/stream
+
+metrics:
+  base: platform
+  method: GET
+  path: /api/arena/metrics
+
+rollback:
+  base: vulcan
+  method: POST
+  path: /rollback

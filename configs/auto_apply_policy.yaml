@@ -1,0 +1,50 @@
+version: 1
+auto_apply:
+  enabled: true
+  # Budget limits for a single auto-apply
+  max_files: 3
+  max_total_loc: 50
+
+  # Allow/deny patterns (POSIX-style, relative to repo root)
+  allowed_globs:
+    - "configs/**"
+    - "scripts/**"
+    - "src/**/*.py"
+    - "!src/**/auth/**"
+    - "!src/**/security/**"
+    - "!src/**/db/**"
+    - "!src/**/migrations/**"
+    - "!src/**/network/**"
+    - "!src/**/concurrency/**"
+    - "!src/**/deployment/**"
+    - "!src/**/kubernetes/**"
+    - "!src/**/terraform/**"
+    - "!configs/profile_production.json"
+    - "!configs/profile_staging.json"
+
+  deny_globs:
+    - "**/*.lock"
+    - "**/requirements*.txt"
+    - "**/poetry.lock"
+    - "Dockerfile"
+    - "**/pyproject.toml"
+    - "**/*.yml"  # pipeline/deploy files; whitelist explicit ones if needed
+
+  # Pre-apply gates. Each item can be a string (command) or an object with cmd/timeout_s/cwd/env
+  gates:
+    commands:
+      - "python -m black --check ."
+      - "python -m isort --check-only ."
+      - "python -m flake8"
+      - "python -m mypy --ignore-missing-imports"
+      - "pytest -q"
+      - cmd: "python scripts/health_smoke.py"
+        timeout_s: 30
+        cwd: "."
+        env:
+          ARENA_HOST: "127.0.0.1"
+          ARENA_PORT: "8181"
+
+    nso_requirements:
+      adversarial_detected: false
+      risk_score_max: 0.30

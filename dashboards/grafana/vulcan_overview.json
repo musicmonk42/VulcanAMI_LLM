@@ -1,0 +1,15 @@
+{
+  "title": "Graphix/Vulcan v4.6 Overview",
+  "editable": true,
+  "panels": [
+    { "type": "graph", "title": "get_by_hash_p95_ms", "targets": [] },
+    { "type": "graph", "title": "hybrid_search_p95_ms", "targets": [] },
+    { "type": "graph", "title": "cold_restore_p95_sec", "targets": [] },
+    { "type": "graph", "title": "tombstone_visible_p95_sec", "targets": [] },
+    { "type": "graph", "title": "vector_recall_at_50", "targets": [] },
+    { "type": "graph", "title": "fragmentation_ratio", "targets": [] },
+    { "type": "graph", "title": "compaction_wa_ratio", "targets": [] }
+  ],
+  "schemaVersion": 38,
+  "version": 1
+}

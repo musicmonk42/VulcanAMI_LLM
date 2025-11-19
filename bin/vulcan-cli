@@ -1,0 +1,472 @@
+#!/usr/bin/env bash
+################################################################################
+# VulcanAMI Command-Line Interface (CLI)
+# Version: 4.6.0
+# Description: Main entry point for all VulcanAMI operations
+################################################################################
+
+set -euo pipefail
+
+# Script metadata
+readonly SCRIPT_NAME="vulcan-cli"
+readonly SCRIPT_VERSION="4.6.0"
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly BIN_DIR="${SCRIPT_DIR}"
+
+# Colors for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly MAGENTA='\033[0;35m'
+readonly CYAN='\033[0;36m'
+readonly NC='\033[0m' # No Color
+readonly BOLD='\033[1m'
+
+# Configuration
+VULCAN_CONFIG="${VULCAN_CONFIG:-${HOME}/.vulcanrc}"
+VULCAN_VERBOSE="${VULCAN_VERBOSE:-0}"
+VULCAN_DEBUG="${VULCAN_DEBUG:-0}"
+VULCAN_QUIET="${VULCAN_QUIET:-0}"
+VULCAN_NO_COLOR="${VULCAN_NO_COLOR:-0}"
+
+################################################################################
+# Utility Functions
+################################################################################
+
+log() {
+    if [[ "${VULCAN_QUIET}" -eq 0 ]]; then
+        if [[ "${VULCAN_NO_COLOR}" -eq 1 ]]; then
+            echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" >&2
+        else
+            echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $*" >&2
+        fi
+    fi
+}
+
+log_info() {
+    if [[ "${VULCAN_QUIET}" -eq 0 ]]; then
+        if [[ "${VULCAN_NO_COLOR}" -eq 1 ]]; then
+            echo "[INFO] $*" >&2
+        else
+            echo -e "${BLUE}[INFO]${NC} $*" >&2
+        fi
+    fi
+}
+
+log_warn() {
+    if [[ "${VULCAN_NO_COLOR}" -eq 1 ]]; then
+        echo "[WARN] $*" >&2
+    else
+        echo -e "${YELLOW}[WARN]${NC} $*" >&2
+    fi
+}
+
+log_error() {
+    if [[ "${VULCAN_NO_COLOR}" -eq 1 ]]; then
+        echo "[ERROR] $*" >&2
+    else
+        echo -e "${RED}[ERROR]${NC} $*" >&2
+    fi
+}
+
+log_success() {
+    if [[ "${VULCAN_QUIET}" -eq 0 ]]; then
+        if [[ "${VULCAN_NO_COLOR}" -eq 1 ]]; then
+            echo "[SUCCESS] $*" >&2
+        else
+            echo -e "${GREEN}[SUCCESS]${NC} $*" >&2
+        fi
+    fi
+}
+
+log_debug() {
+    if [[ "${VULCAN_DEBUG}" -eq 1 ]]; then
+        if [[ "${VULCAN_NO_COLOR}" -eq 1 ]]; then
+            echo "[DEBUG] $*" >&2
+        else
+            echo -e "${MAGENTA}[DEBUG]${NC} $*" >&2
+        fi
+    fi
+}
+
+log_verbose() {
+    if [[ "${VULCAN_VERBOSE}" -eq 1 ]]; then
+        if [[ "${VULCAN_NO_COLOR}" -eq 1 ]]; then
+            echo "[VERBOSE] $*" >&2
+        else
+            echo -e "${CYAN}[VERBOSE]${NC} $*" >&2
+        fi
+    fi
+}
+
+die() {
+    log_error "$*"
+    exit 1
+}
+
+################################################################################
+# Configuration Management
+################################################################################
+
+load_config() {
+    if [[ -f "${VULCAN_CONFIG}" ]]; then
+        log_debug "Loading configuration from ${VULCAN_CONFIG}"
+        # shellcheck source=/dev/null
+        source "${VULCAN_CONFIG}"
+        log_verbose "Configuration loaded successfully"
+    else
+        log_verbose "No configuration file found at ${VULCAN_CONFIG}"
+    fi
+}
+
+show_config() {
+    cat << EOF
+${BOLD}VulcanAMI Configuration${NC}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Configuration File: ${VULCAN_CONFIG}
+Version: ${SCRIPT_VERSION}
+Binary Directory: ${BIN_DIR}
+
+Environment Variables:
+  VULCAN_VERBOSE=${VULCAN_VERBOSE}
+  VULCAN_DEBUG=${VULCAN_DEBUG}
+  VULCAN_QUIET=${VULCAN_QUIET}
+  VULCAN_NO_COLOR=${VULCAN_NO_COLOR}
+
+Service Endpoints:
+  DQS_ENDPOINT=${DQS_ENDPOINT:-http://dqs-service:8080}
+  OPA_ENDPOINT=${OPA_ENDPOINT:-http://opa-service:8181}
+  POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+  REDIS_HOST=${REDIS_HOST:-redis}
+
+Paths:
+  DATA_DIR=${VULCAN_DATA_DIR:-/var/lib/vulcanami}
+  LOG_DIR=${VULCAN_LOG_DIR:-/var/log/vulcanami}
+  CACHE_DIR=${VULCAN_CACHE_DIR:-/var/cache/vulcanami}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+EOF
+}
+
+################################################################################
+# Version and Help
+################################################################################
+
+show_version() {
+    cat << EOF
+${BOLD}VulcanAMI CLI${NC} version ${SCRIPT_VERSION}
+Copyright © 2025 VulcanAMI. All rights reserved.
+
+Build Information:
+  Build Date: 2025-11-14
+  Git Commit: abc123def456
+  Go Version: go1.21.5
+  Platform: linux/amd64
+
+For more information: https://docs.vulcanami.io
+EOF
+}
+
+show_help() {
+    cat << 'EOF'
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                    VulcanAMI CLI v4.6.0                          ┃
+┃              Enterprise Graph Data Platform                      ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+USAGE:
+    vulcan-cli [OPTIONS] <COMMAND> [ARGS...]
+
+OPTIONS:
+    -h, --help              Show this help message
+    -v, --version           Show version information
+    -V, --verbose           Enable verbose output
+    -d, --debug             Enable debug output
+    -q, --quiet             Suppress all non-error output
+    --no-color              Disable colored output
+    --config <FILE>         Use alternate configuration file
+
+CORE COMMANDS:
+    pack                    Pack management operations
+    verify                  Verification and validation
+    unlearn                 Machine unlearning operations
+    vector                  Vector operations and management
+    proof                   Zero-knowledge proof operations
+
+PACK COMMANDS:
+    pack build              Build a new packfile
+    pack verify             Verify packfile integrity
+    pack repack             Repack and optimize packfiles
+    pack info               Display packfile information
+    pack list               List all packfiles
+    pack extract            Extract data from packfile
+    pack merge              Merge multiple packfiles
+
+VERIFICATION COMMANDS:
+    verify pack             Verify packfile integrity
+    verify merkle           Verify Merkle tree consistency
+    verify bloom            Verify bloom filter accuracy
+    verify checksums        Verify all checksums
+    verify quality          Verify data quality scores
+
+UNLEARNING COMMANDS:
+    unlearn pattern         Unlearn data matching pattern
+    unlearn file            Unlearn data from file
+    unlearn verify          Verify unlearning completeness
+    unlearn status          Check unlearning status
+
+VECTOR COMMANDS:
+    vector bootstrap        Initialize vector storage
+    vector prefetch         Prefetch vectors for query
+    vector index            Build vector index
+    vector search           Search vectors
+    vector stats            Show vector statistics
+
+PROOF COMMANDS:
+    proof generate          Generate zero-knowledge proof
+    proof verify            Verify zero-knowledge proof
+    proof batch             Batch proof operations
+
+DATA QUALITY COMMANDS:
+    dqs score               Score data quality
+    dqs classify            Classify data
+    dqs report              Generate quality report
+    dqs remediate           Auto-remediate quality issues
+
+POLICY COMMANDS:
+    policy check            Check data against policies
+    policy list             List active policies
+    policy test             Test policy rules
+
+SYSTEM COMMANDS:
+    config                  Show configuration
+    health                  Check system health
+    status                  Show system status
+    metrics                 Show system metrics
+    logs                    View logs
+
+EXAMPLES:
+    # Build a packfile from input files
+    vulcan-cli pack build -i data.json -o output.pack
+
+    # Verify a packfile
+    vulcan-cli pack verify output.pack
+
+    # Unlearn data matching pattern
+    vulcan-cli unlearn pattern "user_id:12345"
+
+    # Bootstrap vector storage
+    vulcan-cli vector bootstrap --tier hot
+
+    # Generate ZK proof for unlearning
+    vulcan-cli proof generate --type unlearning --data proof_data.json
+
+    # Check data quality
+    vulcan-cli dqs score --input data.json
+
+    # Check system health
+    vulcan-cli health --verbose
+
+For detailed command help:
+    vulcan-cli <command> --help
+
+Documentation: https://docs.vulcanami.io
+Support: support@vulcanami.io
+EOF
+}
+
+################################################################################
+# Command Dispatcher
+################################################################################
+
+dispatch_command() {
+    local cmd="$1"
+    shift || true
+
+    log_debug "Dispatching command: ${cmd}"
+    log_debug "Arguments: $*"
+
+    case "${cmd}" in
+        # Pack commands
+        pack)
+            local subcmd="${1:-build}"
+            shift || true
+            case "${subcmd}" in
+                build)          "${BIN_DIR}/vulcan-pack" "$@" ;;
+                verify)         "${BIN_DIR}/vulcan-pack-verify" "$@" ;;
+                repack)         "${BIN_DIR}/vulcan-repack" "$@" ;;
+                info|list|extract|merge)
+                    die "Command not yet implemented: pack ${subcmd}"
+                    ;;
+                *)
+                    die "Unknown pack subcommand: ${subcmd}"
+                    ;;
+            esac
+            ;;
+
+        # Verification commands
+        verify)
+            local subcmd="${1:-pack}"
+            shift || true
+            case "${subcmd}" in
+                pack)           "${BIN_DIR}/vulcan-pack-verify" "$@" ;;
+                merkle|bloom|checksums|quality)
+                    die "Command not yet implemented: verify ${subcmd}"
+                    ;;
+                *)
+                    die "Unknown verify subcommand: ${subcmd}"
+                    ;;
+            esac
+            ;;
+
+        # Unlearning commands
+        unlearn)
+            local subcmd="${1:-pattern}"
+            shift || true
+            case "${subcmd}" in
+                pattern|file)   "${BIN_DIR}/vulcan-unlearn" "$@" ;;
+                verify|status)
+                    die "Command not yet implemented: unlearn ${subcmd}"
+                    ;;
+                *)
+                    die "Unknown unlearn subcommand: ${subcmd}"
+                    ;;
+            esac
+            ;;
+
+        # Vector commands
+        vector)
+            local subcmd="${1:-bootstrap}"
+            shift || true
+            case "${subcmd}" in
+                bootstrap)      "${BIN_DIR}/vulcan-vector-bootstrap" "$@" ;;
+                prefetch)       "${BIN_DIR}/vulcan-prefetch-vectors" "$@" ;;
+                index|search|stats)
+                    die "Command not yet implemented: vector ${subcmd}"
+                    ;;
+                *)
+                    die "Unknown vector subcommand: ${subcmd}"
+                    ;;
+            esac
+            ;;
+
+        # Proof commands
+        proof)
+            local subcmd="${1:-verify}"
+            shift || true
+            case "${subcmd}" in
+                verify)         "${BIN_DIR}/vulcan-proof-verify-zk" "$@" ;;
+                generate|batch)
+                    die "Command not yet implemented: proof ${subcmd}"
+                    ;;
+                *)
+                    die "Unknown proof subcommand: ${subcmd}"
+                    ;;
+            esac
+            ;;
+
+        # Legacy commands (for backward compatibility)
+        pack-build)             "${BIN_DIR}/vulcan-pack" "$@" ;;
+        pack-verify)            "${BIN_DIR}/vulcan-pack-verify" "$@" ;;
+        proof-verify-zk)        "${BIN_DIR}/vulcan-proof-verify-zk" "$@" ;;
+        repack)                 "${BIN_DIR}/vulcan-repack" "$@" ;;
+        prefetch)               "${BIN_DIR}/vulcan-prefetch-vectors" "$@" ;;
+        vector-bootstrap)       "${BIN_DIR}/vulcan-vector-bootstrap" "$@" ;;
+
+        # System commands
+        config)                 show_config ;;
+        health|status|metrics|logs|dqs|policy)
+            die "Command not yet implemented: ${cmd}"
+            ;;
+
+        # Help and version
+        help|--help|-h)         show_help ;;
+        version|--version|-v)   show_version ;;
+
+        # Unknown command
+        *)
+            log_error "Unknown command: ${cmd}"
+            echo ""
+            echo "Run 'vulcan-cli --help' for usage information."
+            exit 1
+            ;;
+    esac
+}
+
+################################################################################
+# Argument Parsing
+################################################################################
+
+parse_global_options() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+            -V|--verbose)
+                export VULCAN_VERBOSE=1
+                shift
+                ;;
+            -d|--debug)
+                export VULCAN_DEBUG=1
+                export VULCAN_VERBOSE=1
+                shift
+                ;;
+            -q|--quiet)
+                export VULCAN_QUIET=1
+                shift
+                ;;
+            --no-color)
+                export VULCAN_NO_COLOR=1
+                shift
+                ;;
+            --config)
+                export VULCAN_CONFIG="$2"
+                shift 2
+                ;;
+            -*)
+                die "Unknown option: $1"
+                ;;
+            *)
+                # First non-option argument is the command
+                echo "$@"
+                return
+                ;;
+        esac
+    done
+}
+
+################################################################################
+# Main Entry Point
+################################################################################
+
+main() {
+    # Load configuration
+    load_config
+
+    # Parse global options and get remaining arguments
+    local remaining_args
+    remaining_args=$(parse_global_options "$@")
+    
+    # Convert string back to array
+    eval "set -- ${remaining_args}"
+
+    # Check if command provided
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+
+    # Dispatch to command handler
+    dispatch_command "$@"
+}
+
+# Run main function
+main "$@"

@@ -1,0 +1,3030 @@
+{
+  "generation": 4,
+  "population": [
+    {
+      "graph": {
+        "id": "cross_c699d401",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": null,
+      "generation": 5,
+      "parent_ids": [
+        "cross_c699d401"
+      ]
+    },
+    {
+      "graph": {
+        "id": "clone_0c4b6582",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 5,
+      "parent_ids": [
+        "cross_bb72fb9c"
+      ]
+    },
+    {
+      "graph": {
+        "id": "cross_e66fa1a1",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 5,
+      "parent_ids": [
+        "cross_c4dd042d",
+        "cross_c699d401"
+      ]
+    },
+    {
+      "graph": {
+        "id": "cross_204e73e4",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 5,
+      "parent_ids": [
+        "cross_e0e263d2",
+        "cross_bff45c90"
+      ]
+    },
+    {
+      "graph": {
+        "id": "clone_598780da",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 5,
+      "parent_ids": [
+        "cross_e0e263d2"
+      ]
+    },
+    {
+      "graph": {
+        "id": "cross_29e9cde8",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 5,
+      "parent_ids": [
+        "cross_cce09e41",
+        "clone_d2ad41ca"
+      ]
+    },
+    {
+      "graph": {
+        "id": "cross_5cf85a85",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 5,
+      "parent_ids": [
+        "cross_cce09e41",
+        "cross_c4dd042d"
+      ]
+    },
+    {
+      "graph": {
+        "id": "cross_27a6eac6",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 5,
+      "parent_ids": [
+        "clone_d2ad41ca",
+        "cross_cce09e41"
+      ]
+    }
+  ],
+  "champions": [
+    {
+      "graph": {
+        "id": "sentiment_3d_enhanced_gen0_ind0_d948373e",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 0,
+      "parent_ids": []
+    },
+    {
+      "graph": {
+        "id": "cross_35545dd4",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 1,
+      "parent_ids": [
+        "sentiment_3d_enhanced_gen0_ind0_d948373e",
+        "sentiment_3d_enhanced_gen0_ind1_b4ee595b"
+      ]
+    },
+    {
+      "graph": {
+        "id": "cross_c5870a6f",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 2,
+      "parent_ids": [
+        "cross_35545dd4",
+        "cross_d93064d5_mut_25a0691b"
+      ]
+    },
+    {
+      "graph": {
+        "id": "clone_58713e29",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 3,
+      "parent_ids": [
+        "cross_4a5414c6"
+      ]
+    },
+    {
+      "graph": {
+        "id": "cross_c699d401",
+        "type": "Graph",
+        "grammar_version": "2.3.0",
+        "nodes": [
+          {
+            "id": "t_in",
+            "type": "CONST",
+            "params": {
+              "value": "texts:t0"
+            }
+          },
+          {
+            "id": "matrix",
+            "type": "CONST",
+            "params": {
+              "value": [
+                [
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    3,
+                    4
+                  ]
+                ],
+                [
+                  [
+                    5,
+                    6
+                  ],
+                  [
+                    7,
+                    8
+                  ]
+                ]
+              ]
+            },
+            "metadata": {
+              "author_agent": "sentiment_graph_creator_v2",
+              "creation_timestamp": "2025-08-26T21:01:07Z",
+              "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+              "provenance": "Generated from internal Fairhope compliance model #C-451.",
+              "original_type": "Matrix3DNode"
+            }
+          },
+          {
+            "id": "m_emb",
+            "type": "EMBED",
+            "params": {
+              "provider": "dummy",
+              "model": "text-embedding-3-small"
+            }
+          },
+          {
+            "id": "gen",
+            "type": "GenerativeNode",
+            "params": {
+              "provider": "dummy",
+              "model": "gpt-4o-mini",
+              "max_tokens": 4,
+              "temperature": 0,
+              "prompt": "Label POS/NEG: {text}"
+            }
+          },
+          {
+            "id": "gen_contract",
+            "type": "ContractNode",
+            "params": {
+              "target_node": "gen",
+              "constraints": {
+                "max_cost_usd": 0.001,
+                "max_latency_ms": 500,
+                "accuracy_floor": 0.95
+              }
+            }
+          },
+          {
+            "id": "dec",
+            "type": "CONST",
+            "params": {
+              "value": "decoded_output"
+            }
+          },
+          {
+            "id": "vis",
+            "type": "CONST",
+            "params": {
+              "value": "visualization_placeholder"
+            }
+          },
+          {
+            "id": "out",
+            "type": "OutputNode",
+            "params": {}
+          }
+        ],
+        "edges": [
+          {
+            "from": {
+              "node": "t_in",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "text"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "m_emb",
+              "port": "matrix"
+            }
+          },
+          {
+            "from": {
+              "node": "m_emb",
+              "port": "vector"
+            },
+            "to": {
+              "node": "gen",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen",
+              "port": "output"
+            },
+            "to": {
+              "node": "dec",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "matrix",
+              "port": "value"
+            },
+            "to": {
+              "node": "vis",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "dec",
+              "port": "value"
+            },
+            "to": {
+              "node": "out",
+              "port": "input"
+            }
+          },
+          {
+            "from": {
+              "node": "gen_contract",
+              "port": "output"
+            },
+            "to": {
+              "node": "gen",
+              "port": "contract"
+            }
+          }
+        ]
+      },
+      "metrics": {
+        "accuracy": 0.9119999999999999,
+        "tokens": 176.0,
+        "cycles": 4700.0,
+        "score": 0.8473999999999999
+      },
+      "generation": 4,
+      "parent_ids": [
+        "cross_62b98a98",
+        "clone_00fd1d77"
+      ]
+    }
+  ],
+  "rng_state": [
+    3,
+    [
+      1328929026,
+      4018020943,
+      853225182,
+      374382827,
+      4148260525,
+      2911440337,
+      3863263023,
+      2664546219,
+      720059863,
+      355662397,
+      1856012656,
+      517119815,
+      721920772,
+      3376988506,
+      716749849,
+      2133912011,
+      835084468,
+      4220840295,
+      199292750,
+      3850874919,
+      3659827098,
+      1370597107,
+      35186092,
+      3075199875,
+      628075758,
+      1937066007,
+      1035562012,
+      1062222147,
+      2878780685,
+      1533248,
+      862442272,
+      1159510590,
+      2536403695,
+      712421884,
+      178430691,
+      2238131372,
+      2799521708,
+      3399416931,
+      1031319000,
+      1268819769,
+      2751846009,
+      3805020170,
+      3076357377,
+      162748599,
+      1132741363,
+      4188129393,
+      2319330318,
+      533362885,
+      2558285513,
+      813768415,
+      854499206,
+      2937647238,
+      3437696906,
+      2301526647,
+      4227673251,
+      2592621469,
+      3354480016,
+      2081367543,
+      968993584,
+      2239187354,
+      449723801,
+      2562669562,
+      1147332774,
+      1174536348,
+      87327450,
+      516260269,
+      829026026,
+      2539640329,
+      2987136926,
+      2963152435,
+      3922211684,
+      3044779860,
+      2213500038,
+      1780376811,
+      2728266301,
+      2658846084,
+      3692540235,
+      3392352661,
+      2922513006,
+      4068140927,
+      3234707341,
+      283160047,
+      1971717520,
+      983017547,
+      3441202054,
+      2036619599,
+      2523583027,
+      997453470,
+      1978100413,
+      293593929,
+      1002454660,
+      2461199450,
+      3505990523,
+      1955295815,
+      3372526,
+      3569841694,
+      1821412163,
+      1556246806,
+      1715742516,
+      3493247945,
+      3515444604,
+      184652316,
+      3798113128,
+      3279676551,
+      3173722073,
+      815932420,
+      1288984285,
+      199609096,
+      1845442802,
+      921574334,
+      834659001,
+      2135652599,
+      3300301616,
+      236222073,
+      3861881785,
+      2646033077,
+      2364047400,
+      2131273201,
+      1565939820,
+      2966480708,
+      2209388479,
+      3624975211,
+      22342562,
+      2530928424,
+      2998881387,
+      1435092140,
+      3233622319,
+      2615139265,
+      1198046067,
+      3108794320,
+      2706305477,
+      3735681162,
+      2576419232,
+      1901053475,
+      3168658564,
+      3928659675,
+      3537148633,
+      3049170269,
+      2068293020,
+      807044297,
+      3395519994,
+      1005645504,
+      3509569518,
+      2726384343,
+      468587256,
+      613706264,
+      2789129533,
+      666034527,
+      3090483199,
+      2913010144,
+      317745134,
+      2513628342,
+      3962374408,
+      3493819689,
+      2892254190,
+      1132118895,
+      2326009609,
+      1803637979,
+      1366757296,
+      3076543111,
+      2807576755,
+      3131327365,
+      3630465186,
+      855261519,
+      3907195089,
+      4021582786,
+      1728618410,
+      3402174291,
+      455861970,
+      1485441929,
+      1663612058,
+      868997375,
+      500188899,
+      44388342,
+      3008821894,
+      1022704314,
+      370111421,
+      2596222656,
+      547771404,
+      824135669,
+      2436408404,
+      862920795,
+      3289202364,
+      1324951390,
+      1158108390,
+      2613511671,
+      1886714245,
+      1609759461,
+      3363657690,
+      1165287685,
+      2193031764,
+      987582254,
+      763732045,
+      1797250749,
+      1574618333,
+      3972315201,
+      2988976819,
+      514462632,
+      1972433151,
+      4209405549,
+      2979014852,
+      596359117,
+      22193328,
+      1187996346,
+      1510536191,
+      2501741062,
+      4116976090,
+      4065260662,
+      3026046823,
+      3374662447,
+      1794244288,
+      202093858,
+      1817384099,
+      980346639,
+      2398074709,
+      641880726,
+      1303389604,
+      1490343809,
+      2106205332,
+      1982341790,
+      4070855335,
+      2317608594,
+      2206076106,
+      832319798,
+      2288725144,
+      2526979037,
+      4250556285,
+      3705766464,
+      513845789,
+      2876025503,
+      3235135535,
+      3742608839,
+      2681368757,
+      3118027800,
+      41758028,
+      1510506340,
+      4154939078,
+      111407819,
+      3644074887,
+      1547871841,
+      1434096523,
+      1792533712,
+      2211971073,
+      2270581113,
+      1142837691,
+      3935841471,
+      1684863912,
+      485724513,
+      483251622,
+      3263313428,
+      2386994664,
+      2335341481,
+      2649800494,
+      1467263955,
+      3472460041,
+      2612420945,
+      3876930649,
+      717110305,
+      2085135347,
+      486287246,
+      3738869659,
+      2738073252,
+      3355432594,
+      3500031752,
+      1989078409,
+      2849675166,
+      3855889899,
+      2601732399,
+      842501695,
+      102241448,
+      3638559100,
+      57094827,
+      1877285916,
+      1716964773,
+      3671436147,
+      1382942816,
+      1437935080,
+      1391960939,
+      1369870634,
+      3371017029,
+      1307841797,
+      3307204137,
+      3411102306,
+      1806570798,
+      3955658287,
+      76791444,
+      205192722,
+      199544836,
+      2574981830,
+      1946968187,
+      2589217221,
+      2262274110,
+      1634387311,
+      3258766496,
+      1356541904,
+      1485489749,
+      4065869363,
+      377925621,
+      1499645623,
+      4283900412,
+      3096875802,
+      3252529348,
+      1504005547,
+      3541589320,
+      2363553296,
+      2184807596,
+      1297404995,
+      2079017187,
+      2212662415,
+      4238570381,
+      4290282428,
+      23435264,
+      3015562386,
+      2587595343,
+      2915003741,
+      836817398,
+      4149156800,
+      1573406372,
+      14375396,
+      523687166,
+      1628513470,
+      3867191909,
+      356342453,
+      3110070163,
+      1650547250,
+      1192831559,
+      2335402528,
+      1865023824,
+      186142844,
+      2275725309,
+      2873345528,
+      3289105021,
+      3946469387,
+      2013128286,
+      1012476368,
+      3659994263,
+      2255772611,
+      4184574234,
+      2258478223,
+      58968270,
+      3064658123,
+      3208575615,
+      2095668380,
+      808732948,
+      279035905,
+      1644018860,
+      2204046812,
+      3955155264,
+      1410794582,
+      3643993578,
+      2393496794,
+      1443212317,
+      1456012201,
+      1482611767,
+      3888577983,
+      3740437332,
+      123159848,
+      1920394445,
+      2884292901,
+      1623777889,
+      570033602,
+      3282514964,
+      3110381730,
+      2536165067,
+      1936991442,
+      1777119638,
+      3527245876,
+      3493343832,
+      3600661522,
+      3835945387,
+      1132807323,
+      3778393889,
+      2473146095,
+      3783441623,
+      2847860572,
+      757356965,
+      3106502101,
+      3010539095,
+      1082017835,
+      658390989,
+      190298872,
+      250722313,
+      3794732612,
+      2206179541,
+      3551633207,
+      2321449300,
+      1667369601,
+      4224513955,
+      2713208094,
+      3882635123,
+      1890116510,
+      1421901114,
+      2566162323,
+      677247952,
+      3332534316,
+      4093037542,
+      3726024363,
+      677430664,
+      3730132909,
+      74384443,
+      2534105330,
+      2798578318,
+      2779549124,
+      2214041092,
+      1445014382,
+      3364902822,
+      3532655676,
+      2857797083,
+      694964253,
+      633543290,
+      1327657685,
+      1204362163,
+      672494245,
+      3605500180,
+      3062583409,
+      3661231756,
+      257275601,
+      2760890840,
+      1603352627,
+      265862789,
+      1390286913,
+      1852871064,
+      1704515070,
+      2780587547,
+      3671923354,
+      736916421,
+      356467251,
+      1748843093,
+      1305113417,
+      2117582823,
+      2150612255,
+      2493545695,
+      2294551437,
+      138964835,
+      3914489159,
+      2936319197,
+      195033043,
+      1034004098,
+      1532556222,
+      725674241,
+      3221232828,
+      2726844414,
+      117368486,
+      3681574924,
+      2233334950,
+      3742079648,
+      3599632666,
+      835079438,
+      323567192,
+      1201438775,
+      317470124,
+      1629360524,
+      3501847147,
+      4141305948,
+      3383673478,
+      539956422,
+      2035131647,
+      3538728148,
+      827843722,
+      750814267,
+      1668212350,
+      1354229612,
+      2653204835,
+      2341828378,
+      1781854617,
+      412991781,
+      1337817506,
+      3354800842,
+      813625899,
+      2219494510,
+      2091588345,
+      2629969908,
+      920831074,
+      2398442661,
+      1223124022,
+      3617116156,
+      3340712517,
+      5776708,
+      3647297496,
+      2187418668,
+      1767899529,
+      3491898032,
+      26909538,
+      317853159,
+      2015253414,
+      1573739201,
+      448791064,
+      3323940856,
+      2295773671,
+      195223800,
+      373901465,
+      1051750872,
+      1755571697,
+      2916878712,
+      1273370000,
+      2732452775,
+      1839526512,
+      1811248797,
+      192535639,
+      3710526233,
+      2019001443,
+      3345988029,
+      3749607991,
+      1556247156,
+      147834592,
+      1388127344,
+      1795070145,
+      3648853372,
+      165833774,
+      3817245783,
+      937214040,
+      2271483280,
+      3775946522,
+      1949634824,
+      1379523729,
+      1552856777,
+      3446060107,
+      2068157193,
+      3818505132,
+      786467359,
+      3016912067,
+      1024544491,
+      4135386580,
+      554814308,
+      3595182111,
+      2344142832,
+      4026556095,
+      1623314286,
+      295734245,
+      2272374187,
+      4138053472,
+      215224549,
+      848040221,
+      3417228414,
+      148059815,
+      3357751638,
+      324883686,
+      2495196079,
+      2956171227,
+      114003915,
+      822564852,
+      2095789840,
+      3113181643,
+      2164224665,
+      3750495744,
+      1647900425,
+      904201417,
+      2833493412,
+      507734681,
+      997129902,
+      2448599538,
+      41061452,
+      3676967794,
+      90014162,
+      3868063667,
+      3970349026,
+      3032938507,
+      635273557,
+      3777306245,
+      1416928970,
+      1264044151,
+      1415541212,
+      1347413949,
+      863882721,
+      2949449242,
+      1011756791,
+      1972650428,
+      2973016399,
+      1606448049,
+      1815192501,
+      3955033143,
+      3013274229,
+      2954553720,
+      3326254372,
+      226509373,
+      772565539,
+      2295282207,
+      3982034527,
+      4172111591,
+      1458288120,
+      1392655425,
+      9287020,
+      3926395661,
+      2153018693,
+      1696781929,
+      3325158384,
+      1600919633,
+      3848141378,
+      832116011,
+      2699098964,
+      1863273753,
+      2790023070,
+      3469340000,
+      791287855,
+      3125192938,
+      4201592438,
+      2421580769,
+      2175782398,
+      2688267587,
+      125296384,
+      1819691384,
+      768846537,
+      3589863502,
+      1019949236,
+      2522895273,
+      2476823929,
+      873108563,
+      3429873466,
+      159556547,
+      2985393589,
+      2637911951,
+      1336337814,
+      2549502343,
+      1479539896,
+      1581807606,
+      894558563,
+      1848106935,
+      2076383691,
+      801880466,
+      3237615908,
+      358827527,
+      3630628820,
+      2516670497,
+      4186731050,
+      26
+    ],
+    null
+  ],
+  "config": {
+    "base_tokens": 120.0,
+    "tokens_per_node": 7.0,
+    "base_cycles": 4500.0,
+    "cycles_per_node": 25.0,
+    "base_accuracy": 0.96,
+    "accuracy_drop_per_node": 0.006,
+    "alpha_tokens": 0.0001,
+    "beta_cycles_per_k": 0.01,
+    "mutation_rate": 0.1,
+    "crossover_rate": 0.8
+  }
+}

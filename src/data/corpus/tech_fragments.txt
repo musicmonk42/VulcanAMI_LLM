@@ -1,0 +1,2 @@
+Neural networks require careful calibration. Entropy and perplexity guide early stopping.
+Backoff smoothing blends higher-order statistics with more robust lower-order distributions.

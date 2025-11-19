@@ -1,0 +1,1353 @@
+{
+  "version": "3.0.0",
+  "metadata": {
+    "name": "DQS Advanced Rescore Configuration",
+    "description": "Enterprise-grade configuration for VulcanAMI Data Quality Rescore Orchestrator with all enhancements",
+    "lastModified": "2025-11-15T00:00:00Z",
+    "environment": "production",
+    "schema_version": "3.0.0",
+    "configuration_id": "dqs-rescore-prod-v3",
+    "deployment_region": "global",
+    "compliance": ["GDPR", "CCPA", "HIPAA", "SOC2"],
+    "owners": ["data-quality@vulcanami.io", "ml-team@vulcanami.io"],
+    "sla": {
+      "availability": 99.95,
+      "latency_p99_ms": 500,
+      "throughput_items_per_second": 10000
+    }
+  },
+  
+  "schedules": {
+    "full_rescore": {
+      "description": "Complete dataset quality reassessment with comprehensive validation",
+      "cron": "0 3 * * 0",
+      "strategy": "full_scan",
+      "enabled": true,
+      "priority": "low",
+      "timeout_hours": 24,
+      "max_items": null,
+      "retry_policy": {
+        "max_attempts": 3,
+        "backoff": "exponential",
+        "initial_delay_seconds": 60,
+        "max_delay_seconds": 3600
+      },
+      "filters": {
+        "exclude_locked": true,
+        "exclude_system": false
+      },
+      "checkpointing": {
+        "enabled": true,
+        "interval": 1000,
+        "storage": "database"
+      },
+      "notification": {
+        "on_start": true,
+        "on_success": true,
+        "on_failure": true,
+        "on_warning": true,
+        "recipients": ["ops@vulcanami.io", "data-quality@vulcanami.io"],
+        "channels": ["email", "slack"],
+        "include_report": true
+      },
+      "resource_allocation": {
+        "cpu_limit": "4000m",
+        "memory_limit": "8Gi",
+        "parallel_workers": 8,
+        "queue_size": 10000
+      },
+      "quality_gates": {
+        "min_success_rate": 0.95,
+        "max_error_rate": 0.02,
+        "abort_on_critical_failure": true
+      }
+    },
+    
+    "incremental_rescore": {
+      "description": "Rescore recently modified data with change detection",
+      "cron": "0 2 * * *",
+      "strategy": "incremental",
+      "enabled": true,
+      "priority": "medium",
+      "timeout_hours": 4,
+      "max_items": 10000,
+      "filters": {
+        "updated_since": "24h",
+        "exclude_categories": ["excellent", "very_good"],
+        "include_flagged": true,
+        "change_detection": {
+          "enabled": true,
+          "threshold": 0.1,
+          "track_fields": ["content", "metadata", "source"]
+        }
+      },
+      "optimization": {
+        "use_cache": true,
+        "skip_unchanged": true,
+        "batch_by_source": true
+      },
+      "notification": {
+        "on_success": false,
+        "on_failure": true,
+        "recipients": ["ops@vulcanami.io"],
+        "threshold_alerts": {
+          "score_drop": 0.2,
+          "error_rate": 0.05
+        }
+      },
+      "adaptive_scheduling": {
+        "enabled": true,
+        "adjust_frequency": true,
+        "min_interval_hours": 1,
+        "max_interval_hours": 24
+      }
+    },
+    
+    "priority_rescore": {
+      "description": "Rescore high-priority and critical flagged items",
+      "cron": "0 */6 * * *",
+      "strategy": "priority_based",
+      "enabled": true,
+      "priority": "critical",
+      "timeout_hours": 2,
+      "max_items": 1000,
+      "filters": {
+        "labels": ["critical", "high_priority", "flagged", "urgent", "compliance"],
+        "score_range": [0.0, 0.75],
+        "age_hours": 168,
+        "source_priority": {
+          "production": 1.0,
+          "staging": 0.8,
+          "development": 0.5
+        }
+      },
+      "escalation": {
+        "enabled": true,
+        "threshold_score": 0.3,
+        "escalate_to": ["oncall@vulcanami.io", "security@vulcanami.io"],
+        "auto_quarantine": true
+      },
+      "notification": {
+        "on_success": true,
+        "on_failure": true,
+        "recipients": ["oncall@vulcanami.io"],
+        "channels": ["email", "slack", "pagerduty"],
+        "alert_on_degradation": true
+      },
+      "fast_track": {
+        "enabled": true,
+        "skip_queue": true,
+        "dedicated_workers": 2
+      }
+    },
+    
+    "stale_data_rescore": {
+      "description": "Rescore aging data with freshness validation",
+      "cron": "0 4 * * 1",
+      "strategy": "age_based",
+      "enabled": true,
+      "priority": "low",
+      "timeout_hours": 8,
+      "max_items": 5000,
+      "filters": {
+        "last_scored_before": "30d",
+        "data_age_days": 90,
+        "exclude_archived": true,
+        "staleness_factors": {
+          "no_access_days": 60,
+          "no_update_days": 90,
+          "deprecated_version": true
+        }
+      },
+      "archive_policy": {
+        "enabled": true,
+        "score_threshold": 0.3,
+        "age_threshold_days": 365,
+        "compression": true,
+        "move_to_cold_storage": true
+      },
+      "notification": {
+        "on_success": false,
+        "on_failure": false,
+        "weekly_summary": true,
+        "recipients": ["data-governance@vulcanami.io"]
+      }
+    },
+    
+    "low_score_rescore": {
+      "description": "Re-evaluate poor quality data with remediation",
+      "cron": "0 1 * * *",
+      "strategy": "score_based",
+      "enabled": true,
+      "priority": "high",
+      "timeout_hours": 3,
+      "max_items": 2000,
+      "filters": {
+        "score_range": [0.0, 0.60],
+        "categories": ["poor", "very_poor", "unacceptable"],
+        "max_rescore_attempts": 3,
+        "exclude_permanently_failed": true
+      },
+      "remediation": {
+        "enabled": true,
+        "auto_fix": true,
+        "strategies": [
+          "data_enrichment",
+          "format_standardization",
+          "missing_field_inference",
+          "outlier_correction"
+        ],
+        "confidence_threshold": 0.9
+      },
+      "improvement_tracking": {
+        "track_score_changes": true,
+        "minimum_improvement": 0.1,
+        "report_improvements": true
+      },
+      "notification": {
+        "on_success": false,
+        "on_failure": true,
+        "on_improvement": true,
+        "recipients": ["data-quality@vulcanami.io"]
+      }
+    },
+    
+    "model_drift_rescore": {
+      "description": "Validate model performance and detect drift",
+      "cron": "0 5 1 * *",
+      "strategy": "stratified_sample",
+      "enabled": true,
+      "priority": "medium",
+      "timeout_hours": 12,
+      "max_items": 10000,
+      "filters": {
+        "sample_size": 0.01,
+        "stratified": true,
+        "stratification_fields": ["source", "category", "data_type"],
+        "include_edge_cases": true,
+        "include_recent_failures": true
+      },
+      "drift_detection": {
+        "enabled": true,
+        "methods": ["kolmogorov_smirnov", "jensen_shannon", "population_stability_index"],
+        "threshold": 0.15,
+        "reference_window_days": 30,
+        "detection_window_days": 7
+      },
+      "model_comparison": {
+        "enabled": true,
+        "compare_versions": true,
+        "a_b_testing": true,
+        "champion_challenger": true
+      },
+      "retraining_trigger": {
+        "enabled": true,
+        "drift_threshold": 0.2,
+        "accuracy_drop": 0.05,
+        "auto_retrain": false
+      },
+      "notification": {
+        "on_success": true,
+        "on_failure": true,
+        "on_drift_detected": true,
+        "recipients": ["ml-team@vulcanami.io", "data-science@vulcanami.io"],
+        "include_analysis": true
+      }
+    },
+    
+    "random_sample_rescore": {
+      "description": "Statistical quality sampling for monitoring",
+      "cron": "0 */12 * * *",
+      "strategy": "random_sample",
+      "enabled": true,
+      "priority": "low",
+      "timeout_hours": 2,
+      "max_items": 500,
+      "filters": {
+        "sample_size": 0.001,
+        "stratified": false,
+        "seed": "daily_rotating",
+        "exclude_recently_scored": true
+      },
+      "statistical_analysis": {
+        "calculate_confidence_interval": true,
+        "confidence_level": 0.95,
+        "detect_anomalies": true,
+        "trend_analysis": true
+      },
+      "baseline_comparison": {
+        "enabled": true,
+        "baseline_window_days": 30,
+        "alert_on_deviation": true,
+        "deviation_threshold": 0.1
+      },
+      "notification": {
+        "on_success": false,
+        "on_failure": false,
+        "on_anomaly": true,
+        "recipients": ["monitoring@vulcanami.io"]
+      }
+    },
+    
+    "source_based_rescore": {
+      "description": "Rescore by data source with source-specific rules",
+      "cron": "0 6 * * 2",
+      "strategy": "source_partitioned",
+      "enabled": true,
+      "priority": "medium",
+      "timeout_hours": 6,
+      "max_items": null,
+      "filters": {
+        "sources": ["external_api", "user_upload", "batch_import", "streaming", "webhook"],
+        "score_threshold": 0.80,
+        "source_specific_rules": {
+          "external_api": {
+            "min_score": 0.7,
+            "check_rate_limits": true
+          },
+          "user_upload": {
+            "min_score": 0.6,
+            "virus_scan": true
+          },
+          "batch_import": {
+            "min_score": 0.8,
+            "validate_schema": true
+          }
+        }
+      },
+      "source_health": {
+        "monitor_availability": true,
+        "track_error_rates": true,
+        "quality_trends": true
+      },
+      "notification": {
+        "on_success": false,
+        "on_failure": true,
+        "per_source_alerts": true,
+        "recipients": ["ops@vulcanami.io", "integration-team@vulcanami.io"]
+      }
+    },
+    
+    "remediation_validation": {
+      "description": "Validate data fixes and remediation effectiveness",
+      "cron": "30 * * * *",
+      "strategy": "targeted",
+      "enabled": true,
+      "priority": "high",
+      "timeout_hours": 1,
+      "max_items": 100,
+      "filters": {
+        "labels": ["remediated", "fixed", "updated", "patched", "corrected"],
+        "since_last_run": true,
+        "minimum_improvement": 0.1
+      },
+      "validation_checks": {
+        "verify_fixes": true,
+        "check_side_effects": true,
+        "validate_consistency": true,
+        "regression_testing": true
+      },
+      "rollback_policy": {
+        "enabled": true,
+        "on_degradation": true,
+        "threshold": 0.2,
+        "automatic": false
+      },
+      "notification": {
+        "on_success": true,
+        "on_failure": true,
+        "on_rollback": true,
+        "recipients": ["ops@vulcanami.io", "qa-team@vulcanami.io"]
+      }
+    },
+    
+    "pii_revalidation": {
+      "description": "PII compliance check with regulatory validation",
+      "cron": "0 7 * * 3",
+      "strategy": "compliance_focused",
+      "enabled": true,
+      "priority": "critical",
+      "timeout_hours": 4,
+      "max_items": null,
+      "filters": {
+        "dimension": "pii_detection",
+        "labels": ["contains_pii", "possible_pii", "sensitive", "confidential"],
+        "confidence_threshold": 0.70,
+        "regulatory_scope": ["gdpr", "ccpa", "hipaa"]
+      },
+      "compliance_checks": {
+        "consent_verification": true,
+        "retention_policy": true,
+        "encryption_validation": true,
+        "access_control": true,
+        "audit_trail": true
+      },
+      "remediation": {
+        "auto_mask": true,
+        "auto_encrypt": true,
+        "quarantine_non_compliant": true
+      },
+      "reporting": {
+        "generate_compliance_report": true,
+        "format": ["pdf", "json"],
+        "include_evidence": true,
+        "sign_report": true
+      },
+      "notification": {
+        "on_success": true,
+        "on_failure": true,
+        "on_non_compliance": true,
+        "recipients": ["privacy@vulcanami.io", "compliance@vulcanami.io", "legal@vulcanami.io"],
+        "channels": ["email", "secure_message"],
+        "escalation_path": ["ciso@vulcanami.io", "cto@vulcanami.io"]
+      }
+    },
+    
+    "custom_schedule_1": {
+      "description": "Custom business logic validation",
+      "cron": "0 8 * * 1,2,3,4,5",
+      "strategy": "custom",
+      "enabled": false,
+      "priority": "medium",
+      "timeout_hours": 2,
+      "max_items": 1000,
+      "custom_script": "/opt/vulcanami/scripts/custom_validation.py",
+      "filters": {
+        "custom_field": "value"
+      },
+      "notification": {
+        "on_success": false,
+        "on_failure": true,
+        "recipients": ["custom-team@vulcanami.io"]
+      }
+    },
+    
+    "anomaly_detection_rescore": {
+      "description": "Detect and rescore anomalous patterns",
+      "cron": "0 */4 * * *",
+      "strategy": "anomaly_focused",
+      "enabled": true,
+      "priority": "high",
+      "timeout_hours": 3,
+      "max_items": 5000,
+      "filters": {
+        "outlier_detection": true,
+        "zscore_threshold": 3,
+        "isolation_forest": true
+      },
+      "anomaly_handling": {
+        "auto_flag": true,
+        "human_review": true,
+        "quarantine": false
+      },
+      "notification": {
+        "on_anomaly": true,
+        "recipients": ["security@vulcanami.io", "fraud-detection@vulcanami.io"]
+      }
+    },
+    
+    "performance_optimization": {
+      "description": "Optimize scoring performance based on patterns",
+      "cron": "0 22 * * 0",
+      "strategy": "optimization",
+      "enabled": true,
+      "priority": "low",
+      "timeout_hours": 6,
+      "max_items": 10000,
+      "optimization_targets": {
+        "reduce_false_positives": true,
+        "improve_speed": true,
+        "optimize_cache": true
+      },
+      "notification": {
+        "on_success": true,
+        "recipients": ["engineering@vulcanami.io"]
+      }
+    }
+  },
+  
+  "strategies": {
+    "full_scan": {
+      "description": "Process entire dataset with comprehensive validation",
+      "batch_size": 1000,
+      "dynamic_batch_sizing": true,
+      "ordering": "created_at",
+      "checkpoint_interval": 5000,
+      "parallelism": 8,
+      "skip_cache": false,
+      "force_rescore": true,
+      "partition_strategy": "range",
+      "partition_size": 50000,
+      "memory_optimization": {
+        "streaming": true,
+        "chunk_size": 100,
+        "gc_interval": 1000
+      },
+      "error_handling": {
+        "retry_failed": true,
+        "skip_corrupt": true,
+        "quarantine_errors": true
+      }
+    },
+    
+    "incremental": {
+      "description": "Process recent changes with delta detection",
+      "batch_size": 500,
+      "dynamic_batch_sizing": true,
+      "ordering": "updated_at DESC",
+      "checkpoint_interval": 2000,
+      "parallelism": 4,
+      "skip_cache": false,
+      "force_rescore": false,
+      "change_detection": {
+        "method": "checksum",
+        "track_deltas": true,
+        "minimum_change": 0.01
+      },
+      "optimization": {
+        "prefetch": true,
+        "batch_similar": true,
+        "cache_warm": true
+      }
+    },
+    
+    "priority_based": {
+      "description": "Process by priority with intelligent routing",
+      "batch_size": 100,
+      "dynamic_batch_sizing": false,
+      "ordering": "priority DESC, score ASC, created_at DESC",
+      "checkpoint_interval": 500,
+      "parallelism": 2,
+      "skip_cache": true,
+      "force_rescore": true,
+      "priority_calculation": {
+        "factors": {
+          "age": 0.2,
+          "score": 0.4,
+          "source": 0.2,
+          "labels": 0.2
+        },
+        "boost_critical": 2.0
+      },
+      "queue_management": {
+        "priority_queues": 5,
+        "preemptive": true,
+        "starvation_prevention": true
+      }
+    },
+    
+    "age_based": {
+      "description": "Process oldest first with decay function",
+      "batch_size": 500,
+      "dynamic_batch_sizing": true,
+      "ordering": "last_scored_at ASC NULLS FIRST",
+      "checkpoint_interval": 2500,
+      "parallelism": 4,
+      "skip_cache": false,
+      "force_rescore": true,
+      "age_calculation": {
+        "include_access_time": true,
+        "decay_function": "exponential",
+        "half_life_days": 30
+      }
+    },
+    
+    "score_based": {
+      "description": "Process lowest scores with improvement tracking",
+      "batch_size": 200,
+      "dynamic_batch_sizing": true,
+      "ordering": "current_score ASC, confidence DESC",
+      "checkpoint_interval": 1000,
+      "parallelism": 4,
+      "skip_cache": true,
+      "force_rescore": true,
+      "score_buckets": [
+        {"range": [0.0, 0.2], "batch_size": 50, "priority": "critical"},
+        {"range": [0.2, 0.4], "batch_size": 100, "priority": "high"},
+        {"range": [0.4, 0.6], "batch_size": 200, "priority": "medium"}
+      ],
+      "improvement_tracking": {
+        "baseline": true,
+        "trend_analysis": true,
+        "report_generation": true
+      }
+    },
+    
+    "random_sample": {
+      "description": "Random statistical sampling with stratification",
+      "batch_size": 100,
+      "dynamic_batch_sizing": false,
+      "ordering": "RANDOM()",
+      "checkpoint_interval": 500,
+      "parallelism": 1,
+      "skip_cache": true,
+      "force_rescore": true,
+      "sampling": {
+        "method": "systematic",
+        "seed_rotation": "daily",
+        "stratification": {
+          "enabled": true,
+          "fields": ["source", "category"],
+          "proportional": true
+        },
+        "reservoir_sampling": true,
+        "sample_size_calculation": "statistical"
+      }
+    },
+    
+    "source_partitioned": {
+      "description": "Process by data source with partitioning",
+      "batch_size": 500,
+      "dynamic_batch_sizing": true,
+      "ordering": "source, created_at",
+      "checkpoint_interval": 2500,
+      "parallelism": 6,
+      "skip_cache": false,
+      "force_rescore": false,
+      "partitioning": {
+        "method": "hash",
+        "partition_key": "source",
+        "parallel_partitions": 4,
+        "rebalance": true
+      },
+      "source_optimization": {
+        "batch_by_api": true,
+        "respect_rate_limits": true,
+        "connection_pooling": true
+      }
+    },
+    
+    "targeted": {
+      "description": "Process specific items with precision",
+      "batch_size": 50,
+      "dynamic_batch_sizing": false,
+      "ordering": "updated_at DESC",
+      "checkpoint_interval": 250,
+      "parallelism": 1,
+      "skip_cache": true,
+      "force_rescore": true,
+      "targeting": {
+        "method": "label_match",
+        "exact_match": false,
+        "fuzzy_threshold": 0.8
+      }
+    },
+    
+    "compliance_focused": {
+      "description": "Process with compliance requirements",
+      "batch_size": 100,
+      "dynamic_batch_sizing": false,
+      "ordering": "sensitivity_level DESC, created_at",
+      "checkpoint_interval": 500,
+      "parallelism": 2,
+      "skip_cache": true,
+      "force_rescore": true,
+      "compliance": {
+        "audit_mode": true,
+        "evidence_collection": true,
+        "chain_of_custody": true,
+        "immutable_logs": true
+      },
+      "security": {
+        "encrypted_processing": true,
+        "secure_delete": true,
+        "access_logging": true
+      }
+    },
+    
+    "stratified_sample": {
+      "description": "Stratified sampling for drift detection",
+      "batch_size": 200,
+      "dynamic_batch_sizing": true,
+      "ordering": "RANDOM() WITHIN GROUP",
+      "checkpoint_interval": 1000,
+      "parallelism": 4,
+      "skip_cache": true,
+      "force_rescore": true,
+      "stratification": {
+        "fields": ["source", "category", "score_bucket"],
+        "method": "proportional",
+        "minimum_samples_per_stratum": 10,
+        "oversample_minorities": true
+      }
+    },
+    
+    "custom": {
+      "description": "Custom strategy with user-defined logic",
+      "batch_size": 100,
+      "dynamic_batch_sizing": true,
+      "ordering": "custom_field",
+      "checkpoint_interval": 500,
+      "parallelism": 2,
+      "skip_cache": false,
+      "force_rescore": false,
+      "custom_logic": {
+        "script_path": "/opt/vulcanami/strategies/custom.py",
+        "class_name": "CustomStrategy",
+        "parameters": {}
+      }
+    },
+    
+    "anomaly_focused": {
+      "description": "Focus on anomaly detection and outliers",
+      "batch_size": 150,
+      "dynamic_batch_sizing": true,
+      "ordering": "anomaly_score DESC",
+      "checkpoint_interval": 750,
+      "parallelism": 3,
+      "skip_cache": true,
+      "force_rescore": true,
+      "anomaly_detection": {
+        "algorithms": ["isolation_forest", "local_outlier_factor", "one_class_svm"],
+        "ensemble_voting": true,
+        "contamination": 0.05
+      }
+    },
+    
+    "optimization": {
+      "description": "Performance and accuracy optimization",
+      "batch_size": 1000,
+      "dynamic_batch_sizing": true,
+      "ordering": "performance_impact DESC",
+      "checkpoint_interval": 5000,
+      "parallelism": 8,
+      "skip_cache": false,
+      "force_rescore": false,
+      "optimization_targets": {
+        "latency_reduction": true,
+        "accuracy_improvement": true,
+        "resource_efficiency": true
+      }
+    }
+  },
+  
+  "data_selection": {
+    "sources": {
+      "primary": {
+        "type": "postgresql",
+        "host": "${DB_PRIMARY_HOST:-postgres}",
+        "port": 5432,
+        "database": "vulcanami",
+        "schema": "dqs",
+        "table": "quality_scores",
+        "ssl_mode": "require",
+        "connection_pool": {
+          "min_size": 5,
+          "max_size": 50,
+          "max_overflow": 10,
+          "timeout": 30,
+          "recycle": 3600
+        },
+        "query_optimization": {
+          "use_indexes": true,
+          "parallel_query": true,
+          "work_mem": "256MB"
+        }
+      },
+      "secondary": {
+        "type": "postgresql",
+        "host": "${DB_REPLICA_HOST:-postgres-replica}",
+        "port": 5432,
+        "database": "vulcanami",
+        "schema": "dqs",
+        "table": "quality_scores",
+        "read_only": true,
+        "load_balancing": "round_robin",
+        "fallback_to_primary": true
+      },
+      "archive": {
+        "type": "s3",
+        "endpoint": "https://s3.amazonaws.com",
+        "region": "us-east-1",
+        "bucket": "vulcanami-dqs-archive",
+        "prefix": "scores/",
+        "format": "parquet",
+        "compression": "snappy",
+        "partition_by": ["year", "month", "day"],
+        "access_key_id": "${AWS_ACCESS_KEY_ID}",
+        "secret_access_key": "${AWS_SECRET_ACCESS_KEY}",
+        "encryption": "AES256",
+        "storage_class": "INTELLIGENT_TIERING",
+        "lifecycle_rules": {
+          "transition_to_ia": 30,
+          "transition_to_glacier": 90,
+          "expiration": 730
+        }
+      },
+      "streaming": {
+        "type": "kafka",
+        "brokers": ["${KAFKA_BROKER1:-localhost:9092}", "${KAFKA_BROKER2:-localhost:9093}", "${KAFKA_BROKER3:-localhost:9094}"],
+        "topic": "dqs-scores-input",
+        "consumer_group": "dqs-rescore",
+        "offset_reset": "earliest",
+        "enable_auto_commit": false,
+        "security_protocol": "SASL_SSL",
+        "sasl_mechanism": "PLAIN",
+        "sasl_username": "${KAFKA_USERNAME}",
+        "sasl_password": "${KAFKA_PASSWORD}",
+        "ssl_ca_location": "/etc/kafka/certs/ca-cert.pem",
+        "max_poll_records": 500,
+        "fetch_min_bytes": 1024,
+        "fetch_max_wait_ms": 500,
+        "session_timeout_ms": 30000,
+        "heartbeat_interval_ms": 3000,
+        "compression_type": "lz4"
+      }
+    },
+    "default_filters": {
+      "exclude_deleted": true,
+      "exclude_archived": true,
+      "exclude_test_data": true,
+      "min_data_size": 10,
+      "max_data_size": 10485760,
+      "valid_sources_only": true
+    },
+    "query_builder": {
+      "use_prepared_statements": true,
+      "parameter_binding": true,
+      "sql_injection_prevention": true
+    },
+    "caching": {
+      "query_cache": true,
+      "cache_ttl": 300,
+      "cache_size": 1000
+    }
+  },
+  
+  "execution": {
+    "distributed": {
+      "enabled": true,
+      "coordinator": "kubernetes",
+      "orchestrator": {
+        "type": "airflow",
+        "endpoint": "http://airflow:8080",
+        "dag_prefix": "dqs_rescore"
+      },
+      "worker_pool": {
+        "min_workers": 5,
+        "max_workers": 50,
+        "auto_scale": true,
+        "scale_up_threshold": 0.8,
+        "scale_down_threshold": 0.3
+      },
+      "task_distribution": {
+        "method": "consistent_hash",
+        "load_balancing": "least_loaded",
+        "sticky_sessions": false
+      },
+      "message_queue": {
+        "type": "rabbitmq",
+        "host": "rabbitmq",
+        "port": 5672,
+        "prefetch_count": 10,
+        "durable_queues": true
+      },
+      "coordination": {
+        "type": "zookeeper",
+        "ensemble": ["zk1:2181", "zk2:2181", "zk3:2181"],
+        "session_timeout": 30000
+      },
+      "retry_policy": {
+        "max_retries": 5,
+        "backoff": "exponential",
+        "initial_delay": 1,
+        "max_delay": 300,
+        "jitter": true
+      }
+    },
+    "resource_limits": {
+      "max_memory_mb": 8192,
+      "max_cpu_percent": 80,
+      "max_concurrent_jobs": 10,
+      "max_io_operations_per_second": 1000,
+      "network_bandwidth_mbps": 1000
+    },
+    "error_handling": {
+      "continue_on_error": true,
+      "max_consecutive_errors": 100,
+      "error_rate_threshold": 0.10,
+      "quarantine_failed_items": true,
+      "dead_letter_queue": true,
+      "circuit_breaker": {
+        "enabled": true,
+        "failure_threshold": 5,
+        "timeout": 60,
+        "half_open_requests": 3
+      },
+      "fallback_strategy": "skip",
+      "error_categorization": true,
+      "auto_recovery": true
+    },
+    "performance": {
+      "prefetch": true,
+      "batch_optimization": true,
+      "connection_pooling": true,
+      "result_streaming": true,
+      "compression": "lz4",
+      "zero_copy": true
+    },
+    "checkpointing": {
+      "enabled": true,
+      "storage": "distributed",
+      "backend": "etcd",
+      "interval_seconds": 60,
+      "retention_count": 10,
+      "async_checkpoint": true
+    }
+  },
+  
+  "monitoring": {
+    "logging": {
+      "level": "${LOG_LEVEL:-INFO}",
+      "format": "json",
+      "structured": true,
+      "correlation_id": true,
+      "destination": "/var/log/dqs/rescore.log",
+      "separate_error_log": true,
+      "audit_log": "/var/log/dqs/rescore-audit.log",
+      "performance_log": "/var/log/dqs/rescore-perf.log",
+      "rotation": {
+        "enabled": true,
+        "max_size": "100MB",
+        "max_age": 30,
+        "max_backups": 10,
+        "compress": true
+      },
+      "remote_logging": {
+        "enabled": true,
+        "protocol": "fluentd",
+        "host": "fluentd.vulcanami.io",
+        "port": 24224,
+        "buffer_size": 1048576
+      },
+      "sampling": {
+        "enabled": true,
+        "rate": 0.1,
+        "always_log_errors": true
+      }
+    },
+    "metrics": {
+      "prometheus": {
+        "enabled": true,
+        "port": 9147,
+        "path": "/metrics",
+        "include_histograms": true,
+        "include_summaries": true,
+        "custom_collectors": true,
+        "push_gateway": {
+          "enabled": true,
+          "url": "http://pushgateway:9091",
+          "job": "dqs_rescore",
+          "push_interval": 30,
+          "grouping_keys": ["instance", "schedule"]
+        }
+      },
+      "statsd": {
+        "enabled": true,
+        "host": "statsd.vulcanami.io",
+        "port": 8125,
+        "prefix": "dqs.rescore",
+        "sample_rate": 0.1
+      },
+      "cloudwatch": {
+        "enabled": false,
+        "region": "us-east-1",
+        "namespace": "VulcanAMI/DQS/Rescore",
+        "dimensions": {
+          "Environment": "production",
+          "Service": "rescore"
+        }
+      },
+      "custom_metrics": [
+        "items_per_second",
+        "score_improvement_rate",
+        "pii_detection_rate",
+        "data_freshness_distribution",
+        "error_categorization",
+        "cache_hit_rate",
+        "queue_depth",
+        "worker_utilization",
+        "checkpoint_lag"
+      ],
+      "aggregation": {
+        "enabled": true,
+        "window_seconds": 60,
+        "percentiles": [0.5, 0.75, 0.9, 0.95, 0.99]
+      }
+    },
+    "alerting": {
+      "enabled": true,
+      "alert_manager": {
+        "url": "http://alertmanager:9093",
+        "timeout": 10
+      },
+      "channels": {
+        "email": {
+          "enabled": true,
+          "smtp_host": "smtp.vulcanami.io",
+          "smtp_port": 587,
+          "smtp_tls": true,
+          "from": "dqs-alerts@vulcanami.io",
+          "rate_limit": 100
+        },
+        "slack": {
+          "enabled": true,
+          "webhook_url": "${SLACK_WEBHOOK_URL}",
+          "channel": "#dqs-alerts",
+          "username": "DQS Bot",
+          "icon_emoji": ":robot:"
+        },
+        "pagerduty": {
+          "enabled": true,
+          "integration_key": "${PAGERDUTY_KEY}",
+          "routing_key": "${PAGERDUTY_ROUTING}",
+          "dedup_key_template": "dqs-{{schedule}}-{{timestamp}}"
+        },
+        "webhook": {
+          "enabled": true,
+          "endpoints": [
+            {
+              "url": "https://webhook.vulcanami.io/dqs/alerts",
+              "method": "POST",
+              "headers": {
+                "Authorization": "Bearer ${WEBHOOK_TOKEN}"
+              }
+            }
+          ]
+        },
+        "sms": {
+          "enabled": false,
+          "provider": "twilio",
+          "from": "+1234567890",
+          "critical_only": true
+        }
+      },
+      "rules": [
+        {
+          "name": "high_failure_rate",
+          "condition": "error_rate > 0.20",
+          "duration": "5m",
+          "severity": "critical",
+          "channels": ["email", "slack", "pagerduty"],
+          "throttle": "30m"
+        },
+        {
+          "name": "job_timeout",
+          "condition": "duration > timeout_hours",
+          "severity": "warning",
+          "channels": ["email", "slack"],
+          "auto_resolve": true
+        },
+        {
+          "name": "low_quality_trend",
+          "condition": "avg_score < 0.60 for 3 consecutive runs",
+          "severity": "warning",
+          "channels": ["email", "slack"],
+          "escalate_after": "1h"
+        },
+        {
+          "name": "memory_pressure",
+          "condition": "memory_usage > 90%",
+          "duration": "2m",
+          "severity": "critical",
+          "channels": ["email", "pagerduty"],
+          "auto_scale": true
+        },
+        {
+          "name": "queue_backup",
+          "condition": "queue_depth > 10000",
+          "duration": "10m",
+          "severity": "warning",
+          "channels": ["email", "slack"],
+          "throttle": "1h"
+        },
+        {
+          "name": "drift_detected",
+          "condition": "model_drift > 0.15",
+          "severity": "warning",
+          "channels": ["email", "slack"],
+          "notify_ml_team": true
+        }
+      ],
+      "escalation": {
+        "enabled": true,
+        "levels": [
+          {
+            "level": 1,
+            "after_minutes": 15,
+            "contacts": ["oncall@vulcanami.io"]
+          },
+          {
+            "level": 2,
+            "after_minutes": 30,
+            "contacts": ["team-lead@vulcanami.io"]
+          },
+          {
+            "level": 3,
+            "after_minutes": 60,
+            "contacts": ["engineering-manager@vulcanami.io"]
+          }
+        ]
+      },
+      "suppression": {
+        "enabled": true,
+        "maintenance_windows": [
+          {
+            "name": "weekly_maintenance",
+            "schedule": "0 2-6 * * 0",
+            "suppress": ["warning"]
+          }
+        ],
+        "duplicate_suppression": true,
+        "correlation_window": 300
+      }
+    },
+    "tracing": {
+      "enabled": true,
+      "provider": "opentelemetry",
+      "endpoint": "http://jaeger:4317",
+      "sample_rate": 0.1,
+      "propagation": "w3c",
+      "span_processors": ["batch"],
+      "export_timeout": 30
+    },
+    "profiling": {
+      "enabled": true,
+      "continuous": true,
+      "cpu_profiling": true,
+      "memory_profiling": true,
+      "goroutine_profiling": true,
+      "block_profiling": true,
+      "mutex_profiling": true,
+      "output": "pprof",
+      "storage": "s3://vulcanami-profiles/dqs/"
+    }
+  },
+  
+  "reporting": {
+    "enabled": true,
+    "formats": ["json", "html", "pdf", "csv", "excel"],
+    "templates": {
+      "daily": "/opt/vulcanami/templates/daily_report.j2",
+      "weekly": "/opt/vulcanami/templates/weekly_report.j2",
+      "monthly": "/opt/vulcanami/templates/monthly_report.j2",
+      "custom": "/opt/vulcanami/templates/custom_report.j2"
+    },
+    "storage": {
+      "type": "multi",
+      "destinations": [
+        {
+          "type": "filesystem",
+          "path": "/var/log/dqs/reports",
+          "retention_days": 90
+        },
+        {
+          "type": "s3",
+          "bucket": "vulcanami-dqs-reports",
+          "prefix": "rescore/",
+          "encryption": "AES256",
+          "lifecycle_policy": true
+        },
+        {
+          "type": "database",
+          "table": "dqs.reports",
+          "compress": true
+        }
+      ]
+    },
+    "distribution": {
+      "email": {
+        "enabled": true,
+        "recipients": {
+          "daily": ["team@vulcanami.io"],
+          "weekly": ["management@vulcanami.io"],
+          "monthly": ["executives@vulcanami.io"]
+        },
+        "attach_reports": true,
+        "include_summary": true
+      },
+      "slack": {
+        "enabled": true,
+        "channels": {
+          "daily": "#dqs-daily",
+          "weekly": "#dqs-weekly",
+          "monthly": "#dqs-monthly"
+        },
+        "include_charts": true
+      },
+      "dashboard": {
+        "enabled": true,
+        "url": "https://dashboard.vulcanami.io/dqs",
+        "auto_publish": true
+      },
+      "api": {
+        "enabled": true,
+        "endpoint": "https://api.vulcanami.io/v1/reports",
+        "authentication": "oauth2"
+      }
+    },
+    "include_metrics": [
+      "total_items_processed",
+      "processing_duration",
+      "score_distribution",
+      "category_breakdown",
+      "dimension_analysis",
+      "improvement_trends",
+      "error_summary",
+      "performance_metrics",
+      "cost_analysis",
+      "compliance_status",
+      "remediation_effectiveness",
+      "drift_analysis",
+      "anomaly_detection_results",
+      "source_quality_trends",
+      "queue_statistics",
+      "resource_utilization"
+    ],
+    "visualizations": {
+      "enabled": true,
+      "charts": [
+        "score_histogram",
+        "trend_lines",
+        "heatmaps",
+        "scatter_plots",
+        "box_plots",
+        "pie_charts"
+      ],
+      "interactive": true,
+      "export_format": "svg"
+    },
+    "scheduling": {
+      "daily": "0 6 * * *",
+      "weekly": "0 8 * * 1",
+      "monthly": "0 10 1 * *",
+      "quarterly": "0 12 1 */3 *",
+      "annual": "0 14 1 1 *"
+    }
+  },
+  
+  "optimization": {
+    "cache_warming": {
+      "enabled": true,
+      "strategies": ["most_accessed", "low_scoring", "recent_failures"],
+      "preload_top_items": 5000,
+      "preload_schedule": "0 0 * * *",
+      "ttl_hours": 24,
+      "parallel_warming": true
+    },
+    "adaptive_scheduling": {
+      "enabled": true,
+      "ml_based": true,
+      "factors": {
+        "data_volume": 0.3,
+        "error_rate": 0.2,
+        "processing_time": 0.2,
+        "business_hours": 0.3
+      },
+      "adjust_frequency": true,
+      "adjust_batch_size": true,
+      "adjust_parallelism": true,
+      "learning_period_days": 30,
+      "min_interval_minutes": 30,
+      "max_interval_hours": 168
+    },
+    "smart_batching": {
+      "enabled": true,
+      "algorithms": ["similarity", "locality", "affinity"],
+      "group_by": ["source", "data_type", "size", "complexity"],
+      "optimize_for": "throughput",
+      "dynamic_grouping": true,
+      "max_batch_wait_ms": 1000
+    },
+    "query_optimization": {
+      "enabled": true,
+      "query_planner": "cost_based",
+      "index_hints": true,
+      "materialized_views": true,
+      "partition_pruning": true,
+      "parallel_execution": true
+    },
+    "resource_optimization": {
+      "cpu_pinning": false,
+      "numa_aware": true,
+      "huge_pages": false,
+      "io_scheduler": "deadline",
+      "network_optimization": true
+    },
+    "cost_optimization": {
+      "spot_instances": true,
+      "auto_shutdown": true,
+      "resource_tagging": true,
+      "cost_allocation": true,
+      "budget_alerts": true
+    }
+  },
+  
+  "disaster_recovery": {
+    "backup": {
+      "enabled": true,
+      "frequency": "hourly",
+      "retention": {
+        "hourly": 24,
+        "daily": 30,
+        "weekly": 12,
+        "monthly": 12,
+        "yearly": 7
+      },
+      "destinations": [
+        {
+          "type": "s3",
+          "bucket": "vulcanami-dr-backups",
+          "region": "us-west-2"
+        },
+        {
+          "type": "azure",
+          "container": "dqs-backups",
+          "account": "vulcanamistoragedr"
+        }
+      ],
+      "encryption": true,
+      "verification": true
+    },
+    "replication": {
+      "enabled": true,
+      "multi_region": true,
+      "sync_mode": "async",
+      "lag_threshold_seconds": 60
+    },
+    "failover": {
+      "automatic": false,
+      "rto_minutes": 30,
+      "rpo_minutes": 5,
+      "health_check_interval": 30,
+      "decision_threshold": 3
+    }
+  },
+  
+  "compliance": {
+    "standards": ["GDPR", "CCPA", "HIPAA", "SOC2", "ISO27001"],
+    "audit_trail": {
+      "enabled": true,
+      "immutable": true,
+      "retention_years": 7,
+      "encryption": true
+    },
+    "data_residency": {
+      "enforce": true,
+      "regions": {
+        "eu": ["eu-west-1", "eu-central-1"],
+        "us": ["us-east-1", "us-west-2"],
+        "asia": ["ap-southeast-1", "ap-northeast-1"]
+      }
+    },
+    "consent_management": {
+      "check_consent": true,
+      "consent_service": "https://consent.vulcanami.io/v1"
+    },
+    "right_to_be_forgotten": {
+      "enabled": true,
+      "automated": false,
+      "verification_required": true
+    }
+  }
+}

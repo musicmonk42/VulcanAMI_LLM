@@ -1,0 +1,48 @@
+{
+  "num_stages": 3,
+  "tasks_per_stage": [
+    3,
+    3,
+    4
+  ],
+  "stage_info": {
+    "0": {
+      "stage_id": 0,
+      "difficulty_range": [
+        0.0,
+        0.2
+      ],
+      "num_tasks": 3,
+      "samples_seen": 0,
+      "performance_history": [],
+      "time_spent": 0.0,
+      "completed": false
+    },
+    "1": {
+      "stage_id": 1,
+      "difficulty_range": [
+        0.3,
+        0.5
+      ],
+      "num_tasks": 3,
+      "samples_seen": 0,
+      "performance_history": [],
+      "time_spent": 0.0,
+      "completed": false
+    },
+    "2": {
+      "stage_id": 2,
+      "difficulty_range": [
+        0.6,
+        0.9
+      ],
+      "num_tasks": 4,
+      "samples_seen": 0,
+      "performance_history": [],
+      "time_spent": 0.0,
+      "completed": false
+    }
+  },
+  "total_tasks": 10,
+  "pacing_strategy": "adaptive"
+}

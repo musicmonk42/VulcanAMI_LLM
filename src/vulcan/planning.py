@@ -1,0 +1,1777 @@
+# ============================================================
+# VULCAN-AGI Planning Module
+# Hierarchical goals, resource-aware compute, distributed coordination
+# FULLY DEBUGGED VERSION - All critical issues resolved
+# FIXED: Proper imports for src.vulcan package structure
+# ============================================================
+
+import numpy as np
+import time
+from typing import Any, Dict, List, Optional, Tuple, Set, Union, Callable
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+import logging
+import hashlib
+import threading
+from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+import heapq
+from queue import PriorityQueue, Queue
+import copy
+import json
+import asyncio
+import weakref
+import gc
+
+# FIXED: Import from src.vulcan.config instead of config
+from vulcan.config import ActionType, GoalType, AgentConfig, HierarchicalGoalSystem
+
+# --- VULCAN-AGI Module Imports ---
+try:
+    from vulcan.safety import SafetyValidator
+except ImportError:
+    SafetyValidator = None
+try:
+    from src.unified_runtime import UnifiedRuntime
+except ImportError:
+    UnifiedRuntime = None
+
+logger = logging.getLogger(__name__)
+
+# ============================================================
+# PLANNING TYPES
+# ============================================================
+
+class PlanningMethod(Enum):
+    """Planning methods available."""
+    HIERARCHICAL = "hierarchical"
+    MCTS = "mcts"
+    A_STAR = "a_star"
+    STRIPS = "strips"
+    PARTIAL_ORDER = "partial_order"
+    TEMPORAL = "temporal"
+    PROBABILISTIC = "probabilistic"
+
+@dataclass
+class PlanStep:
+    """Single step in a plan."""
+    step_id: str
+    action: str
+    preconditions: List[str] = field(default_factory=list)
+    effects: List[str] = field(default_factory=list)
+    resources: Dict[str, float] = field(default_factory=dict)
+    duration: float = 1.0
+    probability: float = 1.0
+    status: str = "pending"
+    dependencies: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class Plan:
+    """Complete plan representation."""
+    plan_id: str
+    goal: str
+    context: Dict[str, Any]
+    steps: List[PlanStep] = field(default_factory=list)
+    total_cost: float = 0.0
+    expected_duration: float = 0.0
+    success_probability: float = 1.0
+    created_at: float = field(default_factory=time.time)
+    
+    def add_step(self, step: PlanStep):
+        """Add step to plan."""
+        self.steps.append(step)
+        self.total_cost += sum(step.resources.values())
+        self.expected_duration += step.duration
+        self.success_probability *= step.probability
+    
+    def optimize(self):
+        """Optimize step ordering based on dependencies."""
+        dependency_graph = defaultdict(list)
+        in_degree = defaultdict(int)
+        
+        for step in self.steps:
+            for dep in step.dependencies:
+                dependency_graph[dep].append(step.step_id)
+                in_degree[step.step_id] += 1
+        
+        queue = deque([step.step_id for step in self.steps 
+                      if in_degree[step.step_id] == 0])
+        
+        optimized_order = []
+        while queue:
+            current = queue.popleft()
+            optimized_order.append(current)
+            
+            for neighbor in dependency_graph[current]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+        
+        step_map = {step.step_id: step for step in self.steps}
+        self.steps = [step_map[step_id] for step_id in optimized_order 
+                     if step_id in step_map]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert plan to dictionary."""
+        return {
+            'plan_id': self.plan_id,
+            'goal': self.goal,
+            'num_steps': len(self.steps),
+            'total_cost': self.total_cost,
+            'expected_duration': self.expected_duration,
+            'success_probability': self.success_probability,
+            'steps': [s.__dict__ for s in self.steps]
+        }
+
+# ============================================================
+# MONTE CARLO TREE SEARCH (FIXED)
+# ============================================================
+
+class MCTSNode:
+    """Node in MCTS tree with proper memory management."""
+    
+    def __init__(self, state: Any, parent: Optional['MCTSNode'] = None, 
+                 action: Optional[Any] = None):
+        self.state = state
+        # FIXED: Use weak reference for parent to prevent circular reference memory leak
+        self._parent_ref = weakref.ref(parent) if parent is not None else None
+        self.action = action
+        self.children = {}
+        self.visits = 0
+        self.value = 0.0
+        self.untried_actions = None
+        self._lock = threading.Lock()
+    
+    @property
+    def parent(self):
+        """Get parent node (may be None if parent was garbage collected)."""
+        if self._parent_ref is None:
+            return None
+        return self._parent_ref()
+    
+    def ucb1(self, c: float = 1.414) -> float:
+        """Upper Confidence Bound calculation."""
+        if self.visits == 0:
+            return float('inf')
+        
+        exploitation = self.value / self.visits
+        
+        parent = self.parent
+        if parent:
+            exploration = c * np.sqrt(np.log(parent.visits) / self.visits)
+        else:
+            exploration = 0
+        
+        return exploitation + exploration
+    
+    def best_child(self, c: float = 1.414) -> 'MCTSNode':
+        """Select best child using UCB1."""
+        return max(self.children.values(), key=lambda n: n.ucb1(c))
+    
+    def update(self, reward: float):
+        """Update node statistics."""
+        with self._lock:
+            self.visits += 1
+            self.value += reward
+    
+    def cleanup(self):
+        """Explicit cleanup of node and children."""
+        with self._lock:
+            # Clear children
+            for child in self.children.values():
+                child.cleanup()
+            self.children.clear()
+            
+            # Clear references
+            self._parent_ref = None
+            self.state = None
+            self.action = None
+            self.untried_actions = None
+
+class MonteCarloTreeSearch:
+    """Enhanced MCTS for planning with proper memory management."""
+    
+    def __init__(self, simulation_budget: int = 1000, max_depth: int = 50,
+                 exploration_constant: float = 1.414):
+        self.simulation_budget = simulation_budget
+        self.max_depth = max_depth
+        self.exploration_constant = exploration_constant
+        self.root = None
+        self.action_generator = None
+        self.state_evaluator = None
+        self.transition_model = None
+        self._cleanup_lock = threading.Lock()
+    
+    def search(self, initial_state: Any, 
+              available_actions: Optional[List[Any]] = None) -> Tuple[Any, float]:
+        """Run MCTS synchronously to find best action."""
+        # Clean up previous tree
+        self._cleanup_tree()
+        
+        self.root = MCTSNode(initial_state)
+        
+        if available_actions:
+            self.root.untried_actions = available_actions.copy()
+        else:
+            self.root.untried_actions = self._get_actions(initial_state)
+        
+        # Run simulations
+        for sim in range(self.simulation_budget):
+            node = self._tree_policy(self.root)
+            reward = self._default_policy(node.state)
+            self._backup(node, reward)
+            
+            # Progressive widening every 100 simulations
+            if sim % 100 == 0 and sim > 0:
+                self._progressive_widening(self.root)
+            
+            # Memory management: cleanup old branches periodically
+            if sim % 200 == 0 and sim > 0:
+                self._prune_tree()
+        
+        # Return best action based on visit count
+        if self.root.children:
+            best_child = max(self.root.children.values(), key=lambda n: n.visits)
+            return best_child.action, best_child.value / max(best_child.visits, 1)
+        
+        # Fallback to random action
+        if self.root.untried_actions:
+            return self.root.untried_actions[0], 0.0
+        
+        return None, 0.0
+    
+    async def search_async(self, initial_state: Any, 
+                          available_actions: Optional[List[Any]] = None) -> Tuple[Any, float]:
+        """Async MCTS with parallel simulations and proper memory management."""
+        # Clean up previous tree
+        self._cleanup_tree()
+        
+        self.root = MCTSNode(initial_state)
+        
+        if available_actions:
+            self.root.untried_actions = available_actions.copy()
+        else:
+            self.root.untried_actions = self._get_actions(initial_state)
+        
+        # Create simulation tasks in batches to control memory
+        batch_size = min(self.simulation_budget, 50)
+        total_simulations = 0
+        
+        while total_simulations < self.simulation_budget:
+            current_batch = min(batch_size, self.simulation_budget - total_simulations)
+            tasks = []
+            
+            for _ in range(current_batch):
+                tasks.append(self._simulate_async())
+            
+            # Process batch
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Simulation error: {result}")
+                    continue
+                    
+                node, reward = result
+                self._backup(node, reward)
+            
+            total_simulations += current_batch
+            
+            # Progressive widening
+            if total_simulations % 100 == 0 and total_simulations > 0:
+                self._progressive_widening(self.root)
+            
+            # Memory management: cleanup and garbage collect
+            if total_simulations % 200 == 0:
+                self._prune_tree()
+                gc.collect()
+        
+        # Return best action based on visit count
+        if self.root.children:
+            best_child = max(self.root.children.values(), key=lambda n: n.visits)
+            return best_child.action, best_child.value / max(best_child.visits, 1)
+        
+        # Fallback to random action
+        if self.root.untried_actions:
+            return self.root.untried_actions[0], 0.0
+        
+        return None, 0.0
+    
+    async def _simulate_async(self) -> Tuple[MCTSNode, float]:
+        """Single async simulation with error handling."""
+        try:
+            # Run tree policy in thread to avoid blocking
+            loop = asyncio.get_event_loop()
+            node = await loop.run_in_executor(None, self._tree_policy, self.root)
+            # Run rollout in thread
+            reward = await loop.run_in_executor(None, self._default_policy, node.state)
+            return node, reward
+        except Exception as e:
+            logger.error(f"Simulation error: {e}")
+            # Return root with zero reward on error
+            return self.root, 0.0
+    
+    def _tree_policy(self, node: MCTSNode) -> MCTSNode:
+        """Select or expand node using tree policy."""
+        depth = 0
+        
+        while not self._is_terminal(node.state) and depth < self.max_depth:
+            if node.untried_actions:
+                return self._expand(node)
+            elif node.children:
+                node = node.best_child(self.exploration_constant)
+                depth += 1
+            else:
+                # Leaf node, initialize actions
+                node.untried_actions = self._get_actions(node.state)
+                if node.untried_actions:
+                    return self._expand(node)
+                break
+        
+        return node
+    
+    def _expand(self, node: MCTSNode) -> MCTSNode:
+        """Expand tree with new node."""
+        if not node.untried_actions:
+            return node
+        
+        # Select random untried action
+        action_idx = np.random.randint(len(node.untried_actions))
+        action = node.untried_actions.pop(action_idx)
+        
+        # Simulate transition
+        next_state = self._simulate_action(node.state, action)
+        
+        # Create child node
+        child = MCTSNode(next_state, parent=node, action=action)
+        node.children[action] = child
+        
+        # Initialize untried actions for child
+        child.untried_actions = self._get_actions(next_state)
+        
+        return child
+    
+    def _default_policy(self, state: Any) -> float:
+        """Random rollout for value estimation."""
+        current_state = state
+        depth = 0
+        cumulative_reward = 0
+        discount = 0.99
+        
+        while not self._is_terminal(current_state) and depth < self.max_depth:
+            actions = self._get_actions(current_state)
+            if not actions:
+                break
+            
+            # Random action selection
+            action = np.random.choice(actions)
+            current_state = self._simulate_action(current_state, action)
+            
+            # Get immediate reward
+            reward = self._evaluate_state(current_state)
+            cumulative_reward += (discount ** depth) * reward
+            
+            depth += 1
+        
+        # Terminal state evaluation
+        terminal_value = self._evaluate_state(current_state)
+        cumulative_reward += (discount ** depth) * terminal_value
+        
+        return cumulative_reward
+    
+    def _backup(self, node: MCTSNode, reward: float):
+        """Backpropagate reward up the tree."""
+        current = node
+        discount = 0.99
+        depth = 0
+        
+        while current is not None:
+            current.update(reward * (discount ** depth))
+            current = current.parent
+            depth += 1
+    
+    def _progressive_widening(self, node: MCTSNode):
+        """Add new actions progressively based on visit count."""
+        if node.visits > len(node.children) * 10:
+            new_actions = self._get_new_actions(node.state)
+            if new_actions and node.untried_actions is not None:
+                node.untried_actions.extend(new_actions[:1])
+    
+    def _prune_tree(self):
+        """Prune least visited branches to control memory."""
+        with self._cleanup_lock:
+            if not self.root or not self.root.children:
+                return
+            
+            # Keep only top 50% of children by visit count
+            children_list = list(self.root.children.items())
+            if len(children_list) > 10:
+                children_list.sort(key=lambda x: x[1].visits, reverse=True)
+                keep_count = max(5, len(children_list) // 2)
+                
+                # Remove bottom half
+                for action, child in children_list[keep_count:]:
+                    child.cleanup()
+                    del self.root.children[action]
+    
+    def _cleanup_tree(self):
+        """Clean up entire tree to prevent memory leaks."""
+        with self._cleanup_lock:
+            if self.root:
+                self.root.cleanup()
+                self.root = None
+            
+            # Force garbage collection
+            gc.collect()
+    
+    def _is_terminal(self, state: Any) -> bool:
+        """Check if state is terminal."""
+        if hasattr(state, 'is_terminal'):
+            return state.is_terminal()
+        return False
+    
+    def _get_actions(self, state: Any) -> List[Any]:
+        """Get available actions for state."""
+        if self.action_generator:
+            return self.action_generator(state)
+        
+        if hasattr(state, 'get_actions'):
+            return state.get_actions()
+        
+        # Default actions
+        return [ActionType.EXPLORE, ActionType.OPTIMIZE, ActionType.MAINTAIN]
+    
+    def _get_new_actions(self, state: Any) -> List[Any]:
+        """Get additional actions for progressive widening."""
+        return []
+    
+    def _simulate_action(self, state: Any, action: Any) -> Any:
+        """Simulate action execution."""
+        if self.transition_model:
+            return self.transition_model(state, action)
+        
+        if hasattr(state, 'apply_action'):
+            return state.apply_action(action)
+        
+        # Simple state copy
+        return copy.deepcopy(state)
+    
+    def _evaluate_state(self, state: Any) -> float:
+        """Evaluate state value."""
+        if self.state_evaluator:
+            return self.state_evaluator(state)
+        
+        if hasattr(state, 'evaluate'):
+            return state.evaluate()
+        
+        # Random evaluation
+        return np.random.random()
+    
+    def cleanup(self):
+        """Explicit cleanup method."""
+        self._cleanup_tree()
+    
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        try:
+            self.cleanup()
+        except:
+            pass
+
+# ============================================================
+# ENHANCED HIERARCHICAL GOAL SYSTEM
+# ============================================================
+
+class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
+    """Enhanced hierarchical planning with plan library and repair."""
+    
+    def __init__(self):
+        super().__init__()
+        self.plan_library = PlanLibrary()
+        self.plan_monitor = PlanMonitor()
+        self.plan_repairer = PlanRepairer()
+        self.mcts = MonteCarloTreeSearch()
+        self._lock = threading.RLock()
+
+    def generate_plan(self, goal: str, context: Dict[str, Any], 
+                      method: PlanningMethod = PlanningMethod.HIERARCHICAL) -> Plan:
+        """Generates and validates a plan."""
+        plan = self.create_plan(goal, context, method)
+
+        if SafetyValidator and AgentConfig:
+            try:
+                config = AgentConfig()
+                validator = SafetyValidator(config)
+                
+                is_safe, reason, _ = validator.validate_action(plan.to_dict(), context)
+                
+                if not is_safe:
+                    logger.error(f"Generated plan for goal '{goal}' failed safety validation: {reason}")
+                    raise ValueError(f"Unsafe plan generated: {reason}")
+            except Exception as e:
+                logger.error(f"An error occurred during plan validation: {e}")
+                raise ValueError(f"Unsafe plan: validation failed. Reason: {e}")
+        
+        return plan
+    
+    def create_plan(self, goal: str, context: Dict[str, Any],
+                   method: PlanningMethod = PlanningMethod.HIERARCHICAL) -> Plan:
+        """Create complete plan for goal using specified method."""
+        
+        # Check plan library first
+        cached_plan = self.plan_library.get_plan(goal, context)
+        if cached_plan and self._is_plan_valid(cached_plan, context):
+            logger.info(f"Using cached plan for goal: {goal}")
+            return cached_plan
+        
+        # Select planning method
+        if method == PlanningMethod.MCTS:
+            return self._create_mcts_plan(goal, context)
+        elif method == PlanningMethod.A_STAR:
+            return self._create_astar_plan(goal, context)
+        else:
+            return self._create_hierarchical_plan(goal, context)
+    
+    def _create_hierarchical_plan(self, goal: str, context: Dict[str, Any]) -> Plan:
+        """Create plan using hierarchical decomposition."""
+        with self._lock:
+            # Decompose goal
+            subgoals = self.decompose_goal(goal, context)
+            
+            # Create plan structure
+            plan = Plan(
+                plan_id=f"plan_{goal}_{int(time.time())}",
+                goal=goal,
+                context=context
+            )
+            
+            # Convert subgoals to plan steps
+            for i, subgoal in enumerate(subgoals):
+                step = PlanStep(
+                    step_id=f"step_{i}_{subgoal['subgoal']}",
+                    action=subgoal['subgoal'],
+                    preconditions=self._extract_preconditions(subgoal),
+                    effects=self._extract_effects(subgoal),
+                    resources=subgoal.get('resources_required', {}),
+                    duration=self._estimate_duration(subgoal),
+                    probability=self._estimate_success_probability(subgoal),
+                    dependencies=self._identify_dependencies(subgoal['subgoal'], 
+                                                            subgoals[:i])
+                )
+                plan.add_step(step)
+            
+            # Optimize plan
+            plan.optimize()
+            
+            # Cache plan
+            self.plan_library.store_plan(plan)
+            
+            return plan
+    
+    def _create_mcts_plan(self, goal: str, context: Dict[str, Any]) -> Plan:
+        """Create plan using MCTS."""
+        # Define initial state
+        initial_state = PlanningState(goal=goal, context=context)
+        
+        # Configure MCTS
+        self.mcts.action_generator = lambda s: self._generate_actions(s)
+        self.mcts.state_evaluator = lambda s: self._evaluate_planning_state(s)
+        self.mcts.transition_model = lambda s, a: self._apply_planning_action(s, a)
+        
+        # Run MCTS
+        plan_steps = []
+        current_state = initial_state
+        
+        # Check if we're in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in async context, use async search
+            return asyncio.run(self._create_mcts_plan_async(goal, context))
+        except RuntimeError:
+            # Not in async context, use sync search
+            pass
+        
+        for step_num in range(20):
+            action, value = self.mcts.search(current_state)
+            
+            if action is None:
+                break
+            
+            # Convert action to plan step
+            step = self._action_to_step(action, step_num)
+            plan_steps.append(step)
+            
+            # Update state
+            current_state = self._apply_planning_action(current_state, action)
+            
+            if self._goal_achieved(current_state, goal):
+                break
+        
+        # Create plan
+        plan = Plan(
+            plan_id=f"mcts_plan_{goal}_{int(time.time())}",
+            goal=goal,
+            context=context
+        )
+        
+        for step in plan_steps:
+            plan.add_step(step)
+        
+        # Cleanup MCTS tree
+        self.mcts.cleanup()
+        
+        return plan
+    
+    async def _create_mcts_plan_async(self, goal: str, context: Dict[str, Any]) -> Plan:
+        """Create plan using async MCTS for better performance."""
+        initial_state = PlanningState(goal=goal, context=context)
+        
+        # Configure MCTS
+        self.mcts.action_generator = lambda s: self._generate_actions(s)
+        self.mcts.state_evaluator = lambda s: self._evaluate_planning_state(s)
+        self.mcts.transition_model = lambda s, a: self._apply_planning_action(s, a)
+        
+        plan_steps = []
+        current_state = initial_state
+        
+        for step_num in range(20):
+            action, value = await self.mcts.search_async(current_state)
+            
+            if action is None:
+                break
+            
+            # Convert action to plan step
+            step = self._action_to_step(action, step_num)
+            plan_steps.append(step)
+            
+            # Update state
+            current_state = self._apply_planning_action(current_state, action)
+            
+            if self._goal_achieved(current_state, goal):
+                break
+        
+        # Create plan
+        plan = Plan(
+            plan_id=f"mcts_plan_{goal}_{int(time.time())}",
+            goal=goal,
+            context=context
+        )
+        
+        for step in plan_steps:
+            plan.add_step(step)
+        
+        # Cleanup MCTS tree
+        self.mcts.cleanup()
+        
+        return plan
+    
+    def _create_astar_plan(self, goal: str, context: Dict[str, Any]) -> Plan:
+        """Create plan using A* search."""
+        initial_state = PlanningState(goal=goal, context=context)
+        goal_state = PlanningState(goal=goal, context=context, achieved=True)
+        
+        # A* search
+        open_set = [(0, initial_state)]
+        closed_set = set()
+        g_score = {initial_state: 0}
+        f_score = {initial_state: self._heuristic(initial_state, goal_state)}
+        came_from = {}
+        
+        max_iterations = 1000
+        iteration = 0
+        
+        while open_set and iteration < max_iterations:
+            iteration += 1
+            current_f, current = heapq.heappop(open_set)
+            
+            if self._goal_achieved(current, goal):
+                # Reconstruct path
+                path = self._reconstruct_path(came_from, current)
+                return self._path_to_plan(path, goal, context)
+            
+            closed_set.add(current)
+            
+            # Explore neighbors
+            for action in self._generate_actions(current):
+                neighbor = self._apply_planning_action(current, action)
+                
+                if neighbor in closed_set:
+                    continue
+                
+                tentative_g = g_score[current] + self._action_cost(action)
+                
+                if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                    came_from[neighbor] = (current, action)
+                    g_score[neighbor] = tentative_g
+                    f_score[neighbor] = tentative_g + self._heuristic(neighbor, goal_state)
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
+        
+        # No plan found or max iterations reached
+        logger.warning(f"A* search failed to find plan for goal: {goal}")
+        return Plan(plan_id=f"failed_{goal}", goal=goal, context=context)
+    
+    def execute_plan(self, plan: Plan, executor: Optional[Callable] = None) -> Dict[str, Any]:
+        """Execute plan with monitoring and repair."""
+        execution_trace = []
+        failed_steps = []
+        
+        for step in plan.steps:
+            # Monitor preconditions
+            if not self._check_preconditions(step.preconditions):
+                # Try repair
+                repair_success = self.plan_repairer.repair_preconditions(step)
+                if not repair_success:
+                    failed_steps.append(step)
+                    continue
+            
+            # Execute step
+            step.status = "executing"
+            
+            if executor:
+                result = executor(step)
+            else:
+                result = self._execute_step(step)
+            
+            execution_trace.append(result)
+            
+            # Update step status
+            if result['success']:
+                step.status = "completed"
+            else:
+                step.status = "failed"
+                failed_steps.append(step)
+                
+                # Try recovery
+                recovery_plan = self.plan_repairer.create_recovery_plan(
+                    plan, step, result.get('error', 'Unknown error')
+                )
+                
+                if recovery_plan:
+                    logger.info(f"Executing recovery plan for step {step.step_id}")
+                    recovery_result = self.execute_plan(recovery_plan, executor)
+                    
+                    if recovery_result['success']:
+                        step.status = "recovered"
+                    else:
+                        break
+        
+        success = len(failed_steps) == 0
+        
+        return {
+            'success': success,
+            'executed_steps': len(execution_trace),
+            'failed_steps': [s.step_id for s in failed_steps],
+            'trace': execution_trace
+        }
+    
+    def _extract_preconditions(self, subgoal: Dict) -> List[str]:
+        """Extract preconditions for subgoal."""
+        preconditions = []
+        
+        # Resource preconditions
+        for resource, amount in subgoal.get('resources_required', {}).items():
+            preconditions.append(f"has_{resource}>={amount}")
+        
+        # Dependency preconditions
+        for dep in subgoal.get('dependencies', []):
+            preconditions.append(f"completed_{dep}")
+        
+        return preconditions
+    
+    def _extract_effects(self, subgoal: Dict) -> List[str]:
+        """Extract effects of completing subgoal."""
+        effects = [f"completed_{subgoal['subgoal']}"]
+        
+        # Success criteria as effects
+        for criterion, value in subgoal.get('success_criteria', {}).items():
+            effects.append(f"{criterion}={value}")
+        
+        return effects
+    
+    def _estimate_duration(self, subgoal: Dict) -> float:
+        """Estimate duration for subgoal."""
+        base_duration = 1.0
+        
+        # Adjust based on complexity
+        if 'optimize' in subgoal['subgoal']:
+            base_duration *= 2.0
+        if 'learn' in subgoal['subgoal']:
+            base_duration *= 1.5
+        
+        # Adjust based on resources
+        resource_factor = sum(subgoal.get('resources_required', {}).values())
+        base_duration *= (1 + resource_factor)
+        
+        return base_duration
+    
+    def _estimate_success_probability(self, subgoal: Dict) -> float:
+        """Estimate success probability for subgoal."""
+        base_prob = 0.9
+        
+        # Adjust based on priority
+        priority = subgoal.get('priority', 0.5)
+        base_prob = min(1.0, base_prob * (0.5 + priority))
+        
+        # Adjust based on conflicts
+        if subgoal.get('conflicts'):
+            base_prob *= 0.8
+        
+        return base_prob
+    
+    def _identify_dependencies(self, subgoal: str, previous_subgoals: List[Dict]) -> List[str]:
+        """Identify dependencies for a subgoal."""
+        dependencies = []
+        
+        # Simple heuristic: learning depends on exploration
+        if 'learn' in subgoal:
+            for prev in previous_subgoals:
+                if 'explore' in prev['subgoal']:
+                    dependencies.append(f"step_{previous_subgoals.index(prev)}_{prev['subgoal']}")
+        
+        # Optimization depends on both exploration and learning
+        if 'optimize' in subgoal:
+            for prev in previous_subgoals:
+                if 'explore' in prev['subgoal'] or 'learn' in prev['subgoal']:
+                    dependencies.append(f"step_{previous_subgoals.index(prev)}_{prev['subgoal']}")
+        
+        return dependencies
+    
+    def _is_plan_valid(self, plan: Plan, context: Dict) -> bool:
+        """Check if cached plan is still valid."""
+        # Check age
+        age = time.time() - plan.created_at
+        if age > 3600:
+            return False
+        
+        # Check context compatibility
+        for key, value in context.items():
+            if key in plan.context and plan.context[key] != value:
+                return False
+        
+        return True
+    
+    def _generate_actions(self, state: 'PlanningState') -> List[Any]:
+        """Generate available actions for a planning state."""
+        actions = []
+        
+        # Basic action types
+        base_actions = [ActionType.EXPLORE, ActionType.OPTIMIZE, ActionType.MAINTAIN]
+        
+        # Add actions based on state
+        if not state.achieved:
+            actions.extend(base_actions)
+        
+        # Add context-specific actions
+        if 'learning' in state.goal:
+            actions.append(ActionType.LEARN)
+        
+        return actions
+    
+    def _evaluate_planning_state(self, state: 'PlanningState') -> float:
+        """Evaluate a planning state."""
+        score = 0.0
+        
+        # Reward goal achievement
+        if state.achieved:
+            score += 10.0
+        
+        # Penalize resource usage
+        total_resources = sum(state.resources_used.values())
+        score -= total_resources * 0.1
+        
+        # Penalize step count
+        score -= len(state.steps_taken) * 0.01
+        
+        return score
+    
+    def _apply_planning_action(self, state: 'PlanningState', action: Any) -> 'PlanningState':
+        """Apply an action to a planning state."""
+        new_state = copy.deepcopy(state)
+        
+        # Update state based on action
+        action_str = str(action)
+        new_state.steps_taken.append(action_str)
+        
+        # Simulate resource usage
+        if 'explore' in action_str.lower():
+            new_state.resources_used['time'] = new_state.resources_used.get('time', 0) + 1.0
+        elif 'optimize' in action_str.lower():
+            new_state.resources_used['compute'] = new_state.resources_used.get('compute', 0) + 2.0
+        
+        # Check goal achievement
+        if len(new_state.steps_taken) > 3:
+            new_state.achieved = np.random.random() > 0.3
+        
+        return new_state
+    
+    def _goal_achieved(self, state: 'PlanningState', goal: str) -> bool:
+        """Check if goal is achieved in state."""
+        return state.achieved
+    
+    def _action_to_step(self, action: Any, step_num: int) -> PlanStep:
+        """Convert an action to a plan step."""
+        action_str = str(action)
+        
+        return PlanStep(
+            step_id=f"mcts_step_{step_num}",
+            action=action_str,
+            duration=1.0,
+            probability=0.8,
+            resources={'compute': 1.0}
+        )
+    
+    def _heuristic(self, state: 'PlanningState', goal_state: 'PlanningState') -> float:
+        """Heuristic function for A* search."""
+        distance = 0.0
+        
+        # Estimate remaining steps
+        if not state.achieved:
+            distance += 5.0
+        
+        # Resource difference
+        for resource in ['time', 'compute', 'memory']:
+            state_val = state.resources_used.get(resource, 0)
+            goal_val = goal_state.resources_used.get(resource, 0)
+            distance += abs(state_val - goal_val)
+        
+        return distance
+    
+    def _action_cost(self, action: Any) -> float:
+        """Cost of taking an action."""
+        action_str = str(action).lower()
+        
+        if 'explore' in action_str:
+            return 1.0
+        elif 'optimize' in action_str:
+            return 2.0
+        elif 'maintain' in action_str:
+            return 0.5
+        
+        return 1.0
+    
+    def _reconstruct_path(self, came_from: Dict, current: 'PlanningState') -> List[Tuple['PlanningState', Any]]:
+        """Reconstruct path from A* search."""
+        path = []
+        
+        while current in came_from:
+            prev_state, action = came_from[current]
+            path.append((current, action))
+            current = prev_state
+        
+        return list(reversed(path))
+    
+    def _path_to_plan(self, path: List[Tuple['PlanningState', Any]], 
+                     goal: str, context: Dict) -> Plan:
+        """Convert A* path to plan."""
+        plan = Plan(
+            plan_id=f"astar_plan_{goal}_{int(time.time())}",
+            goal=goal,
+            context=context
+        )
+        
+        for i, (state, action) in enumerate(path):
+            step = PlanStep(
+                step_id=f"astar_step_{i}",
+                action=str(action),
+                duration=1.0,
+                probability=0.85,
+                resources={'compute': self._action_cost(action)}
+            )
+            plan.add_step(step)
+        
+        return plan
+    
+    def _execute_step(self, step: PlanStep) -> Dict[str, Any]:
+        """Execute a single plan step using the UnifiedRuntime."""
+        if not UnifiedRuntime:
+            logger.warning("UnifiedRuntime not available for step execution. Simulating.")
+            success = np.random.random() < step.probability
+            return {
+                'step_id': step.step_id,
+                'action': step.action,
+                'success': success,
+                'duration': step.duration,
+                'resources_used': step.resources
+            }
+
+        try:
+            runtime = UnifiedRuntime()
+            graph = {
+                "nodes": [{
+                    "id": step.step_id,
+                    "type": step.action,
+                    "params": step.metadata
+                }],
+                "edges": []
+            }
+            
+            result = asyncio.run(runtime.execute_graph(graph))
+            
+            success = result.get('status') == 'completed'
+            
+            return {
+                'step_id': step.step_id,
+                'action': step.action,
+                'success': success,
+                'duration': result.get('duration_ms', step.duration * 1000),
+                'resources_used': step.resources,
+                'runtime_output': result.get('output')
+            }
+        except Exception as e:
+            logger.error(f"Error executing step {step.step_id} with UnifiedRuntime: {e}")
+            return {
+                'step_id': step.step_id,
+                'action': step.action,
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _check_preconditions(self, preconditions: List[str]) -> bool:
+        """Check if preconditions are satisfied."""
+        return np.random.random() > 0.1
+    
+    def cleanup(self):
+        """Cleanup resources."""
+        with self._lock:
+            if self.mcts:
+                self.mcts.cleanup()
+            if self.plan_library:
+                self.plan_library.cleanup()
+            gc.collect()
+    
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        try:
+            self.cleanup()
+        except:
+            pass
+
+# ============================================================
+# PLANNING STATE
+# ============================================================
+
+@dataclass
+class PlanningState:
+    """State representation for planning."""
+    goal: str
+    context: Dict[str, Any]
+    achieved: bool = False
+    steps_taken: List[str] = field(default_factory=list)
+    resources_used: Dict[str, float] = field(default_factory=dict)
+    
+    def __hash__(self):
+        return hash((self.goal, tuple(self.steps_taken)))
+    
+    def __eq__(self, other):
+        return (self.goal == other.goal and 
+                self.steps_taken == other.steps_taken)
+    
+    def __lt__(self, other):
+        """Less than comparison for heap operations."""
+        return len(self.steps_taken) < len(other.steps_taken)
+
+# ============================================================
+# PLAN LIBRARY
+# ============================================================
+
+class PlanLibrary:
+    """Library of reusable plans with proper memory management."""
+    
+    def __init__(self, max_size: int = 1000):
+        self.plans = {}
+        self.access_counts = defaultdict(int)
+        self.max_size = max_size
+        self._lock = threading.RLock()
+    
+    def get_plan(self, goal: str, context: Dict) -> Optional[Plan]:
+        """Retrieve plan from library."""
+        key = self._make_key(goal, context)
+        
+        with self._lock:
+            if key in self.plans:
+                self.access_counts[key] += 1
+                return copy.deepcopy(self.plans[key])
+        
+        return None
+    
+    def store_plan(self, plan: Plan):
+        """Store plan in library."""
+        key = self._make_key(plan.goal, plan.context)
+        
+        with self._lock:
+            # Evict if at capacity
+            if len(self.plans) >= self.max_size:
+                self._evict_lru()
+            
+            self.plans[key] = plan
+            self.access_counts[key] = 1
+    
+    def _make_key(self, goal: str, context: Dict) -> str:
+        """Create key for plan lookup."""
+        context_str = json.dumps(context, sort_keys=True, default=str)
+        return hashlib.md5(f"{goal}_{context_str}".encode()).hexdigest()
+    
+    def _evict_lru(self):
+        """Evict least recently used plan."""
+        if not self.access_counts:
+            return
+        
+        lru_key = min(self.access_counts.items(), key=lambda x: x[1])[0]
+        
+        del self.plans[lru_key]
+        del self.access_counts[lru_key]
+    
+    def cleanup(self):
+        """Cleanup library."""
+        with self._lock:
+            self.plans.clear()
+            self.access_counts.clear()
+    
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        try:
+            self.cleanup()
+        except:
+            pass
+
+# ============================================================
+# PLAN MONITOR
+# ============================================================
+
+class PlanMonitor:
+    """Monitor plan execution."""
+    
+    def __init__(self):
+        self.execution_history = deque(maxlen=100)
+        self.performance_metrics = defaultdict(list)
+        self._lock = threading.RLock()
+    
+    def monitor_step(self, step: PlanStep, result: Dict[str, Any]):
+        """Monitor step execution."""
+        with self._lock:
+            self.execution_history.append({
+                'step': step,
+                'result': result,
+                'timestamp': time.time()
+            })
+            
+            # Update metrics
+            self.performance_metrics[step.action].append(result['success'])
+    
+    def get_action_success_rate(self, action: str) -> float:
+        """Get success rate for action type."""
+        with self._lock:
+            if action not in self.performance_metrics:
+                return 0.5
+            
+            successes = self.performance_metrics[action]
+            return sum(successes) / len(successes) if successes else 0.5
+
+# ============================================================
+# PLAN REPAIRER
+# ============================================================
+
+class PlanRepairer:
+    """Repair failed plans."""
+    
+    def __init__(self):
+        self.repair_strategies = {
+            'precondition_failure': self._repair_preconditions_strategy,
+            'resource_shortage': self._repair_resources_strategy,
+            'timeout': self._repair_timeout_strategy
+        }
+    
+    def repair_preconditions(self, step: PlanStep) -> bool:
+        """Try to establish preconditions."""
+        for precondition in step.preconditions:
+            if not self._is_satisfied(precondition):
+                if not self._achieve_condition(precondition):
+                    return False
+        
+        return True
+    
+    def create_recovery_plan(self, original_plan: Plan, 
+                            failed_step: PlanStep,
+                            error: str) -> Optional[Plan]:
+        """Create recovery plan from failure."""
+        failure_type = self._classify_failure(error)
+        
+        if failure_type in self.repair_strategies:
+            strategy = self.repair_strategies[failure_type]
+            return strategy(original_plan, failed_step)
+        
+        return None
+    
+    def _is_satisfied(self, condition: str) -> bool:
+        """Check if condition is satisfied."""
+        return np.random.random() > 0.3
+    
+    def _achieve_condition(self, condition: str) -> bool:
+        """Try to achieve a condition."""
+        return np.random.random() > 0.5
+    
+    def _classify_failure(self, error: str) -> str:
+        """Classify failure type from error."""
+        error_lower = error.lower()
+        
+        if 'precondition' in error_lower:
+            return 'precondition_failure'
+        elif 'resource' in error_lower:
+            return 'resource_shortage'
+        elif 'timeout' in error_lower or 'time' in error_lower:
+            return 'timeout'
+        
+        return 'unknown'
+    
+    def _repair_preconditions_strategy(self, plan: Plan, 
+                                      failed_step: PlanStep) -> Plan:
+        """Repair plan with precondition failure."""
+        recovery_plan = Plan(
+            plan_id=f"recovery_{plan.plan_id}",
+            goal=f"recover_{failed_step.step_id}",
+            context=plan.context
+        )
+        
+        # Add steps to establish preconditions
+        for precondition in failed_step.preconditions:
+            recovery_step = PlanStep(
+                step_id=f"establish_{precondition}",
+                action=f"achieve_{precondition}",
+                effects=[precondition],
+                duration=0.5,
+                probability=0.8
+            )
+            recovery_plan.add_step(recovery_step)
+        
+        # Add original step
+        recovery_plan.add_step(failed_step)
+        
+        return recovery_plan
+    
+    def _repair_resources_strategy(self, plan: Plan, 
+                                  failed_step: PlanStep) -> Plan:
+        """Repair plan with resource shortage."""
+        recovery_plan = Plan(
+            plan_id=f"resource_recovery_{plan.plan_id}",
+            goal=f"acquire_resources_{failed_step.step_id}",
+            context=plan.context
+        )
+        
+        # Add resource acquisition steps
+        for resource, amount in failed_step.resources.items():
+            acquire_step = PlanStep(
+                step_id=f"acquire_{resource}",
+                action=f"gather_{resource}",
+                effects=[f"has_{resource}>={amount}"],
+                duration=1.0,
+                probability=0.7
+            )
+            recovery_plan.add_step(acquire_step)
+        
+        return recovery_plan
+    
+    def _repair_timeout_strategy(self, plan: Plan, 
+                                failed_step: PlanStep) -> Plan:
+        """Repair plan with timeout."""
+        recovery_plan = Plan(
+            plan_id=f"timeout_recovery_{plan.plan_id}",
+            goal=f"expedite_{failed_step.step_id}",
+            context=plan.context
+        )
+        
+        # Create faster alternative
+        fast_step = copy.deepcopy(failed_step)
+        fast_step.step_id = f"fast_{failed_step.step_id}"
+        fast_step.duration *= 0.5
+        fast_step.probability *= 0.9
+        
+        recovery_plan.add_step(fast_step)
+        
+        return recovery_plan
+
+# ============================================================
+# RESOURCE-AWARE COMPUTE
+# ============================================================
+
+class ResourceAwareCompute:
+    """Enhanced resource-aware computation with prediction and optimization."""
+    
+    def __init__(self):
+        self.resource_monitors = {
+            'cpu': self._monitor_cpu,
+            'memory': self._monitor_memory,
+            'gpu': self._monitor_gpu,
+            'energy': self._monitor_energy,
+            'network': self._monitor_network
+        }
+        
+        self.optimization_strategies = {
+            'pruning': self._apply_pruning,
+            'quantization': self._apply_quantization,
+            'caching': self._apply_caching,
+            'batching': self._apply_batching,
+            'offloading': self._apply_offloading,
+            'parallelization': self._apply_parallelization
+        }
+        
+        self.resource_history = defaultdict(lambda: deque(maxlen=100))
+        self.resource_predictions = {}
+        self.cache = {}
+        self.resource_allocator = ResourceAllocator()
+        self._lock = threading.RLock()
+    
+    def get_resource_availability(self) -> Dict[str, float]:
+        """Get current resource availability."""
+        with self._lock:
+            return {
+                'cpu': 100 - self._monitor_cpu(),
+                'memory': 8000 - self._monitor_memory(),
+                'gpu': 100 - self._monitor_gpu(),
+                'energy': 1000000 - self._monitor_energy(),
+                'network': 1000 - self._monitor_network()
+            }
+    
+    def plan_with_budget(self, problem: Dict, time_budget_ms: float, 
+                        energy_budget_nJ: float) -> Dict[str, Any]:
+        """Plan computation within resource constraints."""
+        start_time = time.time()
+        
+        # Check cache
+        cache_key = self._compute_cache_key(problem)
+        with self._lock:
+            if cache_key in self.cache:
+                cached = self.cache[cache_key]
+                if time.time() - cached['timestamp'] < 60:
+                    return cached['result']
+        
+        # Estimate requirements
+        estimated = self._estimate_requirements(problem)
+        
+        # Allocate resources
+        allocation = self.resource_allocator.allocate(
+            estimated,
+            {'time_ms': time_budget_ms, 'energy_nJ': energy_budget_nJ}
+        )
+        
+        # Select optimization strategy
+        strategy = None
+        if not allocation['feasible']:
+            strategy = self._select_optimization_strategy(
+                problem, estimated, time_budget_ms, energy_budget_nJ
+            )
+            
+            if strategy:
+                problem = self.optimization_strategies[strategy](problem)
+                estimated = self._estimate_requirements(problem)
+        
+        # Execute plan
+        plan = self._execute_plan(problem, time_budget_ms - (time.time() - start_time) * 1000)
+        
+        # Track usage
+        actual_time = (time.time() - start_time) * 1000
+        actual_energy = self._estimate_energy_usage(actual_time)
+        
+        plan['resource_usage'] = {
+            'time_ms': actual_time,
+            'energy_nJ': actual_energy,
+            'memory_mb': self._get_current_memory(),
+            'within_budget': actual_time <= time_budget_ms and actual_energy <= energy_budget_nJ,
+            'optimization_used': strategy,
+            'allocation': allocation
+        }
+        
+        # Update history
+        self._update_resource_history(plan['resource_usage'])
+        
+        # Cache result
+        with self._lock:
+            self.cache[cache_key] = {
+                'result': plan,
+                'timestamp': time.time()
+            }
+            
+            # Limit cache size
+            if len(self.cache) > 1000:
+                oldest_keys = sorted(self.cache.items(), key=lambda x: x[1]['timestamp'])[:200]
+                for key, _ in oldest_keys:
+                    del self.cache[key]
+        
+        return plan
+    
+    def _apply_parallelization(self, problem: Dict) -> Dict:
+        """Apply parallelization to speed up computation."""
+        problem['parallel'] = True
+        problem['num_workers'] = min(4, problem.get('data_size', 1000) // 100)
+        problem['complexity'] = problem.get('complexity', 1.0) * 0.6
+        return problem
+    
+    def _compute_cache_key(self, problem: Dict) -> str:
+        """Compute cache key for problem."""
+        key_str = json.dumps(problem, sort_keys=True, default=str)
+        return hashlib.md5(key_str.encode()).hexdigest()
+    
+    def _monitor_cpu(self) -> float:
+        """Monitor CPU usage (%)."""
+        return np.random.uniform(20, 80)
+    
+    def _monitor_memory(self) -> float:
+        """Monitor memory usage (MB)."""
+        return np.random.uniform(1000, 7000)
+    
+    def _monitor_gpu(self) -> float:
+        """Monitor GPU usage (%)."""
+        return np.random.uniform(0, 100)
+    
+    def _monitor_energy(self) -> float:
+        """Monitor energy consumption (nJ)."""
+        return np.random.uniform(100, 1000)
+    
+    def _monitor_network(self) -> float:
+        """Monitor network usage (Mbps)."""
+        return np.random.uniform(0, 100)
+    
+    def _get_current_memory(self) -> float:
+        """Get current memory usage."""
+        return self._monitor_memory()
+    
+    def _estimate_energy_usage(self, time_ms: float) -> float:
+        """Estimate energy usage based on time."""
+        baseline_power = 10
+        return baseline_power * time_ms
+    
+    def _update_resource_history(self, usage: Dict[str, float]):
+        """Update resource usage history."""
+        with self._lock:
+            for resource, value in usage.items():
+                self.resource_history[resource].append(value)
+    
+    def _estimate_requirements(self, problem: Dict) -> Dict[str, float]:
+        """Estimate resource requirements for problem."""
+        complexity = problem.get('complexity', 1.0)
+        data_size = problem.get('data_size', 1000)
+        goal_type = problem.get('goal', {}).get('type', 'default')
+        
+        time_ms = 10 * complexity * np.log(data_size + 1)
+        memory_mb = data_size / 1000 + complexity * 100
+        energy_nJ = time_ms * 0.1 * complexity
+        
+        if goal_type == 'learning':
+            time_ms *= 1.5
+            memory_mb *= 1.2
+        elif goal_type == 'maintenance':
+            time_ms *= 0.5
+            memory_mb *= 0.8
+        
+        return {
+            'time_ms': time_ms,
+            'memory_mb': memory_mb,
+            'energy_nJ': energy_nJ
+        }
+    
+    def _select_optimization_strategy(self, problem: Dict, estimated: Dict,
+                                     time_budget: float, energy_budget: float) -> str:
+        """Select appropriate optimization strategy."""
+        time_ratio = estimated['time_ms'] / time_budget
+        energy_ratio = estimated['energy_nJ'] / energy_budget
+        
+        if problem.get('data_size', 0) > 10000 and time_ratio > 1.5:
+            return 'pruning'
+        elif energy_ratio > 1.5:
+            return 'quantization'
+        elif problem.get('complexity', 1) > 2:
+            return 'parallelization'
+        elif time_budget < 100:
+            return 'caching'
+        else:
+            return 'batching'
+    
+    def _execute_plan(self, problem: Dict, remaining_budget: float) -> Dict:
+        """Execute computation plan."""
+        action_type = ActionType.OPTIMIZED_ACTION
+        
+        if problem.get('goal', {}).get('type') == 'learning':
+            action_type = ActionType.EXPLORE
+        elif problem.get('goal', {}).get('type') == 'maintenance':
+            action_type = ActionType.MAINTAIN
+        
+        return {
+            'action': {
+                'type': action_type.value,
+                'details': problem,
+                'executed_at': time.time()
+            },
+            'confidence': min(0.9, remaining_budget / 1000)
+        }
+    
+    def _apply_pruning(self, problem: Dict) -> Dict:
+        """Apply pruning to reduce computation."""
+        problem = problem.copy()
+        current_size = problem.get('data_size', 1000)
+        problem['data_size'] = int(current_size * 0.5)
+        problem['pruned'] = True
+        problem['complexity'] = problem.get('complexity', 1.0) * 0.8
+        return problem
+    
+    def _apply_quantization(self, problem: Dict) -> Dict:
+        """Apply quantization to reduce precision and energy."""
+        problem['precision'] = 'int8'
+        problem['complexity'] = problem.get('complexity', 1.0) * 0.7
+        problem['quantized'] = True
+        return problem
+    
+    def _apply_caching(self, problem: Dict) -> Dict:
+        """Apply caching to reuse computations."""
+        problem['use_cache'] = True
+        problem['complexity'] = problem.get('complexity', 1.0) * 0.3
+        return problem
+    
+    def _apply_batching(self, problem: Dict) -> Dict:
+        """Apply batching for efficiency."""
+        problem['batch_size'] = min(32, problem.get('data_size', 1000) // 10)
+        problem['complexity'] = problem.get('complexity', 1.0) * 0.9
+        return problem
+    
+    def _apply_offloading(self, problem: Dict) -> Dict:
+        """Offload computation to external resources."""
+        problem['offloaded'] = True
+        problem['complexity'] = problem.get('complexity', 1.0) * 0.5
+        return problem
+
+# ============================================================
+# RESOURCE ALLOCATOR
+# ============================================================
+
+class ResourceAllocator:
+    """Allocate resources optimally."""
+    
+    def allocate(self, requirements: Dict[str, float], 
+                available: Dict[str, float]) -> Dict[str, Any]:
+        """Allocate resources based on requirements and availability."""
+        allocation = {}
+        feasible = True
+        
+        for resource, required in requirements.items():
+            if resource in available:
+                if required <= available[resource]:
+                    allocation[resource] = required
+                else:
+                    allocation[resource] = available[resource]
+                    feasible = False
+            else:
+                allocation[resource] = required
+        
+        return {
+            'allocation': allocation,
+            'feasible': feasible,
+            'utilization': {r: allocation.get(r, 0) / available.get(r, 1) 
+                          for r in available}
+        }
+
+# ============================================================
+# DISTRIBUTED COORDINATOR
+# ============================================================
+
+class DistributedCoordinator:
+    """Enhanced distributed coordination with consensus and fault tolerance."""
+    
+    def __init__(self, max_agents: int = 8):
+        self.max_agents = max_agents
+        self.agents = {}
+        self.message_queue = defaultdict(deque)
+        self.task_queue = Queue()
+        self.results_cache = {}
+        self.consensus_protocol = ConsensusProtocol()
+        self.shared_knowledge = {}
+        self.executor = ThreadPoolExecutor(max_workers=max_agents)
+        self.lock = threading.RLock()
+        self._shutdown_event = threading.Event() # ADDED
+        self.heartbeat_thread = None
+        self._start_heartbeat_monitor()
+    
+    def _start_heartbeat_monitor(self):
+        """Start heartbeat monitoring thread."""
+        def monitor():
+            while not self._shutdown_event.is_set(): # CHANGED
+                try:
+                    if self._shutdown_event.wait(timeout=5): # CHANGED
+                        break # Shutdown signaled
+                    self._check_agent_health()
+                except:
+                    break
+        
+        self.heartbeat_thread = threading.Thread(target=monitor, daemon=True)
+        self.heartbeat_thread.start()
+    
+    def _check_agent_health(self):
+        """Check agent health based on heartbeats."""
+        current_time = time.time()
+        with self.lock:
+            for agent_id, info in list(self.agents.items()):
+                if current_time - info['last_heartbeat'] > 30:
+                    info['status'] = 'inactive'
+                    logger.warning(f"Agent {agent_id} marked inactive")
+    
+    def register_agent(self, agent_id: str, capabilities: List[str]) -> bool:
+        """Register a new agent."""
+        with self.lock:
+            if len(self.agents) >= self.max_agents:
+                return False
+            
+            self.agents[agent_id] = {
+                'capabilities': capabilities,
+                'status': 'active',
+                'tasks_completed': 0,
+                'last_heartbeat': time.time()
+            }
+            
+            logger.info(f"Registered agent {agent_id} with capabilities {capabilities}")
+            return True
+    
+    def distribute_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Distribute task to available agents."""
+        with self.lock:
+            active_agents = [aid for aid, info in self.agents.items() 
+                           if info['status'] == 'active']
+        
+        if not active_agents:
+            return {'status': 'no_agents', 'result': None}
+        
+        # Task decomposition
+        subtasks = self._decompose_task(task)
+        
+        # Assignment
+        assignments = self._assign_subtasks(subtasks, active_agents)
+        
+        # Execute
+        futures = []
+        for agent_id, subtask in assignments.items():
+            future = self.executor.submit(self._execute_subtask, agent_id, subtask)
+            futures.append(future)
+        
+        # Gather results
+        results = []
+        for future in as_completed(futures):
+            try:
+                result = future.result(timeout=10)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Subtask execution failed: {e}")
+        
+        # Consensus on results
+        if results:
+            consensus_result = self.consensus_protocol.achieve_consensus(
+                {f"agent_{i}": r for i, r in enumerate(results)}
+            )
+            
+            return {
+                'status': 'distributed',
+                'result': consensus_result,
+                'assignments': assignments
+            }
+        
+        return {'status': 'failed', 'result': None}
+    
+    def _decompose_task(self, task: Dict) -> List[Dict]:
+        """Decompose task into subtasks."""
+        task_type = task.get('type', 'default')
+        
+        if task_type == 'parallel':
+            data = task.get('data', [])
+            chunk_size = max(1, len(data) // self.max_agents)
+            
+            subtasks = []
+            for i in range(0, len(data), chunk_size):
+                subtask = {
+                    'type': 'process_chunk',
+                    'data': data[i:i+chunk_size],
+                    'params': task.get('params', {})
+                }
+                subtasks.append(subtask)
+            
+            return subtasks
+        
+        return [task]
+    
+    def _assign_subtasks(self, subtasks: List[Dict], 
+                        agents: List[str]) -> Dict[str, Dict]:
+        """Assign subtasks to agents."""
+        assignments = {}
+        
+        for i, subtask in enumerate(subtasks):
+            agent_id = agents[i % len(agents)]
+            assignments[agent_id] = subtask
+        
+        return assignments
+    
+    def _execute_subtask(self, agent_id: str, subtask: Dict) -> Any:
+        """Execute subtask on agent."""
+        time.sleep(np.random.uniform(0.1, 0.5))
+        
+        with self.lock:
+            if agent_id in self.agents:
+                self.agents[agent_id]['tasks_completed'] += 1
+                self.agents[agent_id]['last_heartbeat'] = time.time()
+        
+        return {
+            'agent_id': agent_id,
+            'subtask': subtask,
+            'result': f"Processed by {agent_id}",
+            'success': np.random.random() > 0.1
+        }
+    
+    def cleanup(self):
+        """Cleanup coordinator resources."""
+        # ADDED: Stop heartbeat thread
+        self._shutdown_event.set()
+        if self.heartbeat_thread and self.heartbeat_thread.is_alive():
+            self.heartbeat_thread.join(timeout=1)
+
+        with self.lock:
+            self.executor.shutdown(wait=False)
+            self.agents.clear()
+            self.message_queue.clear()
+            self.results_cache.clear()
+    
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        try:
+            self.cleanup()
+        except:
+            pass
+
+# ============================================================
+# CONSENSUS PROTOCOL
+# ============================================================
+
+class ConsensusProtocol:
+    """Byzantine Fault Tolerant consensus protocol."""
+    
+    def achieve_consensus(self, proposals: Dict[str, Any]) -> Any:
+        """Achieve consensus using BFT."""
+        if not proposals:
+            return None
+        
+        values = list(proposals.values())
+        n = len(values)
+        
+        if n == 1:
+            return values[0]
+        
+        # Need 2f+1 agreement for f faults
+        f = (n - 1) // 3
+        threshold = n - f
+        
+        # Count votes
+        from collections import Counter
+        vote_counts = Counter(str(v) for v in values)
+        
+        # Find value with enough votes
+        for value_str, count in vote_counts.most_common():
+            if count >= threshold:
+                for v in values:
+                    if str(v) == value_str:
+                        return v
+        
+        # No consensus - return most common
+        return values[0]

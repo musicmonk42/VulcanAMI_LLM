@@ -1,0 +1,834 @@
+{
+  "$schema": "https://vulcanami.io/schemas/cache-policy/v2.0.0",
+  "version": "2.0.0",
+  "metadata": {
+    "name": "VulcanAMI Unified Cache Policy",
+    "description": "Comprehensive cache policy for multi-tier CDN with Bloom filters, ZK unlearning, and intelligent routing",
+    "lastModified": "2025-11-14T00:00:00Z",
+    "maintainer": "infrastructure@vulcanami.io",
+    "environment": "production"
+  },
+  
+  "cacheKey": {
+    "standard": [
+      "Range",
+      "If-Range",
+      "If-None-Match",
+      "If-Modified-Since",
+      "Accept-Encoding",
+      "Accept-Language"
+    ],
+    "bloom": [
+      "X-Bloom",
+      "X-Bloom-Filter",
+      "X-Bloom-Version",
+      "X-Bloom-Hash-Count"
+    ],
+    "merkle": [
+      "X-Pack-Merkle",
+      "X-Merkle-Root",
+      "X-Merkle-Proof",
+      "X-Merkle-Depth"
+    ],
+    "custom": [
+      "X-Model-Version",
+      "X-Embedding-Type",
+      "X-Vector-Dimension",
+      "X-Quantization-Level",
+      "X-Client-Capability",
+      "X-Device-Type",
+      "X-Resolution",
+      "X-Bandwidth-Class"
+    ],
+    "security": [
+      "X-Request-Signature",
+      "X-Client-Token",
+      "X-Session-ID"
+    ],
+    "queryStringBehavior": "whitelist",
+    "queryStringWhitelist": [
+      "version",
+      "format",
+      "quality",
+      "resolution",
+      "embedding_type",
+      "model_id",
+      "layer",
+      "quantization",
+      "compression"
+    ],
+    "normalization": {
+      "enabled": true,
+      "lowercaseHeaders": true,
+      "sortQueryString": true,
+      "removeDefaultPorts": true,
+      "canonicalizePath": true
+    }
+  },
+
+  "forwardHeaders": {
+    "origin": [
+      "Host",
+      "User-Agent",
+      "Accept",
+      "Accept-Encoding",
+      "Accept-Language",
+      "Range",
+      "If-Range",
+      "If-None-Match",
+      "If-Modified-Since",
+      "Cache-Control",
+      "Pragma"
+    ],
+    "response": [
+      "ETag",
+      "Last-Modified",
+      "Content-Type",
+      "Content-Length",
+      "Content-Range",
+      "Accept-Ranges",
+      "Content-Encoding",
+      "Content-Language",
+      "Vary"
+    ],
+    "bloomFilter": [
+      "X-Bloom",
+      "X-Bloom-Filter",
+      "X-Bloom-Version",
+      "X-Bloom-Hash-Count",
+      "X-Bloom-Size",
+      "X-Bloom-FPR"
+    ],
+    "merkle": [
+      "X-Pack-Merkle",
+      "X-Merkle-Root",
+      "X-Merkle-Proof",
+      "X-Merkle-Depth",
+      "X-Merkle-Index",
+      "X-Merkle-Verified"
+    ],
+    "performance": [
+      "X-Cache-Status",
+      "X-Cache-Tier",
+      "X-Cache-Age",
+      "X-Cache-Hits",
+      "X-Origin-Time",
+      "X-Edge-Time",
+      "X-Total-Time"
+    ],
+    "security": [
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+      "X-XSS-Protection",
+      "Strict-Transport-Security",
+      "Content-Security-Policy"
+    ],
+    "cors": [
+      "Access-Control-Allow-Origin",
+      "Access-Control-Allow-Methods",
+      "Access-Control-Allow-Headers",
+      "Access-Control-Expose-Headers",
+      "Access-Control-Max-Age",
+      "Access-Control-Allow-Credentials"
+    ],
+    "custom": [
+      "X-Model-Version",
+      "X-Embedding-Type",
+      "X-Vector-Dimension",
+      "X-Quantization-Level",
+      "X-Compression-Type",
+      "X-Chunk-Index",
+      "X-Total-Chunks"
+    ]
+  },
+
+  "ttl": {
+    "default": 86400,
+    "byStatusCode": {
+      "200": 86400,
+      "201": 3600,
+      "202": 1800,
+      "203": 86400,
+      "204": 3600,
+      "206": 86400,
+      "301": 2592000,
+      "302": 3600,
+      "303": 3600,
+      "304": 86400,
+      "307": 3600,
+      "308": 2592000,
+      "400": 60,
+      "401": 0,
+      "403": 300,
+      "404": 600,
+      "405": 3600,
+      "410": 180,
+      "429": 60,
+      "500": 0,
+      "502": 10,
+      "503": 30,
+      "504": 10
+    },
+    "byContentType": {
+      "application/octet-stream": 604800,
+      "application/json": 3600,
+      "application/x-ndjson": 3600,
+      "application/vnd.vulcan.model+safetensors": 2592000,
+      "application/vnd.vulcan.embedding+binary": 604800,
+      "application/vnd.vulcan.bloom-filter": 86400,
+      "application/vnd.vulcan.merkle-proof": 86400,
+      "application/x-msgpack": 86400,
+      "application/cbor": 86400,
+      "application/protobuf": 86400,
+      "text/plain": 3600,
+      "text/html": 3600,
+      "text/css": 604800,
+      "text/javascript": 604800,
+      "application/javascript": 604800,
+      "application/wasm": 2592000,
+      "image/jpeg": 2592000,
+      "image/png": 2592000,
+      "image/webp": 2592000,
+      "image/avif": 2592000,
+      "image/svg+xml": 604800,
+      "video/mp4": 2592000,
+      "video/webm": 2592000,
+      "audio/mpeg": 2592000,
+      "audio/ogg": 2592000,
+      "font/woff": 31536000,
+      "font/woff2": 31536000,
+      "font/ttf": 31536000,
+      "font/otf": 31536000
+    },
+    "byPathPattern": {
+      "/models/*": 2592000,
+      "/embeddings/*": 604800,
+      "/vectors/*": 604800,
+      "/bloom/*": 86400,
+      "/manifests/*": 3600,
+      "/metadata/*": 3600,
+      "/checksums/*": 86400,
+      "/signatures/*": 86400,
+      "/proofs/*": 86400,
+      "*.safetensors": 2592000,
+      "*.gguf": 2592000,
+      "*.bin": 604800,
+      "*.pt": 604800,
+      "*.onnx": 2592000,
+      "*.tflite": 2592000,
+      "*.mlmodel": 2592000,
+      "*.pkl": 604800,
+      "*.json": 3600,
+      "*.yaml": 3600,
+      "*.toml": 3600,
+      "*.bloom": 86400,
+      "*.merkle": 86400
+    },
+    "bySize": {
+      "small": {
+        "maxBytes": 1048576,
+        "ttl": 86400
+      },
+      "medium": {
+        "maxBytes": 104857600,
+        "ttl": 604800
+      },
+      "large": {
+        "maxBytes": 1073741824,
+        "ttl": 2592000
+      },
+      "xlarge": {
+        "maxBytes": 10737418240,
+        "ttl": 2592000
+      }
+    },
+    "byFrequency": {
+      "hot": {
+        "minRequestsPerHour": 100,
+        "ttl": 2592000
+      },
+      "warm": {
+        "minRequestsPerHour": 10,
+        "ttl": 604800
+      },
+      "cold": {
+        "minRequestsPerHour": 1,
+        "ttl": 86400
+      }
+    },
+    "staleWhileRevalidate": 3600,
+    "staleIfError": 86400,
+    "gracePeriod": 300
+  },
+
+  "caching": {
+    "tiers": {
+      "hot": {
+        "enabled": true,
+        "priority": 1,
+        "maxSize": "50GB",
+        "evictionPolicy": "lru",
+        "criteria": {
+          "minRequestsPerHour": 100,
+          "minCacheHitRate": 0.8
+        },
+        "types": [
+          "application/vnd.vulcan.bloom-filter",
+          "application/vnd.vulcan.merkle-proof",
+          "application/json",
+          "application/x-msgpack"
+        ]
+      },
+      "warm": {
+        "enabled": true,
+        "priority": 2,
+        "maxSize": "200GB",
+        "evictionPolicy": "lru",
+        "criteria": {
+          "minRequestsPerHour": 10,
+          "minCacheHitRate": 0.5
+        },
+        "types": [
+          "application/vnd.vulcan.embedding+binary",
+          "application/octet-stream"
+        ]
+      },
+      "cold": {
+        "enabled": true,
+        "priority": 3,
+        "maxSize": "500GB",
+        "evictionPolicy": "lfu",
+        "criteria": {
+          "minRequestsPerHour": 1
+        },
+        "types": [
+          "application/vnd.vulcan.model+safetensors",
+          "application/protobuf"
+        ]
+      },
+      "bloom": {
+        "enabled": true,
+        "priority": 0,
+        "maxSize": "10GB",
+        "evictionPolicy": "ttl",
+        "dedicated": true,
+        "types": [
+          "application/vnd.vulcan.bloom-filter"
+        ]
+      },
+      "manifest": {
+        "enabled": true,
+        "priority": 0,
+        "maxSize": "5GB",
+        "evictionPolicy": "ttl",
+        "dedicated": true,
+        "types": [
+          "application/json",
+          "application/yaml",
+          "text/plain"
+        ],
+        "pathPatterns": [
+          "/manifests/*",
+          "/metadata/*",
+          "*.json",
+          "*.yaml"
+        ]
+      }
+    },
+    "methods": {
+      "GET": true,
+      "HEAD": true,
+      "OPTIONS": true,
+      "POST": false,
+      "PUT": false,
+      "DELETE": false,
+      "PATCH": false
+    },
+    "respectOriginHeaders": true,
+    "bypassCacheControl": [
+      "no-cache",
+      "no-store",
+      "private"
+    ],
+    "minimumTTL": 60,
+    "maximumTTL": 31536000,
+    "defaultTTL": 86400
+  },
+
+  "compression": {
+    "enabled": true,
+    "algorithms": ["br", "gzip", "deflate"],
+    "level": {
+      "br": 6,
+      "gzip": 6,
+      "deflate": 6
+    },
+    "minSize": 1024,
+    "maxSize": 10485760,
+    "types": [
+      "text/plain",
+      "text/html",
+      "text/css",
+      "text/javascript",
+      "application/javascript",
+      "application/json",
+      "application/x-ndjson",
+      "application/xml",
+      "application/yaml",
+      "image/svg+xml"
+    ],
+    "excludeTypes": [
+      "application/vnd.vulcan.model+safetensors",
+      "application/vnd.vulcan.embedding+binary",
+      "application/octet-stream",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "video/*",
+      "audio/*"
+    ],
+    "precompressed": {
+      "enabled": true,
+      "extensions": [".br", ".gz"]
+    }
+  },
+
+  "rangeRequests": {
+    "enabled": true,
+    "maxRanges": 10,
+    "minChunkSize": 262144,
+    "supportMultipart": true,
+    "cachePartialResponses": true,
+    "sliceSize": 1048576,
+    "enableSliceCache": true
+  },
+
+  "origin": {
+    "primary": "s3://graphix-vulcan-use1/origin",
+    "fallback": [
+      "s3://graphix-vulcan-usw2/origin",
+      "s3://graphix-vulcan-euw1/origin"
+    ],
+    "protocol": "https",
+    "port": 443,
+    "timeout": {
+      "connect": 5,
+      "read": 30,
+      "write": 30
+    },
+    "retry": {
+      "enabled": true,
+      "maxAttempts": 3,
+      "backoff": "exponential",
+      "initialDelay": 100,
+      "maxDelay": 5000,
+      "retryOn": [502, 503, 504]
+    },
+    "healthCheck": {
+      "enabled": true,
+      "interval": 30,
+      "timeout": 5,
+      "unhealthyThreshold": 3,
+      "healthyThreshold": 2,
+      "path": "/minio/health/live"
+    },
+    "loadBalancing": {
+      "algorithm": "least_conn",
+      "stickySession": false,
+      "backends": [
+        {
+          "host": "minio-1",
+          "port": 9000,
+          "weight": 100,
+          "maxFails": 3,
+          "failTimeout": 30
+        },
+        {
+          "host": "minio-2",
+          "port": 9000,
+          "weight": 100,
+          "maxFails": 3,
+          "failTimeout": 30
+        },
+        {
+          "host": "minio-3",
+          "port": 9000,
+          "weight": 100,
+          "maxFails": 3,
+          "failTimeout": 30
+        }
+      ]
+    },
+    "keepalive": {
+      "enabled": true,
+      "connections": 100,
+      "timeout": 60,
+      "requests": 1000
+    }
+  },
+
+  "bloomFilter": {
+    "enabled": true,
+    "implementation": "scalable",
+    "falsePositiveRate": 0.001,
+    "expectedElements": 10000000,
+    "hashFunctions": 7,
+    "autoScale": true,
+    "scaleFactor": 2,
+    "persistToDisk": true,
+    "syncInterval": 300,
+    "redisBackend": {
+      "enabled": true,
+      "keyPrefix": "bloom:",
+      "ttl": 86400,
+      "pipeline": true,
+      "compression": true
+    },
+    "optimization": {
+      "useMMH3": true,
+      "useSIMD": true,
+      "parallelLookup": true
+    },
+    "caching": {
+      "enabled": true,
+      "maxMemory": "2GB",
+      "evictionPolicy": "lru"
+    }
+  },
+
+  "merkleTree": {
+    "enabled": true,
+    "hashAlgorithm": "sha256",
+    "leafHashAlgorithm": "sha256",
+    "enableProofCache": true,
+    "proofCacheTTL": 86400,
+    "verifyOnCache": true,
+    "maxTreeDepth": 20,
+    "chunkSize": 1048576,
+    "parallelHashing": true,
+    "persistProofs": true
+  },
+
+  "validation": {
+    "enabled": true,
+    "checksums": {
+      "enabled": true,
+      "algorithms": ["sha256", "blake3"],
+      "verifyOnCache": true,
+      "verifyOnServe": false
+    },
+    "signatures": {
+      "enabled": true,
+      "algorithm": "ed25519",
+      "publicKeyPath": "/etc/nginx/keys/vulcan-public.pem",
+      "verifyOnCache": true
+    },
+    "contentIntegrity": {
+      "enabled": true,
+      "algorithm": "sha384",
+      "includeInHeaders": true
+    }
+  },
+
+  "security": {
+    "rateLimit": {
+      "enabled": true,
+      "default": {
+        "requests": 1000,
+        "window": 60,
+        "burst": 100
+      },
+      "byPath": {
+        "/models/*": {
+          "requests": 100,
+          "window": 60,
+          "burst": 20
+        },
+        "/embeddings/*": {
+          "requests": 500,
+          "window": 60,
+          "burst": 50
+        },
+        "/bloom/*": {
+          "requests": 10000,
+          "window": 60,
+          "burst": 1000
+        }
+      },
+      "byIP": true,
+      "whitelistIPs": [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16"
+      ]
+    },
+    "authentication": {
+      "enabled": false,
+      "type": "bearer",
+      "headerName": "Authorization",
+      "cacheBehavior": "separate"
+    },
+    "headers": {
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "X-XSS-Protection": "1; mode=block",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "Content-Security-Policy": "default-src 'self'",
+      "Referrer-Policy": "strict-origin-when-cross-origin",
+      "Permissions-Policy": "geolocation=(), microphone=(), camera=()"
+    },
+    "cors": {
+      "enabled": true,
+      "allowOrigins": ["*"],
+      "allowMethods": ["GET", "HEAD", "OPTIONS"],
+      "allowHeaders": [
+        "Range",
+        "If-Range",
+        "If-None-Match",
+        "If-Modified-Since",
+        "X-Bloom",
+        "X-Pack-Merkle"
+      ],
+      "exposeHeaders": [
+        "ETag",
+        "Content-Range",
+        "Accept-Ranges",
+        "X-Cache-Status",
+        "X-Bloom-Filter",
+        "X-Pack-Merkle"
+      ],
+      "maxAge": 86400,
+      "credentials": false
+    },
+    "ipFiltering": {
+      "enabled": false,
+      "whitelist": [],
+      "blacklist": []
+    },
+    "geoBlocking": {
+      "enabled": false,
+      "allowCountries": [],
+      "blockCountries": []
+    }
+  },
+
+  "invalidation": {
+    "methods": ["PURGE"],
+    "authentication": {
+      "enabled": true,
+      "type": "token",
+      "tokens": [],
+      "ipWhitelist": [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16"
+      ]
+    },
+    "patterns": {
+      "exact": true,
+      "prefix": true,
+      "regex": true,
+      "wildcard": true
+    },
+    "propagation": {
+      "enabled": true,
+      "async": true,
+      "timeout": 30
+    },
+    "zkUnlearning": {
+      "enabled": true,
+      "circuitPath": "/opt/zk/circuits/unlearning_v1.0",
+      "verifyProofs": true,
+      "propagateToBloom": true,
+      "updateMerkleTree": true,
+      "auditLog": true
+    }
+  },
+
+  "monitoring": {
+    "enabled": true,
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics",
+      "format": "prometheus",
+      "includeLabels": [
+        "cache_tier",
+        "status_code",
+        "content_type",
+        "cache_status"
+      ]
+    },
+    "logging": {
+      "accessLog": {
+        "enabled": true,
+        "path": "/var/log/nginx/origin-access.log",
+        "format": "combined",
+        "includeHeaders": true,
+        "includeTiming": true
+      },
+      "errorLog": {
+        "enabled": true,
+        "path": "/var/log/nginx/origin-error.log",
+        "level": "warn"
+      },
+      "cacheLog": {
+        "enabled": true,
+        "path": "/var/log/nginx/cache.log",
+        "includeHitRate": true,
+        "includeTier": true
+      }
+    },
+    "healthCheck": {
+      "enabled": true,
+      "endpoint": "/health",
+      "checks": [
+        "cache_health",
+        "upstream_health",
+        "disk_space",
+        "memory_usage"
+      ]
+    },
+    "alerts": {
+      "enabled": true,
+      "webhook": "https://monitoring.vulcanami.io/webhooks/nginx",
+      "conditions": {
+        "errorRateThreshold": 5,
+        "responseTimeThreshold": 1000,
+        "cacheHitRateThreshold": 60,
+        "diskUsageThreshold": 85
+      }
+    }
+  },
+
+  "performance": {
+    "prefetch": {
+      "enabled": true,
+      "maxConcurrent": 10,
+      "predictiveAlgorithm": "markov",
+      "minConfidence": 0.7
+    },
+    "warming": {
+      "enabled": true,
+      "schedule": "0 2 * * *",
+      "sources": [
+        "/var/log/nginx/popular-urls.txt"
+      ],
+      "concurrency": 20
+    },
+    "optimization": {
+      "deduplication": {
+        "enabled": true,
+        "method": "content-hash"
+      },
+      "deltaEncoding": {
+        "enabled": true,
+        "maxDeltaSize": 10485760
+      },
+      "adaptiveTTL": {
+        "enabled": true,
+        "algorithm": "ml-based",
+        "adjustmentFactor": 1.5
+      }
+    },
+    "edgeComputing": {
+      "enabled": false,
+      "wasmSupport": true,
+      "jsSupport": true,
+      "maxExecutionTime": 50
+    }
+  },
+
+  "vectorDatabase": {
+    "milvus": {
+      "enabled": true,
+      "host": "milvus",
+      "port": 19530,
+      "collections": [
+        {
+          "name": "model_embeddings",
+          "cachePolicy": "aggressive",
+          "ttl": 604800
+        },
+        {
+          "name": "text_embeddings",
+          "cachePolicy": "moderate",
+          "ttl": 86400
+        },
+        {
+          "name": "image_embeddings",
+          "cachePolicy": "moderate",
+          "ttl": 86400
+        }
+      ],
+      "caching": {
+        "enabled": true,
+        "maxMemory": "10GB",
+        "evictionPolicy": "lru"
+      }
+    }
+  },
+
+  "experimental": {
+    "http3": {
+      "enabled": false,
+      "quicPort": 443,
+      "maxStreams": 100
+    },
+    "earlyHints": {
+      "enabled": false,
+      "resources": []
+    },
+    "webPush": {
+      "enabled": false,
+      "vapidPublicKey": "",
+      "vapidPrivateKey": ""
+    },
+    "edgeSideIncludes": {
+      "enabled": false,
+      "maxDepth": 3
+    }
+  },
+
+  "compliance": {
+    "gdpr": {
+      "enabled": true,
+      "anonymizeIPs": true,
+      "dataRetention": 90,
+      "rightToErasure": true
+    },
+    "logging": {
+      "auditTrail": true,
+      "sensitiveDataMasking": true,
+      "retentionPeriod": 365
+    }
+  },
+
+  "advancedFeatures": {
+    "contentNegotiation": {
+      "enabled": true,
+      "supportedFormats": [
+        "json",
+        "msgpack",
+        "cbor",
+        "protobuf"
+      ],
+      "preferredFormat": "msgpack"
+    },
+    "conditionalRequests": {
+      "enabled": true,
+      "etagGeneration": "weak",
+      "lastModifiedPrecision": "second"
+    },
+    "streamingResponse": {
+      "enabled": true,
+      "chunkSize": 65536,
+      "bufferSize": 262144
+    },
+    "multiCDN": {
+      "enabled": false,
+      "providers": [],
+      "loadBalancing": "round-robin",
+      "failover": true
+    }
+  }
+}

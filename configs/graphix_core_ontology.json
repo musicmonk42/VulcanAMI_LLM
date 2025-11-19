@@ -1,0 +1,405 @@
+{
+  "version": "1.0.0",
+  "description": "Core ontology for Graphix IR in VULCAN-AGI, defining classes, properties, relationships, and constraints for semantic graph validation.",
+  "ontology": {
+    "classes": [
+      {
+        "name": "Node",
+        "description": "Represents a node in the Graphix IR, such as a variable, concept, or entity.",
+        "attributes": {
+          "id": {
+            "type": "str",
+            "description": "Unique identifier for the node",
+            "constraints": {
+              "required": true,
+              "max_length": 128,
+              "pattern": "^[a-zA-Z0-9_\\-]+$"
+            }
+          },
+          "type": {
+            "type": "str",
+            "description": "Node type (e.g., variable, concept, objective)",
+            "constraints": {
+              "required": true,
+              "enum": ["variable", "concept", "objective", "agent", "state", "action"]
+            }
+          },
+          "domain": {
+            "type": "str",
+            "description": "Domain of the node (e.g., environment, reasoning)",
+            "constraints": {
+              "required": false,
+              "max_length": 64
+            }
+          },
+          "metadata": {
+            "type": "dict",
+            "description": "Additional metadata for the node",
+            "constraints": {
+              "required": false,
+              "max_size": 1000
+            }
+          }
+        }
+      },
+      {
+        "name": "Edge",
+        "description": "Represents a directed edge in the Graphix IR, such as a causal or dependency relationship.",
+        "attributes": {
+          "source": {
+            "type": "str",
+            "description": "ID of the source node",
+            "constraints": {
+              "required": true,
+              "max_length": 128
+            }
+          },
+          "target": {
+            "type": "str",
+            "description": "ID of the target node",
+            "constraints": {
+              "required": true,
+              "max_length": 128
+            }
+          },
+          "type": {
+            "type": "str",
+            "description": "Edge type (e.g., causal, dependency, conflict)",
+            "constraints": {
+              "required": true,
+              "enum": ["causal", "dependency", "conflict", "correlation", "transition"]
+            }
+          },
+          "strength": {
+            "type": "float",
+            "description": "Strength of the relationship (e.g., correlation coefficient)",
+            "constraints": {
+              "required": false,
+              "min": -1.0,
+              "max": 1.0
+            }
+          },
+          "confidence": {
+            "type": "float",
+            "description": "Confidence in the relationship",
+            "constraints": {
+              "required": false,
+              "min": 0.0,
+              "max": 1.0
+            }
+          },
+          "metadata": {
+            "type": "dict",
+            "description": "Additional metadata for the edge",
+            "constraints": {
+              "required": false,
+              "max_size": 1000
+            }
+          }
+        }
+      },
+      {
+        "name": "Agent",
+        "description": "Represents an agent in the VULCAN-AGI system, such as a reasoning or execution agent.",
+        "attributes": {
+          "id": {
+            "type": "str",
+            "description": "Unique identifier for the agent",
+            "constraints": {
+              "required": true,
+              "max_length": 128,
+              "pattern": "^agent_[a-f0-9]{8}$"
+            }
+          },
+          "capability": {
+            "type": "str",
+            "description": "Agent capability (e.g., perception, reasoning)",
+            "constraints": {
+              "required": true,
+              "enum": ["perception", "reasoning", "learning", "planning", "execution", "general"]
+            }
+          },
+          "state": {
+            "type": "str",
+            "description": "Current state of the agent",
+            "constraints": {
+              "required": true,
+              "enum": ["idle", "running", "paused", "terminated", "cleanup"]
+            }
+          },
+          "metadata": {
+            "type": "dict",
+            "description": "Additional metadata for the agent",
+            "constraints": {
+              "required": false,
+              "max_size": 1000
+            }
+          }
+        }
+      },
+      {
+        "name": "Objective",
+        "description": "Represents an objective in the meta-reasoning subsystem.",
+        "attributes": {
+          "id": {
+            "type": "str",
+            "description": "Unique identifier for the objective",
+            "constraints": {
+              "required": true,
+              "max_length": 128
+            }
+          },
+          "type": {
+            "type": "str",
+            "description": "Type of objective (primary, secondary, derived)",
+            "constraints": {
+              "required": true,
+              "enum": ["primary", "secondary", "derived"]
+            }
+          },
+          "weight": {
+            "type": "float",
+            "description": "Weight of the objective",
+            "constraints": {
+              "required": true,
+              "min": 0.0,
+              "max": 1.0
+            }
+          },
+          "priority": {
+            "type": "int",
+            "description": "Priority level (0=critical, 1=high, 2=normal, 3=low)",
+            "constraints": {
+              "required": true,
+              "min": 0,
+              "max": 3
+            }
+          },
+          "metadata": {
+            "type": "dict",
+            "description": "Additional metadata for the objective",
+            "constraints": {
+              "required": false,
+              "max_size": 1000
+            }
+          }
+        }
+      },
+      {
+        "name": "Concept",
+        "description": "Represents a concept in the semantic bridge subsystem.",
+        "attributes": {
+          "id": {
+            "type": "str",
+            "description": "Unique identifier for the concept",
+            "constraints": {
+              "required": true,
+              "max_length": 128
+            }
+          },
+          "domain": {
+            "type": "str",
+            "description": "Domain of the concept",
+            "constraints": {
+              "required": true,
+              "max_length": 64
+            }
+          },
+          "grounding_status": {
+            "type": "str",
+            "description": "Grounding status of the concept",
+            "constraints": {
+              "required": true,
+              "enum": ["ungrounded", "weakly_grounded", "grounded", "strongly_grounded"]
+            }
+          },
+          "confidence": {
+            "type": "float",
+            "description": "Confidence in the concept",
+            "constraints": {
+              "required": true,
+              "min": 0.0,
+              "max": 1.0
+            }
+          },
+          "metadata": {
+            "type": "dict",
+            "description": "Additional metadata for the concept",
+            "constraints": {
+              "required": false,
+              "max_size": 1000
+            }
+          }
+        }
+      }
+    ],
+    "properties": [
+      {
+        "name": "id",
+        "type": "str",
+        "description": "Unique identifier for nodes, edges, agents, objectives, or concepts",
+        "constraints": {
+          "required": true,
+          "max_length": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        }
+      },
+      {
+        "name": "strength",
+        "type": "float",
+        "description": "Strength of a relationship (e.g., correlation, causal effect)",
+        "constraints": {
+          "required": false,
+          "min": -1.0,
+          "max": 1.0
+        }
+      },
+      {
+        "name": "confidence",
+        "type": "float",
+        "description": "Confidence in a relationship or prediction",
+        "constraints": {
+          "required": false,
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      {
+        "name": "type",
+        "type": "str",
+        "description": "Type of node, edge, or objective",
+        "constraints": {
+          "required": true,
+          "enum": [
+            "variable", "concept", "objective", "agent", "state", "action",
+            "causal", "dependency", "conflict", "correlation", "transition",
+            "primary", "secondary", "derived"
+          ]
+        }
+      },
+      {
+        "name": "domain",
+        "type": "str",
+        "description": "Domain context (e.g., environment, reasoning)",
+        "constraints": {
+          "required": false,
+          "max_length": 64
+        }
+      },
+      {
+        "name": "metadata",
+        "type": "dict",
+        "description": "Additional metadata for entities",
+        "constraints": {
+          "required": false,
+          "max_size": 1000
+        }
+      },
+      {
+        "name": "weight",
+        "type": "float",
+        "description": "Weight for objectives or edges",
+        "constraints": {
+          "required": false,
+          "min": 0.0,
+          "max": 1.0
+        }
+      },
+      {
+        "name": "priority",
+        "type": "int",
+        "description": "Priority level for objectives",
+        "constraints": {
+          "required": false,
+          "min": 0,
+          "max": 3
+        }
+      },
+      {
+        "name": "state",
+        "type": "str",
+        "description": "State of an agent",
+        "constraints": {
+          "required": false,
+          "enum": ["idle", "running", "paused", "terminated", "cleanup"]
+        }
+      },
+      {
+        "name": "grounding_status",
+        "type": "str",
+        "description": "Grounding status for concepts",
+        "constraints": {
+          "required": false,
+          "enum": ["ungrounded", "weakly_grounded", "grounded", "strongly_grounded"]
+        }
+      }
+    ],
+    "relationships": [
+      {
+        "name": "causal",
+        "description": "Causal relationship between nodes",
+        "source_class": "Node",
+        "target_class": "Node",
+        "edge_type": "causal",
+        "constraints": {
+          "strength_required": true,
+          "confidence_required": true
+        }
+      },
+      {
+        "name": "dependency",
+        "description": "Dependency relationship between objectives or nodes",
+        "source_class": ["Objective", "Node"],
+        "target_class": ["Objective", "Node"],
+        "edge_type": "dependency",
+        "constraints": {
+          "strength_required": false
+        }
+      },
+      {
+        "name": "conflict",
+        "description": "Conflict relationship between objectives",
+        "source_class": "Objective",
+        "target_class": "Objective",
+        "edge_type": "conflict",
+        "constraints": {
+          "strength_required": true
+        }
+      },
+      {
+        "name": "correlation",
+        "description": "Correlation relationship between nodes",
+        "source_class": "Node",
+        "target_class": "Node",
+        "edge_type": "correlation",
+        "constraints": {
+          "strength_required": true,
+          "confidence_required": true
+        }
+      },
+      {
+        "name": "transition",
+        "description": "State transition for agents or dynamics",
+        "source_class": ["Agent", "Node"],
+        "target_class": ["Agent", "Node"],
+        "edge_type": "transition",
+        "constraints": {
+          "strength_required": false
+        }
+      }
+    ],
+    "constraints": {
+      "max_nodes": 10000,
+      "max_edges": 50000,
+      "max_metadata_size": 1000,
+      "acyclic_causal": true,
+      "unique_ids": true
+    },
+    "metadata": {
+      "modules": ["world_model", "semantic_bridge", "orchestrator", "meta_reasoning"],
+      "dependencies": ["networkx", "numpy"],
+      "created_at": "2025-10-16",
+      "version": "1.0.0"
+    }
+  }
+}

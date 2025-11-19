@@ -1,0 +1,76 @@
+{
+  "cpu": {
+    "description": "Conventional x86 CPU, multi-core",
+    "latency_ms": 3.2,
+    "throughput_tops": 0.5,
+    "serialization_cost_mb_per_s": 400,
+    "energy_per_op_nj": 0.3,
+    "max_tensor_size_mb": 512,
+    "dynamic_metrics": {
+      "bus_saturation": 0.85,
+      "last_updated": "2025-08-27"
+    }
+  },
+  "gpu": {
+    "description": "NVIDIA A100 40GB",
+    "latency_ms": 0.6,
+    "throughput_tops": 32,
+    "serialization_cost_mb_per_s": 8000,
+    "energy_per_op_nj": 0.012,
+    "max_tensor_size_mb": 40960,
+    "dynamic_metrics": {
+      "bus_saturation": 0.72,
+      "last_updated": "2025-08-27"
+    }
+  },
+  "vllm": {
+    "description": "Tensor-parallel vLLM engine",
+    "latency_ms": 0.9,
+    "throughput_tops": 22,
+    "serialization_cost_mb_per_s": 6500,
+    "energy_per_op_nj": 0.021,
+    "max_tensor_size_mb": 20480,
+    "dynamic_metrics": {
+      "bus_saturation": 0.68,
+      "last_updated": "2025-08-27"
+    }
+  },
+  "photonic": {
+    "description": "Analog-photonic MVM core (sim/emulated)",
+    "latency_ms": 0.15,
+    "throughput_tops": 85,
+    "density_tops_per_mm2": 34,
+    "serialization_cost_mb_per_s": 450,
+    "energy_per_op_nj": 0.0004,
+    "max_tensor_size_mb": 2048,
+    "dynamic_metrics": {
+      "bus_saturation": 0.45,
+      "last_updated": "2025-08-27"
+    }
+  },
+  "memristor": {
+    "description": "Memristor compute-in-memory array (sim/emulated)",
+    "latency_ms": 0.2,
+    "throughput_tops": 40,
+    "density_tops_per_mm2": 16,
+    "serialization_cost_mb_per_s": 200,
+    "energy_per_op_nj": 0.0012,
+    "max_tensor_size_mb": 1024,
+    "dynamic_metrics": {
+      "bus_saturation": 0.55,
+      "last_updated": "2025-08-27"
+    }
+  },
+  "aws-f1-fpga": {
+    "description": "AWS F1 FPGA Instance (custom bitstream)",
+    "latency_ms": 1.1,
+    "throughput_tops": 3.5,
+    "serialization_cost_mb_per_s": 1200,
+    "energy_per_op_nj": 0.034,
+    "max_tensor_size_mb": 10240,
+    "dynamic_metrics": {
+      "bus_saturation": 0.60,
+      "last_updated": "2025-08-27"
+    }
+  }
+}

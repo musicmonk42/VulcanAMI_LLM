@@ -1,0 +1,1394 @@
+{
+  "drives": {
+    "self_improvement": {
+      "enabled": true,
+      "priority": 0.8,
+      "description": "Continuous self-improvement and bug fixing",
+      
+      "triggers": [
+        {
+          "type": "on_startup",
+          "cooldown_minutes": 60
+        },
+        {
+          "type": "on_error_detected",
+          "min_severity": "ERROR",
+          "error_count_threshold": 3,
+          "time_window_minutes": 60
+        },
+        {
+          "type": "on_performance_degradation",
+          "metric": "response_time_p95",
+          "threshold_percent": 20,
+          "consecutive_checks": 3
+        },
+        {
+          "type": "periodic",
+          "interval_hours": 24,
+          "random_jitter_minutes": 60
+        },
+        {
+          "type": "on_low_activity",
+          "cpu_threshold_percent": 30,
+          "duration_minutes": 10
+        }
+      ],
+      
+      "objectives": [
+        {
+          "type": "fix_circular_imports",
+          "weight": 1.0,
+          "auto_apply": true,
+          "success_criteria": {
+            "max_import_depth": 5,
+            "no_circular_chains": true
+          },
+          "scope": {
+            "directories": ["src/", "lib/"],
+            "exclude": ["tests/", "migrations/"]
+          }
+        },
+        {
+          "type": "optimize_performance",
+          "weight": 0.8,
+          "auto_apply": true,
+          "target_metrics": {
+            "response_time_p95_ms": {"target": 100, "max": 200},
+            "memory_usage_mb": {"target": 512, "max": 1024},
+            "cpu_usage_percent": {"target": 50, "max": 80}
+          },
+          "allowed_optimizations": [
+            "caching",
+            "query_optimization",
+            "lazy_loading",
+            "batching"
+          ],
+          "forbidden_optimizations": [
+            "remove_logging",
+            "skip_validation",
+            "reduce_precision"
+          ]
+        },
+        {
+          "type": "improve_test_coverage",
+          "weight": 0.6,
+          "auto_apply": true,
+          "coverage_targets": {
+            "line_coverage_percent": 80,
+            "branch_coverage_percent": 70,
+            "critical_paths_percent": 95
+          },
+          "priority_areas": [
+            "safety_systems",
+            "governance",
+            "public_apis"
+          ]
+        },
+        {
+          "type": "enhance_safety_systems",
+          "weight": 1.0,
+          "auto_apply": true
+        },
+        {
+          "type": "fix_known_bugs",
+          "weight": 0.9,
+          "auto_apply": true,
+          "bug_sources": [
+            {"type": "issue_tracker", "labels": ["bug"], "min_priority": "medium"},
+            {"type": "error_logs", "severity": ["ERROR", "CRITICAL"]},
+            {"type": "user_reports", "min_votes": 3}
+          ],
+          "priority_order": ["critical", "high", "medium", "low"]
+        }
+      ],
+      
+      "constraints": {
+        "require_human_approval": false,
+        "max_changes_per_session": 5,
+        
+        "rate_limits": {
+          "max_sessions_per_day": 3,
+          "min_time_between_sessions_hours": 6,
+          "max_files_changed_per_session": 10,
+          "max_lines_changed_per_file": 100
+        },
+        
+        "change_requirements": {
+          "always_maintain_tests": true,
+          "never_reduce_safety": true,
+          "require_changelog_entry": true,
+          "require_rollback_plan": true,
+          "create_backup_before_changes": true
+        },
+        
+        "safety_checks": {
+          "never_modify": [
+            "configs/safety_*.json",
+            "configs/governance.json",
+            "auth/",
+            "encryption/"
+          ],
+          "never_delete": [
+            "tests/",
+            "docs/",
+            "*.lock"
+          ],
+          "require_extra_approval_for": [
+            "database_migrations",
+            "api_contracts",
+            "configuration_changes"
+          ]
+        },
+        
+        "rollback_on_failure": true,
+        "max_session_duration_minutes": 30
+      },
+      
+      "validation": {
+        "run_all_tests": true,
+        "require_test_pass": true,
+        "performance_regression_threshold": 0.1,
+        
+        "validation_steps": [
+          {"step": "lint", "required": true, "timeout_seconds": 60},
+          {"step": "unit_tests", "required": true, "timeout_seconds": 300},
+          {
+            "step": "integration_tests",
+            "required": true,
+            "timeout_seconds_by_env": {
+              "development": 300,
+              "staging": 600,
+              "production": 900
+            },
+            "timeout_seconds_default": 600,
+            "allow_timeout_override": true,
+            "max_timeout_seconds": 1800
+          },
+          {"step": "security_scan", "required": true, "timeout_seconds": 120},
+          {"step": "performance_benchmarks", "required": false, "timeout_seconds": 300}
+        ],
+        
+        "env_overrides": {
+          "development": {
+            "skip_security_scan": true,
+            "run_lint": true
+          },
+          "staging": {
+            "skip_security_scan": false,
+            "run_lint": true
+          },
+          "production": {
+            "run_all": true
+          }
+        },
+        
+        "auto_rollback_on": [
+          "test_failure",
+          "security_issue_detected",
+          "performance_regression_exceeded",
+          "runtime_error_in_production"
+        ],
+        
+        "post_deployment_monitoring": {
+          "duration_hours": 24,
+          "metrics_to_watch": ["error_rate", "response_time", "memory_usage"],
+          "alert_on_anomaly": true
+        }
+      },
+      
+      "logging": {
+        "log_all_decisions": true,
+        "log_level": "INFO",
+        "include_reasoning": true,
+        "audit_trail_retention_days": 90
+      },
+      
+      "resource_limits": {
+        "max_cpu_percent": 50,
+        "max_memory_mb": 2048,
+        "max_disk_io_mbps": 100,
+        
+        "llm_costs": {
+          "max_tokens_per_session": 100000,
+          "max_cost_usd_per_session": 5.0,
+          "max_cost_usd_per_day": 20.0,
+          "max_cost_usd_per_month": 500.0,
+          "cost_tracking_window_hours": 24,
+          "warn_at_percent": 80,
+          "pause_at_percent": 95,
+          "cost_reconciliation_period_days": 7
+        }
+      },
+      
+      "adaptive_learning": {
+        "enabled": true,
+        "track_outcomes": {
+          "success_metrics": [
+            "validation_passed",
+            { "no_rollback_within_hours": 48 },
+            "error_rate_improved",
+            "performance_improved"
+          ],
+          "adjust_weights_based_on": "success_rate",
+          "learning_rate": 0.2,
+          "min_samples_before_adjust": 10,
+          "weight_bounds": {"min": 0.3, "max": 1.0}
+        },
+        "failure_patterns": {
+          "track_common_failures": true,
+          "avoid_similar_changes_after_failures": 3,
+          "cooldown_hours": 72,
+          
+          "failure_classification": {
+            "transient": {
+              "indicators": [
+                "network_timeout",
+                "temporary_service_unavailable",
+                "resource_temporarily_exhausted"
+              ],
+              "cooldown_hours": 4,
+              "retry_with_backoff": true
+            },
+            "systemic": {
+              "indicators": [
+                "validation_failed",
+                "breaking_change_detected",
+                "security_scan_failed"
+              ],
+              "cooldown_hours": 72,
+              "require_analysis": true
+            }
+          },
+          "exception_with_human_override": true
+        },
+        
+        "transparency": {
+          "log_weight_changes": true,
+          "include_reasoning": true,
+          "notify_on_significant_change": {
+            "enabled": true,
+            "threshold_change": 0.2
+          }
+        }
+      },
+      
+      "dry_run": {
+        "enabled_by_default": true,
+        "always_dry_run_for": [
+          "safety_changes",
+          "database_migrations",
+          "api_contract_changes",
+          "authentication_changes",
+          "authorization_changes",
+          "encryption_changes",
+          "rate_limiting_changes",
+          "cors_configuration",
+          "environment_config_changes"
+        ],
+        "generate_preview": {
+          "include_diff": true,
+          "include_impact_analysis": true,
+          "include_affected_components": true,
+          "include_test_predictions": true,
+          
+          "summary_format": {
+            "max_diff_lines_shown": 100,
+            "highlight_critical_changes": true,
+            "bullet_point_summary": true,
+            "estimated_review_time_minutes": true
+          }
+        },
+        "require_explicit_apply": false,
+        "dry_run_timeout_minutes": 15
+      },
+      
+      "impact_analysis": {
+        "enabled": true,
+        "analyze_before_changes": true,
+        
+        "risk_score_calculation": {
+          "scale": "1-10",
+          "formula": "weighted_sum",
+          "factors": [
+            {
+              "factor": "complexity",
+              "weight": 0.3,
+              "scoring": {
+                "cyclomatic_complexity": {"low": 1, "medium": 5, "high": 9},
+                "lines_changed": {"<50": 1, "50-200": 5, ">200": 9}
+              }
+            },
+            {
+              "factor": "criticality",
+              "weight": 0.5,
+              "scoring": {
+                "safety_system": 10,
+                "authentication": 9,
+                "core_api": 8,
+                "business_logic": 6,
+                "ui_component": 3,
+                "documentation": 1
+              }
+            },
+            {
+              "factor": "test_coverage",
+              "weight": 0.2,
+              "scoring": {
+                "no_tests": 9,
+                "partial_tests": 5,
+                "full_coverage": 1
+              }
+            }
+          ],
+          "examples": {
+            "low_risk": "Docs change, full tests, simple = ~2",
+            "medium_risk": "Business logic, partial tests, moderate = ~6",
+            "high_risk": "Auth change, no tests, complex = ~9"
+          }
+        },
+        
+        "metrics": [
+          {
+            "name": "blast_radius",
+            "calculate": "affected_files_and_dependencies",
+            "threshold_warn": 10,
+            "threshold_block": 50,
+            
+            "dynamic_thresholds": {
+              "enabled": true,
+              "scale_with_codebase_size": true,
+              "small_codebase": {"files": 100, "warn": 5, "block": 20},
+              "medium_codebase": {"files": 1000, "warn": 10, "block": 50},
+              "large_codebase": {"files": 10000, "warn": 20, "block": 100}
+            }
+          },
+          {
+            "name": "user_impact",
+            "calculate": "api_changes_and_breaking",
+            "threshold_warn": "any_breaking_change",
+            "threshold_block": "critical_api_change"
+          },
+          {
+            "name": "risk_score",
+            "calculate": "complexity_x_criticality",
+            "threshold_warn": 7,
+            "threshold_block": 9,
+            "scale": "1-10"
+          }
+        ],
+        "dependency_graph": {
+          "analyze_imports": true,
+          "analyze_callers": true,
+          "max_depth": 3,
+          
+          "circular_dependency_handling": {
+            "detect": true,
+            "max_iterations": 100,
+            "break_cycles_at": "weakest_coupling"
+          }
+        },
+        "require_approval_on_high_impact": true
+      },
+      
+      "metrics_collection": {
+        "enabled": true,
+        "track": [
+          "session_duration_seconds",
+          "tokens_used",
+          "cost_usd",
+          "files_changed",
+          "lines_added",
+          "lines_removed",
+          "validation_time_seconds",
+          "objective_type",
+          "success_outcome",
+          "rollback_occurred"
+        ],
+        "storage": {
+          "type": "time_series_db",
+          "path": "data/metrics/",
+          "retention_days": 90,
+          
+          "batching": {
+            "enabled": true,
+            "batch_size": 100,
+            "flush_interval_seconds": 60
+          },
+          "compression": {
+            "enabled": true,
+            "compress_after_days": 7
+          },
+          "downsampling": {
+            "enabled": true,
+            "keep_full_resolution_days": 30,
+            "hourly_after_days": 30,
+            "daily_after_days": 60
+          }
+        },
+        "dashboards": {
+          "enabled": true,
+          "update_interval_minutes": 5,
+          "graphs": [
+            "success_rate_over_time",
+            "cost_per_objective_type",
+            "average_session_duration",
+            "files_changed_distribution"
+          ]
+        },
+        "anomaly_detection": {
+          "enabled": true,
+          "alert_on_stddev": 3,
+          "baseline_window_days": 30,
+          
+          "rules": [
+            {
+              "metric": "cost_usd",
+              "method": "stddev",
+              "threshold": 3,
+              "min_samples": 20,
+              "alert_level": "warning"
+            },
+            {
+              "metric": "session_duration_seconds",
+              "method": "percentage_increase",
+              "threshold_percent": 200,
+              "alert_level": "warning"
+            },
+            {
+              "metric": "rollback_occurred",
+              "method": "count_in_window",
+              "window_hours": 24,
+              "threshold_count": 3,
+              "alert_level": "critical"
+            },
+            {
+              "metric": "validation_time_seconds",
+              "method": "stddev",
+              "threshold": 2,
+              "consecutive_violations": 3,
+              "alert_level": "info"
+            }
+          ],
+          "false_positive_reduction": {
+            "ignore_first_n_samples": 10,
+            "require_consecutive_violations": 2,
+            "exclude_known_maintenance_windows": true
+          }
+        }
+      },
+      
+      "pre_flight_checks": {
+        "enabled": true,
+        "required_before_session": [
+          {
+            "check": "git_repo_clean",
+            "description": "No uncommitted changes",
+            "required": true
+          },
+          {
+            "check": "all_tests_passing",
+            "description": "Test suite green before starting",
+            "required": true,
+            "cache_duration_minutes": 60
+          },
+          {
+            "check": "no_active_incidents",
+            "description": "Check incident management system",
+            "required": true,
+            "api_endpoint": "https://status.example.com/api/incidents",
+            
+            "fallback": {
+              "enabled": true,
+              "on_api_failure": "check_local_cache",
+              "cache_ttl_minutes": 5,
+              "on_cache_miss": "fail_safe",
+              "log_fallback_usage": true
+            },
+            "redundancy": {
+              "secondary_endpoint": "https://status2.example.com/api/incidents",
+              "timeout_per_endpoint_seconds": 3
+            }
+          },
+          {
+            "check": "cost_budget_available",
+            "description": "Verify cost limits not exceeded",
+            "required": true
+          },
+          {
+            "check": "dependencies_up_to_date",
+            "description": "No critical dependency updates pending",
+            "required": false,
+            "warn_only": true
+          }
+        ],
+        "fail_fast_on_check_failure": true,
+        
+        "execution": {
+          "run_checks_in_parallel": true,
+          "timeout_per_check_seconds": 30,
+          "overall_timeout_seconds": 90
+        }
+      },
+      
+      "change_strategy": {
+        "prefer_incremental": true,
+        "max_change_size": {
+          "lines_per_commit": 200,
+          "files_per_commit": 5,
+          "commits_per_session": 3
+        },
+        "break_large_changes": {
+          "enabled": true,
+          "strategy": "dependency_order",
+          "validate_after_each_increment": true,
+          
+          "fallback_strategies": [
+            {
+              "when": "circular_dependencies_detected",
+              "use": "strongly_connected_components",
+              "description": "Group circular deps together"
+            },
+            {
+              "when": "dependency_analysis_timeout",
+              "use": "file_by_file",
+              "description": "Simple sequential ordering"
+            },
+            {
+              "when": "all_strategies_fail",
+              "use": "feature_by_feature",
+              "require_human_approval": true
+            }
+          ]
+        },
+        "atomic_changes": {
+          "ensure_tests_with_code": true,
+          "ensure_docs_with_features": true
+        }
+      },
+      
+      "smoke_tests": {
+        "enabled": true,
+        "run_after_deployment": true,
+        "tests": [
+          {
+            "name": "api_health_check",
+            "endpoint": "/health",
+            "expected_status": 200,
+            "timeout_seconds": 5
+          },
+          {
+            "name": "critical_user_flow",
+            "script": "tests/smoke/critical_flow.sh",
+            "timeout_seconds": 30
+          },
+          {
+            "name": "database_connectivity",
+            "type": "connection_test",
+            "timeout_seconds": 10
+          },
+          {
+            "name": "authentication_flow",
+            "script": "tests/smoke/auth_flow.sh",
+            "timeout_seconds": 20,
+            "critical": true
+          },
+          {
+            "name": "authorization_checks",
+            "script": "tests/smoke/authz_flow.sh",
+            "timeout_seconds": 15,
+            "critical": true
+          },
+          {
+            "name": "payment_gateway_connection",
+            "type": "connection_test",
+            "endpoint": "https://payment-gateway/health",
+            "timeout_seconds": 10,
+            "critical": false
+          },
+          {
+            "name": "cache_layer_responsive",
+            "type": "connection_test",
+            "timeout_seconds": 5,
+            "critical": false
+          }
+        ],
+        "rollback_on_smoke_test_failure": true,
+        "retry_failed_tests": {
+          "enabled": true,
+          "max_retries": 2,
+          "backoff_seconds": 10
+        },
+        
+        "failure_handling": {
+          "critical_test_fails": "immediate_rollback",
+          "non_critical_test_fails": "alert_and_continue",
+          "all_tests_fail": "immediate_rollback"
+        }
+      }
+    },
+    
+    "exploration": {
+      "enabled": true,
+      "priority": 0.6,
+      "description": "Explore new capabilities and knowledge"
+    },
+    
+    "optimization": {
+      "enabled": true,
+      "priority": 0.7,
+      "description": "Optimize existing processes"
+    },
+    
+    "maintenance": {
+      "enabled": true,
+      "priority": 0.5,
+      "description": "Maintain system health"
+    }
+  },
+  
+  "motivational_introspection": {
+    "enabled": true,
+    "description": "Meta-level introspection for evaluating decision quality and prediction accuracy",
+    
+    "design_spec": {
+      "objectives": {
+        "prediction_accuracy": {
+          "weight": 1.0,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "target": 0.95,
+          "description": "Accuracy of world model predictions",
+          "measurement": "fraction_correct_predictions"
+        },
+        "decision_quality": {
+          "weight": 0.9,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "target": 0.90,
+          "description": "Quality of decisions made under uncertainty",
+          "measurement": "outcome_vs_expected_value"
+        },
+        "calibration": {
+          "weight": 0.85,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "target": 0.88,
+          "description": "How well confidence matches actual accuracy",
+          "measurement": "calibration_error"
+        },
+        "self_improvement_success_rate": {
+          "weight": 0.8,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "target": 0.80,
+          "description": "Success rate of self-improvement objectives",
+          "source": "self_improvement_drive.objectives",
+          "measurement": "success_count / total_attempts"
+        },
+        "exploration_efficiency": {
+          "weight": 0.7,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "target": 0.75,
+          "description": "Efficiency of exploration vs exploitation balance",
+          "measurement": "information_gain_per_action"
+        },
+        "reasoning_coherence": {
+          "weight": 0.75,
+          "constraints": {"min": 0.0, "max": 1.0},
+          "target": 0.85,
+          "description": "Internal consistency of reasoning chains",
+          "measurement": "logical_consistency_score"
+        }
+      }
+    },
+    
+    "introspection_triggers": {
+      "periodic": {
+        "enabled": true,
+        "interval_hours": 6,
+        "jitter_minutes": 30
+      },
+      "on_significant_event": {
+        "enabled": true,
+        "events": [
+          "major_decision_made",
+          "prediction_outcome_observed",
+          "self_improvement_completed",
+          "significant_error_detected"
+        ]
+      },
+      "on_threshold_deviation": {
+        "enabled": true,
+        "check_interval_minutes": 30,
+        "deviation_threshold_percent": 10
+      }
+    },
+    
+    "evaluation_methods": {
+      "prediction_tracking": {
+        "enabled": true,
+        "store_predictions": true,
+        "retention_days": 90,
+        "compare_on_resolution": true
+      },
+      "decision_audit": {
+        "enabled": true,
+        "track_outcomes": true,
+        "analyze_counterfactuals": true,
+        "retention_days": 90
+      },
+      "calibration_analysis": {
+        "enabled": true,
+        "bin_count": 10,
+        "min_samples_per_bin": 20,
+        "update_frequency_hours": 24
+      }
+    },
+    
+    "feedback_loops": {
+      "adjust_confidence": {
+        "enabled": true,
+        "learning_rate": 0.1,
+        "min_samples": 50
+      },
+      "update_world_model": {
+        "enabled": true,
+        "on_prediction_error": true,
+        "error_threshold": 0.3
+      },
+      "inform_self_improvement": {
+        "enabled": true,
+        "share_metrics_with": ["self_improvement_drive"],
+        "update_objective_weights": false
+      }
+    },
+    
+    "reporting": {
+      "enabled": true,
+      "daily_summary": {
+        "enabled": true,
+        "send_at_hour": 9,
+        "recipients": ["team@example.com"],
+        "include": [
+          "objective_performance",
+          "recent_predictions",
+          "calibration_status",
+          "improvement_recommendations"
+        ]
+      },
+      "weekly_deep_dive": {
+        "enabled": true,
+        "send_on_day": "monday",
+        "send_at_hour": 9,
+        "recipients": ["leadership@example.com"],
+        "include": [
+          "trend_analysis",
+          "decision_quality_trends",
+          "meta_learning_insights",
+          "recommended_focus_areas"
+        ]
+      }
+    },
+    
+    "storage": {
+      "predictions_path": "data/motivational/predictions/",
+      "decisions_path": "data/motivational/decisions/",
+      "metrics_path": "data/motivational/metrics/",
+      "retention_days": 90,
+      "compress_after_days": 30
+    }
+  },
+  
+  "global_settings": {
+    "balance_drives": true,
+    "allow_drive_conflicts": false,
+    
+    "conflict_resolution": {
+      "stages": [
+        {
+          "stage": 1,
+          "method": "priority_based",
+          "description": "Compare drive priorities"
+        },
+        {
+          "stage": 2,
+          "method": "most_recent_trigger",
+          "description": "If priorities equal, use most recent",
+          "time_window_seconds": 60
+        },
+        {
+          "stage": 3,
+          "method": "most_urgent_trigger",
+          "description": "If still tied, check urgency",
+          "urgency_order": [
+            "on_error_detected",
+            "on_performance_degradation",
+            "periodic",
+            "on_low_activity"
+          ]
+        },
+        {
+          "stage": 4,
+          "method": "human_decision",
+          "description": "If all else fails, ask human",
+          "notification": {
+            "channels": ["slack", "email"],
+            "timeout_minutes": 60,
+            "default_action_on_timeout": "defer_both"
+          }
+        }
+      ],
+      
+      "simultaneous_triggers": {
+        "detection_window_seconds": 5,
+        "behavior": "queue_by_priority",
+        "max_queue_size": 3,
+        "queue_timeout_minutes": 120,
+        "drop_lowest_priority_when_full": true,
+        "jitter_milliseconds": 200
+      }
+    },
+    
+    "emergency_controls": {
+      "kill_switch": {
+        "primary": {
+          "type": "file",
+          "path": ".agent_disabled",
+          "check_interval_seconds": 10
+        },
+        "secondary_verification": {
+          "enabled": true,
+          "type": "api_endpoint",
+          "url": "https://control.example.com/api/agent-status",
+          "expected_response": {"enabled": true},
+          "timeout_seconds": 5,
+          "on_verification_failure": "default_to_enabled"
+        },
+        "tertiary_verification": {
+          "enabled": true,
+          "type": "timestamp_check",
+          "description": "Verify kill switch file was modified recently",
+          "max_age_minutes": 60,
+          "reason": "Prevent stale kill switches from old crashes"
+        },
+        "enable_requires_both_files": {
+          "enabled": true,
+          "files": [".agent_disabled", ".agent_disabled_confirmed"],
+          "both_must_exist": true,
+          "reason": "Prevent accidental disabling from single file creation"
+        }
+      },
+      
+      "manual_override": {
+        "enabled": true,
+        "approval_required": true,
+        "log_action": true
+      },
+      
+      "pause_conditions": {
+        "on_error_count": {
+          "threshold": 5,
+          "time_window_minutes": 30,
+          "severity": ["ERROR", "CRITICAL"],
+          "resume_strategy": "exponential_backoff",
+          "max_backoff_minutes": 120,
+          "require_human_approval_after_attempts": 3
+        },
+        "on_cost_exceeded": {
+          "enabled": true,
+          "grace_period_minutes": 5,
+          "notification_advance_percent": 90
+        },
+        "on_validation_failure": {
+          "consecutive_failures": 3,
+          "pause_duration_minutes": 60,
+          "require_investigation": true
+        }
+      },
+      
+      "alerts": {
+        "contacts": [
+          {
+            "name": "ops-team",
+            "email": "ops@example.com",
+            "slack_webhook": "https://hooks.slack.com/...",
+            "priority": "all"
+          },
+          {
+            "name": "on-call",
+            "phone": "+1-555-0123",
+            "pagerduty_key": "abc123",
+            "priority": ["critical", "emergency"]
+          }
+        ],
+        "escalation": {
+          "enabled": true,
+          "levels": [
+            {"after_minutes": 5, "contact": "ops-team", "methods": ["slack"]},
+            {"after_minutes": 15, "contact": "ops-team", "methods": ["slack", "email"]},
+            {"after_minutes": 30, "contact": "on-call", "methods": ["pagerduty"]}
+          ]
+        },
+        "quiet_hours": {
+          "enabled": true,
+          "timezone": "America/Los_Angeles",
+          "suppress_non_critical": {
+            "start_hour": 22,
+            "end_hour": 8
+          },
+          "never_suppress": ["critical", "emergency"]
+        }
+      },
+      
+      "health_checks": {
+        "enabled": true,
+        "interval_seconds": 60,
+        "checks": [
+          {
+            "name": "state_file_accessible",
+            "critical": true
+          },
+          {
+            "name": "llm_api_responsive",
+            "critical": true,
+            "timeout_seconds": 10
+          },
+          {
+            "name": "disk_space_available",
+            "critical": true,
+            "min_gb_free": 5
+          },
+          {
+            "name": "git_repo_clean",
+            "critical": false
+          },
+          {
+            "name": "network_latency",
+            "critical": false,
+            "max_ms": 200
+          }
+        ],
+        "failed_health_check_action": "pause_and_alert",
+        "consecutive_failures_to_kill_switch": 3
+      }
+    },
+    
+    "state_persistence": {
+      "save_state_after_each_action": true,
+      "state_storage_path": "data/agent_state.json",
+      "backup_state_every_n_actions": 5
+    },
+    
+    "human_approval_required_for": [
+      "self_modification",
+      "safety_changes",
+      "governance_changes",
+      "database_schema_changes",
+      "external_api_calls",
+      "production_deployments"
+    ],
+    
+    "approval_workflow": {
+      "primary": {
+        "method": "git_pr",
+        "git_config": {
+          "create_branch": true,
+          "branch_prefix": "agent-improvement/",
+          "target_branch": "main",
+          "pr_template": "templates/agent_pr.md",
+          "auto_assign_reviewers": true,
+          "required_approvals": 1,
+          "allow_self_approval": false
+        }
+      },
+      
+      "fallback": [
+        {
+          "method": "slack",
+          "enabled": true,
+          "on_primary_failure": true,
+          "config": {
+            "channel": "#agent-approvals",
+            "thread_per_request": true,
+            "reaction_approve": "white_check_mark",
+            "reaction_reject": "x"
+          }
+        },
+        {
+          "method": "email",
+          "enabled": true,
+          "on_slack_failure": true,
+          "config": {
+            "to": ["approvers@example.com"],
+            "subject_prefix": "[AGENT APPROVAL REQUIRED]",
+            "reply_to_approve": "Reply APPROVE",
+            "reply_to_reject": "Reply REJECT"
+          }
+        }
+      ],
+      
+      "timeout_behavior": {
+        "timeout_hours": 48,
+        "warnings_before_timeout": [
+          {"at_hours": 24, "channels": ["slack", "email"]},
+          {"at_hours": 40, "channels": ["slack", "email", "pagerduty"]}
+        ],
+        "on_timeout": "auto_reject",
+        "auto_approve_if_safe_criteria": {
+          "enabled": true,
+          "max_cost_usd": 1.0,
+          "AND": {
+            "only_documentation": true,
+            "all_validations_passed": true,
+            "no_dependencies_changed": true,
+            "match_file_patterns": ["docs/**", "**/*.md", "**/*.rst"],
+            "max_lines_changed": 50
+          }
+        }
+      },
+      
+      "approved_approver_list": {
+        "users": [
+          {"email": "user1@example.com", "permissions": ["all"]},
+          {"email": "user2@example.com", "permissions": ["all"]},
+          {"email": "readonly@example.com", "permissions": ["view_only"]}
+        ],
+        "require_multiple_approvers_for": [
+          "safety_changes",
+          "governance_changes",
+          "production_deployments"
+        ],
+        "minimum_approvers_for_critical": 2
+      }
+    },
+    
+    "deployment_strategy": {
+      "enabled": true,
+      "method": "progressive",
+      "stages": [
+        {
+          "name": "canary",
+          "traffic_percent": 5,
+          "duration_minutes": 30,
+          "auto_rollback_on_error_rate": 0.01,
+          "required_success_rate": 0.99
+        },
+        {
+          "name": "small_rollout",
+          "traffic_percent": 25,
+          "duration_minutes": 60,
+          "auto_rollback_on_error_rate": 0.005,
+          "required_success_rate": 0.995
+        },
+        {
+          "name": "full_rollout",
+          "traffic_percent": 100,
+          "monitoring_duration_hours": 24
+        }
+      ],
+      "rollback_on_anomaly": true,
+      "preserve_rollback_artifacts_days": 30,
+      
+      "rollback_notification": {
+        "notify_contacts": ["ops-team", "on-call"],
+        "channels": ["slack", "email"]
+      }
+    },
+    
+    "circuit_breaker": {
+      "enabled": true,
+      "failure_threshold": 5,
+      "success_threshold": 3,
+      
+      "timeout_minutes_by_env": {
+        "development": 15,
+        "staging": 30,
+        "production": 45
+      },
+      "timeout_minutes_default": 30,
+      
+      "half_open_test_interval_minutes": 10,
+      "states": {
+        "closed": "normal_operation",
+        "open": "block_all_changes",
+        "half_open": "allow_single_test_change"
+      },
+      "reset_on_manual_override": true,
+      
+      "observability": {
+        "log_state_transitions": true,
+        "alert_on_open": true,
+        "track_time_in_each_state": true
+      }
+    },
+    
+    "reporting": {
+      "enabled": true,
+      "daily_digest": {
+        "enabled": true,
+        "send_at_hour": 9,
+        "recipients": ["team@example.com"],
+        "include": [
+          "changes_summary",
+          "success_rate",
+          "cost_breakdown",
+          "upcoming_sessions",
+          "failed_attempts",
+          "recommendations"
+        ]
+      },
+      "weekly_report": {
+        "enabled": true,
+        "send_on_day": "monday",
+        "send_at_hour": 9,
+        "recipients": ["leadership@example.com"],
+        "include": [
+          "weekly_summary",
+          "trend_analysis",
+          "cost_efficiency",
+          "top_improvements",
+          "areas_needing_attention"
+        ]
+      },
+      "change_log": {
+        "auto_generate": true,
+        "format": "markdown",
+        "path": "CHANGELOG.md",
+        "include_reasoning": true,
+        "group_by": "objective_type",
+        
+        "formatting": {
+          "version_tags": {
+            "enabled": true,
+            "format": "v{major}.{minor}.{patch}",
+            "auto_increment": "patch"
+          },
+          "categories": {
+            "fix_circular_imports": "🔧 Refactoring",
+            "optimize_performance": "⚡ Performance",
+            "improve_test_coverage": "✅ Testing",
+            "enhance_safety_systems": "🔒 Security",
+            "fix_known_bugs": "🐛 Bug Fixes"
+          },
+          "entry_template": "- {emoji} {description} (#{pr_number})",
+          "include_links": true,
+          "readable_summaries": {
+            "max_length_chars": 100,
+            "avoid_technical_jargon": true
+          }
+        }
+      }
+    },
+    
+    "baseline_tracking": {
+      "enabled": true,
+      "metrics": [
+        {
+          "name": "response_time_p95",
+          "unit": "milliseconds",
+          "measure_interval_minutes": 60,
+          "baseline_calculation": "rolling_average_30_days"
+        },
+        {
+          "name": "error_rate",
+          "unit": "percentage",
+          "measure_interval_minutes": 5,
+          "baseline_calculation": "rolling_average_7_days"
+        },
+        {
+          "name": "memory_usage",
+          "unit": "megabytes",
+          "measure_interval_minutes": 15,
+          "baseline_calculation": "rolling_average_14_days"
+        }
+      ],
+      "alert_on_degradation": {
+        "enabled": true,
+        "threshold_percent": 15,
+        "sustained_duration_minutes": 30,
+        
+        "adaptive_thresholds": {
+          "enabled": true,
+          "adjust_based_on_volatility": true,
+          "volatility_calculation": "coefficient_of_variation",
+          "low_volatility": {"cv": 0.1, "threshold_percent": 10},
+          "medium_volatility": {"cv": 0.3, "threshold_percent": 15},
+          "high_volatility": {"cv": 0.5, "threshold_percent": 25}
+        }
+      },
+      "storage_path": "data/baselines/"
+    },
+    
+    "rollback_testing": {
+      "enabled": true,
+      "test_rollback_procedure": {
+        "frequency": "weekly",
+        "dry_run": true,
+        "verify_artifacts_exist": true,
+        "verify_procedure_documented": true,
+        
+        "test_environments": {
+          "staging": {
+            "enabled": true,
+            "perform_actual_rollback": true,
+            "restore_after_test": true
+          },
+          "production": {
+            "enabled": true,
+            "dry_run_only": true
+          }
+        }
+      },
+      "fast_rollback": {
+        "enabled": true,
+        "keep_previous_version_ready": true,
+        "max_rollback_time_minutes": 5,
+        "automatic_on_critical_failure": true,
+        
+        "post_rollback_verification": {
+          "run_smoke_tests": true,
+          "verify_version_number": true,
+          "check_data_integrity": true
+        }
+      }
+    },
+    
+    "cost_prediction": {
+      "enabled": true,
+      "estimate_before_session": true,
+      "factors": [
+        "estimated_tokens",
+        "validation_compute",
+        "test_execution_time",
+        "deployment_overhead"
+      ],
+      "accuracy_tracking": {
+        "enabled": true,
+        "improve_model_over_time": true,
+        "min_samples": 15,
+        
+        "confidence_intervals": {
+          "enabled": true,
+          "confidence_level": 0.95,
+          "show_in_estimates": true
+        }
+      },
+      "alert_if_predicted_cost_exceeds": {
+        "session_budget_percent": 80,
+        "require_approval": true
+      },
+      
+      "detailed_breakdown": {
+        "show_per_component": true,
+        "components": ["llm_tokens", "compute", "storage", "networking"]
+      }
+    },
+    
+    "dependency_checks": {
+      "enabled": true,
+      "verify_before_changes": [
+        {
+          "check": "external_services_available",
+          "services": ["github", "npm", "pypi"],
+          "timeout_seconds": 10
+        },
+        {
+          "check": "required_tools_installed",
+          "tools": ["git", "python3", "node"],
+          "versions_required": {
+            "git": ">=2.30",
+            "python3": ">=3.9",
+            "node": ">=18"
+          }
+        },
+        {
+          "check": "disk_space_sufficient",
+          "min_gb_required": 10
+        },
+        {
+          "check": "network_connectivity",
+          "critical_services": [
+            {
+              "name": "llm_api",
+              "host": "api.anthropic.com",
+              "port": 443,
+              "timeout_seconds": 5
+            },
+            {
+              "name": "git_remote",
+              "host": "github.com",
+              "port": 443,
+              "timeout_seconds": 5
+            },
+            {
+              "name": "package_registry",
+              "host": "registry.npmjs.org",
+              "port": 443,
+              "timeout_seconds": 5
+            }
+          ],
+          "allow_partial_failures": false
+        },
+        {
+          "check": "s3_permissions_valid",
+          "description": "Verify S3 bucket permissions for session log archival",
+          "bucket": "logs-archive",
+          "required_permissions": ["PutObject", "GetObject", "ListBucket"],
+          "timeout_seconds": 10
+        }
+      ],
+      "skip_on_check_failure": true,
+      "retry_on_transient_failure": {
+        "enabled": true,
+        "max_retries": 3,
+        "backoff_seconds": 30
+      }
+    },
+    
+    "debugging": {
+      "session_recording": {
+        "enabled": true,
+        "record_all_decisions": true,
+        "record_llm_prompts": true,
+        "record_llm_responses": true,
+        "storage_path": "data/session_logs/",
+        "retention_days": 30,
+        "compress_old_logs": true,
+        
+        "security": {
+          "encrypt_at_rest": true,
+          "encryption_algorithm": "AES-256-GCM",
+          "redact_sensitive_data": {
+            "enabled": true,
+            "patterns": [
+              "api_key",
+              "password",
+              "secret",
+              "token",
+              "private_key",
+              "jwt",
+              "bearer"
+            ]
+          },
+          "access_control": {
+            "require_authentication": true,
+            "allowed_roles": ["admin", "developer", "auditor"]
+          }
+        },
+        "scalability": {
+          "max_log_size_mb": 100,
+          "rotate_on_size": true,
+          "archive_to_cold_storage_after_days": 7,
+          "cold_storage_path": "s3://logs-archive/session_logs/"
+        }
+      },
+      "replay_capability": {
+        "enabled": true,
+        "allow_replay_for_analysis": true,
+        "replay_without_applying_changes": true,
+        
+        "replay_controls": {
+          "allow_step_through": true,
+          "allow_speed_adjustment": true,
+          "capture_replay_metrics": true
+        }
+      }
+    }
+  }
+}

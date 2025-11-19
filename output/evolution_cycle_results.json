@@ -1,0 +1,17 @@
+{
+  "start_time": "2025-10-23T14:59:37.384535",
+  "config": {
+    "proposal_dir": "src",
+    "output_dir": "output",
+    "grammar_version": "3.4.0",
+    "timeout_seconds": 30,
+    "skip_validation": false,
+    "enable_code_safety": true,
+    "max_code_size": 10000,
+    "verbose": false
+  },
+  "steps": {},
+  "success": false,
+  "error": "'UnifiedRuntime' object has no attribute '_validate_graph'",
+  "end_time": "2025-10-23T14:59:37.390066"
+}

@@ -1,0 +1,1028 @@
+{
+  "version": "2.4.0",
+  "metadata": {
+    "description": "Core ontology for Graphix IR, mapping all node_type, edge_type, and semantic_type strings to globally unique URIs. This ensures semantic consistency across agents, prevents drift, and links to external ontologies for interoperability.",
+    "base_uri": "https://graphix.ai/ontology/",
+    "external_ontologies": {
+      "schema_org": "https://schema.org/",
+      "prov_o": "https://www.w3.org/TR/prov-o/",
+      "wikidata": "https://www.wikidata.org/wiki/",
+      "foaf": "http://xmlns.com/foaf/0.1/",
+      "dcterms": "http://purl.org/dc/terms/"
+    },
+    "last_updated": "2025-01-15T10:30:00Z",
+    "change_log": [
+      {
+        "version": "2.4.0",
+        "date": "2025-01-15T10:30:00Z",
+        "changes": [
+          "Fixed duplicate external references",
+          "Moved MetaEdge from node_types to edge_types",
+          "Improved external mappings with more specific references",
+          "Added JSON Schema definitions",
+          "Added deprecation mechanism",
+          "Added semantic types for quantum, cryptographic, and distributed operations",
+          "Added lifecycle status field to all types"
+        ]
+      },
+      {
+        "version": "2.3.0",
+        "date": "2024-12-01T00:00:00Z",
+        "changes": [
+          "Initial stable release"
+        ]
+      }
+    ],
+    "json_schema_uri": "https://graphix.ai/schemas/ontology-v2.4.0.schema.json"
+  },
+  "lifecycle_statuses": {
+    "active": "Type is fully supported and recommended for use",
+    "deprecated": "Type is supported but discouraged; will be removed in future version",
+    "experimental": "Type is under development and may change",
+    "superseded": "Type has been replaced by another type"
+  },
+  "node_types": {
+    "InputNode": {
+      "uri": "https://graphix.ai/ontology/InputNode",
+      "description": "Node for data input into the graph",
+      "external_ref": "https://schema.org/DataFeedItem",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/InputNode.json"
+    },
+    "OutputNode": {
+      "uri": "https://graphix.ai/ontology/OutputNode",
+      "description": "Node for data output from the graph",
+      "external_ref": "https://schema.org/DataDownload",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/OutputNode.json"
+    },
+    "DenseNode": {
+      "uri": "https://graphix.ai/ontology/DenseNode",
+      "description": "Dense neural network layer node",
+      "external_ref": "https://www.wikidata.org/wiki/Q2266782",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/DenseNode.json"
+    },
+    "ActivationNode": {
+      "uri": "https://graphix.ai/ontology/ActivationNode",
+      "description": "Activation function node in neural networks",
+      "external_ref": "https://www.wikidata.org/wiki/Q4677687",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ActivationNode.json"
+    },
+    "BranchNode": {
+      "uri": "https://graphix.ai/ontology/BranchNode",
+      "description": "Conditional branching node for control flow",
+      "external_ref": "https://schema.org/ChooseAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/BranchNode.json"
+    },
+    "LoopNode": {
+      "uri": "https://graphix.ai/ontology/LoopNode",
+      "description": "Looping control flow node",
+      "external_ref": "https://www.wikidata.org/wiki/Q1128396",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/LoopNode.json"
+    },
+    "GraphNode": {
+      "uri": "https://graphix.ai/ontology/GraphNode",
+      "description": "Subgraph or nested graph node",
+      "external_ref": "https://schema.org/Graph",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/GraphNode.json"
+    },
+    "SwitchNode": {
+      "uri": "https://graphix.ai/ontology/SwitchNode",
+      "description": "Multi-way switch node for control flow",
+      "external_ref": "https://www.wikidata.org/wiki/Q473955",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SwitchNode.json"
+    },
+    "DataNode": {
+      "uri": "https://graphix.ai/ontology/DataNode",
+      "description": "Node for data storage or processing",
+      "external_ref": "https://schema.org/DataCatalog",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/DataNode.json"
+    },
+    "ModelNode": {
+      "uri": "https://graphix.ai/ontology/ModelNode",
+      "description": "Node representing a machine learning model",
+      "external_ref": "https://schema.org/MLModel",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ModelNode.json"
+    },
+    "MapNode": {
+      "uri": "https://graphix.ai/ontology/MapNode",
+      "description": "Mapping operation node",
+      "external_ref": "https://www.wikidata.org/wiki/Q370502",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/MapNode.json"
+    },
+    "ReduceNode": {
+      "uri": "https://graphix.ai/ontology/ReduceNode",
+      "description": "Reduction operation node",
+      "external_ref": "https://www.wikidata.org/wiki/Q1753873",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ReduceNode.json"
+    },
+    "FusionNode": {
+      "uri": "https://graphix.ai/ontology/FusionNode",
+      "description": "Node for fusing multiple operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q1334284",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/FusionNode.json"
+    },
+    "MultimodalNode": {
+      "uri": "https://graphix.ai/ontology/MultimodalNode",
+      "description": "Node for multimodal data processing",
+      "external_ref": "https://www.wikidata.org/wiki/Q1150070",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/MultimodalNode.json"
+    },
+    "ScatterGatherNode": {
+      "uri": "https://graphix.ai/ontology/ScatterGatherNode",
+      "description": "Node for scatter-gather parallel processing",
+      "external_ref": "https://www.wikidata.org/wiki/Q7427227",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ScatterGatherNode.json"
+    },
+    "ContractNode": {
+      "uri": "https://graphix.ai/ontology/ContractNode",
+      "description": "Node for defining contracts or constraints",
+      "external_ref": "https://schema.org/Agreement",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ContractNode.json"
+    },
+    "SchedulerNode": {
+      "uri": "https://graphix.ai/ontology/SchedulerNode",
+      "description": "Node for scheduling tasks",
+      "external_ref": "https://www.wikidata.org/wiki/Q11235",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SchedulerNode.json"
+    },
+    "ErrorNode": {
+      "uri": "https://graphix.ai/ontology/ErrorNode",
+      "description": "Node for error handling",
+      "external_ref": "https://schema.org/ErrorAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ErrorNode.json"
+    },
+    "MetricsNode": {
+      "uri": "https://graphix.ai/ontology/MetricsNode",
+      "description": "Node for performance metrics",
+      "external_ref": "https://schema.org/QuantitativeValue",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/MetricsNode.json"
+    },
+    "MetaLearnerNode": {
+      "uri": "https://graphix.ai/ontology/MetaLearnerNode",
+      "description": "Node for meta-learning",
+      "external_ref": "https://www.wikidata.org/wiki/Q6822325",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/MetaLearnerNode.json"
+    },
+    "AsyncNode": {
+      "uri": "https://graphix.ai/ontology/AsyncNode",
+      "description": "Node for asynchronous operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q2593556",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/AsyncNode.json"
+    },
+    "P2PNode": {
+      "uri": "https://graphix.ai/ontology/P2PNode",
+      "description": "Node for peer-to-peer interactions",
+      "external_ref": "https://www.wikidata.org/wiki/Q165090",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/P2PNode.json"
+    },
+    "ConsensusNode": {
+      "uri": "https://graphix.ai/ontology/ConsensusNode",
+      "description": "Node for consensus mechanisms",
+      "external_ref": "https://www.wikidata.org/wiki/Q2995307",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ConsensusNode.json"
+    },
+    "ProposalNode": {
+      "uri": "https://graphix.ai/ontology/ProposalNode",
+      "description": "Node for proposing changes",
+      "external_ref": "https://schema.org/Offer",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ProposalNode.json"
+    },
+    "ValidationNode": {
+      "uri": "https://graphix.ai/ontology/ValidationNode",
+      "description": "Node for validation",
+      "external_ref": "https://schema.org/ValidateAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ValidationNode.json"
+    },
+    "AuditNode": {
+      "uri": "https://graphix.ai/ontology/AuditNode",
+      "description": "Node for auditing",
+      "external_ref": "https://www.wikidata.org/wiki/Q213449",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/AuditNode.json"
+    },
+    "EthicsNode": {
+      "uri": "https://graphix.ai/ontology/EthicsNode",
+      "description": "Node for ethical considerations",
+      "external_ref": "https://www.wikidata.org/wiki/Q81062",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EthicsNode.json"
+    },
+    "FederatedNode": {
+      "uri": "https://graphix.ai/ontology/FederatedNode",
+      "description": "Node for federated learning",
+      "external_ref": "https://www.wikidata.org/wiki/Q5883902",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/FederatedNode.json"
+    },
+    "CollaborationNode": {
+      "uri": "https://graphix.ai/ontology/CollaborationNode",
+      "description": "Node for collaboration",
+      "external_ref": "https://schema.org/CollaborativeActivity",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/CollaborationNode.json"
+    },
+    "AttestationNode": {
+      "uri": "https://graphix.ai/ontology/AttestationNode",
+      "description": "Node for attestation",
+      "external_ref": "https://www.wikidata.org/wiki/Q4818050",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/AttestationNode.json"
+    },
+    "CacheNode": {
+      "uri": "https://graphix.ai/ontology/CacheNode",
+      "description": "Node for caching",
+      "external_ref": "https://www.wikidata.org/wiki/Q184826",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/CacheNode.json"
+    },
+    "ReplayNode": {
+      "uri": "https://graphix.ai/ontology/ReplayNode",
+      "description": "Node for replaying operations",
+      "external_ref": "https://schema.org/PlayAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ReplayNode.json"
+    },
+    "EncryptNode": {
+      "uri": "https://graphix.ai/ontology/EncryptNode",
+      "description": "Node for encryption",
+      "external_ref": "https://www.wikidata.org/wiki/Q14397",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EncryptNode.json"
+    },
+    "ExplainNode": {
+      "uri": "https://graphix.ai/ontology/ExplainNode",
+      "description": "Node for explanations",
+      "external_ref": "https://schema.org/Explanation",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ExplainNode.json"
+    },
+    "PolicyNode": {
+      "uri": "https://graphix.ai/ontology/PolicyNode",
+      "description": "Node for policies",
+      "external_ref": "https://schema.org/Policy",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/PolicyNode.json"
+    },
+    "ResourceNode": {
+      "uri": "https://graphix.ai/ontology/ResourceNode",
+      "description": "Node for computational resources",
+      "external_ref": "https://schema.org/ComputerLanguage",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ResourceNode.json"
+    },
+    "OptimizerNode": {
+      "uri": "https://graphix.ai/ontology/OptimizerNode",
+      "description": "Node for optimization",
+      "external_ref": "https://www.wikidata.org/wiki/Q1418502",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/OptimizerNode.json"
+    },
+    "ONNXExportNode": {
+      "uri": "https://graphix.ai/ontology/ONNXExportNode",
+      "description": "Node for ONNX export",
+      "external_ref": "https://www.wikidata.org/wiki/Q47520004",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ONNXExportNode.json"
+    },
+    "ONNXImportNode": {
+      "uri": "https://graphix.ai/ontology/ONNXImportNode",
+      "description": "Node for ONNX import",
+      "external_ref": "https://www.wikidata.org/wiki/Q47520004",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ONNXImportNode.json"
+    },
+    "RandomNode": {
+      "uri": "https://graphix.ai/ontology/RandomNode",
+      "description": "Node for random operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q176384",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/RandomNode.json"
+    },
+    "ProbabilisticNode": {
+      "uri": "https://graphix.ai/ontology/ProbabilisticNode",
+      "description": "Node for probabilistic computations",
+      "external_ref": "https://www.wikidata.org/wiki/Q220041",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ProbabilisticNode.json"
+    },
+    "QuantumNode": {
+      "uri": "https://graphix.ai/ontology/QuantumNode",
+      "description": "Node for quantum computations",
+      "external_ref": "https://www.wikidata.org/wiki/Q836",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/nodes/QuantumNode.json"
+    },
+    "PromptNode": {
+      "uri": "https://graphix.ai/ontology/PromptNode",
+      "description": "Node for prompts in generative AI",
+      "external_ref": "https://schema.org/Text",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/PromptNode.json"
+    },
+    "NLGeneratorNode": {
+      "uri": "https://graphix.ai/ontology/NLGeneratorNode",
+      "description": "Node for natural language generation",
+      "external_ref": "https://www.wikidata.org/wiki/Q30642",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/NLGeneratorNode.json"
+    },
+    "CustomNode": {
+      "uri": "https://graphix.ai/ontology/CustomNode",
+      "description": "Custom user-defined node",
+      "external_ref": "https://schema.org/SoftwareApplication",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/CustomNode.json"
+    },
+    "HyperParamNode": {
+      "uri": "https://graphix.ai/ontology/HyperParamNode",
+      "description": "Node for hyperparameters",
+      "external_ref": "https://www.wikidata.org/wiki/Q310285",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/HyperParamNode.json"
+    },
+    "ForeignNode": {
+      "uri": "https://graphix.ai/ontology/ForeignNode",
+      "description": "Node for foreign code integration",
+      "external_ref": "https://schema.org/Code",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ForeignNode.json"
+    },
+    "MemoryNode": {
+      "uri": "https://graphix.ai/ontology/MemoryNode",
+      "description": "Node for memory management",
+      "external_ref": "https://www.wikidata.org/wiki/Q583090",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/MemoryNode.json"
+    },
+    "SandboxNode": {
+      "uri": "https://graphix.ai/ontology/SandboxNode",
+      "description": "Node for sandboxed execution",
+      "external_ref": "https://www.wikidata.org/wiki/Q844512",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SandboxNode.json"
+    },
+    "TrustPolicyNode": {
+      "uri": "https://graphix.ai/ontology/TrustPolicyNode",
+      "description": "Node for trust policies",
+      "external_ref": "https://schema.org/DigitalDocument",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/TrustPolicyNode.json"
+    },
+    "SignatureNode": {
+      "uri": "https://graphix.ai/ontology/SignatureNode",
+      "description": "Node for digital signatures",
+      "external_ref": "https://www.wikidata.org/wiki/Q3410901",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SignatureNode.json"
+    },
+    "HybridPlanNode": {
+      "uri": "https://graphix.ai/ontology/HybridPlanNode",
+      "description": "Node for hybrid planning",
+      "external_ref": "https://schema.org/PlanAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/HybridPlanNode.json"
+    },
+    "EmergentEventNode": {
+      "uri": "https://graphix.ai/ontology/EmergentEventNode",
+      "description": "Node for emergent events",
+      "external_ref": "https://schema.org/Event",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EmergentEventNode.json"
+    },
+    "ObserverNode": {
+      "uri": "https://graphix.ai/ontology/ObserverNode",
+      "description": "Node for observation",
+      "external_ref": "https://www.wikidata.org/wiki/Q7073299",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ObserverNode.json"
+    },
+    "SustainabilityAuditNode": {
+      "uri": "https://graphix.ai/ontology/SustainabilityAuditNode",
+      "description": "Node for sustainability auditing",
+      "external_ref": "https://www.wikidata.org/wiki/Q192039",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SustainabilityAuditNode.json"
+    },
+    "SwarmNode": {
+      "uri": "https://graphix.ai/ontology/SwarmNode",
+      "description": "Node for swarm intelligence",
+      "external_ref": "https://www.wikidata.org/wiki/Q160390",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SwarmNode.json"
+    },
+    "GenerativeNode": {
+      "uri": "https://graphix.ai/ontology/GenerativeNode",
+      "description": "Node for generative AI operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q2481079",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/GenerativeNode.json"
+    },
+    "DynamicCodeNode": {
+      "uri": "https://graphix.ai/ontology/DynamicCodeNode",
+      "description": "Node for dynamic code execution",
+      "external_ref": "https://schema.org/SoftwareSourceCode",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/DynamicCodeNode.json"
+    },
+    "SustainabilityNode": {
+      "uri": "https://graphix.ai/ontology/SustainabilityNode",
+      "description": "Node for sustainability constraints",
+      "external_ref": "https://schema.org/Energy",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SustainabilityNode.json"
+    },
+    "EmergenceNode": {
+      "uri": "https://graphix.ai/ontology/EmergenceNode",
+      "description": "Node for emergent behaviors",
+      "external_ref": "https://www.wikidata.org/wiki/Q3752579",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EmergenceNode.json"
+    },
+    "InteropNode": {
+      "uri": "https://graphix.ai/ontology/InteropNode",
+      "description": "Node for interoperability",
+      "external_ref": "https://schema.org/CommunicateAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/InteropNode.json"
+    },
+    "LearningNode": {
+      "uri": "https://graphix.ai/ontology/LearningNode",
+      "description": "Node for learning operations",
+      "external_ref": "https://schema.org/LearnAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/LearningNode.json"
+    },
+    "SelfModifyingNode": {
+      "uri": "https://graphix.ai/ontology/SelfModifyingNode",
+      "description": "Node for self-modification",
+      "external_ref": "https://www.wikidata.org/wiki/Q1048678",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/nodes/SelfModifyingNode.json"
+    },
+    "GoalNode": {
+      "uri": "https://graphix.ai/ontology/GoalNode",
+      "description": "Node for goal definition",
+      "external_ref": "https://schema.org/Goal",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/GoalNode.json"
+    },
+    "IntentNode": {
+      "uri": "https://graphix.ai/ontology/IntentNode",
+      "description": "Node for intent expression",
+      "external_ref": "https://schema.org/Intent",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/IntentNode.json"
+    },
+    "PlanNode": {
+      "uri": "https://graphix.ai/ontology/PlanNode",
+      "description": "Node for planning",
+      "external_ref": "https://schema.org/PlanAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/PlanNode.json"
+    },
+    "NegotiationNode": {
+      "uri": "https://graphix.ai/ontology/NegotiationNode",
+      "description": "Node for negotiation",
+      "external_ref": "https://schema.org/NegotiateAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/NegotiationNode.json"
+    },
+    "MarketNode": {
+      "uri": "https://graphix.ai/ontology/MarketNode",
+      "description": "Node for market interactions",
+      "external_ref": "https://schema.org/TradeAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/MarketNode.json"
+    },
+    "SensorNode": {
+      "uri": "https://graphix.ai/ontology/SensorNode",
+      "description": "Node for sensor input",
+      "external_ref": "https://schema.org/Observation",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SensorNode.json"
+    },
+    "ActionNode": {
+      "uri": "https://graphix.ai/ontology/ActionNode",
+      "description": "Node for actions",
+      "external_ref": "https://schema.org/Action",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ActionNode.json"
+    },
+    "WorldModelNode": {
+      "uri": "https://graphix.ai/ontology/WorldModelNode",
+      "description": "Node for world modeling",
+      "external_ref": "https://www.wikidata.org/wiki/Q216892",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/WorldModelNode.json"
+    },
+    "ExternalInteropNode": {
+      "uri": "https://graphix.ai/ontology/ExternalInteropNode",
+      "description": "Node for external interoperability",
+      "external_ref": "https://schema.org/APIReference",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ExternalInteropNode.json"
+    },
+    "ProofNode": {
+      "uri": "https://graphix.ai/ontology/ProofNode",
+      "description": "Node for proofs",
+      "external_ref": "https://schema.org/Evidence",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ProofNode.json"
+    },
+    "StreamNode": {
+      "uri": "https://graphix.ai/ontology/StreamNode",
+      "description": "Node for streaming data",
+      "external_ref": "https://schema.org/DataFeed",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/StreamNode.json"
+    },
+    "SafetyNode": {
+      "uri": "https://graphix.ai/ontology/SafetyNode",
+      "description": "Node for safety mechanisms",
+      "external_ref": "https://schema.org/SafetyHealthAspect",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/SafetyNode.json"
+    },
+    "EvolveNode": {
+      "uri": "https://graphix.ai/ontology/EvolveNode",
+      "description": "Node for evolution",
+      "external_ref": "https://www.wikidata.org/wiki/Q evolutionary_algorithm",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EvolveNode.json"
+    },
+    "MetaNode": {
+      "uri": "https://graphix.ai/ontology/MetaNode",
+      "description": "Meta node for meta-programming",
+      "external_ref": "https://www.wikidata.org/wiki/Q1064731",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/nodes/MetaNode.json"
+    }
+  },
+  "edge_types": {
+    "data": {
+      "uri": "https://graphix.ai/ontology/data",
+      "description": "Data flow edge",
+      "external_ref": "https://schema.org/DataFeed",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/data.json"
+    },
+    "control": {
+      "uri": "https://graphix.ai/ontology/control",
+      "description": "Control flow edge",
+      "external_ref": "https://schema.org/potentialAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/control.json"
+    },
+    "contract": {
+      "uri": "https://graphix.ai/ontology/contract",
+      "description": "Contract enforcement edge",
+      "external_ref": "https://schema.org/Agreement",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/contract.json"
+    },
+    "error": {
+      "uri": "https://graphix.ai/ontology/error",
+      "description": "Error handling edge",
+      "external_ref": "https://schema.org/ErrorAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/error.json"
+    },
+    "trigger": {
+      "uri": "https://graphix.ai/ontology/trigger",
+      "description": "Trigger event edge",
+      "external_ref": "https://schema.org/Event",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/trigger.json"
+    },
+    "monitor": {
+      "uri": "https://graphix.ai/ontology/monitor",
+      "description": "Monitoring edge",
+      "external_ref": "https://schema.org/ViewAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/monitor.json"
+    },
+    "dependency": {
+      "uri": "https://graphix.ai/ontology/dependency",
+      "description": "Dependency edge",
+      "external_ref": "https://schema.org/requires",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/dependency.json"
+    },
+    "scatter": {
+      "uri": "https://graphix.ai/ontology/scatter",
+      "description": "Scatter operation edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q7427227",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/scatter.json"
+    },
+    "quantum": {
+      "uri": "https://graphix.ai/ontology/quantum",
+      "description": "Quantum computation edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q836",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/edges/quantum.json"
+    },
+    "async": {
+      "uri": "https://graphix.ai/ontology/async",
+      "description": "Asynchronous operation edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q2593556",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/async.json"
+    },
+    "p2p": {
+      "uri": "https://graphix.ai/ontology/p2p",
+      "description": "Peer-to-peer edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q165090",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/p2p.json"
+    },
+    "audit": {
+      "uri": "https://graphix.ai/ontology/audit",
+      "description": "Audit trail edge",
+      "external_ref": "https://www.w3.org/TR/prov-o/#wasGeneratedBy",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/audit.json"
+    },
+    "resource": {
+      "uri": "https://graphix.ai/ontology/resource",
+      "description": "Resource allocation edge",
+      "external_ref": "https://schema.org/AllocateAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/resource.json"
+    },
+    "federated": {
+      "uri": "https://graphix.ai/ontology/federated",
+      "description": "Federated learning edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q5883902",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/federated.json"
+    },
+    "collaboration": {
+      "uri": "https://graphix.ai/ontology/collaboration",
+      "description": "Collaboration edge",
+      "external_ref": "https://schema.org/CollaborativeActivity",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/collaboration.json"
+    },
+    "attestation": {
+      "uri": "https://graphix.ai/ontology/attestation",
+      "description": "Attestation edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q4818050",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/attestation.json"
+    },
+    "loop": {
+      "uri": "https://graphix.ai/ontology/loop",
+      "description": "Loop control edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q1128396",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/loop.json"
+    },
+    "probabilistic": {
+      "uri": "https://graphix.ai/ontology/probabilistic",
+      "description": "Probabilistic computation edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q220041",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/probabilistic.json"
+    },
+    "synth": {
+      "uri": "https://graphix.ai/ontology/synth",
+      "description": "Synthesis edge for generative AI",
+      "external_ref": "https://schema.org/CreateAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/synth.json"
+    },
+    "prompt": {
+      "uri": "https://graphix.ai/ontology/prompt",
+      "description": "Prompt edge for LLM interactions",
+      "external_ref": "https://schema.org/Question",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/prompt.json"
+    },
+    "dynamic_code": {
+      "uri": "https://graphix.ai/ontology/dynamic_code",
+      "description": "Dynamic code execution edge",
+      "external_ref": "https://schema.org/SoftwareSourceCode",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/dynamic_code.json"
+    },
+    "sustainability": {
+      "uri": "https://graphix.ai/ontology/sustainability",
+      "description": "Sustainability constraint edge",
+      "external_ref": "https://schema.org/Energy",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/sustainability.json"
+    },
+    "resource_contract": {
+      "uri": "https://graphix.ai/ontology/resource_contract",
+      "description": "Resource contract edge",
+      "external_ref": "https://schema.org/ServiceAgreement",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/resource_contract.json"
+    },
+    "emergence": {
+      "uri": "https://graphix.ai/ontology/emergence",
+      "description": "Emergence pattern edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q3752579",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/emergence.json"
+    },
+    "evolution": {
+      "uri": "https://graphix.ai/ontology/evolution",
+      "description": "Evolution edge for self-modification",
+      "external_ref": "https://www.wikidata.org/wiki/Q1048678",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/edges/evolution.json"
+    },
+    "interop": {
+      "uri": "https://graphix.ai/ontology/interop",
+      "description": "Interop edge for polyglot integration",
+      "external_ref": "https://schema.org/CommunicateAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/interop.json"
+    },
+    "learning": {
+      "uri": "https://graphix.ai/ontology/learning",
+      "description": "Learning edge",
+      "external_ref": "https://schema.org/LearnAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/learning.json"
+    },
+    "goal": {
+      "uri": "https://graphix.ai/ontology/goal",
+      "description": "Goal-directed edge",
+      "external_ref": "https://schema.org/Goal",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/goal.json"
+    },
+    "intent": {
+      "uri": "https://graphix.ai/ontology/intent",
+      "description": "Intent edge",
+      "external_ref": "https://schema.org/Intent",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/intent.json"
+    },
+    "plan": {
+      "uri": "https://graphix.ai/ontology/plan",
+      "description": "Planning edge",
+      "external_ref": "https://schema.org/PlanAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/plan.json"
+    },
+    "negotiation": {
+      "uri": "https://graphix.ai/ontology/negotiation",
+      "description": "Negotiation edge",
+      "external_ref": "https://schema.org/NegotiateAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/negotiation.json"
+    },
+    "market": {
+      "uri": "https://graphix.ai/ontology/market",
+      "description": "Market exchange edge",
+      "external_ref": "https://schema.org/TradeAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/market.json"
+    },
+    "sensor": {
+      "uri": "https://graphix.ai/ontology/sensor",
+      "description": "Sensor data edge",
+      "external_ref": "https://schema.org/Observation",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/sensor.json"
+    },
+    "action": {
+      "uri": "https://graphix.ai/ontology/action",
+      "description": "Action execution edge",
+      "external_ref": "https://schema.org/Action",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/action.json"
+    },
+    "proof": {
+      "uri": "https://graphix.ai/ontology/proof",
+      "description": "Proof edge",
+      "external_ref": "https://schema.org/Evidence",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/proof.json"
+    },
+    "stream": {
+      "uri": "https://graphix.ai/ontology/stream",
+      "description": "Streaming data edge",
+      "external_ref": "https://schema.org/DataFeed",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/stream.json"
+    },
+    "safety": {
+      "uri": "https://graphix.ai/ontology/safety",
+      "description": "Safety constraint edge",
+      "external_ref": "https://schema.org/SafetyHealthAspect",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/safety.json"
+    },
+    "uncertainty": {
+      "uri": "https://graphix.ai/ontology/uncertainty",
+      "description": "Uncertainty propagation edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q843070",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/uncertainty.json"
+    },
+    "error_propagation": {
+      "uri": "https://graphix.ai/ontology/error_propagation",
+      "description": "Error propagation edge",
+      "external_ref": "https://schema.org/ReportAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/error_propagation.json"
+    },
+    "rollback": {
+      "uri": "https://graphix.ai/ontology/rollback",
+      "description": "Rollback edge",
+      "external_ref": "https://www.wikidata.org/wiki/Q1434784",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/rollback.json"
+    },
+    "emergent_event": {
+      "uri": "https://graphix.ai/ontology/emergent_event",
+      "description": "Emergent event edge",
+      "external_ref": "https://schema.org/PublicationEvent",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/emergent_event.json"
+    },
+    "reporting": {
+      "uri": "https://graphix.ai/ontology/reporting",
+      "description": "Reporting edge",
+      "external_ref": "https://schema.org/Report",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/reporting.json"
+    },
+    "meta": {
+      "uri": "https://graphix.ai/ontology/meta",
+      "description": "Meta edge for meta-programming",
+      "external_ref": "https://schema.org/relatedTo",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/edges/meta.json"
+    }
+  },
+  "semantic_types": {
+    "logical_inference": {
+      "uri": "https://graphix.ai/ontology/logical_inference",
+      "description": "Semantic type for logical reasoning operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q1150070",
+      "lifecycle_status": "active"
+    },
+    "computation": {
+      "uri": "https://graphix.ai/ontology/computation",
+      "description": "Semantic type for general computation",
+      "external_ref": "https://schema.org/ComputationalProcess",
+      "lifecycle_status": "active"
+    },
+    "control_flow": {
+      "uri": "https://graphix.ai/ontology/control_flow",
+      "description": "Semantic type for control flow operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q629394",
+      "lifecycle_status": "active"
+    },
+    "data_processing": {
+      "uri": "https://graphix.ai/ontology/data_processing",
+      "description": "Semantic type for data processing",
+      "external_ref": "https://schema.org/DataProcessing",
+      "lifecycle_status": "active"
+    },
+    "machine_learning": {
+      "uri": "https://graphix.ai/ontology/machine_learning",
+      "description": "Semantic type for machine learning models",
+      "external_ref": "https://www.wikidata.org/wiki/Q2539",
+      "lifecycle_status": "active"
+    },
+    "agentic_behavior": {
+      "uri": "https://graphix.ai/ontology/agentic_behavior",
+      "description": "Semantic type for agentic behaviors",
+      "external_ref": "https://www.wikidata.org/wiki/Q4506755",
+      "lifecycle_status": "active"
+    },
+    "security": {
+      "uri": "https://graphix.ai/ontology/security",
+      "description": "Semantic type for security operations",
+      "external_ref": "https://schema.org/SecurityScreening",
+      "lifecycle_status": "active"
+    },
+    "provenance": {
+      "uri": "https://graphix.ai/ontology/provenance",
+      "description": "Semantic type for provenance tracking",
+      "external_ref": "https://www.w3.org/TR/prov-o/",
+      "lifecycle_status": "active"
+    },
+    "explainability": {
+      "uri": "https://graphix.ai/ontology/explainability",
+      "description": "Semantic type for explainability",
+      "external_ref": "https://www.wikidata.org/wiki/Q1150070",
+      "lifecycle_status": "active"
+    },
+    "non_verbal_signal": {
+      "uri": "https://graphix.ai/ontology/non_verbal_signal",
+      "description": "Semantic type for non-verbal communication signals in multi-agent systems",
+      "external_ref": "https://www.wikidata.org/wiki/Q183617",
+      "lifecycle_status": "active"
+    },
+    "quantum_computing": {
+      "uri": "https://graphix.ai/ontology/quantum_computing",
+      "description": "Semantic type for quantum computation operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q170322",
+      "lifecycle_status": "experimental"
+    },
+    "cryptographic": {
+      "uri": "https://graphix.ai/ontology/cryptographic",
+      "description": "Semantic type for cryptographic operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q8789",
+      "lifecycle_status": "active"
+    },
+    "distributed_computing": {
+      "uri": "https://graphix.ai/ontology/distributed_computing",
+      "description": "Semantic type for distributed computing operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q193769",
+      "lifecycle_status": "active"
+    },
+    "parallel_computation": {
+      "uri": "https://graphix.ai/ontology/parallel_computation",
+      "description": "Semantic type for parallel computation operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q188872",
+      "lifecycle_status": "active"
+    },
+    "federated_learning": {
+      "uri": "https://graphix.ai/ontology/federated_learning",
+      "description": "Semantic type for federated learning operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q5883902",
+      "lifecycle_status": "active"
+    },
+    "consensus_mechanism": {
+      "uri": "https://graphix.ai/ontology/consensus_mechanism",
+      "description": "Semantic type for consensus mechanisms",
+      "external_ref": "https://www.wikidata.org/wiki/Q2995307",
+      "lifecycle_status": "active"
+    },
+    "optimization": {
+      "uri": "https://graphix.ai/ontology/optimization",
+      "description": "Semantic type for optimization operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q1418502",
+      "lifecycle_status": "active"
+    },
+    "probabilistic_computation": {
+      "uri": "https://graphix.ai/ontology/probabilistic_computation",
+      "description": "Semantic type for probabilistic computation",
+      "external_ref": "https://www.wikidata.org/wiki/Q220041",
+      "lifecycle_status": "active"
+    },
+    "natural_language": {
+      "uri": "https://graphix.ai/ontology/natural_language",
+      "description": "Semantic type for natural language processing",
+      "external_ref": "https://www.wikidata.org/wiki/Q30642",
+      "lifecycle_status": "active"
+    },
+    "sustainability": {
+      "uri": "https://graphix.ai/ontology/sustainability",
+      "description": "Semantic type for sustainability and energy efficiency",
+      "external_ref": "https://www.wikidata.org/wiki/Q192039",
+      "lifecycle_status": "active"
+    }
+  },
+  "deprecation_policy": {
+    "description": "Policy for handling deprecated types",
+    "grace_period_versions": 2,
+    "notification_required": true,
+    "migration_guide_required": true,
+    "deprecation_process": [
+      "Type marked as 'deprecated' with lifecycle_status",
+      "Migration guide published",
+      "Grace period of 2 major versions",
+      "Type removed in subsequent major version"
+    ]
+  },
+  "validation": {
+    "json_schema_base": "https://graphix.ai/schemas/",
+    "schema_version": "2.4.0",
+    "required_fields": ["uri", "description", "external_ref", "lifecycle_status"],
+    "uri_pattern": "^https://graphix\\.ai/ontology/[A-Za-z0-9_]+$"
+  }
+}

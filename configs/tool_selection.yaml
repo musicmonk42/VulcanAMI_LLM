@@ -1,0 +1,20 @@
+defaults:
+  utility_weights:
+    quality: 1.0
+    time_penalty: 1.0
+    energy_penalty: 1.0
+    risk_penalty: 1.0
+  
+  calibration:
+    min_samples: 100
+    retrain_interval: 100
+    temperature_scaling: true
+    isotonic_regression: true
+  
+  portfolio_strategies:
+    enabled: ['single', 'speculative_parallel', 'sequential_refinement']
+    
+  cost_model:
+    track_variance: true
+    cold_start_penalty_ms: 50
+    health_check_interval: 60

@@ -1,0 +1,199 @@
+{
+  "id": "generic_mutator_v1",
+  "type": "Graph",
+  "grammar_version": "1.2.0",
+  "metadata": {
+    "author_agent": "OptimizerAgent_v3",
+    "creation_timestamp": "2025-08-26T21:04:44Z",
+    "description": "A generic metaprogram for finding a subgraph pattern in a target graph and replacing it with a template. The pattern, template, and target graph are provided as inputs. Enhanced with NSO self-modification and ethical labeling nodes.",
+    "usage": "Set the 'value' parameters in 'pattern_input', 'template_input', and 'target_graph_input' before execution."
+  },
+  "nodes": [
+    {
+      "id": "pattern_input",
+      "type": "CONST",
+      "params": {
+        "value": {
+          "nodes": [
+            {
+              "id": "?gen",
+              "type": "GENERATE"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "template_input",
+      "type": "CONST",
+      "params": {
+        "value": {
+          "nodes": [
+            {
+              "id": "?gen",
+              "type": "GENERATE",
+              "params": {
+                "prompt_template": "This is an improved prompt: {text}"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "target_graph_input",
+      "type": "CONST",
+      "params": {
+        "value": "graph_id_to_modify"
+      }
+    },
+    {
+      "id": "pat",
+      "type": "PATTERN_COMPILE"
+    },
+    {
+      "id": "find",
+      "type": "FIND_SUBGRAPH",
+      "params": {
+        "start_idx": 0
+      }
+    },
+    {
+      "id": "find_contract",
+      "type": "ContractNode",
+      "params": {
+        "target_node": "find",
+        "constraints": {
+          "max_latency_ms": 1000,
+          "max_compute_cycles": 1000000
+        }
+      }
+    },
+    {
+      "id": "splice",
+      "type": "GRAPH_SPLICE",
+      "params": {
+        "method": "replace_subgraph"
+      }
+    },
+    {
+      "id": "commit",
+      "type": "GRAPH_COMMIT"
+    },
+    {
+      "id": "nso_modify",
+      "type": "NSO_MODIFY",
+      "params": {
+        "target": "self_code"
+      }
+    },
+    {
+      "id": "ethical_label",
+      "type": "ETHICAL_LABEL",
+      "params": {
+        "label": "unknown"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": {
+        "node": "pattern_input",
+        "port": "value"
+      },
+      "to": {
+        "node": "pat",
+        "port": "pattern_in"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "pat",
+        "port": "pattern_out"
+      },
+      "to": {
+        "node": "find",
+        "port": "pattern_in"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "target_graph_input",
+        "port": "value"
+      },
+      "to": {
+        "node": "find",
+        "port": "graph_ref"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "find",
+        "port": "match_out"
+      },
+      "to": {
+        "node": "splice",
+        "port": "match_in"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "template_input",
+        "port": "value"
+      },
+      "to": {
+        "node": "splice",
+        "port": "template_in"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "splice",
+        "port": "graph_out"
+      },
+      "to": {
+        "node": "commit",
+        "port": "graph_in"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "find_contract",
+        "port": "apply"
+      },
+      "to": {
+        "node": "find",
+        "port": "contract_in"
+      },
+      "kind": "contract_binding"
+    },
+    {
+      "from": {
+        "node": "nso_modify",
+        "port": "nso_out"
+      },
+      "to": {
+        "node": "commit",
+        "port": "nso_in"
+      },
+      "kind": "nso_binding"
+    },
+    {
+      "from": {
+        "node": "ethical_label",
+        "port": "label_out"
+      },
+      "to": {
+        "node": "commit",
+        "port": "label_in"
+      },
+      "kind": "ethics_binding"
+    }
+  ]
+}

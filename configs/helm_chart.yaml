@@ -1,0 +1,104 @@
+# graphix-arena-dev.yaml
+# One-file, dev-friendly manifest: Namespace + Deployment + Service.
+# Defaults are lightweight, with probes and sensible resources for local/dev clusters.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    env: dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphix-arena
+  namespace: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graphix-arena
+      app.kubernetes.io/instance: dev
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: graphix-arena
+        app.kubernetes.io/instance: dev
+    spec:
+      containers:
+        - name: graphix-arena
+          image: graphix/graphix-arena:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8181
+              protocol: TCP
+          env:
+            - name: ARENA_MODE
+              value: "dev"
+            - name: GRAPHIX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: graphix-api-secret
+                  key: api-key
+            # Add anything else you need here:
+            # - name: REGISTRY_ENDPOINT
+            #   value: "http://graphix-registry.dev.svc:8787"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8181
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8181
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          # Uncomment if you need files, creds, etc.
+          # volumeMounts:
+          #   - name: config
+          #     mountPath: /app/config
+      # volumes:
+      #   - name: config
+      #     configMap:
+      #       name: graphix-arena-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphix-arena
+  namespace: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+spec:
+  selector:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+  # For easy access from your laptop on minikube/kind, use NodePort.
+  # If you're on a cloud dev cluster with ingress, switch to ClusterIP.
+  type: NodePort
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8181
+      targetPort: 8181
+      nodePort: 30181

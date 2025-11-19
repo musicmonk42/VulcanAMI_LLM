@@ -1,0 +1,1046 @@
+version: "v4.6"
+schema_version: "2.0"
+configuration_name: "vulcan_llm_vector_store"
+last_updated: "2025-11-15"
+
+# ============================================================================
+# GLOBAL METADATA AND DOCUMENTATION
+# ============================================================================
+metadata:
+  project: "Vulcan LLM Vector Database"
+  owner: "VulcanAMI Team"
+  environment: "production"
+  region: "primary"
+  compliance:
+    - "SOC2"
+    - "GDPR"
+    - "HIPAA"
+  documentation_url: "https://docs.vulcanami.io/vector-store"
+  support_contact: "vectordb-support@vulcanami.io"
+
+# ============================================================================
+# GLOBAL DEFAULTS AND SCHEMA CONFIGURATION
+# ============================================================================
+defaults:
+  metric_type: "COSINE"
+  dim: 1536
+  pk_field: "id"
+  vec_field: "embedding"
+  enable_dynamic_field: true
+  consistency_level: "Strong"
+  
+  # Primary Key Configuration
+  pk_config:
+    type: "VARCHAR"
+    max_length: 256
+    auto_id: false
+    is_primary: true
+    description: "Unique identifier for each vector entry"
+  
+  # Vector Field Configuration
+  vector_config:
+    type: "FLOAT_VECTOR"
+    description: "Embedding vector representation"
+    normalize: true
+    validate_dimensions: true
+  
+  # Standard Metadata Fields
+  extra_fields:
+    - name: "age_days"
+      type: "INT64"
+      description: "Age of the document in days since creation"
+      indexed: true
+      default_value: 0
+      
+    - name: "dqs"
+      type: "FLOAT"
+      description: "Data Quality Score (0.0-1.0)"
+      indexed: true
+      range: [0.0, 1.0]
+      default_value: 1.0
+      
+    - name: "tenant"
+      type: "VARCHAR"
+      max_length: 128
+      description: "Tenant identifier for multi-tenancy support"
+      indexed: true
+      partition_key: true
+      
+    - name: "domain"
+      type: "VARCHAR"
+      max_length: 128
+      description: "Domain or category classification"
+      indexed: true
+      
+    - name: "created_at"
+      type: "INT64"
+      description: "Unix timestamp of document creation"
+      indexed: true
+      
+    - name: "updated_at"
+      type: "INT64"
+      description: "Unix timestamp of last update"
+      indexed: true
+      
+    - name: "document_id"
+      type: "VARCHAR"
+      max_length: 256
+      description: "Original document identifier"
+      indexed: true
+      
+    - name: "chunk_index"
+      type: "INT32"
+      description: "Chunk sequence number for multi-chunk documents"
+      indexed: true
+      default_value: 0
+      
+    - name: "total_chunks"
+      type: "INT32"
+      description: "Total number of chunks in the document"
+      default_value: 1
+      
+    - name: "source_url"
+      type: "VARCHAR"
+      max_length: 1024
+      description: "Original source URL or path"
+      
+    - name: "content_hash"
+      type: "VARCHAR"
+      max_length: 64
+      description: "SHA256 hash of content for deduplication"
+      indexed: true
+      
+    - name: "language"
+      type: "VARCHAR"
+      max_length: 16
+      description: "ISO 639-1 language code"
+      indexed: true
+      default_value: "en"
+      
+    - name: "content_type"
+      type: "VARCHAR"
+      max_length: 64
+      description: "MIME type of original content"
+      
+    - name: "tags"
+      type: "JSON"
+      description: "Flexible tags and metadata in JSON format"
+      
+    - name: "access_level"
+      type: "INT32"
+      description: "Access control level (0=public, 1-10=restricted)"
+      indexed: true
+      default_value: 0
+      
+    - name: "embedding_model"
+      type: "VARCHAR"
+      max_length: 128
+      description: "Model used to generate embeddings"
+      indexed: true
+      default_value: "text-embedding-ada-002"
+      
+    - name: "embedding_version"
+      type: "VARCHAR"
+      max_length: 32
+      description: "Version of the embedding model"
+      default_value: "v1"
+      
+    - name: "relevance_score"
+      type: "FLOAT"
+      description: "Pre-computed relevance or importance score"
+      indexed: true
+      range: [0.0, 1.0]
+      
+    - name: "view_count"
+      type: "INT64"
+      description: "Number of times this vector was retrieved"
+      default_value: 0
+      
+    - name: "last_accessed"
+      type: "INT64"
+      description: "Unix timestamp of last access"
+      
+    - name: "retention_policy"
+      type: "VARCHAR"
+      max_length: 64
+      description: "Data retention policy identifier"
+      default_value: "standard"
+      
+    - name: "is_deleted"
+      type: "BOOL"
+      description: "Soft delete flag"
+      indexed: true
+      default_value: false
+      
+    - name: "parent_id"
+      type: "VARCHAR"
+      max_length: 256
+      description: "Parent document ID for hierarchical relationships"
+
+# ============================================================================
+# RESOURCE POOL CONFIGURATION
+# ============================================================================
+resource_pools:
+  hot_pool:
+    name: "hot_data_pool"
+    description: "High-performance pool for frequently accessed data"
+    cpu_cores: 16
+    memory_gb: 64
+    gpu_enabled: true
+    gpu_count: 2
+    storage_type: "nvme_ssd"
+    iops_limit: 100000
+    
+  warm_pool:
+    name: "warm_data_pool"
+    description: "Balanced pool for moderately accessed data"
+    cpu_cores: 8
+    memory_gb: 32
+    storage_type: "ssd"
+    iops_limit: 50000
+    
+  cold_pool:
+    name: "cold_data_pool"
+    description: "Cost-optimized pool for infrequently accessed data"
+    cpu_cores: 4
+    memory_gb: 16
+    storage_type: "hdd"
+    iops_limit: 5000
+    
+  archive_pool:
+    name: "archive_data_pool"
+    description: "Long-term storage pool with minimal access"
+    cpu_cores: 2
+    memory_gb: 8
+    storage_type: "object_storage"
+    compression_enabled: true
+
+# ============================================================================
+# SECURITY CONFIGURATION (FIXED)
+# ============================================================================
+security:
+  enabled: true
+  
+  encryption:
+    at_rest:
+      enabled: true
+      algorithm: "AES-256-GCM"
+      key_rotation_days: 90
+      kms_provider: "aws"
+      
+    in_transit:
+      enabled: true
+      protocol: "TLS 1.3"
+      cipher_suites:
+        - "TLS_AES_256_GCM_SHA384"
+        - "TLS_AES_128_GCM_SHA256"
+      certificate_validation: true
+      
+  authentication:
+    enabled: true
+    method: "jwt"
+    providers:
+      - "oauth2"
+      - "saml"
+      - "api_key"
+    mfa_enabled: true
+    session_timeout_minutes: 60
+    
+  authorization:
+    enabled: true
+    rbac_enabled: true
+    default_role: "viewer"
+    roles:
+      - name: "admin"
+        permissions: ["read", "write", "delete", "manage"]
+      - name: "writer"
+        permissions: ["read", "write"]
+      - name: "viewer"
+        permissions: ["read"]
+        
+  audit_logging:
+    enabled: true
+    log_level: "INFO"
+    retention_days: 365
+    sensitive_data_masking: true
+    
+  network_security:
+    ip_whitelist_enabled: false
+    ip_whitelist: []
+    rate_limiting:
+      enabled: true
+      requests_per_minute: 1000
+      burst_size: 100
+    ddos_protection: true
+
+# ============================================================================
+# TIERED STORAGE CONFIGURATION
+# ============================================================================
+tiers:
+  # --------------------------------------------------------------------------
+  # TIER S: Ultra-Premium (0-3 days)
+  # --------------------------------------------------------------------------
+  - name: "S_ultra"
+    description: "0-3 days: FP32 + GPU-accelerated HNSW + Real-time indexing"
+    collection: "v46_tier_S_ultra"
+    age_range:
+      min_days: 0
+      max_days: 3
+    priority: "critical"
+    resource_pool: "hot_pool"
+    
+    index:
+      type: "GPU_IVF_PQ"
+      params:
+        nlist: 8192
+        m: 64
+        nbits: 8
+        gpu_id: 0
+        use_raft: true
+        build_algo: "IVF_PQ"
+        search_algo: "IVF_PQ"
+        
+    quantization: "FP32"
+    compression: "none"
+    
+    performance:
+      recall_at_1_target: 0.999
+      recall_at_10_target: 0.995
+      recall_at_50_target: 0.993
+      recall_at_100_target: 0.991
+      latency_p50_ms: 5
+      latency_p95_ms: 15
+      latency_p99_ms: 25
+      throughput_qps: 10000
+      
+    cache:
+      enabled: true
+      type: "gpu_memory"
+      size_gb: 32
+      eviction_policy: "lru"
+      warm_up_enabled: true
+      
+    replication:
+      enabled: true
+      replicas: 3
+      sync_mode: "strong"
+      geo_redundancy: true
+      regions: ["us-east-1", "us-west-2", "eu-west-1"]
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 10
+      alert_on_recall_drop: true
+      alert_threshold: 0.990
+      
+  # --------------------------------------------------------------------------
+  # TIER A+: Premium (4-7 days)
+  # --------------------------------------------------------------------------
+  - name: "A_plus"
+    description: "4-7 days: FP16 + HNSW + Rotational 8-bit quantization with rescore"
+    collection: "v46_tier_A_plus"
+    age_range:
+      min_days: 4
+      max_days: 7
+    priority: "high"
+    resource_pool: "hot_pool"
+    
+    index:
+      type: "HNSW"
+      params:
+        M: 48
+        efConstruction: 400
+        ef: 200
+        
+    # Note: Custom quantization - experimental feature
+    quantization: "FP16"  # Changed from custom "FP16+rot-8bit" to standard FP16
+    compression: "none"
+    
+    performance:
+      recall_at_1_target: 0.997
+      recall_at_10_target: 0.992
+      recall_at_50_target: 0.990
+      recall_at_100_target: 0.988
+      latency_p50_ms: 8
+      latency_p95_ms: 20
+      latency_p99_ms: 35
+      throughput_qps: 8000
+      
+    cache:
+      enabled: true
+      type: "memory"
+      size_gb: 16
+      eviction_policy: "lfu"
+      
+    replication:
+      enabled: true
+      replicas: 3
+      sync_mode: "eventual"
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 30
+      alert_on_recall_drop: true
+      alert_threshold: 0.985
+      
+  # --------------------------------------------------------------------------
+  # TIER A: High-Performance (8-14 days)
+  # --------------------------------------------------------------------------
+  - name: "A"
+    description: "8-14 days: FP16 + HNSW with optimized parameters"
+    collection: "v46_tier_A"
+    age_range:
+      min_days: 8
+      max_days: 14
+    priority: "high"
+    resource_pool: "hot_pool"
+    
+    index:
+      type: "HNSW"
+      params:
+        M: 32
+        efConstruction: 300
+        ef: 150
+        
+    quantization: "FP16"
+    compression: "none"
+    
+    performance:
+      recall_at_1_target: 0.995
+      recall_at_10_target: 0.987
+      recall_at_50_target: 0.985
+      recall_at_100_target: 0.983
+      latency_p50_ms: 12
+      latency_p95_ms: 30
+      latency_p99_ms: 50
+      throughput_qps: 6000
+      
+    cache:
+      enabled: true
+      type: "memory"
+      size_gb: 8
+      eviction_policy: "lru"
+      
+    replication:
+      enabled: true
+      replicas: 2
+      sync_mode: "eventual"
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 60
+      alert_on_recall_drop: true
+      alert_threshold: 0.980
+      
+  # --------------------------------------------------------------------------
+  # TIER B: Balanced (15-60 days)
+  # --------------------------------------------------------------------------
+  - name: "B"
+    description: "15-60 days: INT8 quantization + IVF_FLAT"
+    collection: "v46_tier_B"
+    age_range:
+      min_days: 15
+      max_days: 60
+    priority: "normal"
+    resource_pool: "warm_pool"
+    
+    index:
+      type: "IVF_FLAT"
+      params:
+        nlist: 4096
+        nprobe: 128
+        
+    quantization: "INT8"  # Changed from custom "rot-8bit" to standard INT8
+    compression: "none"
+    
+    performance:
+      recall_at_1_target: 0.990
+      recall_at_10_target: 0.980
+      recall_at_50_target: 0.978
+      recall_at_100_target: 0.976
+      latency_p50_ms: 20
+      latency_p95_ms: 50
+      latency_p99_ms: 80
+      throughput_qps: 4000
+      
+    cache:
+      enabled: true
+      type: "memory"
+      size_gb: 4
+      eviction_policy: "lru"
+      
+    replication:
+      enabled: true
+      replicas: 2
+      sync_mode: "eventual"
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 120
+      alert_on_recall_drop: true
+      alert_threshold: 0.975
+      
+  # --------------------------------------------------------------------------
+  # TIER C: Cost-Optimized (61-180 days)
+  # --------------------------------------------------------------------------
+  - name: "C"
+    description: "61-180 days: INT8 + DISKANN for disk-backed search"
+    collection: "v46_tier_C"
+    age_range:
+      min_days: 61
+      max_days: 180
+    priority: "low"
+    resource_pool: "warm_pool"
+    
+    index:
+      type: "DISKANN"
+      params:
+        search_l: 100
+        build_l: 200
+        max_degree: 64
+        
+    quantization: "INT8"  # Changed from custom "int4+ecc" to standard INT8
+    compression:
+      type: "zstd"
+      level: 3
+    
+    performance:
+      recall_at_1_target: 0.985
+      recall_at_10_target: 0.975
+      recall_at_50_target: 0.973
+      recall_at_100_target: 0.970
+      latency_p50_ms: 35
+      latency_p95_ms: 80
+      latency_p99_ms: 120
+      throughput_qps: 2000
+      
+    cache:
+      enabled: true
+      type: "disk"
+      size_gb: 8
+      eviction_policy: "lru"
+      
+    replication:
+      enabled: true
+      replicas: 1
+      sync_mode: "eventual"
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 300
+      alert_on_recall_drop: true
+      alert_threshold: 0.970
+      
+  # --------------------------------------------------------------------------
+  # TIER D: Cold Storage (181-365 days)
+  # --------------------------------------------------------------------------
+  - name: "D"
+    description: "181-365 days: INT8 quantization + IVF_PQ"
+    collection: "v46_tier_D"
+    age_range:
+      min_days: 181
+      max_days: 365
+    priority: "low"
+    resource_pool: "cold_pool"
+    
+    index:
+      type: "IVF_PQ"
+      params:
+        nlist: 2048
+        m: 32
+        nbits: 8
+        nprobe: 64
+        
+    quantization: "INT8"  # Changed from custom "int2" to standard INT8
+    compression:
+      type: "zstd"
+      level: 6
+    
+    performance:
+      recall_at_1_target: 0.975
+      recall_at_10_target: 0.965
+      recall_at_50_target: 0.962
+      recall_at_100_target: 0.960
+      latency_p50_ms: 80
+      latency_p95_ms: 200
+      latency_p99_ms: 400
+      throughput_qps: 500
+      
+    cache:
+      enabled: false
+      
+    replication:
+      enabled: true
+      replicas: 1
+      sync_mode: "eventual"
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 600
+      alert_on_recall_drop: true
+      alert_threshold: 0.960
+      
+  # --------------------------------------------------------------------------
+  # TIER E: Archive (366-730 days)
+  # --------------------------------------------------------------------------
+  - name: "E_archive"
+    description: "366-730 days: Binary quantization + FLAT index"
+    collection: "v46_tier_E_archive"
+    age_range:
+      min_days: 366
+      max_days: 730
+    priority: "minimal"
+    resource_pool: "archive_pool"
+    
+    index:
+      type: "FLAT"
+      params: {}
+      
+    quantization: "BINARY"  # Changed from lowercase "binary" to standard BINARY
+    compression:
+      type: "zstd"
+      level: 9
+    
+    performance:
+      recall_at_1_target: 0.960
+      recall_at_10_target: 0.945
+      recall_at_50_target: 0.942
+      recall_at_100_target: 0.940
+      latency_p50_ms: 200
+      latency_p95_ms: 500
+      latency_p99_ms: 1000
+      throughput_qps: 50
+      
+    cache:
+      enabled: false
+      
+    replication:
+      enabled: false
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 1800
+      alert_on_recall_drop: true
+      alert_threshold: 0.940
+      
+  # --------------------------------------------------------------------------
+  # TIER F: Deep Archive (730+ days)
+  # --------------------------------------------------------------------------
+  - name: "F_deep_archive"
+    description: "730+ days: Binary quantization + Object storage"
+    collection: "v46_tier_F_deep_archive"
+    age_range:
+      min_days: 730
+      max_days: "inf"
+    priority: "minimal"
+    resource_pool: "archive_pool"
+    
+    index:
+      type: "FLAT"
+      params: {}
+      
+    quantization: "BINARY"  # Changed from lowercase "binary" to standard BINARY
+    compression:
+      type: "gzip"
+      level: 9
+    
+    performance:
+      recall_at_1_target: 0.930
+      recall_at_10_target: 0.915
+      recall_at_50_target: 0.912
+      recall_at_100_target: 0.910
+      latency_p50_ms: 1000
+      latency_p95_ms: 5000
+      latency_p99_ms: 10000
+      throughput_qps: 10
+      
+    cache:
+      enabled: false
+      
+    replication:
+      enabled: false
+      
+    monitoring:
+      enabled: true
+      metrics_interval_seconds: 3600
+      alert_on_recall_drop: true
+      alert_threshold: 0.900
+
+# ============================================================================
+# BACKUP AND RECOVERY CONFIGURATION (FIXED - Previously missing)
+# ============================================================================
+backup_recovery:
+  enabled: true
+  
+  schedules:
+    - name: "hourly_incremental"
+      type: "incremental"
+      frequency_hours: 1
+      retention_count: 48
+      tiers: ["S_ultra", "A_plus", "A"]
+      
+    - name: "daily_incremental"
+      type: "incremental"
+      frequency_hours: 24
+      retention_count: 30
+      tiers: ["all"]
+      
+    - name: "weekly_full"
+      type: "full"
+      frequency_hours: 168
+      retention_count: 12
+      tiers: ["all"]
+      
+    - name: "monthly_full"
+      type: "full"
+      frequency_hours: 720
+      retention_count: 12
+      tiers: ["all"]
+      
+  storage:
+    provider: "s3"
+    bucket: "vulcan-vectors-backups"
+    storage_class: "STANDARD_IA"
+    encryption: true
+    cross_region_replication:
+      enabled: true
+      destination_regions: ["us-west-2", "eu-west-1"]
+    
+  disaster_recovery:
+    enabled: true
+    rpo_minutes: 60
+    rto_minutes: 240
+    
+    failover:
+      automatic: true
+      health_check_interval_seconds: 30
+      failure_threshold: 3
+      
+    geo_redundancy:
+      enabled: true
+      primary_region: "us-east-1"
+      secondary_regions: ["us-west-2", "eu-west-1"]
+      
+    testing:
+      enabled: true
+      frequency_days: 90
+      notification_emails:
+        - "dr-team@vulcanami.io"
+        - "ops-team@vulcanami.io"
+
+# ============================================================================
+# PERFORMANCE TUNING (OPTIMIZED)
+# ============================================================================
+performance_tuning:
+  memory:
+    buffer_pool_size_gb: 64
+    query_memory_limit_gb: 16
+    insert_buffer_size_mb: 512
+    
+  concurrency:
+    max_concurrent_queries: 500  # Reduced from 1000 for stability
+    max_concurrent_inserts: 50   # Reduced from 100 for stability
+    max_concurrent_deletes: 25   # Reduced from 50 for stability
+    thread_pool_size: 128        # Increased from 64 for better throughput
+    
+  io_optimization:
+    read_ahead_kb: 1024
+    write_buffer_kb: 512
+    io_scheduler: "deadline"
+    direct_io_enabled: true
+    
+  network:
+    tcp_keepalive_enabled: true
+    tcp_nodelay: true
+    max_connections: 10000
+    connection_pool_size: 100
+
+# ============================================================================
+# COST OPTIMIZATION
+# ============================================================================
+cost_optimization:
+  enabled: true
+  
+  compute:
+    auto_scaling_enabled: true
+    min_instances: 2
+    max_instances: 20
+    scale_up_threshold: 0.75
+    scale_down_threshold: 0.25
+    cooldown_minutes: 10
+    
+  storage:
+    tiering_enabled: true
+    compression_enabled: true
+    deduplication_enabled: true
+    
+    lifecycle_transitions:
+      - from_tier: "B"
+        to_tier: "C"
+        after_days: 60
+        
+      - from_tier: "C"
+        to_tier: "D"
+        after_days: 180
+        
+      - from_tier: "D"
+        to_tier: "E_archive"
+        after_days: 365
+        
+      - from_tier: "E_archive"
+        to_tier: "F_deep_archive"
+        after_days: 730
+        
+  resource_scheduling:
+    off_peak_compute_reduction: 0.5
+    off_peak_hours: ["22:00-06:00"]
+    off_peak_days: ["saturday", "sunday"]
+
+# ============================================================================
+# MAINTENANCE AND OPERATIONS
+# ============================================================================
+maintenance:
+  scheduled_maintenance:
+    enabled: true
+    window_start: "02:00"
+    window_duration_hours: 4
+    day_of_week: "sunday"
+    
+  automatic_tasks:
+    - name: "index_optimization"
+      enabled: true
+      frequency_hours: 24
+      
+    - name: "statistics_update"
+      enabled: true
+      frequency_hours: 6
+      
+    - name: "vacuum"
+      enabled: true
+      frequency_hours: 168
+      
+    - name: "compact"
+      enabled: true
+      frequency_hours: 168
+      threshold: 0.3
+      
+    - name: "backup_verification"
+      enabled: true
+      frequency_hours: 24
+      
+  health_checks:
+    enabled: true
+    interval_seconds: 60
+    
+    checks:
+      - name: "connectivity"
+        timeout_seconds: 5
+        
+      - name: "disk_space"
+        threshold: 0.90
+        
+      - name: "memory_usage"
+        threshold: 0.85
+        
+      - name: "query_success_rate"
+        threshold: 0.99
+        
+      - name: "backup_status"
+        threshold: 0.95
+
+# ============================================================================
+# EXPERIMENTATION AND A/B TESTING
+# ============================================================================
+experimentation:
+  enabled: true
+  
+  experiments:
+    - name: "quantization_comparison"
+      description: "Compare FP16 vs INT8 quantization performance"
+      enabled: false
+      traffic_split: 0.1
+      
+    - name: "index_parameter_tuning"
+      description: "Test different HNSW parameters"
+      enabled: false
+      traffic_split: 0.05
+
+# ============================================================================
+# INTEGRATION CONFIGURATION
+# ============================================================================
+integrations:
+  observability:
+    - name: "prometheus"
+      enabled: true
+      endpoint: "http://prometheus:9090"
+      scrape_interval_seconds: 30
+      
+    - name: "grafana"
+      enabled: true
+      endpoint: "http://grafana:3000"
+      dashboard_ids:
+        - "vulcan-vectors-overview"
+        - "vulcan-vectors-performance"
+        - "vulcan-vectors-costs"
+      
+    - name: "datadog"
+      enabled: true
+      api_key_env: "DATADOG_API_KEY"
+      tags:
+        - "service:vulcan-vectors"
+        - "env:production"
+      
+  logging:
+    - name: "elasticsearch"
+      enabled: true
+      endpoint: "http://elasticsearch:9200"
+      index_pattern: "vulcan-vectors-logs"
+      retention_days: 30
+      
+    - name: "cloudwatch"
+      enabled: true
+      log_group: "/vulcan/vector-store"
+      retention_days: 90
+      
+  tracing:
+    - name: "jaeger"
+      enabled: true
+      endpoint: "http://jaeger:14268"
+      sampling_rate: 0.1
+      
+  alerting:
+    - name: "pagerduty"
+      enabled: true
+      api_key_env: "PAGERDUTY_API_KEY"
+      service_id: "vulcan-vectors"
+      
+    - name: "slack"
+      enabled: true
+      webhook_url_env: "SLACK_WEBHOOK_URL"
+      channel: "#vulcan-alerts"
+
+# ============================================================================
+# ADVANCED FEATURES
+# ============================================================================
+advanced_features:
+  hybrid_search:
+    enabled: true
+    sparse_vector_support: true
+    keyword_search_weight: 0.3
+    vector_search_weight: 0.7
+    
+  multi_vector:
+    enabled: true
+    max_vectors_per_document: 5
+    fusion_strategy: "reciprocal_rank"
+    
+  filtering:
+    pre_filter_enabled: true
+    post_filter_enabled: true
+    filter_optimization: true
+    
+  ranking:
+    enable_learning_to_rank: true
+    custom_ranking_functions: true
+    
+  semantic_cache:
+    enabled: true
+    similarity_threshold: 0.95
+    cache_size_gb: 8
+    ttl_seconds: 3600
+
+# ============================================================================
+# COMPLIANCE AND GOVERNANCE
+# ============================================================================
+compliance:
+  data_residency:
+    enabled: true
+    allowed_regions: ["us-east-1", "us-west-2", "eu-west-1"]
+    
+  data_retention:
+    enforce_policies: true
+    audit_trail: true
+    default_retention_days: 2555
+    
+    policies:
+      - name: "standard"
+        retention_days: 2555
+        applies_to: ["all"]
+        
+      - name: "regulatory"
+        retention_days: 2920
+        applies_to: ["financial", "healthcare"]
+        
+      - name: "ephemeral"
+        retention_days: 30
+        applies_to: ["temporary", "test"]
+    
+  privacy:
+    pii_detection: true
+    pii_masking: true
+    anonymization: true
+    right_to_be_forgotten: true
+    
+  regulatory:
+    gdpr_compliant: true
+    hipaa_compliant: true
+    soc2_compliant: true
+    
+  audit:
+    enabled: true
+    log_all_access: true
+    log_all_modifications: true
+    retention_years: 7
+    immutable_storage: true
+
+# ============================================================================
+# DOCUMENTATION AND METADATA
+# ============================================================================
+documentation:
+  schema_documentation: |
+    Vulcan LLM Vector Store Schema
+    ================================
+    
+    This configuration defines a comprehensive multi-tier vector storage system
+    optimized for embedding-based semantic search with automatic lifecycle
+    management, performance optimization, and cost control.
+    
+    Tier Overview:
+    - S_ultra (0-3d): GPU-accelerated, highest precision
+    - A+ (4-7d): Premium performance with quantization
+    - A (8-14d): High performance
+    - B (15-60d): Balanced performance/cost
+    - C (61-180d): Cost-optimized with disk backing
+    - D (181-365d): Cold storage
+    - E (366-730d): Archive storage
+    - F (730+d): Deep archive
+    
+    For detailed documentation, visit: https://docs.vulcanami.io
+    
+  change_log:
+    - version: "4.6.1"
+      date: "2025-11-15"
+      changes:
+        - "Fixed security configuration structure"
+        - "Added comprehensive backup and recovery configuration"
+        - "Standardized quantization types to supported values"
+        - "Optimized thread pool configuration"
+        - "Added disaster recovery testing procedures"
+        - "Enhanced compliance and audit settings"
+        
+    - version: "4.6.0"
+      date: "2025-11-14"
+      changes:
+        - "Added S_ultra tier for ultra-fresh data"
+        - "Implemented GPU-accelerated indexing"
+        - "Enhanced quantization strategies"
+        - "Added comprehensive monitoring"
+        - "Implemented automatic lifecycle management"
+        - "Added deep archive tier"
+        - "Enhanced security and compliance features"
+        
+  contact:
+    support_email: "vectordb-support@vulcanami.io"
+    documentation: "https://docs.vulcanami.io/vector-store"
+    slack_channel: "#vectordb-support"
+    on_call_rotation: "vulcan-vectors-oncall"

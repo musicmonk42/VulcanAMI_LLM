@@ -1,0 +1,96 @@
+{
+  "grammar_version": "1.0.0",
+  "id": "ai_native_core_v1.0.0",
+  "type": "Graph",
+  "metadata": {
+    "author": "agent-grok",
+    "timestamp": "2025-08-25T00:00:00Z",
+    "version": "1.0.0",
+    "explanation": "Core meta-graph for AI computations"
+  },
+  "manifest": {
+    "type_system": {
+      "node_types": {
+        "InputNode": {
+          "schema": "https://graphix.ai/schema/InputNode.json",
+          "description": "Node for data input"
+        },
+        "OutputNode": {
+          "schema": "https://graphix.ai/schema/OutputNode.json",
+          "description": "Node for data output"
+        },
+        "GenerativeNode": {
+          "schema": "https://graphix.ai/schema/GenerativeNode.json",
+          "description": "Node for AI-generated output"
+        },
+        "MetaNode": {
+          "schema": "https://graphix.ai/schema/MetaNode.json",
+          "description": "Node for meta-control"
+        }
+      },
+      "edge_types": {
+        "data": {
+          "schema": "https://graphix.ai/schema/EdgeData.json",
+          "description": "Data flow between nodes"
+        },
+        "control": {
+          "schema": "https://graphix.ai/schema/EdgeControl.json",
+          "description": "Control flow between nodes"
+        }
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "InputNode",
+      "metadata": {
+        "explanation": "Provides input data"
+      },
+      "params": {}
+    },
+    {
+      "id": "gen_pipeline_node",
+      "type": "GenerativeNode",
+      "metadata": {
+        "explanation": "Generative pipeline"
+      },
+      "params": {
+        "prompt": "Generate AI output based on input"
+      }
+    },
+    {
+      "id": "meta_node",
+      "type": "MetaNode",
+      "metadata": {
+        "explanation": "Meta control node"
+      },
+      "params": {}
+    },
+    {
+      "id": "output_node",
+      "type": "OutputNode",
+      "metadata": {
+        "explanation": "Outputs final result"
+      },
+      "params": {}
+    }
+  ],
+  "edges": [
+    {
+      "from": "input_node",
+      "to": "gen_pipeline_node",
+      "type": "data"
+    },
+    {
+      "from": "gen_pipeline_node",
+      "to": "meta_node",
+      "type": "control"
+    },
+    {
+      "from": "meta_node",
+      "to": "output_node",
+      "type": "data"
+    }
+  ]
+}

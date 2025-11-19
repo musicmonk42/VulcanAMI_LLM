@@ -1,0 +1,833 @@
+################################################################################
+# VulcanAMI Development Environment - Docker Compose
+# Version: 4.6.0
+# Description: Complete development stack with all services, monitoring,
+#              and development tools
+################################################################################
+
+version: "3.9"
+
+################################################################################
+# Networks
+################################################################################
+
+networks:
+  vulcanami-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+  
+  monitoring-network:
+    driver: bridge
+    internal: false
+  
+  storage-network:
+    driver: bridge
+    internal: true
+
+################################################################################
+# Volumes
+################################################################################
+
+volumes:
+  # Storage
+  minio_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  milvus_data:
+    driver: local
+  
+  # Monitoring
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  
+  # Caching
+  nginx_cache_hot:
+    driver: local
+  nginx_cache_warm:
+    driver: local
+  nginx_cache_cold:
+    driver: local
+  
+  # Logs
+  logs:
+    driver: local
+
+################################################################################
+# Services
+################################################################################
+
+services:
+  
+  ############################################################################
+  # Storage Services
+  ############################################################################
+  
+  # MinIO Object Storage (S3-compatible)
+  minio:
+    image: minio/minio:RELEASE.2025-01-10T00-00-00Z
+    container_name: vulcanami-minio
+    hostname: minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - MINIO_REGION_NAME=us-east-1
+      - MINIO_BROWSER_REDIRECT_URL=http://localhost:9001
+      - MINIO_SERVER_URL=http://localhost:9000
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
+      - MINIO_PROMETHEUS_URL=http://prometheus:9090
+      - MINIO_PROMETHEUS_JOB_ID=minio-metrics
+    ports:
+      - "9000:9000"    # API
+      - "9001:9001"    # Console
+    volumes:
+      - minio_data:/data
+      - ./configs/minio:/root/.minio:rw
+    networks:
+      - vulcanami-network
+      - storage-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=storage"
+      - "com.vulcanami.type=object-storage"
+  
+  # MinIO Bucket Initialization
+  minio-init:
+    image: minio/mc:RELEASE.2025-01-10T00-00-00Z
+    container_name: vulcanami-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin123;
+      mc mb --ignore-existing myminio/vulcanami-hot;
+      mc mb --ignore-existing myminio/vulcanami-warm;
+      mc mb --ignore-existing myminio/vulcanami-cold;
+      mc mb --ignore-existing myminio/vulcanami-archive;
+      mc mb --ignore-existing myminio/vulcanami-logs;
+      mc mb --ignore-existing myminio/vulcanami-backups;
+      mc policy set download myminio/vulcanami-hot;
+      mc policy set download myminio/vulcanami-warm;
+      mc ilm rule add --expire-days 90 myminio/vulcanami-warm;
+      mc ilm rule add --expire-days 365 myminio/vulcanami-cold;
+      mc tag set myminio/vulcanami-hot 'tier=hot' 'environment=dev';
+      mc tag set myminio/vulcanami-warm 'tier=warm' 'environment=dev';
+      mc tag set myminio/vulcanami-cold 'tier=cold' 'environment=dev';
+      echo 'MinIO buckets initialized successfully';
+      "
+    networks:
+      - vulcanami-network
+  
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: vulcanami-postgres
+    hostname: postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-vulcanami}
+      - POSTGRES_USER=${POSTGRES_USER:-vulcanami}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vulcanami_dev_password}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./docker/postgres/postgres.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      - vulcanami-network
+      - storage-network
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vulcanami"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=database"
+      - "com.vulcanami.type=postgres"
+  
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: vulcanami-redis
+    hostname: redis
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./configs/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./configs/redis/keys_ttl.yml:/etc/redis/keys_ttl.yml:ro
+    networks:
+      - vulcanami-network
+      - storage-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=cache"
+      - "com.vulcanami.type=redis"
+  
+  # Redis Exporter for Prometheus
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    container_name: vulcanami-redis-exporter
+    hostname: redis-exporter
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    env_file:
+      - ./configs/redis/exporter.env
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+      - monitoring-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=monitoring"
+      - "com.vulcanami.type=exporter"
+  
+  # Milvus Vector Database
+  milvus-etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: vulcanami-milvus-etcd
+    hostname: milvus-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - storage-network
+    restart: unless-stopped
+  
+  milvus-minio:
+    image: minio/minio:RELEASE.2025-01-10T00-00-00Z
+    container_name: vulcanami-milvus-minio
+    hostname: milvus-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    networks:
+      - storage-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+  
+  milvus:
+    image: milvusdb/milvus:v2.4.6
+    container_name: vulcanami-milvus
+    hostname: milvus
+    environment:
+      - ETCD_ENDPOINTS=milvus-etcd:2379
+      - MINIO_ADDRESS=milvus-minio:9000
+      - MINIO_ACCESS_KEY_ID=minioadmin
+      - MINIO_SECRET_ACCESS_KEY=minioadmin
+      - common.security.authorizationEnabled=true
+    ports:
+      - "19530:19530"  # gRPC
+      - "9091:9091"    # Metrics
+    volumes:
+      - milvus_data:/var/lib/milvus
+      - ./configs/milvus/milvus.yaml:/milvus/configs/milvus.yaml:ro
+    depends_on:
+      - milvus-etcd
+      - milvus-minio
+    networks:
+      - vulcanami-network
+      - storage-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=vector-db"
+      - "com.vulcanami.type=milvus"
+  
+  ############################################################################
+  # VulcanAMI Core Services
+  ############################################################################
+  
+  # Data Quality System (DQS)
+  dqs-service:
+    build:
+      context: .
+      dockerfile: ./docker/dqs/Dockerfile
+    container_name: vulcanami-dqs
+    hostname: dqs-service
+    environment:
+      - ENVIRONMENT=development
+      - VERSION=4.6.0
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=vulcanami
+      - POSTGRES_USER=vulcanami
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vulcanami_dev_password}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=1
+      - DQS_CONFIG=/etc/dqs/classifier.json
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8080:8080"  # API
+      - "9145:9145"  # Metrics
+    volumes:
+      - ./configs/dqs:/etc/dqs:ro
+      - logs:/var/log/dqs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    labels:
+      - "com.vulcanami.service=dqs"
+      - "com.vulcanami.type=core"
+  
+  # OPA Policy Engine
+  opa-service:
+    image: openpolicyagent/opa:0.65.0
+    container_name: vulcanami-opa
+    hostname: opa-service
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--diagnostic-addr=0.0.0.0:8282"
+      - "--log-level=info"
+      - "--log-format=json"
+      - "/policies"
+    environment:
+      - OPA_LOG_LEVEL=${OPA_LOG_LEVEL:-info}
+    ports:
+      - "8181:8181"  # API
+      - "8282:8282"  # Diagnostics
+    volumes:
+      - ./configs/opa/policy.rego:/policies/policy.rego:ro
+      - ./configs/opa/data.json:/policies/data.json:ro
+      - logs:/var/log/opa
+    networks:
+      - vulcanami-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=opa"
+      - "com.vulcanami.type=policy"
+  
+  # PII Detection Service
+  pii-service:
+    build:
+      context: .
+      dockerfile: ./docker/pii/Dockerfile
+    container_name: vulcanami-pii
+    hostname: pii-service
+    environment:
+      - ENVIRONMENT=development
+      - VERSION=4.6.0
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MODEL_CACHE=/models
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "8082:8082"  # API
+      - "9147:9147"  # Metrics
+    volumes:
+      - ./models/pii:/models:ro
+      - logs:/var/log/pii
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    labels:
+      - "com.vulcanami.service=pii"
+      - "com.vulcanami.type=ml"
+  
+  # VulcanAMI API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./docker/api/Dockerfile
+    container_name: vulcanami-api
+    hostname: api-gateway
+    environment:
+      - ENVIRONMENT=development
+      - VERSION=4.6.0
+      - DQS_ENDPOINT=http://dqs-service:8080
+      - OPA_ENDPOINT=http://opa-service:8181
+      - PII_ENDPOINT=http://pii-service:8082
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_change_in_production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"  # API
+      - "9148:9148"  # Metrics
+    volumes:
+      - ./configs/api:/etc/api:ro
+      - logs:/var/log/api
+    depends_on:
+      dqs-service:
+        condition: service_healthy
+      opa-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    labels:
+      - "com.vulcanami.service=api"
+      - "com.vulcanami.type=gateway"
+  
+  # NGINX Origin Server
+  nginx-origin:
+    image: nginx:1.27-alpine
+    container_name: vulcanami-nginx-origin
+    hostname: nginx-origin
+    volumes:
+      - ./configs/nginx/origin.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/nginx/mime.types:/etc/nginx/mime.types:ro
+      - nginx_cache_hot:/var/cache/nginx/hot
+      - nginx_cache_warm:/var/cache/nginx/warm
+      - nginx_cache_cold:/var/cache/nginx/cold
+      - logs:/var/log/nginx
+    ports:
+      - "8081:80"
+      - "8444:443"
+    depends_on:
+      - minio
+    networks:
+      - vulcanami-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=nginx"
+      - "com.vulcanami.type=web-server"
+  
+  # Rescore Cron Service
+  rescore-cron:
+    build:
+      context: .
+      dockerfile: ./docker/dqs/Dockerfile.cron
+    container_name: vulcanami-rescore-cron
+    hostname: rescore-cron
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+      - RESCORE_CONFIG=/etc/dqs/rescore_cron.json
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./configs/dqs:/etc/dqs:ro
+      - logs:/var/log/rescore
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dqs-service:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=rescore"
+      - "com.vulcanami.type=cron"
+  
+  ############################################################################
+  # Monitoring & Observability
+  ############################################################################
+  
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: vulcanami-prometheus
+    hostname: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=50GB'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./configs/prometheus/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    networks:
+      - vulcanami-network
+      - monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=prometheus"
+      - "com.vulcanami.type=monitoring"
+  
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: vulcanami-grafana
+    hostname: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=redis-datasource,grafana-clock-panel
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./configs/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./configs/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+      - monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=grafana"
+      - "com.vulcanami.type=visualization"
+  
+  # Jaeger Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: vulcanami-jaeger
+    hostname: jaeger
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=badger
+      - BADGER_EPHEMERAL=false
+      - BADGER_DIRECTORY_VALUE=/badger/data
+      - BADGER_DIRECTORY_KEY=/badger/key
+    ports:
+      - "5775:5775/udp"  # zipkin.thrift compact
+      - "6831:6831/udp"  # jaeger.thrift compact
+      - "6832:6832/udp"  # jaeger.thrift binary
+      - "5778:5778"      # serve configs
+      - "16686:16686"    # Web UI
+      - "14268:14268"    # jaeger.thrift
+      - "14250:14250"    # model.proto
+      - "9411:9411"      # zipkin
+      - "4317:4317"      # OTLP gRPC
+      - "4318:4318"      # OTLP HTTP
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/jaeger:/badger
+    networks:
+      - vulcanami-network
+      - monitoring-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=jaeger"
+      - "com.vulcanami.type=tracing"
+  
+  # Elasticsearch for Logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: vulcanami-elasticsearch
+    hostname: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - vulcanami-network
+      - monitoring-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    labels:
+      - "com.vulcanami.service=elasticsearch"
+      - "com.vulcanami.type=logging"
+  
+  # Kibana Log Visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.3
+    container_name: vulcanami-kibana
+    hostname: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=changeme
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+      - monitoring-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=kibana"
+      - "com.vulcanami.type=visualization"
+  
+  # Alertmanager for Alerts
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: vulcanami-alertmanager
+    hostname: alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./configs/alertmanager/config.yml:/etc/alertmanager/config.yml:ro
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/alertmanager:/alertmanager
+    networks:
+      - monitoring-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=alertmanager"
+      - "com.vulcanami.type=alerting"
+  
+  ############################################################################
+  # Development Tools
+  ############################################################################
+  
+  # pgAdmin for PostgreSQL Management
+  pgadmin:
+    image: dpage/pgadmin4:8.0
+    container_name: vulcanami-pgadmin
+    hostname: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@vulcanami.io}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+    ports:
+      - "5050:80"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/pgadmin:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=pgadmin"
+      - "com.vulcanami.type=dev-tool"
+  
+  # Redis Commander for Redis Management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: vulcanami-redis-commander
+    hostname: redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8083:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=redis-commander"
+      - "com.vulcanami.type=dev-tool"
+  
+  # Portainer for Container Management
+  portainer:
+    image: portainer/portainer-ce:2.19.4
+    container_name: vulcanami-portainer
+    hostname: portainer
+    command: -H unix:///var/run/docker.sock
+    ports:
+      - "9443:9443"
+      - "8084:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/portainer:/data
+    networks:
+      - vulcanami-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=portainer"
+      - "com.vulcanami.type=dev-tool"
+  
+  # MailHog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: vulcanami-mailhog
+    hostname: mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - vulcanami-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=mailhog"
+      - "com.vulcanami.type=dev-tool"
+  
+  # Documentation Server
+  docs:
+    image: nginx:1.27-alpine
+    container_name: vulcanami-docs
+    hostname: docs
+    ports:
+      - "8085:80"
+    volumes:
+      - ./docs:/usr/share/nginx/html:ro
+    networks:
+      - vulcanami-network
+    restart: unless-stopped
+    labels:
+      - "com.vulcanami.service=docs"
+      - "com.vulcanami.type=documentation"
+
+################################################################################
+# End of Docker Compose Configuration
+################################################################################

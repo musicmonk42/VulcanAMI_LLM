@@ -1,0 +1,390 @@
+{
+  "enable_self_improvement": true,
+  "agent_config": {
+    "agent_id": "vulcan-agi-dev-001",
+    "collective_id": "VULCAN-COLLECTIVE-DEV-001",
+    "version": "1.0.0",
+    "profile": "development",
+    "enable_learning": true,
+    "enable_adaptation": true,
+    "enable_self_modification": false,
+    "enable_multi_agent": false,
+    "enable_explainability": true,
+    "enable_adversarial_testing": true,
+    "enable_multimodal": true,
+    "enable_symbolic": true,
+    "enable_distributed": false,
+    "enable_self_improvement": true,
+    "max_parallel_tasks": 10,
+    "checkpoint_interval": 100,
+    "log_level": "DEBUG",
+    "max_working_memory": 20,
+    "slo_p95_latency_ms": 1000,
+    "slo_p99_latency_ms": 2000,
+    "slo_max_error_rate": 0.1
+  },
+  "resource_limits": {
+    "max_memory_mb": 8000,
+    "max_cpu_percent": 80.0,
+    "max_gpu_percent": 90.0,
+    "energy_budget_nj": 1000000000.0,
+    "max_network_bandwidth_mbps": 100.0,
+    "max_disk_io_mbps": 500.0,
+    "max_threads": 100,
+    "max_processes": 10,
+    "gpu_memory_mb": 8000,
+    "enable_distributed": false
+  },
+  "safety_policies": {
+    "safety_level": 0,
+    "require_human_approval": false,
+    "max_autonomy_level": 5,
+    "rollback_threshold": 0.3,
+    "uncertainty_threshold": 0.8,
+    "identity_drift_threshold": 0.5,
+    "compliance_standards": [
+      "ITU_F748_53"
+    ],
+    "prohibited_actions": [],
+    "audit_everything": false,
+    "encryption_required": false,
+    "safety_validation_timeout_ms": 1000,
+    "safety_thresholds": {
+      "uncertainty_max": 0.9,
+      "identity_drift_max": 0.5,
+      "energy_usage_max": 0.9
+    },
+    "names_to_versions": {
+      "ITU_F748_53": "1.0",
+      "safety_validator": "1.0",
+      "governance": "1.0"
+    }
+  },
+  "authentication": {
+    "require_api_key": false,
+    "api_key_header": "X-API-Key",
+    "allow_bearer_token": true,
+    "bypass_for_health": true,
+    "bypass_for_docs": true,
+    "bypass_for_metrics": true,
+    "development_mode": true
+  },
+  "monitoring_config": {
+    "enable_logging": true,
+    "log_level": "DEBUG",
+    "enable_metrics": true,
+    "enable_tracing": true,
+    "metrics_port": 9090
+  },
+  "tool_selection_config": {
+    "default_selection_mode": "balanced",
+    "confidence_threshold": 0.5,
+    "veto_threshold": 0.8,
+    "max_reasoning_time": 30.0,
+    "enable_caching": true,
+    "enable_warm_start": false,
+    "enable_portfolio": true,
+    "enable_voi": true,
+    "enable_calibration": true,
+    "enable_distribution_monitoring": true,
+    "max_parallel_tools": 4,
+    "cache_ttl_seconds": 300,
+    "warm_pool_size": 10,
+    "portfolio_strategies": {
+      "default": "adaptive",
+      "fast": "speculative_parallel",
+      "accurate": "committee_consensus",
+      "efficient": "cascade"
+    },
+    "utility_weights": {
+      "quality": 1.0,
+      "time_penalty": 1.0,
+      "energy_penalty": 0.5,
+      "risk_penalty": 0.8,
+      "exploration_bonus": 0.1
+    },
+    "calibration_config": {
+      "method": "isotonic",
+      "n_bins": 10,
+      "update_frequency": 100,
+      "min_samples": 50
+    },
+    "voi_config": {
+      "voi_threshold": 0.1,
+      "max_iterations": 3,
+      "myopic": true,
+      "information_sources": [
+        "tier2_features",
+        "tier3_features",
+        "probe_tool",
+        "memory_lookup"
+      ]
+    },
+    "distribution_monitor_config": {
+      "window_size": 1000,
+      "detection_threshold": 0.05,
+      "check_interval": 100
+    },
+    "cost_model_config": {
+      "max_observations": 1000,
+      "cold_start_time_ms": 100,
+      "cold_start_energy_mj": 50
+    },
+    "safety_governor_config": {
+      "veto_threshold": 0.8,
+      "require_consensus": false,
+      "rate_limit_window": 60,
+      "max_requests_per_tool": 100
+    }
+  },
+  "intrinsic_drives_config": {
+    "enabled": true,
+    "config_file": "configs/intrinsic_drives.json",
+    "state_file": "data/agent_state.json",
+    "approval_required": false,
+    "load_on_startup": true,
+    "check_interval_seconds": 120,
+    "max_cost_usd_per_day": 20.0,
+    "max_cost_usd_per_session": 5.0,
+    "enable_autonomous_improvement": true,
+    "enable_objective_reflection": true,
+    "enable_transparency_reporting": true
+  },
+  "world_model": {
+    "enable_meta_reasoning": true,
+    "enable_self_improvement": true,
+    "self_improvement_enabled": true,
+    "meta_reasoning_config": "configs/intrinsic_drives.json",
+    "self_improvement_config": "configs/intrinsic_drives.json",
+    "self_improvement_state": "data/agent_state.json",
+    "enable_causal_discovery": true,
+    "enable_counterfactual_reasoning": true,
+    "enable_prediction": true,
+    "enable_intervention": true,
+    "enable_dynamics_modeling": true,
+    "causal_discovery_method": "pc",
+    "confidence_calibration_method": "isotonic",
+    "prediction_horizon": 10,
+    "intervention_simulation_mode": true,
+    "max_causal_graph_nodes": 1000,
+    "max_causal_graph_edges": 10000
+  },
+  "learning_config": {
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "memory_size": 10000,
+    "replay_ratio": 0.5,
+    "update_frequency": 10,
+    "gradient_clip": 1.0,
+    "enable_continual_learning": true,
+    "enable_meta_learning": false,
+    "knowledge_distillation_temperature": 3.0,
+    "enable_experience_replay": true,
+    "enable_prioritized_replay": true,
+    "enable_curriculum_learning": false,
+    "enable_self_supervised_learning": true
+  },
+  "reasoning_config": {
+    "max_reasoning_depth": 10,
+    "min_confidence_threshold": 0.7,
+    "enable_symbolic_reasoning": true,
+    "enable_causal_reasoning": true,
+    "enable_counterfactual_reasoning": true,
+    "enable_analogical_reasoning": true,
+    "reasoning_timeout_ms": 5000,
+    "max_hypothesis_count": 100,
+    "proof_search_depth": 20,
+    "enable_forward_chaining": true,
+    "enable_backward_chaining": true,
+    "enable_abductive_reasoning": true,
+    "enable_probabilistic_reasoning": true
+  },
+  "planning_config": {
+    "planning_horizon": 20,
+    "max_plan_length": 50,
+    "replan_threshold": 0.3,
+    "enable_hierarchical_planning": true,
+    "enable_continual_planning": true,
+    "enable_meta_planning": false,
+    "planning_timeout_ms": 10000,
+    "enable_goal_decomposition": true,
+    "enable_constraint_satisfaction": true,
+    "enable_temporal_planning": true,
+    "enable_multi_objective_planning": true
+  },
+  "memory_config": {
+    "max_working_memory": 20,
+    "max_long_term_memory": 100000,
+    "enable_episodic_memory": true,
+    "enable_semantic_memory": true,
+    "enable_procedural_memory": true,
+    "memory_consolidation_interval": 100,
+    "retrieval_k": 10,
+    "similarity_threshold": 0.7,
+    "enable_memory_compression": true,
+    "enable_memory_pruning": true,
+    "memory_importance_threshold": 0.3,
+    "enable_associative_retrieval": true,
+    "enable_temporal_indexing": true
+  },
+  "task_queue": {
+    "type": "ray",
+    "config": {
+      "address": "auto",
+      "num_cpus": 4,
+      "num_gpus": 0,
+      "memory": 8000000000,
+      "object_store_memory": 2000000000,
+      "dashboard_host": "127.0.0.1",
+      "dashboard_port": 8265,
+      "include_dashboard": true,
+      "ignore_reinit_error": true,
+      "log_to_driver": true
+    }
+  },
+  "api_config": {
+    "enable_cors": true,
+    "cors_origins": [
+      "*"
+    ],
+    "enable_rate_limiting": true,
+    "rate_limit_per_minute": 100,
+    "enable_request_logging": true,
+    "enable_response_caching": true,
+    "cache_ttl_seconds": 300,
+    "max_request_size_mb": 10,
+    "max_response_size_mb": 50,
+    "request_timeout_seconds": 300,
+    "enable_compression": true,
+    "compression_level": 6
+  },
+  "optimization_config": {
+    "enable_jit_compilation": true,
+    "enable_graph_optimization": true,
+    "enable_operator_fusion": true,
+    "enable_memory_pooling": true,
+    "enable_async_execution": true,
+    "max_parallel_operations": 10,
+    "batch_size_optimization": true,
+    "auto_mixed_precision": false,
+    "gradient_accumulation_steps": 1
+  },
+  "explainability_config": {
+    "enable_attention_visualization": true,
+    "enable_feature_importance": true,
+    "enable_counterfactual_explanations": true,
+    "enable_example_based_explanations": true,
+    "explanation_detail_level": "medium",
+    "max_explanation_tokens": 500,
+    "enable_uncertainty_quantification": true,
+    "enable_confidence_intervals": true
+  },
+  "observability_config": {
+    "enable_distributed_tracing": true,
+    "enable_profiling": true,
+    "enable_debugging": true,
+    "trace_sampling_rate": 0.1,
+    "profile_interval_seconds": 60,
+    "enable_performance_counters": true,
+    "enable_resource_monitoring": true,
+    "monitoring_interval_seconds": 10,
+    "enable_anomaly_detection": true,
+    "anomaly_detection_sensitivity": 0.95
+  },
+  "backup_config": {
+    "enable_automatic_backup": true,
+    "backup_interval_seconds": 3600,
+    "backup_directory": "backups",
+    "max_backup_count": 10,
+    "enable_incremental_backup": true,
+    "enable_compression": true,
+    "compression_algorithm": "gzip"
+  },
+  "deployment_config": {
+    "environment": "development",
+    "deployment_mode": "local",
+    "auto_scaling_enabled": false,
+    "min_replicas": 1,
+    "max_replicas": 1,
+    "target_cpu_utilization": 0.7,
+    "target_memory_utilization": 0.8,
+    "health_check_interval_seconds": 30,
+    "readiness_check_interval_seconds": 10,
+    "liveness_check_interval_seconds": 60
+  },
+  "experimental_features": {
+    "enable_quantum_inspired_optimization": false,
+    "enable_neuromorphic_simulation": false,
+    "enable_federated_learning": false,
+    "enable_differential_privacy": false,
+    "enable_homomorphic_encryption": false,
+    "enable_zero_knowledge_proofs": false,
+    "enable_blockchain_integration": false,
+    "enable_swarm_intelligence": false,
+    "enable_evolutionary_algorithms": false,
+    "enable_neural_architecture_search": false
+  },
+  "integration_config": {
+    "enable_langchain_integration": false,
+    "enable_llama_index_integration": false,
+    "enable_huggingface_integration": true,
+    "enable_openai_integration": true,
+    "enable_anthropic_integration": true,
+    "enable_google_integration": false,
+    "enable_aws_integration": false,
+    "enable_azure_integration": false,
+    "enable_gcp_integration": false
+  },
+  "versioning": {
+    "config_version": "2.1.1",
+    "schema_version": "1.0.0",
+    "last_updated": "2025-11-17T14:17:34Z",
+    "updated_by": "musicmonk42",
+    "changelog": [
+      {
+        "version": "2.1.1",
+        "date": "2025-11-17T14:17:34Z",
+        "author": "musicmonk42",
+        "changes": [
+          "CRITICAL FIX: Added enable_self_improvement = true at ROOT level",
+          "This is required by world_model_core.py line 1380",
+          "The code checks config.get('enable_self_improvement', False) at root",
+          "Previously only had it in agent_config and world_model sections",
+          "This fixes the 'Self-improvement drive disabled in config' error"
+        ]
+      },
+      {
+        "version": "2.1.0",
+        "date": "2025-11-17T14:04:50Z",
+        "author": "musicmonk42",
+        "changes": [
+          "Added authentication.require_api_key = false for development",
+          "Enabled world_model.self_improvement_enabled = true",
+          "Added intrinsic_drives_config.enable_autonomous_improvement",
+          "Enhanced world_model with additional causal reasoning features",
+          "Added comprehensive API, optimization, and observability configs",
+          "Added experimental features section (all disabled by default)",
+          "Added integration config for external services",
+          "Added versioning and changelog tracking"
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "description": "Development profile for VULCAN-AGI with full self-improvement capabilities - FIXED ROOT LEVEL FLAG",
+    "author": "musicmonk42",
+    "organization": "VulcanAMI",
+    "license": "Proprietary",
+    "documentation_url": "https://github.com/musicmonk42/VulcanAMI/docs",
+    "support_email": "support@vulcanami.dev",
+    "tags": [
+      "development",
+      "agi",
+      "self-improvement",
+      "causal-reasoning",
+      "meta-reasoning",
+      "safety-first",
+      "autonomous-improvement-enabled"
+    ]
+  }
+}

@@ -1,0 +1,269 @@
+{
+  "version": "1.0.0",
+  "description": "Type system manifest for VULCAN-AGI, defining all data types used across modules for validation and runtime type checking.",
+  "types": {
+    "int": {
+      "description": "Integer type for whole numbers",
+      "constraints": {
+        "min": -9223372036854775808,
+        "max": 9223372036854775807
+      },
+      "metadata": {
+        "used_in": ["world_model", "reasoning", "safety"],
+        "python_type": "int"
+      }
+    },
+    "float": {
+      "description": "Floating-point type for real numbers",
+      "constraints": {
+        "min": -1.7976931348623157e308,
+        "max": 1.7976931348623157e308,
+        "precision": 15
+      },
+      "metadata": {
+        "used_in": ["world_model", "reasoning", "semantic_bridge"],
+        "python_type": "float"
+      }
+    },
+    "str": {
+      "description": "String type for textual data",
+      "constraints": {
+        "max_length": 10000,
+        "pattern": "^[\\w\\s\\p{P}\\p{S}]*$"
+      },
+      "metadata": {
+        "used_in": ["semantic_bridge", "memory", "reasoning"],
+        "python_type": "str"
+      }
+    },
+    "bool": {
+      "description": "Boolean type for true/false values",
+      "constraints": {},
+      "metadata": {
+        "used_in": ["safety", "world_model", "meta_reasoning"],
+        "python_type": "bool"
+      }
+    },
+    "list": {
+      "description": "List type for ordered collections",
+      "constraints": {
+        "max_length": 10000,
+        "element_types": ["any"]
+      },
+      "metadata": {
+        "used_in": ["world_model", "reasoning", "meta_reasoning"],
+        "python_type": "list"
+      }
+    },
+    "dict": {
+      "description": "Dictionary type for key-value pairs",
+      "constraints": {
+        "max_size": 10000,
+        "key_type": "str",
+        "value_type": "any"
+      },
+      "metadata": {
+        "used_in": ["world_model", "semantic_bridge", "safety"],
+        "python_type": "dict"
+      }
+    },
+    "set": {
+      "description": "Set type for unordered unique elements",
+      "constraints": {
+        "max_size": 10000,
+        "element_types": ["any"]
+      },
+      "metadata": {
+        "used_in": ["world_model", "semantic_bridge"],
+        "python_type": "set"
+      }
+    },
+    "numpy.ndarray": {
+      "description": "NumPy array for numerical computations",
+      "constraints": {
+        "max_size": 1000000,
+        "dtype": ["float64", "float32", "int64", "int32"]
+      },
+      "metadata": {
+        "used_in": ["world_model", "reasoning", "semantic_bridge"],
+        "python_type": "numpy.ndarray",
+        "dependency": "numpy"
+      }
+    },
+    "Observation": {
+      "description": "Dataclass for world model observations",
+      "fields": {
+        "timestamp": {"type": "float", "description": "Observation timestamp"},
+        "variables": {"type": "dict", "description": "Variable names to values"},
+        "domain": {"type": "str", "description": "Domain of observation"}
+      },
+      "metadata": {
+        "used_in": ["world_model"],
+        "module": "vulcan.world_model.world_model_core",
+        "dataclass": true
+      }
+    },
+    "CausalEdge": {
+      "description": "Dataclass for causal graph edges",
+      "fields": {
+        "source": {"type": "str", "description": "Source node ID"},
+        "target": {"type": "str", "description": "Target node ID"},
+        "strength": {"type": "float", "description": "Edge strength"},
+        "confidence": {"type": "float", "description": "Edge confidence"},
+        "metadata": {"type": "dict", "description": "Additional metadata"}
+      },
+      "metadata": {
+        "used_in": ["world_model"],
+        "module": "vulcan.world_model.causal_graph",
+        "dataclass": true
+      }
+    },
+    "Prediction": {
+      "description": "Dataclass for prediction results",
+      "fields": {
+        "expected": {"type": "float", "description": "Expected value"},
+        "lower_bound": {"type": "float", "description": "Lower confidence bound"},
+        "upper_bound": {"type": "float", "description": "Upper confidence bound"},
+        "confidence": {"type": "float", "description": "Prediction confidence"},
+        "method": {"type": "str", "description": "Prediction method"},
+        "supporting_paths": {"type": "list", "description": "Causal paths"},
+        "metadata": {"type": "dict", "description": "Additional metadata"},
+        "timestamp": {"type": "float", "description": "Prediction timestamp"}
+      },
+      "metadata": {
+        "used_in": ["world_model"],
+        "module": "vulcan.world_model.prediction_engine",
+        "dataclass": true
+      }
+    },
+    "Concept": {
+      "description": "Dataclass for semantic bridge concepts",
+      "fields": {
+        "concept_id": {"type": "str", "description": "Unique concept identifier"},
+        "domain": {"type": "str", "description": "Domain of the concept"},
+        "pattern_signature": {"type": "str", "description": "Pattern hash"},
+        "grounding_status": {"type": "GroundingStatus", "description": "Grounding level"},
+        "effects": {"type": "list", "description": "List of measurable effects"},
+        "confidence": {"type": "float", "description": "Concept confidence"},
+        "timestamp": {"type": "float", "description": "Creation timestamp"}
+      },
+      "metadata": {
+        "used_in": ["semantic_bridge"],
+        "module": "vulcan.semantic_bridge.concept_mapper",
+        "dataclass": true
+      }
+    },
+    "Objective": {
+      "description": "Dataclass for meta-reasoning objectives",
+      "fields": {
+        "name": {"type": "str", "description": "Objective name"},
+        "description": {"type": "str", "description": "Objective description"},
+        "constraints": {"type": "dict", "description": "Constraints on objective"},
+        "priority": {"type": "int", "description": "Priority level (0-3)"},
+        "dependencies": {"type": "list", "description": "Dependent objectives"},
+        "conflicts_with": {"type": "list", "description": "Conflicting objectives"},
+        "objective_type": {"type": "ObjectiveType", "description": "Type of objective"},
+        "weight": {"type": "float", "description": "Objective weight"},
+        "target_value": {"type": "float", "description": "Target value", "optional": true},
+        "current_value": {"type": "float", "description": "Current value", "optional": true},
+        "parent": {"type": "str", "description": "Parent objective", "optional": true},
+        "children": {"type": "list", "description": "Child objectives"},
+        "maximize": {"type": "bool", "description": "Maximize or minimize"},
+        "metadata": {"type": "dict", "description": "Additional metadata"},
+        "created_at": {"type": "float", "description": "Creation timestamp"}
+      },
+      "metadata": {
+        "used_in": ["meta_reasoning"],
+        "module": "vulcan.world_model.meta_reasoning.objective_hierarchy",
+        "dataclass": true
+      }
+    },
+    "SafetyReport": {
+      "description": "Dataclass for safety validation reports",
+      "fields": {
+        "safe": {"type": "bool", "description": "Whether action is safe"},
+        "violations": {"type": "list", "description": "List of safety violations"},
+        "confidence": {"type": "float", "description": "Confidence in safety assessment"}
+      },
+      "metadata": {
+        "used_in": ["safety"],
+        "module": "vulcan.safety.safety_types",
+        "dataclass": true
+      }
+    },
+    "UpdateType": {
+      "description": "Enum for world model update types",
+      "values": [
+        "intervention",
+        "correlation",
+        "dynamics",
+        "invariant",
+        "confidence",
+        "causal",
+        "distribution",
+        "structural"
+      ],
+      "metadata": {
+        "used_in": ["world_model"],
+        "module": "vulcan.world_model.world_model_router",
+        "enum": true
+      }
+    },
+    "GroundingStatus": {
+      "description": "Enum for concept grounding status",
+      "values": [
+        "ungrounded",
+        "weakly_grounded",
+        "grounded",
+        "strongly_grounded"
+      ],
+      "metadata": {
+        "used_in": ["semantic_bridge"],
+        "module": "vulcan.semantic_bridge.concept_mapper",
+        "enum": true
+      }
+    },
+    "ObjectiveType": {
+      "description": "Enum for types of objectives",
+      "values": [
+        "primary",
+        "secondary",
+        "derived"
+      ],
+      "metadata": {
+        "used_in": ["meta_reasoning"],
+        "module": "vulcan.world_model.meta_reasoning.objective_hierarchy",
+        "enum": true
+      }
+    },
+    "ConflictType": {
+      "description": "Enum for types of objective conflicts",
+      "values": [
+        "direct",
+        "indirect",
+        "constraint",
+        "priority",
+        "tradeoff"
+      ],
+      "metadata": {
+        "used_in": ["meta_reasoning"],
+        "module": "vulcan.world_model.meta_reasoning.goal_conflict_detector",
+        "enum": true
+      }
+    },
+    "ValidationOutcome": {
+      "description": "Enum for validation outcomes",
+      "values": [
+        "approved",
+        "rejected",
+        "modified",
+        "unknown"
+      ],
+      "metadata": {
+        "used_in": ["meta_reasoning"],
+        "module": "vulcan.world_model.meta_reasoning.validation_tracker",
+        "enum": true
+      }
+    }
+  }
+}

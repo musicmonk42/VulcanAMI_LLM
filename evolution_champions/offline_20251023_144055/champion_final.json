@@ -1,0 +1,181 @@
+{
+  "graph": {
+    "id": "sentiment_3d_enhanced_gen0_ind0_d948373e",
+    "type": "Graph",
+    "grammar_version": "2.3.0",
+    "nodes": [
+      {
+        "id": "t_in",
+        "type": "CONST",
+        "params": {
+          "value": "texts:t0"
+        }
+      },
+      {
+        "id": "matrix",
+        "type": "CONST",
+        "params": {
+          "value": [
+            [
+              [
+                1,
+                2
+              ],
+              [
+                3,
+                4
+              ]
+            ],
+            [
+              [
+                5,
+                6
+              ],
+              [
+                7,
+                8
+              ]
+            ]
+          ]
+        },
+        "metadata": {
+          "author_agent": "sentiment_graph_creator_v2",
+          "creation_timestamp": "2025-08-26T21:01:07Z",
+          "chain_of_thought": "This 2x2x2 matrix represents a simplified polarity/intensity/modality decision space for the sentiment task.",
+          "provenance": "Generated from internal Fairhope compliance model #C-451.",
+          "original_type": "Matrix3DNode"
+        }
+      },
+      {
+        "id": "m_emb",
+        "type": "EMBED",
+        "params": {
+          "provider": "dummy",
+          "model": "text-embedding-3-small"
+        }
+      },
+      {
+        "id": "gen",
+        "type": "GenerativeNode",
+        "params": {
+          "provider": "dummy",
+          "model": "gpt-4o-mini",
+          "max_tokens": 4,
+          "temperature": 0,
+          "prompt": "Label POS/NEG: {text}"
+        }
+      },
+      {
+        "id": "gen_contract",
+        "type": "ContractNode",
+        "params": {
+          "target_node": "gen",
+          "constraints": {
+            "max_cost_usd": 0.001,
+            "max_latency_ms": 500,
+            "accuracy_floor": 0.95
+          }
+        }
+      },
+      {
+        "id": "dec",
+        "type": "CONST",
+        "params": {
+          "value": "decoded_output"
+        }
+      },
+      {
+        "id": "vis",
+        "type": "CONST",
+        "params": {
+          "value": "visualization_placeholder"
+        }
+      },
+      {
+        "id": "out",
+        "type": "OutputNode",
+        "params": {}
+      }
+    ],
+    "edges": [
+      {
+        "from": {
+          "node": "t_in",
+          "port": "value"
+        },
+        "to": {
+          "node": "m_emb",
+          "port": "text"
+        }
+      },
+      {
+        "from": {
+          "node": "matrix",
+          "port": "value"
+        },
+        "to": {
+          "node": "m_emb",
+          "port": "matrix"
+        }
+      },
+      {
+        "from": {
+          "node": "m_emb",
+          "port": "vector"
+        },
+        "to": {
+          "node": "gen",
+          "port": "input"
+        }
+      },
+      {
+        "from": {
+          "node": "gen",
+          "port": "output"
+        },
+        "to": {
+          "node": "dec",
+          "port": "input"
+        }
+      },
+      {
+        "from": {
+          "node": "matrix",
+          "port": "value"
+        },
+        "to": {
+          "node": "vis",
+          "port": "input"
+        }
+      },
+      {
+        "from": {
+          "node": "dec",
+          "port": "value"
+        },
+        "to": {
+          "node": "out",
+          "port": "input"
+        }
+      },
+      {
+        "from": {
+          "node": "gen_contract",
+          "port": "output"
+        },
+        "to": {
+          "node": "gen",
+          "port": "contract"
+        }
+      }
+    ]
+  },
+  "metrics": {
+    "accuracy": 0.9119999999999999,
+    "tokens": 176.0,
+    "cycles": 4700.0,
+    "score": 0.8473999999999999
+  },
+  "generation": 0,
+  "parent_ids": []
+}

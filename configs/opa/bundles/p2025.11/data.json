@@ -1,0 +1,459 @@
+{
+  "bundle_version": "p2025.11",
+  "policy_version": "2.0.0",
+  "last_updated": "2025-11-14T00:00:00Z",
+  "environment": "production",
+
+  "policies": {
+    "writebarrier": "active",
+    "access_control": "active",
+    "compliance": "active",
+    "rate_limiting": "active"
+  },
+
+  "thresholds": {
+    "accept": 0.75,
+    "warning": 0.60,
+    "quarantine": 0.40,
+    "reject": 0.30,
+    "min_source_credibility": 0.50
+  },
+
+  "dimension_thresholds": {
+    "pii_confidence": 0.70,
+    "graph_completeness": 0.75,
+    "syntactic_completeness": 0.80,
+    "semantic_validity": 0.70,
+    "data_freshness": 0.50,
+    "source_credibility": 0.60,
+    "consistency_score": 0.70,
+    "completeness_score": 0.70
+  },
+
+  "critical_dimensions": [
+    "pii_confidence",
+    "graph_completeness"
+  ],
+
+  "acceptable_categories": [
+    "excellent",
+    "good",
+    "fair"
+  ],
+
+  "pii": {
+    "sensitive_types": [
+      "ssn",
+      "social_security_number",
+      "tax_id",
+      "drivers_license",
+      "passport_number",
+      "credit_card",
+      "bank_account",
+      "iban",
+      "email_address",
+      "phone_number",
+      "date_of_birth",
+      "full_name",
+      "address",
+      "ip_address",
+      "mac_address",
+      "biometric",
+      "fingerprint",
+      "facial_recognition",
+      "medical_record_number",
+      "health_insurance_id",
+      "genetic_data"
+    ],
+    "critical_types": [
+      "ssn",
+      "social_security_number",
+      "passport_number",
+      "credit_card",
+      "bank_account",
+      "biometric",
+      "fingerprint",
+      "facial_recognition",
+      "medical_record_number",
+      "health_insurance_id",
+      "genetic_data"
+    ],
+    "anonymization_methods": [
+      "k_anonymity",
+      "l_diversity",
+      "t_closeness",
+      "differential_privacy"
+    ]
+  },
+
+  "authorized_roles": [
+    "admin",
+    "data_engineer",
+    "data_scientist",
+    "ml_engineer",
+    "analyst",
+    "service_account"
+  ],
+
+  "authorized_users": [
+    "system",
+    "etl_pipeline",
+    "ml_training_service",
+    "data_quality_service"
+  ],
+
+  "suspended_users": [],
+
+  "blacklisted_users": [],
+
+  "revoked_api_keys": [],
+
+  "compliance": {
+    "review_threshold_records": 10000,
+    "gdpr_enabled": true,
+    "hipaa_enabled": true,
+    "sox_enabled": true,
+    "pci_dss_enabled": false,
+    "audit_retention_days": 2555
+  },
+
+  "gdpr_regions": [
+    "EU",
+    "EEA",
+    "AT",
+    "BE",
+    "BG",
+    "HR",
+    "CY",
+    "CZ",
+    "DK",
+    "EE",
+    "FI",
+    "FR",
+    "DE",
+    "GR",
+    "HU",
+    "IE",
+    "IT",
+    "LV",
+    "LT",
+    "LU",
+    "MT",
+    "NL",
+    "PL",
+    "PT",
+    "RO",
+    "SK",
+    "SI",
+    "ES",
+    "SE",
+    "GB"
+  ],
+
+  "regions_with_residency_requirements": [
+    "EU",
+    "CN",
+    "RU",
+    "IN",
+    "BR",
+    "AU"
+  ],
+
+  "allowed_storage_regions": {
+    "EU": ["eu-west-1", "eu-central-1", "eu-north-1"],
+    "CN": ["cn-north-1", "cn-northwest-1"],
+    "RU": ["ru-central-1"],
+    "IN": ["ap-south-1"],
+    "BR": ["sa-east-1"],
+    "AU": ["ap-southeast-2"],
+    "US": ["us-east-1", "us-west-1", "us-west-2"],
+    "global": ["us-east-1", "eu-west-1", "ap-southeast-1"]
+  },
+
+  "rate_limits": {
+    "per_user": 10000,
+    "per_source": 50000,
+    "global": 1000000,
+    "window_seconds": 3600,
+    "burst_allowance": 100
+  },
+
+  "quotas": {
+    "default_storage_gb": 100,
+    "default_records": 1000000,
+    "premium_storage_gb": 1000,
+    "premium_records": 10000000,
+    "enterprise_storage_gb": 10000,
+    "enterprise_records": 100000000
+  },
+
+  "temporal_restrictions": {
+    "enabled": false,
+    "start_hour": 0,
+    "end_hour": 24,
+    "allowed_days": [0, 1, 2, 3, 4, 5, 6],
+    "maintenance_windows": [
+      {
+        "start": "2025-12-25T00:00:00Z",
+        "end": "2025-12-26T00:00:00Z",
+        "reason": "Holiday maintenance"
+      }
+    ]
+  },
+
+  "geographic_restrictions": {
+    "blocked_regions": [],
+    "restricted_regions": [
+      "KP",
+      "IR",
+      "SY",
+      "CU"
+    ],
+    "high_risk_regions": [
+      "AF",
+      "IQ",
+      "LY",
+      "SO",
+      "YE"
+    ]
+  },
+
+  "embargoed_countries": [
+    "KP",
+    "IR",
+    "SY",
+    "CU"
+  ],
+
+  "blocked_sources": [],
+
+  "trusted_sources": [
+    "internal_etl",
+    "verified_partner_api",
+    "certified_data_provider",
+    "government_database",
+    "academic_institution"
+  ],
+
+  "remediation": {
+    "enabled": true,
+    "max_attempts": 3,
+    "timeout_seconds": 300,
+    "strategies": [
+      "auto_repair",
+      "data_enrichment",
+      "schema_inference",
+      "missing_value_imputation",
+      "outlier_correction",
+      "format_standardization",
+      "deduplication",
+      "normalization"
+    ],
+    "strategy_mappings": {
+      "auto_repair": ["syntax_errors", "format_errors"],
+      "data_enrichment": ["incomplete_fields", "missing_metadata"],
+      "schema_inference": ["schema_mismatch", "type_errors"],
+      "missing_value_imputation": ["incomplete_fields", "null_values"],
+      "outlier_correction": ["inconsistent_data", "statistical_anomalies"],
+      "format_standardization": ["format_errors", "encoding_issues"],
+      "deduplication": ["duplicate_records", "redundant_data"],
+      "normalization": ["inconsistent_format", "value_normalization"]
+    },
+    "priority_order": [
+      "auto_repair",
+      "format_standardization",
+      "deduplication",
+      "missing_value_imputation",
+      "data_enrichment",
+      "schema_inference",
+      "normalization",
+      "outlier_correction"
+    ]
+  },
+
+  "encryption": {
+    "algorithms": {
+      "default": "AES-256-GCM",
+      "pii": "AES-256-GCM",
+      "phi": "AES-256-GCM",
+      "financial": "AES-256-GCM"
+    },
+    "key_rotation_days": 90,
+    "require_at_rest": true,
+    "require_in_transit": true
+  },
+
+  "audit": {
+    "enabled": true,
+    "log_level": "INFO",
+    "include_payload": false,
+    "include_decision_path": true,
+    "include_timing": true,
+    "destinations": [
+      {
+        "type": "elasticsearch",
+        "index": "opa-audit-logs",
+        "enabled": true
+      },
+      {
+        "type": "s3",
+        "bucket": "vulcanami-audit-logs",
+        "prefix": "opa/",
+        "enabled": true
+      },
+      {
+        "type": "syslog",
+        "host": "syslog.vulcanami.io",
+        "port": 514,
+        "enabled": false
+      }
+    ],
+    "retention": {
+      "hot_days": 30,
+      "warm_days": 90,
+      "cold_days": 365,
+      "archive_days": 2555
+    }
+  },
+
+  "monitoring": {
+    "enabled": true,
+    "prometheus": {
+      "enabled": true,
+      "port": 9147,
+      "path": "/metrics"
+    },
+    "health_check": {
+      "enabled": true,
+      "path": "/health",
+      "interval_seconds": 30
+    },
+    "alerting": {
+      "enabled": true,
+      "webhook": "https://monitoring.vulcanami.io/webhooks/opa",
+      "conditions": {
+        "high_reject_rate": 0.25,
+        "high_quarantine_rate": 0.40,
+        "low_allow_rate": 0.50,
+        "policy_evaluation_errors": 10
+      }
+    }
+  },
+
+  "performance": {
+    "cache": {
+      "enabled": true,
+      "ttl_seconds": 300,
+      "max_size_mb": 512
+    },
+    "max_decision_time_ms": 100,
+    "batch_size": 1000,
+    "parallel_evaluation": true
+  },
+
+  "features": {
+    "batch_decisions": true,
+    "async_audit": true,
+    "decision_caching": true,
+    "partial_evaluation": true,
+    "distributed_tracing": true,
+    "custom_functions": true
+  },
+
+  "integrations": {
+    "dqs": {
+      "enabled": true,
+      "endpoint": "http://dqs-service:8080",
+      "timeout_ms": 5000,
+      "cache_ttl_seconds": 3600
+    },
+    "pii_service": {
+      "enabled": true,
+      "endpoint": "http://pii-detection:8080",
+      "timeout_ms": 3000,
+      "cache_ttl_seconds": 1800
+    },
+    "identity_provider": {
+      "enabled": true,
+      "type": "oauth2",
+      "endpoint": "https://auth.vulcanami.io",
+      "jwks_uri": "https://auth.vulcanami.io/.well-known/jwks.json"
+    },
+    "secret_manager": {
+      "enabled": true,
+      "type": "vault",
+      "endpoint": "https://vault.vulcanami.io",
+      "mount_path": "secret/opa"
+    }
+  },
+
+  "custom_rules": {
+    "industry_specific": {
+      "healthcare": {
+        "enabled": false,
+        "require_phi_protection": true,
+        "require_baa": true
+      },
+      "financial": {
+        "enabled": false,
+        "require_sox_compliance": true,
+        "transaction_limit": 10000
+      },
+      "government": {
+        "enabled": false,
+        "require_fedramp": false,
+        "classification_levels": ["unclassified", "confidential", "secret"]
+      }
+    },
+    "organizational": {
+      "cost_center_validation": false,
+      "project_approval_required": false,
+      "data_owner_approval": false
+    }
+  },
+
+  "risk_scoring": {
+    "enabled": true,
+    "weights": {
+      "dqs_score": 0.30,
+      "pii_presence": 0.25,
+      "source_credibility": 0.15,
+      "data_volume": 0.10,
+      "user_reputation": 0.10,
+      "geographic_risk": 0.10
+    },
+    "thresholds": {
+      "low": 0.30,
+      "medium": 0.50,
+      "high": 0.70,
+      "critical": 0.85
+    }
+  },
+
+  "experimental": {
+    "ml_based_decisions": {
+      "enabled": false,
+      "model_endpoint": "http://ml-policy:8080/predict",
+      "confidence_threshold": 0.85,
+      "fallback_to_rules": true
+    },
+    "adaptive_thresholds": {
+      "enabled": false,
+      "learning_rate": 0.01,
+      "adjustment_interval_hours": 24
+    },
+    "anomaly_detection": {
+      "enabled": false,
+      "sensitivity": 0.95,
+      "baseline_window_days": 30
+    }
+  },
+
+  "metadata": {
+    "maintainer": "policy-team@vulcanami.io",
+    "documentation": "https://docs.vulcanami.io/opa/writebarrier",
+    "source_repository": "https://github.com/vulcanami/opa-policies",
+    "last_audit": "2025-11-01T00:00:00Z",
+    "next_review": "2026-02-01T00:00:00Z"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "grammar_version": "1.0.0",
+  "id": "gemini_causal_engine_v1",
+  "type": "Graph",
+  "metadata": {
+    "author": "agent-gemini",
+    "timestamp": "2025-08-25T00:00:00Z",
+    "version": "1.0.0",
+    "explanation": "Proposal for causal primitives"
+  },
+  "nodes": [
+    {
+      "id": "gemini_proposal_node",
+      "type": "ProposalNode",
+      "proposed_by": "agent-gemini",
+      "rationale": "Add node for causal reasoning",
+      "proposal_content": {
+        "add": {
+          "SemanticGroundingNode": {
+            "description": "Node for causal reasoning"
+          }
+        }
+      },
+      "metadata": {
+        "explanation": "Proposes new node type"
+      }
+    },
+    {
+      "id": "gemini_consensus_node",
+      "type": "ConsensusNode",
+      "target": "gemini_proposal_node",
+      "metadata": {
+        "explanation": "Handles consensus voting"
+      }
+    },
+    {
+      "id": "gemini_validation_node",
+      "type": "ValidationNode",
+      "target": "gemini_proposal_node",
+      "validation_type": "schema",
+      "metadata": {
+        "explanation": "Validates proposal"
+      }
+    },
+    {
+      "id": "gemini_audit_node",
+      "type": "AuditNode",
+      "target": "gemini_proposal_node",
+      "scope": ["syntax", "semantics"],
+      "metadata": {
+        "explanation": "Audits proposal process"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "gemini_proposal_node",
+      "to": "gemini_consensus_node",
+      "type": "control"
+    },
+    {
+      "from": "gemini_consensus_node",
+      "to": "gemini_validation_node",
+      "type": "control"
+    },
+    {
+      "from": "gemini_validation_node",
+      "to": "gemini_audit_node",
+      "type": "control"
+    }
+  ]
+}

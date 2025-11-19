@@ -1,0 +1,32 @@
+{
+  "submit_run": {
+    "base": "platform",
+    "method": "POST",
+    "path": "/api/arena/run/generator"
+  },
+  "submit_feedback": {
+    "base": "platform",
+    "method": "POST",
+    "path": "/api/arena/feedback_dispatch"
+  },
+  "improve": {
+    "base": "vulcan",
+    "method": "POST",
+    "path": "/improve"
+  },
+  "sse_stream": {
+    "base": "vulcan",
+    "method": "GET",
+    "path": "/v1/stream"
+  },
+  "metrics": {
+    "base": "platform",
+    "method": "GET",
+    "path": "/api/arena/metrics"
+  },
+  "rollback": {
+    "base": "vulcan",
+    "method": "POST",
+    "path": "/rollback"
+  }
+}

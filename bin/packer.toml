@@ -1,0 +1,1295 @@
+################################################################################
+# VulcanAMI Graph Packer Configuration
+# Version: 4.6.0
+# Format: TOML 1.0.0
+# License: Proprietary
+# Last Updated: 2025-11-14
+################################################################################
+#
+# This configuration file controls the behavior of the VulcanAMI Graph Packer,
+# a high-performance, intelligent data packing system designed for graph-based
+# machine learning pipelines with integrated data quality, security, and
+# compliance features.
+#
+# Key Features:
+# - Multi-tier compression with adaptive algorithms
+# - Cryptographic integrity verification
+# - Advanced indexing with bloom filters and spatial trees
+# - Integration with DQS (Data Quality System)
+# - PII detection and two-stage review workflow
+# - Zero-knowledge proof support for privacy-preserving operations
+# - Tiered storage optimization (hot/warm/cold)
+# - Real-time metrics and observability
+# - GDPR/HIPAA compliance features
+#
+################################################################################
+
+################################################################################
+# Core Packer Configuration
+################################################################################
+
+[packer]
+# Magic number identifying GraphPack v2 format (4 bytes)
+magic = "GPK2"
+
+# Format version for backward compatibility
+version = 2
+
+# Protocol version for wire format compatibility
+protocol_version = "2.0.0"
+
+# Build metadata
+build_date = "2025-11-14T00:00:00Z"
+build_commit = "abc123def456"
+build_environment = "production"
+
+# Endianness for binary encoding
+# Options: "little", "big", "native"
+# Default: "little" (most modern systems)
+endianness = "little"
+
+# Enable strict mode for validation
+# When enabled, all data must pass validation before packing
+strict_mode = true
+
+# Fail-fast behavior
+# Stop processing on first error vs. collect all errors
+fail_fast = false
+
+# Enable dry-run mode for testing
+# When enabled, no actual packs are written
+dry_run = false
+
+# Verbose logging
+verbose = false
+
+# Debug mode - extensive logging and validation
+debug = false
+
+
+################################################################################
+# Chunk Configuration
+# Chunks are the smallest unit of data in a pack
+################################################################################
+
+[chunking]
+# Minimum chunk size in bytes (8 KB)
+# Smaller chunks = more overhead, better deduplication
+chunk_size_min = 8192
+
+# Maximum chunk size in bytes (64 KB)
+# Larger chunks = less overhead, worse deduplication
+chunk_size_max = 65536
+
+# Target average chunk size (32 KB)
+# Used by adaptive chunking algorithm
+chunk_size_target = 32768
+
+# Chunk alignment in bytes
+# Aligns chunks to block boundaries for better I/O performance
+chunk_alignment = 4096
+
+# Chunking algorithm
+# Options: "fixed", "content_defined", "rabin", "fastcdc", "gear", "ae"
+# - fixed: Simple fixed-size chunking
+# - content_defined: Content-aware chunking using rolling hash
+# - rabin: Rabin fingerprinting (slower, better dedup)
+# - fastcdc: Fast content-defined chunking (recommended)
+# - gear: Gear-based rolling hash (fast, good dedup)
+# - ae: Asymmetric Extremum (best dedup, slower)
+chunking_algorithm = "fastcdc"
+
+# Rolling hash window size for content-defined chunking
+rolling_hash_window = 48
+
+# Normalization level for chunk size distribution
+# Higher values = more consistent chunk sizes
+# Range: 0-3 (0=none, 1=low, 2=medium, 3=high)
+normalization_level = 2
+
+# Enable adaptive chunking
+# Adjusts chunk boundaries based on data characteristics
+adaptive_chunking = true
+
+# Minimum chunk count per pack (for small files)
+min_chunks_per_pack = 1
+
+# Maximum chunk count per pack (prevents excessive fragmentation)
+max_chunks_per_pack = 8192
+
+# Enable chunk-level metadata
+chunk_metadata = true
+
+# Chunk labeling for classification
+# Useful for selective processing and tiered storage
+chunk_labels = true
+
+
+################################################################################
+# Pack Configuration
+# Packs are collections of chunks stored together
+################################################################################
+
+[packing]
+# Minimum pack size in bytes (8 MB)
+# Smaller packs = more files, better granularity
+pack_size_min = 8388608
+
+# Maximum pack size in bytes (64 MB)
+# Larger packs = fewer files, better I/O efficiency
+pack_size_max = 67108864
+
+# Target pack size (32 MB)
+# Packer will try to create packs close to this size
+pack_size_target = 33554432
+
+# Pack alignment in bytes
+# Aligns packs to block boundaries
+pack_alignment = 4096
+
+# Pack fill threshold (0.0-1.0)
+# Minimum fill ratio before creating a new pack
+pack_fill_threshold = 0.90
+
+# Maximum age of a pack before forced flush (seconds)
+# Prevents packs from staying open too long
+pack_max_age = 3600
+
+# Maximum number of open packs
+# Limits memory usage and file descriptor count
+max_open_packs = 64
+
+# Enable pack pooling
+# Reuses pack structures to reduce allocations
+pack_pooling = true
+
+# Pool size
+pack_pool_size = 128
+
+# Enable pack compaction
+# Periodically consolidates sparse packs
+pack_compaction = true
+
+# Compaction threshold (0.0-1.0)
+# Minimum fill ratio to trigger compaction
+compaction_threshold = 0.60
+
+# Compaction interval (seconds)
+compaction_interval = 86400
+
+# Enable pack splitting
+# Splits large packs during reorganization
+pack_splitting = true
+
+# Pack naming scheme
+# Options: "uuid", "sequential", "timestamp", "hash", "hybrid"
+pack_naming = "hybrid"
+
+# Pack directory structure
+# Options: "flat", "sharded", "hierarchical", "date_based"
+pack_layout = "sharded"
+
+# Number of shards for sharded layout
+shard_count = 256
+
+# Shard hash algorithm
+# Options: "murmur3", "xxhash", "cityhash", "metro"
+shard_hash = "xxhash"
+
+
+################################################################################
+# Compression Configuration
+################################################################################
+
+[compression]
+# Primary compression algorithm
+# Options: "none", "zstd", "lz4", "snappy", "brotli", "gzip", "xz", "zlib"
+algorithm = "zstd"
+
+# Compression level
+# Range depends on algorithm:
+# - zstd: 1-22 (default: 3, negative values for fast mode)
+# - lz4: 1-12 (default: 1)
+# - brotli: 0-11 (default: 6)
+# - gzip: 1-9 (default: 6)
+level = 3
+
+# Enable adaptive compression
+# Automatically adjusts algorithm and level based on data characteristics
+adaptive = true
+
+# Minimum compression ratio to keep compressed (0.0-1.0)
+# If ratio is worse, store uncompressed
+min_compression_ratio = 0.90
+
+# Compression dictionary size (bytes)
+# Shared dictionary for better compression of similar data
+dict_size = 131072
+
+# Enable dictionary training
+# Learn optimal dictionary from sample data
+dict_training = true
+
+# Dictionary training sample size
+dict_training_samples = 10000
+
+# Enable parallel compression
+# Compresses chunks in parallel for better performance
+parallel = true
+
+# Compression worker threads
+# 0 = auto-detect based on CPU cores
+worker_threads = 0
+
+# Compression buffer size (bytes)
+buffer_size = 1048576
+
+# Enable compression level auto-tuning
+# Adjusts compression level based on CPU load and throughput
+auto_tune = true
+
+# Target compression throughput (MB/s)
+# Used by auto-tuning to balance compression ratio vs. speed
+target_throughput = 500
+
+# Per-type compression settings
+# Override compression for specific data types
+[compression.by_type]
+text = { algorithm = "zstd", level = 6 }
+json = { algorithm = "zstd", level = 5 }
+binary = { algorithm = "lz4", level = 1 }
+image = { algorithm = "zstd", level = 1 }
+graph = { algorithm = "zstd", level = 4 }
+embeddings = { algorithm = "lz4", level = 1 }
+
+# Compression statistics
+[compression.stats]
+enabled = true
+window_size = 3600
+report_interval = 300
+
+
+################################################################################
+# Encryption Configuration
+################################################################################
+
+[encryption]
+# Enable encryption
+enabled = true
+
+# Encryption algorithm
+# Options: "aes-256-gcm", "aes-256-cbc", "chacha20-poly1305", "aes-128-gcm"
+algorithm = "aes-256-gcm"
+
+# Key derivation function
+# Options: "pbkdf2", "argon2id", "scrypt", "hkdf"
+kdf = "argon2id"
+
+# KDF iterations/parameters
+kdf_iterations = 10
+kdf_memory = 65536
+kdf_parallelism = 4
+
+# Key rotation
+key_rotation_enabled = true
+key_rotation_interval = 7776000  # 90 days
+
+# Encrypt pack metadata
+encrypt_metadata = true
+
+# Encrypt index
+encrypt_index = true
+
+# Encrypt chunk-level (vs. pack-level)
+# More secure but slower
+chunk_level_encryption = false
+
+# Key management
+[encryption.key_management]
+# Key storage backend
+# Options: "vault", "kms", "file", "env", "memory"
+backend = "vault"
+
+# Vault configuration
+vault_endpoint = "https://vault.vulcanami.io"
+vault_mount_path = "secret/packer"
+vault_key_path = "encryption/master"
+
+# Key caching
+key_cache_enabled = true
+key_cache_ttl = 3600
+
+# Hardware security module
+hsm_enabled = false
+
+
+################################################################################
+# Integrity Verification
+################################################################################
+
+[integrity]
+# Enable CRC32C checksums
+# Fast hardware-accelerated checksums
+crc32c = true
+
+# Enable SHA-256 hashes
+# Cryptographically secure hashing
+sha256 = true
+
+# Enable SHA-3 hashes (Keccak)
+# More secure but slower
+sha3_256 = false
+
+# Enable BLAKE3 hashes
+# Fast, parallelizable, cryptographically secure
+blake3 = true
+
+# Enable Merkle tree
+# Hierarchical hashing for efficient verification
+merkle_tree = true
+
+# Merkle tree algorithm
+# Options: "sha256", "blake3", "sha3_256"
+merkle_algorithm = "blake3"
+
+# Merkle tree arity (branching factor)
+# Higher = flatter tree, lower = deeper tree
+merkle_arity = 16
+
+# Enable chunk-level verification
+# Verify each chunk independently
+chunk_verification = true
+
+# Enable pack-level verification
+# Verify entire pack as a unit
+pack_verification = true
+
+# Verification strategy
+# Options: "eager" (verify on read), "lazy" (verify on write), "paranoid" (both)
+verification_strategy = "eager"
+
+# Enable verification caching
+# Cache verification results to avoid repeated checks
+verification_cache = true
+verification_cache_size = 10000
+
+# Enable self-healing
+# Automatically repair corrupted data when redundancy is available
+self_healing = true
+
+# Corruption detection sensitivity
+# Options: "low", "medium", "high", "paranoid"
+corruption_detection = "high"
+
+
+################################################################################
+# Indexing and Search
+################################################################################
+
+[indexing]
+# Enable primary index
+enabled = true
+
+# Index type
+# Options: "btree", "hash", "lsm", "art", "hybrid"
+index_type = "lsm"
+
+# Index entry size in bytes
+entry_size = 64
+
+# Enable secondary indexes
+secondary_indexes = true
+
+# Secondary index types
+[indexing.secondary]
+by_type = true
+by_timestamp = true
+by_size = true
+by_quality_score = true
+by_labels = true
+by_source = true
+
+# Bloom filter configuration
+[indexing.bloom]
+enabled = true
+
+# Bloom filter size in KB per pack
+size_kb = 128
+
+# Number of hash functions
+# More = lower false positive rate, slower
+hash_functions = 7
+
+# Expected false positive rate
+target_fpr = 0.01
+
+# Per-field bloom filters
+per_field_blooms = true
+
+# Bloom filter persistence
+persistent = true
+
+# Spatial indexing for graph data
+[indexing.spatial]
+enabled = true
+
+# Spatial index type
+# Options: "rtree", "quadtree", "kd_tree", "hilbert"
+spatial_index_type = "rtree"
+
+# Dimensions
+spatial_dimensions = 128
+
+# Enable approximate nearest neighbor search
+ann_enabled = true
+ann_algorithm = "hnsw"  # Hierarchical Navigable Small World
+
+# Full-text search
+[indexing.fulltext]
+enabled = true
+tokenizer = "unicode"
+stemming = true
+stop_words = true
+language = "english"
+
+
+################################################################################
+# Deduplication
+################################################################################
+
+[deduplication]
+# Enable content-based deduplication
+enabled = true
+
+# Deduplication level
+# Options: "chunk", "pack", "global"
+level = "chunk"
+
+# Deduplication algorithm
+# Options: "fixed", "content_defined", "delta", "similar"
+algorithm = "content_defined"
+
+# Minimum chunk size for deduplication
+min_chunk_size = 4096
+
+# Similarity threshold for fuzzy deduplication (0.0-1.0)
+similarity_threshold = 0.95
+
+# Enable delta compression
+# Store only differences between similar chunks
+delta_compression = true
+
+# Delta encoding algorithm
+# Options: "xdelta", "bsdiff", "vcdiff", "zdelta"
+delta_algorithm = "xdelta"
+
+# Reference window for delta compression
+delta_window_size = 16
+
+# Enable deduplication cache
+cache_enabled = true
+cache_size_mb = 1024
+
+# Deduplication statistics
+stats_enabled = true
+
+
+################################################################################
+# Data Quality System (DQS) Integration
+################################################################################
+
+[dqs]
+# Enable DQS gate
+# Prevents packing of low-quality data
+enabled = true
+
+# DQS service endpoint
+endpoint = "http://dqs-service:8080"
+
+# Request timeout
+timeout_ms = 5000
+
+# Minimum DQS score threshold (0.0-1.0)
+min_score = 0.75
+
+# Score dimensions to check
+[dqs.dimensions]
+pii_confidence = 0.70
+graph_completeness = 0.75
+syntactic_completeness = 0.80
+semantic_validity = 0.70
+data_freshness = 0.50
+source_credibility = 0.60
+consistency_score = 0.70
+completeness_score = 0.70
+
+# Critical dimensions that must pass
+critical_dimensions = [
+    "pii_confidence",
+    "graph_completeness"
+]
+
+# Action on low-quality data
+# Options: "reject", "quarantine", "warn", "accept_with_label"
+low_quality_action = "quarantine"
+
+# Enable quality-based tiering
+# Routes data to different storage tiers based on quality
+quality_tiering = true
+
+# Quality tier thresholds
+[dqs.tiers]
+hot = 0.90      # Excellent quality -> hot storage
+warm = 0.75     # Good quality -> warm storage
+cold = 0.60     # Fair quality -> cold storage
+quarantine = 0.40  # Poor quality -> quarantine
+
+# Enable auto-remediation
+auto_remediation = true
+
+# Maximum remediation attempts
+max_remediation_attempts = 3
+
+# Remediation strategies
+remediation_strategies = [
+    "auto_repair",
+    "data_enrichment",
+    "schema_inference",
+    "missing_value_imputation"
+]
+
+# DQS caching
+[dqs.cache]
+enabled = true
+ttl = 3600
+size = 10000
+
+
+################################################################################
+# PII Detection and Privacy
+################################################################################
+
+[pii]
+# Enable PII detection
+enabled = true
+
+# PII detection service endpoint
+endpoint = "http://pii-detection:8080"
+
+# Request timeout
+timeout_ms = 3000
+
+# Two-stage review workflow
+two_stage_review = true
+
+# Sensitive PII types to detect
+sensitive_types = [
+    "ssn",
+    "social_security_number",
+    "tax_id",
+    "drivers_license",
+    "passport_number",
+    "credit_card",
+    "bank_account",
+    "iban",
+    "email_address",
+    "phone_number",
+    "date_of_birth",
+    "full_name",
+    "address",
+    "ip_address",
+    "mac_address"
+]
+
+# Critical PII types requiring immediate action
+critical_types = [
+    "ssn",
+    "social_security_number",
+    "passport_number",
+    "credit_card",
+    "bank_account",
+    "biometric",
+    "medical_record_number",
+    "genetic_data"
+]
+
+# Action on PII detection
+# Options: "block", "quarantine", "redact", "encrypt", "label"
+pii_action = "quarantine"
+
+# Auto-redaction
+auto_redact = true
+redaction_char = "*"
+partial_redaction = true  # Keep first/last characters
+
+# PII encryption
+pii_encryption = true
+pii_encryption_algorithm = "aes-256-gcm"
+
+# Anonymization
+[pii.anonymization]
+enabled = true
+method = "k_anonymity"  # Options: k_anonymity, l_diversity, t_closeness, differential_privacy
+k_value = 5
+
+# Audit logging for PII
+[pii.audit]
+enabled = true
+log_level = "INFO"
+retention_days = 2555  # 7 years
+
+
+################################################################################
+# Zero-Knowledge Proof Support
+################################################################################
+
+[zkp]
+# Enable zero-knowledge proofs
+enabled = true
+
+# ZKP system
+# Options: "groth16", "plonk", "stark", "bulletproofs"
+system = "groth16"
+
+# Circuit type
+circuit = "unlearning_v1_0"
+
+# Proving key location
+proving_key = "/etc/vulcanami/zkp/proving_key.bin"
+
+# Verification key location
+verification_key = "/etc/vulcanami/zkp/verification_key.bin"
+
+# Enable proof batching
+# Aggregate multiple proofs for efficiency
+proof_batching = true
+batch_size = 10
+
+# Proof caching
+proof_cache_enabled = true
+proof_cache_size = 1000
+
+# Proof generation timeout
+proof_timeout_ms = 30000
+
+# Enable proof compression
+proof_compression = true
+
+# Enable recursive proofs
+recursive_proofs = false
+
+# Public inputs
+[zkp.public_inputs]
+include_data_hash = true
+include_timestamp = true
+include_quality_score = true
+include_compliance_flags = true
+
+
+################################################################################
+# Parent-Child Relationships
+################################################################################
+
+[relationships]
+# Enable parent-child tracking
+enabled = true
+
+# Relationship types
+[relationships.types]
+parent_child = true
+derived_from = true
+depends_on = true
+version_of = true
+related_to = true
+
+# Maximum relationship depth
+max_depth = 10
+
+# Enable bidirectional relationships
+bidirectional = true
+
+# Enable relationship validation
+validate_references = true
+
+# Orphan handling
+# Options: "allow", "reject", "warn"
+orphan_policy = "warn"
+
+# Cycle detection
+detect_cycles = true
+reject_cycles = true
+
+# Relationship indexing
+index_relationships = true
+
+# Relationship metadata
+store_relationship_metadata = true
+
+
+################################################################################
+# Adaptive Range Queries
+################################################################################
+
+[adaptive_range]
+# Enable adaptive range optimization
+enabled = true
+
+# Learning algorithm
+# Options: "histogram", "ml_based", "rule_based", "hybrid"
+algorithm = "hybrid"
+
+# Range query patterns to optimize
+optimize_patterns = [
+    "timestamp_range",
+    "quality_score_range",
+    "size_range",
+    "label_prefix"
+]
+
+# Statistics collection
+collect_statistics = true
+statistics_window = 86400
+
+# Query plan caching
+query_plan_cache = true
+query_plan_cache_size = 1000
+
+# Enable query rewriting
+query_rewriting = true
+
+# Cost-based optimization
+cost_based_optimization = true
+
+
+################################################################################
+# Tiered Storage
+################################################################################
+
+[storage]
+# Enable tiered storage
+tiered = true
+
+# Storage tiers
+[storage.tiers.hot]
+enabled = true
+path = "/var/cache/nginx/hot"
+max_size_gb = 100
+retention_days = 7
+eviction_policy = "lru"
+compression_level = 1
+replication_factor = 1
+
+[storage.tiers.warm]
+enabled = true
+path = "/var/cache/nginx/warm"
+max_size_gb = 500
+retention_days = 30
+eviction_policy = "lfu"
+compression_level = 3
+replication_factor = 2
+
+[storage.tiers.cold]
+enabled = true
+path = "/var/cache/nginx/cold"
+max_size_gb = 2000
+retention_days = 365
+eviction_policy = "fifo"
+compression_level = 6
+replication_factor = 3
+
+[storage.tiers.archive]
+enabled = true
+path = "s3://vulcanami-archive"
+retention_days = 2555  # 7 years
+compression_level = 9
+replication_factor = 3
+glacier_class = "deep_archive"
+
+# Automatic tier migration
+[storage.migration]
+enabled = true
+schedule = "0 2 * * *"  # Daily at 2 AM
+concurrent_migrations = 4
+migration_batch_size = 100
+
+# Access pattern tracking for tier optimization
+track_access_patterns = true
+access_log_retention = 90
+
+
+################################################################################
+# Backup and Recovery
+################################################################################
+
+[backup]
+# Enable automatic backups
+enabled = true
+
+# Backup schedule (cron format)
+schedule = "0 1 * * *"  # Daily at 1 AM
+
+# Backup destination
+destination = "s3://vulcanami-backups/packer"
+
+# Backup retention
+retention_days = 90
+min_backup_count = 7
+
+# Incremental backups
+incremental = true
+full_backup_interval = 7
+
+# Backup compression
+compress_backups = true
+backup_compression_level = 6
+
+# Backup encryption
+encrypt_backups = true
+
+# Verify backups after creation
+verify_backups = true
+
+# Backup parallelism
+parallel_backups = 4
+
+# Point-in-time recovery
+[backup.pitr]
+enabled = true
+wal_enabled = true
+wal_retention_days = 30
+
+
+################################################################################
+# Performance Tuning
+################################################################################
+
+[performance]
+# I/O configuration
+[performance.io]
+# Buffer size for I/O operations
+buffer_size = 1048576  # 1 MB
+
+# Enable direct I/O (bypass OS cache)
+direct_io = false
+
+# Enable asynchronous I/O
+async_io = true
+
+# Maximum concurrent I/O operations
+max_concurrent_io = 128
+
+# I/O scheduler
+# Options: "cfq", "deadline", "noop", "bfq"
+io_scheduler = "bfq"
+
+# Read-ahead size (bytes)
+readahead_size = 131072
+
+# Memory management
+[performance.memory]
+# Memory limit (bytes, 0 = unlimited)
+max_memory = 8589934592  # 8 GB
+
+# Memory pool size
+pool_size = 268435456  # 256 MB
+
+# Enable memory mapping for large files
+mmap_enabled = true
+mmap_threshold = 1048576
+
+# Enable huge pages
+huge_pages = true
+
+# Memory allocator
+# Options: "system", "jemalloc", "tcmalloc", "mimalloc"
+allocator = "jemalloc"
+
+# CPU optimization
+[performance.cpu]
+# Worker threads
+# 0 = auto-detect (number of cores)
+worker_threads = 0
+
+# Enable CPU affinity
+cpu_affinity = true
+
+# SIMD optimization
+simd_enabled = true
+
+# Enable prefetching
+prefetch_enabled = true
+
+# Caching
+[performance.cache]
+# Metadata cache size (MB)
+metadata_cache_mb = 512
+
+# Index cache size (MB)
+index_cache_mb = 256
+
+# Block cache size (MB)
+block_cache_mb = 1024
+
+# Cache eviction policy
+# Options: "lru", "lfu", "arc", "2q"
+eviction_policy = "arc"
+
+# Batch processing
+[performance.batching]
+enabled = true
+batch_size = 1000
+batch_timeout_ms = 100
+max_batch_count = 100
+
+
+################################################################################
+# Monitoring and Observability
+################################################################################
+
+[monitoring]
+# Enable Prometheus metrics
+prometheus_enabled = true
+prometheus_port = 9150
+prometheus_path = "/metrics"
+
+# Metrics export interval (seconds)
+metrics_interval = 15
+
+# Enable detailed metrics
+detailed_metrics = true
+
+# Metric namespaces
+metric_prefix = "vulcanami_packer"
+
+# Exported metrics
+[monitoring.metrics]
+# Throughput metrics
+pack_operations_total = true
+chunk_operations_total = true
+bytes_packed_total = true
+bytes_unpacked_total = true
+
+# Performance metrics
+pack_duration_seconds = true
+compression_ratio = true
+deduplication_ratio = true
+cache_hit_rate = true
+
+# Resource metrics
+memory_usage_bytes = true
+cpu_usage_percent = true
+io_operations_total = true
+disk_usage_bytes = true
+
+# Quality metrics
+dqs_score_distribution = true
+pii_detection_count = true
+integrity_check_failures = true
+
+# Health check
+[monitoring.health]
+enabled = true
+port = 8081
+path = "/health"
+check_interval = 30
+
+# Include in health check
+check_disk_space = true
+check_memory = true
+check_dqs_service = true
+check_pii_service = true
+check_database = true
+
+# Distributed tracing
+[monitoring.tracing]
+enabled = true
+provider = "jaeger"
+endpoint = "http://jaeger:14268/api/traces"
+sample_rate = 0.1
+
+# Include trace context in pack metadata
+trace_context = true
+
+# Logging
+[monitoring.logging]
+level = "INFO"  # Options: TRACE, DEBUG, INFO, WARN, ERROR
+format = "json"
+output = "stdout"
+
+# Log rotation
+rotate = true
+max_size_mb = 100
+max_files = 10
+compress = true
+
+# Structured logging fields
+[monitoring.logging.fields]
+timestamp = true
+level = true
+message = true
+pack_id = true
+operation = true
+duration_ms = true
+error = true
+trace_id = true
+
+
+################################################################################
+# Compliance and Audit
+################################################################################
+
+[compliance]
+# Enable compliance mode
+enabled = true
+
+# Regulatory frameworks
+gdpr = true
+hipaa = true
+sox = true
+pci_dss = false
+
+# Audit logging
+[compliance.audit]
+enabled = true
+log_all_operations = true
+log_data_access = true
+log_modifications = true
+log_deletions = true
+
+# Audit log destination
+destination = "elasticsearch"
+elasticsearch_endpoint = "http://elasticsearch:9200"
+elasticsearch_index = "packer-audit"
+
+# Audit log retention
+retention_days = 2555  # 7 years
+
+# Data residency
+[compliance.residency]
+enforce = true
+allowed_regions = ["us-east-1", "eu-central-1", "ap-southeast-1"]
+default_region = "us-east-1"
+
+# Data classification
+[compliance.classification]
+enabled = true
+levels = ["public", "internal", "confidential", "restricted"]
+default_level = "internal"
+
+# Retention policies
+[compliance.retention]
+enabled = true
+default_retention_days = 365
+min_retention_days = 90
+max_retention_days = 2555
+
+# Legal hold
+legal_hold_enabled = true
+
+# Right to erasure (GDPR)
+erasure_enabled = true
+erasure_verification = true
+
+
+################################################################################
+# API and Integration
+################################################################################
+
+[api]
+# Enable REST API
+rest_enabled = true
+rest_port = 8080
+rest_path = "/api/v1"
+
+# Enable gRPC API
+grpc_enabled = true
+grpc_port = 50051
+
+# Authentication
+[api.auth]
+enabled = true
+method = "jwt"  # Options: jwt, oauth2, api_key, mutual_tls
+jwt_secret_path = "secret/packer/jwt"
+token_expiry = 3600
+
+# Rate limiting
+[api.rate_limit]
+enabled = true
+requests_per_minute = 1000
+burst_size = 100
+
+# CORS
+[api.cors]
+enabled = true
+allowed_origins = ["*"]
+allowed_methods = ["GET", "POST", "PUT", "DELETE"]
+allowed_headers = ["*"]
+
+# Webhooks
+[api.webhooks]
+enabled = true
+on_pack_complete = true
+on_pack_error = true
+on_quality_failure = true
+on_pii_detected = true
+
+
+################################################################################
+# Advanced Features
+################################################################################
+
+[features]
+# Parent-child relationship tracking
+parent_child = true
+
+# Adaptive range query optimization
+adaptive_range = true
+
+# Data quality gate
+dqs_gate = true
+
+# PII two-stage review workflow
+pii_two_stage = true
+
+# Zero-knowledge proof support
+zk_proof = true
+
+# Content-addressable storage
+content_addressable = true
+
+# Versioning support
+versioning = true
+max_versions = 10
+
+# Time-travel queries
+time_travel = true
+time_travel_retention_days = 90
+
+# Snapshot support
+snapshots = true
+snapshot_schedule = "0 */6 * * *"  # Every 6 hours
+
+# Clone support
+cloning = true
+
+# Federation support
+federation = false
+
+# Multi-tenancy
+multi_tenancy = true
+tenant_isolation = "strict"  # Options: none, soft, strict
+
+# Machine learning integration
+[features.ml]
+enabled = true
+quality_prediction = true
+anomaly_detection = true
+auto_classification = true
+embedding_storage = true
+
+
+################################################################################
+# Experimental Features
+################################################################################
+
+[experimental]
+# WARNING: These features are experimental and may change or be removed
+
+# Quantum-resistant encryption
+post_quantum_crypto = false
+
+# Neural compression
+neural_compression = false
+neural_model = "learned_index"
+
+# Homomorphic encryption
+homomorphic_encryption = false
+
+# Blockchain integration
+blockchain_anchoring = false
+blockchain_network = "ethereum"
+
+# Edge computing support
+edge_mode = false
+edge_sync_interval = 300
+
+# Serverless mode
+serverless = false
+
+# Auto-scaling
+auto_scaling = false
+scale_metric = "throughput"
+scale_min = 1
+scale_max = 10
+
+
+################################################################################
+# Development and Testing
+################################################################################
+
+[development]
+# Enable development mode
+# WARNING: Do not enable in production
+dev_mode = false
+
+# Enable test mode
+test_mode = false
+
+# Mock external services
+mock_dqs = false
+mock_pii_service = false
+mock_zkp = false
+
+# Seed for reproducible testing
+random_seed = 42
+
+# Enable benchmarking
+benchmarking = false
+benchmark_iterations = 1000
+
+# Enable profiling
+profiling = false
+profile_output = "/tmp/packer-profile"
+
+# Enable assertions
+enable_assertions = true
+
+# Panic on error (for debugging)
+panic_on_error = false
+
+
+################################################################################
+# Metadata and Documentation
+################################################################################
+
+[metadata]
+name = "VulcanAMI Graph Packer"
+description = "High-performance graph packing system with integrated data quality and compliance"
+vendor = "VulcanAMI"
+maintainer = "data-platform@vulcanami.io"
+license = "Proprietary"
+documentation = "https://docs.vulcanami.io/packer"
+repository = "https://github.com/vulcanami/graph-packer"
+support_email = "support@vulcanami.io"
+security_email = "security@vulcanami.io"
+
+# Version information
+[metadata.version]
+major = 4
+minor = 6
+patch = 0
+prerelease = ""
+build = ""
+semver = "4.6.0"
+
+# Dependencies
+[metadata.dependencies]
+opa_min_version = "0.60.0"
+dqs_min_version = "2.0.0"
+postgres_min_version = "14.0"
+redis_min_version = "6.0"
+
+
+################################################################################
+# End of Configuration
+################################################################################

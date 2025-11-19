@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8"/>
+<title>Preference Slider — Speed vs Accuracy</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+  :root { color-scheme: dark; }
+  body { background:#0b1220; color:#e5e7eb; font-family: ui-sans-serif,system-ui; margin:0; padding:24px; }
+  .card { max-width:640px; margin:40px auto; padding:16px; border:1px solid #1f2937; border-radius:12px; }
+  button { padding:8px 12px; border:1px solid #334155; background:#0b1220; color:#e5e7eb; border-radius:8px; cursor:pointer; }
+  button.active { background:#0ea5e9; color:#0b1220; }
+  input, label { display:block; margin:8px 0; }
+  pre { background:#0b1220; border:1px solid #1f2937; border-radius:8px; padding:12px; overflow:auto; }
+</style>
+<div class="card">
+  <h2>Human-in-the-loop Preference</h2>
+  <p>This calls POST /improve with objective_weights. If your API differs, ignore this page or update the adapter.</p>
+  <label for="base">VULCAN Base URL</label>
+  <input id="base" value="http://127.0.0.1:8080/vulcan"/>
+  <div style="display:flex; gap:8px; margin:12px 0;">
+    <button id="speed" class="active">Speed</button>
+    <button id="accuracy">Accuracy</button>
+  </div>
+  <button id="apply">Apply Preference</button>
+  <pre id="out" style="margin-top:12px; white-space:pre-wrap;"></pre>
+</div>
+<script>
+  const speedBtn = document.getElementById('speed');
+  const accBtn = document.getElementById('accuracy');
+  const out = document.getElementById('out');
+  const base = document.getElementById('base');
+  let pref = 'speed';
+  function setPref(p) {
+    pref = p;
+    speedBtn.classList.toggle('active', p==='speed');
+    accBtn.classList.toggle('active', p==='accuracy');
+  }
+  speedBtn.onclick = () => setPref('speed');
+  accBtn.onclick = () => setPref('accuracy');
+  document.getElementById('apply').onclick = async () => {
+    const url = base.value.replace(/\/$/, '') + '/improve';
+    const weights = pref === 'speed' ? { speed: 0.7, accuracy: 0.3 } : { speed: 0.3, accuracy: 0.7 };
+    try {
+      const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ trigger:'preference_change', objective_weights: weights })});
+      const j = await r.json().catch(async () => ({ raw: await r.text() }));
+      out.textContent = JSON.stringify(j, null, 2);
+    } catch (e) {
+      out.textContent = 'Failed: ' + e;
+    }
+  };
+</script>

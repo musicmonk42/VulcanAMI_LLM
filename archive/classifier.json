@@ -1,0 +1,36 @@
+{
+  "grammar_version": "1.0.0",
+  "id": "classifier_mnist_v1",
+  "type": "Graph",
+  "metadata": {
+    "author": "agent-grok",
+    "timestamp": "2025-08-25T00:00:00Z",
+    "version": "1.0.0"
+  },
+  "nodes": [
+    {
+      "id": "input_node",
+      "type": "InputNode"
+    },
+    {
+      "id": "cnn_node",
+      "type": "CNNNode"
+    },
+    {
+      "id": "output_node",
+      "type": "OutputNode"
+    }
+  ],
+  "edges": [
+    {
+      "from": "input_node",
+      "to": "cnn_node",
+      "type": "data"
+    },
+    {
+      "from": "cnn_node",
+      "to": "output_node",
+      "type": "data"
+    }
+  ]
+}

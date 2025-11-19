@@ -1,0 +1,82 @@
+{
+  "id": "sentiment_eval_workload_v2",
+  "type": "Graph",
+  "grammar_version": "1.2.0",
+  "metadata": {
+    "author_agent": "Evo_Framework_Agent_v1",
+    "creation_timestamp": "2025-08-26T21:11:28Z",
+    "description": "A generic evaluation workload for classification programs. It loads a specified dataset and evaluates a specified program graph against it, outputting performance metrics.",
+    "inputs": {
+      "dataset_ref": "The address of the dataset file to load.",
+      "program_to_evaluate": "The ID of the program graph to be evaluated."
+    },
+    "outputs": {
+      "metrics_out": "A dictionary of performance metrics, including accuracy, tokens, and cycles."
+    }
+  },
+  "nodes": [
+    {
+      "id": "dataset_ref",
+      "type": "LOAD",
+      "params": {
+        "addr": "datasets/sentiment_20_samples.json"
+      },
+      "metadata": {
+        "description": "Loads the ground truth dataset from an external source."
+      }
+    },
+    {
+      "id": "program_to_evaluate",
+      "type": "CONST",
+      "params": {
+        "value": "sentiment_3d_enhanced_v1_candidate_7"
+      },
+      "metadata": {
+        "description": "A reference to the specific program graph being evaluated."
+      }
+    },
+    {
+      "id": "run_evaluation",
+      "type": "EVAL"
+    },
+    {
+      "id": "evaluation_output",
+      "type": "HALT"
+    }
+  ],
+  "edges": [
+    {
+      "from": {
+        "node": "dataset_ref",
+        "port": "data_out"
+      },
+      "to": {
+        "node": "run_evaluation",
+        "port": "dataset_in"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "program_to_evaluate",
+        "port": "value"
+      },
+      "to": {
+        "node": "run_evaluation",
+        "port": "graph_ref_in"
+      },
+      "kind": "data"
+    },
+    {
+      "from": {
+        "node": "run_evaluation",
+        "port": "metrics_out"
+      },
+      "to": {
+        "node": "evaluation_output",
+        "port": "final_in"
+      },
+      "kind": "data"
+    }
+  ]
+}

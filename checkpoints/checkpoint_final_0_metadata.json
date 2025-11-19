@@ -1,0 +1,21 @@
+{
+  "timestamp": 1761857542.0939384,
+  "step": 0,
+  "cid": "vulcan_agi_1761857541",
+  "orchestrator_type": "parallel",
+  "agent_pool_status": {
+    "total_agents": 10,
+    "state_distribution": {
+      "idle": 10
+    },
+    "capability_distribution": {
+      "perception": 1,
+      "reasoning": 1,
+      "learning": 1,
+      "planning": 1,
+      "execution": 1,
+      "general": 5
+    },
+    "queue_status": {}
+  }
+}

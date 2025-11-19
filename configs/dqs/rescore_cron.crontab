@@ -1,0 +1,56 @@
+# VulcanAMI Data Quality System - Crontab Configuration
+# Install with: crontab -e, then paste these lines
+# Or: crontab rescore_cron.crontab
+
+# Set environment variables
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+PYTHONPATH=/opt/vulcanami/dqs
+DQS_CONFIG=/etc/dqs/rescore_cron.json
+CLASSIFIER_CONFIG=/etc/dqs/classifier.json
+LOG_DIR=/var/log/dqs
+
+# Full Rescore - Weekly on Sunday at 03:00 UTC
+0 3 * * 0 python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule full_rescore >> $LOG_DIR/full_rescore.log 2>&1
+
+# Incremental Rescore - Daily at 02:00 UTC
+0 2 * * * python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule incremental_rescore >> $LOG_DIR/incremental_rescore.log 2>&1
+
+# Priority Rescore - Every 6 hours
+0 */6 * * * python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule priority_rescore >> $LOG_DIR/priority_rescore.log 2>&1
+
+# Stale Data Rescore - Weekly on Monday at 04:00 UTC
+0 4 * * 1 python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule stale_data_rescore >> $LOG_DIR/stale_data_rescore.log 2>&1
+
+# Low Score Rescore - Daily at 01:00 UTC
+0 1 * * * python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule low_score_rescore >> $LOG_DIR/low_score_rescore.log 2>&1
+
+# Model Drift Rescore - Monthly on 1st at 05:00 UTC
+0 5 1 * * python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule model_drift_rescore >> $LOG_DIR/model_drift_rescore.log 2>&1
+
+# Random Sample Rescore - Every 12 hours
+0 */12 * * * python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule random_sample_rescore >> $LOG_DIR/random_sample_rescore.log 2>&1
+
+# Source-Based Rescore - Weekly on Tuesday at 06:00 UTC
+0 6 * * 2 python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule source_based_rescore >> $LOG_DIR/source_based_rescore.log 2>&1
+
+# Remediation Validation - Hourly at :30 past the hour
+30 * * * * python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule remediation_validation >> $LOG_DIR/remediation_validation.log 2>&1
+
+# PII Revalidation - Weekly on Wednesday at 07:00 UTC
+0 7 * * 3 python3 /opt/vulcanami/dqs/dqs_rescore.py run --schedule pii_revalidation >> $LOG_DIR/pii_revalidation.log 2>&1
+
+# Log rotation - Daily at 23:00 UTC
+0 23 * * * find $LOG_DIR -name "*.log" -type f -mtime +30 -delete
+
+# Health check - Every 5 minutes
+*/5 * * * * curl -sf http://localhost:9146/health > /dev/null || echo "DQS Rescore service down" | mail -s "DQS Alert" ops@vulcanami.io
+
+# Metrics aggregation - Every hour
+0 * * * * python3 /opt/vulcanami/dqs/aggregate_metrics.py >> $LOG_DIR/metrics.log 2>&1
+
+# Report generation - Weekly on Sunday at 06:00 UTC
+0 6 * * 0 python3 /opt/vulcanami/dqs/generate_report.py --period weekly --output $LOG_DIR/reports/ >> $LOG_DIR/reports.log 2>&1
+
+# Monthly report - Monthly on 1st at 08:00 UTC
+0 8 1 * * python3 /opt/vulcanami/dqs/generate_report.py --period monthly --output $LOG_DIR/reports/ >> $LOG_DIR/reports.log 2>&1

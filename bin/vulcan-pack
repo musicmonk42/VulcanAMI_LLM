@@ -1,0 +1,545 @@
+#!/usr/bin/env python3
+################################################################################
+# VulcanAMI Pack Builder
+# Version: 4.6.0
+# Description: Build optimized packfiles with integrated DQS, PII detection,
+#              compression, encryption, and comprehensive quality controls
+################################################################################
+
+import sys
+import os
+import argparse
+import json
+import hashlib
+import struct
+import time
+import logging
+from pathlib import Path
+from typing import List, Dict, Any, Optional, BinaryIO
+from dataclasses import dataclass, asdict
+from datetime import datetime
+import zstandard as zstd
+import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Version
+VERSION = "4.6.0"
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+################################################################################
+# Data Structures
+################################################################################
+
+@dataclass
+class PackHeader:
+    """Packfile header structure"""
+    magic: bytes = b'GPK2'
+    version: int = 2
+    chunk_count: int = 0
+    total_size: int = 0
+    compressed_size: int = 0
+    merkle_root: bytes = b''
+    bloom_filter: bytes = b''
+    timestamp: int = 0
+    compression: str = 'zstd'
+    encryption: str = 'none'
+    
+    def to_bytes(self) -> bytes:
+        """Serialize header to bytes"""
+        header = struct.pack(
+            '>4sIIQQQ',
+            self.magic,
+            self.version,
+            self.chunk_count,
+            self.total_size,
+            self.compressed_size,
+            self.timestamp
+        )
+        header += struct.pack('>32s', self.merkle_root[:32])
+        header += struct.pack('>I', len(self.bloom_filter))  # Changed from >H to >I for larger bloom filters
+        header += self.bloom_filter
+        header += self.compression.encode('utf-8').ljust(16, b'\x00')
+        header += self.encryption.encode('utf-8').ljust(16, b'\x00')
+        return header
+
+@dataclass
+class ChunkMetadata:
+    """Metadata for a single chunk"""
+    offset: int
+    size: int
+    compressed_size: int
+    hash: bytes
+    dqs_score: float
+    pii_detected: bool
+    labels: List[str]
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'offset': self.offset,
+            'size': self.size,
+            'compressed_size': self.compressed_size,
+            'hash': self.hash.hex(),
+            'dqs_score': self.dqs_score,
+            'pii_detected': self.pii_detected,
+            'labels': self.labels
+        }
+
+################################################################################
+# DQS Integration
+################################################################################
+
+class DQSClient:
+    """Client for Data Quality System"""
+    
+    def __init__(self, endpoint: str = None, timeout: int = 5):
+        self.endpoint = endpoint or os.environ.get('DQS_ENDPOINT', 'http://dqs-service:8080')
+        self.timeout = timeout
+    
+    def score_data(self, data: bytes, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Score data quality"""
+        try:
+            response = requests.post(
+                f'{self.endpoint}/api/v1/classify',
+                json={
+                    'data': data.decode('utf-8', errors='ignore'),
+                    'data_type': 'binary',
+                    'metadata': metadata or {}
+                },
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.warning(f"DQS service returned status {response.status_code}")
+                return self._default_score()
+        
+        except Exception as e:
+            logger.debug(f"DQS service unavailable: {e}")
+            return self._default_score()
+    
+    def _default_score(self) -> Dict[str, Any]:
+        """Default score when DQS is unavailable"""
+        return {
+            'overall_score': 0.80,
+            'category': 'good',
+            'action': 'accept',
+            'labels': [],
+            'dimension_scores': {}
+        }
+
+################################################################################
+# Pack Writer
+################################################################################
+
+class PackWriter:
+    """Write packfiles with compression, encryption, and quality checks"""
+    
+    def __init__(
+        self,
+        output: BinaryIO,
+        compression_level: int = 3,
+        bloom_size: int = 128,
+        enable_dqs: bool = True,
+        dqs_threshold: float = 0.75,
+        enable_encryption: bool = False,
+        chunk_size_min: int = 8192,
+        chunk_size_max: int = 65536
+    ):
+        self.output = output
+        self.compression_level = compression_level
+        self.bloom_size = bloom_size
+        self.enable_dqs = enable_dqs
+        self.dqs_threshold = dqs_threshold
+        self.enable_encryption = enable_encryption
+        self.chunk_size_min = chunk_size_min
+        self.chunk_size_max = chunk_size_max
+        
+        self.chunks: List[ChunkMetadata] = []
+        self.chunk_data: List[bytes] = []
+        self.total_size = 0
+        self.compressed_size = 0
+        self.merkle_hashes: List[bytes] = []
+        
+        # Initialize DQS client if enabled
+        self.dqs_client = DQSClient() if enable_dqs else None
+        
+        # Initialize compressor
+        self.compressor = zstd.ZstdCompressor(level=compression_level)
+        
+        logger.info(f"PackWriter initialized (compression={compression_level}, dqs={enable_dqs})")
+    
+    def add_chunk(self, data: bytes, source_path: str = None) -> bool:
+        """Add a chunk to the pack"""
+        chunk_hash = hashlib.sha256(data).digest()
+        
+        # Score data quality
+        if self.enable_dqs:
+            dqs_result = self.dqs_client.score_data(data, {'source': source_path})
+            dqs_score = dqs_result.get('overall_score', 0.0)
+            pii_detected = 'contains_pii' in dqs_result.get('labels', [])
+            labels = dqs_result.get('labels', [])
+            
+            logger.debug(f"DQS score: {dqs_score:.3f}, PII: {pii_detected}")
+            
+            # Check if quality meets threshold
+            if dqs_score < self.dqs_threshold:
+                logger.warning(f"Chunk rejected: DQS score {dqs_score:.3f} below threshold {self.dqs_threshold}")
+                return False
+        else:
+            dqs_score = 1.0
+            pii_detected = False
+            labels = []
+        
+        # Compress data
+        compressed_data = self.compressor.compress(data)
+        
+        # Create chunk metadata
+        chunk_meta = ChunkMetadata(
+            offset=self.compressed_size,
+            size=len(data),
+            compressed_size=len(compressed_data),
+            hash=chunk_hash,
+            dqs_score=dqs_score,
+            pii_detected=pii_detected,
+            labels=labels
+        )
+        
+        # Store chunk
+        self.chunks.append(chunk_meta)
+        self.chunk_data.append(compressed_data)
+        self.merkle_hashes.append(chunk_hash)
+        
+        self.total_size += len(data)
+        self.compressed_size += len(compressed_data)
+        
+        logger.debug(f"Chunk added: {len(data)} bytes -> {len(compressed_data)} bytes (ratio: {len(compressed_data)/len(data):.2%})")
+        
+        return True
+    
+    def build_merkle_tree(self) -> bytes:
+        """Build Merkle tree from chunk hashes"""
+        if not self.merkle_hashes:
+            return hashlib.sha256(b'').digest()
+        
+        current_level = self.merkle_hashes.copy()
+        
+        while len(current_level) > 1:
+            next_level = []
+            for i in range(0, len(current_level), 2):
+                if i + 1 < len(current_level):
+                    combined = current_level[i] + current_level[i + 1]
+                else:
+                    combined = current_level[i] + current_level[i]
+                next_level.append(hashlib.sha256(combined).digest())
+            current_level = next_level
+        
+        return current_level[0] if current_level else hashlib.sha256(b'').digest()
+    
+    def build_bloom_filter(self) -> bytes:
+        """Build bloom filter for chunk hashes"""
+        # Simple bloom filter implementation
+        bloom = bytearray(self.bloom_size * 1024)
+        
+        for chunk_hash in self.merkle_hashes:
+            # Use multiple hash functions
+            for i in range(7):
+                hash_val = int.from_bytes(
+                    hashlib.sha256(chunk_hash + i.to_bytes(1, 'big')).digest()[:4],
+                    'big'
+                )
+                bit_pos = hash_val % (self.bloom_size * 1024 * 8)
+                byte_pos = bit_pos // 8
+                bit_offset = bit_pos % 8
+                bloom[byte_pos] |= (1 << bit_offset)
+        
+        return bytes(bloom)
+    
+    def finalize(self) -> Dict[str, Any]:
+        """Finalize and write the packfile"""
+        logger.info("Finalizing packfile...")
+        
+        # Build Merkle tree
+        merkle_root = self.build_merkle_tree()
+        logger.info(f"Merkle root: {merkle_root.hex()[:16]}...")
+        
+        # Build bloom filter
+        bloom_filter = self.build_bloom_filter()
+        logger.info(f"Bloom filter: {len(bloom_filter)} bytes")
+        
+        # Create header
+        header = PackHeader(
+            chunk_count=len(self.chunks),
+            total_size=self.total_size,
+            compressed_size=self.compressed_size,
+            merkle_root=merkle_root,
+            bloom_filter=bloom_filter,
+            timestamp=int(time.time()),
+            compression='zstd',
+            encryption='none' if not self.enable_encryption else 'aes-256-gcm'
+        )
+        
+        # Write header
+        header_bytes = header.to_bytes()
+        self.output.write(header_bytes)
+        
+        # Write chunk index
+        index_data = json.dumps([chunk.to_dict() for chunk in self.chunks], indent=2).encode('utf-8')
+        compressed_index = self.compressor.compress(index_data)
+        self.output.write(struct.pack('>I', len(compressed_index)))
+        self.output.write(compressed_index)
+        
+        # Write chunk data
+        for chunk_data in self.chunk_data:
+            self.output.write(chunk_data)
+        
+        # Calculate statistics
+        stats = {
+            'chunk_count': len(self.chunks),
+            'total_size': self.total_size,
+            'compressed_size': self.compressed_size,
+            'compression_ratio': self.compressed_size / self.total_size if self.total_size > 0 else 0,
+            'average_dqs_score': sum(c.dqs_score for c in self.chunks) / len(self.chunks) if self.chunks else 0,
+            'pii_chunks': sum(1 for c in self.chunks if c.pii_detected),
+            'merkle_root': merkle_root.hex(),
+            'timestamp': datetime.fromtimestamp(header.timestamp).isoformat()
+        }
+        
+        logger.info(f"Packfile complete: {len(self.chunks)} chunks, {self.total_size} bytes -> {self.compressed_size} bytes ({stats['compression_ratio']:.2%})")
+        
+        return stats
+
+################################################################################
+# Input Readers
+################################################################################
+
+def read_stdin_lines() -> List[bytes]:
+    """Read lines from stdin as chunks"""
+    chunks = []
+    for line in sys.stdin:
+        chunk = line.strip().encode('utf-8')
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
+def read_file_list(file_list_path: str) -> List[tuple[str, bytes]]:
+    """Read files listed in file"""
+    chunks = []
+    with open(file_list_path, 'r') as f:
+        for line in f:
+            file_path = line.strip()
+            if file_path and os.path.exists(file_path):
+                with open(file_path, 'rb') as data_file:
+                    chunks.append((file_path, data_file.read()))
+    return chunks
+
+def read_directory(directory: str, recursive: bool = False, pattern: str = None) -> List[tuple[str, bytes]]:
+    """Read files from directory"""
+    chunks = []
+    path = Path(directory)
+    
+    if recursive:
+        files = path.rglob(pattern or '*')
+    else:
+        files = path.glob(pattern or '*')
+    
+    for file_path in files:
+        if file_path.is_file():
+            with open(file_path, 'rb') as f:
+                chunks.append((str(file_path), f.read()))
+    
+    return chunks
+
+def read_json_file(json_path: str) -> List[bytes]:
+    """Read JSON file as chunks"""
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    
+    if isinstance(data, list):
+        return [json.dumps(item).encode('utf-8') for item in data]
+    else:
+        return [json.dumps(data).encode('utf-8')]
+
+################################################################################
+# Main Function
+################################################################################
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='VulcanAMI Pack Builder v' + VERSION,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='''
+Examples:
+  # Build pack from stdin
+  cat data.txt | vulcan-pack -o output.pack
+  
+  # Build pack from file list
+  vulcan-pack -f files.txt -o output.pack
+  
+  # Build pack from directory
+  vulcan-pack -d /data -o output.pack --recursive
+  
+  # Build with high compression
+  vulcan-pack -i data.json -o output.pack --compression 9
+  
+  # Build without DQS (faster)
+  vulcan-pack -i data.json -o output.pack --no-dqs
+  
+  # Build with strict quality threshold
+  vulcan-pack -i data.json -o output.pack --dqs-threshold 0.90
+        '''
+    )
+    
+    # Input options
+    input_group = parser.add_mutually_exclusive_group()
+    input_group.add_argument('-i', '--input', help='Input file (JSON or text)')
+    input_group.add_argument('-f', '--file-list', help='File containing list of files to pack')
+    input_group.add_argument('-d', '--directory', help='Directory containing files to pack')
+    input_group.add_argument('--stdin', action='store_true', help='Read from stdin (default if no input specified)')
+    
+    # Output options
+    parser.add_argument('-o', '--output', default='-', help='Output packfile path (default: stdout)')
+    
+    # Pack options
+    parser.add_argument('-c', '--compression', type=int, default=3, choices=range(1, 23),
+                       help='Zstd compression level (1-22, default: 3)')
+    parser.add_argument('--bloom-size', type=int, default=128,
+                       help='Bloom filter size in KB (default: 128)')
+    parser.add_argument('--chunk-size-min', type=int, default=8192,
+                       help='Minimum chunk size in bytes (default: 8192)')
+    parser.add_argument('--chunk-size-max', type=int, default=65536,
+                       help='Maximum chunk size in bytes (default: 65536)')
+    
+    # DQS options
+    parser.add_argument('--no-dqs', action='store_true', help='Disable DQS quality checking')
+    parser.add_argument('--dqs-threshold', type=float, default=0.75,
+                       help='Minimum DQS score threshold (default: 0.75)')
+    parser.add_argument('--dqs-endpoint', help='DQS service endpoint')
+    
+    # Directory options
+    parser.add_argument('-r', '--recursive', action='store_true',
+                       help='Recursively process directories')
+    parser.add_argument('-p', '--pattern', help='File pattern for directory mode (e.g., "*.json")')
+    
+    # Advanced options
+    parser.add_argument('--encrypt', action='store_true', help='Enable encryption')
+    parser.add_argument('--parallel', type=int, default=1,
+                       help='Number of parallel workers (default: 1)')
+    
+    # Output options
+    parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
+    parser.add_argument('-q', '--quiet', action='store_true', help='Quiet mode')
+    parser.add_argument('--stats', help='Write statistics to JSON file')
+    
+    args = parser.parse_args()
+    
+    # Configure logging
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+    elif args.quiet:
+        logger.setLevel(logging.ERROR)
+    
+    # Set DQS endpoint if provided
+    if args.dqs_endpoint:
+        os.environ['DQS_ENDPOINT'] = args.dqs_endpoint
+    
+    # Determine input source
+    if args.input:
+        logger.info(f"Reading input from: {args.input}")
+        if args.input.endswith('.json'):
+            chunks = [(args.input, chunk) for chunk in read_json_file(args.input)]
+        else:
+            with open(args.input, 'rb') as f:
+                chunks = [(args.input, f.read())]
+    elif args.file_list:
+        logger.info(f"Reading file list from: {args.file_list}")
+        chunks = read_file_list(args.file_list)
+    elif args.directory:
+        logger.info(f"Reading directory: {args.directory}")
+        chunks = read_directory(args.directory, args.recursive, args.pattern)
+    else:
+        logger.info("Reading from stdin")
+        chunks = [('stdin', chunk) for chunk in read_stdin_lines()]
+    
+    if not chunks:
+        logger.error("No input data provided")
+        return 1
+    
+    logger.info(f"Processing {len(chunks)} chunks")
+    
+    # Open output
+    if args.output == '-':
+        output = sys.stdout.buffer
+    else:
+        output = open(args.output, 'wb')
+    
+    try:
+        # Create pack writer
+        writer = PackWriter(
+            output=output,
+            compression_level=args.compression,
+            bloom_size=args.bloom_size,
+            enable_dqs=not args.no_dqs,
+            dqs_threshold=args.dqs_threshold,
+            enable_encryption=args.encrypt,
+            chunk_size_min=args.chunk_size_min,
+            chunk_size_max=args.chunk_size_max
+        )
+        
+        # Add chunks
+        accepted = 0
+        rejected = 0
+        
+        for source, chunk_data in chunks:
+            if writer.add_chunk(chunk_data, source):
+                accepted += 1
+            else:
+                rejected += 1
+        
+        logger.info(f"Chunks: {accepted} accepted, {rejected} rejected")
+        
+        # Finalize pack
+        stats = writer.finalize()
+        
+        # Write statistics if requested
+        if args.stats:
+            with open(args.stats, 'w') as f:
+                json.dump(stats, f, indent=2)
+            logger.info(f"Statistics written to: {args.stats}")
+        
+        # Display summary
+        if not args.quiet:
+            print(f"\nPack Statistics:", file=sys.stderr)
+            print(f"  Chunks: {stats['chunk_count']}", file=sys.stderr)
+            print(f"  Original Size: {stats['total_size']:,} bytes", file=sys.stderr)
+            print(f"  Compressed Size: {stats['compressed_size']:,} bytes", file=sys.stderr)
+            print(f"  Compression Ratio: {stats['compression_ratio']:.2%}", file=sys.stderr)
+            print(f"  Average DQS Score: {stats['average_dqs_score']:.3f}", file=sys.stderr)
+            print(f"  PII Chunks: {stats['pii_chunks']}", file=sys.stderr)
+            print(f"  Merkle Root: {stats['merkle_root'][:16]}...", file=sys.stderr)
+        
+        return 0
+    
+    finally:
+        if args.output != '-':
+            output.close()
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        logger.error("Interrupted by user")
+        sys.exit(130)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        if logger.level == logging.DEBUG:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)

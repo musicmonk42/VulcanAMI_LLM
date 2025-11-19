@@ -1,0 +1,40 @@
+{
+  "id": "grok-gen-ai-node-proposal-3025",
+  "type": "ai-node-proposal",
+  "grammar_version": "3.4.0",
+  "metadata": {
+    "name": "Grok Generative AI Node",
+    "description": "A node spec for generative AI with Grok-style prompt integration.",
+    "author": "musicmonk42",
+    "version": "1.0",
+    "timestamp": "3025-10-19T20:00:00Z"
+  },
+  "nodes": [
+    {
+      "id": "gen_input",
+      "type": "InputNode",
+      "value": "Generate a poetic summary of the Mars colony evolution experiment."
+    },
+    {
+      "id": "gen_ai",
+      "type": "GrokGenerativeAINode",
+      "prompt_template": "{input}"
+    },
+    {
+      "id": "gen_output",
+      "type": "OutputNode"
+    }
+  ],
+  "edges": [
+    {
+      "source": "gen_input",
+      "target": "gen_ai",
+      "type": "data"
+    },
+    {
+      "source": "gen_ai",
+      "target": "gen_output",
+      "type": "data"
+    }
+  ]
+}

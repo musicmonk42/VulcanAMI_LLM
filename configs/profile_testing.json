@@ -1,0 +1,14 @@
+{
+  "agent_config": {
+    "log_level": "DEBUG",
+    "enable_adversarial_testing": true
+  },
+  "resource_limits": {
+    "max_memory_mb": 4000,
+    "max_cpu_percent": 50.0
+  },
+  "tool_selection_config": {
+    "default_selection_mode": "fast",
+    "max_reasoning_time": 10.0
+  }
+}
