@@ -116,8 +116,7 @@ class RPCClient:
                 else:
                     self.connections[node_id].close()
                 del self.connections[node_id]
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     def send_request(self, node_id: str, msg_type: str, data: Any) -> Optional[Any]:
         """Send request and wait for response."""
@@ -283,12 +282,10 @@ class RPCServer:
             # Always close socket properly
             try:
                 conn.shutdown(socket.SHUT_RDWR)
-            except:
-                pass  # Socket might already be closed
+            except Exception as e:                pass  # Socket might already be closed
             try:
                 conn.close()
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     
     def _handle_request(self, request: Dict[str, Any]) -> Any:
         """Handle incoming request."""
