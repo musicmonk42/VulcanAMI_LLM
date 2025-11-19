@@ -3,6 +3,7 @@
 # Dynamic, layered, validated configuration system with runtime updates
 # Enhanced with Tool Selection Configuration
 # FULLY DEBUGGED VERSION - All critical issues resolved
+# FIXED: Reordered definitions to prevent NameError (AgentConfig defined before usage)
 # FIXED: Added missing SafetyPolicies.names_to_versions and other orchestrator dependencies
 # FIXED: get_config() now returns AgentConfig instance when called without parameters
 # ADDED: Intrinsic Drives Configuration for Self-Improvement
@@ -1230,30 +1231,6 @@ class ConfigurationManager:
             except Exception as e:
                 logger.error(f"Error in change callback: {e}")
                 
-    def _setup_file_watcher(self, file_path: Path, layer: ConfigLayer):
-        """Set up file watcher for auto-reload."""
-        if not WATCHDOG_AVAILABLE or not self.observer:
-            return
-            
-        with self.lock:
-            try:
-                if str(file_path) in self.file_watchers:
-                    return
-                
-                event_handler = ConfigFileEventHandler(self, file_path, layer)
-                
-                watch = self.observer.schedule(
-                    event_handler,
-                    str(file_path.parent),
-                    recursive=False
-                )
-                
-                self.file_watchers[str(file_path)] = watch
-                logger.info(f"File watcher set up for {file_path}")
-                
-            except Exception as e:
-                logger.error(f"Failed to setup file watcher for {file_path}: {e}")
-    
     def cleanup(self):
         """Cleanup resources."""
         if self.observer:
@@ -1370,94 +1347,6 @@ class ConfigurationAPI:
             return {'success': True, 'content': content}
         else:
             return {'success': False, 'error': 'Export failed'}
-
-# ============================================================
-# CONVENIENCE FUNCTIONS
-# ============================================================
-
-def get_config(key: str = None, default: Any = None) -> Any:
-    """Get configuration value. Returns AgentConfig when called with string profile name or no args."""
-    config_manager = _get_config_manager()
-    
-    # Handle string profile names (e.g., "development", "production", "testing")
-    if isinstance(key, str) and key in [p.value for p in ProfileType]:
-        # Load the profile and return AgentConfig
-        try:
-            profile_type = ProfileType(key)
-            config_manager.load_profile(profile_type)
-            return AgentConfig()
-        except (ValueError, AttributeError) as e:
-            logger.error(f"Failed to load profile '{key}': {e}")
-            return AgentConfig()
-    
-    # If no key provided, return AgentConfig instance
-    if key is None:
-        return AgentConfig()
-    
-    # Otherwise get the specific config value
-    return config_manager.get(key, default)
-
-def set_config(key: str, value: Any) -> bool:
-    """Set configuration value."""
-    config_manager = _get_config_manager()
-    return config_manager.set_runtime_override(key, value)
-
-def load_profile(profile: ProfileType) -> bool:
-    """Load configuration profile."""
-    config_manager = _get_config_manager()
-    return config_manager.load_profile(profile)
-
-def validate_config() -> Tuple[bool, List[str], List[str]]:
-    """Validate current configuration."""
-    config_manager = _get_config_manager()
-    return config_manager.validate()
-
-def export_config(file_path: Union[str, Path]) -> bool:
-    """Export configuration to file."""
-    config_manager = _get_config_manager()
-    return config_manager.export(file_path)
-
-def get_tool_selection_config() -> Dict[str, Any]:
-    """Get tool selection configuration."""
-    return get_config('tool_selection_config', {})
-
-def get_utility_weights() -> Dict[str, float]:
-    """Get utility weights for tool selection."""
-    return get_config('tool_selection_config.utility_weights', {
-        'quality': 1.0,
-        'time_penalty': 1.0,
-        'energy_penalty': 0.5,
-        'risk_penalty': 0.8
-    })
-
-def get_portfolio_strategy(mode: str = 'default') -> str:
-    """Get portfolio execution strategy for given mode."""
-    strategies = get_config('tool_selection_config.portfolio_strategies', {})
-    return strategies.get(mode, ExecutionStrategy.ADAPTIVE.value)
-
-def get_intrinsic_drives_config() -> Dict[str, Any]:
-    """Get intrinsic drives configuration."""
-    return get_config('intrinsic_drives_config', {})
-
-def load_intrinsic_drives_from_file(file_path: str = None) -> Dict[str, Any]:
-    """Load intrinsic drives configuration from file."""
-    if file_path is None:
-        file_path = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
-    
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load intrinsic drives config from {file_path}: {e}")
-        return {}
-
-def enable_self_improvement(enabled: bool = True) -> bool:
-    """Enable or disable self-improvement system."""
-    return set_config('intrinsic_drives_config.enabled', enabled)
-
-def is_self_improvement_enabled() -> bool:
-    """Check if self-improvement is enabled."""
-    return get_config('intrinsic_drives_config.enabled', False)
 
 # ============================================================
 # LEGACY DATACLASSES
@@ -1729,10 +1618,6 @@ class HierarchicalGoalSystem:
             }
         ]
     
-    def update_progress(self, goal: str, progress: float):
-        """Update goal progress."""
-        pass
-    
     def generate_plan(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Generate plan from context."""
         return {
@@ -1748,6 +1633,111 @@ class HierarchicalGoalSystem:
             'completed_goals': 0,
             'failed_goals': 0
         }
+
+# ============================================================
+# CONVENIENCE FUNCTIONS
+# ============================================================
+
+def _dict_to_agent_config(raw: dict) -> AgentConfig:
+    """
+    Given a config dict (result from get_all()), produce an AgentConfig with correct fields from both root and agent_config blocks.
+    """
+    agent_cfg = raw.get("agent_config", {})
+    # Add root-level and nested overrides
+    enable_self_improvement = raw.get("enable_self_improvement", False)
+    intrinsic_drives = raw.get("intrinsic_drives_config", {})
+    # Provide more fields as needed for new features
+    return AgentConfig(
+        **agent_cfg,
+        enable_self_improvement=enable_self_improvement or agent_cfg.get("enable_self_improvement", False),
+        intrinsic_drives_config_file=intrinsic_drives.get("config_file", "configs/intrinsic_drives.json"),
+        intrinsic_drives_state_file=intrinsic_drives.get("state_file", "data/agent_state.json")
+    )
+
+def get_config(key: str = None, default: Any = None) -> Any:
+    """Get configuration value. Returns AgentConfig when called with string profile name or no args."""
+    config_manager = _get_config_manager()
+    
+    # Handle string profile names (e.g., "development", "production", "testing")
+    if isinstance(key, str) and key in [p.value for p in ProfileType]:
+        try:
+            profile_type = ProfileType(key)
+            config_manager.load_profile(profile_type)
+            raw = config_manager.get_all()
+            return _dict_to_agent_config(raw)
+        except Exception as e:
+            logger.error(f"Failed to construct AgentConfig from loaded profile: {e}")
+            return AgentConfig()
+    
+    # If no key provided, return AgentConfig instance
+    if key is None:
+        raw = config_manager.get_all()
+        return _dict_to_agent_config(raw)
+    
+    # Otherwise get the specific config value
+    return config_manager.get(key, default)
+
+def set_config(key: str, value: Any) -> bool:
+    """Set configuration value."""
+    config_manager = _get_config_manager()
+    return config_manager.set_runtime_override(key, value)
+
+def load_profile(profile: ProfileType) -> bool:
+    """Load configuration profile."""
+    config_manager = _get_config_manager()
+    return config_manager.load_profile(profile)
+
+def validate_config() -> Tuple[bool, List[str], List[str]]:
+    """Validate current configuration."""
+    config_manager = _get_config_manager()
+    return config_manager.validate()
+
+def export_config(file_path: Union[str, Path]) -> bool:
+    """Export configuration to file."""
+    config_manager = _get_config_manager()
+    return config_manager.export(file_path)
+
+def get_tool_selection_config() -> Dict[str, Any]:
+    """Get tool selection configuration."""
+    return get_config('tool_selection_config', {})
+
+def get_utility_weights() -> Dict[str, float]:
+    """Get utility weights for tool selection."""
+    return get_config('tool_selection_config.utility_weights', {
+        'quality': 1.0,
+        'time_penalty': 1.0,
+        'energy_penalty': 0.5,
+        'risk_penalty': 0.8
+    })
+
+def get_portfolio_strategy(mode: str = 'default') -> str:
+    """Get portfolio execution strategy for given mode."""
+    strategies = get_config('tool_selection_config.portfolio_strategies', {})
+    return strategies.get(mode, ExecutionStrategy.ADAPTIVE.value)
+
+def get_intrinsic_drives_config() -> Dict[str, Any]:
+    """Get intrinsic drives configuration."""
+    return get_config('intrinsic_drives_config', {})
+
+def load_intrinsic_drives_from_file(file_path: str = None) -> Dict[str, Any]:
+    """Load intrinsic drives configuration from file."""
+    if file_path is None:
+        file_path = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
+    
+    try:
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load intrinsic drives config from {file_path}: {e}")
+        return {}
+
+def enable_self_improvement(enabled: bool = True) -> bool:
+    """Enable or disable self-improvement system."""
+    return set_config('intrinsic_drives_config.enabled', enabled)
+
+def is_self_improvement_enabled() -> bool:
+    """Check if self-improvement is enabled."""
+    return get_config('intrinsic_drives_config.enabled', False)
 
 # ============================================================
 # INITIALIZATION
