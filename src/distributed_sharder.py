@@ -15,6 +15,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from security_fixes import safe_pickle_load
 
 # Optional compression
 try:
@@ -747,7 +748,7 @@ class DistributedSharder:
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
         
         with open(checkpoint_path, 'rb') as f:
-            checkpoint_data = pickle.load(f)
+            checkpoint_data = safe_pickle_load(f)
         
         shards = checkpoint_data['shards']
         metadata = ShardMetadata.from_dict(checkpoint_data['metadata'])
