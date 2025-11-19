@@ -30,6 +30,7 @@ except (ImportError, AttributeError):
 from ..config import EMBEDDING_DIM, HIDDEN_DIM
 from .learning_types import LearningConfig
 from .parameter_history import ParameterHistoryManager
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -377,7 +378,7 @@ class TaskDetector:
         if save_file.exists():
             try:
                 with open(save_file, 'rb') as f:
-                    data = pickle.load(f)
+                    data = safe_pickle_load(f)
                 
                 self.task_signatures = data.get('signatures', {})
                 
