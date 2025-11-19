@@ -240,7 +240,9 @@ class VersionedDataLogger:
                 serialized = pickle.dumps(np.array(data).tolist())
             else:
                 serialized = pickle.dumps(data)
-        except:
+        except (TypeError, AttributeError, pickle.PicklingError) as e:
+            # Fallback to string representation if object can't be pickled
+            logger.warning(f"Failed to pickle data, falling back to string: {e}")
             serialized = pickle.dumps(str(data))
         
         # Compute hash
@@ -287,8 +289,8 @@ class VersionedDataLogger:
         try:
             # Force Python to close any open handles to the file
             gc.collect()
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"gc.collect() during log rotation failed: {e}")
         
         # Move current log to archive
         if self.log_file.exists():
@@ -333,10 +335,12 @@ class VersionedDataLogger:
                             return input_data, output_data
                         else:
                             return entry['input_summary'], entry['output_summary']
-        except:
-            pass
-        
-        return None
+        except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Failed to retrieve processing log {log_id}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error retrieving processing log {log_id}: {e}", exc_info=True)
+            return None
     
     def _load_data(self, data_hash: str) -> Any:
         """Load data from versioned store."""
@@ -402,8 +406,9 @@ class VersionedDataLogger:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except:
-            pass
+        except Exception as e:
+            # Log the error but don't raise in destructor
+            logger.debug(f"Error during ProcessingLogger shutdown: {e}")
 
 # ============================================================
 # DYNAMIC MODEL MANAGER WITH HOT-SWAPPING (FIXED & MODIFIED)
