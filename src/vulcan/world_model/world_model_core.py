@@ -1470,6 +1470,18 @@ class WorldModel:
 
         if META_REASONING_AVAILABLE and SelfImprovementDrive and effective_self_improvement:
             try:
+                # Runtime diagnostics: Verify required methods exist before initialization
+                assert hasattr(self.__class__, "_handle_improvement_alert"), \
+                    "Missing required method: _handle_improvement_alert in WorldModel"
+                assert hasattr(self.__class__, "_check_improvement_approval"), \
+                    "Missing required method: _check_improvement_approval in WorldModel"
+                
+                logger.debug("Self-healing diagnostics: WorldModel methods verified")
+                logger.debug("  - _handle_improvement_alert: %s", 
+                           hasattr(self, "_handle_improvement_alert"))
+                logger.debug("  - _check_improvement_approval: %s", 
+                           hasattr(self, "_check_improvement_approval"))
+                
                 self.self_improvement_drive = SelfImprovementDrive(
                     world_model=self,
                     config_path=config.get('self_improvement_config', "configs/intrinsic_drives.json"),
@@ -2780,6 +2792,76 @@ def validate_component_installation() -> Tuple[bool, List[str]]:
     return all_available, missing
 
 
+def validate_self_healing_setup() -> Tuple[bool, List[str]]:
+    """
+    Validate that self-healing/self-improvement is properly set up
+    
+    Returns:
+        Tuple of (is_working, issues_found)
+    """
+    issues = []
+    
+    # Check if meta-reasoning is available
+    if not META_REASONING_AVAILABLE:
+        issues.append("Meta-reasoning module not available")
+    
+    # Check if SelfImprovementDrive is available
+    if SelfImprovementDrive is None:
+        issues.append("SelfImprovementDrive class not loaded")
+    
+    # Check if WorldModel has required methods
+    required_methods = ['_handle_improvement_alert', '_check_improvement_approval']
+    for method in required_methods:
+        if not hasattr(WorldModel, method):
+            issues.append(f"WorldModel missing required method: {method}")
+    
+    # Check if methods are callable
+    if hasattr(WorldModel, '_handle_improvement_alert'):
+        if not callable(getattr(WorldModel, '_handle_improvement_alert')):
+            issues.append("_handle_improvement_alert exists but is not callable")
+    
+    if hasattr(WorldModel, '_check_improvement_approval'):
+        if not callable(getattr(WorldModel, '_check_improvement_approval')):
+            issues.append("_check_improvement_approval exists but is not callable")
+    
+    is_working = len(issues) == 0
+    return is_working, issues
+
+
+def print_self_healing_diagnostics():
+    """Print self-healing/self-improvement diagnostics"""
+    
+    print("\n" + "=" * 60)
+    print("VULCAN-AGI Self-Healing Diagnostics")
+    print("=" * 60)
+    
+    is_working, issues = validate_self_healing_setup()
+    
+    if is_working:
+        print("\n✓ Self-healing system is properly configured")
+        print("\nAll required components:")
+        print("  ✓ Meta-reasoning module available")
+        print("  ✓ SelfImprovementDrive class loaded")
+        print("  ✓ WorldModel._handle_improvement_alert() exists")
+        print("  ✓ WorldModel._check_improvement_approval() exists")
+    else:
+        print("\n✗ Self-healing system has issues:")
+        for issue in issues:
+            print(f"  ✗ {issue}")
+        
+        print("\nRecommended actions:")
+        print("  1. Delete all __pycache__ directories:")
+        print("     find . -type d -name '__pycache__' -exec rm -rf {} +")
+        print("  2. Delete all .pyc files:")
+        print("     find . -name '*.pyc' -delete")
+        print("  3. Restart your Python process")
+        print("  4. Verify imports:")
+        print("     from vulcan.world_model.world_model_core import WorldModel")
+        print("     assert hasattr(WorldModel, '_handle_improvement_alert')")
+    
+    print("\n" + "=" * 60)
+
+
 # Module-level diagnostics
 def print_diagnostics():
     """Print component availability diagnostics"""
@@ -2814,8 +2896,14 @@ def print_diagnostics():
         print(f"✗ CRITICAL COMPONENTS MISSING: {', '.join(missing)}")
         print("  System cannot be initialized")
     print("=" * 60 + "\n")
+    
+    # Add self-healing diagnostics
+    if components.get('self_improvement', False):
+        print_self_healing_diagnostics()
 
 
 # Run diagnostics on import if in main execution
 if __name__ == "__main__":
     print_diagnostics()
+    print("\n")
+    print_self_healing_diagnostics()
