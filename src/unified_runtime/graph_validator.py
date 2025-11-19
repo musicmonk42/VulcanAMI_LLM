@@ -113,7 +113,7 @@ class GraphValidator:
     """Validates Graphix IR graphs for correctness, safety, and compatibility"""
 
     def __init__(self,
-                 ontology_path: str = 'D:/Graphix/configs/graphix_core_ontology.json',
+                 ontology_path: str = None,
                  manifest_node_types: Dict[str, Any] = None,
                  max_memory_mb: int = ResourceLimits.MAX_MEMORY_MB,  # Keep optional params from previous version
                  max_node_count: int = ResourceLimits.MAX_NODE_COUNT,
@@ -123,6 +123,13 @@ class GraphValidator:
                  enable_resource_checking: bool = True,
                  enable_security_validation: bool = True):
 
+        # Security fix: Don't hardcode paths, use environment variable or relative path
+        if ontology_path is None:
+            ontology_path = os.environ.get(
+                'GRAPHIX_ONTOLOGY_PATH',
+                os.path.join(os.path.dirname(__file__), '..', '..', 'configs', 'graphix_core_ontology.json')
+            )
+        
         self.ontology_path = ontology_path
         self.manifest_node_types = manifest_node_types or {}
         self.resource_limits = ResourceLimits()  # Use internal class

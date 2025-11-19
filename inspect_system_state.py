@@ -2,11 +2,27 @@ import argparse, pickle, torch, json, sys
 from pathlib import Path
 
 def load(p):
+    """
+    Load checkpoint with security restrictions.
+    
+    Security: Uses weights_only=True for torch.load to prevent code execution.
+    For pickle files, uses restricted unpickler (if available).
+    """
     try:
-        return torch.load(p, map_location="cpu")
-    except Exception:
-        with open(p,"rb") as f:
-            return pickle.load(f)
+        # Use weights_only=True to prevent arbitrary code execution (CWE-502)
+        return torch.load(p, map_location="cpu", weights_only=True)
+    except Exception as e:
+        # If torch.load fails, try pickle with safety checks
+        print(f"[warn] torch.load failed: {e}, trying pickle...")
+        try:
+            from src.vulcan.security_fixes import safe_pickle_load
+            with open(p, "rb") as f:
+                return safe_pickle_load(f)
+        except ImportError:
+            print("[SECURITY WARNING] safe_pickle_load not available, using unsafe pickle.load")
+            print("[SECURITY WARNING] This could allow arbitrary code execution!")
+            with open(p, "rb") as f:
+                return pickle.load(f)
 
 def main():
     ap = argparse.ArgumentParser()

@@ -158,6 +158,13 @@ class AuditLog(db.Model):
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
     # Could add metadata/json field for structured expansion later
 
+class BootstrapStatus(db.Model):
+    """Track bootstrap key usage to prevent race conditions"""
+    id = db.Column(db.Integer, primary_key=True)
+    used = db.Column(db.Boolean, default=False, nullable=False)
+    used_at = db.Column(db.DateTime)
+    used_by_ip = db.Column(db.String(100))
+    
 with app.app_context():
     db.create_all()
     # Ensure index uniqueness for pubkey not enforced at DB layer; logical uniqueness enforced in code.
@@ -728,8 +735,8 @@ def login():
         backoff = _record_login_failure(ip)
         log_audit(agent_id, "Login failed: nonce invalid or expired",
                   {"ip": ip, "backoff_seconds": backoff})
-        # Add slight random jitter to reduce timing side-channels
-        time.sleep((5 + secrets.randbelow(25)) / 1000.0)
+        # SECURITY FIX: Increased jitter to 100-500ms to prevent timing attacks
+        time.sleep((100 + secrets.randbelow(400)) / 1000.0)
         abort(401, description="Invalid nonce")
 
     agent = Agent.query.filter_by(agent_id=agent_id).first()
@@ -737,7 +744,8 @@ def login():
         backoff = _record_login_failure(ip)
         log_audit(agent_id, "Login failed: agent not found",
                   {"ip": ip, "backoff_seconds": backoff})
-        time.sleep((5 + secrets.randbelow(25)) / 1000.0)
+        # SECURITY FIX: Increased jitter to 100-500ms to prevent timing attacks
+        time.sleep((100 + secrets.randbelow(400)) / 1000.0)
         abort(401, description="Invalid credentials")
 
     message = f"{agent_id}:{nonce}".encode("utf-8")
@@ -747,14 +755,21 @@ def login():
         backoff = _record_login_failure(ip)
         log_audit(agent_id, "Login failed: signature invalid",
                   {"ip": ip, "backoff_seconds": backoff})
-        time.sleep((5 + secrets.randbelow(25)) / 1000.0)
+        # SECURITY FIX: Increased jitter to 100-500ms to prevent timing attacks
+        time.sleep((100 + secrets.randbelow(400)) / 1000.0)
         abort(401, description="Invalid credentials")
 
     _clear_login_failures(ip)
+    # SECURITY FIX: Add complete JWT claims per RFC 8725
     claims = {
         "iss": JWT_ISSUER,
         "aud": JWT_AUDIENCE,
-        "jti": secrets.token_hex(16)
+        "sub": agent_id,  # Subject (who the token is about)
+        "jti": secrets.token_hex(16),  # Unique token ID for revocation
+        "iat": int(time.time()),  # Issued at timestamp
+        "nbf": int(time.time()),  # Not valid before timestamp
+        "roles": agent.roles,  # Include roles for RBAC
+        "trust": agent.trust  # Include trust score for reputation checks
     }
     token = create_access_token(identity=agent_id, additional_claims=claims)
     log_audit(agent_id, "Login success", {"ip": ip})
@@ -784,6 +799,7 @@ def registry_bootstrap():
     - Rate-limit invalid attempts with exponential backoff.
     - Log all failed attempts to audit chain.
     - Auto-expire bootstrap key after successful use (disallow reuse).
+    - SECURITY FIX: Database-level locking to prevent race conditions.
     """
     ip = get_remote_address()
     if ENFORCE_HTTPS_BOOTSTRAP and not _is_request_secure(request):
@@ -795,60 +811,99 @@ def registry_bootstrap():
         abort(429, description=f"Bootstrap temporarily blocked. Try again in {int(wait_remaining)}s seconds.")
 
     data = safe_json()
-    existing_count = Agent.query.count()
-    provided_key = request.headers.get("X-Bootstrap-Key", "")
-
-    configured_key = (BOOTSTRAP_KEY or "")
-    key_valid = secrets.compare_digest(provided_key, configured_key)
-    bootstrap_used = _is_bootstrap_used()
-    allow_without_key = (existing_count == 0) and (not bootstrap_used)
-
-    if not allow_without_key:
-        if not key_valid:
-            backoff = _record_bootstrap_failure(ip)
-            log_audit(None, "Bootstrap failed: invalid key", {"ip": ip, "backoff": backoff})
-            abort(403, description="Bootstrap not allowed: invalid bootstrap key")
-        if bootstrap_used:
-            log_audit(None, "Bootstrap failed: key already used", {"ip": ip})
-            abort(403, description="Bootstrap not allowed: bootstrap key has expired")
-
-    agent_id = validate_agent_id(data.get("agent_id"))
-    pubkey = validate_pubkey(data.get("pubkey"))
-    roles = validate_roles(data.get("roles", ["admin"]))
+    
+    # SECURITY FIX: Use database transaction with SELECT FOR UPDATE to prevent race conditions
+    # This ensures atomic check-and-set for bootstrap status
     try:
-        trust = float(data.get("trust", 0.9))
-    except Exception:
-        abort(400, description="trust must be a float")
-    if trust < 0.0 or trust > 1.0:
-        abort(400, description="trust must be between 0 and 1")
-
-    if Agent.query.filter_by(agent_id=agent_id).first():
-        abort(409, description="Agent already exists")
-    # Enforce public key uniqueness
-    if Agent.query.filter_by(pubkey=pubkey).first():
-        abort(409, description="Public key already registered")
-
-    _ = _load_public_key(pubkey)
-
-    new_agent = Agent(agent_id=agent_id, pubkey=pubkey, roles=roles, trust=trust)
-    db.session.add(new_agent)
-    db.session.commit()
-    claims = {
-        "iss": JWT_ISSUER,
-        "aud": JWT_AUDIENCE,
-        "jti": secrets.token_hex(16)
-    }
-    token = create_access_token(identity=agent_id, additional_claims=claims)
-
-    _clear_bootstrap_failures(ip)
-    _mark_bootstrap_used()
-    log_audit(agent_id, "Bootstrap created agent", {"ip": ip})
-    return jsonify({
-        "status": "bootstrapped",
-        "agent_id": agent_id,
-        "access_token": token,
-        "roles": roles
-    })
+        # Start a new transaction with explicit locking
+        with db.session.begin_nested():
+            # Lock the bootstrap status row for update (prevents concurrent access)
+            bootstrap_status = db.session.query(BootstrapStatus).with_for_update().first()
+            
+            if bootstrap_status is None:
+                # First time - create the record
+                bootstrap_status = BootstrapStatus(used=False)
+                db.session.add(bootstrap_status)
+                db.session.flush()
+            
+            # Check if bootstrap has been used
+            if bootstrap_status.used:
+                log_audit(None, "Bootstrap failed: key already used", {"ip": ip})
+                abort(403, description="Bootstrap not allowed: bootstrap key has expired")
+            
+            # Check if we need a key
+            existing_count = Agent.query.count()
+            provided_key = request.headers.get("X-Bootstrap-Key", "")
+            configured_key = (BOOTSTRAP_KEY or "")
+            key_valid = secrets.compare_digest(provided_key, configured_key)
+            allow_without_key = (existing_count == 0)
+            
+            if not allow_without_key and not key_valid:
+                backoff = _record_bootstrap_failure(ip)
+                log_audit(None, "Bootstrap failed: invalid key", {"ip": ip, "backoff": backoff})
+                abort(403, description="Bootstrap not allowed: invalid bootstrap key")
+            
+            # Validate input
+            agent_id = validate_agent_id(data.get("agent_id"))
+            pubkey = validate_pubkey(data.get("pubkey"))
+            roles = validate_roles(data.get("roles", ["admin"]))
+            try:
+                trust = float(data.get("trust", 0.9))
+            except Exception:
+                abort(400, description="trust must be a float")
+            if trust < 0.0 or trust > 1.0:
+                abort(400, description="trust must be between 0 and 1")
+            
+            # Check for duplicates
+            if Agent.query.filter_by(agent_id=agent_id).first():
+                abort(409, description="Agent already exists")
+            if Agent.query.filter_by(pubkey=pubkey).first():
+                abort(409, description="Public key already registered")
+            
+            # Validate public key format
+            _ = _load_public_key(pubkey)
+            
+            # Create agent
+            new_agent = Agent(agent_id=agent_id, pubkey=pubkey, roles=roles, trust=trust)
+            db.session.add(new_agent)
+            
+            # Mark bootstrap as used ATOMICALLY in same transaction
+            bootstrap_status.used = True
+            bootstrap_status.used_at = datetime.utcnow()
+            bootstrap_status.used_by_ip = ip
+            
+            # Commit the transaction (both agent and bootstrap status)
+            db.session.flush()
+        
+        # Transaction committed successfully
+        db.session.commit()
+        
+        # Generate token
+        claims = {
+            "iss": JWT_ISSUER,
+            "aud": JWT_AUDIENCE,
+            "sub": agent_id,  # SECURITY FIX: Added subject claim
+            "jti": secrets.token_hex(16),
+            "iat": int(time.time()),  # SECURITY FIX: Added issued-at claim
+            "nbf": int(time.time()),  # SECURITY FIX: Added not-before claim
+        }
+        token = create_access_token(identity=agent_id, additional_claims=claims)
+        
+        _clear_bootstrap_failures(ip)
+        _mark_bootstrap_used()  # Also mark in Redis/memory for consistency
+        log_audit(agent_id, "Bootstrap created agent", {"ip": ip})
+        
+        return jsonify({
+            "status": "bootstrapped",
+            "agent_id": agent_id,
+            "access_token": token,
+            "roles": roles
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.exception("Bootstrap failed with exception")
+        abort(500, description="Bootstrap failed")
 
 @app.route("/registry/bootstrap/reset", methods=["POST"])
 @require_roles(["admin"])
