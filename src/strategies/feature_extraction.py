@@ -28,29 +28,25 @@ try:
     except LookupError:
         try:
             nltk.download('punkt_tab', quiet=True)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     try:
         nltk.data.find('tokenizers/punkt')
     except LookupError:
         try:
             nltk.download('punkt', quiet=True)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     try:
         nltk.data.find('taggers/averaged_perceptron_tagger')
     except LookupError:
         try:
             nltk.download('averaged_perceptron_tagger', quiet=True)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
     try:
         nltk.data.find('taggers/averaged_perceptron_tagger_eng')
     except LookupError:
         try:
             nltk.download('averaged_perceptron_tagger_eng', quiet=True)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
 except ImportError:
     HAS_NLTK = False
     nltk = None
@@ -137,8 +133,7 @@ class SyntacticFeatureExtractor(FeatureExtractor):
         if HAS_NLTK and text:
             try:
                 tokens = nltk.word_tokenize(text.lower())
-            except:
-                # Fallback to simple tokenization if NLTK fails
+            except Exception as e:                # Fallback to simple tokenization if NLTK fails
                 tokens = text.lower().split()
         else:
             # Fallback to simple tokenization
@@ -228,8 +223,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             try:
                 tfidf_features = self.tfidf.fit_transform([structure.text]).toarray()[0]
                 features.extend(tfidf_features[:20])  # Top 20 TF-IDF features
-            except:
-                features.extend([0.0] * 20)
+            except Exception as e:                features.extend([0.0] * 20)
         else:
             features.extend([0.0] * 20)
         
@@ -245,8 +239,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and problem:
                 try:
                     structure.tokens = nltk.word_tokenize(problem)
-                except:
-                    structure.tokens = problem.split()
+                except Exception as e:                    structure.tokens = problem.split()
             else:
                 structure.tokens = problem.split() if problem else []
         elif isinstance(problem, dict):
@@ -265,8 +258,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and structure.text:
                 try:
                     structure.tokens = nltk.word_tokenize(structure.text)
-                except:
-                    structure.tokens = structure.text.split()
+                except Exception as e:                    structure.tokens = structure.text.split()
             else:
                 structure.tokens = structure.text.split() if structure.text else []
         
@@ -282,8 +274,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             if HAS_NLTK:
                 try:
                     sentences = nltk.sent_tokenize(structure.text)
-                except:
-                    # Fallback: split on periods
+                except Exception as e:                    # Fallback: split on periods
                     sentences = structure.text.split('.')
             else:
                 # Fallback: split on periods
@@ -358,8 +349,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             if HAS_NLTK:
                 try:
                     pos_tags = nltk.pos_tag(structure.tokens)
-                except:
-                    # Fallback: no POS tagging
+                except Exception as e:                    # Fallback: no POS tagging
                     pos_tags = []
             else:
                 # Fallback: no POS tagging
@@ -410,8 +400,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
         # Cycles
         try:
             features.append(len(nx.cycle_basis(graph)))
-        except:
-            features.append(0.0)
+        except Exception as e:            features.append(0.0)
         
         # Diameter and radius
         if nx.is_connected(graph) and graph.number_of_nodes() > 1:
@@ -515,8 +504,7 @@ class SemanticFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and problem:
                 try:
                     structure.tokens = nltk.word_tokenize(problem)
-                except:
-                    structure.tokens = problem.split()
+                except Exception as e:                    structure.tokens = problem.split()
             else:
                 structure.tokens = problem.split() if problem else []
         elif isinstance(problem, dict):
@@ -527,8 +515,7 @@ class SemanticFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and structure.text:
                 try:
                     structure.tokens = nltk.word_tokenize(structure.text)
-                except:
-                    structure.tokens = structure.text.split()
+                except Exception as e:                    structure.tokens = structure.text.split()
             else:
                 structure.tokens = structure.text.split() if structure.text else []
         
@@ -815,16 +802,14 @@ class MultimodalFeatureExtractor(FeatureExtractor):
                 # Assortativity
                 try:
                     features.append(nx.degree_assortativity_coefficient(G))
-                except:
-                    features.append(0.0)
+                except Exception as e:                    features.append(0.0)
                 
                 # Spectral properties
                 try:
                     laplacian_eigenvalues = nx.laplacian_spectrum(G)
                     features.append(np.mean(laplacian_eigenvalues))
                     features.append(np.std(laplacian_eigenvalues))
-                except:
-                    features.extend([0.0] * 2)
+                except Exception as e:                    features.extend([0.0] * 2)
             else:
                 features.extend([0.0] * 5)
         else:
