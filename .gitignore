@@ -95,6 +95,8 @@ audit_*.json
 
 # Temporary / Generated Files
 *.tmp
+*_temp.txt
+requirements_temp.txt
 shutdown_checkpoint_*.pkl.tmp
 final_metrics.json
 stress_test_report.json

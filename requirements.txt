@@ -134,7 +134,11 @@ graphql-core==3.2.6
 graphql-relay==3.2.0
 graphviz==0.20.3
 pydot==4.0.1
-git+https://github.com/musicmonk42/VulcanAMI.git@main#egg=vulcan-ami
+# FIXME: GitHub dependency requires authentication and blocks installation
+# Options: 1) Publish to PyPI, 2) Use deploy keys, 3) Vendor the package
+# git+https://github.com/musicmonk42/VulcanAMI.git@main#egg=vulcan-ami
+# For now, comment out to allow installation. Install manually if needed:
+# pip install git+https://github.com/musicmonk42/VulcanAMI.git@main
 
 # Hyperparameter Optimization
 # ----------------------------------------------------------------------------
