@@ -1022,5 +1022,4 @@ class GovernedUnlearning:
         """Destructor."""
         try:
             self.shutdown()
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
