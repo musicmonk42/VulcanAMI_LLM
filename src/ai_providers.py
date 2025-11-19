@@ -282,8 +282,7 @@ class ProviderClient:
                 try:
                     error_json = json.loads(error_body)
                     error_msg = error_json.get('error', {}).get('message', error_body)
-                except:
-                    error_msg = error_body
+                except Exception as e:                    error_msg = error_body
                 
                 # Don't retry client errors (4xx)
                 if 400 <= e.code < 500:
@@ -613,8 +612,7 @@ class LocalModelClient(ProviderClient):
                 "load_duration": response.get("load_duration", 0),
                 "eval_count": response.get("eval_count", 0)
             }
-        except:
-            raise ConnectionError(f"Failed to connect to local model at {self.endpoint}")
+        except Exception as e:            raise ConnectionError(f"Failed to connect to local model at {self.endpoint}")
 
 
 # --- 5. Cache Management with JSON ---
