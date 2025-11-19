@@ -870,8 +870,8 @@ class HardwareDispatcherIntegration:
                         return args[0].shape[0] * args[0].shape[1]
                     elif isinstance(args[0], list) and isinstance(args[1], list):
                         return len(args[0]) * len(args[0][0]) if args[0] else 0
-                except:
-                    pass
+                except Exception as e:
+                    logger.error(f"Operation failed: {e}")
         elif operation == "photonic_fused":
             # Estimate from subgraph
             if args and isinstance(args[0], dict):
