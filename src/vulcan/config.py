@@ -8,6 +8,8 @@
 # FIXED: get_config() now returns AgentConfig instance when called without parameters
 # ADDED: Intrinsic Drives Configuration for Self-Improvement
 # INTEGRATED: Complete intrinsic drives configuration with profile support
+# FIXED: _setup_file_watcher defined unconditionally to prevent AttributeError
+# FIXED: Added initialize_config function to resolve startup NameError
 # ============================================================
 
 import os
@@ -400,6 +402,292 @@ if WATCHDOG_AVAILABLE:
                 logger.error(f"Failed to reload configuration: {e}")
 
 # ============================================================
+# LEGACY DATACLASSES
+# ============================================================
+
+EMBEDDING_DIM = 384
+LATENT_DIM = 128
+HIDDEN_DIM = 512
+BATCH_SIZE = 32
+LEARNING_RATE = 0.001
+GAMMA = 0.99
+TAU = 0.005
+
+@dataclass
+class AgentConfig:
+    """Legacy agent configuration."""
+    agent_id: str = ''
+    collective_id: str = ''
+    version: str = ''
+    enable_learning: bool = True
+    enable_adaptation: bool = True
+    enable_self_modification: bool = False
+    enable_multi_agent: bool = False
+    enable_explainability: bool = True
+    enable_adversarial_testing: bool = False
+    enable_multimodal: bool = True
+    enable_symbolic: bool = True
+    enable_distributed: bool = False
+    max_parallel_tasks: int = 10
+    checkpoint_interval: int = 100
+    log_level: str = 'INFO'
+    max_working_memory: int = 20
+    enable_self_improvement: bool = False
+    intrinsic_drives_config_file: str = ''
+    intrinsic_drives_state_file: str = ''
+    
+    def __post_init__(self):
+        """Initialize from global config if not set."""
+        if not self.agent_id:
+            self.agent_id = get_config('agent_config.agent_id', 'vulcan-001')
+        if not self.collective_id:
+            self.collective_id = get_config('agent_config.collective_id', 'COLLECTIVE-001')
+        if not self.version:
+            self.version = get_config('agent_config.version', '1.0.0')
+        if self.max_working_memory == 20:
+            self.max_working_memory = get_config('memory_config.max_working_memory', 20)
+        if not self.enable_self_improvement:
+            self.enable_self_improvement = get_config('intrinsic_drives_config.enabled', False)
+        if not self.intrinsic_drives_config_file:
+            self.intrinsic_drives_config_file = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
+        if not self.intrinsic_drives_state_file:
+            self.intrinsic_drives_state_file = get_config('intrinsic_drives_config.state_file', 'data/agent_state.json')
+    
+    @property
+    def safety_policies(self):
+        """Get safety policies configuration."""
+        return SafetyPolicies()
+    
+    @property
+    def resource_limits(self) -> Dict[str, Any]:
+        return get_config('resource_limits', {})
+    
+    @property
+    def tool_selection_config(self) -> Dict[str, Any]:
+        return get_config('tool_selection_config', {})
+    
+    @property
+    def intrinsic_drives_config(self) -> Dict[str, Any]:
+        return get_config('intrinsic_drives_config', {})
+    
+    @property
+    def world_model(self) -> 'WorldModelConfig':
+        """Get world model configuration."""
+        return WorldModelConfig()
+
+@dataclass
+class ResourceLimits:
+    """Legacy resource limits configuration."""
+    max_memory_mb: int = 0
+    max_cpu_percent: float = 0.0
+    max_gpu_percent: float = 0.0
+    energy_budget_nj: float = 0.0
+    
+    def __post_init__(self):
+        """Initialize from global config if not set."""
+        if self.max_memory_mb == 0:
+            self.max_memory_mb = get_config('resource_limits.max_memory_mb', 8000)
+        if self.max_cpu_percent == 0.0:
+            self.max_cpu_percent = get_config('resource_limits.max_cpu_percent', 80.0)
+        if self.max_gpu_percent == 0.0:
+            self.max_gpu_percent = get_config('resource_limits.max_gpu_percent', 90.0)
+        if self.energy_budget_nj == 0.0:
+            self.energy_budget_nj = get_config('resource_limits.energy_budget_nj', 1e9)
+
+@dataclass
+class SafetyPolicies:
+    """Legacy safety policies configuration (FIXED - added names_to_versions)."""
+    safety_level: Optional[SafetyLevel] = None
+    require_human_approval: bool = False
+    max_autonomy_level: int = 0
+    rollback_threshold: float = 0.0
+    safety_thresholds: Dict[str, float] = field(default_factory=dict)
+    names_to_versions: Dict[str, str] = field(default_factory=dict)
+    
+    def __post_init__(self):
+        """Initialize from global config if not set."""
+        if self.safety_level is None:
+            self.safety_level = SafetyLevel(get_config('safety_policies.safety_level', 1))
+        if not self.require_human_approval:
+            self.require_human_approval = get_config('safety_policies.require_human_approval', False)
+        if self.max_autonomy_level == 0:
+            self.max_autonomy_level = get_config('safety_policies.max_autonomy_level', 5)
+        if self.rollback_threshold == 0.0:
+            self.rollback_threshold = get_config('safety_policies.rollback_threshold', 0.3)
+        if not self.safety_thresholds:
+            self.safety_thresholds = get_config('safety_policies.safety_thresholds', {})
+        if not self.names_to_versions:
+            self.names_to_versions = get_config('safety_policies.names_to_versions', {
+                'ITU_F748_53': '1.0',
+                'safety_validator': '1.0',
+                'governance': '1.0'
+            })
+
+@dataclass
+class LearningConfig:
+    """Legacy learning configuration."""
+    learning_rate: float = 0.0
+    batch_size: int = 0
+    memory_size: int = 0
+    replay_ratio: float = 0.0
+    
+    def __post_init__(self):
+        """Initialize from global config if not set."""
+        if self.learning_rate == 0.0:
+            self.learning_rate = get_config('learning_config.learning_rate', 0.001)
+        if self.batch_size == 0:
+            self.batch_size = get_config('learning_config.batch_size', 32)
+        if self.memory_size == 0:
+            self.memory_size = get_config('learning_config.memory_size', 10000)
+        if self.replay_ratio == 0.0:
+            self.replay_ratio = get_config('learning_config.replay_ratio', 0.5)
+
+@dataclass
+class ToolSelectionConfig:
+    """Tool selection configuration."""
+    default_selection_mode: Optional[SelectionMode] = None
+    confidence_threshold: float = 0.0
+    veto_threshold: float = 0.0
+    max_reasoning_time: float = 0.0
+    enable_caching: bool = True
+    enable_warm_start: bool = True
+    enable_portfolio: bool = True
+    enable_voi: bool = True
+    enable_calibration: bool = True
+    max_parallel_tools: int = 0
+    
+    def __post_init__(self):
+        """Initialize from global config if not set."""
+        if self.default_selection_mode is None:
+            mode_str = get_config('tool_selection_config.default_selection_mode', 'balanced')
+            self.default_selection_mode = SelectionMode(mode_str)
+        if self.confidence_threshold == 0.0:
+            self.confidence_threshold = get_config('tool_selection_config.confidence_threshold', 0.5)
+        if self.veto_threshold == 0.0:
+            self.veto_threshold = get_config('tool_selection_config.veto_threshold', 0.8)
+        if self.max_reasoning_time == 0.0:
+            self.max_reasoning_time = get_config('tool_selection_config.max_reasoning_time', 30.0)
+        if self.max_parallel_tools == 0:
+            self.max_parallel_tools = get_config('tool_selection_config.max_parallel_tools', 4)
+    
+    @property
+    def utility_weights(self) -> Dict[str, float]:
+        return get_utility_weights()
+    
+    @property
+    def portfolio_strategies(self) -> Dict[str, str]:
+        return get_config('tool_selection_config.portfolio_strategies', {})
+    
+    @property
+    def calibration_config(self) -> Dict[str, Any]:
+        return get_config('tool_selection_config.calibration_config', {})
+
+@dataclass
+class IntrinsicDrivesConfig:
+    """Intrinsic drives configuration for self-improvement."""
+    enabled: bool = False
+    config_file: str = ''
+    state_file: str = ''
+    approval_required: bool = True
+    load_on_startup: bool = True
+    check_interval_seconds: int = 60
+    max_cost_usd_per_day: float = 20.0
+    max_cost_usd_per_session: float = 5.0
+    
+    def __post_init__(self):
+        """Initialize from global config if not set."""
+        if not self.enabled:
+            self.enabled = get_config('intrinsic_drives_config.enabled', False)
+        if not self.config_file:
+            self.config_file = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
+        if not self.state_file:
+            self.state_file = get_config('intrinsic_drives_config.state_file', 'data/agent_state.json')
+        if self.approval_required:
+            self.approval_required = get_config('intrinsic_drives_config.approval_required', True)
+        if self.load_on_startup:
+            self.load_on_startup = get_config('intrinsic_drives_config.load_on_startup', True)
+        if self.check_interval_seconds == 60:
+            self.check_interval_seconds = get_config('intrinsic_drives_config.check_interval_seconds', 60)
+        if self.max_cost_usd_per_day == 20.0:
+            self.max_cost_usd_per_day = get_config('intrinsic_drives_config.max_cost_usd_per_day', 20.0)
+        if self.max_cost_usd_per_session == 5.0:
+            self.max_cost_usd_per_session = get_config('intrinsic_drives_config.max_cost_usd_per_session', 5.0)
+
+@dataclass
+class WorldModelConfig:
+    """World model configuration for meta-reasoning and self-improvement."""
+    enable_meta_reasoning: bool = False
+    enable_self_improvement: bool = False
+    meta_reasoning_config: str = ''
+    self_improvement_config: str = ''
+    improvement_state: str = ''
+    
+    def __post_init__(self):
+        """Initialize from global config if not set."""
+        if not self.enable_meta_reasoning:
+            self.enable_meta_reasoning = get_config('world_model.enable_meta_reasoning', False)
+        if not self.enable_self_improvement:
+            self.enable_self_improvement = get_config('world_model.enable_self_improvement', False)
+        if not self.meta_reasoning_config:
+            self.meta_reasoning_config = get_config('world_model.meta_reasoning_config', 'configs/intrinsic_drives.json')
+        if not self.self_improvement_config:
+            self.self_improvement_config = get_config('world_model.self_improvement_config', 'configs/intrinsic_drives.json')
+        if not self.improvement_state:
+            self.improvement_state = get_config('world_model.self_improvement_state', 'data/agent_state.json')
+
+logger.info("WorldModelConfig defined successfully")
+
+@dataclass
+class HierarchicalGoalSystem:
+    """Legacy hierarchical goal system configuration."""
+    max_depth: int = 5
+    goal_types: List[GoalType] = field(default_factory=lambda: list(GoalType))
+    priority_decay: float = 0.9
+    
+    def decompose_goal(self, goal: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Decompose high-level goal into subgoals."""
+        # Basic decomposition - return simple subgoal structure
+        return [
+            {
+                'subgoal': f"analyze_{goal}",
+                'priority': 1.0,
+                'estimated_cost': 0.5
+            },
+            {
+                'subgoal': f"execute_{goal}",
+                'priority': 0.9,
+                'estimated_cost': 0.7
+            }
+        ]
+    
+    def prioritize_goals(self, resources: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Prioritize goals based on available resources."""
+        # Return basic prioritized goal list
+        return [
+            {
+                'subgoal': 'explore',
+                'priority': 1.0,
+                'feasible': True
+            }
+        ]
+    
+    def generate_plan(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate plan from context."""
+        return {
+            'actions': [],
+            'estimated_duration': 0,
+            'resources_needed': {}
+        }
+    
+    def get_goal_status(self) -> Dict[str, Any]:
+        """Get status of all goals."""
+        return {
+            'active_goals': 0,
+            'completed_goals': 0,
+            'failed_goals': 0
+        }
+
+# ============================================================
 # CONFIGURATION MANAGER
 # ============================================================
 
@@ -450,6 +738,27 @@ class ConfigurationManager:
         self._load_defaults()
         self._merge_configurations()
         
+    def _setup_file_watcher(self, file_path: Path, layer: ConfigLayer):
+        """Set up file watcher for configuration file."""
+        # Defensive: only set up watcher if watchdog available and observer initialized
+        if not WATCHDOG_AVAILABLE or not self.observer:
+            return
+            
+        try:
+            if str(file_path) in self.file_watchers:
+                return
+                
+            event_handler = ConfigFileEventHandler(self, file_path, layer)
+            watch = self.observer.schedule(
+                event_handler,
+                str(file_path.parent),
+                recursive=False
+            )
+            self.file_watchers[str(file_path)] = watch
+            logger.info(f"File watcher set up for {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to setup file watcher for {file_path}: {e}")
+            
     def _load_defaults(self):
         """Load default configuration."""
         self.layers[ConfigLayer.DEFAULT] = {
@@ -1241,6 +1550,111 @@ class ConfigurationManager:
                 logger.error(f"Error stopping file observer: {e}")
 
 # ============================================================
+# CONVENIENCE FUNCTIONS
+# ============================================================
+
+def _dict_to_agent_config(raw: dict) -> AgentConfig:
+    """
+    Given a config dict (result from get_all()), produce an AgentConfig with correct fields from both root and agent_config blocks.
+    """
+    agent_cfg = raw.get("agent_config", {})
+    # Add root-level and nested overrides
+    enable_self_improvement = raw.get("enable_self_improvement", False)
+    intrinsic_drives = raw.get("intrinsic_drives_config", {})
+    # Provide more fields as needed for new features
+    return AgentConfig(
+        **agent_cfg,
+        enable_self_improvement=enable_self_improvement or agent_cfg.get("enable_self_improvement", False),
+        intrinsic_drives_config_file=intrinsic_drives.get("config_file", "configs/intrinsic_drives.json"),
+        intrinsic_drives_state_file=intrinsic_drives.get("state_file", "data/agent_state.json")
+    )
+
+def get_config(key: str = None, default: Any = None) -> Any:
+    """Get configuration value. Returns AgentConfig when called with string profile name or no args."""
+    config_manager = _get_config_manager()
+    
+    # Handle string profile names (e.g., "development", "production", "testing")
+    if isinstance(key, str) and key in [p.value for p in ProfileType]:
+        try:
+            profile_type = ProfileType(key)
+            config_manager.load_profile(profile_type)
+            raw = config_manager.get_all()
+            return _dict_to_agent_config(raw)
+        except Exception as e:
+            logger.error(f"Failed to construct AgentConfig from loaded profile: {e}")
+            return AgentConfig()
+    
+    # If no key provided, return AgentConfig instance
+    if key is None:
+        raw = config_manager.get_all()
+        return _dict_to_agent_config(raw)
+    
+    # Otherwise get the specific config value
+    return config_manager.get(key, default)
+
+def set_config(key: str, value: Any) -> bool:
+    """Set configuration value."""
+    config_manager = _get_config_manager()
+    return config_manager.set_runtime_override(key, value)
+
+def load_profile(profile: ProfileType) -> bool:
+    """Load configuration profile."""
+    config_manager = _get_config_manager()
+    return config_manager.load_profile(profile)
+
+def validate_config() -> Tuple[bool, List[str], List[str]]:
+    """Validate current configuration."""
+    config_manager = _get_config_manager()
+    return config_manager.validate()
+
+def export_config(file_path: Union[str, Path]) -> bool:
+    """Export configuration to file."""
+    config_manager = _get_config_manager()
+    return config_manager.export(file_path)
+
+def get_tool_selection_config() -> Dict[str, Any]:
+    """Get tool selection configuration."""
+    return get_config('tool_selection_config', {})
+
+def get_utility_weights() -> Dict[str, float]:
+    """Get utility weights for tool selection."""
+    return get_config('tool_selection_config.utility_weights', {
+        'quality': 1.0,
+        'time_penalty': 1.0,
+        'energy_penalty': 0.5,
+        'risk_penalty': 0.8
+    })
+
+def get_portfolio_strategy(mode: str = 'default') -> str:
+    """Get portfolio execution strategy for given mode."""
+    strategies = get_config('tool_selection_config.portfolio_strategies', {})
+    return strategies.get(mode, ExecutionStrategy.ADAPTIVE.value)
+
+def get_intrinsic_drives_config() -> Dict[str, Any]:
+    """Get intrinsic drives configuration."""
+    return get_config('intrinsic_drives_config', {})
+
+def load_intrinsic_drives_from_file(file_path: str = None) -> Dict[str, Any]:
+    """Load intrinsic drives configuration from file."""
+    if file_path is None:
+        file_path = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
+    
+    try:
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load intrinsic drives config from {file_path}: {e}")
+        return {}
+
+def enable_self_improvement(enabled: bool = True) -> bool:
+    """Enable or disable self-improvement system."""
+    return set_config('intrinsic_drives_config.enabled', enabled)
+
+def is_self_improvement_enabled() -> bool:
+    """Check if self-improvement is enabled."""
+    return get_config('intrinsic_drives_config.enabled', False)
+
+# ============================================================
 # GLOBAL CONFIGURATION INSTANCE
 # ============================================================
 
@@ -1349,447 +1763,52 @@ class ConfigurationAPI:
             return {'success': False, 'error': 'Export failed'}
 
 # ============================================================
-# LEGACY DATACLASSES
-# ============================================================
-
-EMBEDDING_DIM = 384
-LATENT_DIM = 128
-HIDDEN_DIM = 512
-BATCH_SIZE = 32
-LEARNING_RATE = 0.001
-GAMMA = 0.99
-TAU = 0.005
-
-@dataclass
-class AgentConfig:
-    """Legacy agent configuration."""
-    agent_id: str = ''
-    collective_id: str = ''
-    version: str = ''
-    enable_learning: bool = True
-    enable_adaptation: bool = True
-    enable_self_modification: bool = False
-    enable_multi_agent: bool = False
-    enable_explainability: bool = True
-    enable_adversarial_testing: bool = False
-    enable_multimodal: bool = True
-    enable_symbolic: bool = True
-    enable_distributed: bool = False
-    max_parallel_tasks: int = 10
-    checkpoint_interval: int = 100
-    log_level: str = 'INFO'
-    max_working_memory: int = 20
-    enable_self_improvement: bool = False
-    intrinsic_drives_config_file: str = ''
-    intrinsic_drives_state_file: str = ''
-    
-    def __post_init__(self):
-        """Initialize from global config if not set."""
-        if not self.agent_id:
-            self.agent_id = get_config('agent_config.agent_id', 'vulcan-001')
-        if not self.collective_id:
-            self.collective_id = get_config('agent_config.collective_id', 'COLLECTIVE-001')
-        if not self.version:
-            self.version = get_config('agent_config.version', '1.0.0')
-        if self.max_working_memory == 20:
-            self.max_working_memory = get_config('memory_config.max_working_memory', 20)
-        if not self.enable_self_improvement:
-            self.enable_self_improvement = get_config('intrinsic_drives_config.enabled', False)
-        if not self.intrinsic_drives_config_file:
-            self.intrinsic_drives_config_file = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
-        if not self.intrinsic_drives_state_file:
-            self.intrinsic_drives_state_file = get_config('intrinsic_drives_config.state_file', 'data/agent_state.json')
-    
-    @property
-    def safety_policies(self):
-        """Get safety policies configuration."""
-        return SafetyPolicies()
-    
-    @property
-    def resource_limits(self) -> Dict[str, Any]:
-        return get_config('resource_limits', {})
-    
-    @property
-    def tool_selection_config(self) -> Dict[str, Any]:
-        return get_config('tool_selection_config', {})
-    
-    @property
-    def intrinsic_drives_config(self) -> Dict[str, Any]:
-        return get_config('intrinsic_drives_config', {})
-    
-    @property
-    def world_model(self) -> 'WorldModelConfig':
-        """Get world model configuration."""
-        return WorldModelConfig()
-
-@dataclass
-class ResourceLimits:
-    """Legacy resource limits configuration."""
-    max_memory_mb: int = 0
-    max_cpu_percent: float = 0.0
-    max_gpu_percent: float = 0.0
-    energy_budget_nj: float = 0.0
-    
-    def __post_init__(self):
-        """Initialize from global config if not set."""
-        if self.max_memory_mb == 0:
-            self.max_memory_mb = get_config('resource_limits.max_memory_mb', 8000)
-        if self.max_cpu_percent == 0.0:
-            self.max_cpu_percent = get_config('resource_limits.max_cpu_percent', 80.0)
-        if self.max_gpu_percent == 0.0:
-            self.max_gpu_percent = get_config('resource_limits.max_gpu_percent', 90.0)
-        if self.energy_budget_nj == 0.0:
-            self.energy_budget_nj = get_config('resource_limits.energy_budget_nj', 1e9)
-
-@dataclass
-class SafetyPolicies:
-    """Legacy safety policies configuration (FIXED - added names_to_versions)."""
-    safety_level: Optional[SafetyLevel] = None
-    require_human_approval: bool = False
-    max_autonomy_level: int = 0
-    rollback_threshold: float = 0.0
-    safety_thresholds: Dict[str, float] = field(default_factory=dict)
-    names_to_versions: Dict[str, str] = field(default_factory=dict)
-    
-    def __post_init__(self):
-        """Initialize from global config if not set."""
-        if self.safety_level is None:
-            self.safety_level = SafetyLevel(get_config('safety_policies.safety_level', 1))
-        if not self.require_human_approval:
-            self.require_human_approval = get_config('safety_policies.require_human_approval', False)
-        if self.max_autonomy_level == 0:
-            self.max_autonomy_level = get_config('safety_policies.max_autonomy_level', 5)
-        if self.rollback_threshold == 0.0:
-            self.rollback_threshold = get_config('safety_policies.rollback_threshold', 0.3)
-        if not self.safety_thresholds:
-            self.safety_thresholds = get_config('safety_policies.safety_thresholds', {})
-        if not self.names_to_versions:
-            self.names_to_versions = get_config('safety_policies.names_to_versions', {
-                'ITU_F748_53': '1.0',
-                'safety_validator': '1.0',
-                'governance': '1.0'
-            })
-
-@dataclass
-class LearningConfig:
-    """Legacy learning configuration."""
-    learning_rate: float = 0.0
-    batch_size: int = 0
-    memory_size: int = 0
-    replay_ratio: float = 0.0
-    
-    def __post_init__(self):
-        """Initialize from global config if not set."""
-        if self.learning_rate == 0.0:
-            self.learning_rate = get_config('learning_config.learning_rate', 0.001)
-        if self.batch_size == 0:
-            self.batch_size = get_config('learning_config.batch_size', 32)
-        if self.memory_size == 0:
-            self.memory_size = get_config('learning_config.memory_size', 10000)
-        if self.replay_ratio == 0.0:
-            self.replay_ratio = get_config('learning_config.replay_ratio', 0.5)
-
-@dataclass
-class ToolSelectionConfig:
-    """Tool selection configuration."""
-    default_selection_mode: Optional[SelectionMode] = None
-    confidence_threshold: float = 0.0
-    veto_threshold: float = 0.0
-    max_reasoning_time: float = 0.0
-    enable_caching: bool = True
-    enable_warm_start: bool = True
-    enable_portfolio: bool = True
-    enable_voi: bool = True
-    enable_calibration: bool = True
-    max_parallel_tools: int = 0
-    
-    def __post_init__(self):
-        """Initialize from global config if not set."""
-        if self.default_selection_mode is None:
-            mode_str = get_config('tool_selection_config.default_selection_mode', 'balanced')
-            self.default_selection_mode = SelectionMode(mode_str)
-        if self.confidence_threshold == 0.0:
-            self.confidence_threshold = get_config('tool_selection_config.confidence_threshold', 0.5)
-        if self.veto_threshold == 0.0:
-            self.veto_threshold = get_config('tool_selection_config.veto_threshold', 0.8)
-        if self.max_reasoning_time == 0.0:
-            self.max_reasoning_time = get_config('tool_selection_config.max_reasoning_time', 30.0)
-        if self.max_parallel_tools == 0:
-            self.max_parallel_tools = get_config('tool_selection_config.max_parallel_tools', 4)
-    
-    @property
-    def utility_weights(self) -> Dict[str, float]:
-        return get_utility_weights()
-    
-    @property
-    def portfolio_strategies(self) -> Dict[str, str]:
-        return get_config('tool_selection_config.portfolio_strategies', {})
-    
-    @property
-    def calibration_config(self) -> Dict[str, Any]:
-        return get_config('tool_selection_config.calibration_config', {})
-
-@dataclass
-class IntrinsicDrivesConfig:
-    """Intrinsic drives configuration for self-improvement."""
-    enabled: bool = False
-    config_file: str = ''
-    state_file: str = ''
-    approval_required: bool = True
-    load_on_startup: bool = True
-    check_interval_seconds: int = 60
-    max_cost_usd_per_day: float = 20.0
-    max_cost_usd_per_session: float = 5.0
-    
-    def __post_init__(self):
-        """Initialize from global config if not set."""
-        if not self.enabled:
-            self.enabled = get_config('intrinsic_drives_config.enabled', False)
-        if not self.config_file:
-            self.config_file = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
-        if not self.state_file:
-            self.state_file = get_config('intrinsic_drives_config.state_file', 'data/agent_state.json')
-        if self.approval_required:
-            self.approval_required = get_config('intrinsic_drives_config.approval_required', True)
-        if self.load_on_startup:
-            self.load_on_startup = get_config('intrinsic_drives_config.load_on_startup', True)
-        if self.check_interval_seconds == 60:
-            self.check_interval_seconds = get_config('intrinsic_drives_config.check_interval_seconds', 60)
-        if self.max_cost_usd_per_day == 20.0:
-            self.max_cost_usd_per_day = get_config('intrinsic_drives_config.max_cost_usd_per_day', 20.0)
-        if self.max_cost_usd_per_session == 5.0:
-            self.max_cost_usd_per_session = get_config('intrinsic_drives_config.max_cost_usd_per_session', 5.0)
-
-@dataclass
-class WorldModelConfig:
-    """World model configuration for meta-reasoning and self-improvement."""
-    enable_meta_reasoning: bool = False
-    enable_self_improvement: bool = False
-    meta_reasoning_config: str = ''
-    self_improvement_config: str = ''
-    improvement_state: str = ''
-    
-    def __post_init__(self):
-        """Initialize from global config if not set."""
-        if not self.enable_meta_reasoning:
-            self.enable_meta_reasoning = get_config('world_model.enable_meta_reasoning', False)
-        if not self.enable_self_improvement:
-            self.enable_self_improvement = get_config('world_model.enable_self_improvement', False)
-        if not self.meta_reasoning_config:
-            self.meta_reasoning_config = get_config('world_model.meta_reasoning_config', 'configs/intrinsic_drives.json')
-        if not self.self_improvement_config:
-            self.self_improvement_config = get_config('world_model.self_improvement_config', 'configs/intrinsic_drives.json')
-        if not self.improvement_state:
-            self.improvement_state = get_config('world_model.self_improvement_state', 'data/agent_state.json')
-
-logger.info("WorldModelConfig defined successfully")
-
-@dataclass
-class HierarchicalGoalSystem:
-    """Legacy hierarchical goal system configuration."""
-    max_depth: int = 5
-    goal_types: List[GoalType] = field(default_factory=lambda: list(GoalType))
-    priority_decay: float = 0.9
-    
-    def decompose_goal(self, goal: str, context: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Decompose high-level goal into subgoals."""
-        # Basic decomposition - return simple subgoal structure
-        return [
-            {
-                'subgoal': f"analyze_{goal}",
-                'priority': 1.0,
-                'estimated_cost': 0.5
-            },
-            {
-                'subgoal': f"execute_{goal}",
-                'priority': 0.9,
-                'estimated_cost': 0.7
-            }
-        ]
-    
-    def prioritize_goals(self, resources: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Prioritize goals based on available resources."""
-        # Return basic prioritized goal list
-        return [
-            {
-                'subgoal': 'explore',
-                'priority': 1.0,
-                'feasible': True
-            }
-        ]
-    
-    def generate_plan(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate plan from context."""
-        return {
-            'actions': [],
-            'estimated_duration': 0,
-            'resources_needed': {}
-        }
-    
-    def get_goal_status(self) -> Dict[str, Any]:
-        """Get status of all goals."""
-        return {
-            'active_goals': 0,
-            'completed_goals': 0,
-            'failed_goals': 0
-        }
-
-# ============================================================
-# CONVENIENCE FUNCTIONS
-# ============================================================
-
-def _dict_to_agent_config(raw: dict) -> AgentConfig:
-    """
-    Given a config dict (result from get_all()), produce an AgentConfig with correct fields from both root and agent_config blocks.
-    """
-    agent_cfg = raw.get("agent_config", {})
-    # Add root-level and nested overrides
-    enable_self_improvement = raw.get("enable_self_improvement", False)
-    intrinsic_drives = raw.get("intrinsic_drives_config", {})
-    # Provide more fields as needed for new features
-    return AgentConfig(
-        **agent_cfg,
-        enable_self_improvement=enable_self_improvement or agent_cfg.get("enable_self_improvement", False),
-        intrinsic_drives_config_file=intrinsic_drives.get("config_file", "configs/intrinsic_drives.json"),
-        intrinsic_drives_state_file=intrinsic_drives.get("state_file", "data/agent_state.json")
-    )
-
-def get_config(key: str = None, default: Any = None) -> Any:
-    """Get configuration value. Returns AgentConfig when called with string profile name or no args."""
-    config_manager = _get_config_manager()
-    
-    # Handle string profile names (e.g., "development", "production", "testing")
-    if isinstance(key, str) and key in [p.value for p in ProfileType]:
-        try:
-            profile_type = ProfileType(key)
-            config_manager.load_profile(profile_type)
-            raw = config_manager.get_all()
-            return _dict_to_agent_config(raw)
-        except Exception as e:
-            logger.error(f"Failed to construct AgentConfig from loaded profile: {e}")
-            return AgentConfig()
-    
-    # If no key provided, return AgentConfig instance
-    if key is None:
-        raw = config_manager.get_all()
-        return _dict_to_agent_config(raw)
-    
-    # Otherwise get the specific config value
-    return config_manager.get(key, default)
-
-def set_config(key: str, value: Any) -> bool:
-    """Set configuration value."""
-    config_manager = _get_config_manager()
-    return config_manager.set_runtime_override(key, value)
-
-def load_profile(profile: ProfileType) -> bool:
-    """Load configuration profile."""
-    config_manager = _get_config_manager()
-    return config_manager.load_profile(profile)
-
-def validate_config() -> Tuple[bool, List[str], List[str]]:
-    """Validate current configuration."""
-    config_manager = _get_config_manager()
-    return config_manager.validate()
-
-def export_config(file_path: Union[str, Path]) -> bool:
-    """Export configuration to file."""
-    config_manager = _get_config_manager()
-    return config_manager.export(file_path)
-
-def get_tool_selection_config() -> Dict[str, Any]:
-    """Get tool selection configuration."""
-    return get_config('tool_selection_config', {})
-
-def get_utility_weights() -> Dict[str, float]:
-    """Get utility weights for tool selection."""
-    return get_config('tool_selection_config.utility_weights', {
-        'quality': 1.0,
-        'time_penalty': 1.0,
-        'energy_penalty': 0.5,
-        'risk_penalty': 0.8
-    })
-
-def get_portfolio_strategy(mode: str = 'default') -> str:
-    """Get portfolio execution strategy for given mode."""
-    strategies = get_config('tool_selection_config.portfolio_strategies', {})
-    return strategies.get(mode, ExecutionStrategy.ADAPTIVE.value)
-
-def get_intrinsic_drives_config() -> Dict[str, Any]:
-    """Get intrinsic drives configuration."""
-    return get_config('intrinsic_drives_config', {})
-
-def load_intrinsic_drives_from_file(file_path: str = None) -> Dict[str, Any]:
-    """Load intrinsic drives configuration from file."""
-    if file_path is None:
-        file_path = get_config('intrinsic_drives_config.config_file', 'configs/intrinsic_drives.json')
-    
-    try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load intrinsic drives config from {file_path}: {e}")
-        return {}
-
-def enable_self_improvement(enabled: bool = True) -> bool:
-    """Enable or disable self-improvement system."""
-    return set_config('intrinsic_drives_config.enabled', enabled)
-
-def is_self_improvement_enabled() -> bool:
-    """Check if self-improvement is enabled."""
-    return get_config('intrinsic_drives_config.enabled', False)
-
-# ============================================================
-# INITIALIZATION
+# MODULE INITIALIZATION
 # ============================================================
 
 def initialize_config(profile: ProfileType = ProfileType.DEVELOPMENT,
-                     config_file: str = None,
-                     load_env: bool = True,
-                     validate: bool = True) -> bool:
-    """Initialize configuration system."""
+                      config_file: str = None,
+                      load_env: bool = True,
+                      validate: bool = True) -> bool:
+    """
+    Initializes the configuration manager, loads the specified profile, config file,
+    and optionally environment variables, and validates the configuration.
+    """
     config_manager = _get_config_manager()
-    
     success = True
     
+    # Load profile
     if not config_manager.load_profile(profile):
         logger.warning(f"Failed to load profile: {profile}")
         success = False
         
+    # Load config file if specified
     if config_file:
         if not config_manager.load_from_file(config_file):
             logger.warning(f"Failed to load config file: {config_file}")
             success = False
             
+    # Load environment
     if load_env:
         count = config_manager.load_from_environment()
         logger.info(f"Loaded {count} configuration values from environment")
-        
-        # NEW: honor a simple env toggle that actually maps to our nested key
         env_si = os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT")
         if env_si and str(env_si).lower() in ("1", "true", "yes", "on"):
-            # Force-enable intrinsic drives so AgentConfig and WorldModel see it enabled
             config_manager.set_runtime_override("intrinsic_drives_config.enabled", True)
             
+    # Validation
     if validate:
         is_valid, errors, warnings = config_manager.validate()
-        
         if warnings:
             for warning in warnings:
                 logger.warning(f"Configuration warning: {warning}")
-                
         if not is_valid:
             for error in errors:
                 logger.error(f"Configuration error: {error}")
-            
             if config_manager.validator.validation_level.value >= ConfigValidationLevel.STRICT.value:
                 raise ValueError(f"Configuration validation failed with {len(errors)} errors")
                 
     return success
-
-# ============================================================
-# MODULE INITIALIZATION
-# ============================================================
 
 def _lazy_init():
     """Lazy initialization of configuration."""
