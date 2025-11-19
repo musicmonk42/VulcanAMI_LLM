@@ -1,0 +1,1 @@
+{"step": 50, "loss": 39.81547927856445, "loss_tok_alt": 0.0777646079659462, "learning_rate": 1.4999999999999999e-05, "grad_norm": 1.0000577327249418, "tokens_per_batch_nominal": 512, "effective_seq_len_train": 64, "elapsed_sec": 100.67932295799255, "timestamp": 1763485363.7482603}
