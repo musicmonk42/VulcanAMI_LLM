@@ -22,6 +22,7 @@ from pathlib import Path
 import pickle
 import threading
 import warnings
+from .security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -694,7 +695,7 @@ class DistributionMonitor:
             hist_file = load_path / 'detection_history.pkl'
             if hist_file.exists():
                 with open(hist_file, 'rb') as f:
-                    history = pickle.load(f)
+                    history = safe_pickle_load(f)
                     self.detection_history = deque(history, maxlen=1000)
         
         logger.info(f"Distribution monitor state loaded from {load_path}")
