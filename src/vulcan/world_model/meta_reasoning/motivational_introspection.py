@@ -332,7 +332,9 @@ class MotivationalIntrospection:
         _ = self.counterfactual_reasoner
         _ = self.conflict_detector
         _ = self.validation_tracker
-        _ = self.transparency_interface
+        # DO NOT initialize transparency_interface here - it needs world_model.motivational_introspection
+        # to be set first, which happens after MotivationalIntrospection.__init__ completes
+        # _ = self.transparency_interface
         logger.debug("MI components initialized (via properties).")
 
     def _load_persisted_data(self):
@@ -529,7 +531,9 @@ class MotivationalIntrospection:
                 self._validation_tracker = ValidationTracker(
                     world_model=self.world_model,  # PASS IT HERE
                     self_improvement_drive=si_drive,
-                    transparency_interface=self.transparency_interface
+                    # DO NOT pass transparency_interface here - it would trigger circular initialization
+                    # ValidationTracker will get it from world_model when needed
+                    transparency_interface=None
                 )
         return self._validation_tracker
     # --- END REPLACEMENT ---
@@ -542,11 +546,9 @@ class MotivationalIntrospection:
                 logger.error("TransparencyInterface failed to load during init. Using MagicMock.")
                 self._transparency_interface = MagicMock()
             else:
-                # Safely access self_improvement_drive
-                si_drive = None
-                if self.world_model: # Check if world_model exists
-                     si_drive = getattr(self.world_model, 'self_improvement_drive', None)
-                self._transparency_interface = TransparencyInterface(world_model=self)
+                # FIXED: Pass self.world_model instead of self to TransparencyInterface
+                # This ensures TransparencyInterface can access world_model.motivational_introspection
+                self._transparency_interface = TransparencyInterface(world_model=self.world_model)
         return self._transparency_interface
 
     # This property was NOT in the fix list, so it retains its original lazy loading
