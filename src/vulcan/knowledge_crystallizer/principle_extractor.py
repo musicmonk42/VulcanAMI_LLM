@@ -95,8 +95,7 @@ class Pattern:
                 elif hasattr(c, 'to_dict'):
                     try:
                         serializable_components.append(('dict', c.to_dict()))
-                    except:
-                        serializable_components.append(('str', str(c)))
+                    except Exception as e:                        serializable_components.append(('str', str(c)))
                 elif isinstance(c, (list, tuple)):
                     serializable_components.append(('list', [str(item) for item in c]))
                 elif isinstance(c, dict):
@@ -281,8 +280,7 @@ class ExecutionTrace:
         """Get sequence of action types"""
         try:
             return [a.get('type', 'unknown') for a in self.actions if isinstance(a, dict)]
-        except:
-            return []
+        except Exception as e:            return []
     
     def __eq__(self, other):
         """Equality comparison based on trace_id"""
@@ -567,8 +565,7 @@ class CrystallizedPrinciple:
         try:
             total = self.success_count + self.failure_count
             return self.success_count / total if total > 0 else 0.5
-        except:
-            return 0.5
+        except Exception as e:            return 0.5
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -1585,8 +1582,7 @@ class PatternDetector:
             indicators = ['condition', 'if', 'when', 'check', 'test', 'evaluate']
             action_str = str(action).lower()
             return any(ind in action_str for ind in indicators)
-        except:
-            return False
+        except Exception as e:            return False
     
     def _is_start_marker(self, action: Any) -> bool:
         """Check if action marks start of a block"""
@@ -1594,8 +1590,7 @@ class PatternDetector:
             indicators = ['start', 'begin', 'open', 'enter', '{']
             action_str = str(action).lower()
             return any(ind in action_str for ind in indicators)
-        except:
-            return False
+        except Exception as e:            return False
     
     def _is_end_marker(self, action: Any) -> bool:
         """Check if action marks end of a block"""
@@ -1603,8 +1598,7 @@ class PatternDetector:
             indicators = ['end', 'finish', 'close', 'exit', '}']
             action_str = str(action).lower()
             return any(ind in action_str for ind in indicators)
-        except:
-            return False
+        except Exception as e:            return False
     
     def _extract_branches(self, actions: List[Any], condition_idx: int) -> List[str]:
         """Extract branches from conditional"""
@@ -1638,8 +1632,7 @@ class PatternDetector:
                 return False
             
             return True
-        except:
-            return False
+        except Exception as e:            return False
 
 
 class SuccessAnalyzer:
@@ -1897,8 +1890,7 @@ class SuccessAnalyzer:
                         evidence_count=1,
                         conditions=['business_hours_execution']
                     ))
-            except:
-                pass
+            except Exception as e:                logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             
             return factors
         except Exception as e:
