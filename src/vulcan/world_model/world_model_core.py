@@ -1981,11 +1981,10 @@ class CodeLLMClient:
         return status
     
     def _handle_improvement_alert(self, severity: str, alert_data: Dict[str, Any]):
-        """Handle alerts from self-improvement drive"""
         log_level = logging.WARNING if severity == 'warning' else logging.INFO
         logger.log(
             log_level,
-            f"Self-improvement alert [{severity}]: {alert_data.get('message')}"
+            f"Self-improvement alert [{severity}]: {alert_data.get('message', str(alert_data))}"
         )
     
     def _check_improvement_approval(self, approval_id: str) -> Optional[str]:
