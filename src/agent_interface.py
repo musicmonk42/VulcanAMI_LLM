@@ -373,8 +373,7 @@ class HTTPCommunicator:
         except urllib.error.HTTPError as e:
             try:
                 error_body = e.read().decode('utf-8')
-            except:
-                error_body = "Unable to read error body"
+            except Exception as e:                error_body = "Unable to read error body"
             raise RuntimeError(f"HTTP {e.code}: {error_body} (Request ID: {request_id})")
         except urllib.error.URLError as e:
             raise ConnectionError(f"Failed to connect: {e.reason} (Request ID: {request_id})")
@@ -671,8 +670,7 @@ class WebSocketCommunicator:
                 
                 try:
                     self._send_message({"type": "heartbeat"})
-                except:
-                    break
+                except Exception as e:                    break
                 
                 time.sleep(HEARTBEAT_INTERVAL)
         
@@ -737,8 +735,7 @@ class WebSocketCommunicator:
             if self.ws:
                 try:
                     self.ws.close()
-                except:
-                    pass
+                except Exception as e:                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
             self.connected = False
         
         if self.worker_thread:
