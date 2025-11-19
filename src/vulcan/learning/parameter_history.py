@@ -23,6 +23,7 @@ import json
 from datetime import datetime
 
 from .learning_types import LearningConfig, LearningTrajectory
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -508,7 +509,7 @@ class ParameterHistoryManager:
             # FIXED: Use Path object
             path = Path(trajectory_path).resolve()
             with path.open('rb') as f:
-                data = pickle.load(f)
+                data = safe_pickle_load(f)
                 return LearningTrajectory(**data)
         except Exception as e:
             logger.error(f"Failed to load trajectory: {e}")
@@ -740,5 +741,4 @@ class ParameterHistoryManager:
         if hasattr(self, '_running') and self._running:
             try:
                 self.shutdown()
-            except:
-                pass  # Suppress errors in destructor
+            except Exception as e:                pass  # Suppress errors in destructor
