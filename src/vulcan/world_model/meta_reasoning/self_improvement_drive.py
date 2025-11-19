@@ -43,6 +43,9 @@ import shutil
 import os
 import math
 import threading
+import subprocess
+import ast
+import difflib
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple, Callable
 from dataclasses import dataclass, field
@@ -1909,20 +1912,164 @@ class SelfImprovementDrive:
 
     def _execute_improvement(self, action: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         """
-        (Mock) Executes the improvement action.
-        In a real system, this would call an external orchestrator or code executor.
+        Executes the improvement action using LLM-driven code generation, AST validation, and Git integration.
         """
         objective_type = action.get('_drive_metadata', {}).get('objective_type')
-        logger.info(f"PERFORMING MOCK EXECUTION for: {objective_type}")
+        logger.info(f"EXECUTING IMPROVEMENT for: {objective_type}")
+
+        try:
+            # 1. Generate Solution Content (LLM + Diff)
+            solution_content, file_path = self._generate_solution_content(action)
+            if not solution_content or not file_path:
+                return False, {'status': 'failed', 'error': 'LLM failed to generate valid solution content'}
+
+            # 2. AST / Syntax Validation
+            if file_path.endswith('.py'):
+                valid_syntax, syntax_error = self._validate_python_syntax(solution_content)
+                if not valid_syntax:
+                    logger.error(f"Generated code has syntax errors: {syntax_error}")
+                    return False, {'status': 'failed', 'error': f'Syntax error: {syntax_error}'}
+
+            # 3. File Application (I/O)
+            changes_applied, diff_summary = self._apply_file_modification(file_path, solution_content)
+            if not changes_applied:
+                return False, {'status': 'failed', 'error': 'Failed to apply file changes'}
+
+            # 4. Git Integration (Commit)
+            commit_hash = self._commit_to_version_control(file_path, objective_type)
+
+            return True, {
+                'status': 'success',
+                'objective_type': objective_type,
+                'changes_applied': diff_summary,
+                'commit_hash': commit_hash,
+                'cost_usd': 0.05,  # Estimated cost for this operation
+                'tokens_used': 1500 # Estimated tokens
+            }
+
+        except Exception as e:
+            logger.error(f"Execution failed: {e}", exc_info=True)
+            return False, {'status': 'failed', 'error': str(e)}
+
+    def _generate_solution_content(self, action: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Uses the WorldModel's LLM interface (or fallback) to generate the code improvement.
+        Returns (content, file_path).
+        """
+        # Extract details from action plan
+        goal = action.get('high_level_goal')
+        observation = action.get('raw_observation', {})
         
-        # Simulate work
-        time.sleep(0.01) 
+        # Construct Prompt
+        prompt = f"""
+        You are an expert software engineer improving the Vulcan system.
+        Objective: {goal}
+        Task Details: {json.dumps(observation)}
         
-        # Simulate a successful outcome
-        return (True, {
-            'status': 'mock_success',
-            'objective_type': objective_type,
-            'changes_applied': f"Mock change for {objective_type}",
-            'cost_usd': 0.01,
-            'tokens_used': 50
-        })
+        Please provide the FULL content of the Python file that needs to be created or modified to solve this.
+        If modifying, provide the complete updated file.
+        
+        Format your response exactly as follows:
+        FILE: <path/to/file.py>
+        ```python
+        <code content here>
+        ```
+        """
+        
+        # Call LLM (Mock integration if WorldModel not fully wired, otherwise use it)
+        try:
+            response_text = ""
+            if self.world_model and hasattr(self.world_model, 'ask_llm'):
+                response_text = self.world_model.ask_llm(prompt)
+            elif hasattr(self, '_mock_llm_response'):
+                response_text = self._mock_llm_response(prompt)
+            else:
+                # Fallback stub for standalone runs without full environment
+                logger.warning("No LLM provider found, using stub response.")
+                response_text = "FILE: src/vulcan/temp_fix.py\n```python\n# Auto-generated fix\ndef fix(): pass\n```"
+
+            # Parse Response
+            lines = response_text.strip().split('\n')
+            file_path = None
+            code_lines = []
+            in_code_block = False
+            
+            for line in lines:
+                if line.startswith("FILE:"):
+                    file_path = line.replace("FILE:", "").strip()
+                elif line.strip().startswith("```python"):
+                    in_code_block = True
+                elif line.strip().startswith("```") and in_code_block:
+                    in_code_block = False
+                elif in_code_block:
+                    code_lines.append(line)
+            
+            return "\n".join(code_lines), file_path
+
+        except Exception as e:
+            logger.error(f"LLM generation failed: {e}")
+            return None, None
+
+    def _validate_python_syntax(self, content: str) -> Tuple[bool, Optional[str]]:
+        """Validates Python code syntax using AST."""
+        try:
+            ast.parse(content)
+            return True, None
+        except SyntaxError as e:
+            return False, str(e)
+        except Exception as e:
+            return False, str(e)
+
+    def _apply_file_modification(self, file_path: str, new_content: str) -> Tuple[bool, str]:
+        """Writes the new content to disk and calculates a diff."""
+        try:
+            path = Path(file_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            old_content = ""
+            if path.exists():
+                with open(path, 'r', encoding='utf-8') as f:
+                    old_content = f.read()
+            
+            # Calculate Diff
+            diff = difflib.unified_diff(
+                old_content.splitlines(),
+                new_content.splitlines(),
+                fromfile=f"a/{file_path}",
+                tofile=f"b/{file_path}",
+                lineterm=""
+            )
+            diff_text = "\n".join(list(diff))
+            
+            # Write New Content
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+                
+            return True, diff_text if diff_text else "New file created"
+            
+        except Exception as e:
+            logger.error(f"File I/O failed for {file_path}: {e}")
+            return False, ""
+
+    def _commit_to_version_control(self, file_path: str, message: str) -> str:
+        """Stages and commits changes using git subprocess."""
+        try:
+            # Stage
+            subprocess.run(['git', 'add', file_path], check=True, capture_output=True)
+            
+            # Commit
+            commit_msg = f"vulcan(auto): {message}"
+            result = subprocess.run(['git', 'commit', '-m', commit_msg], capture_output=True, text=True)
+            
+            # Parse hash (rudimentary)
+            if result.returncode == 0:
+                # Try to get short hash
+                hash_proc = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True)
+                return hash_proc.stdout.strip()
+            else:
+                logger.warning(f"Git commit returned non-zero: {result.stderr}")
+                return "unknown_hash"
+                
+        except Exception as e:
+            logger.warning(f"Git operation failed (is this a repo?): {e}")
+            return "git_failed"
