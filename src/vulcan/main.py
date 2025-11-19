@@ -403,7 +403,7 @@ async def lifespan(app: FastAPI):
                     
                     # Modern approach: get config path from AgentConfig
                     world_model_config = config.world_model  # This returns WorldModelConfig instance
-                    config_path = world_model_config.meta_reasoning_config or 'configs/intrinsic_drives.json'
+                    config_path = getattr(world_model_config, 'meta_reasoning_config', 'configs/intrinsic_drives.json')
                     
                     introspection = MotivationalIntrospection(world_model, config_path=config_path)
                     logger.info("✓ MotivationalIntrospection initialized (modern mode)")
@@ -463,6 +463,12 @@ app = FastAPI(
     redoc_url="/redoc" if settings.deployment_mode != "production" else None,
     lifespan=lifespan
 )
+
+# --- START NEW ENDPOINT ---
+@app.get("/", response_class=JSONResponse)
+async def root():
+    return {"status": "ok", "message": "VULCAN-AGI API is alive"}
+# --- END NEW ENDPOINT ---
 
 if settings.cors_enabled:
     app.add_middleware(
@@ -529,7 +535,7 @@ async def validate_api_key(request: Request, call_next):
     API key validation middleware.
     Public routes are allowed by suffix so it works when mounted under /vulcan.
     """
-    public_suffixes = ("/health", "/metrics", "/docs", "/redoc", "/openapi.json")
+    public_suffixes = ("/", "/health", "/metrics", "/docs", "/redoc", "/openapi.json")
     path = request.url.path or ""
     if any(path.endswith(sfx) for sfx in public_suffixes):
         return await call_next(request)
@@ -572,7 +578,7 @@ async def rate_limiting(request: Request, call_next):
     if not settings.rate_limit_enabled:
         return await call_next(request)
 
-    public_suffixes = ("/health", "/metrics")
+    public_suffixes = ("/", "/health", "/metrics")
     path = request.url.path or ""
     if any(path.endswith(sfx) for sfx in public_suffixes):
         return await call_next(request)
