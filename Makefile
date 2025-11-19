@@ -362,31 +362,29 @@ version: ## Show version information
 .PHONY: env-example
 env-example: ## Create .env.example file
 	@echo "$(GREEN)Creating .env.example...$(NC)"
-	@cat > .env.example << 'EOF'
-# JWT Configuration
-JWT_SECRET_KEY=generate-with-openssl-rand-base64-48
-BOOTSTRAP_KEY=generate-with-openssl-rand-base64-32
-
-# Database
-POSTGRES_DB=vulcanami
-POSTGRES_USER=vulcanami
-POSTGRES_PASSWORD=change-me-in-production
-
-# Redis
-REDIS_PASSWORD=change-me-in-production
-
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=change-me-in-production
-
-# Grafana
-GRAFANA_USER=admin
-GRAFANA_PASSWORD=change-me-in-production
-
-# Application
-LOG_LEVEL=INFO
-ENVIRONMENT=development
-EOF
+	@echo "# JWT Configuration" > .env.example
+	@echo "JWT_SECRET_KEY=generate-with-openssl-rand-base64-48" >> .env.example
+	@echo "BOOTSTRAP_KEY=generate-with-openssl-rand-base64-32" >> .env.example
+	@echo "" >> .env.example
+	@echo "# Database" >> .env.example
+	@echo "POSTGRES_DB=vulcanami" >> .env.example
+	@echo "POSTGRES_USER=vulcanami" >> .env.example
+	@echo "POSTGRES_PASSWORD=change-me-in-production" >> .env.example
+	@echo "" >> .env.example
+	@echo "# Redis" >> .env.example
+	@echo "REDIS_PASSWORD=change-me-in-production" >> .env.example
+	@echo "" >> .env.example
+	@echo "# MinIO" >> .env.example
+	@echo "MINIO_ROOT_USER=minioadmin" >> .env.example
+	@echo "MINIO_ROOT_PASSWORD=change-me-in-production" >> .env.example
+	@echo "" >> .env.example
+	@echo "# Grafana" >> .env.example
+	@echo "GRAFANA_USER=admin" >> .env.example
+	@echo "GRAFANA_PASSWORD=change-me-in-production" >> .env.example
+	@echo "" >> .env.example
+	@echo "# Application" >> .env.example
+	@echo "LOG_LEVEL=INFO" >> .env.example
+	@echo "ENVIRONMENT=development" >> .env.example
 
 .PHONY: generate-secrets
 generate-secrets: ## Generate secure secrets for .env
