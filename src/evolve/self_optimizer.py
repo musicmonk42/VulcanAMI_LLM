@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Optional, Callable, Tuple
 from dataclasses import dataclass, field, asdict
 from collections import deque, defaultdict
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from .security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -330,8 +331,7 @@ class SelfOptimizer:
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             util = pynvml.nvmlDeviceGetUtilizationRates(handle)
             return float(util.gpu)
-        except:
-            return 0.0
+        except Exception as e:            return 0.0
     
     def _should_optimize(self, metrics: PerformanceMetrics) -> bool:
         """Determine if optimization is needed."""
@@ -814,7 +814,7 @@ class SelfOptimizer:
         
         try:
             with open(filepath, 'rb') as f:
-                state = pickle.load(f)
+                state = safe_pickle_load(f)
             
             # Restore strategies
             if 'strategies' in state:
@@ -893,5 +893,4 @@ class SelfOptimizer:
                 self.thread_executor.shutdown(wait=False)
             if hasattr(self, 'process_executor'):
                 self.process_executor.shutdown(wait=False)
-        except:
-            pass
+        except Exception as e:            logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
