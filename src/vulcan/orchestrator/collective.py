@@ -18,6 +18,15 @@ from .dependencies import EnhancedCollectiveDeps
 from .agent_pool import AgentPoolManager
 from .agent_lifecycle import AgentState, AgentCapability
 
+# Import the WorldModel class to access its internal execution method
+try:
+    from ..world_model.world_model_core import WorldModel
+except ImportError:
+    # Use MagicMock if the world_model is not available (e.g., test environment)
+    from unittest.mock import MagicMock
+    WorldModel = MagicMock
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -343,10 +352,16 @@ class VULCANAGICollective:
         # Check if deps has experiment_generator and problem_executor
         if not hasattr(self.deps, 'experiment_generator'):
             logger.warning("experiment_generator not available in deps")
+            # --- START REPLACEMENT ---
+            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
+            # --- END REPLACEMENT ---
             return
         
         if not hasattr(self.deps, 'problem_executor'):
             logger.warning("problem_executor not available in deps")
+            # --- START REPLACEMENT ---
+            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
+            # --- END REPLACEMENT ---
             return
         
         # Import KnowledgeGap if available
@@ -359,8 +374,9 @@ class VULCANAGICollective:
                 from curiosity_engine.experiment_generator import KnowledgeGap
         except ImportError:
             logger.warning("KnowledgeGap not available, cannot generate experiments")
-            # Fallback to direct execution
-            self._execute_improvement_direct(improvement_action)
+            # --- START REPLACEMENT ---
+            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
+            # --- END REPLACEMENT ---
             return
         
         # Create knowledge gap from improvement objective
@@ -377,7 +393,9 @@ class VULCANAGICollective:
             experiments = self.deps.experiment_generator.generate_for_gap(gap)
         except Exception as e:
             logger.error(f"Failed to generate experiments: {e}", exc_info=True)
-            self._execute_improvement_direct(improvement_action)
+            # --- START REPLACEMENT ---
+            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
+            # --- END REPLACEMENT ---
             return
         
         if not experiments:
@@ -393,7 +411,11 @@ class VULCANAGICollective:
             plan = self._experiment_to_plan(experiment)
             
             # Execute via problem executor
-            outcome = self.deps.problem_executor.execute_plan(problem_graph, plan)
+            # --- START REPLACEMENT ---
+            # Use the integrated WorldModel execution pipeline for the real improvement attempt
+            success, result = self.deps.world_model._execute_improvement(improvement_action)
+            outcome = MagicMock(success=success, execution_time=result.get('execution_timestamp', time.time()), cost_actual=result.get('cost_usd', 0.0))
+            # --- END REPLACEMENT ---
             
             # Record outcome in both systems
             self.deps.experiment_generator.complete_experiment(
@@ -406,7 +428,8 @@ class VULCANAGICollective:
                 outcome.success,
                 {
                     'execution_time': getattr(outcome, 'execution_time', 0),
-                    'experiment_id': experiment.experiment_id
+                    'experiment_id': experiment.experiment_id,
+                    'cost_usd': outcome.cost_actual # Pass actual cost
                 }
             )
             
@@ -450,47 +473,44 @@ class VULCANAGICollective:
         
         logger.info(f"🔧 Executing improvement directly: {objective_type}")
         
-        # Simple execution based on objective type
-        success = False
-        result = {'error': 'Not implemented'}
-        
+        # --- START REPLACEMENT ---
+        # Direct execution must use the integrated WorldModel execution pipeline
         try:
-            if objective_type == 'fix_circular_imports':
-                success, result = self._improve_circular_imports()
-            elif objective_type == 'optimize_performance':
-                success, result = self._improve_performance()
-            elif objective_type == 'improve_test_coverage':
-                success, result = self._improve_tests()
-            elif objective_type == 'enhance_safety_systems':
-                success, result = self._improve_safety()
-            elif objective_type == 'fix_known_bugs':
-                success, result = self._improve_bugs()
-            else:
-                logger.warning(f"Unknown improvement objective: {objective_type}")
-        
-        except Exception as e:
-            logger.error(f"Direct improvement execution failed: {e}", exc_info=True)
-            success = False
-            result = {'error': str(e)}
-        
-        # Record outcome
-        if hasattr(self.deps, 'self_improvement_drive') and self.deps.self_improvement_drive:
-            try:
+            if not hasattr(self.deps, 'world_model') or not hasattr(self.deps.world_model, '_execute_improvement'):
+                raise RuntimeError("WorldModel._execute_improvement dependency not available for direct execution.")
+                
+            success, result = self.deps.world_model._execute_improvement(improvement_action)
+            
+            # Record outcome
+            if hasattr(self.deps, 'self_improvement_drive') and self.deps.self_improvement_drive:
                 self.deps.self_improvement_drive.record_outcome(
                     objective_type,
                     success,
                     result
                 )
-            except Exception as e:
-                logger.error(f"Failed to record improvement outcome: {e}")
-        
-        # Track improvement metrics
-        with self._lock:
-            self.improvement_experiments_run += 1
-            if success:
-                self.improvement_successes += 1
-        
-        logger.info(f"{'✅' if success else '❌'} Direct improvement completed: {objective_type}")
+            
+            # Track improvement metrics
+            with self._lock:
+                self.improvement_experiments_run += 1
+                if success:
+                    self.improvement_successes += 1
+            
+            logger.info(f"{'✅' if success else '❌'} Direct improvement completed: {objective_type}")
+            
+        except Exception as e:
+            logger.error(f"Direct improvement execution failed: {e}", exc_info=True)
+            
+            # Record failure
+            if hasattr(self.deps, 'self_improvement_drive') and self.deps.self_improvement_drive:
+                try:
+                    self.deps.self_improvement_drive.record_outcome(
+                        objective_type,
+                        False,
+                        {'error': str(e)}
+                    )
+                except Exception as e_rec:
+                    logger.error(f"Failed to record improvement outcome after failure: {e_rec}")
+        # --- END REPLACEMENT ---
     
     def _experiment_to_problem_graph(self, experiment: Any) -> Dict[str, Any]:
         """
@@ -604,69 +624,9 @@ class VULCANAGICollective:
         
         return plan
     
-    def _improve_circular_imports(self) -> Tuple[bool, Dict[str, Any]]:
-        """Analyze and suggest fixes for circular imports"""
-        logger.info("Analyzing circular imports...")
-        
-        # TODO: Implement actual circular import detection and fixing
-        return True, {
-            'files_analyzed': 150,
-            'circular_imports_found': 3,
-            'circular_imports_fixed': 3,
-            'cost_usd': 0.50,
-            'tokens_used': 5000
-        }
-    
-    def _improve_performance(self) -> Tuple[bool, Dict[str, Any]]:
-        """Analyze and optimize system performance"""
-        logger.info("Analyzing performance bottlenecks...")
-        
-        # TODO: Implement actual performance optimization
-        return True, {
-            'bottlenecks_found': 5,
-            'optimizations_applied': 5,
-            'performance_improvement_percent': 15,
-            'cost_usd': 1.20,
-            'tokens_used': 12000
-        }
-    
-    def _improve_tests(self) -> Tuple[bool, Dict[str, Any]]:
-        """Generate and improve test coverage"""
-        logger.info("Analyzing test coverage...")
-        
-        # TODO: Implement test generation
-        return True, {
-            'tests_generated': 12,
-            'coverage_before': 65,
-            'coverage_after': 72,
-            'cost_usd': 0.80,
-            'tokens_used': 8000
-        }
-    
-    def _improve_safety(self) -> Tuple[bool, Dict[str, Any]]:
-        """Enhance safety systems"""
-        logger.info("Enhancing safety systems...")
-        
-        # TODO: Implement safety enhancements
-        return True, {
-            'safety_checks_added': 8,
-            'vulnerabilities_patched': 3,
-            'cost_usd': 2.00,
-            'tokens_used': 20000
-        }
-    
-    def _improve_bugs(self) -> Tuple[bool, Dict[str, Any]]:
-        """Fix known bugs"""
-        logger.info("Fixing known bugs...")
-        
-        # TODO: Implement bug fixing
-        return True, {
-            'bugs_analyzed': 5,
-            'bugs_fixed': 4,
-            'bugs_remaining': 1,
-            'cost_usd': 1.50,
-            'tokens_used': 15000
-        }
+    # REMOVED MOCK HANDLERS: _improve_circular_imports, _improve_performance, 
+    # _improve_tests, _improve_safety, _improve_bugs. They are now consolidated 
+    # into the direct call to WorldModel._execute_improvement.
     
     def _record_error(self, error: Exception, phase: str):
         """
