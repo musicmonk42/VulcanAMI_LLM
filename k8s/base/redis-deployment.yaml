@@ -52,6 +52,7 @@ spec:
       - name: redis
         # Pin to specific version with digest for production
         image: redis:7-alpine
+        imagePullPolicy: Always
         command:
         - redis-server
         - --requirepass
