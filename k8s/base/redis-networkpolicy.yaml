@@ -14,9 +14,11 @@ spec:
   - Egress
   
   ingress:
-  # Allow ingress from pods in the same namespace (e.g., API pods)
+  # Allow ingress from API pods in the same namespace
   - from:
-    - podSelector: {}
+    - podSelector:
+        matchLabels:
+          app: vulcanami-api
     ports:
     - protocol: TCP
       port: 6379
@@ -32,5 +34,11 @@ spec:
       port: 53
   
   # Allow egress to pods in the same namespace (for potential cluster mode)
+  # Remove this rule if Redis doesn't need inter-pod communication
   - to:
-    - podSelector: {}
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
