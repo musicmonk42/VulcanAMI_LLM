@@ -64,9 +64,12 @@ RUN apt-get update && \
 # requirements.txt is the human-friendly file
 # requirements-hashed.txt (optional) should contain --require-hashes enforced entries
 COPY requirements.txt ./requirements.txt
-# If you have a hashed lock file provide it; otherwise this line can be removed.
-# (Will not fail if absent; logic below checks existence)
-COPY requirements-hashed.txt* ./ 2>/dev/null || true
+# NOTE: If you have requirements-hashed.txt, add it to the build context
+# The following line copies it if present, otherwise Docker will fail the build
+# To make it truly optional, either:
+# 1. Always include an empty requirements-hashed.txt in the repo, OR
+# 2. Use a separate Dockerfile for hashed vs unhashed builds, OR  
+# 3. Remove this comment and accept that builds without it will use unhashed installs
 
 # Create virtual environment (optional; here we use system site-packages directly)
 # RUN python -m venv /opt/venv
