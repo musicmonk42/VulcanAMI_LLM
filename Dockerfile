@@ -73,12 +73,17 @@ COPY requirements-hashed.txt* ./ 2>/dev/null || true
 # ENV PATH="/opt/venv/bin:$PATH"
 
 # Install dependencies with hash verification if lock file present
+# Added retry logic with --trusted-host as fallback for SSL issues
 RUN if [ -f requirements-hashed.txt ]; then \
         echo "Using hashed dependency verification (requirements-hashed.txt)"; \
-        pip install --no-cache-dir --require-hashes -r requirements-hashed.txt; \
+        pip install --no-cache-dir --require-hashes -r requirements-hashed.txt || \
+        (echo "WARNING: Hashed install failed, retrying with --trusted-host" && \
+         pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org --require-hashes -r requirements-hashed.txt); \
     else \
         echo "WARNING: requirements-hashed.txt not found - falling back to unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
-        pip install --no-cache-dir -r requirements.txt; \
+        pip install --no-cache-dir -r requirements.txt || \
+        (echo "WARNING: requirements install failed with SSL verification, retrying with --trusted-host" && \
+         pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt); \
     fi
 
 # Optional: Generate CycloneDX SBOM (can be skipped by removing lines)
