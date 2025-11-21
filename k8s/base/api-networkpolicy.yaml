@@ -37,13 +37,13 @@ spec:
     - protocol: UDP
       port: 53
   
-  # Allow HTTPS egress for external API calls (OpenAI, model downloads, etc.)
-  # For production, consider restricting to specific external services using networkPolicies
-  # or egress gateways with more granular control
-  - to:
-    - podSelector: {}
-      namespaceSelector: {}
-    ports:
+  # Allow HTTPS/HTTP egress for external API calls (OpenAI, model downloads, etc.)
+  # This rule allows traffic to IPs outside the cluster (no selectors = all destinations)
+  # For production, consider:
+  # 1. Using an egress gateway with allowlisting
+  # 2. Restricting to specific CIDR ranges
+  # 3. Using DNS-based policies if supported by your CNI
+  - ports:
     - protocol: TCP
       port: 443
     - protocol: TCP

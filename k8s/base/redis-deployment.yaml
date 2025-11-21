@@ -32,9 +32,14 @@ spec:
       automountServiceAccountToken: false
       
       # Pod-level security context
-      # Note: The official redis:7-alpine image runs as root by default.
-      # We enforce a non-root user for security. Using UID 1000 as a generic non-root user.
-      # For production, consider building a custom Redis image with a dedicated redis user.
+      # IMPORTANT: The official redis:7-alpine image runs as root by default.
+      # Forcing UID 1000 may cause permission issues with data directories.
+      # RECOMMENDATION FOR PRODUCTION:
+      # 1. Build a custom Redis image with a dedicated redis user (UID 999 or similar)
+      # 2. Ensure the data volume has correct ownership
+      # 3. Test thoroughly before deploying
+      # For development/testing with standard image, you may need to disable this or
+      # use an initContainer to chown the data directory.
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000  # generic non-root user

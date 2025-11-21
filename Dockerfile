@@ -76,7 +76,8 @@ COPY requirements-hashed.txt ./requirements-hashed.txt
 # Install dependencies with hash verification if lock file present and non-empty
 # SECURITY: No fallback to --trusted-host. Build fails if verification fails.
 # For production, always provide requirements-hashed.txt with pip-compile --generate-hashes
-RUN if [ -f requirements-hashed.txt ] && [ -s requirements-hashed.txt ]; then \
+# Check if the file exists, is non-empty, and contains actual package entries (not just comments)
+RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.txt; then \
         echo "Using hashed dependency verification (requirements-hashed.txt)"; \
         pip install --no-cache-dir --require-hashes -r requirements-hashed.txt; \
     else \
