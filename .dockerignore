@@ -1,0 +1,243 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.hypothesis/
+.pytype/
+.pyre/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Documentation
+docs/_build/
+site/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+test-results/
+
+# Development
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+audit.db*
+rollback_storage/
+logs/
+*.log
+*.pid
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+secrets/
+keystore/
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Data and models
+data/
+*.h5
+*.pkl
+*.pickle
+*.joblib
+checkpoints/
+models/
+*.pt
+*.pth
+*.onnx
+*.tflite
+
+# Logs and databases
+logs/
+*.log
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Archives
+*.tar
+*.tar.gz
+*.zip
+*.rar
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# CI/CD artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+junit/
+test-results/
+
+# Large binary files
+*.bin
+*.dat
+*.npy
+*.npz
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Local configuration
+local_settings.py
+settings_local.py
+
+# Backups
+*.bak
+*.backup
+*~
+
+# Generated files
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Volumes
+volumes/
+minio_data/
+postgres_data/
+redis_data/
+elasticsearch_data/
+grafana_data/
+prometheus_data/
+
+# Monitoring and observability
+interpretability_logs/
+nso_aligner_logs/
+dashboards/output/
+
+# Search indices
+search_indices/
+
+# Stress tests output
+stress_tests/output/
+
+# Evolution champions
+evolution_champions/*.json
+evolution_champions/*.pkl
+
+# Task signatures
+task_signatures/*.json
+
+# Curriculum states
+curriculum_states/*.json
+
+# Graphs
+graphs/output/
+
+# Demo artifacts
+demo/output/
+demos/output/
+
+# Archive
+archive/
+
+# Probabilistic models cache
+probabilistic_models/cache/
+
+# Unified models cache
+unified_models/cache/
+
+# Specs
+specs/generated/
+
+# Operations
+ops/logs/
+ops/metrics/
+
+# Client SDK build artifacts
+client_sdk/dist/
+client_sdk/build/
+
+# Config overrides
+configs/local/
+configs/*.local.*
+
+# Corpus files
+corpus_files.txt.local
+
+# Experiment outputs
+exp_probe_*/
+
+# Output directory
+output/

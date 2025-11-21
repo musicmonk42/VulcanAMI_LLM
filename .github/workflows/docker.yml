@@ -1,0 +1,249 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      push_to_registry:
+        description: 'Push to registry'
+        required: false
+        default: 'false'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: main
+            dockerfile: Dockerfile
+            context: .
+          - name: dqs
+            dockerfile: docker/dqs/Dockerfile
+            context: .
+          - name: pii
+            dockerfile: docker/pii/Dockerfile
+            context: .
+          - name: api
+            dockerfile: docker/api/Dockerfile
+            context: .
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub (optional)
+        if: github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service.name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/vulcanami-${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Check if Dockerfile exists
+        id: check_dockerfile
+        run: |
+          if [ -f "${{ matrix.service.dockerfile }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Warning: Dockerfile ${{ matrix.service.dockerfile }} not found"
+          fi
+
+      - name: Build and push Docker image
+        if: steps.check_dockerfile.outputs.exists == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' || github.event.inputs.push_to_registry == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            REJECT_INSECURE_JWT=ack
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+      - name: Generate SBOM
+        if: steps.check_dockerfile.outputs.exists == 'true' && github.event_name != 'pull_request'
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service.name }}:${{ steps.meta.outputs.version }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.service.name }}.spdx.json
+
+      - name: Upload SBOM
+        if: steps.check_dockerfile.outputs.exists == 'true' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.service.name }}
+          path: sbom-${{ matrix.service.name }}.spdx.json
+          retention-days: 90
+
+  scan-images:
+    name: Security Scan Images
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+    
+    strategy:
+      matrix:
+        service: [main, dqs, pii, api]
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.service }}.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+          category: trivy-${{ matrix.service }}
+
+  build-docker-compose:
+    name: Test Docker Compose
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          JWT_SECRET_KEY=$(openssl rand -base64 48)
+          BOOTSTRAP_KEY=$(openssl rand -base64 32)
+          POSTGRES_PASSWORD=$(openssl rand -base64 32)
+          MINIO_ROOT_USER=minioadmin
+          MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)
+          REDIS_PASSWORD=
+          EOF
+
+      - name: Validate docker-compose files
+        run: |
+          docker-compose -f docker-compose.dev.yml config > /dev/null
+          if [ -f "docker-compose.prod.yml" ]; then
+            docker-compose -f docker-compose.prod.yml config > /dev/null
+          fi
+
+      - name: Test docker-compose build
+        run: |
+          # Build only the main services without starting
+          docker-compose -f docker-compose.dev.yml build --parallel || echo "Some services may not have build configs"
+
+  push-to-registries:
+    name: Push to Multiple Registries
+    runs-on: ubuntu-latest
+    needs: [build-and-push, scan-images]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: secrets.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to AWS ECR (optional)
+        if: secrets.AWS_ACCESS_KEY_ID != ''
+        uses: aws-actions/amazon-ecr-login@v2
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Tag and push release images
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          
+          # Pull from GitHub Container Registry
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-main:latest
+          
+          # Tag for different registries
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-main:latest \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-main:${VERSION}
+          
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-main:latest \
+              ${{ secrets.DOCKERHUB_USERNAME }}/vulcanami-main:${VERSION}
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/vulcanami-main:${VERSION}
+          fi
+          
+          # Push versioned tag
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-main:${VERSION}

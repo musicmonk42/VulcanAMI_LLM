@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulcanami-api
+  namespace: vulcanami
+  labels:
+    app: vulcanami-api
+    component: api-gateway
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vulcanami-api
+  template:
+    metadata:
+      labels:
+        app: vulcanami-api
+        component: api-gateway
+    spec:
+      containers:
+      - name: api
+        image: ghcr.io/musicmonk42/vulcanami_llm-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 9148
+          name: metrics
+          protocol: TCP
+        env:
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: JWT_SECRET_KEY
+        - name: BOOTSTRAP_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: BOOTSTRAP_KEY
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: POSTGRES_PASSWORD
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: REDIS_PASSWORD
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: MINIO_SECRET_KEY
+        envFrom:
+        - configMapRef:
+            name: vulcanami-config
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vulcanami-api
+  namespace: vulcanami
+  labels:
+    app: vulcanami-api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 9148
+    targetPort: 9148
+    protocol: TCP
+    name: metrics
+  selector:
+    app: vulcanami-api

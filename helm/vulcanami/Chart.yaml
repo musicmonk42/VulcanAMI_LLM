@@ -1,0 +1,17 @@
+apiVersion: v2
+name: vulcanami
+description: A Helm chart for VulcanAMI / Graphix Vulcan Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - vulcanami
+  - graphix
+  - ai
+  - ml
+home: https://github.com/musicmonk42/VulcanAMI_LLM
+sources:
+  - https://github.com/musicmonk42/VulcanAMI_LLM
+maintainers:
+  - name: musicmonk42
+    email: support@vulcanami.io
