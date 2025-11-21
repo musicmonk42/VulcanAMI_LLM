@@ -33,11 +33,13 @@ spec:
       automountServiceAccountToken: false
       
       # Pod-level security context
+      # Note: The official postgres:14-alpine image runs as root by default,
+      # but we enforce non-root for security. The image supports running as postgres user (UID 70).
       securityContext:
         runAsNonRoot: true
-        runAsUser: 999  # postgres user in the official image
-        runAsGroup: 999
-        fsGroup: 999
+        runAsUser: 70  # postgres user in official PostgreSQL images
+        runAsGroup: 70
+        fsGroup: 70
         seccompProfile:
           type: RuntimeDefault
       
@@ -53,7 +55,7 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
-          runAsUser: 999
+          runAsUser: 70  # postgres user UID in official images
           # Note: readOnlyRootFilesystem: true is not feasible for postgres
           # as it needs to write to various system directories
           seccompProfile:

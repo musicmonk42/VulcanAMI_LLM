@@ -37,10 +37,12 @@ spec:
     - protocol: UDP
       port: 53
   
-  # Allow egress to external services (for API calls, model downloads, etc.)
-  # Tighten these rules based on your actual requirements
+  # Allow HTTPS egress for external API calls (OpenAI, model downloads, etc.)
+  # For production, consider restricting to specific external services using networkPolicies
+  # or egress gateways with more granular control
   - to:
-    - namespaceSelector: {}
+    - podSelector: {}
+      namespaceSelector: {}
     ports:
     - protocol: TCP
       port: 443

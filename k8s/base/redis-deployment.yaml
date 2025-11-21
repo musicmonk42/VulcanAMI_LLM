@@ -32,11 +32,14 @@ spec:
       automountServiceAccountToken: false
       
       # Pod-level security context
+      # Note: The official redis:7-alpine image runs as root by default.
+      # We enforce a non-root user for security. Using UID 1000 as a generic non-root user.
+      # For production, consider building a custom Redis image with a dedicated redis user.
       securityContext:
         runAsNonRoot: true
-        runAsUser: 999  # redis user in the official image
-        runAsGroup: 999
-        fsGroup: 999
+        runAsUser: 1000  # generic non-root user
+        runAsGroup: 1000
+        fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
       
@@ -56,7 +59,7 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
-          runAsUser: 999
+          runAsUser: 1000  # generic non-root user (redis runs as root by default in alpine)
           # Note: readOnlyRootFilesystem not set for redis as it needs write access
           seccompProfile:
             type: RuntimeDefault
