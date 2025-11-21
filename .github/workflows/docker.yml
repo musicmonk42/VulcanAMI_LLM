@@ -133,7 +133,7 @@ jobs:
 
       - name: Upload SBOM
         if: steps.check_dockerfile.outputs.exists == 'true' && github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sbom-${{ matrix.service.name }}
           path: sbom-${{ matrix.service.name }}.spdx.json
