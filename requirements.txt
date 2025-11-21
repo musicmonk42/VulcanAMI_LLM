@@ -57,7 +57,7 @@ torch-geometric==2.6.1
 torchrl==0.10.0
 tensordict==0.10.0
 transformers==4.56.2
-sentence-transformers==5.1.1
+sentence-transformers==5.1.2
 tokenizers==0.22.1
 huggingface-hub==0.35.1
 safetensors==0.6.2
