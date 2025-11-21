@@ -47,6 +47,7 @@ spec:
       - name: postgres
         # Pin to specific version with digest for production
         image: postgres:14-alpine
+        imagePullPolicy: Always
         ports:
         - containerPort: 5432
           name: postgres
