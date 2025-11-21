@@ -379,7 +379,7 @@ pycparser==2.23
 
 # Zope Ecosystem
 # ----------------------------------------------------------------------------
-zope.event==6.0
+zope.event==6.1
 zope.interface==8.0.1
 
 # Miscellaneous
