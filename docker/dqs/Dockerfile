@@ -23,6 +23,7 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         build-essential \
+        git \
         libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 

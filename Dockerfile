@@ -57,7 +57,7 @@ WORKDIR /app
 # NOTE: Remove packages you do not strictly need to minimize surface.
 RUN apt-get update && \
     apt-get dist-upgrade -y && \
-    apt-get install -y --no-install-recommends curl ca-certificates build-essential && \
+    apt-get install -y --no-install-recommends curl ca-certificates build-essential git && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirement files
