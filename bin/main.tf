@@ -541,6 +541,14 @@ resource "aws_s3_bucket_public_access_block" "secondary" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket_logging" "secondary" {
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.secondary.id
+
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "s3-access-logs/secondary/"
+}
+
 ################################################################################
 # S3 Bucket - Logs
 ################################################################################
@@ -562,6 +570,14 @@ resource "aws_s3_bucket_public_access_block" "logs" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "logs" {
+  bucket = aws_s3_bucket.logs.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "logs" {
@@ -716,6 +732,33 @@ resource "aws_s3_bucket" "cloudfront_logs" {
     Name = local.bucket_cloudfront_logs
     Type = "cloudfront-logs"
   })
+}
+
+resource "aws_s3_bucket_public_access_block" "cloudfront_logs" {
+  count  = var.enable_cloudfront_logging ? 1 : 0
+  bucket = aws_s3_bucket.cloudfront_logs[0].id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "cloudfront_logs" {
+  count  = var.enable_cloudfront_logging ? 1 : 0
+  bucket = aws_s3_bucket.cloudfront_logs[0].id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_logging" "cloudfront_logs" {
+  count  = var.enable_cloudfront_logging ? 1 : 0
+  bucket = aws_s3_bucket.cloudfront_logs[0].id
+
+  target_bucket = aws_s3_bucket.logs.id
+  target_prefix = "s3-access-logs/cloudfront-logs/"
 }
 
 resource "aws_cloudfront_origin_access_control" "oac" {
