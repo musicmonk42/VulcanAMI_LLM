@@ -130,7 +130,7 @@ nltk==3.9.2
 # Graph Processing and Visualization
 # ----------------------------------------------------------------------------
 graphene==3.4.3
-graphql-core==3.2.6
+graphql-core==3.2.7
 graphql-relay==3.2.0
 graphviz==0.20.3
 pydot==4.0.1
