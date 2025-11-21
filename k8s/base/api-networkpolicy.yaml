@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vulcanami-api-netpol
+  namespace: vulcanami
+  labels:
+    app: vulcanami-api
+spec:
+  podSelector:
+    matchLabels:
+      app: vulcanami-api
+  policyTypes:
+  - Ingress
+  - Egress
+  
+  ingress:
+  # Allow ingress from pods in the same namespace
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9148
+  
+  egress:
+  # Allow egress to pods in the same namespace (e.g., postgres, redis)
+  - to:
+    - podSelector: {}
+  
+  # Allow DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  
+  # Allow egress to external services (for API calls, model downloads, etc.)
+  # Tighten these rules based on your actual requirements
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

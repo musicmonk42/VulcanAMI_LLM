@@ -29,12 +29,39 @@ spec:
       labels:
         app: postgres
     spec:
+      # Disable automount service account token
+      automountServiceAccountToken: false
+      
+      # Pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999  # postgres user in the official image
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
       - name: postgres
+        # Pin to specific version with digest for production
         image: postgres:14-alpine
         ports:
         - containerPort: 5432
           name: postgres
+        
+        # Container-level security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 999
+          # Note: readOnlyRootFilesystem: true is not feasible for postgres
+          # as it needs to write to various system directories
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+        
         env:
         - name: POSTGRES_DB
           valueFrom:

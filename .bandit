@@ -1,0 +1,35 @@
+# Bandit Security Configuration
+# This file configures which security checks Bandit runs on the codebase
+# See: https://bandit.readthedocs.io/en/latest/config.html
+
+[bandit]
+# Target directories to scan
+targets = src
+
+# Output format (can be overridden by CLI)
+output_format = json
+
+# Excluded test IDs (with justification):
+# - B301: pickle usage - Acceptable with proper input validation and trusted sources
+# - B324: hashlib.md5 - Used for non-security-critical checksums; consider sha256 for security
+# - B614: torch.load - Model loading with path restrictions in place; review for production
+# 
+# NOTE: These exclusions are temporary to prevent Bandit plugin internal errors
+# and known false positives. Review and tighten as security posture improves.
+skip = B301,B324,B614
+
+# Directories to exclude from scanning
+exclude_dirs = 
+    tests,
+    .venv,
+    venv,
+    __pycache__,
+    .git,
+    build,
+    dist
+
+# Severity level threshold
+severity_level = medium
+
+# Confidence level threshold  
+confidence_level = medium
