@@ -17,8 +17,23 @@ spec:
         app: vulcanami-api
         component: api-gateway
     spec:
+      # Prevent automatic mounting of the service account token unless explicitly needed
+      automountServiceAccountToken: false
+      
+      # Pod-level security defaults
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001           # matches the 'graphix' user from Dockerfile
+        runAsGroup: 1001
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
       - name: api
+        # NOTE: Replace :latest with a pinned tag or digest for production
+        # Example: ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+        # or (best): ghcr.io/musicmonk42/vulcanami_llm-api@sha256:<DIGEST>
         image: ghcr.io/musicmonk42/vulcanami_llm-api:latest
         imagePullPolicy: Always
         ports:
@@ -28,6 +43,26 @@ spec:
         - containerPort: 9148
           name: metrics
           protocol: TCP
+        
+        # Container-level security hardening
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+        
+        # Add volume mounts for writable directories needed by the app
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-data
+          mountPath: /app/data
+        
         env:
         - name: JWT_SECRET_KEY
           valueFrom:
@@ -80,6 +115,14 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
+      
+      # Volumes for readOnlyRootFilesystem compatibility
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-data
+        emptyDir: {}
+      
       restartPolicy: Always
 ---
 apiVersion: v1

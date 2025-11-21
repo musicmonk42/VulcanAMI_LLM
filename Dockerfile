@@ -64,26 +64,26 @@ RUN apt-get update && \
 # requirements.txt is the human-friendly file
 # requirements-hashed.txt (optional) should contain --require-hashes enforced entries
 COPY requirements.txt ./requirements.txt
-# If you have a hashed lock file provide it; otherwise this line can be removed.
-# (Will not fail if absent; logic below checks existence)
-COPY requirements-hashed.txt* ./ 2>/dev/null || true
+
+# (Optional) If you include a requirements-hashed.txt in the build context, it will be copied.
+# Do NOT use shell redirection in COPY instruction; Dockerfile does not support it.
+COPY requirements-hashed.txt ./requirements-hashed.txt
 
 # Create virtual environment (optional; here we use system site-packages directly)
 # RUN python -m venv /opt/venv
 # ENV PATH="/opt/venv/bin:$PATH"
 
-# Install dependencies with hash verification if lock file present
-# Added retry logic with --trusted-host as fallback for SSL issues
-RUN if [ -f requirements-hashed.txt ]; then \
+# Install dependencies with hash verification if lock file present and non-empty
+# SECURITY: No fallback to --trusted-host. Build fails if verification fails.
+# For production, always provide requirements-hashed.txt with pip-compile --generate-hashes
+# Check if the file exists, is non-empty, and contains actual package entries (not just comments)
+RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.txt; then \
         echo "Using hashed dependency verification (requirements-hashed.txt)"; \
-        pip install --no-cache-dir --require-hashes -r requirements-hashed.txt || \
-        (echo "WARNING: Hashed install failed, retrying with --trusted-host" && \
-         pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org --require-hashes -r requirements-hashed.txt); \
+        pip install --no-cache-dir --require-hashes -r requirements-hashed.txt; \
     else \
-        echo "WARNING: requirements-hashed.txt not found - falling back to unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
-        pip install --no-cache-dir -r requirements.txt || \
-        (echo "WARNING: requirements install failed with SSL verification, retrying with --trusted-host" && \
-         pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt); \
+        echo "WARNING: requirements-hashed.txt not found or empty - using unhashed install (NOT RECOMMENDED FOR PRODUCTION)"; \
+        echo "For production builds, generate requirements-hashed.txt with: pip-compile --generate-hashes requirements.txt"; \
+        pip install --no-cache-dir -r requirements.txt; \
     fi
 
 # Optional: Generate CycloneDX SBOM (can be skipped by removing lines)

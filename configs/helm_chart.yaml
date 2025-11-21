@@ -30,6 +30,18 @@ spec:
         app.kubernetes.io/name: graphix-arena
         app.kubernetes.io/instance: dev
     spec:
+      # Disable automount service account token
+      automountServiceAccountToken: false
+      
+      # Pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
         - name: graphix-arena
           image: graphix/graphix-arena:dev
@@ -38,6 +50,26 @@ spec:
             - name: http
               containerPort: 8181
               protocol: TCP
+          
+          # Container-level security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          
+          # Volume mounts for readOnlyRootFilesystem compatibility
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: app-data
+              mountPath: /app/data
+          
           env:
             - name: ARENA_MODE
               value: "dev"
@@ -72,11 +104,14 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
-          # Uncomment if you need files, creds, etc.
-          # volumeMounts:
-          #   - name: config
-          #     mountPath: /app/config
-      # volumes:
+      
+      # Volumes for readOnlyRootFilesystem compatibility
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: app-data
+          emptyDir: {}
+      # Uncomment if you need additional config files, creds, etc.
       #   - name: config
       #     configMap:
       #       name: graphix-arena-config

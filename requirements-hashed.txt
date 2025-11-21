@@ -1,0 +1,6 @@
+# This is an empty placeholder for hashed requirements.
+# To use hashed installs, replace this file with pip-compile output:
+# pip-compile --generate-hashes requirements.in -o requirements-hashed.txt
+#
+# The build will check if this file contains actual package entries.
+# Lines starting with # are ignored.

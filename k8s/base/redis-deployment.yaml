@@ -28,8 +28,29 @@ spec:
       labels:
         app: redis
     spec:
+      # Disable automount service account token
+      automountServiceAccountToken: false
+      
+      # Pod-level security context
+      # IMPORTANT: The official redis:7-alpine image runs as root by default.
+      # Forcing UID 1000 may cause permission issues with data directories.
+      # RECOMMENDATION FOR PRODUCTION:
+      # 1. Build a custom Redis image with a dedicated redis user (UID 999 or similar)
+      # 2. Ensure the data volume has correct ownership
+      # 3. Test thoroughly before deploying
+      # For development/testing with standard image, you may need to disable this or
+      # use an initContainer to chown the data directory.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000  # generic non-root user
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
       - name: redis
+        # Pin to specific version with digest for production
         image: redis:7-alpine
         command:
         - redis-server
@@ -38,6 +59,19 @@ spec:
         ports:
         - containerPort: 6379
           name: redis
+        
+        # Container-level security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000  # generic non-root user (redis runs as root by default in alpine)
+          # Note: readOnlyRootFilesystem not set for redis as it needs write access
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+        
         env:
         - name: REDIS_PASSWORD
           valueFrom:
