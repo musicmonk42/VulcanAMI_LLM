@@ -597,20 +597,23 @@ class EnhancedContinualLearner(nn.Module):
                                         try:
                                             pickle.dumps(v)
                                             clean_item[k] = v
-                                        except Exception as e:                                            if isinstance(v, torch.Tensor):
+                                        except Exception as e:
+                                            if isinstance(v, torch.Tensor):
                                                 clean_item[k] = v.detach().cpu().numpy()
                                             elif isinstance(v, np.ndarray):
                                                 clean_item[k] = v.copy()
                                             else:
                                                 try:
                                                     clean_item[k] = str(v)
-                                                except Exception as e:                                                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+                                                except Exception as e:
+                                                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                                     sanitized.append(clean_item)
                                 else:
                                     try:
                                         pickle.dumps(item)
                                         sanitized.append(item)
-                                    except Exception as e:                                        sanitized.append(str(item))
+                                    except Exception as e:
+                                        sanitized.append(str(item))
                             return sanitized
                         
                         # Create config dict excluding locks and testing picklability
@@ -624,7 +627,7 @@ class EnhancedContinualLearner(nn.Module):
                             try:
                                 pickle.dumps(v)
                                 clean_config_dict[k] = v
-                            except Exception as e:                                # Skip non-picklable values
+                            except Exception as e:  # Skip non-picklable values
                                 pass
 
                         # Sanitize task_info dicts
@@ -635,13 +638,14 @@ class EnhancedContinualLearner(nn.Module):
                             try:
                                 pickle.dumps(info_dict)
                                 clean_task_info[k] = info_dict
-                            except Exception as e:                                # Sanitize individual fields
+                            except Exception as e:  # Sanitize individual fields
                                 sanitized_info = {}
                                 for field, value in info_dict.items():
                                     try:
                                         pickle.dumps(value)
                                         sanitized_info[field] = value
-                                    except Exception as e:                                        sanitized_info[field] = str(value) if value is not None else None
+                                    except Exception as e:  # Convert to string if not picklable
+                                        sanitized_info[field] = str(value) if value is not None else None
                                 clean_task_info[k] = sanitized_info
                         
                         # Build state and test each component individually

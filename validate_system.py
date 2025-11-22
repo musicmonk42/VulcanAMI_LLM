@@ -140,9 +140,11 @@ class SystemValidator:
         
         all_ok = True
         all_ok &= self.validate_module("vulcan.semantic_bridge", "Semantic Bridge - Core")
-        all_ok &= self.validate_module("vulcan.semantic_bridge.semantic_graph", "Semantic Bridge - Graph")
-        all_ok &= self.validate_module("vulcan.semantic_bridge.semantic_space", "Semantic Bridge - Space")
+        # Note: semantic_graph and semantic_space are not separate modules - graph functionality
+        # is integrated into semantic_bridge_core with networkx or SimpleDiGraph fallback
         all_ok &= self.validate_module("vulcan.semantic_bridge.concept_mapper", "Semantic Bridge - Concept Mapper")
+        all_ok &= self.validate_module("vulcan.semantic_bridge.transfer_engine", "Semantic Bridge - Transfer Engine")
+        all_ok &= self.validate_module("vulcan.semantic_bridge.domain_registry", "Semantic Bridge - Domain Registry")
         
         return all_ok
     
