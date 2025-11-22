@@ -159,6 +159,9 @@ class AIResult:
         return asdict(self)
 
 
+# Rate limiter configuration constants
+ROLLING_WINDOW_MULTIPLIER = 2  # Multiplier for deque maxlen (2x rate limit provides adequate rolling window)
+
 # ============================================================================
 # RATE LIMITER (Adjusted based on test failures)
 # ============================================================================
@@ -174,14 +177,14 @@ class RateLimiter:
             # Add others as needed
         }
         # Fixed: Use bounded deques to prevent unbounded memory growth
-        # Each provider gets a deque with maxlen = 2x their rate limit (enough for rolling window)
+        # Each provider gets a deque with maxlen = ROLLING_WINDOW_MULTIPLIER x their rate limit
         self.calls: Dict[str, deque] = {}
 
     def _get_or_create_deque(self, provider_name: str) -> deque:
         """Get or create a bounded deque for the provider"""
         if provider_name not in self.calls:
             limit_info = self.limits.get(provider_name, {"calls": 100})
-            max_len = limit_info["calls"] * 2  # 2x the limit is enough for rolling window
+            max_len = limit_info["calls"] * ROLLING_WINDOW_MULTIPLIER
             self.calls[provider_name] = deque(maxlen=max_len)
         return self.calls[provider_name]
 

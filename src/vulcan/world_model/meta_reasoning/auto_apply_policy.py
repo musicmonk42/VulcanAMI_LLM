@@ -4,6 +4,7 @@ Auto-apply policy engine (hardened)
 - Enforces small, safe change budgets (files, LOC)
 - Executes pre-apply gates with timeouts and shell disabled
 - Evaluates optional NSO requirements (risk gating)
+- Uses safe_execution module for enhanced security
 """
 from __future__ import annotations
 
@@ -39,6 +40,15 @@ except ImportError:
             
     yaml = YamlJsonFallback()
 # --- END FIX ---
+
+# Import safe execution if available
+try:
+    from .safe_execution import get_safe_executor
+    SAFE_EXECUTION_AVAILABLE = True
+except ImportError:
+    SAFE_EXECUTION_AVAILABLE = False
+    logger.debug("Safe execution module not available, using direct subprocess")
+    get_safe_executor = None
 
 
 # ----------------------------
