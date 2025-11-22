@@ -238,16 +238,6 @@ Note: Exact routes may vary by version and deployment profile. Refer to your int
 
 ---
 
-## Licensing
-
-This software is proprietary and confidential to Novatrax Labs LLC. All rights reserved.
-
-- No part of this software or documentation may be reproduced, distributed, or transmitted in any form or by any means without prior written permission from Novatrax.
-- Use of this software is governed solely by your written agreement with Novatrax. In case of conflict between this README and your agreement, your agreement controls.
-- Trademarks and service marks are the property of their respective owners.
-
----
-
 ## Platform Capabilities Audit
 
 For a comprehensive inventory of all platform capabilities, architecture, and implementation details, see:
@@ -259,7 +249,17 @@ For a comprehensive inventory of all platform capabilities, architecture, and im
 - Complete technology stack and architecture
 - API endpoints, security features, and deployment infrastructure
 
-This audit provides full transparency for technical evaluation, security review, and compliance verification.
+This audit provides full transparency for technical evaluation, security review, compliance verification, and architectural assessment.
+
+---
+
+## Licensing
+
+This software is proprietary and confidential to Novatrax Labs LLC. All rights reserved.
+
+- No part of this software or documentation may be reproduced, distributed, or transmitted in any form or by any means without prior written permission from Novatrax.
+- Use of this software is governed solely by your written agreement with Novatrax. In case of conflict between this README and your agreement, your agreement controls.
+- Trademarks and service marks are the property of their respective owners.
 
 ---
 
