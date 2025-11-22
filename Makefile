@@ -61,6 +61,12 @@ install: ## Install Python dependencies
 	@echo "$(GREEN)Installing Python dependencies...$(NC)"
 	pip install --upgrade pip setuptools wheel
 	pip install -r requirements.txt
+	@if [ -f setup.py ]; then \
+		echo "$(GREEN)Installing local package...$(NC)"; \
+		pip install -e .; \
+	fi
+	@echo "$(GREEN)Downloading spacy language model...$(NC)"
+	python -m spacy download en_core_web_sm || echo "$(YELLOW)Spacy model download failed (non-critical)$(NC)"
 
 .PHONY: install-dev
 install-dev: install ## Install development dependencies
