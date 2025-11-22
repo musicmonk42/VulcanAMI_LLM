@@ -35,6 +35,10 @@ def float_equals(a: float, b: float, epsilon: float = DEFAULT_EPSILON) -> bool:
         
     Returns:
         True if |a - b| < epsilon
+        
+    Note:
+        For very large or small numbers, consider using is_close() instead,
+        which handles both relative and absolute tolerance.
     """
     if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
         return False
@@ -46,6 +50,31 @@ def float_equals(a: float, b: float, epsilon: float = DEFAULT_EPSILON) -> bool:
         return a == b
     
     return abs(a - b) < epsilon
+
+
+def is_close(a: float, b: float, rel_tol: float = 1e-9, abs_tol: float = 0.0) -> bool:
+    """
+    Check if two values are close using both relative and absolute tolerance.
+    
+    This is more robust than float_equals for very large or very small numbers.
+    Uses the same algorithm as math.isclose from Python 3.5+.
+    
+    Args:
+        a: First value
+        b: Second value
+        rel_tol: Relative tolerance (default 1e-9)
+        abs_tol: Absolute tolerance (default 0.0)
+        
+    Returns:
+        True if abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+        
+    Example:
+        >>> is_close(1e10, 1e10 + 1)  # Relative tolerance for large numbers
+        True
+        >>> is_close(1e-10, 2e-10, abs_tol=1e-10)  # Absolute for small numbers
+        True
+    """
+    return math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
 
 
 def clamp(value: float, min_val: float, max_val: float) -> float:

@@ -21,7 +21,7 @@ IMPORTANT: All CSIU logging uses DEBUG level or internal-only logs.
 import logging
 import time
 import json
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from collections import deque
@@ -197,7 +197,7 @@ class CSIUEnforcement:
                 'max_allowed': self.config.max_cumulative_influence_window
             }
     
-    def should_block_influence(self) -> tuple[bool, Optional[str]]:
+    def should_block_influence(self) -> Tuple[bool, Optional[str]]:
         """
         Check if influence should be blocked due to cumulative cap
         
