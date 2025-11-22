@@ -1,6 +1,21 @@
-# This is an empty placeholder for hashed requirements.
-# To use hashed installs, replace this file with pip-compile output:
-# pip-compile --generate-hashes requirements.in -o requirements-hashed.txt
+# =============================================================================
+# Hashed Requirements File (for secure production builds)
+# =============================================================================
+# This is a placeholder file. For production deployments, generate hashed
+# requirements using pip-tools:
 #
-# The build will check if this file contains actual package entries.
-# Lines starting with # are ignored.
+# Installation:
+#   pip install pip-tools
+#
+# Generate hashed requirements:
+#   pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+#
+# This will create a file with entries like:
+#   package==version \
+#       --hash=sha256:abc123... \
+#       --hash=sha256:def456...
+#
+# Docker builds will automatically use this file when present and non-empty.
+# Until generated, Docker builds will fall back to unhashed requirements.txt
+# (acceptable for development, NOT recommended for production).
+# =============================================================================
