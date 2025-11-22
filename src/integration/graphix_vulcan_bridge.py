@@ -46,6 +46,28 @@ class BridgeConfig:
     max_retries: int = _MAX_RETRIES
     vocab_size: int = _VOCAB_SIZE
     cache_ttl_seconds: float = _CACHE_TTL_SECONDS
+    consensus_timeout_seconds: float = 2.0  # Added consensus timeout configuration
+    
+    def __post_init__(self):
+        """Validate configuration parameters."""
+        # Define validation rules: (field_name, allow_zero, allow_negative)
+        validations = [
+            ('async_timeout', False, False),
+            ('embedding_dim', False, False),
+            ('memory_capacity', False, False),
+            ('kl_guard_threshold', True, False),  # Can be zero
+            ('max_retries', True, False),  # Can be zero (no retries)
+            ('vocab_size', False, False),
+            ('cache_ttl_seconds', False, False),
+            ('consensus_timeout_seconds', False, False),
+        ]
+        
+        for field_name, allow_zero, allow_negative in validations:
+            value = getattr(self, field_name)
+            if not allow_negative and value < 0:
+                raise ValueError(f"{field_name} must be non-negative, got {value}")
+            if not allow_zero and value <= 0:
+                raise ValueError(f"{field_name} must be positive, got {value}")
 
 
 # ------------------------ Functional VULCAN Components ------------------------ #
@@ -383,12 +405,13 @@ class GraphixVulcanBridge:
         fn: Optional[Union[Callable, Any]], 
         args: Any, 
         default: Any, 
-        timeout: float = _ASYNC_TIMEOUT, 
-        max_retries: int = _MAX_RETRIES
+        timeout: Optional[float] = None, 
+        max_retries: Optional[int] = None
     ) -> Any:
         
-        timeout = self.config.async_timeout
-        max_retries = self.config.max_retries
+        # Use provided timeout/retries or fall back to config defaults
+        timeout = timeout if timeout is not None else self.config.async_timeout
+        max_retries = max_retries if max_retries is not None else self.config.max_retries
         
         if fn is None:
             return default
@@ -579,7 +602,13 @@ class GraphixVulcanBridge:
             "bridge_context": asdict(self._last_context) if self._last_context else {},
         }
         
-        approved = await self._safe_call_async(self._consensus.approve, proposal, default=True, timeout=self.config.consensus_timeout_seconds) 
+        # Use configured consensus timeout
+        approved = await self._safe_call_async(
+            self._consensus.approve, 
+            proposal, 
+            default=True, 
+            timeout=self.config.consensus_timeout_seconds
+        ) 
         
         await self._obs("bridge.consensus", {"approved": bool(approved)})
         return bool(approved)
@@ -622,8 +651,9 @@ class GraphixVulcanBridge:
                 else:
                     # Run sync observation in a thread
                     await asyncio.to_thread(fn, event_type, payload)
-            except Exception:
-                pass
+            except Exception as e:
+                # Log observability failures for debugging (non-critical)
+                log.debug(f"Observability recording failed for {event_type}: {e}")
 
     # ASYNC AUDIT (ENHANCEMENT)
     async def _audit(self, event_type: str, payload: Dict[str, Any]) -> None:
@@ -639,5 +669,6 @@ class GraphixVulcanBridge:
                 else:
                     # Run sync audit in a thread
                     await asyncio.to_thread(fn, record_payload if getattr(self._audit_log, "append", None) else event_type, record_payload if not getattr(self._audit_log, "append", None) else None)
-            except Exception:
-                pass
+            except Exception as e:
+                # Log audit failures for debugging (non-critical)
+                log.debug(f"Audit logging failed for {event_type}: {e}")
