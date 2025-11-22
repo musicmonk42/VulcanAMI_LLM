@@ -72,6 +72,19 @@ except Exception:
     class Policy: 
         enabled=False
 
+try:
+    from .csiu_enforcement import get_csiu_enforcer, CSIUEnforcementConfig
+except ImportError:
+    # Fallback if enforcement module not available
+    get_csiu_enforcer = None
+    CSIUEnforcementConfig = None
+
+try:
+    from .safe_execution import get_safe_executor
+except ImportError:
+    # Fallback if safe execution module not available
+    get_safe_executor = None
+
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +252,18 @@ class SelfImprovementDrive:
         # CSIU: Injectable metrics provider and cache
         self.metrics_provider: Optional[Callable[[str], Optional[float]]] = None
         self._metrics_cache: Dict[str, Any] = {}
+        
+        # CSIU: Initialize enforcer with kill switches from environment
+        self._csiu_enforcer = None
+        if get_csiu_enforcer is not None and self._csiu_enabled:
+            enforcer_config = CSIUEnforcementConfig(
+                global_enabled=self._csiu_enabled,
+                calculation_enabled=self._csiu_calc_enabled,
+                regularization_enabled=self._csiu_regs_enabled,
+                history_tracking_enabled=self._csiu_hist_enabled
+            )
+            self._csiu_enforcer = get_csiu_enforcer(enforcer_config)
+            logger.info("CSIU enforcement module initialized with safety controls")
 
         # Load or initialize state
         self.state = self._load_state()
@@ -945,12 +970,33 @@ class SelfImprovementDrive:
         """
         Apply CSIU regularization to improvement plan.
         
-        Adds small adjustments to objective weights, route penalties, and reward shaping
-        based on CSIU pressure and current metrics.
+        Uses the CSIU enforcement module if available for proper cap enforcement,
+        audit trails, and safety controls. Falls back to inline logic if not available.
+        
+        Args:
+            plan: Improvement plan to regularize
+            d: CSIU pressure value
+            cur: Current metrics snapshot
+            
+        Returns:
+            Regularized plan with CSIU influence applied (or blocked if cap exceeded)
         """
         if not self._csiu_enabled or not self._csiu_regs_enabled:
             return plan
         
+        # Use enforcement module if available
+        if self._csiu_enforcer is not None:
+            plan_id = plan.get('id', 'unknown')
+            action_type = plan.get('type', 'improvement')
+            return self._csiu_enforcer.apply_regularization_with_enforcement(
+                plan=plan,
+                pressure=d,
+                metrics=cur,
+                plan_id=plan_id,
+                action_type=action_type
+            )
+        
+        # Fallback: Original inline logic (without enforcement)
         plan = dict(plan or {})
         alpha = beta = gamma = 0.03
         

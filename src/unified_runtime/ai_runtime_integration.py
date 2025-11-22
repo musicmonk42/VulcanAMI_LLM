@@ -173,7 +173,17 @@ class RateLimiter:
             "Anthropic": {"calls": 30, "window": 60},
             # Add others as needed
         }
-        self.calls: Dict[str, deque] = defaultdict(deque) # Use deque for efficient popleft
+        # Fixed: Use bounded deques to prevent unbounded memory growth
+        # Each provider gets a deque with maxlen = 2x their rate limit (enough for rolling window)
+        self.calls: Dict[str, deque] = {}
+
+    def _get_or_create_deque(self, provider_name: str) -> deque:
+        """Get or create a bounded deque for the provider"""
+        if provider_name not in self.calls:
+            limit_info = self.limits.get(provider_name, {"calls": 100})
+            max_len = limit_info["calls"] * 2  # 2x the limit is enough for rolling window
+            self.calls[provider_name] = deque(maxlen=max_len)
+        return self.calls[provider_name]
 
     def check_limit(self, provider_name: str) -> bool:
         """Check if call is within rate limits"""
@@ -188,7 +198,7 @@ class RateLimiter:
         window_seconds = limit_info["window"]
 
         with self._lock:
-            timestamps = self.calls[provider_name]
+            timestamps = self._get_or_create_deque(provider_name)
             # Remove timestamps older than the window
             window_start = now - window_seconds
             while timestamps and timestamps[0] < window_start:

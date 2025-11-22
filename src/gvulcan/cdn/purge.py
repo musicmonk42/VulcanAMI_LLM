@@ -139,16 +139,16 @@ class SmartPurger:
         self.retry_backoff = retry_backoff
         self.caller_reference_prefix = caller_reference_prefix
         
-        # Priority queues for each priority level
+        # Priority queues for each priority level (bounded to prevent memory issues)
         self.queues = {
-            priority: deque() for priority in PurgePriority
+            priority: deque(maxlen=10000) for priority in PurgePriority
         }
         
         # Deduplication tracking
         self.pending_paths: Set[str] = set()
         
-        # Rate limiting
-        self.invalidation_timestamps: deque = deque()
+        # Rate limiting (keep last hour of timestamps)
+        self.invalidation_timestamps: deque = deque(maxlen=max_invalidations_per_hour * 2)
         self.last_flush = 0.0
         
         # Statistics
