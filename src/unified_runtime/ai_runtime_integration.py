@@ -117,9 +117,9 @@ class AITask:
 
     def __post_init__(self):
         if not self.trace_id:
-            # Generate trace ID for tracking
+            # Generate trace ID for tracking (non-cryptographic use)
             trace_data = f"{self.operation}_{self.provider}_{self.model}_{time.time()}_{random.random()}"
-            self.trace_id = hashlib.md5(trace_data.encode()).hexdigest()[:16]
+            self.trace_id = hashlib.md5(trace_data.encode()).hexdigest()[:16]  # nosec B324 - used for trace ID generation, not security
 
     def is_expired(self) -> bool:
         """Check if task has passed deadline"""
@@ -863,7 +863,7 @@ class ResultCache:
             logger.warning(f"Non-serializable data in cache key computation: {e}")
             key_str = json.dumps({k: v for k, v in key_data.items() if k != 'payload'}, sort_keys=True)
 
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode()).hexdigest()  # nosec B324 - used for cache key generation, not security
 
     def get(self, task: AITask, contract: AIContract) -> Optional[AIResult]:
         """Get cached result if available and valid"""
