@@ -317,10 +317,13 @@ class Concept:
                 expected = effect.measurement
                 
                 # Calculate alignment
-                if expected != 0:
+                # FIXED: Use epsilon for float comparison
+                epsilon = 1e-9
+                if abs(expected) > epsilon:
                     alignment = 1.0 - min(1.0, abs(measured - expected) / abs(expected))
                 else:
-                    alignment = 1.0 if measured == 0 else 0.0
+                    # Both expected and measured should be near zero
+                    alignment = 1.0 if abs(measured) < epsilon else 0.0
                 
                 alignment_scores.append(alignment)
         
