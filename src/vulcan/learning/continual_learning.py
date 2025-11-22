@@ -597,20 +597,23 @@ class EnhancedContinualLearner(nn.Module):
                                         try:
                                             pickle.dumps(v)
                                             clean_item[k] = v
-                                        except Exception as e:                                            if isinstance(v, torch.Tensor):
+                                        except Exception as e:
+                                            if isinstance(v, torch.Tensor):
                                                 clean_item[k] = v.detach().cpu().numpy()
                                             elif isinstance(v, np.ndarray):
                                                 clean_item[k] = v.copy()
                                             else:
                                                 try:
                                                     clean_item[k] = str(v)
-                                                except Exception as e:                                                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
+                                                except Exception as e:
+                                                    logger.debug(f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}")
                                     sanitized.append(clean_item)
                                 else:
                                     try:
                                         pickle.dumps(item)
                                         sanitized.append(item)
-                                    except Exception as e:                                        sanitized.append(str(item))
+                                    except Exception as e:
+                                        sanitized.append(str(item))
                             return sanitized
                         
                         # Create config dict excluding locks and testing picklability
