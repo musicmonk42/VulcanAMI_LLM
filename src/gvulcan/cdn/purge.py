@@ -20,6 +20,10 @@ import threading
 
 logger = logging.getLogger(__name__)
 
+# Configuration constants
+MAX_PRIORITY_QUEUE_SIZE = 10000  # Maximum items per priority queue to prevent unbounded growth
+RATE_LIMITER_WINDOW_MULTIPLIER = 2  # Multiplier for rate limiter deque size
+
 
 class PurgePriority(Enum):
     """Priority levels for purge operations"""
@@ -139,16 +143,16 @@ class SmartPurger:
         self.retry_backoff = retry_backoff
         self.caller_reference_prefix = caller_reference_prefix
         
-        # Priority queues for each priority level
+        # Priority queues for each priority level (bounded to prevent memory issues)
         self.queues = {
-            priority: deque() for priority in PurgePriority
+            priority: deque(maxlen=MAX_PRIORITY_QUEUE_SIZE) for priority in PurgePriority
         }
         
         # Deduplication tracking
         self.pending_paths: Set[str] = set()
         
-        # Rate limiting
-        self.invalidation_timestamps: deque = deque()
+        # Rate limiting (keep last hour of timestamps)
+        self.invalidation_timestamps: deque = deque(maxlen=max_invalidations_per_hour * RATE_LIMITER_WINDOW_MULTIPLIER)
         self.last_flush = 0.0
         
         # Statistics

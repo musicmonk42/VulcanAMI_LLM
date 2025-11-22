@@ -117,9 +117,9 @@ class AITask:
 
     def __post_init__(self):
         if not self.trace_id:
-            # Generate trace ID for tracking
+            # Generate trace ID for tracking (non-cryptographic use)
             trace_data = f"{self.operation}_{self.provider}_{self.model}_{time.time()}_{random.random()}"
-            self.trace_id = hashlib.md5(trace_data.encode()).hexdigest()[:16]
+            self.trace_id = hashlib.md5(trace_data.encode()).hexdigest()[:16]  # nosec B324 - used for trace ID generation, not security
 
     def is_expired(self) -> bool:
         """Check if task has passed deadline"""
@@ -159,6 +159,9 @@ class AIResult:
         return asdict(self)
 
 
+# Rate limiter configuration constants
+ROLLING_WINDOW_MULTIPLIER = 2  # Multiplier for deque maxlen (2x rate limit provides adequate rolling window)
+
 # ============================================================================
 # RATE LIMITER (Adjusted based on test failures)
 # ============================================================================
@@ -173,7 +176,17 @@ class RateLimiter:
             "Anthropic": {"calls": 30, "window": 60},
             # Add others as needed
         }
-        self.calls: Dict[str, deque] = defaultdict(deque) # Use deque for efficient popleft
+        # Fixed: Use bounded deques to prevent unbounded memory growth
+        # Each provider gets a deque with maxlen = ROLLING_WINDOW_MULTIPLIER x their rate limit
+        self.calls: Dict[str, deque] = {}
+
+    def _get_or_create_deque(self, provider_name: str) -> deque:
+        """Get or create a bounded deque for the provider"""
+        if provider_name not in self.calls:
+            limit_info = self.limits.get(provider_name, {"calls": 100})
+            max_len = limit_info["calls"] * ROLLING_WINDOW_MULTIPLIER
+            self.calls[provider_name] = deque(maxlen=max_len)
+        return self.calls[provider_name]
 
     def check_limit(self, provider_name: str) -> bool:
         """Check if call is within rate limits"""
@@ -188,7 +201,7 @@ class RateLimiter:
         window_seconds = limit_info["window"]
 
         with self._lock:
-            timestamps = self.calls[provider_name]
+            timestamps = self._get_or_create_deque(provider_name)
             # Remove timestamps older than the window
             window_start = now - window_seconds
             while timestamps and timestamps[0] < window_start:
@@ -850,7 +863,7 @@ class ResultCache:
             logger.warning(f"Non-serializable data in cache key computation: {e}")
             key_str = json.dumps({k: v for k, v in key_data.items() if k != 'payload'}, sort_keys=True)
 
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode()).hexdigest()  # nosec B324 - used for cache key generation, not security
 
     def get(self, task: AITask, contract: AIContract) -> Optional[AIResult]:
         """Get cached result if available and valid"""

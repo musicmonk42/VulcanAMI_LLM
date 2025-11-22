@@ -72,6 +72,25 @@ except Exception:
     class Policy: 
         enabled=False
 
+try:
+    from .csiu_enforcement import get_csiu_enforcer, CSIUEnforcementConfig
+    CSIU_ENFORCEMENT_AVAILABLE = True
+except ImportError:
+    # Fallback if enforcement module not available
+    logger.warning(
+        "CSIU enforcement module not available - running without enforcement caps. "
+        "This is NOT recommended for production use."
+    )
+    get_csiu_enforcer = None
+    CSIUEnforcementConfig = None
+    CSIU_ENFORCEMENT_AVAILABLE = False
+
+try:
+    from .safe_execution import get_safe_executor
+except ImportError:
+    # Fallback if safe execution module not available
+    get_safe_executor = None
+
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +258,18 @@ class SelfImprovementDrive:
         # CSIU: Injectable metrics provider and cache
         self.metrics_provider: Optional[Callable[[str], Optional[float]]] = None
         self._metrics_cache: Dict[str, Any] = {}
+        
+        # CSIU: Initialize enforcer with kill switches from environment
+        self._csiu_enforcer = None
+        if get_csiu_enforcer is not None and self._csiu_enabled:
+            enforcer_config = CSIUEnforcementConfig(
+                global_enabled=self._csiu_enabled,
+                calculation_enabled=self._csiu_calc_enabled,
+                regularization_enabled=self._csiu_regs_enabled,
+                history_tracking_enabled=self._csiu_hist_enabled
+            )
+            self._csiu_enforcer = get_csiu_enforcer(enforcer_config)
+            logger.info("CSIU enforcement module initialized with safety controls")
 
         # Load or initialize state
         self.state = self._load_state()
@@ -945,12 +976,33 @@ class SelfImprovementDrive:
         """
         Apply CSIU regularization to improvement plan.
         
-        Adds small adjustments to objective weights, route penalties, and reward shaping
-        based on CSIU pressure and current metrics.
+        Uses the CSIU enforcement module if available for proper cap enforcement,
+        audit trails, and safety controls. Falls back to inline logic if not available.
+        
+        Args:
+            plan: Improvement plan to regularize
+            d: CSIU pressure value
+            cur: Current metrics snapshot
+            
+        Returns:
+            Regularized plan with CSIU influence applied (or blocked if cap exceeded)
         """
         if not self._csiu_enabled or not self._csiu_regs_enabled:
             return plan
         
+        # Use enforcement module if available
+        if self._csiu_enforcer is not None:
+            plan_id = plan.get('id', 'unknown')
+            action_type = plan.get('type', 'improvement')
+            return self._csiu_enforcer.apply_regularization_with_enforcement(
+                plan=plan,
+                pressure=d,
+                metrics=cur,
+                plan_id=plan_id,
+                action_type=action_type
+            )
+        
+        # Fallback: Original inline logic (without enforcement)
         plan = dict(plan or {})
         alpha = beta = gamma = 0.03
         
@@ -2052,23 +2104,44 @@ class SelfImprovementDrive:
             return False, ""
 
     def _commit_to_version_control(self, file_path: str, message: str) -> str:
-        """Stages and commits changes using git subprocess."""
+        """Stages and commits changes using git subprocess with safe execution."""
         try:
-            # Stage
-            subprocess.run(['git', 'add', file_path], check=True, capture_output=True)
-            
-            # Commit
-            commit_msg = f"vulcan(auto): {message}"
-            result = subprocess.run(['git', 'commit', '-m', commit_msg], capture_output=True, text=True)
-            
-            # Parse hash (rudimentary)
-            if result.returncode == 0:
-                # Try to get short hash
-                hash_proc = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True)
-                return hash_proc.stdout.strip()
+            # Use safe executor if available, otherwise fallback to direct subprocess
+            if get_safe_executor is not None:
+                executor = get_safe_executor()
+                
+                # Stage
+                stage_result = executor.execute_safe(['git', 'add', file_path], timeout=30)
+                if not stage_result.success:
+                    logger.warning(f"Git add failed: {stage_result.error}")
+                    return "git_failed"
+                
+                # Commit
+                commit_msg = f"vulcan(auto): {message}"
+                commit_result = executor.execute_safe(['git', 'commit', '-m', commit_msg], timeout=30)
+                
+                if commit_result.success:
+                    # Try to get short hash
+                    hash_result = executor.execute_safe(['git', 'rev-parse', '--short', 'HEAD'], timeout=10)
+                    if hash_result.success:
+                        return hash_result.stdout.strip()
+                    return "unknown_hash"
+                else:
+                    logger.warning(f"Git commit returned non-zero: {commit_result.stderr}")
+                    return "unknown_hash"
             else:
-                logger.warning(f"Git commit returned non-zero: {result.stderr}")
-                return "unknown_hash"
+                # Fallback to direct subprocess (already safe - using list args, not shell=True)
+                subprocess.run(['git', 'add', file_path], check=True, capture_output=True)
+                
+                commit_msg = f"vulcan(auto): {message}"
+                result = subprocess.run(['git', 'commit', '-m', commit_msg], capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    hash_proc = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True)
+                    return hash_proc.stdout.strip()
+                else:
+                    logger.warning(f"Git commit returned non-zero: {result.stderr}")
+                    return "unknown_hash"
                 
         except Exception as e:
             logger.warning(f"Git operation failed (is this a repo?): {e}")
