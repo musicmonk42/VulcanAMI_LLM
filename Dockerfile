@@ -57,8 +57,16 @@ WORKDIR /app
 # NOTE: Remove packages you do not strictly need to minimize surface.
 RUN apt-get update && \
     apt-get dist-upgrade -y && \
-    apt-get install -y --no-install-recommends curl ca-certificates build-essential git && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        build-essential \
+        git && \
+    update-ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and setuptools to latest versions
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Copy requirement files
 # requirements.txt is the human-friendly file
@@ -68,6 +76,9 @@ COPY requirements.txt ./requirements.txt
 # (Optional) If you include a requirements-hashed.txt in the build context, it will be copied.
 # Do NOT use shell redirection in COPY instruction; Dockerfile does not support it.
 COPY requirements-hashed.txt ./requirements-hashed.txt
+
+# Copy setup.py and source for local package installation
+COPY setup.py ./setup.py
 
 # Create virtual environment (optional; here we use system site-packages directly)
 # RUN python -m venv /opt/venv
@@ -93,6 +104,15 @@ RUN pip install --no-cache-dir cyclonedx-bom && \
 
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
+
+# Install local package (graphix) if setup.py exists
+RUN if [ -f setup.py ]; then \
+        echo "Installing local package from setup.py"; \
+        pip install --no-cache-dir -e .; \
+    fi
+
+# Download spacy language model if spacy is installed
+RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)"
 
 # Pre-compile Python bytecode (optional performance / tamper evidence)
 RUN python -m compileall -q src

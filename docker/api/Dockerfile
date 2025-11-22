@@ -27,15 +27,29 @@ RUN apt-get update && \
         libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip and setuptools to latest versions
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
 # Copy and install Python dependencies
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy setup.py for local package installation
+COPY setup.py ./
 
 # Copy application source
 COPY src/ ./src/
 COPY app.py ./
 COPY configs/ ./configs/
+
+# Install local package if setup.py exists
+RUN if [ -f setup.py ]; then \
+        echo "Installing local package from setup.py"; \
+        pip install --no-cache-dir -e .; \
+    fi
+
+# Download spacy language model if spacy is installed
+RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)"
 
 # Pre-compile Python bytecode
 RUN python -m compileall -q src app.py

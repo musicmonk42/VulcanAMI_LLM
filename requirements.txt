@@ -30,9 +30,10 @@ cymem==2.0.13
 Cython==3.2.1
 decorator==5.2.1
 Deprecated==1.3.1
-dowhy @ git+https://github.com/microsoft/dowhy.git@526573b1bbad7a4b5b0575cf65281456772d6330
+dowhy==0.14
 ecdsa==0.19.1
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
+# en_core_web_sm model - install via: python -m spacy download en_core_web_sm
+# Model URL: https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
 faiss-cpu==1.13.0
 Faker==38.2.0
 fastapi==0.121.3
@@ -45,7 +46,8 @@ Flask-SQLAlchemy==3.1.1
 fonttools==4.60.1
 frozenlist==1.8.0
 fsspec==2025.10.0
-graphix @ git+https://github.com/musicmonk42/VulcanAMI_LLM.git@6d9f03753e97ed6389c3e011728d5f330f8d5031
+# graphix - this is the current package, installed from local source via setup.py or editable install
+# Use: pip install -e . (for development) or pip install . (for installation)
 graphviz==0.21
 greenlet==3.2.4
 h11==0.16.0
