@@ -79,6 +79,25 @@ Note: Platform components and integrations are configurable; enterprise deployme
 
 Important: The steps below are for internal or licensed development environments only. Do not expose development services to the public internet.
 
+### Omega Sequence Demo
+
+VulcanAMI includes the **Omega Sequence** demonstration - a cinematic showcase of catastrophe survival and safety capabilities.
+
+```bash
+# Run the complete demonstration
+python3 omega_sequence_demo.py
+
+# Run via CLI
+./bin/vulcan-cli demo omega
+
+# Quick demo (no pauses)
+./bin/vulcan-cli demo omega --no-pause
+```
+
+See [docs/OMEGA_SEQUENCE_DEMO.md](docs/OMEGA_SEQUENCE_DEMO.md) for complete documentation.
+
+### Standard Setup
+
 1) Clone and environment
 ```bash
 git clone <your-internal-repo-url> graphix_vulcan

@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-11-22T17:00:51.053756",
+  "proof_type": "SNARK",
+  "algorithm": "Groth16",
+  "commitment": "869b007f535a2aef9b762434a42f6bbb1b26cd06eebdf943e687d47e9f3008cf",
+  "nullifier": "620ae32217d190ec63c33b6c56411846a4e0266dac79496f91d4a1bcf9166d9b",
+  "verified": true,
+  "public_inputs": {
+    "data_vectors_removed": 2,
+    "model_integrity": "maintained"
+  }
+}

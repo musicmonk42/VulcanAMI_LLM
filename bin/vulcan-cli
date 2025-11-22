@@ -194,6 +194,7 @@ CORE COMMANDS:
     unlearn                 Machine unlearning operations
     vector                  Vector operations and management
     proof                   Zero-knowledge proof operations
+    demo                    Run demonstration scenarios
 
 PACK COMMANDS:
     pack build              Build a new packfile
@@ -228,6 +229,11 @@ PROOF COMMANDS:
     proof generate          Generate zero-knowledge proof
     proof verify            Verify zero-knowledge proof
     proof batch             Batch proof operations
+
+DEMO COMMANDS:
+    demo omega              Run Omega Sequence investor demo
+    demo list               List available demonstrations
+    demo solve              Solve domain-specific problems
 
 DATA QUALITY COMMANDS:
     dqs score               Score data quality
@@ -268,6 +274,15 @@ EXAMPLES:
 
     # Check system health
     vulcan-cli health --verbose
+
+    # Run Omega Sequence demo
+    vulcan-cli demo omega
+    
+    # Run demo with no pauses
+    vulcan-cli demo omega --no-pause
+
+    # Solve a domain-specific problem
+    vulcan-cli demo solve --domain BIO_SECURITY --problem "pathogen_0x99A"
 
 For detailed command help:
     vulcan-cli <command> --help
@@ -363,6 +378,39 @@ dispatch_command() {
                     ;;
                 *)
                     die "Unknown proof subcommand: ${subcmd}"
+                    ;;
+            esac
+            ;;
+
+        # Demo commands
+        demo)
+            local subcmd="${1:-list}"
+            shift || true
+            case "${subcmd}" in
+                omega)
+                    # Run Omega Sequence demo
+                    local demo_script="${SCRIPT_DIR}/../omega_sequence_demo.py"
+                    if [[ -f "${demo_script}" ]]; then
+                        python3 "${demo_script}" "$@"
+                    else
+                        die "Omega Sequence demo script not found: ${demo_script}"
+                    fi
+                    ;;
+                solve)
+                    # Simulate problem solving
+                    python3 "${SCRIPT_DIR}/../omega_sequence_demo.py" --phase polymath "$@"
+                    ;;
+                list)
+                    echo "Available Demonstrations:"
+                    echo "  omega     - Omega Sequence: Full catastrophe survival demo"
+                    echo "  solve     - Solve domain-specific problems with knowledge transfer"
+                    ;;
+                mission_complete)
+                    # Simulate mission cleanup
+                    python3 "${SCRIPT_DIR}/../omega_sequence_demo.py" --phase cleanup "$@"
+                    ;;
+                *)
+                    die "Unknown demo subcommand: ${subcmd}"
                     ;;
             esac
             ;;
