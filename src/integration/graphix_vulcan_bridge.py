@@ -50,22 +50,24 @@ class BridgeConfig:
     
     def __post_init__(self):
         """Validate configuration parameters."""
-        if self.async_timeout <= 0:
-            raise ValueError(f"async_timeout must be positive, got {self.async_timeout}")
-        if self.embedding_dim <= 0:
-            raise ValueError(f"embedding_dim must be positive, got {self.embedding_dim}")
-        if self.memory_capacity <= 0:
-            raise ValueError(f"memory_capacity must be positive, got {self.memory_capacity}")
-        if self.kl_guard_threshold < 0:
-            raise ValueError(f"kl_guard_threshold must be non-negative, got {self.kl_guard_threshold}")
-        if self.max_retries < 0:
-            raise ValueError(f"max_retries must be non-negative, got {self.max_retries}")
-        if self.vocab_size <= 0:
-            raise ValueError(f"vocab_size must be positive, got {self.vocab_size}")
-        if self.cache_ttl_seconds <= 0:
-            raise ValueError(f"cache_ttl_seconds must be positive, got {self.cache_ttl_seconds}")
-        if self.consensus_timeout_seconds <= 0:
-            raise ValueError(f"consensus_timeout_seconds must be positive, got {self.consensus_timeout_seconds}")
+        # Define validation rules: (field_name, allow_zero, allow_negative)
+        validations = [
+            ('async_timeout', False, False),
+            ('embedding_dim', False, False),
+            ('memory_capacity', False, False),
+            ('kl_guard_threshold', True, False),  # Can be zero
+            ('max_retries', True, False),  # Can be zero (no retries)
+            ('vocab_size', False, False),
+            ('cache_ttl_seconds', False, False),
+            ('consensus_timeout_seconds', False, False),
+        ]
+        
+        for field_name, allow_zero, allow_negative in validations:
+            value = getattr(self, field_name)
+            if not allow_negative and value < 0:
+                raise ValueError(f"{field_name} must be non-negative, got {value}")
+            if not allow_zero and value <= 0:
+                raise ValueError(f"{field_name} must be positive, got {value}")
 
 
 # ------------------------ Functional VULCAN Components ------------------------ #
@@ -403,12 +405,13 @@ class GraphixVulcanBridge:
         fn: Optional[Union[Callable, Any]], 
         args: Any, 
         default: Any, 
-        timeout: float = _ASYNC_TIMEOUT, 
-        max_retries: int = _MAX_RETRIES
+        timeout: Optional[float] = None, 
+        max_retries: Optional[int] = None
     ) -> Any:
         
-        timeout = self.config.async_timeout
-        max_retries = self.config.max_retries
+        # Use provided timeout/retries or fall back to config defaults
+        timeout = timeout if timeout is not None else self.config.async_timeout
+        max_retries = max_retries if max_retries is not None else self.config.max_retries
         
         if fn is None:
             return default
