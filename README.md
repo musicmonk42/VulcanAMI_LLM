@@ -248,6 +248,21 @@ This software is proprietary and confidential to Novatrax Labs LLC. All rights r
 
 ---
 
+## Platform Capabilities Audit
+
+For a comprehensive inventory of all platform capabilities, architecture, and implementation details, see:
+
+**[PLATFORM_CAPABILITIES_AUDIT.md](PLATFORM_CAPABILITIES_AUDIT.md)** - Complete 100% coverage audit documenting:
+- 522 source files with 471,599 lines of code
+- 4,485 classes and 21,101 functions
+- 12 major capability categories
+- Complete technology stack and architecture
+- API endpoints, security features, and deployment infrastructure
+
+This audit provides full transparency for technical evaluation, security review, and compliance verification.
+
+---
+
 ## Acknowledgments
 
 This product may integrate with or interoperate alongside third-party components and services under their respective terms. Such third-party terms do not grant any rights in Novatrax proprietary software.
