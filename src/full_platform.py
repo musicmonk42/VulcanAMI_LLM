@@ -148,7 +148,7 @@ class UnifiedPlatformSettings(BaseSettings):
     registry_mount: str = "/registry"
     
     # Service import paths (support absolute imports like src.vulcan.main)
-    vulcan_module: str = "main"
+    vulcan_module: str = "src.vulcan.main"
     vulcan_attr: str = "app"
     arena_module: str = "graphix_arena"
     arena_attr: str = "app"
