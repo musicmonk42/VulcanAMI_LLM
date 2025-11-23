@@ -55,7 +55,7 @@ class PackVerifier:
             timestamp = struct.unpack('>Q', f.read(8))[0]
             merkle_root = f.read(32)
             
-            bloom_size = struct.unpack('>H', f.read(2))[0]
+            bloom_size = struct.unpack('>I', f.read(4))[0]
             bloom_filter = f.read(bloom_size)
             
             compression = f.read(16).rstrip(b'\x00').decode('utf-8')

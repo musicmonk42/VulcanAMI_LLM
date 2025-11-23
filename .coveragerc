@@ -1,5 +1,5 @@
 [run]
-source = .
+source = ., bin
 omit = 
     */tests/*
     */test_*
@@ -10,6 +10,11 @@ omit =
     load_test.py
     setup.py
     */site-packages/*
+    bin/main.tf
+    bin/outputs.tf
+    bin/variables.tf
+    bin/packer.toml
+    bin/README.md
 
 [report]
 exclude_lines =

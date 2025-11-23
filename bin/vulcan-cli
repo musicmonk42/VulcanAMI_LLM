@@ -155,7 +155,7 @@ EOF
 ################################################################################
 
 show_version() {
-    cat << EOF
+    cat << EOF >&2
 ${BOLD}VulcanAMI CLI${NC} version ${SCRIPT_VERSION}
 Copyright © 2025 VulcanAMI. All rights reserved.
 
@@ -170,7 +170,7 @@ EOF
 }
 
 show_help() {
-    cat << 'EOF'
+    cat << 'EOF' >&2
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃                    VulcanAMI CLI v4.6.0                          ┃
 ┃              Enterprise Graph Data Platform                      ┃
@@ -436,11 +436,12 @@ parse_global_options() {
                 ;;
             *)
                 # First non-option argument is the command
-                echo "$@"
+                printf '%q ' "$@"
                 return
                 ;;
         esac
     done
+    echo ""
 }
 
 ################################################################################
@@ -453,10 +454,14 @@ main() {
 
     # Parse global options and get remaining arguments
     local remaining_args
-    remaining_args=$(parse_global_options "$@")
+    remaining_args=$(parse_global_options "$@") || exit $?
     
-    # Convert string back to array
-    eval "set -- ${remaining_args}"
+    # Convert string back to array (safe because parse_global_options uses printf %q)
+    if [[ -n "${remaining_args}" ]]; then
+        eval "set -- ${remaining_args}"
+    else
+        set --
+    fi
 
     # Check if command provided
     if [[ $# -eq 0 ]]; then
