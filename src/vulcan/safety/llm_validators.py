@@ -210,6 +210,170 @@ class HallucinationValidator(BaseValidator):
 
 
 # ---------------------------------------------------------------------------
+# Structural Validator
+# ---------------------------------------------------------------------------
+
+class StructuralValidator(BaseValidator):
+    """
+    Validates structural integrity and well-formedness of tokens.
+    Checks for:
+    - Proper formatting
+    - Valid syntax patterns
+    - Balanced delimiters
+    """
+    name = "structural"
+
+    def __init__(self) -> None:
+        self.delimiter_pairs = [
+            ('(', ')'),
+            ('[', ']'),
+            ('{', '}'),
+            ('<', '>'),
+        ]
+        self.threshold = 0.5
+
+    def _check_balanced_delimiters(self, text: str) -> bool:
+        """Check if delimiters are balanced in the text."""
+        for open_d, close_d in self.delimiter_pairs:
+            stack = []
+            for char in text:
+                if char == open_d:
+                    stack.append(char)
+                elif char == close_d:
+                    if not stack:
+                        return False
+                    stack.pop()
+            if stack:
+                return False
+        return True
+
+    def score(self, token: Any, context: Dict[str, Any]) -> float:
+        """
+        Return structural risk score.
+        Higher score means more structural issues.
+        """
+        text = str(token)
+        risk = 0.0
+
+        # Check for balanced delimiters
+        if not self._check_balanced_delimiters(text):
+            risk += 0.4
+
+        # Check for excessive special characters (potential encoding issues)
+        special_chars = sum(1 for c in text if not c.isalnum() and not c.isspace())
+        if len(text) > 0:
+            special_ratio = special_chars / len(text)
+            if special_ratio > 0.5:
+                risk += 0.3
+
+        # Check for control characters
+        if any(ord(c) < 32 and c not in '\n\r\t' for c in text):
+            risk += 0.3
+
+        return min(1.0, risk)
+
+    def check(self, token: Any, context: Dict[str, Any]) -> bool:
+        """Return True if token is structurally valid."""
+        return self.score(token, context) < self.threshold
+
+    def get_safe_alternative(self, token: Any, context: Dict[str, Any]) -> Any:
+        """Return a safe alternative for structurally invalid tokens."""
+        return "[SAFE_TOKEN]"
+
+    def reason(self, token: Any, context: Dict[str, Any]) -> str:
+        """Provide reason for structural validation result."""
+        if not self.check(token, context):
+            return "structural integrity issues detected"
+        return "structurally valid"
+
+    def applies(self, token: Any) -> bool:
+        return isinstance(token, (str, int))
+
+
+# ---------------------------------------------------------------------------
+# Ethical Validator
+# ---------------------------------------------------------------------------
+
+class EthicalValidator(BaseValidator):
+    """
+    Validates ethical considerations in token generation.
+    Checks for:
+    - Harmful content
+    - Discriminatory language
+    - Privacy violations
+    - Manipulation attempts
+    """
+    name = "ethical"
+
+    def __init__(self) -> None:
+        # Ethical concern patterns
+        self._concern_patterns = [
+            (re.compile(r"\b(manipulate|deceive|trick|fool)\b", re.IGNORECASE), 0.6),
+            (re.compile(r"\b(discriminat(e|ion)|prejudice|bigot)\b", re.IGNORECASE), 0.8),
+            (re.compile(r"\b(harm|hurt|damage|destroy)\s+(people|humans|users)\b", re.IGNORECASE), 0.9),
+            (re.compile(r"\b(steal|hack|exploit|breach)\b", re.IGNORECASE), 0.7),
+            (re.compile(r"\b(personal|private)\s+(data|information)\b", re.IGNORECASE), 0.5),
+        ]
+        
+        # Ethical concern keywords
+        self._concern_keywords = {
+            "exploit": 0.7,
+            "manipulate": 0.6,
+            "deceive": 0.7,
+            "harm": 0.8,
+            "discriminate": 0.85,
+            "violate": 0.6,
+        }
+        self.threshold = 0.5
+
+    def _normalize(self, token: Any) -> str:
+        return str(token).lower()
+
+    def score(self, token: Any, context: Dict[str, Any]) -> float:
+        """
+        Return ethical risk score.
+        Higher score means more ethical concerns.
+        """
+        text = self._normalize(token)
+        risk = 0.0
+
+        # Check patterns
+        for pattern, score_val in self._concern_patterns:
+            if pattern.search(text):
+                risk = max(risk, score_val)
+
+        # Check keywords
+        for keyword, score_val in self._concern_keywords.items():
+            if keyword in text:
+                risk = max(risk, score_val)
+
+        # Context-based adjustments
+        intent = context.get("intent")
+        if intent in ("educational", "safety_training"):
+            # Lower risk if context is educational
+            risk *= 0.5
+
+        return min(1.0, risk)
+
+    def check(self, token: Any, context: Dict[str, Any]) -> bool:
+        """Return True if token is ethically acceptable."""
+        return self.score(token, context) < self.threshold
+
+    def get_safe_alternative(self, token: Any, context: Dict[str, Any]) -> Any:
+        """Return a safe alternative for ethically problematic tokens."""
+        return "[SAFE_TOKEN]"
+
+    def reason(self, token: Any, context: Dict[str, Any]) -> str:
+        """Provide reason for ethical validation result."""
+        if not self.check(token, context):
+            return "ethical concerns detected"
+        return "ethically acceptable"
+
+    def applies(self, token: Any) -> bool:
+        return isinstance(token, (str, int))
+
+
+# ---------------------------------------------------------------------------
 # Prompt Injection Validator
 # ---------------------------------------------------------------------------
 
