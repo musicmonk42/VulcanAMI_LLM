@@ -887,6 +887,7 @@ class LanguageEvolutionRegistry:
         if not proposal_id:
             raise ValueError("proposal_id required in consensus_node")
         
+        proposal_record_copy = None
         with self.state_lock:
             # Get proposal
             proposal_record = self.get_proposal(proposal_id)
@@ -904,12 +905,14 @@ class LanguageEvolutionRegistry:
                         self.backend.save_data(f"{self.proposals_prefix}{proposal_id}", proposal_record)
                         self._create_audit_entry("vote_timeout", {"proposal_id": proposal_id})
                         should_store_timeout = True
+                        # Create a copy for use outside the lock
+                        proposal_record_copy = proposal_record.copy()
                 except ValueError as e:
                     self.logger.error(f"Invalid deadline format: {e}")
         
         # Store in LTM outside of state_lock to avoid deadlock
-        if should_store_timeout:
-            self._store_outcome(proposal_id, proposal_record, "rejected_timeout")
+        if should_store_timeout and proposal_record_copy:
+            self._store_outcome(proposal_id, proposal_record_copy, "rejected_timeout")
             return False
         
         with self.state_lock:
