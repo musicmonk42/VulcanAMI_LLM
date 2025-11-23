@@ -18,6 +18,10 @@ on:
       - 'Dockerfile'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   validate-helm:
     name: Validate Helm Charts
