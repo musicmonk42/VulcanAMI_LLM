@@ -1,4 +1,3 @@
-```python
 """
 Graphix Graph Executor
 ======================
@@ -149,4 +148,3 @@ class TestGraphExecutor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-```

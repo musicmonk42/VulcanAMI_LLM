@@ -1,390 +1,58 @@
-# ============================================================================
-# VulcanAMI / Graphix Requirements File
-# ============================================================================
-# This file contains all Python dependencies for the VulcanAMI project.
-# Organized by category for better maintainability.
-# ============================================================================
+#!/usr/bin/env python3
+"""
+Demo script for GovernedTrainer with safety checks and meta self-improvement.
 
-# Core Web Framework and API
-# ----------------------------------------------------------------------------
-Flask==3.0.3
-flask-cors==6.0.1
-Flask-JWT-Extended==4.7.1
-Flask-Limiter==4.0.0
-Flask-Login==0.6.3
-Flask-SQLAlchemy==3.1.1
-fastapi==0.117.1
-uvicorn==0.37.0
-starlette==0.48.0
-python-multipart==0.0.20
+This script demonstrates the usage of the GovernedTrainer class for training
+neural network models with built-in safety mechanisms and governance features.
+"""
 
-# Database and ORM
-# ----------------------------------------------------------------------------
-SQLAlchemy==2.0.35
-alembic==1.16.5
+import sys
+import os
 
-# Async and Networking
-# ----------------------------------------------------------------------------
-aiohttp==3.9.5
-aiosignal==1.4.0
-httpx==0.27.0
-httpcore==1.0.9
-h11==0.16.0
-websockets==15.0.1
-websocket-client==1.8.0
-python-socketio==5.13.0
-python-engineio==4.12.2
+# Add src to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-gevent==25.5.1
-geventhttpclient==2.3.4
-greenlet==3.2.4
+try:
+    from src.training.governed_trainer import GovernedTrainer
+    print("✓ GovernedTrainer loaded successfully")
+except ImportError as e:
+    print(f"Error importing GovernedTrainer: {e}")
+    print("Please ensure src/training/governed_trainer.py exists and dependencies are installed.")
+    sys.exit(1)
 
-# Task Queue and Message Broker
-# ----------------------------------------------------------------------------
-celery==5.5.3
-redis==5.2.1
-amqp==5.3.1
-billiard==4.2.2
-kombu==5.5.4
-vine==5.1.0
 
-# Machine Learning and Deep Learning
-# ----------------------------------------------------------------------------
-torch==2.8.0
-torchvision==0.23.0
-torchaudio==2.8.0
-torch-geometric==2.6.1
-torchrl==0.10.0
-tensordict==0.10.0
-transformers==4.56.2
-sentence-transformers==5.1.1
-tokenizers==0.22.1
-huggingface-hub==0.35.1
-safetensors==0.6.2
-accelerate==1.11.0
-timm==1.0.20
+def run_demo():
+    """Run a simple demonstration of GovernedTrainer."""
+    print("\n" + "="*60)
+    print("GovernedTrainer Demo")
+    print("="*60)
+    
+    # Initialize trainer with safety parameters
+    trainer = GovernedTrainer(
+        learning_rate=1e-3,
+        lr_schedule="constant",
+        warmup_steps=20,
+        total_steps=200,
+        log_interval=10,
+        checkpoint_interval=100,
+        safety_check_interval=10,
+        gradient_accumulation_steps=1,
+        detect_anomalies=True,
+        enable_mixed_precision=False,
+        random_seed=42,
+        divergence_threshold=100.0,
+    )
+    
+    print(f"\n✓ Initialized GovernedTrainer with:")
+    print(f"  - Learning Rate: {trainer.learning_rate}")
+    print(f"  - Safety Checks: Enabled")
+    print(f"  - Gradient Accumulation: {trainer.gradient_accumulation_steps} steps")
+    print(f"  - Divergence Threshold: {trainer.divergence_threshold}")
+    
+    print("\nDemo completed successfully!")
+    print("For actual training, use: src/training/train_learnable_bigram.py")
+    print("="*60 + "\n")
 
-# Scientific Computing and Data Analysis
-# ----------------------------------------------------------------------------
-numpy==1.26.4
-pandas==2.3.2
-scipy==1.15.3
-scikit-learn==1.7.2
-statsmodels==0.14.5
-matplotlib==3.10.6
-networkx==3.3
 
-# Optimization and Mathematical Libraries
-# ----------------------------------------------------------------------------
-cvxpy==1.4.4
-clarabel==0.11.1
-ecos==2.0.14
-osqp==1.0.5
-scs==3.2.9
-opt_einsum==3.4.0
-sympy==1.14.0
-mpmath==1.3.0
-
-# Causal Inference and Statistical Learning
-# ----------------------------------------------------------------------------
-causal-learn==0.1.4.3
-dowhy==0.13
-lingam==1.11.0
-pgmpy==1.0.0
-semopy==2.3.11
-pygam==0.10.1
-patsy==1.0.1
-
-# Probabilistic Programming
-# ----------------------------------------------------------------------------
-pyro-ppl==1.9.1
-pyro-api==0.1.2
-
-# Explainability and Interpretability
-# ----------------------------------------------------------------------------
-captum==0.8.0
-
-# Gradient Boosting
-# ----------------------------------------------------------------------------
-lightgbm==4.6.0
-
-# Vector Search and Embeddings
-# ----------------------------------------------------------------------------
-faiss-cpu==1.12.0
-
-# Audio Processing
-# ----------------------------------------------------------------------------
-librosa==0.11.0
-audioread==3.0.1
-soundfile==0.13.1
-soxr==1.0.0
-
-# Chemistry and Molecular Modeling
-# ----------------------------------------------------------------------------
-rdkit==2025.3.6
-
-# Natural Language Processing
-# ----------------------------------------------------------------------------
-nltk==3.9.2
-
-# Graph Processing and Visualization
-# ----------------------------------------------------------------------------
-graphene==3.4.3
-graphql-core==3.2.6
-graphql-relay==3.2.0
-graphviz==0.20.3
-pydot==4.0.1
-git+https://github.com/musicmonk42/VulcanAMI.git@main#egg=vulcan-ami
-
-# Hyperparameter Optimization
-# ----------------------------------------------------------------------------
-optuna==4.5.0
-ray==2.49.2
-
-# Distributed Computing
-# ----------------------------------------------------------------------------
-grpcio==1.75.1
-grpcio-tools==1.75.1
-jaeger-client==4.8.0
-opentracing==2.4.0
-
-# Load Testing
-# ----------------------------------------------------------------------------
-locust==2.41.1
-locust-cloud==1.27.1
-
-# Testing Framework
-# ----------------------------------------------------------------------------
-pytest==8.4.2
-pytest-asyncio==0.23.8
-pytest-cov==7.0.0
-pytest-timeout==2.3.1
-hypothesis==6.98.9
-mock==5.2.0
-coverage==7.10.7
-
-# Configuration and Environment
-# ----------------------------------------------------------------------------
-python-dotenv==1.0.1
-ConfigArgParse==1.7.1
-pydantic==2.7.4
-pydantic-settings==2.11.0
-pydantic_core==2.18.4
-PyYAML==6.0.2
-
-# API Clients
-# ----------------------------------------------------------------------------
-openai==2.3.0
-slack_sdk==3.36.0
-
-# Service Discovery
-# ----------------------------------------------------------------------------
-python-consul==1.1.0
-
-# Utilities
-# ----------------------------------------------------------------------------
-click==8.3.0
-click-didyoumean==0.3.1
-click-plugins==1.1.1.2
-click-repl==0.3.0
-typer==0.19.2
-rich==14.1.0
-colorlog==6.9.0
-tqdm==4.67.1
-progressbar2==4.5.0
-python-utils==3.9.1
-tenacity==8.5.0
-ratelimit==2.2.1
-circuitbreaker==2.1.3
-slowapi==0.1.9
-limits==5.5.0
-
-# Serialization and Compression
-# ----------------------------------------------------------------------------
-msgpack==1.1.1
-orjson==3.11.3
-cloudpickle==3.1.1
-cramjam==2.11.0
-lz4==4.4.4
-python-snappy==0.7.3
-Brotli==1.1.0
-
-# Data Processing
-# ----------------------------------------------------------------------------
-joblib==1.5.2
-fsspec==2025.9.0
-cloudpathlib==0.23.0
-smart_open==7.3.1
-pyzmq==27.1.0
-
-# Search and Text Processing
-# ----------------------------------------------------------------------------
-Whoosh==2.7.4
-marisa-trie==1.3.1
-regex==2025.9.18
-
-# Cryptography and Security
-# ----------------------------------------------------------------------------
-cryptography==42.0.8
-ecdsa==0.19.0
-PyJWT==2.10.1
-
-# Templating and Markup
-# ----------------------------------------------------------------------------
-Jinja2==3.1.6
-MarkupSafe==3.0.2
-markdown-it-py==4.0.0
-mdurl==0.1.2
-Pygments==2.19.2
-
-# HTTP and Requests
-# ----------------------------------------------------------------------------
-requests==2.32.5
-urllib3==2.5.0
-certifi==2025.8.3
-charset-normalizer==3.4.3
-idna==3.10
-
-# Data Validation and Schema
-# ----------------------------------------------------------------------------
-jsonschema==4.22.0
-jsonschema-specifications==2025.9.1
-referencing==0.36.2
-rpds-py==0.27.1
-
-# Build Tools
-# ----------------------------------------------------------------------------
-build==1.3.0
-cmake==4.1.0
-ninja==1.13.0
-setuptools==80.9.0
-wheel==0.45.1
-pyproject_hooks==1.2.0
-scikit_build_core==0.11.6
-
-# Compilation and Low-Level
-# ----------------------------------------------------------------------------
-Cython==3.1.4
-pybind11==3.0.1
-llvmlite==0.45.1
-numba==0.62.1
-
-# File Handling and Path
-# ----------------------------------------------------------------------------
-pathspec==0.12.1
-filelock==3.19.1
-platformdirs==4.4.0
-watchdog==6.0.0
-
-# Type Extensions and Annotations
-# ----------------------------------------------------------------------------
-typing_extensions==4.15.0
-typing-inspection==0.4.1
-annotated-types==0.7.0
-
-# Date and Time
-# ----------------------------------------------------------------------------
-python-dateutil==2.9.0.post0
-pytz==2025.2
-tzdata==2025.2
-
-# Data Generation and Mocking
-# ----------------------------------------------------------------------------
-Faker==24.14.0
-
-# System and Process Utilities
-# ----------------------------------------------------------------------------
-psutil==6.0.0
-distro==1.9.0
-shellingham==1.5.4
-
-# Parsing and AST
-# ----------------------------------------------------------------------------
-pyparsing==3.2.5
-astor==0.8.1
-
-# Graph and Tree Data Structures
-# ----------------------------------------------------------------------------
-sortedcontainers==2.4.0
-ordered-set==4.1.0
-bidict==0.23.1
-
-# Protocols and Interfaces
-# ----------------------------------------------------------------------------
-protobuf==6.32.1
-thrift==0.22.0
-wsproto==1.2.0
-
-# Web Framework Support
-# ----------------------------------------------------------------------------
-tornado==6.5.2
-Werkzeug==3.1.3
-itsdangerous==2.2.0
-blinker==1.9.0
-simple-websocket==1.1.0
-sniffio==1.3.1
-anyio==4.11.0
-
-# Caching
-# ----------------------------------------------------------------------------
-cachetools==6.2.0
-
-# Console and Terminal
-# ----------------------------------------------------------------------------
-colorama==0.4.6
-wcwidth==0.2.14
-prompt_toolkit==3.0.52
-
-# Threading and Concurrency
-# ----------------------------------------------------------------------------
-threadloop==1.0.2
-threadpoolctl==3.6.0
-
-# Numerical and Scientific Support
-# ----------------------------------------------------------------------------
-numdifftools==0.9.41
-momentchi2==0.1.8
-lazy_loader==0.4
-pooch==1.8.2
-
-# Image Processing
-# ----------------------------------------------------------------------------
-pillow==11.3.0
-
-# Plotting Support
-# ----------------------------------------------------------------------------
-contourpy==1.3.2
-cycler==0.12.1
-fonttools==4.60.0
-kiwisolver==1.4.9
-
-# Core Python Utilities
-# ----------------------------------------------------------------------------
-attrs==25.3.0
-frozenlist==1.7.0
-multidict==6.6.4
-yarl==1.20.1
-propcache==0.3.2
-six==1.17.0
-decorator==5.2.1
-Deprecated==1.2.18
-wrapt==1.17.3
-zipp==3.23.0
-importlib_metadata==8.7.0
-packaging==25.0
-pluggy==1.6.0
-iniconfig==2.1.0
-cffi==1.17.1
-pycparser==2.23
-
-# Zope Ecosystem
-# ----------------------------------------------------------------------------
-zope.event==6.0
-zope.interface==8.0.1
-
-# Miscellaneous
-# ----------------------------------------------------------------------------
-pyvers==0.1.0
-Mako==1.3.10
-psy==0.0.1
-jiter==0.11.0
+if __name__ == "__main__":
+    run_demo()

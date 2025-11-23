@@ -1107,4 +1107,230 @@ def run_training(args: argparse.Namespace) -> None:
     patience_counter = 0
     applied_updates = applied_updates_restored
 
-    def safe_lr_change(old_lr: float, new_lr: float) ->
+    def safe_lr_change(old_lr: float, new_lr: float) -> bool:
+        """
+        Apply a guarded learning-rate change. Returns True if applied, False if rejected.
+        Enforces ratio bounds (0.25x .. 4x) and only applies positive learning rates.
+        """
+        min_ratio, max_ratio = 0.25, 4.0
+        try:
+            if old_lr <= 0 or new_lr <= 0:
+                print(f"[SAFETY] Invalid LR values: old_lr={old_lr}, new_lr={new_lr}")
+                return False
+            ratio = new_lr / old_lr
+            if ratio < min_ratio or ratio > max_ratio:
+                print(f"[SAFETY] Proposed LR change {old_lr:.4e} -> {new_lr:.4e} rejected (ratio={ratio:.2f})")
+                return False
+            # Apply to trainer if available
+            try:
+                trainer.optimizer.set_lr(new_lr)
+                # If scheduler tracks an initial_lr, update it too
+                if hasattr(trainer, "lr_scheduler") and hasattr(trainer.lr_scheduler, "initial_lr"):
+                    trainer.lr_scheduler.initial_lr = new_lr
+                print(f"[SAFETY] Learning rate changed {old_lr:.4e} -> {new_lr:.4e}")
+                return True
+            except Exception as e:
+                print(f"[SAFETY] Failed to apply LR change to trainer: {e}")
+                return False
+        except Exception as e:
+            print(f"[SAFETY] Error in safe_lr_change: {e}")
+            return False
+
+    # Main training loop
+    for step in range(args.steps):
+        if step >= args.steps:
+            break
+        
+        try:
+            batch = dataset.sample_train_batch()
+        except Exception:
+            break
+        
+        loss, grads = trainer.gradient_fn(batch)
+        
+        # Update model
+        if hasattr(trainer, "step"):
+            trainer.step(grads)
+        elif hasattr(trainer, "apply_gradients"):
+            trainer.apply_gradients(grads)
+        elif hasattr(model, "apply_update"):
+            current_lr = trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate
+            model.apply_update(grads, learning_rate=current_lr)
+        
+        applied_updates += 1
+        
+        # Accumulate counts if enabled
+        if counts is not None:
+            seq = batch["sequence"]
+            order = getattr(model, "order", 2)
+            for j in range(len(seq)):
+                tok = seq[j]
+                counts.unigram[tok] += 1
+                counts.total += 1
+                if j > 0:
+                    prev1 = seq[j-1]
+                    counts.bigram[prev1][tok] += 1
+                    if order == 3 and j > 1:
+                        prev2 = seq[j-2]
+                        counts.trigram[prev2][prev1][tok] += 1
+        
+        # Validation and checkpointing
+        if applied_updates % max(1, args.val_interval) == 0:
+            val_loss = blended_validation_loss(
+                model, dataset, batches=args.val_batches, full=args.val_full,
+                backoff_enabled=args.enable_backoff, backoff_lambda=args.backoff_lambda,
+                backoff_weights=tuple(map(float, args.backoff_weights.split(","))) if isinstance(args.backoff_weights, str) else args.backoff_weights,
+                trigram_weight=args.trigram_weight, bigram_weight=args.bigram_weight,
+                counts=counts, alpha=args.count_smoothing_alpha, discount_d=args.discount_d, use_count_loss=args.use_count_loss
+            )
+            print(f"[VAL] Step {applied_updates}: val_loss={val_loss:.4f}")
+            
+            if val_loss + args.early_stop_tol < best_val:
+                best_val = val_loss
+                best_update = applied_updates
+                patience_counter = 0
+                optimizer_state = {
+                    "learning_rate": trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate,
+                    "applied_updates": applied_updates
+                }
+                save_best_params(model, dataset, args.best_out_dir, applied_updates, val_loss, best_name, counts, args.save_optimizer_state, optimizer_state)
+            else:
+                patience_counter += 1
+                if patience_counter >= args.patience:
+                    print("[TRAIN] Early stopping triggered.")
+                    break
+        
+        # Meta self-improvement (if enabled)
+        if args.meta_interval > 0 and applied_updates % args.meta_interval == 0:
+            current_lr = trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate
+            issue_report = {
+                "current_val_loss": best_val,
+                "patience_counter": patience_counter,
+                "learning_rate": current_lr,
+                "step": applied_updates
+            }
+            orchestrator.record_metrics(applied_updates, {"val_loss": best_val})
+            
+            if args.meta_apply:
+                safe_types = [s.strip() for s in args.meta_safe_types.split(",") if s.strip()]
+                proposals = orchestrator.propose_experiments(issue_report)
+                for proposal in proposals:
+                    exp_type = proposal.get("type", "")
+                    if exp_type in safe_types:
+                        print(f"[META] Applying safe experiment: {exp_type}")
+                        if exp_type == "lr_adjustment" and "new_lr" in proposal:
+                            safe_lr_change(current_lr, proposal["new_lr"])
+    
+    # Final save
+    print(f"[TRAIN] Training complete. Best val loss: {best_val:.4f} at step {best_update}")
+    optimizer_state = {
+        "learning_rate": trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate,
+        "applied_updates": applied_updates
+    }
+    save_best_params(model, dataset, args.best_out_dir, applied_updates, best_val, f"final_{best_name}", counts, args.save_optimizer_state, optimizer_state)
+    
+    # Save meta state
+    if args.meta_interval > 0:
+        try:
+            meta_state_path = args.meta_state_path or os.path.join(args.best_out_dir, "meta_state.json")
+            with open(meta_state_path, "w", encoding="utf-8") as f:
+                json.dump(orchestrator.export_state(), f)
+            print(f"[META] Saved orchestrator state to {meta_state_path}")
+        except Exception as e:
+            print(f"[META] Failed to save meta state: {e}")
+    
+    # Generate if requested
+    if args.generate_length > 0:
+        print(f"\n[GEN] Generating {args.generate_length} tokens...")
+        if counts is not None:
+            V = dataset.vocab_size
+            tri_log, bi_log, uni_log = counts.smooth_log_probs(V, args.count_smoothing_alpha, args.discount_d)
+        else:
+            tri_log, bi_log, uni_log = {}, {}, {}
+        
+        tokens = generate_tokens(
+            model, dataset, args.generate_length, args.temperature,
+            args.top_k, args.top_p, args.repetition_penalty,
+            args.start_token, args.stop_on_eos, args.mask_bos,
+            args.enable_backoff, args.backoff_lambda,
+            tuple(map(float, args.backoff_weights.split(","))) if isinstance(args.backoff_weights, str) else args.backoff_weights,
+            args.trigram_weight, args.bigram_weight,
+            tri_log, bi_log, uni_log, args.interp_lambda
+        )
+        text = dataset.tok.decode(tokens)
+        print(f"[GEN] {text}")
+
+
+# ============================= Main Entry Point ============================= #
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Learnable bigram/trigram trainer with governance and meta self-improvement")
+    
+    # Data and model
+    parser.add_argument("--data-path", "--data_path", required=True, help="Path to training corpus")
+    parser.add_argument("--order", type=int, default=2, choices=[2, 3], help="N-gram order (2=bigram, 3=trigram)")
+    parser.add_argument("--seq-len", "--seq_len", type=int, default=16, help="Sequence length for training windows")
+    parser.add_argument("--min-freq", "--min_freq", type=int, default=1, help="Minimum token frequency")
+    parser.add_argument("--use-eos", "--use_eos", action="store_true", default=True, help="Append EOS to sequences")
+    
+    # Training
+    parser.add_argument("--steps", type=int, default=200, help="Training steps")
+    parser.add_argument("--learning-rate", "--learning_rate", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--batch-size", "--batch_size", type=int, default=1, help="Gradient accumulation steps")
+    parser.add_argument("--label-smoothing", "--label_smoothing", type=float, default=0.0, help="Label smoothing")
+    parser.add_argument("--lr-schedule", "--lr_schedule", default="constant", choices=["constant", "cosine"], help="LR schedule")
+    parser.add_argument("--divergence-threshold", "--divergence_threshold", type=float, default=100.0, help="Divergence threshold")
+    
+    # Validation and checkpointing
+    parser.add_argument("--val-interval", "--val_interval", type=int, default=100, help="Validation interval")
+    parser.add_argument("--val-batches", "--val_batches", type=int, default=5, help="Validation batches")
+    parser.add_argument("--val-full", "--val_full", action="store_true", default=False, help="Use full validation set")
+    parser.add_argument("--patience", type=int, default=5, help="Early stopping patience")
+    parser.add_argument("--early-stop-tol", "--early_stop_tol", type=float, default=1e-6, help="Early stopping tolerance")
+    parser.add_argument("--best-out-dir", "--best_out_dir", default=".", help="Output directory for checkpoints")
+    parser.add_argument("--save-optimizer-state", "--save_optimizer_state", action="store_true", default=False, help="Save optimizer state")
+    
+    # Backoff and counts
+    parser.add_argument("--enable-backoff", "--enable_backoff", action="store_true", default=False, help="Enable learned backoff")
+    parser.add_argument("--store-counts", "--store_counts", action="store_true", default=False, help="Store n-gram counts")
+    parser.add_argument("--backoff-lambda", "--backoff_lambda", type=float, default=0.5, help="Backoff interpolation lambda")
+    parser.add_argument("--backoff-weights", "--backoff_weights", default="0.6,0.3,0.1", help="Backoff weights (tri,bi,uni)")
+    parser.add_argument("--trigram-weight", "--trigram_weight", type=float, default=1.0, help="Trigram weight")
+    parser.add_argument("--bigram-weight", "--bigram_weight", type=float, default=0.0, help="Bigram weight")
+    parser.add_argument("--count-smoothing-alpha", "--count_smoothing_alpha", type=float, default=0.1, help="Count smoothing alpha")
+    parser.add_argument("--discount-d", "--discount_d", type=float, default=0.0, help="Count discount factor")
+    parser.add_argument("--use-count-loss", "--use_count_loss", action="store_true", default=False, help="Use count-based validation loss")
+    
+    # Meta self-improvement
+    parser.add_argument("--meta-interval", "--meta_interval", type=int, default=0, help="Meta self-improvement interval (0=disabled)")
+    parser.add_argument("--meta-apply", "--meta_apply", action="store_true", default=False, help="Apply meta experiments")
+    parser.add_argument("--meta-safe-types", "--meta_safe_types", default="lr_adjustment", help="Safe experiment types (comma-separated)")
+    parser.add_argument("--meta-state-path", "--meta_state_path", default=None, help="Meta state file path")
+    parser.add_argument("--meta-enable-decay", "--meta_enable_decay", action="store_true", default=False, help="Enable meta memory decay")
+    
+    # Resume and generation
+    parser.add_argument("--resume-from", "--resume_from", default=None, help="Resume from checkpoint")
+    parser.add_argument("--load-best", "--load_best", default=None, help="Load best checkpoint for generation")
+    parser.add_argument("--override-lr", "--override_lr", action="store_true", default=False, help="Override loaded LR")
+    parser.add_argument("--generate-length", "--generate_length", type=int, default=0, help="Generate N tokens")
+    parser.add_argument("--temperature", type=float, default=1.0, help="Sampling temperature")
+    parser.add_argument("--top-k", "--top_k", type=int, default=0, help="Top-k sampling")
+    parser.add_argument("--top-p", "--top_p", type=float, default=1.0, help="Top-p (nucleus) sampling")
+    parser.add_argument("--repetition-penalty", "--repetition_penalty", type=float, default=1.0, help="Repetition penalty")
+    parser.add_argument("--start-token", "--start_token", default=None, help="Start token for generation")
+    parser.add_argument("--stop-on-eos", "--stop_on_eos", action="store_true", default=False, help="Stop generation on EOS")
+    parser.add_argument("--mask-bos", "--mask_bos", action="store_true", default=False, help="Mask BOS during generation")
+    parser.add_argument("--interp-lambda", "--interp_lambda", type=float, default=0.0, help="Legacy interpolation lambda")
+    
+    # Other
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    
+    args = parser.parse_args()
+    
+    try:
+        run_training(args)
+    except Exception as e:
+        print(f"[ERROR] run_training failed: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
