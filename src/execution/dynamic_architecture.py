@@ -1089,7 +1089,8 @@ class DynamicArchitecture:
             elif isinstance(end, tuple) and len(end) == 2:
                 try:
                     return int(end[0]), str(end[1])
-                except Exception as e:                    return None, None
+                except Exception as e:
+                    return None, None
             return None, None
 
         src_layer, src_id = parse_end(src)
@@ -1218,7 +1219,8 @@ class DynamicArchitecture:
         if state.get("mode") == "model" and self._get_layers() is not None:
             try:
                 self.model.layers = copy.deepcopy(state["layers"])
-            except Exception as e:                cur = self._get_layers()
+            except Exception as e:
+                cur = self._get_layers()
                 if isinstance(cur, list):
                     cur.clear()
                     cur.extend(copy.deepcopy(state["layers"]))
@@ -1370,7 +1372,8 @@ class DynamicArchitecture:
         if self._get_layers() is not None:
             try:
                 self.model.layers = layers
-            except Exception as e:                cur = self._get_layers()
+            except Exception as e:
+                cur = self._get_layers()
                 if isinstance(cur, list):
                     cur.clear()
                     cur.extend(layers)

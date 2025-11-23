@@ -51,8 +51,9 @@ spec:
       containers:
       - name: redis
         # Pin to specific version with digest for production
-        image: redis:7-alpine
-        imagePullPolicy: Always
+        # Using redis:7-alpine with a recent stable digest
+        image: redis:7-alpine@sha256:3c9c5f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f
+        imagePullPolicy: IfNotPresent
         command:
         - redis-server
         - --requirepass

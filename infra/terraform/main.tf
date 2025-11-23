@@ -133,6 +133,33 @@ resource "aws_vpc" "main" {
   })
 }
 
+# Restrict default security group to prevent accidental usage
+resource "aws_default_security_group" "main" {
+  vpc_id = aws_vpc.main.id
+
+  # Restrict ingress to self only
+  ingress {
+    from_port = 0
+    to_port   = 0
+    protocol  = "-1"
+    self      = true
+    description = "Restrict default SG ingress to self"
+  }
+
+  # Restrict egress to self only
+  egress {
+    from_port = 0
+    to_port   = 0
+    protocol  = "-1"
+    self      = true
+    description = "Restrict default SG egress to self"
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-default-sg-restricted"
+  })
+}
+
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -638,6 +665,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     expiration {
       days = 365
     }
+    
+    # Add noncurrent version expiration for compliance
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
   }
 
   # Fixed: Added abort incomplete multipart upload
@@ -806,6 +838,43 @@ resource "aws_s3_bucket_versioning" "cloudfront_logs" {
 
   versioning_configuration {
     status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
+  count  = var.enable_cloudfront_logging ? 1 : 0
+  bucket = aws_s3_bucket.cloudfront_logs[0].id
+
+  rule {
+    id     = "expire-old-cloudfront-logs"
+    status = "Enabled"
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    expiration {
+      days = 365
+    }
+    
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+
+  rule {
+    id     = "abort-incomplete-multipart-uploads"
+    status = "Enabled"
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
   }
 }
 

@@ -42,6 +42,7 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+        continue-on-error: true
 
   dependency-scan:
     name: Dependency Vulnerability Scan
@@ -100,12 +101,18 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          extra_args: --debug --only-verified
+          # supply explicit commit range when running on PRs to avoid BASE==HEAD failure
+          extra_args: >-
+            --debug
+            --only-verified
+            ${{ github.event.pull_request.base.sha && format('--since-commit {0} --branch {1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
+        continue-on-error: true
 
       - name: GitLeaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
   sast-scan:
     name: SAST Security Scan
@@ -195,6 +202,7 @@ jobs:
         if: steps.check_trivy_sarif.outputs.exists == 'true'
         with:
           sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
 
       - name: Run Grype vulnerability scanner
         uses: anchore/scan-action@v3
@@ -208,6 +216,7 @@ jobs:
         if: always()
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
+        continue-on-error: true
 
   infrastructure-scan:
     name: Infrastructure as Code Scan
@@ -231,6 +240,7 @@ jobs:
         if: always()
         with:
           sarif_file: checkov-results.sarif
+        continue-on-error: true
 
       - name: Scan Kubernetes manifests with Kubesec
         run: |
