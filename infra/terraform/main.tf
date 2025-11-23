@@ -720,8 +720,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "logs_secondary" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3.arn
-      sse_algorithm     = "aws:kms"
+      # Note: Using default AWS-managed key (SSE-S3) for cross-region compatibility
+      # For customer-managed keys, create a separate KMS key in secondary region
+      sse_algorithm     = "AES256"
     }
   }
 }

@@ -9,7 +9,8 @@ image:
   pullPolicy: IfNotPresent
   # SECURITY: Use specific version tag instead of 'latest' for production
   # Example: tag: "v1.0.0" or tag: "1.0.0-sha256:abc123..."
-  tag: ""  # REQUIRED: Must be set to a specific version
+  # This MUST be overridden during deployment with --set image.tag=<version>
+  tag: "REPLACE_ME"  # REQUIRED: Must be set to a specific version during deployment
 
 imagePullSecrets: []
 nameOverride: ""

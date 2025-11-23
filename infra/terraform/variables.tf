@@ -210,9 +210,16 @@ variable "enable_ipv6" {
   default     = true
 }
 
-# Fixed: Added allowed_ip_ranges variable with validation
+# Security: IP Access Control
+# Empty default requires explicit specification for security
+# IMPORTANT: Resources expecting IP ranges must handle empty list or provide their own defaults
 variable "allowed_ip_ranges" {
-  description = "IP ranges allowed to access ALB and other public resources"
+  description = <<-EOT
+    IP ranges allowed to access ALB and other public resources.
+    Empty default requires explicit specification for security.
+    Example: ["10.0.0.0/8", "172.16.0.0/12"]
+    WARNING: Using ["0.0.0.0/0"] allows unrestricted internet access
+  EOT
   type        = list(string)
   default     = []  # Empty default requires explicit IP range specification
 
