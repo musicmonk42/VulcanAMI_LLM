@@ -400,7 +400,8 @@ class CycleDetector:
         with self.lock:
             try:
                 return not nx.is_directed_acyclic_graph(self.storage.nx_graph)
-            except Exception as e:                return self._has_cycles_dfs()
+            except Exception as e:
+                return self._has_cycles_dfs()
     
     def find_cycles(self) -> List[List[str]]:
         """Find all cycles in graph"""
@@ -464,7 +465,8 @@ class CycleDetector:
             try:
                 sccs = list(nx.strongly_connected_components(self.storage.nx_graph))
                 return [scc for scc in sccs if len(scc) > 1]
-            except Exception as e:                return self._find_sccs_tarjan()
+            except Exception as e:
+                return self._find_sccs_tarjan()
     
     def _has_cycles_dfs(self) -> bool:
         """Check for cycles using DFS"""
@@ -623,7 +625,8 @@ class CacheManager:
                     return self._path_cache[key]
                 self.cache_misses += 1
                 return None
-            except Exception as e:                self.cache_misses += 1
+            except Exception as e:
+                self.cache_misses += 1
                 return None
     
     def put_path(self, key: Tuple[str, str], value: bool):
@@ -647,7 +650,8 @@ class CacheManager:
                     return self._descendants_cache[node_id].copy()
                 self.cache_misses += 1
                 return None
-            except Exception as e:                self.cache_misses += 1
+            except Exception as e:
+                self.cache_misses += 1
                 return None
     
     def put_descendants(self, node_id: str, descendants: Set[str]):
@@ -671,7 +675,8 @@ class CacheManager:
                     return self._ancestors_cache[node_id].copy()
                 self.cache_misses += 1
                 return None
-            except Exception as e:                self.cache_misses += 1
+            except Exception as e:
+                self.cache_misses += 1
                 return None
     
     def put_ancestors(self, node_id: str, ancestors: Set[str]):
@@ -694,7 +699,8 @@ class CacheManager:
                     return self._topological_cache
                 self.cache_misses += 1
                 return None
-            except Exception as e:                self.cache_misses += 1
+            except Exception as e:
+                self.cache_misses += 1
                 return None
     
     def put_topological(self, result: List[Any]):
