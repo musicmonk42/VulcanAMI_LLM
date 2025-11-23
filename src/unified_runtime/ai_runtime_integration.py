@@ -10,7 +10,9 @@ import json
 import time
 import hashlib
 import os
-from typing import Dict, Any, Optional, List, Union, Callable, Awaitable, Tuple, TYPE_CHECKING
+from typing import (
+    Dict, Any, Optional, List, Union, Callable, Awaitable, Tuple, TYPE_CHECKING
+)
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from abc import ABC, abstractmethod
@@ -21,6 +23,8 @@ from collections import defaultdict, deque
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+# TYPE_CHECKING import for type annotations without runtime import
+# This allows using aiohttp types in annotations even when aiohttp is not installed
 if TYPE_CHECKING:
     import aiohttp
 
