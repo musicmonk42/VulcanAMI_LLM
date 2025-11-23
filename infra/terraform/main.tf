@@ -133,6 +133,18 @@ resource "aws_vpc" "main" {
   })
 }
 
+# Default security group - restrict all traffic
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+
+  ingress = []
+  egress  = []
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-default-sg"
+  })
+}
+
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -651,6 +663,81 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   }
 }
 
+# Cross-region replication for logs bucket
+resource "aws_s3_bucket" "logs_replica" {
+  count         = var.enable_bucket_replication ? 1 : 0
+  provider      = aws.secondary
+  bucket        = "${local.bucket_logs}-replica"
+  force_destroy = var.environment == "dev" ? true : false
+
+  tags = merge(local.common_tags, {
+    Name = "${local.bucket_logs}-replica"
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "logs_replica" {
+  count    = var.enable_bucket_replication ? 1 : 0
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.logs_replica[0].id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "logs_replica" {
+  count    = var.enable_bucket_replication ? 1 : 0
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.logs_replica[0].id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "logs_replica" {
+  count    = var.enable_bucket_replication ? 1 : 0
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.logs_replica[0].id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_replication_configuration" "logs" {
+  count = var.enable_bucket_replication ? 1 : 0
+
+  role   = aws_iam_role.replication[0].arn
+  bucket = aws_s3_bucket.logs.id
+
+  rule {
+    id     = "replicate-logs"
+    status = "Enabled"
+
+    filter {}
+
+    destination {
+      bucket        = aws_s3_bucket.logs_replica[0].arn
+      storage_class = var.replication_storage_class
+
+      encryption_configuration {
+        replica_kms_key_id = aws_kms_key.s3.arn
+      }
+    }
+
+    delete_marker_replication {
+      status = "Enabled"
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.logs]
+}
+
 ################################################################################
 # S3 Bucket Policies
 ################################################################################
@@ -809,12 +896,99 @@ resource "aws_s3_bucket_versioning" "cloudfront_logs" {
   }
 }
 
+resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs" {
+  count  = var.enable_cloudfront_logging ? 1 : 0
+  bucket = aws_s3_bucket.cloudfront_logs[0].id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}
+
 resource "aws_s3_bucket_logging" "cloudfront_logs" {
   count  = var.enable_cloudfront_logging ? 1 : 0
   bucket = aws_s3_bucket.cloudfront_logs[0].id
 
   target_bucket = aws_s3_bucket.logs.id
   target_prefix = "s3-access-logs/${local.bucket_cloudfront_logs}/"
+}
+
+# Cross-region replication for CloudFront logs bucket
+resource "aws_s3_bucket" "cloudfront_logs_replica" {
+  count         = var.enable_cloudfront_logging && var.enable_bucket_replication ? 1 : 0
+  provider      = aws.secondary
+  bucket        = "${local.bucket_cloudfront_logs}-replica"
+  force_destroy = var.environment == "dev" ? true : false
+
+  tags = merge(local.common_tags, {
+    Name = "${local.bucket_cloudfront_logs}-replica"
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "cloudfront_logs_replica" {
+  count    = var.enable_cloudfront_logging && var.enable_bucket_replication ? 1 : 0
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.cloudfront_logs_replica[0].id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "cloudfront_logs_replica" {
+  count    = var.enable_cloudfront_logging && var.enable_bucket_replication ? 1 : 0
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.cloudfront_logs_replica[0].id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs_replica" {
+  count    = var.enable_cloudfront_logging && var.enable_bucket_replication ? 1 : 0
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.cloudfront_logs_replica[0].id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_replication_configuration" "cloudfront_logs" {
+  count = var.enable_cloudfront_logging && var.enable_bucket_replication ? 1 : 0
+
+  role   = aws_iam_role.replication[0].arn
+  bucket = aws_s3_bucket.cloudfront_logs[0].id
+
+  rule {
+    id     = "replicate-cloudfront-logs"
+    status = "Enabled"
+
+    filter {}
+
+    destination {
+      bucket        = aws_s3_bucket.cloudfront_logs_replica[0].arn
+      storage_class = var.replication_storage_class
+
+      encryption_configuration {
+        replica_kms_key_id = aws_kms_key.s3.arn
+      }
+    }
+
+    delete_marker_replication {
+      status = "Enabled"
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.cloudfront_logs]
 }
 
 resource "aws_cloudfront_origin_access_identity" "main" {

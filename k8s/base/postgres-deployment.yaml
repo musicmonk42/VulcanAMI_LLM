@@ -31,10 +31,12 @@ spec:
     spec:
       # Disable automount service account token
       automountServiceAccountToken: false
-      
+
       # Pod-level security context
-      # Note: The official postgres:14-alpine image runs as root by default,
-      # but we enforce non-root for security. The image supports running as postgres user (UID 70).
+      # Note: The official postgres:14-alpine image runs as postgres user (UID 70).
+      # This is lower than the recommended UID 10000+ for CKV_K8S_40, but is
+      # required by the official PostgreSQL image. For production, consider using
+      # a custom image with a higher UID or accept this exception.
       securityContext:
         runAsNonRoot: true
         runAsUser: 70  # postgres user in official PostgreSQL images
@@ -42,81 +44,89 @@ spec:
         fsGroup: 70
         seccompProfile:
           type: RuntimeDefault
-      
+
       containers:
-      - name: postgres
-        # Pin to specific version with digest for production
-        image: postgres:14-alpine
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 5432
-          name: postgres
-        
-        # Container-level security context
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          runAsUser: 70  # postgres user UID in official images
-          # Note: readOnlyRootFilesystem: true is not feasible for postgres
-          # as it needs to write to various system directories
-          seccompProfile:
-            type: RuntimeDefault
-          capabilities:
-            drop:
-              - ALL
-        
-        env:
-        - name: POSTGRES_DB
-          valueFrom:
-            configMapKeyRef:
-              name: vulcanami-config
-              key: POSTGRES_DB
-        - name: POSTGRES_USER
-          valueFrom:
-            configMapKeyRef:
-              name: vulcanami-config
-              key: POSTGRES_USER
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: vulcanami-secrets
-              key: POSTGRES_PASSWORD
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        volumeMounts:
-        - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
+        - name: postgres
+          # Pin to specific version with digest for production
+          image: postgres:14-alpine
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5432
+              name: postgres
+
+          # Container-level security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 70  # postgres user UID in official images
+            # Note: readOnlyRootFilesystem: true is not feasible for postgres
+            # as it needs to write to various system directories
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+
+          # Use secrets as files instead of environment variables for better security
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: vulcanami-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: vulcanami-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD_FILE
+              value: /etc/secrets/postgres-password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-secret
+              mountPath: /etc/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - vulcanami
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - vulcanami
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-secret
+          secret:
+            secretName: vulcanami-secrets
+            items:
+              - key: POSTGRES_PASSWORD
+                path: postgres-password
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
         resources:
           requests:
-            cpu: 500m
-            memory: 1Gi
-          limits:
-            cpu: 2000m
-            memory: 2Gi
-        livenessProbe:
-          exec:
-            command:
-            - pg_isready
-            - -U
-            - vulcanami
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          exec:
-            command:
-            - pg_isready
-            - -U
-            - vulcanami
-          initialDelaySeconds: 5
-          periodSeconds: 5
-  volumeClaimTemplates:
-  - metadata:
-      name: postgres-storage
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 20Gi
+            storage: 20Gi
 ---
 apiVersion: v1
 kind: Service
@@ -128,9 +138,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 5432
-    targetPort: 5432
-    protocol: TCP
-    name: postgres
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
   selector:
     app: postgres

@@ -36,9 +36,9 @@ spec:
       # Pod-level security context
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1001
-        runAsGroup: 1001
-        fsGroup: 2000
+        runAsUser: 10001  # High UID for enhanced security (CKV_K8S_40)
+        runAsGroup: 10001
+        fsGroup: 20000
         seccompProfile:
           type: RuntimeDefault
       
@@ -55,7 +55,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
-            runAsUser: 1001
+            runAsUser: 10001
             readOnlyRootFilesystem: true
             seccompProfile:
               type: RuntimeDefault
@@ -69,15 +69,16 @@ spec:
               mountPath: /tmp
             - name: app-data
               mountPath: /app/data
+            - name: app-secrets
+              mountPath: /etc/secrets
+              readOnly: true
           
+          # Use secrets as files where possible for better security
           env:
             - name: ARENA_MODE
               value: "dev"
-            - name: GRAPHIX_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: graphix-api-secret
-                  key: api-key
+            - name: GRAPHIX_API_KEY_FILE
+              value: /etc/secrets/api-key
             # Add anything else you need here:
             # - name: REGISTRY_ENDPOINT
             #   value: "http://graphix-registry.dev.svc:8787"
@@ -111,6 +112,12 @@ spec:
           emptyDir: {}
         - name: app-data
           emptyDir: {}
+        - name: app-secrets
+          secret:
+            secretName: graphix-api-secret
+            items:
+            - key: api-key
+              path: api-key
       # Uncomment if you need additional config files, creds, etc.
       #   - name: config
       #     configMap:

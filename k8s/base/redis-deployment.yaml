@@ -30,83 +30,87 @@ spec:
     spec:
       # Disable automount service account token
       automountServiceAccountToken: false
-      
+
       # Pod-level security context
       # IMPORTANT: The official redis:7-alpine image runs as root by default.
-      # Forcing UID 1000 may cause permission issues with data directories.
+      # Using UID 10000+ for enhanced security (CKV_K8S_40).
       # RECOMMENDATION FOR PRODUCTION:
-      # 1. Build a custom Redis image with a dedicated redis user (UID 999 or similar)
+      # 1. Build a custom Redis image with a dedicated redis user (UID 10000 or similar)
       # 2. Ensure the data volume has correct ownership
       # 3. Test thoroughly before deploying
       # For development/testing with standard image, you may need to disable this or
       # use an initContainer to chown the data directory.
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000  # generic non-root user
-        runAsGroup: 1000
-        fsGroup: 1000
+        runAsUser: 10000  # High UID for enhanced security
+        runAsGroup: 10000
+        fsGroup: 10000
         seccompProfile:
           type: RuntimeDefault
-      
+
       containers:
-      - name: redis
-        # Pin to specific version with digest for production
-        image: redis:7-alpine
-        imagePullPolicy: Always
-        command:
-        - redis-server
-        - --requirepass
-        - $(REDIS_PASSWORD)
-        ports:
-        - containerPort: 6379
-          name: redis
-        
-        # Container-level security context
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          runAsUser: 1000  # generic non-root user (redis runs as root by default in alpine)
-          # Note: readOnlyRootFilesystem not set for redis as it needs write access
-          seccompProfile:
-            type: RuntimeDefault
-          capabilities:
-            drop:
-              - ALL
-        
-        env:
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: vulcanami-secrets
-              key: REDIS_PASSWORD
-        volumeMounts:
-        - name: redis-storage
-          mountPath: /data
-        resources:
-          requests:
-            cpu: 250m
-            memory: 512Mi
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-        livenessProbe:
-          exec:
-            command:
-            - redis-cli
-            - ping
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          exec:
-            command:
-            - redis-cli
-            - ping
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        - name: redis
+          # Pin to specific version with digest for production
+          image: redis:7-alpine
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - redis-server --requirepass $(cat /etc/secrets/redis-password)
+          ports:
+            - containerPort: 6379
+              name: redis
+
+          # Container-level security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10000  # High UID for enhanced security (CKV_K8S_40)
+            # Note: readOnlyRootFilesystem not set for redis as it needs write access
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+
+          # Use secrets as files instead of environment variables for better security
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+            - name: redis-secret
+              mountPath: /etc/secrets
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
       volumes:
-      - name: redis-storage
-        persistentVolumeClaim:
-          claimName: redis-pvc
+        - name: redis-storage
+          persistentVolumeClaim:
+            claimName: redis-pvc
+        - name: redis-secret
+          secret:
+            secretName: vulcanami-secrets
+            items:
+              - key: REDIS_PASSWORD
+                path: redis-password
 ---
 apiVersion: v1
 kind: Service
@@ -118,9 +122,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 6379
-    targetPort: 6379
-    protocol: TCP
-    name: redis
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+      name: redis
   selector:
     app: redis

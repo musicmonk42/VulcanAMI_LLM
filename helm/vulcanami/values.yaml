@@ -7,6 +7,10 @@ replicaCount: 3
 image:
   repository: ghcr.io/musicmonk42/vulcanami_llm-api
   pullPolicy: IfNotPresent
+  # SECURITY: Use a specific tag or digest instead of 'latest' for production
+  # Example with tag: tag: "v1.2.3"
+  # Example with digest (recommended): tag: "sha256:abcdef1234567890..."
+  # To get the digest: docker inspect --format='{{index .RepoDigests 0}}' <image>:<tag>
   tag: "latest"
 
 imagePullSecrets: []
@@ -22,8 +26,8 @@ podAnnotations: {}
 
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1001
-  fsGroup: 1001
+  runAsUser: 10001  # High UID for enhanced security (CKV_K8S_40)
+  fsGroup: 10001
 
 securityContext:
   capabilities:
