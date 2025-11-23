@@ -152,3 +152,8 @@ local.settings.json
 # Allow listing files explicitly tracked despite patterns:
 !LICENSE
 !README.md
+# Test result directories
+test_results_*/
+docker_test_results_*/
+full_test_run.log
+comprehensive_test_run.log
