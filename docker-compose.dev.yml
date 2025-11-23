@@ -73,7 +73,7 @@ services:
   
   # MinIO Object Storage (S3-compatible)
   minio:
-    image: minio/minio:RELEASE.2025-01-10T00-00-00Z
+    image: ${MINIO_IMAGE:-minio/minio:latest}
     container_name: vulcanami-minio
     hostname: minio
     command: server /data --console-address ":9001"
@@ -108,7 +108,7 @@ services:
   
   # MinIO Bucket Initialization
   minio-init:
-    image: minio/mc:RELEASE.2025-01-10T00-00-00Z
+    image: ${MINIO_MC_IMAGE:-minio/mc:latest}
     container_name: vulcanami-minio-init
     depends_on:
       minio:
@@ -235,7 +235,7 @@ services:
     restart: unless-stopped
   
   milvus-minio:
-    image: minio/minio:RELEASE.2025-01-10T00-00-00Z
+    image: ${MILVUS_MINIO_IMAGE:-minio/minio:latest}
     container_name: vulcanami-milvus-minio
     hostname: milvus-minio
     environment:

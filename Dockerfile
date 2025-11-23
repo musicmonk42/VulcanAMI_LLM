@@ -100,7 +100,7 @@ RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.tx
 # Optional: Generate CycloneDX SBOM (can be skipped by removing lines)
 # This gives you an sbom.json artifact for compliance / scanning.
 RUN pip install --no-cache-dir cyclonedx-bom && \
-    cyclonedx-py -o sbom.json || (echo "CycloneDX generation failed (continuing)"; true)
+    cyclonedx-py requirements -r requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
 
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
