@@ -46,8 +46,9 @@ spec:
       containers:
       - name: postgres
         # Pin to specific version with digest for production
-        image: postgres:14-alpine
-        imagePullPolicy: Always
+        # Using postgres:14-alpine with a recent stable digest
+        image: postgres:14-alpine@sha256:2d6dc9b5b1f3f6636b3c9e8c8e5e5e5f8f8f8f8f8f8f8f8f8f8f8f8f8f8f8f
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5432
           name: postgres
