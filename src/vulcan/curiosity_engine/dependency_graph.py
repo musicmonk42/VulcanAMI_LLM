@@ -59,7 +59,8 @@ class DependencyEdge:
         """Get age of edge in seconds"""
         try:
             return time.time() - self.created_at
-        except Exception as e:            return 0.0
+        except Exception as e:
+            return 0.0
 
 
 class GraphStorage:
@@ -195,7 +196,8 @@ class GraphStorage:
                 if not isinstance(node_id, str):
                     node_id = str(node_id)
                 return self.nodes.get(node_id)
-            except Exception as e:                return None
+            except Exception as e:
+                return None
     
     def get_edge(self, source_id: str, target_id: str) -> Optional[DependencyEdge]:
         """Get edge data"""
@@ -206,7 +208,8 @@ class GraphStorage:
                 if not isinstance(target_id, str):
                     target_id = str(target_id)
                 return self.edges.get((source_id, target_id))
-            except Exception as e:                return None
+            except Exception as e:
+                return None
     
     def get_children(self, node_id: str) -> Set[str]:
         """Get immediate children of node"""
@@ -215,7 +218,8 @@ class GraphStorage:
                 if not isinstance(node_id, str):
                     node_id = str(node_id)
                 return self.adjacency.get(node_id, set()).copy()
-            except Exception as e:                return set()
+            except Exception as e:
+                return set()
     
     def get_parents(self, node_id: str) -> Set[str]:
         """Get immediate parents of node"""
@@ -224,7 +228,8 @@ class GraphStorage:
                 if not isinstance(node_id, str):
                     node_id = str(node_id)
                 return self.reverse_adjacency.get(node_id, set()).copy()
-            except Exception as e:                return set()
+            except Exception as e:
+                return set()
     
     def node_count(self) -> int:
         """Get number of nodes"""
@@ -254,7 +259,8 @@ class GraphStorage:
                     node_id = str(node_id)
                 created = self.node_creation_times.get(node_id, time.time())
                 return time.time() - created
-            except Exception as e:                return 0.0
+            except Exception as e:
+                return 0.0
 
 
 class PathFinder:
@@ -365,7 +371,8 @@ class PathFinder:
                     target_id = str(target_id)
                 
                 return nx.shortest_path(self.storage.nx_graph, source_id, target_id)
-            except Exception as e:                return None
+            except Exception as e:
+                return None
 
 
 class CycleDetector:
@@ -409,7 +416,8 @@ class CycleDetector:
             try:
                 cycles = list(nx.simple_cycles(self.storage.nx_graph))
                 return cycles[:100]  # Limit to first 100
-            except Exception as e:                return []
+            except Exception as e:
+                return []
     
     def break_cycles_minimum_cost(self) -> List[Tuple[str, str]]:
         """Break cycles by removing minimum cost edges"""
@@ -554,7 +562,8 @@ class TopologicalSorter:
                 sorted_ids = list(nx.topological_sort(self.storage.nx_graph))
                 return [self.storage.get_node(node_id) for node_id in sorted_ids 
                        if self.storage.get_node(node_id) is not None]
-            except Exception as e:                # Fallback to Kahn's algorithm
+            except Exception as e:
+                # Fallback to Kahn's algorithm
                 return self._topological_sort_kahn()
     
     def _topological_sort_kahn(self) -> List[Any]:
@@ -743,7 +752,8 @@ class CacheManager:
             
             cached_time = self._cache_times.get(key, 0)
             return time.time() - cached_time < self.cache_ttl
-        except Exception as e:            return False
+        except Exception as e:
+            return False
     
     def _limit_cache_size(self, cache: Dict, max_size: int):
         """Limit cache size by removing oldest entries using LRU"""
@@ -1334,7 +1344,8 @@ class DependencyAnalyzer:
                 return str(gap.gap_id)
             else:
                 return str(id(gap))
-        except Exception as e:            return str(id(gap))
+        except Exception as e:
+            return str(id(gap))
     
     def _find_semantic_dependencies(self, gap) -> List[Any]:
         """Find semantic dependencies for decomposition gap"""
