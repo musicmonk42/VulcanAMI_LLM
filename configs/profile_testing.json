@@ -1,14 +1,51 @@
 {
+  "enable_self_improvement": false,
   "agent_config": {
     "log_level": "DEBUG",
-    "enable_adversarial_testing": true
+    "enable_adversarial_testing": true,
+    "profile": "testing"
   },
   "resource_limits": {
     "max_memory_mb": 4000,
     "max_cpu_percent": 50.0
   },
+  "safety_policies": {
+    "safety_level": 1,
+    "require_human_approval": false,
+    "max_autonomy_level": 3,
+    "rollback_threshold": 0.3,
+    "uncertainty_threshold": 0.8
+  },
   "tool_selection_config": {
     "default_selection_mode": "fast",
     "max_reasoning_time": 10.0
+  },
+  "versioning": {
+    "config_version": "1.0.0",
+    "schema_version": "1.0.0",
+    "last_updated": "2025-11-23T10:00:00Z",
+    "updated_by": "config_audit",
+    "changelog": [
+      {
+        "version": "1.0.0",
+        "date": "2025-11-23T10:00:00Z",
+        "author": "config_audit",
+        "changes": [
+          "Added enable_self_improvement flag (set to false for testing)",
+          "Added safety_policies section for consistency with development profile",
+          "Added versioning section for better config tracking",
+          "Added profile field to agent_config"
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "description": "Testing profile for VULCAN-AGI with reduced resource limits and fast tool selection",
+    "author": "VulcanAMI",
+    "tags": [
+      "testing",
+      "fast",
+      "adversarial-testing"
+    ]
   }
 }
