@@ -721,7 +721,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "logs_replica" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3_secondary[0].arn
+      kms_master_key_id = aws_kms_key.s3_secondary.arn
       sse_algorithm     = "aws:kms"
     }
   }
@@ -744,7 +744,7 @@ resource "aws_s3_bucket_replication_configuration" "logs" {
       storage_class = var.replication_storage_class
 
       encryption_configuration {
-        replica_kms_key_id = aws_kms_key.s3_secondary[0].arn
+        replica_kms_key_id = aws_kms_key.s3_secondary.arn
       }
     }
 
@@ -974,7 +974,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs_r
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3_secondary[0].arn
+      kms_master_key_id = aws_kms_key.s3_secondary.arn
       sse_algorithm     = "aws:kms"
     }
   }
@@ -997,7 +997,7 @@ resource "aws_s3_bucket_replication_configuration" "cloudfront_logs" {
       storage_class = var.replication_storage_class
 
       encryption_configuration {
-        replica_kms_key_id = aws_kms_key.s3_secondary[0].arn
+        replica_kms_key_id = aws_kms_key.s3_secondary.arn
       }
     }
 
