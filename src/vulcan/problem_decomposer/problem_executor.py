@@ -24,8 +24,8 @@ from unittest.mock import MagicMock
 
 # Import safety validator
 try:
-    from safety_validator import EnhancedSafetyValidator
-    from safety_types import SafetyConfig
+    from ..safety.safety_validator import EnhancedSafetyValidator
+    from ..safety.safety_types import SafetyConfig
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
     SAFETY_VALIDATOR_AVAILABLE = False
