@@ -18,9 +18,6 @@ import os
 import json
 import logging
 import time
-import numpy as np
-import torch
-import torch.nn as nn
 import asyncio
 import atexit
 import threading
@@ -30,6 +27,15 @@ from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
 from enum import Enum
+
+# Optional imports for heavy dependencies
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    np = None
+    logging.warning("numpy not available - some safety features will be disabled")
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)

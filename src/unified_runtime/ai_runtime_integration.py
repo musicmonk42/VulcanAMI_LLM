@@ -3,12 +3,14 @@ AI Runtime Integration Module for Graphix IR
 Provides unified interface for AI providers and services
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import time
 import hashlib
 import os
-from typing import Dict, Any, Optional, List, Union, Callable, Awaitable, Tuple
+from typing import Dict, Any, Optional, List, Union, Callable, Awaitable, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from abc import ABC, abstractmethod
@@ -18,6 +20,9 @@ import random
 from collections import defaultdict, deque
 import threading
 from concurrent.futures import ThreadPoolExecutor
+
+if TYPE_CHECKING:
+    import aiohttp
 
 try:
     import aiohttp
