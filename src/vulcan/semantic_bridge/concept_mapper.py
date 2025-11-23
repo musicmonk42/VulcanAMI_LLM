@@ -25,7 +25,7 @@ try:
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
     SAFETY_VALIDATOR_AVAILABLE = False
-    logging.warning("safety_validator not available, concept_mapper operating without safety checks")
+    # Note: Warning moved to __init__ to avoid spurious warnings at import time
     EnhancedSafetyValidator = None
     SafetyConfig = None
 
