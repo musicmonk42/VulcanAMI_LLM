@@ -570,7 +570,7 @@
     "EvolveNode": {
       "uri": "https://graphix.ai/ontology/EvolveNode",
       "description": "Node for evolution",
-      "external_ref": "https://www.wikidata.org/wiki/Q evolutionary_algorithm",
+      "external_ref": "https://www.wikidata.org/wiki/Q846345",
       "lifecycle_status": "active",
       "json_schema": "https://graphix.ai/schemas/nodes/EvolveNode.json"
     },
@@ -580,6 +580,97 @@
       "external_ref": "https://www.wikidata.org/wiki/Q1064731",
       "lifecycle_status": "experimental",
       "json_schema": "https://graphix.ai/schemas/nodes/MetaNode.json"
+    },
+    "ConstNode": {
+      "uri": "https://graphix.ai/ontology/ConstNode",
+      "description": "Node for constant values",
+      "external_ref": "https://schema.org/PropertyValue",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/ConstNode.json"
+    },
+    "LoadNode": {
+      "uri": "https://graphix.ai/ontology/LoadNode",
+      "description": "Node for loading external data",
+      "external_ref": "https://schema.org/LoadAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/LoadNode.json"
+    },
+    "HaltNode": {
+      "uri": "https://graphix.ai/ontology/HaltNode",
+      "description": "Node for halting execution",
+      "external_ref": "https://schema.org/EndAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/HaltNode.json"
+    },
+    "EvalNode": {
+      "uri": "https://graphix.ai/ontology/EvalNode",
+      "description": "Node for evaluation operations",
+      "external_ref": "https://schema.org/AssessAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EvalNode.json"
+    },
+    "AddNode": {
+      "uri": "https://graphix.ai/ontology/AddNode",
+      "description": "Node for addition operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q32043",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/AddNode.json"
+    },
+    "MultiplyNode": {
+      "uri": "https://graphix.ai/ontology/MultiplyNode",
+      "description": "Node for multiplication operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q40276",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/MultiplyNode.json"
+    },
+    "EmbedNode": {
+      "uri": "https://graphix.ai/ontology/EmbedNode",
+      "description": "Node for embedding operations",
+      "external_ref": "https://www.wikidata.org/wiki/Q193977",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EmbedNode.json"
+    },
+    "PatternCompileNode": {
+      "uri": "https://graphix.ai/ontology/PatternCompileNode",
+      "description": "Node for compiling patterns for graph matching",
+      "external_ref": "https://www.wikidata.org/wiki/Q7297055",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/PatternCompileNode.json"
+    },
+    "FindSubgraphNode": {
+      "uri": "https://graphix.ai/ontology/FindSubgraphNode",
+      "description": "Node for finding subgraph patterns",
+      "external_ref": "https://www.wikidata.org/wiki/Q141488",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/FindSubgraphNode.json"
+    },
+    "GraphSpliceNode": {
+      "uri": "https://graphix.ai/ontology/GraphSpliceNode",
+      "description": "Node for splicing/replacing subgraphs",
+      "external_ref": "https://schema.org/ReplaceAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/GraphSpliceNode.json"
+    },
+    "GraphCommitNode": {
+      "uri": "https://graphix.ai/ontology/GraphCommitNode",
+      "description": "Node for committing graph modifications",
+      "external_ref": "https://schema.org/ConfirmAction",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/GraphCommitNode.json"
+    },
+    "NSOModifyNode": {
+      "uri": "https://graphix.ai/ontology/NSOModifyNode",
+      "description": "Node for NSO (Neuro-Symbolic Ontology) modifications",
+      "external_ref": "https://schema.org/UpdateAction",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/nodes/NSOModifyNode.json"
+    },
+    "EthicalLabelNode": {
+      "uri": "https://graphix.ai/ontology/EthicalLabelNode",
+      "description": "Node for ethical labeling and compliance",
+      "external_ref": "https://www.wikidata.org/wiki/Q81062",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/nodes/EthicalLabelNode.json"
     }
   },
   "edge_types": {
@@ -883,6 +974,27 @@
       "external_ref": "https://schema.org/relatedTo",
       "lifecycle_status": "experimental",
       "json_schema": "https://graphix.ai/schemas/edges/meta.json"
+    },
+    "contract_binding": {
+      "uri": "https://graphix.ai/ontology/contract_binding",
+      "description": "Contract binding edge for applying contracts to nodes",
+      "external_ref": "https://schema.org/Agreement",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/contract_binding.json"
+    },
+    "nso_binding": {
+      "uri": "https://graphix.ai/ontology/nso_binding",
+      "description": "NSO binding edge for neuro-symbolic ontology integration",
+      "external_ref": "https://schema.org/UpdateAction",
+      "lifecycle_status": "experimental",
+      "json_schema": "https://graphix.ai/schemas/edges/nso_binding.json"
+    },
+    "ethics_binding": {
+      "uri": "https://graphix.ai/ontology/ethics_binding",
+      "description": "Ethics binding edge for ethical constraint enforcement",
+      "external_ref": "https://www.wikidata.org/wiki/Q81062",
+      "lifecycle_status": "active",
+      "json_schema": "https://graphix.ai/schemas/edges/ethics_binding.json"
     }
   },
   "semantic_types": {

@@ -895,6 +895,7 @@ class LanguageEvolutionRegistry:
             
             # Check deadline
             deadline_str = consensus_node.get("deadline")
+            should_store_timeout = False
             if deadline_str:
                 try:
                     deadline = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
@@ -902,13 +903,16 @@ class LanguageEvolutionRegistry:
                         proposal_record["status"] = "rejected_timeout"
                         self.backend.save_data(f"{self.proposals_prefix}{proposal_id}", proposal_record)
                         self._create_audit_entry("vote_timeout", {"proposal_id": proposal_id})
-                        
-                        # Store in LTM without nested lock
-                        self._store_outcome(proposal_id, proposal_record, "rejected_timeout")
-                        return False
+                        should_store_timeout = True
                 except ValueError as e:
                     self.logger.error(f"Invalid deadline format: {e}")
-            
+        
+        # Store in LTM outside of state_lock to avoid deadlock
+        if should_store_timeout:
+            self._store_outcome(proposal_id, proposal_record, "rejected_timeout")
+            return False
+        
+        with self.state_lock:
             # Calculate weighted votes
             votes = consensus_node.get("votes", {})
             weights = consensus_node.get("weights", {agent: 1.0 for agent in votes.keys()})
@@ -954,6 +958,9 @@ class LanguageEvolutionRegistry:
         Returns:
             True if deployed successfully
         """
+        proposal_record_for_store = None
+        outcome_to_store = None
+        
         with self.state_lock:
             # Validate version format
             if not self.validator.validate_version_string(new_version):
@@ -1012,11 +1019,17 @@ class LanguageEvolutionRegistry:
                 "new_version": new_version
             })
             
-            # Store outcome
-            self._store_outcome(proposal_id, proposal_record, "deployed")
+            # Save data for LTM storage outside lock
+            proposal_record_for_store = proposal_record.copy()
+            outcome_to_store = "deployed"
             
             self.logger.info(f"Deployed version {new_version} from proposal {proposal_id}")
-            return True
+        
+        # Store outcome outside of state_lock to avoid deadlock
+        if proposal_record_for_store and outcome_to_store:
+            self._store_outcome(proposal_id, proposal_record_for_store, outcome_to_store)
+        
+        return True
     
     def _store_outcome(self, proposal_id: str, proposal_record: Dict, outcome: str):
         """Store proposal outcome in LTM (without nested locks)."""
