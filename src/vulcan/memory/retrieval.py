@@ -725,68 +725,72 @@ class TemporalIndex:
 # LEARNED ATTENTION MECHANISM
 # ============================================================
 
-class LearnedAttention(nn.Module):
-    """Learned attention mechanism using neural network."""
-    
-    def __init__(self, input_dim: int = 512, hidden_dim: int = 256, num_heads: int = 8):
-        super().__init__()
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.num_heads = num_heads
-        self.head_dim = hidden_dim // num_heads
+if TORCH_AVAILABLE:
+    class LearnedAttention(nn.Module):
+        """Learned attention mechanism using neural network."""
         
-        # Multi-head attention layers
-        self.W_q = nn.Linear(input_dim, hidden_dim)
-        self.W_k = nn.Linear(input_dim, hidden_dim)
-        self.W_v = nn.Linear(input_dim, hidden_dim)
+        def __init__(self, input_dim: int = 512, hidden_dim: int = 256, num_heads: int = 8):
+            super().__init__()
+            self.input_dim = input_dim
+            self.hidden_dim = hidden_dim
+            self.num_heads = num_heads
+            self.head_dim = hidden_dim // num_heads
+            
+            # Multi-head attention layers
+            self.W_q = nn.Linear(input_dim, hidden_dim)
+            self.W_k = nn.Linear(input_dim, hidden_dim)
+            self.W_v = nn.Linear(input_dim, hidden_dim)
+            
+            # Output projection
+            self.W_o = nn.Linear(hidden_dim, input_dim)
+            
+            # Layer normalization
+            self.layer_norm = nn.LayerNorm(input_dim)
+            
+            # Feed-forward network
+            self.ffn = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim * 4),
+                nn.ReLU(),
+                nn.Dropout(0.1),
+                nn.Linear(hidden_dim * 4, input_dim)
+            )
         
-        # Output projection
-        self.W_o = nn.Linear(hidden_dim, input_dim)
-        
-        # Layer normalization
-        self.layer_norm = nn.LayerNorm(input_dim)
-        
-        # Feed-forward network
-        self.ffn = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim * 4),
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(hidden_dim * 4, input_dim)
-        )
-    
-    def forward(self, query: torch.Tensor, keys: torch.Tensor) -> torch.Tensor:
-        """Compute multi-head attention."""
-        batch_size = query.size(0)
-        seq_len = keys.size(1)
-        
-        # Compute Q, K, V
-        Q = self.W_q(query).view(batch_size, 1, self.num_heads, self.head_dim)
-        K = self.W_k(keys).view(batch_size, seq_len, self.num_heads, self.head_dim)
-        V = self.W_v(keys).view(batch_size, seq_len, self.num_heads, self.head_dim)
-        
-        # Transpose for attention computation
-        Q = Q.transpose(1, 2)  # [batch, heads, 1, head_dim]
-        K = K.transpose(1, 2)  # [batch, heads, seq_len, head_dim]
-        V = V.transpose(1, 2)  # [batch, heads, seq_len, head_dim]
-        
-        # Compute attention scores
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.head_dim)
-        attention_weights = torch.softmax(scores, dim=-1)
-        
-        # Apply attention to values
-        context = torch.matmul(attention_weights, V)
-        
-        # Reshape and project
-        context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.hidden_dim)
-        output = self.W_o(context)
-        
-        # Add residual and normalize
-        output = self.layer_norm(output + query.unsqueeze(1))
-        
-        # Feed-forward network
-        output = output + self.ffn(output)
-        
-        return output.squeeze(1), attention_weights.mean(dim=1).squeeze(1)
+        def forward(self, query: torch.Tensor, keys: torch.Tensor) -> torch.Tensor:
+            """Compute multi-head attention."""
+            batch_size = query.size(0)
+            seq_len = keys.size(1)
+            
+            # Compute Q, K, V
+            Q = self.W_q(query).view(batch_size, 1, self.num_heads, self.head_dim)
+            K = self.W_k(keys).view(batch_size, seq_len, self.num_heads, self.head_dim)
+            V = self.W_v(keys).view(batch_size, seq_len, self.num_heads, self.head_dim)
+            
+            # Transpose for attention computation
+            Q = Q.transpose(1, 2)  # [batch, heads, 1, head_dim]
+            K = K.transpose(1, 2)  # [batch, heads, seq_len, head_dim]
+            V = V.transpose(1, 2)  # [batch, heads, seq_len, head_dim]
+            
+            # Compute attention scores
+            scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.head_dim)
+            attention_weights = torch.softmax(scores, dim=-1)
+            
+            # Apply attention to values
+            context = torch.matmul(attention_weights, V)
+            
+            # Reshape and project
+            context = context.transpose(1, 2).contiguous().view(batch_size, -1, self.hidden_dim)
+            output = self.W_o(context)
+            
+            # Add residual and normalize
+            output = self.layer_norm(output + query.unsqueeze(1))
+            
+            # Feed-forward network
+            output = output + self.ffn(output)
+            
+            return output.squeeze(1), attention_weights.mean(dim=1).squeeze(1)
+else:
+    # Stub class when torch is not available
+    LearnedAttention = None
 
 class AttentionMechanism:
     """Enhanced attention mechanism for memory retrieval."""
