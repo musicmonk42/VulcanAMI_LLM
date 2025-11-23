@@ -503,7 +503,8 @@ class MemoryCompressor:
                 # Try LZ4 fallback
                 decompressed = lz4.frame.decompress(data)
                 return pickle.loads(decompressed)
-            except Exception as e:                return None
+            except Exception as e:
+                return None
     
     @staticmethod
     def _get_neural_compressor():
