@@ -55,9 +55,9 @@ except ImportError:
 import logging
 logger = logging.getLogger(__name__)
 try: 
-    import causallearn.search.ScoreBased.ges as ges 
-    import causallearn.search.ConstraintBased.fci as fci 
-    from causallearn.utils.GraphUtils import GraphUtils 
+    from causallearn.search.ScoreBased import GES as ges 
+    from causallearn.search.ConstraintBased import FCI as fci 
+    from causallearn.utils import GraphUtils 
     CAUSALLEARN_AVAILABLE = True 
     logger.info("causallearn loaded, using GES/FCI algorithms")
 except ImportError: 
