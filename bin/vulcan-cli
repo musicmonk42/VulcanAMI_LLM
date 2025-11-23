@@ -216,6 +216,7 @@ UNLEARNING COMMANDS:
     unlearn file            Unlearn data from file
     unlearn verify          Verify unlearning completeness
     unlearn status          Check unlearning status
+    unlearn --secure-erase  Unlearn with secure multi-pass erase
 
 VECTOR COMMANDS:
     vector bootstrap        Initialize vector storage
@@ -256,6 +257,9 @@ EXAMPLES:
 
     # Unlearn data matching pattern
     vulcan-cli unlearn pattern "user_id:12345"
+
+    # Unlearn with secure erase
+    vulcan-cli unlearn --secure-erase "user_id:12345"
 
     # Bootstrap vector storage
     vulcan-cli vector bootstrap --tier hot

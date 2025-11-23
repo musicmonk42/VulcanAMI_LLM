@@ -264,3 +264,50 @@ class TestVulcanUnlearn:
             
             assert result.returncode == 0
             assert os.path.exists(json_output)
+
+    def test_unlearn_secure_erase_flag(self):
+        """Test secure erase flag"""
+        result = subprocess.run(
+            [VULCAN_UNLEARN, 'test_pattern', '--secure-erase', '--no-proof'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        assert result.returncode == 0
+        output = result.stdout + result.stderr
+        assert 'secure' in output.lower() or 'erase' in output.lower() or 'SUCCESS' in output
+
+    def test_unlearn_secure_erase_with_verification(self):
+        """Test secure erase with verification"""
+        result = subprocess.run(
+            [VULCAN_UNLEARN, 'test_pattern', '--secure-erase', '--verify'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        assert result.returncode == 0
+        output = result.stdout + result.stderr
+        assert 'verif' in output.lower() or 'SUCCESS' in output
+
+    def test_unlearn_shows_warning_about_simplified_zk(self):
+        """Test that warning about simplified ZK is shown"""
+        result = subprocess.run(
+            [VULCAN_UNLEARN, 'test_pattern', '--verbose'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        assert result.returncode == 0
+        output = result.stdout + result.stderr
+        # Should contain warning about simplified implementation
+        assert 'simplified' in output.lower() or 'WARNING' in output or 'production' in output.lower()
+
+    def test_unlearn_secure_erase_in_help(self):
+        """Test that secure erase is documented in help"""
+        result = subprocess.run(
+            [VULCAN_UNLEARN, '--help'],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert '--secure-erase' in result.stdout or 'secure erase' in result.stdout.lower()
