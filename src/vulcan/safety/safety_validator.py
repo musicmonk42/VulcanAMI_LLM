@@ -332,7 +332,7 @@ class ConstraintManager:
         with self.lock:
             if constraint_name:
                 self.constraint_violations[constraint_name] = 0
-                self.constraint_metrics[constraint.name]['violations'] = 0
+                self.constraint_metrics[constraint_name]['violations'] = 0
                 logger.info(f"Reset violations for constraint: {constraint_name}")
             else:
                 self.constraint_violations.clear()
