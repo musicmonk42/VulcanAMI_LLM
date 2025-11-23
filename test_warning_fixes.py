@@ -77,6 +77,18 @@ def test_lingam():
         print("   Run: pip install lingam==1.11.0")
         return False
 
+def test_cachetools():
+    """Test that cachetools is available without warnings"""
+    print("\nTesting cachetools...")
+    try:
+        from cachetools import TTLCache
+        print("✅ cachetools available")
+        return True
+    except ImportError as e:
+        print(f"⚠️  cachetools not available: {e}")
+        print("   Run: pip install cachetools==6.2.2")
+        return False
+
 def test_safety_validator():
     """Test that safety validator dependencies are available"""
     print("\nTesting Safety Validator Dependencies...")
@@ -137,6 +149,7 @@ if __name__ == "__main__":
         "BM25": test_bm25(),
         "ZMQ": test_zmq(),
         "lingam": test_lingam(),
+        "cachetools": test_cachetools(),
         "Safety Validator": test_safety_validator()
     }
     
