@@ -48,51 +48,55 @@ logger = logging.getLogger(__name__)
 # NEURAL COMPRESSION MODELS
 # ============================================================
 
-class NeuralCompressor(nn.Module):
-    """Neural network for memory compression."""
-    
-    def __init__(self, input_dim: int = 1024, latent_dim: int = 128):
-        super().__init__()
-        self.input_dim = input_dim
-        self.latent_dim = latent_dim
+if TORCH_AVAILABLE:
+    class NeuralCompressor(nn.Module):
+        """Neural network for memory compression."""
         
-        # Encoder
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 512),
-            nn.ReLU(),
-            nn.BatchNorm1d(512),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, latent_dim),
-            nn.Tanh()
-        )
+        def __init__(self, input_dim: int = 1024, latent_dim: int = 128):
+            super().__init__()
+            self.input_dim = input_dim
+            self.latent_dim = latent_dim
+            
+            # Encoder
+            self.encoder = nn.Sequential(
+                nn.Linear(input_dim, 512),
+                nn.ReLU(),
+                nn.BatchNorm1d(512),
+                nn.Linear(512, 256),
+                nn.ReLU(),
+                nn.BatchNorm1d(256),
+                nn.Linear(256, latent_dim),
+                nn.Tanh()
+            )
+            
+            # Decoder
+            self.decoder = nn.Sequential(
+                nn.Linear(latent_dim, 256),
+                nn.ReLU(),
+                nn.BatchNorm1d(256),
+                nn.Linear(256, 512),
+                nn.ReLU(),
+                nn.BatchNorm1d(512),
+                nn.Linear(512, input_dim),
+                nn.Sigmoid()
+            )
         
-        # Decoder
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 256),
-            nn.ReLU(),
-            nn.BatchNorm1d(256),
-            nn.Linear(256, 512),
-            nn.ReLU(),
-            nn.BatchNorm1d(512),
-            nn.Linear(512, input_dim),
-            nn.Sigmoid()
-        )
-    
-    def encode(self, x: torch.Tensor) -> torch.Tensor:
-        """Encode to latent space."""
-        return self.encoder(x)
-    
-    def decode(self, z: torch.Tensor) -> torch.Tensor:
-        """Decode from latent space."""
-        return self.decoder(z)
-    
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Forward pass returns reconstruction and latent."""
-        z = self.encode(x)
-        x_recon = self.decode(z)
-        return x_recon, z
+        def encode(self, x: torch.Tensor) -> torch.Tensor:
+            """Encode to latent space."""
+            return self.encoder(x)
+        
+        def decode(self, z: torch.Tensor) -> torch.Tensor:
+            """Decode from latent space."""
+            return self.decoder(z)
+        
+        def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+            """Forward pass returns reconstruction and latent."""
+            z = self.encode(x)
+            x_recon = self.decode(z)
+            return x_recon, z
+else:
+    # Stub class when torch is not available
+    NeuralCompressor = None
 
 class SemanticCompressor:
     """Semantic compression using language models."""
@@ -504,6 +508,9 @@ class MemoryCompressor:
     @staticmethod
     def _get_neural_compressor():
         """Get or create neural compressor instance."""
+        if not TORCH_AVAILABLE:
+            return None
+        
         # Simple singleton pattern
         if not hasattr(MemoryCompressor, '_neural_instance'):
             MemoryCompressor._neural_instance = NeuralCompressor()
