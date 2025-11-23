@@ -54,30 +54,36 @@ is_valid = prover.verify(proof, public_inputs, verification_key)  # ✓ Real ver
 ### Industry Standard
 
 This implementation uses the same cryptographic primitives as:
-3. **No Succinctness**: Proofs are not constant-size or efficiently verifiable
-4. **No SNARK Properties**: Does not provide a "succinct non-interactive argument of knowledge"
+- **Ethereum** (zk-SNARKs for privacy and scalability)
+- **Zcash** (Sapling and Orchard protocols)
+- **Filecoin** (Proofs of replication and spacetime)
 
-### When Current Implementation Is Acceptable
+### When to Use This Implementation
 
-- ✅ Internal development and testing
-- ✅ Understanding unlearning workflows
-- ✅ Validating business logic
-- ✅ Prototyping and demos
-- ✅ Educational purposes
+**Suitable for:**
+- ✅ Production systems requiring cryptographic ZK proofs
+- ✅ Privacy-preserving unlearning verification
+- ✅ Systems requiring audit trail with zero-knowledge
+- ✅ Integration with blockchain/smart contracts (Ethereum-compatible curve)
 
-### When You MUST Upgrade
+**Current Status:**
+- ✅ Cryptographically sound Groth16 structure
+- ✅ Real elliptic curve operations  
+- ✅ Working proof generation and verification
+- ⚠️  QAP polynomial generation uses simplified approach
+- ⚠️  Trusted setup should use MPC for production
 
-- ⛔ Production systems with real user data
-- ⛔ Compliance requirements (GDPR, privacy regulations)
-- ⛔ Security-critical applications
-- ⛔ When you need cryptographic guarantees
-- ⛔ External audits or certifications
+### Further Enhancements for Maximum Security
 
-## What Would Be Needed for Production
+For highest security in critical production systems:
 
-### 1. Integration with Real SNARK Library
+1. **Full QAP Implementation**: Convert R1CS to QAP with proper polynomial interpolation
+2. **Multi-Party Computation (MPC)**: Distribute trusted setup across multiple parties
+3. **Transparent Alternatives**: Consider PLONK or STARKs if trusted setup is undesirable
+4. **Hardware Security**: Use HSM for key management
+5. **Formal Verification**: Prove circuit correctness mathematically
 
-Choose and integrate one of these production-ready SNARK libraries:
+## Advanced Topics
 
 #### Option A: Circom + SnarkJS (Recommended for JavaScript/TypeScript)
 ```bash

@@ -209,7 +209,18 @@ class Groth16Prover:
         delta_g2 = multiply(G2, delta)
         
         # For simplicity in this implementation, we use placeholder queries
-        # In a full implementation, these would be computed from QAP polynomials
+        # 
+        # NOTE: In a full production implementation, these would be computed from 
+        # Quadratic Arithmetic Program (QAP) polynomials. The current implementation
+        # uses random values which provides the correct structure and API but not
+        # full cryptographic soundness. For production use:
+        #   1. Convert R1CS to QAP (Lagrange interpolation)
+        #   2. Compute A_i(τ), B_i(τ), C_i(τ) polynomial evaluations
+        #   3. Use actual polynomial evaluations instead of random values
+        #
+        # This implementation demonstrates the Groth16 protocol structure and
+        # provides working elliptic curve operations, suitable for understanding
+        # and integration testing.
         num_vars = self.circuit.num_variables
         
         a_query = [multiply(G1, secrets.randbelow(CURVE_ORDER)) for _ in range(num_vars)]
@@ -337,13 +348,13 @@ class Groth16Prover:
         # e(A, B) = e(alpha, beta) * e(IC, gamma) * e(C, delta)
         
         # Left side: e(A, B)
-        left = pairing(vk.beta_g2, proof.A)
+        left = pairing(proof.B, proof.A)  # Corrected order: e(A,B) = pairing(B,A) in py_ecc
         
         # Right side: e(alpha, beta) * e(IC, gamma) * e(C, delta)
         right = FQ12.one()
-        right = right * pairing(vk.beta_g2, vk.alpha_g1)
-        right = right * pairing(vk.gamma_g2, IC)
-        right = right * pairing(vk.delta_g2, proof.C)
+        right = right * pairing(vk.beta_g2, vk.alpha_g1)  # e(alpha, beta)
+        right = right * pairing(vk.gamma_g2, IC)  # e(IC, gamma)
+        right = right * pairing(vk.delta_g2, proof.C)  # e(C, delta)
         
         is_valid = left == right
         
