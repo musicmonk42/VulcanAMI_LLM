@@ -1,0 +1,245 @@
+# Reproducible Build Configuration
+
+This document ensures all builds are reproducible across environments.
+
+## 📦 Dependency Management
+
+### Python Dependencies
+- **File**: `requirements.txt` - Human-readable dependencies
+- **File**: `requirements-hashed.txt` - Hash-verified dependencies for reproducibility
+
+#### Generate Hashed Requirements:
+```bash
+# Install pip-tools
+pip install pip-tools
+
+# Generate hashed requirements
+pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+
+# Update hashed requirements when dependencies change
+pip-compile --upgrade --generate-hashes requirements.txt -o requirements-hashed.txt
+```
+
+## 🐳 Docker Image Versioning
+
+### Image Tagging Strategy:
+```bash
+# Semantic versioning
+IMAGE_TAG="v1.2.3"
+
+# Git commit SHA (most reproducible)
+IMAGE_TAG="sha-$(git rev-parse --short HEAD)"
+
+# Date-based with SHA
+IMAGE_TAG="$(date +%Y%m%d)-$(git rev-parse --short HEAD)"
+```
+
+### Building Reproducible Images:
+```bash
+# Build with explicit tag
+docker build \
+  --build-arg REJECT_INSECURE_JWT=ack \
+  --tag ghcr.io/musicmonk42/vulcanami_llm-api:${IMAGE_TAG} \
+  --tag ghcr.io/musicmonk42/vulcanami_llm-api:latest \
+  .
+
+# Push specific version (never rely on 'latest' in production)
+docker push ghcr.io/musicmonk42/vulcanami_llm-api:${IMAGE_TAG}
+```
+
+## ☸️ Helm Chart Versions
+
+### Chart Version Management:
+```yaml
+# helm/vulcanami/Chart.yaml
+apiVersion: v2
+name: vulcanami
+version: 1.0.0  # Chart version
+appVersion: "1.0.0"  # Application version
+```
+
+### Deploying with Specific Versions:
+```bash
+# Always specify image tag
+helm upgrade --install vulcanami ./helm/vulcanami \
+  --set image.tag=v1.0.0 \
+  --set image.repository=ghcr.io/musicmonk42/vulcanami_llm-api
+
+# Package chart with version
+helm package helm/vulcanami --version 1.0.0 --app-version 1.0.0
+```
+
+## 🏗️ Terraform State Management
+
+### Backend Configuration:
+```hcl
+# infra/terraform/backend.tf
+terraform {
+  backend "s3" {
+    bucket         = "vulcanami-terraform-state"
+    key            = "infrastructure/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "vulcanami-terraform-locks"
+    kms_key_id     = "alias/terraform-state"
+  }
+}
+```
+
+### Version Constraints:
+```hcl
+# infra/terraform/main.tf
+terraform {
+  required_version = ">= 1.7.0"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.60"  # Pin to specific minor version
+    }
+  }
+}
+```
+
+## 🔒 Secret Management
+
+### Never Commit Secrets:
+```bash
+# .gitignore already includes:
+.env
+.env.*
+*.pem
+*.key
+*.crt
+```
+
+### Generate Secrets Reproducibly:
+```bash
+# For CI/CD, use GitHub Actions secrets
+# For local dev, use .env.example as template
+
+cp .env.example .env
+
+# Generate secure random secrets
+export JWT_SECRET_KEY=$(openssl rand -base64 48)
+export BOOTSTRAP_KEY=$(openssl rand -base64 32)
+export POSTGRES_PASSWORD=$(openssl rand -base64 32)
+export REDIS_PASSWORD=$(openssl rand -base64 32)
+```
+
+## 📋 Pre-Build Checklist
+
+Before building for production:
+
+### Python:
+- [ ] `requirements-hashed.txt` is up to date
+- [ ] All dependencies have pinned versions
+- [ ] No `>=` or `~=` version specifiers in production
+
+### Docker:
+- [ ] Base image uses specific version tag (not `latest`)
+- [ ] Build args for reproducibility documented
+- [ ] Multi-stage build minimizes final image size
+- [ ] Non-root user specified
+
+### Helm:
+- [ ] Chart version incremented
+- [ ] App version matches Docker image tag
+- [ ] values.yaml has no `latest` tags
+- [ ] values.yaml has no hardcoded secrets
+
+### Terraform:
+- [ ] All provider versions pinned
+- [ ] State backend configured
+- [ ] No `timestamp()` function in resources
+- [ ] All sensitive values use variables
+
+## 🧪 Testing Reproducibility
+
+### Docker Build Test:
+```bash
+# Build twice and compare
+docker build -t test1:latest .
+IMAGE1_ID=$(docker images test1:latest -q)
+
+docker build -t test2:latest .
+IMAGE2_ID=$(docker images test2:latest -q)
+
+# Images should be identical (same layers)
+echo "Image 1: $IMAGE1_ID"
+echo "Image 2: $IMAGE2_ID"
+```
+
+### Terraform Plan Test:
+```bash
+# Plan should be deterministic
+terraform plan -out=plan1.tfplan
+terraform plan -out=plan2.tfplan
+
+# Plans should be identical
+diff <(terraform show -json plan1.tfplan) <(terraform show -json plan2.tfplan)
+```
+
+## 🔄 CI/CD Integration
+
+### GitHub Actions Variables:
+```yaml
+# .github/workflows/deploy.yml
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  # Tag from git ref or manual input
+  IMAGE_TAG: ${{ github.event.inputs.version || github.sha }}
+```
+
+### Automated Version Tagging:
+```yaml
+- name: Generate version tag
+  id: version
+  run: |
+    if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+      echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    else
+      echo "VERSION=sha-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+    fi
+```
+
+## 📊 Version Tracking
+
+### Manifest File:
+```yaml
+# deployment-manifest.yaml (generated by CI/CD)
+deployment:
+  timestamp: "2025-11-23T16:25:00Z"
+  environment: production
+  versions:
+    application:
+      tag: v1.0.0
+      commit: abc123def456
+      repository: github.com/musicmonk42/VulcanAMI_LLM
+    helm:
+      chart_version: 1.0.0
+      values_sha256: def789abc012...
+    terraform:
+      version: 1.7.0
+      state_serial: 42
+    dependencies:
+      python: 3.11
+      postgres: "14-alpine"
+      redis: "7-alpine"
+      minio: "RELEASE.2025-01-10T00-00-00Z"
+```
+
+## 🎯 Best Practices Summary
+
+1. **Pin Everything**: All versions, all dependencies, everywhere
+2. **Use Hashes**: Verify dependency integrity with SHA256 hashes
+3. **Tag Explicitly**: Never use `latest` in production
+4. **Lock State**: Use backend state locking for Terraform
+5. **Audit Trail**: Keep manifest of all deployed versions
+6. **Test Locally**: Validate reproducibility before CI/CD
+7. **Automate Checks**: Use CI/CD to enforce reproducibility
+
+---
+
+**Validation Status**: All configurations validated by `infrastructure-validation.yml` workflow

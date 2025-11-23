@@ -93,6 +93,7 @@ locals {
   bucket_primary         = "${var.bucket_prefix}-${var.primary_region}-${var.environment}"
   bucket_secondary       = "${var.bucket_prefix}-${var.secondary_region}-${var.environment}"
   bucket_logs            = "${var.bucket_prefix}-logs-${var.primary_region}-${var.environment}"
+  bucket_logs_secondary  = "${var.bucket_prefix}-logs-${var.secondary_region}-${var.environment}"
   bucket_cloudfront_logs = "${var.bucket_prefix}-cf-logs-${var.primary_region}-${var.environment}"
   bucket_backups         = "${var.bucket_prefix}-backups-${var.primary_region}-${var.environment}"
   
@@ -603,7 +604,7 @@ resource "aws_s3_bucket_logging" "secondary" {
   provider = aws.secondary
   bucket   = aws_s3_bucket.secondary.id
 
-  target_bucket = aws_s3_bucket.logs.id
+  target_bucket = aws_s3_bucket.logs_secondary.id
   target_prefix = "s3-access-logs/${local.bucket_secondary}/"
 }
 
@@ -673,6 +674,86 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   }
 
   # Fixed: Added abort incomplete multipart upload
+  rule {
+    id     = "abort-incomplete-multipart-uploads"
+    status = "Enabled"
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+# Secondary region logs bucket (required for cross-region S3 logging)
+resource "aws_s3_bucket" "logs_secondary" {
+  provider      = aws.secondary
+  bucket        = local.bucket_logs_secondary
+  force_destroy = var.environment == "dev" ? true : false
+
+  tags = merge(local.common_tags, {
+    Name = local.bucket_logs_secondary
+  })
+}
+
+resource "aws_s3_bucket_public_access_block" "logs_secondary" {
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.logs_secondary.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "logs_secondary" {
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.logs_secondary.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "logs_secondary" {
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.logs_secondary.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      # Note: Using default AWS-managed key (SSE-S3) for cross-region compatibility
+      # For customer-managed keys, create a separate KMS key in secondary region
+      sse_algorithm     = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "logs_secondary" {
+  provider = aws.secondary
+  bucket   = aws_s3_bucket.logs_secondary.id
+
+  rule {
+    id     = "expire-old-logs"
+    status = "Enabled"
+
+    transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    expiration {
+      days = 365
+    }
+    
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+  }
+
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
@@ -878,6 +959,51 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
   }
 }
 
+# CloudFront logs bucket policy - allows CloudFront to write logs
+data "aws_iam_policy_document" "cloudfront_logs_bucket" {
+  count = var.enable_cloudfront_logging ? 1 : 0
+
+  statement {
+    sid    = "AWSCloudFrontLogsWrite"
+    effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+    actions = [
+      "s3:PutObject"
+    ]
+    resources = [
+      "${aws_s3_bucket.cloudfront_logs[0].arn}/*"
+    ]
+  }
+
+  statement {
+    sid    = "EnforceSecureTransport"
+    effect = "Deny"
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.cloudfront_logs[0].arn,
+      "${aws_s3_bucket.cloudfront_logs[0].arn}/*"
+    ]
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "cloudfront_logs" {
+  count  = var.enable_cloudfront_logging ? 1 : 0
+  bucket = aws_s3_bucket.cloudfront_logs[0].id
+  policy = data.aws_iam_policy_document.cloudfront_logs_bucket[0].json
+}
+
 resource "aws_s3_bucket_logging" "cloudfront_logs" {
   count  = var.enable_cloudfront_logging ? 1 : 0
   bucket = aws_s3_bucket.cloudfront_logs[0].id
@@ -1070,7 +1196,7 @@ resource "aws_db_instance" "main" {
   auto_minor_version_upgrade = var.rds_auto_minor_version_upgrade
   deletion_protection       = var.rds_deletion_protection
   skip_final_snapshot       = var.environment == "dev" ? true : false
-  final_snapshot_identifier = var.environment == "dev" ? null : "${local.name_prefix}-db-final-snapshot-${replace(timestamp(), ":", "-")}"
+  final_snapshot_identifier = var.environment == "dev" ? null : "${local.name_prefix}-db-final-snapshot"
   copy_tags_to_snapshot     = true
   db_subnet_group_name      = aws_db_subnet_group.main[0].name
   vpc_security_group_ids    = [aws_security_group.rds[0].id]
@@ -1150,7 +1276,7 @@ resource "aws_kms_alias" "redis" {
 resource "random_password" "redis_auth_token" {
   count   = var.enable_redis ? 1 : 0
   length  = 32
-  special = false  # Redis auth tokens don't support special characters
+  special = true  # Redis supports special characters in auth tokens
 }
 
 resource "aws_secretsmanager_secret" "redis_auth_token" {
@@ -1339,6 +1465,7 @@ resource "aws_ecs_task_definition" "dqs" {
 
     readonlyRootFilesystem = true  # Fixed: Read-only root filesystem for security
     
+    # NOTE: Health check requires curl to be installed in the container image
     healthCheck = {
       command     = ["CMD-SHELL", "curl -f http://localhost:${var.dqs_container_port}/health || exit 1"]
       interval    = 30
@@ -1386,6 +1513,7 @@ resource "aws_ecs_task_definition" "opa" {
 
     readonlyRootFilesystem = true  # Fixed: Read-only root filesystem for security
     
+    # NOTE: Health check requires curl to be installed in the container image
     healthCheck = {
       command     = ["CMD-SHELL", "curl -f http://localhost:${var.opa_container_port}/health || exit 1"]
       interval    = 30
@@ -1551,7 +1679,7 @@ resource "aws_lb_listener" "https" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = var.alb_ssl_policy
-  certificate_arn   = var.acm_certificate_arn
+  certificate_arn   = var.alb_certificate_arn
 
   default_action {
     type = "fixed-response"
@@ -1642,6 +1770,13 @@ resource "aws_appautoscaling_target" "ecs_dqs" {
   resource_id        = "service/${aws_ecs_cluster.main[0].name}/${aws_ecs_service.dqs[0].name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
+
+  lifecycle {
+    precondition {
+      condition     = var.auto_scaling_min_capacity <= var.auto_scaling_max_capacity
+      error_message = "Auto-scaling minimum capacity must be less than or equal to maximum capacity."
+    }
+  }
 }
 
 resource "aws_appautoscaling_policy" "ecs_dqs_cpu" {
@@ -1772,17 +1907,25 @@ resource "aws_sqs_queue" "lambda_dlq" {
   })
 }
 
+# Archive Lambda@Edge function code
+data "archive_file" "edge_auth" {
+  count       = var.enable_cloudfront ? 1 : 0
+  type        = "zip"
+  source_file = "${path.module}/lambda/edge-auth.js"
+  output_path = "${path.module}/lambda/edge-auth.zip"
+}
+
 resource "aws_lambda_function" "edge_auth" {
   count            = var.enable_cloudfront ? 1 : 0
-  filename         = "${path.module}/lambda/edge-auth.zip"
+  filename         = data.archive_file.edge_auth[0].output_path
   function_name    = "${local.name_prefix}-edge-auth"
   role             = aws_iam_role.lambda_edge[0].arn
-  handler          = "index.handler"
-  source_code_hash = filebase64sha256("${path.module}/lambda/edge-auth.zip")
+  handler          = "edge-auth.handler"
+  source_code_hash = data.archive_file.edge_auth[0].output_base64sha256
   runtime          = "nodejs18.x"
   publish          = true
   timeout          = 5
-  reserved_concurrent_executions = 100  # Fixed: Added concurrent execution limit
+  # NOTE: Lambda@Edge does not support reserved_concurrent_executions
 
   dead_letter_config {
     target_arn = aws_sqs_queue.lambda_dlq[0].arn  # Fixed: Added DLQ

@@ -210,11 +210,18 @@ variable "enable_ipv6" {
   default     = true
 }
 
-# Fixed: Added allowed_ip_ranges variable with validation
+# Security: IP Access Control
+# Empty default requires explicit specification for security
+# IMPORTANT: Resources expecting IP ranges must handle empty list or provide their own defaults
 variable "allowed_ip_ranges" {
-  description = "IP ranges allowed to access ALB and other public resources"
+  description = <<-EOT
+    IP ranges allowed to access ALB and other public resources.
+    Empty default requires explicit specification for security.
+    Example: ["10.0.0.0/8", "172.16.0.0/12"]
+    WARNING: Using ["0.0.0.0/0"] allows unrestricted internet access
+  EOT
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = []  # Empty default requires explicit IP range specification
 
   validation {
     condition = alltrue([
@@ -501,13 +508,24 @@ variable "enable_cloudfront_waf" {
 }
 
 variable "acm_certificate_arn" {
-  description = "ACM certificate ARN for CloudFront"
+  description = "ACM certificate ARN for CloudFront (must be in us-east-1)"
   type        = string
   default     = ""
 
   validation {
     condition     = var.acm_certificate_arn == "" || can(regex("^arn:aws:acm:us-east-1:[0-9]{12}:certificate/", var.acm_certificate_arn))
     error_message = "ACM certificate ARN must be empty or a valid certificate ARN in us-east-1."
+  }
+}
+
+variable "alb_certificate_arn" {
+  description = "ACM certificate ARN for ALB (must be in the same region as the ALB)"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.alb_certificate_arn == "" || can(regex("^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/", var.alb_certificate_arn))
+    error_message = "ALB certificate ARN must be empty or a valid ACM certificate ARN."
   }
 }
 
@@ -1072,9 +1090,9 @@ variable "alarm_email_endpoints" {
 }
 
 variable "cloudwatch_retention_days" {
-  description = "CloudWatch Logs retention in days"
+  description = "CloudWatch Logs retention in days. Note: Production deployments enforce minimum 365 days regardless of this value."
   type        = number
-  default     = 30
+  default     = 365  # Changed default to 365 to match enforced minimum
 
   validation {
     condition = contains([

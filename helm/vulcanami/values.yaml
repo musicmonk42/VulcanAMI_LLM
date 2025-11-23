@@ -7,7 +7,10 @@ replicaCount: 3
 image:
   repository: ghcr.io/musicmonk42/vulcanami_llm-api
   pullPolicy: IfNotPresent
-  tag: "latest"
+  # SECURITY: Use specific version tag instead of 'latest' for production
+  # Example: tag: "v1.0.0" or tag: "1.0.0-sha256:abc123..."
+  # This MUST be overridden during deployment with --set image.tag=<version>
+  tag: "REPLACE_ME"  # REQUIRED: Must be set to a specific version during deployment
 
 imagePullSecrets: []
 nameOverride: ""
@@ -29,7 +32,7 @@ securityContext:
   capabilities:
     drop:
     - ALL
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: true
   allowPrivilegeEscalation: false
 
 service:
@@ -44,7 +47,7 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit: "10"  # 10 req/sec per IP for DoS protection
   hosts:
     - host: api.vulcanami.example.com
       paths:
@@ -70,11 +73,46 @@ autoscaling:
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
 
+# Health probes (CRITICAL for production)
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Pod Disruption Budget (prevents all pods from being terminated during maintenance)
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
 nodeSelector: {}
 
 tolerations: []
 
-affinity: {}
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - vulcanami
+          topologyKey: kubernetes.io/hostname
 
 # Application configuration
 config:
@@ -102,16 +140,20 @@ redis:
 minio:
   enabled: true
   endpoint: http://minio-service:9000
-  accessKey: minioadmin
-  # Secret key should be set via secrets
+  # SECURITY: Credentials must be set via external secrets
+  # accessKey should reference a secret: accessKeySecretName and accessKeySecretKey
+  accessKeySecretName: ""  # REQUIRED: Secret containing MinIO access key
+  accessKeySecretKey: "accessKey"  # Key in the secret
+  secretKeySecretName: ""  # REQUIRED: Secret containing MinIO secret key
+  secretKeySecretKey: "secretKey"  # Key in the secret
 
-# Secrets (set via --set-string or external secret management)
+# Secrets (REQUIRED: Must be set via --set-string or external secret management)
+# Empty values will cause deployment validation to fail
 secrets:
-  jwtSecretKey: ""
-  bootstrapKey: ""
-  postgresPassword: ""
-  redisPassword: ""
-  minioSecretKey: ""
+  jwtSecretKey: ""  # REQUIRED
+  bootstrapKey: ""  # REQUIRED
+  postgresPassword: ""  # REQUIRED
+  redisPassword: ""  # REQUIRED
 
 # Monitoring
 monitoring:
