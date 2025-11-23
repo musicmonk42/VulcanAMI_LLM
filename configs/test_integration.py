@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """
-Integration test for VulcanAMI_LLM configs with the platform
+Integration test suite for VulcanAMI_LLM configs with the platform.
 
-Tests that all config files can be loaded and integrated correctly with:
+This module tests that all configuration files can be loaded and integrated
+correctly with the VulcanAMI platform components including:
 - src/vulcan/config.py (ConfigurationManager)
 - src/vulcan/world_model/ (meta-reasoning, self-improvement)
 - Tool selection system
 - Hardware profiles
 - Type system
+
+Tests verify:
+1. Config files are loadable and parseable
+2. Structures match expected schemas
+3. Integration points work correctly with platform code
+4. ConfigurationManager can load and use configs
 """
 
 import json

@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
-Comprehensive validation script for VulcanAMI_LLM/configs directory
+Comprehensive validation script for VulcanAMI_LLM/configs directory.
 
-This script validates:
-- JSON/YAML syntax
-- Schema compliance for key configuration files
-- Cross-file consistency
-- Security best practices
-- Documentation completeness
+This module provides validation functionality for all configuration files in the
+VulcanAMI_LLM system. It validates JSON/YAML syntax, schema compliance, cross-file
+consistency, security best practices, and documentation completeness.
 
 Usage:
     python configs/validate_configs.py [--strict] [--fix]
@@ -17,10 +14,10 @@ Options:
     --fix       Auto-fix fixable issues (not implemented yet)
 """
 
-import json
-import yaml
-import sys
 import argparse
+import json
+import sys
+import yaml
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
@@ -321,7 +318,7 @@ class ConfigValidator:
                     found = [p for p in sensitive_patterns if p in content]
                     if found:
                         files_with_keywords.append(config_file.relative_to(self.configs_dir))
-                except:
+                except Exception:
                     pass
         
         if files_with_keywords:
