@@ -323,7 +323,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Energy consumption proxy metric (graphix_energy_nj_total). If not exposed, this panel shows placeholder instructions.\n\nTo expose this metric:\n1. Ensure prometheus_client is installed\n2. Add energy tracking to your hardware dispatcher\n3. Expose as Counter: graphix_energy_nj_total",
+      "description": "Energy consumption proxy metric (graphix_energy_nj_total) tracked from hardware dispatcher operations.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -469,7 +469,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(cache_hits_total{instance=~\"$instance\"}[5m])) / (sum(rate(cache_hits_total{instance=~\"$instance\"}[5m])) + sum(rate(cache_misses_total{instance=~\"$instance\"}[5m])))",
+          "expr": "(sum(rate(cache_hits_total{instance=~\"$instance\"}[5m])) or vector(0)) / ((sum(rate(cache_hits_total{instance=~\"$instance\"}[5m])) or vector(0)) + (sum(rate(cache_misses_total{instance=~\"$instance\"}[5m])) or vector(0)) + 1e-10)",
           "legendFormat": "Cache Hit Rate",
           "range": true,
           "refId": "A"
