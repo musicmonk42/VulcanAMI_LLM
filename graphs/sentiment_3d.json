@@ -1,7 +1,7 @@
 {
   "id": "sentiment_3d_enhanced",
   "type": "Graph",
-  "grammar_version": "2.3.0",
+  "grammar_version": "1.2.0",
   "nodes": [
     {
       "id": "t_in",
@@ -37,7 +37,7 @@
       "id": "m_emb",
       "type": "EMBED",
       "params": {
-        "provider": "dummy",
+        "provider": "openai",
         "model": "text-embedding-3-small"
       }
     },
@@ -45,7 +45,7 @@
       "id": "gen",
       "type": "GenerativeNode",
       "params": {
-        "provider": "dummy",
+        "provider": "openai",
         "model": "gpt-4o-mini",
         "max_tokens": 4,
         "temperature": 0,
