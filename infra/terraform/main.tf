@@ -431,6 +431,24 @@ resource "aws_kms_alias" "s3" {
   target_key_id = aws_kms_key.s3.key_id
 }
 
+# KMS key for secondary region S3 buckets
+resource "aws_kms_key" "s3_secondary" {
+  provider                = aws.secondary
+  description             = "KMS key for S3 encryption in secondary region"
+  deletion_window_in_days = 30
+  enable_key_rotation     = var.kms_key_rotation
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-s3-secondary-kms"
+  })
+}
+
+resource "aws_kms_alias" "s3_secondary" {
+  provider      = aws.secondary
+  name          = "alias/${local.name_prefix}-s3-secondary"
+  target_key_id = aws_kms_key.s3_secondary.key_id
+}
+
 ################################################################################
 # S3 Buckets
 ################################################################################
@@ -703,7 +721,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "logs_replica" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3.arn
+      kms_master_key_id = aws_kms_key.s3_secondary[0].arn
       sse_algorithm     = "aws:kms"
     }
   }
@@ -726,7 +744,7 @@ resource "aws_s3_bucket_replication_configuration" "logs" {
       storage_class = var.replication_storage_class
 
       encryption_configuration {
-        replica_kms_key_id = aws_kms_key.s3.arn
+        replica_kms_key_id = aws_kms_key.s3_secondary[0].arn
       }
     }
 
@@ -956,7 +974,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudfront_logs_r
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3.arn
+      kms_master_key_id = aws_kms_key.s3_secondary[0].arn
       sse_algorithm     = "aws:kms"
     }
   }
@@ -979,7 +997,7 @@ resource "aws_s3_bucket_replication_configuration" "cloudfront_logs" {
       storage_class = var.replication_storage_class
 
       encryption_configuration {
-        replica_kms_key_id = aws_kms_key.s3.arn
+        replica_kms_key_id = aws_kms_key.s3_secondary[0].arn
       }
     }
 

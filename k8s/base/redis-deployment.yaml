@@ -56,7 +56,9 @@ spec:
           command:
             - sh
             - -c
-            - redis-server --requirepass $(cat /etc/secrets/redis-password)
+            - |
+              REDIS_PASSWORD=$(cat /etc/secrets/redis-password)
+              redis-server --requirepass "$REDIS_PASSWORD"
           ports:
             - containerPort: 6379
               name: redis
