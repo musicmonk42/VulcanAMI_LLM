@@ -85,13 +85,16 @@
       "type": "NSO_MODIFY",
       "params": {
         "target": "self_code"
+      },
+      "metadata": {
+        "security_note": "Self-modification capability - requires strict access control and audit logging"
       }
     },
     {
       "id": "ethical_label",
       "type": "ETHICAL_LABEL",
       "params": {
-        "label": "unknown"
+        "label": "self_modification_requires_review"
       }
     }
   ],

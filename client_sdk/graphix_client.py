@@ -33,7 +33,7 @@ import json
 import base64
 import logging
 import os
-from typing import Dict, Any, Optional, Callable, List, Union
+from typing import Dict, Any, Optional, Callable, List, Union, Awaitable
 from datetime import datetime, timedelta
 from pathlib import Path
 from cryptography.hazmat.primitives import hashes, serialization
@@ -100,6 +100,7 @@ class GraphixClient:
         self.private_key = None
         self.cache = {}  # Simple in-memory cache for status and health checks
         self.cache_ttl = 300  # Cache TTL in seconds
+        self.cache_lock = asyncio.Lock()  # Lock for thread-safe cache access
 
         # Token management attributes
         self.auth_token: Optional[str] = None
@@ -119,7 +120,9 @@ class GraphixClient:
 
         # Load schema for graph validation
         self.schema = None
-        schema_path = Path("schemas/graph_v3_4_0.json")
+        # Use absolute path relative to this file
+        client_dir = Path(__file__).parent
+        schema_path = client_dir.parent / "schemas" / "graph_v3_4_0.json"
         try:
             if schema_path.exists():
                 with open(schema_path, 'r') as f:
@@ -142,10 +145,18 @@ class GraphixClient:
 
     def _token_is_expired(self) -> bool:
         """Checks if the current auth token is expired or non-existent."""
-        return self.auth_token is None or self.token_expiry is None or datetime.utcnow() >= self.token_expiry
+        # Add 5 minute safety buffer to refresh token before it expires
+        safety_buffer = timedelta(minutes=5)
+        return (self.auth_token is None or 
+                self.token_expiry is None or 
+                datetime.utcnow() >= (self.token_expiry - safety_buffer))
 
     async def _fetch_new_token(self):
-        """Simulates fetching a new authentication token from an auth endpoint."""
+        """Simulates fetching a new authentication token from an auth endpoint.
+        
+        NOTE: This is a simulated implementation for development/testing.
+        In production, replace with actual authentication service call.
+        """
         logger.info("Fetching new authentication token...")
         # In a real implementation, this would make a request to an auth service.
         # For example:
@@ -156,7 +167,7 @@ class GraphixClient:
         await asyncio.sleep(0.1)  # Simulate network latency
         self.auth_token = f"simulated-token-{uuid.uuid4()}"
         self.token_expiry = datetime.utcnow() + timedelta(hours=1)
-        logger.info("Successfully fetched new authentication token.")
+        logger.info("Successfully fetched new authentication token (simulated).")
 
     async def _refresh_token_if_needed(self):
         """
@@ -255,9 +266,10 @@ class GraphixClient:
             Health status dictionary
         """
         cache_key = "health_check"
-        cached = self.cache.get(cache_key)
-        if cached and time.time() - cached['timestamp'] < self.cache_ttl:
-            return cached['data']
+        async with self.cache_lock:
+            cached = self.cache.get(cache_key)
+            if cached and time.time() - cached['timestamp'] < self.cache_ttl:
+                return cached['data']
 
         session = await self._ensure_session()
         async def do_health_check():
@@ -271,7 +283,8 @@ class GraphixClient:
                 raise GraphixClientError(f"Health check failed: {e}")
 
         health = await self._retry_request(do_health_check)
-        self.cache[cache_key] = {'timestamp': time.time(), 'data': health}
+        async with self.cache_lock:
+            self.cache[cache_key] = {'timestamp': time.time(), 'data': health}
         return health
 
     async def get_status(self) -> Dict[str, Any]:
@@ -282,9 +295,10 @@ class GraphixClient:
             System status dictionary
         """
         cache_key = "system_status"
-        cached = self.cache.get(cache_key)
-        if cached and time.time() - cached['timestamp'] < self.cache_ttl:
-            return cached['data']
+        async with self.cache_lock:
+            cached = self.cache.get(cache_key)
+            if cached and time.time() - cached['timestamp'] < self.cache_ttl:
+                return cached['data']
 
         session = await self._ensure_session()
         async def do_get_status():
@@ -298,7 +312,8 @@ class GraphixClient:
                 raise GraphixClientError(f"Status request failed: {e}")
 
         status = await self._retry_request(do_get_status)
-        self.cache[cache_key] = {'timestamp': time.time(), 'data': status}
+        async with self.cache_lock:
+            self.cache[cache_key] = {'timestamp': time.time(), 'data': status}
         return status
 
     async def submit_graph_proposal(self, graph: Dict[str, Any]) -> Dict[str, Any]:
@@ -341,14 +356,14 @@ class GraphixClient:
 
         Args:
             proposal_id: ID of the proposal
-            vote: Vote decision ("approve" or "reject")
+            vote: Vote decision ("yes" or "no")
             rationale: Rationale for the vote
 
         Returns:
             Response dictionary
         """
-        if vote not in ["approve", "reject"]:
-            raise GraphixClientError("Vote must be 'approve' or 'reject'")
+        if vote not in ["yes", "no"]:
+            raise GraphixClientError("Vote must be 'yes' or 'no'")
 
         payload = {
             'agent_id': self.agent_id,
@@ -442,32 +457,35 @@ class GraphixClient:
         logger.info(f"Retrieved {len(response.get('entries', []))} audit log entries")
         return response
 
-    async def connect_websocket(self, event_handler: Callable[[Dict[str, Any]], None]) -> None:
+    async def connect_websocket(self, event_handler: Callable[[Dict[str, Any]], Awaitable[None]]) -> None:
         """
         Connect to WebSocket for real-time event handling.
 
         Args:
-            event_handler: Callback function to handle events
+            event_handler: Async callback function to handle events
         """
         async def websocket_loop():
             try:
                 headers = await self._get_headers()
-                async with aiohttp.ClientSession() as ws_session:
-                    async with ws_session.ws_connect(f"{self.registry_endpoint.replace('http', 'ws')}/ws", headers=headers) as ws:
-                        logger.info("WebSocket connected")
-                        async for msg in ws:
-                            if msg.type == aiohttp.WSMsgType.TEXT:
-                                try:
-                                    event = json.loads(msg.data)
-                                    await event_handler(event)
-                                except json.JSONDecodeError as e:
-                                    logger.error(f"Invalid WebSocket message: {e}")
-                            elif msg.type == aiohttp.WSMsgType.ERROR:
-                                logger.error(f"WebSocket error: {ws.exception()}")
-                                break
-                            elif msg.type == aiohttp.WSMsgType.CLOSED:
-                                logger.info("WebSocket closed")
-                                break
+                # Properly convert HTTP/HTTPS to WS/WSS
+                ws_url = self.registry_endpoint.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws'
+                # Reuse self.session instead of creating a new one
+                session = await self._ensure_session()
+                async with session.ws_connect(ws_url, headers=headers) as ws:
+                    logger.info("WebSocket connected")
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            try:
+                                event = json.loads(msg.data)
+                                await event_handler(event)
+                            except json.JSONDecodeError as e:
+                                logger.error(f"Invalid WebSocket message: {e}")
+                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                            logger.error(f"WebSocket error: {ws.exception()}")
+                            break
+                        elif msg.type == aiohttp.WSMsgType.CLOSED:
+                            logger.info("WebSocket closed")
+                            break
             except aiohttp.ClientError as e:
                 logger.error(f"WebSocket connection failed: {e}")
                 raise GraphixClientError(f"WebSocket connection failed: {e}")
@@ -482,6 +500,10 @@ class GraphixClient:
             await self.session.close()
         if self.ws_session:
             self.ws_session.cancel()
+            try:
+                await self.ws_session
+            except asyncio.CancelledError:
+                pass
         logger.info("Graphix client closed")
 
     async def __aenter__(self):

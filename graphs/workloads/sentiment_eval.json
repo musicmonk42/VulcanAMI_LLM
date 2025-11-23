@@ -29,7 +29,7 @@
       "id": "program_to_evaluate",
       "type": "CONST",
       "params": {
-        "value": "sentiment_3d_enhanced_v1_candidate_7"
+        "value": "sentiment_3d_enhanced"
       },
       "metadata": {
         "description": "A reference to the specific program graph being evaluated."
