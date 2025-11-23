@@ -1,5 +1,49 @@
 from __future__ import annotations
 
+"""
+⚠️  IMPORTANT: SIMPLIFIED ZK IMPLEMENTATION WARNING ⚠️
+
+This module provides a SIMPLIFIED zero-knowledge proof implementation for 
+development and demonstration purposes. It is NOT production-ready and does
+NOT implement full cryptographic security.
+
+LIMITATIONS:
+- This is a custom circuit evaluator, not industry-standard SNARKs
+- Constraint checking is real but simplified  
+- Does NOT implement full Groth16/PLONK protocols
+- Would NOT pass cryptographic audit as "true" zero-knowledge proofs
+- Proofs are based on hash commitments rather than cryptographic pairings
+- No trusted setup ceremony is performed
+- Security assumptions are not cryptographically sound
+
+WHAT WOULD BE NEEDED FOR PRODUCTION:
+1. Integration with actual SNARK library:
+   - libsnark (C++ library for zk-SNARKs)
+   - circom + snarkjs (circuit compiler and JavaScript library)
+   - bellman (Rust implementation)
+   - arkworks (Rust ecosystem)
+
+2. Proper cryptographic primitives:
+   - Elliptic curve pairings (e.g., BN254, BLS12-381)
+   - Polynomial commitment schemes
+   - Fiat-Shamir transformation for non-interactivity
+   - Proper trusted setup or transparent setup (PLONK, STARKs)
+
+3. Circuit compilation and optimization:
+   - Arithmetic circuit representation (R1CS for Groth16, PLONK constraints)
+   - Circuit optimization and gadget libraries
+   - Witness generation and proving key setup
+
+4. Security audit requirements:
+   - Formal verification of circuit correctness
+   - Cryptographic security proofs
+   - Side-channel attack resistance
+   - Proper randomness generation
+
+For development and testing purposes only. Do not use in production without
+replacing with a proper SNARK implementation.
+"""
+
 import hashlib
 import hmac
 import json
@@ -79,7 +123,19 @@ class MerkleTree:
 
 @dataclass
 class ZKCircuit:
-    """Zero-knowledge circuit for privacy-preserving computations."""
+    """
+    ⚠️  SIMPLIFIED Zero-knowledge circuit for privacy-preserving computations.
+    
+    This is a CUSTOM circuit evaluator that checks constraints but does NOT
+    generate cryptographically secure zero-knowledge proofs. Real ZK systems
+    would use:
+    - Arithmetic circuits (R1CS, PLONK constraints)
+    - Polynomial commitments
+    - Cryptographic pairings
+    - Proper proof generation algorithms
+    
+    This implementation is for DEMONSTRATION and DEVELOPMENT only.
+    """
     
     circuit_hash: str
     constraints: List[Dict[str, Any]] = field(default_factory=list)
@@ -155,7 +211,18 @@ class ZKCircuit:
 
 @dataclass
 class GrothProof:
-    """Groth16 zk-SNARK proof structure."""
+    """
+    ⚠️  SIMPLIFIED Groth16-like proof structure.
+    
+    This mimics the structure of a Groth16 proof but does NOT contain actual
+    elliptic curve points or cryptographic pairings. A real Groth16 proof would:
+    - Use points on elliptic curves (e.g., BN254, BLS12-381)
+    - Require a trusted setup ceremony
+    - Use pairing-based cryptography for verification
+    - Provide cryptographic zero-knowledge guarantees
+    
+    This is a PLACEHOLDER structure for development purposes only.
+    """
     
     a: Tuple[int, int]
     b: Tuple[Tuple[int, int], Tuple[int, int]]
@@ -194,15 +261,27 @@ class GrothProof:
 @dataclass
 class ZKProver:
     """
-    Zero-Knowledge Prover for privacy-preserving unlearning verification.
+    ⚠️  SIMPLIFIED Zero-Knowledge Prover for privacy-preserving unlearning verification.
     
-    Features:
-    - Groth16 zk-SNARKs
-    - Merkle tree proofs
-    - Range proofs
-    - Set membership proofs
-    - Cryptographic commitments
-    - Verifiable computation
+    IMPORTANT: This is NOT a real zero-knowledge proof system. It provides:
+    - Hash-based commitments (not cryptographic commitments)
+    - Simplified constraint checking
+    - Merkle tree proofs (these are real and secure)
+    - Simulated proof generation using hashes
+    
+    What this DOES NOT provide:
+    - True zero-knowledge property (does not hide witness)
+    - Cryptographically sound proofs
+    - Succinct verification (proofs are not constant size)
+    - Non-interactive argument of knowledge (SNARK properties)
+    
+    For production use, replace with:
+    - libsnark, circom, bellman, or arkworks libraries
+    - Proper circuit compilation and witness generation
+    - Cryptographic setup and key generation
+    - Pairing-based or hash-based (STARK) proof systems
+    
+    This implementation is for DEVELOPMENT and TESTING purposes only.
     """
     
     circuit_hash: str = "sha256:unlearning_v1.0"

@@ -1,4 +1,39 @@
 """
+⚠️  IMPORTANT: SIMPLIFIED ZK PROOF VERIFICATION WARNING ⚠️
+
+This module provides SIMPLIFIED zero-knowledge proof verification for 
+development and demonstration purposes. It is NOT production-ready.
+
+LIMITATIONS:
+- This is a custom circuit evaluator, not industry-standard SNARKs
+- Constraint checking is real but simplified  
+- Does NOT implement full Groth16/PLONK/STARK verification
+- Would NOT pass cryptographic audit as "true" zero-knowledge proofs
+- No actual pairing-based cryptography
+- No trusted setup verification
+- Security assumptions are not cryptographically sound
+
+WHAT WOULD BE NEEDED FOR PRODUCTION:
+1. Real SNARK library integration:
+   - snarkjs (JavaScript/TypeScript)
+   - bellman (Rust)
+   - arkworks (Rust ecosystem)
+   - libsnark (C++)
+
+2. Proper verification algorithms:
+   - Pairing-based verification (Groth16)
+   - Polynomial commitment verification (PLONK)
+   - FRI protocol verification (STARKs)
+   - Proper public input handling
+
+3. Verification key management:
+   - Secure verification key storage
+   - Key verification and validation
+   - Circuit-specific verification keys
+
+For development and testing purposes only. Do not use in production without
+replacing with a proper SNARK verification implementation.
+
 Zero-Knowledge Proof Verification
 
 This module provides comprehensive ZK proof verification with support for multiple
