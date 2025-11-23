@@ -75,6 +75,10 @@ Choose and integrate one of these production-ready SNARK libraries:
 
 #### Option A: Circom + SnarkJS (Recommended for JavaScript/TypeScript)
 ```bash
+# Install specific versions for reproducible builds
+npm install snarkjs@0.7.0 circomlib@2.0.5
+
+# Or use latest stable versions
 npm install snarkjs circomlib
 ```
 

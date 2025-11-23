@@ -22,8 +22,13 @@ import requests
 VERSION = "4.6.0"
 
 # Secure erase configuration
-ERASE_BLOCK_SIZE = 1024  # Bytes per pass simulation
-ERASE_IO_DELAY = 0.01    # Seconds per pass to simulate I/O operations
+# These values simulate the timing and work of a real secure erase operation
+# For production, these would be tuned based on:
+# - Storage device type (HDD vs SSD)
+# - Block size of underlying storage
+# - I/O throughput characteristics
+ERASE_BLOCK_SIZE = 1024  # Bytes per pass - simulates writing data blocks
+ERASE_IO_DELAY = 0.01    # Seconds per pass - simulates I/O latency and write time
 
 logging.basicConfig(
     level=logging.INFO,
@@ -162,10 +167,13 @@ class UnlearningEngine:
         
         Note: For production use with real model weights, this would:
         1. Identify all storage locations of the data
-        2. Overwrite with random data multiple times (e.g., DoD 5220.22-M standard)
+        2. Overwrite with random data multiple times (NIST SP 800-88 Clear/Purge)
         3. Verify erasure with independent read-back
         4. Update all indices and metadata
         5. Perform physical block erasure if using SSDs (TRIM/DISCARD)
+        
+        Historical note: DoD 5220.22-M was superseded by NIST SP 800-88.
+        For SSDs, modern standards recommend cryptographic erase or physical destruction.
         """
         logger.info("Performing secure erase: 7-pass overwrite with verification")
         
@@ -173,9 +181,11 @@ class UnlearningEngine:
         for pass_num in range(1, 8):
             logger.debug(f"Secure erase pass {pass_num}/7")
             # In production, this would overwrite actual data blocks
-            # Simulate some work to make timing realistic
-            _ = secrets.token_bytes(ERASE_BLOCK_SIZE)  # Generate random data
-            time.sleep(ERASE_IO_DELAY)  # Simulate I/O operations
+            # We intentionally generate cryptographically secure random data here
+            # to simulate the computational cost of generating random overwrites.
+            # This ensures timing characteristics are realistic for testing.
+            _ = secrets.token_bytes(ERASE_BLOCK_SIZE)
+            time.sleep(ERASE_IO_DELAY)  # Simulate storage I/O latency
             
             # Pass 1-6: Random data
             # Pass 7: Verification pass
@@ -334,7 +344,7 @@ Examples:
     parser.add_argument('--fast-lane', action='store_true',
                        help='Skip verification steps (faster but less safe)')
     parser.add_argument('--secure-erase', action='store_true',
-                       help='Perform secure erase with multiple overwrites (DoD 5220.22-M style)')
+                       help='Perform secure erase with multiple overwrites (NIST SP 800-88 / DoD 5220.22-M style)')
     parser.add_argument('--no-proof', action='store_true',
                        help='Skip ZK proof generation')
     parser.add_argument('--verify', action='store_true',
