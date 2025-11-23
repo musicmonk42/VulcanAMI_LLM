@@ -214,7 +214,7 @@ variable "enable_ipv6" {
 variable "allowed_ip_ranges" {
   description = "IP ranges allowed to access ALB and other public resources"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = []  # Empty default requires explicit IP range specification
 
   validation {
     condition = alltrue([
@@ -501,13 +501,24 @@ variable "enable_cloudfront_waf" {
 }
 
 variable "acm_certificate_arn" {
-  description = "ACM certificate ARN for CloudFront"
+  description = "ACM certificate ARN for CloudFront (must be in us-east-1)"
   type        = string
   default     = ""
 
   validation {
     condition     = var.acm_certificate_arn == "" || can(regex("^arn:aws:acm:us-east-1:[0-9]{12}:certificate/", var.acm_certificate_arn))
     error_message = "ACM certificate ARN must be empty or a valid certificate ARN in us-east-1."
+  }
+}
+
+variable "alb_certificate_arn" {
+  description = "ACM certificate ARN for ALB (must be in the same region as the ALB)"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.alb_certificate_arn == "" || can(regex("^arn:aws:acm:[a-z0-9-]+:[0-9]{12}:certificate/", var.alb_certificate_arn))
+    error_message = "ALB certificate ARN must be empty or a valid ACM certificate ARN."
   }
 }
 
@@ -1072,9 +1083,9 @@ variable "alarm_email_endpoints" {
 }
 
 variable "cloudwatch_retention_days" {
-  description = "CloudWatch Logs retention in days"
+  description = "CloudWatch Logs retention in days. Note: Production deployments enforce minimum 365 days regardless of this value."
   type        = number
-  default     = 30
+  default     = 365  # Changed default to 365 to match enforced minimum
 
   validation {
     condition = contains([
