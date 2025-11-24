@@ -148,8 +148,10 @@ class TestPerformanceMetricsFixes:
         
         assert 'comparison' in comparison
         slowdown = comparison['comparison']['fallback_slowdown_factor']
+        slower_by_percent = comparison['comparison']['fallback_slower_by_percent']
         # Should be infinity when full_mean is 0 and fallback_mean > 0
         assert slowdown == float('inf')
+        assert slower_by_percent == float('inf')
     
     def test_division_edge_case_both_zero(self):
         """Test that division when both means are zero returns 1.0"""
@@ -163,8 +165,10 @@ class TestPerformanceMetricsFixes:
         
         assert 'comparison' in comparison
         slowdown = comparison['comparison']['fallback_slowdown_factor']
+        slower_by_percent = comparison['comparison']['fallback_slower_by_percent']
         # Should be 1.0 when both are 0
         assert slowdown == 1.0
+        assert slower_by_percent == 0.0
     
     def test_singleton_thread_safety(self):
         """Test that get_performance_tracker is thread-safe"""
@@ -197,6 +201,10 @@ class TestPerformanceMetricsFixes:
         assert stats is not None
         assert 'p95_ms' in stats
         assert stats['p95_ms'] is not None
+        # P95 should be around the 95th percentile, not the max
+        assert stats['p95_ms'] < stats['max_ms']
+        # P95 should be >= median
+        assert stats['p95_ms'] >= stats['median_ms']
         
         # Not enough for p99 (need 100+)
         assert 'p99_ms' not in stats or stats['p99_ms'] is None
@@ -205,7 +213,7 @@ class TestPerformanceMetricsFixes:
         """Test that p99 is calculated with 100+ samples"""
         tracker = PerformanceTracker()
         
-        # Add enough samples for p99
+        # Add enough samples for p99 (need more than 100 for p99 < max)
         for i in range(150):
             tracker.record("test_op", "impl1", float(i))
         
@@ -215,6 +223,10 @@ class TestPerformanceMetricsFixes:
         assert 'p95_ms' in stats
         assert 'p99_ms' in stats
         assert stats['p99_ms'] is not None
+        # With 150 samples, P99 should be < max (at index 148, not 149)
+        assert stats['p99_ms'] < stats['max_ms']
+        # P99 should be >= p95
+        assert stats['p99_ms'] >= stats['p95_ms']
     
     def test_failure_rate_tracking(self):
         """Test that failure rate is tracked"""

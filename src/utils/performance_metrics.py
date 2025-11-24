@@ -92,10 +92,13 @@ class PerformanceTracker:
         }
         
         # Add percentiles if enough samples
+        # Use proper percentile calculation to avoid truncation errors
         if n >= 20:
-            stats['p95_ms'] = sorted_durations[int(n * 0.95)]
+            p95_index = min(int(n * 0.95), n - 1)
+            stats['p95_ms'] = sorted_durations[p95_index]
         if n >= 100:
-            stats['p99_ms'] = sorted_durations[int(n * 0.99)]
+            p99_index = min(int(n * 0.99), n - 1)
+            stats['p99_ms'] = sorted_durations[p99_index]
         
         return stats
     
@@ -119,17 +122,30 @@ class PerformanceTracker:
             fallback_mean = implementations['fallback']['mean_ms']
             
             # Handle edge cases properly
-            if full_mean <= 0:
-                slowdown_factor = float('inf') if fallback_mean > 0 else 1.0
+            if full_mean < 0:
+                # Negative duration indicates an error
+                logger.warning(f"Negative full_mean duration: {full_mean}")
+                full_mean = 0
+            
+            if full_mean == 0:
+                # When full_mean is zero, calculate slowdown appropriately
+                if fallback_mean > 0:
+                    slowdown_factor = float('inf')
+                    slower_by_percent = float('inf')
+                else:
+                    # Both are zero
+                    slowdown_factor = 1.0
+                    slower_by_percent = 0.0
             else:
                 slowdown_factor = fallback_mean / full_mean
+                slower_by_percent = (slowdown_factor - 1.0) * 100
             
             return {
                 'implementations': implementations,
                 'comparison': {
                     'fallback_slowdown_factor': slowdown_factor,
                     'fallback_slower_by_ms': fallback_mean - full_mean,
-                    'fallback_slower_by_percent': (slowdown_factor - 1.0) * 100
+                    'fallback_slower_by_percent': slower_by_percent
                 }
             }
         
@@ -179,10 +195,12 @@ class PerformanceTracker:
                 lines.append(f"  Comparison:")
                 if comp['fallback_slowdown_factor'] == float('inf'):
                     lines.append(f"    Fallback is infinitely slower (full_mean is 0)")
+                    lines.append(f"    Fallback is slower by {comp['fallback_slower_by_ms']:.2f} ms")
                 else:
                     lines.append(f"    Fallback is {comp['fallback_slowdown_factor']:.2f}x slower")
                     lines.append(f"    Fallback is slower by {comp['fallback_slower_by_ms']:.2f} ms")
-                    lines.append(f"    Fallback is slower by {comp['fallback_slower_by_percent']:.1f}%")
+                    if comp['fallback_slower_by_percent'] != float('inf'):
+                        lines.append(f"    Fallback is slower by {comp['fallback_slower_by_percent']:.1f}%")
         
         lines.append("=" * 70)
         return "\n".join(lines)
