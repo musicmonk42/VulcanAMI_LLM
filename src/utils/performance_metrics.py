@@ -10,6 +10,7 @@ Provides runtime metrics for:
 
 import time
 import logging
+import threading
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
@@ -36,6 +37,7 @@ class PerformanceTracker:
         self.max_samples = max_samples
         self.metrics: Dict[str, deque] = defaultdict(lambda: deque(maxlen=max_samples))
         self.operation_counts: Dict[str, int] = defaultdict(int)
+        self._lock = threading.Lock()
         
     def record(self, operation: str, implementation: str, duration_ms: float, 
               success: bool = True, **details) -> None:
@@ -49,29 +51,56 @@ class PerformanceTracker:
         )
         
         key = f"{operation}:{implementation}"
-        self.metrics[key].append(metric)
-        self.operation_counts[operation] += 1
+        
+        with self._lock:
+            self.metrics[key].append(metric)
+            self.operation_counts[operation] += 1
     
     def get_stats(self, operation: str, implementation: str) -> Optional[Dict]:
         """Get statistics for a specific operation and implementation"""
         key = f"{operation}:{implementation}"
         
-        if key not in self.metrics or not self.metrics[key]:
-            return None
+        with self._lock:
+            if key not in self.metrics or not self.metrics[key]:
+                return None
+            # Copy to avoid holding lock during computation
+            all_metrics = list(self.metrics[key])
         
-        durations = [m.duration_ms for m in self.metrics[key] if m.success]
+        # Compute statistics outside the lock
+        successful = [m.duration_ms for m in all_metrics if m.success]
+        total = len(all_metrics)
         
-        if not durations:
-            return None
+        if not successful:
+            return {
+                'count': 0,
+                'total_attempts': total,
+                'failure_rate': 1.0
+            }
         
-        return {
-            'count': len(durations),
-            'mean_ms': statistics.mean(durations),
-            'median_ms': statistics.median(durations),
-            'min_ms': min(durations),
-            'max_ms': max(durations),
-            'stdev_ms': statistics.stdev(durations) if len(durations) > 1 else 0,
+        sorted_durations = sorted(successful)
+        n = len(sorted_durations)
+        
+        stats = {
+            'count': n,
+            'mean_ms': statistics.mean(successful),
+            'median_ms': statistics.median(successful),
+            'min_ms': min(successful),
+            'max_ms': max(successful),
+            'stdev_ms': statistics.stdev(successful) if n > 1 else 0,
+            'total_attempts': total,
+            'failure_rate': (total - n) / total if total > 0 else 0.0,
         }
+        
+        # Add percentiles if enough samples
+        # Use proper percentile calculation to avoid truncation errors
+        if n >= 20:
+            p95_index = min(int(n * 0.95), n - 1)
+            stats['p95_ms'] = sorted_durations[p95_index]
+        if n >= 100:
+            p99_index = min(int(n * 0.99), n - 1)
+            stats['p99_ms'] = sorted_durations[p99_index]
+        
+        return stats
     
     def compare_implementations(self, operation: str) -> Dict:
         """Compare all implementations for a given operation"""
@@ -91,14 +120,32 @@ class PerformanceTracker:
         if 'full' in implementations and 'fallback' in implementations:
             full_mean = implementations['full']['mean_ms']
             fallback_mean = implementations['fallback']['mean_ms']
-            slowdown_factor = fallback_mean / full_mean if full_mean > 0 else 1.0
+            
+            # Handle edge cases properly
+            if full_mean < 0:
+                # Negative duration indicates an error
+                logger.warning(f"Negative full_mean duration: {full_mean}")
+                full_mean = 0
+            
+            if full_mean == 0:
+                # When full_mean is zero, calculate slowdown appropriately
+                if fallback_mean > 0:
+                    slowdown_factor = float('inf')
+                    slower_by_percent = float('inf')
+                else:
+                    # Both are zero
+                    slowdown_factor = 1.0
+                    slower_by_percent = 0.0
+            else:
+                slowdown_factor = fallback_mean / full_mean
+                slower_by_percent = (slowdown_factor - 1.0) * 100
             
             return {
                 'implementations': implementations,
                 'comparison': {
                     'fallback_slowdown_factor': slowdown_factor,
                     'fallback_slower_by_ms': fallback_mean - full_mean,
-                    'fallback_slower_by_percent': (slowdown_factor - 1.0) * 100
+                    'fallback_slower_by_percent': slower_by_percent
                 }
             }
         
@@ -136,27 +183,54 @@ class PerformanceTracker:
                     lines.append(f"    Median: {stats['median_ms']:.2f} ms")
                     lines.append(f"    Range: {stats['min_ms']:.2f} - {stats['max_ms']:.2f} ms")
                     lines.append(f"    Samples: {stats['count']}")
+                    if 'p95_ms' in stats:
+                        lines.append(f"    P95: {stats['p95_ms']:.2f} ms")
+                    if 'p99_ms' in stats:
+                        lines.append(f"    P99: {stats['p99_ms']:.2f} ms")
+                    if stats.get('total_attempts', 0) > 0:
+                        lines.append(f"    Failure rate: {stats['failure_rate']:.1%}")
             
             if 'comparison' in data:
                 comp = data['comparison']
                 lines.append(f"  Comparison:")
-                lines.append(f"    Fallback is {comp['fallback_slowdown_factor']:.2f}x slower")
-                lines.append(f"    Fallback is slower by {comp['fallback_slower_by_ms']:.2f} ms")
-                lines.append(f"    Fallback is slower by {comp['fallback_slower_by_percent']:.1f}%")
+                if comp['fallback_slowdown_factor'] == float('inf'):
+                    lines.append(f"    Fallback is infinitely slower (full_mean is 0)")
+                    lines.append(f"    Fallback is slower by {comp['fallback_slower_by_ms']:.2f} ms")
+                else:
+                    lines.append(f"    Fallback is {comp['fallback_slowdown_factor']:.2f}x slower")
+                    lines.append(f"    Fallback is slower by {comp['fallback_slower_by_ms']:.2f} ms")
+                    if comp['fallback_slower_by_percent'] != float('inf'):
+                        lines.append(f"    Fallback is slower by {comp['fallback_slower_by_percent']:.1f}%")
         
         lines.append("=" * 70)
         return "\n".join(lines)
+    
+    def clear(self, operation: Optional[str] = None) -> None:
+        """Clear metrics, optionally for a specific operation only"""
+        with self._lock:
+            if operation is None:
+                self.metrics.clear()
+                self.operation_counts.clear()
+            else:
+                keys_to_remove = [k for k in self.metrics if k.startswith(f"{operation}:")]
+                for key in keys_to_remove:
+                    del self.metrics[key]
+                self.operation_counts.pop(operation, None)
 
 
 # Global performance tracker instance
 _performance_tracker: Optional[PerformanceTracker] = None
+_tracker_lock = threading.Lock()
 
 
 def get_performance_tracker() -> PerformanceTracker:
-    """Get global performance tracker instance"""
+    """Get global performance tracker instance with thread-safety"""
     global _performance_tracker
     if _performance_tracker is None:
-        _performance_tracker = PerformanceTracker()
+        with _tracker_lock:
+            # Double-check pattern to avoid race conditions
+            if _performance_tracker is None:
+                _performance_tracker = PerformanceTracker()
     return _performance_tracker
 
 
@@ -188,6 +262,16 @@ class PerformanceTimer:
         )
         
         return False  # Don't suppress exceptions
+    
+    def __call__(self, func):
+        """Use as decorator"""
+        import functools
+        
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with PerformanceTimer(self.operation, self.implementation, **self.details):
+                return func(*args, **kwargs)
+        return wrapper
 
 
 def log_performance_summary():
