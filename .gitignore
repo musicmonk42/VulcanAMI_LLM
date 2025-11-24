@@ -133,6 +133,9 @@ docker-compose.override.yml
 *.pfx
 *.p12
 
+# MinIO certificates directory (should not be committed)
+configs/minio/certs/
+
 # IP data / Large model artifacts (custom)
 model_checkpoints/
 weights/
