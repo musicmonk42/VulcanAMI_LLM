@@ -152,7 +152,7 @@ transferred = bridge.transfer_concept(
 #### ✅ **CAN DO (fully implemented):**
 
 **Adversarial testing EXISTS:**
-- File: `src/adversarial_tester.py` (2,147 lines)
+- File: `src/adversarial_tester.py` (2,062 lines)
 - Multiple attack types: FGSM, PGD, CW, DeepFool, JSMA, Random, Genetic, Boundary
 - Attack generation: ✅
 - Self-testing: ✅

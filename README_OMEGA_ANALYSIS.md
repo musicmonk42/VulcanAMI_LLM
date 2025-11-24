@@ -127,7 +127,7 @@ The functions exist and work. What's missing is automation, integration, and dat
 ### What's REAL (Not Vaporware)
 1. **Semantic Bridge** - Full infrastructure for cross-domain knowledge transfer
 2. **CSIU Protocol** - Production-grade safety enforcement with 5% caps
-3. **Adversarial Testing** - 2,147 lines of attack generation and detection
+3. **Adversarial Testing** - 2,062 lines of attack generation and detection
 4. **Unlearning Engine** - Multiple algorithms (Gradient Surgery, SISA, Influence, Amnesiac)
 5. **Safety Systems** - Comprehensive validation and governance
 

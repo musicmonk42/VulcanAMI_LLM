@@ -47,7 +47,7 @@ Phase 5: UNLEARNING - 85% Real
 
 ✅ Semantic Bridge - src/vulcan/semantic_bridge/ (infrastructure complete)
 ✅ CSIU Enforcement - src/vulcan/world_model/meta_reasoning/ (production)
-✅ Adversarial Testing - src/adversarial_tester.py (2,147 lines)
+✅ Adversarial Testing - src/adversarial_tester.py (2,062 lines)
 ✅ Unlearning Engine - src/persistant_memory_v46/ (multiple algorithms)
 ✅ Safety Systems - src/vulcan/safety/ (comprehensive validation)
 

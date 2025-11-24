@@ -58,7 +58,7 @@ The adversarial system can:
 
 **What's missing:** Scheduled execution (needs cron job, 2-3 days to add)
 
-**Code location:** `src/adversarial_tester.py` (2,147 lines)
+**Code location:** `src/adversarial_tester.py` (2,062 lines)
 
 **Can demo today?** YES, with manual triggering instead of scheduled
 
