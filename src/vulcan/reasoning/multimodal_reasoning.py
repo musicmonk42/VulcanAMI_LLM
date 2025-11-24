@@ -5,7 +5,7 @@ Fixed version with complete ModalityType definition and numerical stability impr
 FULLY IMPLEMENTED VERSION with real feature extraction.
 """
 
-from typing import Any, Dict, List, Tuple, Optional, Union, Callable
+from typing import Any, Dict, List, Tuple, Optional, Union, Callable, TYPE_CHECKING
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
@@ -19,6 +19,9 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 import threading
 
+if TYPE_CHECKING:
+    import torch
+
 try:
     import torch
     import torch.nn as nn
@@ -26,6 +29,7 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+    torch = None  # type: ignore
     logging.getLogger(__name__).warning("PyTorch not available, neural fusion disabled")
 
 from .reasoning_types import ReasoningStep, ReasoningChain, ReasoningResult, ReasoningType
@@ -1331,11 +1335,11 @@ class MultiModalReasoningEngine:
             logger.warning(f"Confidence estimation failed: {e}")
             return 0.5
     
-    def _neural_reasoning(self, features: torch.Tensor, query: Dict) -> Tuple[Any, float]:
+    def _neural_reasoning(self, features: "torch.Tensor", query: Dict) -> Tuple[Any, float]:
         """Advanced neural network-based reasoning using trained models"""
         
         try:
-            if self.neural_reasoner is not None:
+            if self.neural_reasoner is not None and TORCH_AVAILABLE and torch is not None:
                 # Use the advanced neural reasoner
                 with torch.no_grad():
                     reasoning_output, confidence_tensor = self.neural_reasoner(features)

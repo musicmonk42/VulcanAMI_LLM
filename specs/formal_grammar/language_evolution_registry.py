@@ -34,6 +34,64 @@ try:
     import faiss
     import numpy as np
     HAS_FAISS = True
+    
+    # Detect FAISS CPU capabilities with enhanced diagnostics
+    try:
+        from src.utils.cpu_capabilities import get_cpu_capabilities, format_capability_warning
+        
+        caps = get_cpu_capabilities()
+        best_instr = caps.get_best_vector_instruction_set()
+        perf_tier = caps.get_performance_tier()
+        
+        # Log detailed warning based on CPU capabilities
+        if caps.architecture.lower().startswith('arm') or caps.architecture.lower().startswith('aarch'):
+            if not caps.has_sve and not caps.has_sve2:
+                logging.warning(
+                    f"FAISS loaded with ARM NEON "
+                    f"(SVE/SVE2 unavailable, performance tier: {perf_tier}, "
+                    f"cores: {caps.cpu_cores})"
+                )
+        else:
+            # x86/x64
+            if not caps.has_avx512f:
+                if caps.has_avx2:
+                    logging.warning(
+                        f"FAISS loaded with AVX2 "
+                        f"(AVX512 unavailable, performance tier: {perf_tier}, "
+                        f"cores: {caps.cpu_cores})"
+                    )
+                elif caps.has_avx:
+                    logging.warning(
+                        f"FAISS loaded with AVX "
+                        f"(AVX2/AVX512 unavailable, performance tier: {perf_tier}, "
+                        f"cores: {caps.cpu_cores})"
+                    )
+                else:
+                    logging.warning(
+                        f"FAISS loaded with {best_instr} "
+                        f"(modern vector instructions unavailable, performance tier: {perf_tier}, "
+                        f"cores: {caps.cpu_cores})"
+                    )
+    except Exception as e:
+        logging.debug(f"Could not detect FAISS AVX capabilities: {e}")
+        # Fallback to simple detection
+        try:
+            import platform
+            if platform.system() == "Linux":
+                try:
+                    with open('/proc/cpuinfo', 'r') as f:
+                        cpuinfo = f.read()
+                        has_avx512 = 'avx512f' in cpuinfo
+                except (IOError, OSError):
+                    has_avx512 = False
+            else:
+                has_avx512 = False
+            
+            if not has_avx512:
+                logging.warning("FAISS loaded with AVX2 (AVX512 unavailable)")
+        except:
+            pass
+        
 except ImportError:
     HAS_FAISS = False
     logging.error("FAISS is required for production. Install with: pip install faiss-cpu numpy")

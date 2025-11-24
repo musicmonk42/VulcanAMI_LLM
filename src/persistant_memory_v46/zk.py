@@ -48,6 +48,14 @@ import numpy as np
 # Initialize logger before using it
 logger = logging.getLogger(__name__)
 
+# Import performance tracking
+try:
+    from ..utils.performance_metrics import track_zk_proof_generation
+    PERFORMANCE_TRACKING_AVAILABLE = True
+except ImportError:
+    PERFORMANCE_TRACKING_AVAILABLE = False
+    logger.debug("Performance tracking unavailable")
+
 # Import industry-standard SNARK implementation
 try:
     from ..gvulcan.zk.snark import (
@@ -56,7 +64,7 @@ try:
     )
     SNARK_AVAILABLE = True
 except ImportError:
-    logger.warning("Groth16 SNARK module not available, falling back to basic implementation")
+    logger.warning("Groth16 SNARK module unavailable (falling back to basic implementation)")
     SNARK_AVAILABLE = False
 
 
@@ -320,118 +328,138 @@ class ZKProver:
             Proof object with Groth16 ZK proof and verification data
         """
         start_time = time.time()
+        implementation = "full" if SNARK_AVAILABLE else "fallback"
         
-        # Generate roots if not provided
-        if before_root is None:
-            before_root = self._compute_merkle_root(affected_packs)
-        if after_root is None:
-            after_root = self._compute_merkle_root([])
-        
-        # Use real Groth16 SNARK if available
-        if SNARK_AVAILABLE:
-            logger.info("Generating industry-standard Groth16 proof with elliptic curve pairings")
-            
-            # Convert to integers for circuit
-            before_root_int = int(hashlib.sha256(before_root.encode()).hexdigest(), 16) % (2**254)
-            after_root_int = int(hashlib.sha256(after_root.encode()).hexdigest(), 16) % (2**254)
-            pattern_hash_int = int(hashlib.sha256(pattern.encode()).hexdigest(), 16) % (2**254)
-            
-            # Generate model weights and gradients (simulated for now)
-            model_size = 10
-            num_samples = len(affected_packs)
-            model_weights = [secrets.randbelow(2**64) for _ in range(model_size)]
-            gradient_updates = [secrets.randbelow(2**64) for _ in range(model_size)]
-            affected_samples = [secrets.randbelow(2**64) for _ in range(num_samples)]
-            
-            # Generate proof using real Groth16
+        # Track performance if available
+        perf_context = None
+        if PERFORMANCE_TRACKING_AVAILABLE:
             try:
-                groth_proof, vk = generate_proof_for_unlearning(
-                    merkle_root_before=before_root_int,
-                    merkle_root_after=after_root_int,
-                    pattern_hash=pattern_hash_int,
-                    model_weights=model_weights,
-                    gradient_updates=gradient_updates,
-                    affected_samples=affected_samples
-                )
+                perf_context = track_zk_proof_generation(implementation)
+                perf_context.__enter__()
+            except:
+                perf_context = None
+        
+        try:
+            # Generate roots if not provided
+            if before_root is None:
+                before_root = self._compute_merkle_root(affected_packs)
+            if after_root is None:
+                after_root = self._compute_merkle_root([])
+            
+            # Use real Groth16 SNARK if available
+            if SNARK_AVAILABLE:
+                logger.info("Generating industry-standard Groth16 proof with elliptic curve pairings")
                 
-                proof_bytes = groth_proof.to_bytes()
-                proof_dict = groth_proof.to_dict()
-                vk_dict = vk.to_dict()
+                # Convert to integers for circuit
+                before_root_int = int(hashlib.sha256(before_root.encode()).hexdigest(), 16) % (2**254)
+                after_root_int = int(hashlib.sha256(after_root.encode()).hexdigest(), 16) % (2**254)
+                pattern_hash_int = int(hashlib.sha256(pattern.encode()).hexdigest(), 16) % (2**254)
                 
-                logger.info(f"Groth16 proof generated: {len(proof_bytes)} bytes")
+                # Generate model weights and gradients (simulated for now)
+                model_size = 10
+                num_samples = len(affected_packs)
+                model_weights = [secrets.randbelow(2**64) for _ in range(model_size)]
+                gradient_updates = [secrets.randbelow(2**64) for _ in range(model_size)]
+                affected_samples = [secrets.randbelow(2**64) for _ in range(num_samples)]
                 
-                return {
-                    "proof_id": self._generate_proof_id(),
-                    "before_root": before_root,
-                    "after_root": after_root,
-                    "timestamp": int(time.time()),
-                    "zk_proof": {
-                        "type": "groth16",
-                        "proof": proof_dict,
-                        "proof_bytes": proof_bytes.hex(),
-                        "size_bytes": len(proof_bytes),
-                        "cryptographic": True
-                    },
-                    "verification_key": vk_dict,
-                    "pattern_hash": hex(pattern_hash_int),
-                    "affected_packs": affected_packs,
-                    "generation_time": time.time() - start_time,
-                    "metadata": metadata or {}
-                }
-            except Exception as e:
-                logger.error(f"Groth16 proof generation failed: {e}", exc_info=True)
-                # Fall back to legacy implementation
-                logger.warning("Falling back to legacy hash-based proof")
+                # Generate proof using real Groth16
+                try:
+                    groth_proof, vk = generate_proof_for_unlearning(
+                        merkle_root_before=before_root_int,
+                        merkle_root_after=after_root_int,
+                        pattern_hash=pattern_hash_int,
+                        model_weights=model_weights,
+                        gradient_updates=gradient_updates,
+                        affected_samples=affected_samples
+                    )
+                    
+                    proof_bytes = groth_proof.to_bytes()
+                    proof_dict = groth_proof.to_dict()
+                    vk_dict = vk.to_dict()
+                    
+                    logger.info(f"Groth16 proof generated: {len(proof_bytes)} bytes")
+                    
+                    result = {
+                        "proof_id": self._generate_proof_id(),
+                        "before_root": before_root,
+                        "after_root": after_root,
+                        "timestamp": int(time.time()),
+                        "zk_proof": {
+                            "type": "groth16",
+                            "proof": proof_dict,
+                            "proof_bytes": proof_bytes.hex(),
+                            "size_bytes": len(proof_bytes),
+                            "cryptographic": True
+                        },
+                        "verification_key": vk_dict,
+                        "pattern_hash": hex(pattern_hash_int),
+                        "affected_packs": affected_packs,
+                        "generation_time": time.time() - start_time,
+                        "metadata": metadata or {}
+                    }
+                    return result
+                except Exception as e:
+                    logger.error(f"Groth16 proof generation failed: {e}", exc_info=True)
+                    # Fall back to legacy implementation
+                    logger.warning("Falling back to legacy hash-based proof")
+            
+            # Legacy hash-based implementation (fallback)
+            logger.warning("Using legacy hash-based proof - not cryptographically secure")
+            
+            # Create circuit
+            circuit = ZKCircuit(circuit_hash=self.circuit_hash)
+            
+            # Add constraints for unlearning verification
+            self._add_unlearning_constraints(circuit, pattern, affected_packs)
+            
+            # Generate legacy proof
+            zk_proof = self._generate_generic_proof(circuit)
+            
+            # Create proof object
+            proof = {
+                "proof_id": self._generate_proof_id(),
+                "before_root": before_root,
+                "after_root": after_root,
+                "timestamp": int(time.time()),
+                "zk_proof": {
+                    "type": "hash_based_legacy",
+                    "statement": f"All vectors with cosine_sim({pattern}, ·) > 0.85 removed",
+                    "circuit_hash": self.circuit_hash,
+                    "proof_data": zk_proof,
+                    "security_level": self.security_level
+                },
+                "operations": [
+                    {
+                        "type": "tombstone",
+                        "pattern": pattern,
+                        "packs": affected_packs,
+                        "count": len(affected_packs)
+                    }
+                ],
+                "metadata": metadata or {},
+                "verification_key": self.verification_key
+            }
+            
+            # Add integrity check
+            proof["integrity_hash"] = self._compute_proof_hash(proof)
+            
+            # Cache proof
+            self.proof_cache[proof["proof_id"]] = proof
+            
+            elapsed = time.time() - start_time
+            logger.info(
+                f"Generated unlearning proof {proof['proof_id']} in {elapsed:.3f}s"
+            )
+            
+            return proof
         
-        # Legacy hash-based implementation (fallback)
-        logger.warning("Using legacy hash-based proof - not cryptographically secure")
-        
-        # Create circuit
-        circuit = ZKCircuit(circuit_hash=self.circuit_hash)
-        
-        # Add constraints for unlearning verification
-        self._add_unlearning_constraints(circuit, pattern, affected_packs)
-        
-        # Generate legacy proof
-        zk_proof = self._generate_generic_proof(circuit)
-        
-        # Create proof object
-        proof = {
-            "proof_id": self._generate_proof_id(),
-            "before_root": before_root,
-            "after_root": after_root,
-            "timestamp": int(time.time()),
-            "zk_proof": {
-                "type": "hash_based_legacy",
-                "statement": f"All vectors with cosine_sim({pattern}, ·) > 0.85 removed",
-                "circuit_hash": self.circuit_hash,
-                "proof_data": zk_proof,
-                "security_level": self.security_level
-            },
-            "operations": [
-                {
-                    "type": "tombstone",
-                    "pattern": pattern,
-                    "packs": affected_packs,
-                    "count": len(affected_packs)
-                }
-            ],
-            "metadata": metadata or {},
-            "verification_key": self.verification_key
-        }
-        
-        # Add integrity check
-        proof["integrity_hash"] = self._compute_proof_hash(proof)
-        
-        # Cache proof
-        self.proof_cache[proof["proof_id"]] = proof
-        
-        elapsed = time.time() - start_time
-        logger.info(
-            f"Generated unlearning proof {proof['proof_id']} in {elapsed:.3f}s"
-        )
-        
-        return proof
+        finally:
+            # Clean up performance tracking context
+            if perf_context is not None:
+                try:
+                    perf_context.__exit__(None, None, None)
+                except:
+                    pass
     
     def verify_unlearning_proof(self, proof: Dict[str, Any]) -> bool:
         """
