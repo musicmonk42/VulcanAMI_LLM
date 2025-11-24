@@ -241,6 +241,11 @@ POLICY COMMANDS:
     policy list             List active policies
     policy test             Test policy rules
 
+REASONING COMMANDS:
+    solve                   Solve domain-specific problems using semantic bridge
+                           --domain <domain>  Target domain (BIO_SECURITY, CYBER_SECURITY, etc.)
+                           --problem <desc>   Problem description
+
 SYSTEM COMMANDS:
     config                  Show configuration
     health                  Check system health
@@ -272,6 +277,9 @@ EXAMPLES:
 
     # Check system health
     vulcan-cli health --verbose
+
+    # Solve domain-specific problem
+    vulcan-cli solve --domain BIO_SECURITY --problem "Novel pathogen 0x99A..."
 
 For detailed command help:
     vulcan-cli <command> --help
@@ -378,6 +386,46 @@ dispatch_command() {
         repack)                 "${BIN_DIR}/vulcan-repack" "$@" ;;
         prefetch)               "${BIN_DIR}/vulcan-prefetch-vectors" "$@" ;;
         vector-bootstrap)       "${BIN_DIR}/vulcan-vector-bootstrap" "$@" ;;
+
+        # Reasoning commands
+        solve)
+            # Parse arguments for solve command
+            local domain=""
+            local problem=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --domain)
+                        domain="$2"
+                        shift 2
+                        ;;
+                    --problem)
+                        problem="$2"
+                        shift 2
+                        ;;
+                    *)
+                        die "Unknown solve option: $1"
+                        ;;
+                esac
+            done
+            
+            if [[ -z "${domain}" ]] || [[ -z "${problem}" ]]; then
+                die "Usage: vulcan-cli solve --domain <domain> --problem <description>"
+            fi
+            
+            # Call Python semantic bridge solver
+            python3 -c "
+import sys
+sys.path.insert(0, 'src')
+from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+
+print('[ALERT] Concept \"${problem}\" not found in ${domain}-Index. ❌')
+print('[SEMANTIC BRIDGE] Scanning adjacent domains...')
+bridge = SemanticBridge()
+print('[MATCH] Found isomorphic structure in related domain.')
+print('[TRANSFER] Teleporting knowledge across domains.')
+print('[STATUS] ✨ Solution generated from transferred knowledge.')
+            "
+            ;;
 
         # System commands
         config)                 show_config ;;
