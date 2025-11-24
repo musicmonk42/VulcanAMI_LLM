@@ -252,14 +252,20 @@ jobs:
             echo "$REPO_CERT_DIR not present, skipping"
           fi
 
-      - name: Build Docker image
-        run: |
-          set -x
-          docker build \
-            --pull \
-            --build-arg REJECT_INSECURE_JWT=ack \
-            -t vulcanami-llm:scan \
-            .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image with caching
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: vulcanami-llm:scan
+          build-args: |
+            REJECT_INSECURE_JWT=ack
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
