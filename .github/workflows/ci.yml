@@ -197,7 +197,7 @@ jobs:
           # Make directories readable and traversable, files readable
           chmod -R a+rX ./configs/minio
           # Optionally set ownership to the runner user (sudo available on hosted runners)
-          sudo chown -R $USER:$USER ./configs/minio || true
+          sudo chown -R $USER:$USER ./configs/minio || echo "Warning: chown failed, but chmod should be sufficient"
 
       - name: Start services
         run: |
