@@ -6,6 +6,10 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
   packages: write
@@ -14,6 +18,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -74,6 +79,7 @@ jobs:
   build-artifacts:
     name: Build Release Artifacts
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: create-release
 
     steps:
@@ -87,7 +93,10 @@ jobs:
 
       - name: Build Python package
         run: |
-          pip install build twine
+          set -x
+          for i in 1 2 3; do
+            pip install build twine && break || (echo "Retry $i/3: build tools install failed"; sleep $((i*10)))
+          done
           python -m build
 
       - name: Create archive
@@ -114,6 +123,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: build-artifacts
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
 
@@ -128,7 +138,10 @@ jobs:
 
       - name: Build package
         run: |
-          pip install build
+          set -x
+          for i in 1 2 3; do
+            pip install build && break || (echo "Retry $i/3: build tool install failed"; sleep $((i*10)))
+          done
           python -m build
 
       - name: Publish to PyPI
@@ -142,6 +155,7 @@ jobs:
   notify-release:
     name: Notify Release
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [create-release, build-artifacts]
     if: always()
 
