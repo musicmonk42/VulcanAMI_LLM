@@ -226,7 +226,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy to VM via SSH
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.3
         with:
           host: ${{ secrets.DEV_HOST }}
           username: ${{ secrets.DEV_USERNAME }}
