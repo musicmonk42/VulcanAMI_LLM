@@ -229,12 +229,12 @@ jobs:
         run: |
           # Create MinIO certs directory structure
           mkdir -p ./configs/minio/certs/CAs
-          # Set read/execute permissions for all users on base directory
-          chmod -R a+rX ./configs/minio
+          # Set read/execute permissions for all users on base directory (755 = rwxr-xr-x)
+          chmod -R 755 ./configs/minio
           # Attempt ownership change (may fail in CI, but chmod is sufficient)
           sudo chown -R $USER:$USER ./configs/minio || echo "Warning: chown failed, but chmod should be sufficient"
-          # Set full permissions on certs directory (needed for MinIO container to write cert files)
-          # Note: a+rwX is required because MinIO runs as a different user inside the container
+          # Set 755 permissions on certs directory (needed for MinIO container access)
+          # Note: 755 (rwxr-xr-x) allows MinIO container to read/execute while maintaining security
           # This is safe in the isolated GitHub Actions CI environment
           sudo chmod -R 755 ./configs/minio/certs
           # Ensure CAs subdirectory is also accessible
