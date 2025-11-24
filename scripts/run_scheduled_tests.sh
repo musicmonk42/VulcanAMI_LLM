@@ -26,6 +26,7 @@
 # ============================================================================
 
 set -e  # Exit on error
+set -u  # Exit on undefined variables
 
 # Script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,6 +36,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 CONFIG_FILE="$PROJECT_ROOT/configs/adversarial_testing_schedule.json"
 LOG_DIR="$PROJECT_ROOT/logs"
 LOG_FILE="$LOG_DIR/scheduled_tests_$(date +%Y%m%d_%H%M%S).log"
+LOCK_FILE="$PROJECT_ROOT/logs/scheduled_tests.lock"
 DRY_RUN=false
 ATTACKS=""
 
@@ -71,7 +73,28 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Ensure log directory exists
-mkdir -p "$LOG_DIR"
+if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+    echo "ERROR: Failed to create log directory: $LOG_DIR" >&2
+    exit 1
+fi
+
+# Check for concurrent runs using lock file
+if [ -f "$LOCK_FILE" ]; then
+    LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
+    if [ -n "$LOCK_PID" ] && kill -0 "$LOCK_PID" 2>/dev/null; then
+        echo "ERROR: Another instance is already running (PID: $LOCK_PID)" >&2
+        exit 1
+    else
+        # Stale lock file, remove it
+        rm -f "$LOCK_FILE"
+    fi
+fi
+
+# Create lock file
+echo $$ > "$LOCK_FILE"
+
+# Ensure lock file is removed on exit
+trap 'rm -f "$LOCK_FILE"' EXIT INT TERM
 
 # Function to log messages
 log() {
@@ -80,17 +103,26 @@ log() {
 
 # Function to log errors
 log_error() {
-    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}" | tee -a "$LOG_FILE"
+    local msg
+    msg="[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1"
+    echo -e "${RED}${msg}${NC}"  # Colored to terminal
+    echo "$msg" >> "$LOG_FILE"   # Plain text to file
 }
 
 # Function to log success
 log_success() {
-    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')] $1${NC}" | tee -a "$LOG_FILE"
+    local msg
+    msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo -e "${GREEN}${msg}${NC}"  # Colored to terminal
+    echo "$msg" >> "$LOG_FILE"     # Plain text to file
 }
 
 # Function to log warnings
 log_warning() {
-    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1${NC}" | tee -a "$LOG_FILE"
+    local msg
+    msg="[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1"
+    echo -e "${YELLOW}${msg}${NC}"  # Colored to terminal
+    echo "$msg" >> "$LOG_FILE"      # Plain text to file
 }
 
 # Start logging
@@ -137,22 +169,27 @@ fi
 log "Executing: $CMD"
 log "-----------------------------------------"
 
-if eval "$CMD" >> "$LOG_FILE" 2>&1; then
-    EXIT_CODE=$?
+eval "$CMD" >> "$LOG_FILE" 2>&1
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
     log_success "Scheduled testing completed successfully"
     log "Exit code: $EXIT_CODE"
 else
-    EXIT_CODE=$?
     log_error "Scheduled testing failed"
     log "Exit code: $EXIT_CODE"
     
     # Optional: Send alert on failure
     # You can add email notification, Slack webhook, etc. here
-    if [ -n "$SLACK_WEBHOOK_URL" ]; then
-        curl -X POST "$SLACK_WEBHOOK_URL" \
-            -H 'Content-Type: application/json' \
-            -d "{\"text\": \"⚠️ Scheduled adversarial testing failed with exit code $EXIT_CODE\"}" \
-            2>&1 | tee -a "$LOG_FILE"
+    if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+        if command -v curl &> /dev/null; then
+            curl -X POST "$SLACK_WEBHOOK_URL" \
+                -H 'Content-Type: application/json' \
+                -d "{\"text\": \"⚠️ Scheduled adversarial testing failed with exit code $EXIT_CODE\"}" \
+                >> "$LOG_FILE" 2>&1
+        else
+            log_warning "curl not available, skipping Slack notification"
+        fi
     fi
 fi
 

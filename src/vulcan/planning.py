@@ -87,6 +87,30 @@ UnifiedRuntime = None
 logger = logging.getLogger(__name__)
 
 # ============================================================
+# CONSTANTS
+# ============================================================
+
+# Resource thresholds
+CPU_CRITICAL_THRESHOLD = 90
+MEMORY_CRITICAL_THRESHOLD = 90
+GPU_CRITICAL_THRESHOLD = 90
+DISK_CRITICAL_THRESHOLD = 90
+
+# Cache settings
+MAX_CACHE_SIZE = 1000
+CACHE_EVICTION_COUNT = 200
+CACHE_TTL_SECONDS = 60
+
+# Monitoring settings
+DEFAULT_HISTORY_SIZE = 100
+HEARTBEAT_INTERVAL_SECONDS = 5
+AGENT_TIMEOUT_SECONDS = 30
+
+# Network settings
+NETWORK_TEST_TIMEOUT_SECONDS = 2
+NETWORK_FAILURE_THRESHOLD = 2
+
+# ============================================================
 # ENHANCED MONITORING TYPES
 # ============================================================
 
@@ -226,13 +250,13 @@ class SystemState:
     def get_critical_resources(self) -> List[str]:
         """Identify resources under critical load."""
         critical = []
-        if self.cpu_percent > 90:
+        if self.cpu_percent > CPU_CRITICAL_THRESHOLD:
             critical.append("cpu")
-        if self.memory_percent > 90:
+        if self.memory_percent > MEMORY_CRITICAL_THRESHOLD:
             critical.append("memory")
-        if self.gpu_percent and self.gpu_percent > 90:
+        if self.gpu_percent and self.gpu_percent > GPU_CRITICAL_THRESHOLD:
             critical.append("gpu")
-        if self.disk_usage_percent > 90:
+        if self.disk_usage_percent > DISK_CRITICAL_THRESHOLD:
             critical.append("disk")
         return critical
 
@@ -245,12 +269,13 @@ class EnhancedResourceMonitor:
     
     def __init__(self, sampling_interval: float = 1.0):
         self.sampling_interval = sampling_interval
-        self.history = defaultdict(lambda: deque(maxlen=100))
+        self.history = defaultdict(lambda: deque(maxlen=DEFAULT_HISTORY_SIZE))
         self.current_state = None
         self.gpu_initialized = self._init_gpu_monitoring()
         self.platform = platform.system()
         self.monitor_thread = None
         self.stop_monitoring = threading.Event()
+        self._state_lock = threading.RLock()  # Add lock for thread safety
         self.start_monitoring()
     
     def _init_gpu_monitoring(self) -> bool:
@@ -281,12 +306,15 @@ class EnhancedResourceMonitor:
         """Main monitoring loop."""
         while not self.stop_monitoring.is_set():
             try:
-                self.current_state = self.collect_metrics()
-                self._update_history(self.current_state)
+                state = self.collect_metrics()
+                with self._state_lock:
+                    self.current_state = state
+                    self._update_history(state)
             except Exception as e:
                 logger.error(f"Monitoring error: {e}")
             
-            time.sleep(self.sampling_interval)
+            # Use wait() instead of sleep() - will wake immediately when event is set
+            self.stop_monitoring.wait(timeout=self.sampling_interval)
     
     def collect_metrics(self) -> SystemState:
         """Collect real system metrics."""
@@ -362,8 +390,8 @@ class EnhancedResourceMonitor:
             elif self.platform == "Windows":
                 # Windows requires additional tools
                 return None
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to get CPU temperature: {e}")
         
         return None
     
@@ -378,7 +406,8 @@ class EnhancedResourceMonitor:
             temp = pynvml.nvmlDeviceGetTemperature(self.gpu_handle, pynvml.NVML_TEMPERATURE_GPU)
             
             return util.gpu, mem_info.used / (1024 * 1024), temp
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to get GPU metrics: {e}")
             return None, None, None
     
     def _get_power_consumption(self) -> Optional[float]:
@@ -387,8 +416,8 @@ class EnhancedResourceMonitor:
             try:
                 power_mw = pynvml.nvmlDeviceGetPowerUsage(self.gpu_handle)
                 return power_mw / 1000.0
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to get GPU power usage: {e}")
         
         # Estimate based on CPU usage
         if self.current_state:
@@ -411,11 +440,12 @@ class EnhancedResourceMonitor:
         for host, port in test_endpoints:
             try:
                 start_time = time.time()
-                socket.create_connection((host, port), timeout=2).close()
-                latency = (time.time() - start_time) * 1000  # ms
+                with socket.create_connection((host, port), timeout=NETWORK_TEST_TIMEOUT_SECONDS) as sock:
+                    pass  # Connection test successful
+                latency = (time.time() - start_time) * 1000
                 successful_tests += 1
                 total_latency += latency
-            except:
+            except (socket.timeout, socket.error, OSError):
                 pass
         
         # Track network quality in history
@@ -463,16 +493,17 @@ class EnhancedResourceMonitor:
     
     def get_resource_availability(self) -> Dict[str, float]:
         """Get current resource availability."""
-        if not self.current_state:
-            return {'cpu': 50, 'memory': 4000, 'gpu': 50}
-        
-        return {
-            'cpu': 100 - self.current_state.cpu_percent,
-            'memory': 8000 - self.current_state.memory_used_mb,
-            'gpu': 100 - (self.current_state.gpu_percent or 100),
-            'disk': 100 - self.current_state.disk_usage_percent,
-            'energy': 1000000 - (self.current_state.power_watts or 0) * 1000
-        }
+        with self._state_lock:
+            if not self.current_state:
+                return {'cpu': 50, 'memory': 4000, 'gpu': 50}
+            
+            return {
+                'cpu': 100 - self.current_state.cpu_percent,
+                'memory': 8000 - self.current_state.memory_used_mb,
+                'gpu': 100 - (self.current_state.gpu_percent or 100),
+                'disk': 100 - self.current_state.disk_usage_percent,
+                'energy': 1000000 - (self.current_state.power_watts or 0) * 1000
+            }
     
     def cleanup(self):
         """Cleanup monitoring."""
@@ -483,8 +514,8 @@ class EnhancedResourceMonitor:
         if self.gpu_initialized:
             try:
                 pynvml.nvmlShutdown()
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to shutdown NVML: {e}")
 
 # ============================================================
 # SURVIVAL PROTOCOL
@@ -500,6 +531,10 @@ class SurvivalProtocol:
         self.capabilities = self._initialize_capabilities()
         self.resource_monitor = EnhancedResourceMonitor()
         self.degradation_configs = self._define_degradation_configs()
+        # Initialize network-related attributes
+        self.network_retry_enabled = False
+        self.network_batch_size = 100  # Default batch size
+        self.network_priority_threshold = 0.5  # Default threshold
     
     def _initialize_capabilities(self) -> Dict[str, Dict]:
         """Define system capabilities and their resource requirements."""
@@ -677,7 +712,7 @@ class SurvivalProtocol:
         if len(history) >= 3:
             recent_failures = sum(1 for rate in list(history)[-3:] if rate < 0.5)
         
-        failure_detected = connectivity in ['offline', 'intermittent'] or recent_failures >= 2
+        failure_detected = connectivity in ['offline', 'intermittent'] or recent_failures >= NETWORK_FAILURE_THRESHOLD
         
         # Determine recommended actions
         actions = []
@@ -816,7 +851,8 @@ class PowerManager:
         try:
             battery = psutil.sensors_battery()
             return battery is not None
-        except:
+        except Exception as e:
+            logger.debug(f"Failed to detect battery: {e}")
             return False
     
     def check_power_status(self) -> Dict[str, Any]:
@@ -1004,15 +1040,17 @@ class MCTSNode:
             self.value += reward
     
     def cleanup(self):
-        """Explicit cleanup of node and children."""
-        with self._lock:
-            for child in self.children.values():
-                child.cleanup()
-            self.children.clear()
-            self._parent_ref = None
-            self.state = None
-            self.action = None
-            self.untried_actions = None
+        """Iterative cleanup to avoid stack overflow."""
+        nodes_to_cleanup = [self]
+        while nodes_to_cleanup:
+            node = nodes_to_cleanup.pop()
+            with node._lock:
+                nodes_to_cleanup.extend(node.children.values())
+                node.children.clear()
+                node._parent_ref = None
+                node.state = None
+                node.action = None
+                node.untried_actions = None
 
 class MonteCarloTreeSearch:
     """Enhanced MCTS for planning with proper memory management."""
@@ -1271,8 +1309,8 @@ class MonteCarloTreeSearch:
         """Destructor."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error in MCTS destructor: {e}")
 
 # ============================================================
 # ENHANCED HIERARCHICAL GOAL SYSTEM
@@ -1765,8 +1803,8 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
         """Destructor."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error in EnhancedHierarchicalPlanner destructor: {e}")
 
 # ============================================================
 # PLANNING STATE
@@ -1799,7 +1837,7 @@ class PlanningState:
 class PlanLibrary:
     """Library of reusable plans."""
     
-    def __init__(self, max_size: int = 1000):
+    def __init__(self, max_size: int = MAX_CACHE_SIZE):
         self.plans = {}
         self.access_counts = defaultdict(int)
         self.max_size = max_size
@@ -1852,8 +1890,8 @@ class PlanLibrary:
         """Destructor."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error in PlanLibrary destructor: {e}")
 
 # ============================================================
 # PLAN MONITOR (Same as original)
@@ -1863,7 +1901,7 @@ class PlanMonitor:
     """Monitor plan execution."""
     
     def __init__(self):
-        self.execution_history = deque(maxlen=100)
+        self.execution_history = deque(maxlen=DEFAULT_HISTORY_SIZE)
         self.performance_metrics = defaultdict(list)
         self._lock = threading.RLock()
     
@@ -2038,64 +2076,78 @@ class ResourceAwareCompute:
         """Plan computation within resource constraints."""
         start_time = time.time()
         
-        # Check cache
+        # Check cache with atomic check-and-compute pattern
         cache_key = self._compute_cache_key(problem)
+        
         with self._lock:
             if cache_key in self.cache:
                 cached = self.cache[cache_key]
-                if time.time() - cached['timestamp'] < 60:
+                # Check if it's a valid cached result (not a computation marker)
+                if 'result' in cached and time.time() - cached['timestamp'] < CACHE_TTL_SECONDS:
                     return cached['result']
+            
+            # Mark as being computed to prevent duplicate work
+            self.cache[cache_key] = {'computing': True, 'timestamp': time.time()}
         
-        # Get real resource availability
-        resources = self.get_resource_availability()
-        
-        # Check operational mode
-        self.survival_protocol.assess_and_adapt()
-        
-        # Check if GPU is available
-        use_gpu = self.survival_protocol.is_capability_available('gpu_inference')
-        
-        # Estimate requirements
-        estimated = self._estimate_requirements(problem, use_gpu)
-        
-        # Select optimization strategy
-        strategy = self._select_optimization_strategy(
-            problem, estimated, resources, time_budget_ms, energy_budget_nJ
-        )
-        
-        if strategy:
-            problem = self.optimization_strategies[strategy](problem)
+        try:
+            # Get real resource availability
+            resources = self.get_resource_availability()
+            
+            # Check operational mode
+            self.survival_protocol.assess_and_adapt()
+            
+            # Check if GPU is available
+            use_gpu = self.survival_protocol.is_capability_available('gpu_inference')
+            
+            # Estimate requirements
             estimated = self._estimate_requirements(problem, use_gpu)
-        
-        # Execute plan
-        plan = self._execute_plan(problem, time_budget_ms - (time.time() - start_time) * 1000)
-        
-        # Track actual usage
-        actual_time = (time.time() - start_time) * 1000
-        power = self.resource_monitor.current_state.power_watts if self.resource_monitor.current_state else 10
-        actual_energy = power * actual_time
-        
-        plan['resource_usage'] = {
-            'time_ms': actual_time,
-            'energy_nJ': actual_energy,
-            'within_budget': actual_time <= time_budget_ms and actual_energy <= energy_budget_nJ,
-            'optimization_used': strategy,
-            'operational_mode': self.survival_protocol.current_mode.value
-        }
-        
-        # Cache result
-        with self._lock:
-            self.cache[cache_key] = {
-                'result': plan,
-                'timestamp': time.time()
+            
+            # Select optimization strategy
+            strategy = self._select_optimization_strategy(
+                problem, estimated, resources, time_budget_ms, energy_budget_nJ
+            )
+            
+            if strategy:
+                problem = self.optimization_strategies[strategy](problem)
+                estimated = self._estimate_requirements(problem, use_gpu)
+            
+            # Execute plan
+            plan = self._execute_plan(problem, time_budget_ms - (time.time() - start_time) * 1000)
+            
+            # Track actual usage
+            actual_time = (time.time() - start_time) * 1000
+            power = self.resource_monitor.current_state.power_watts if self.resource_monitor.current_state else 10
+            actual_energy = power * actual_time
+            
+            plan['resource_usage'] = {
+                'time_ms': actual_time,
+                'energy_nJ': actual_energy,
+                'within_budget': actual_time <= time_budget_ms and actual_energy <= energy_budget_nJ,
+                'optimization_used': strategy,
+                'operational_mode': self.survival_protocol.current_mode.value
             }
             
-            if len(self.cache) > 1000:
-                oldest_keys = sorted(self.cache.items(), key=lambda x: x[1]['timestamp'])[:200]
-                for key, _ in oldest_keys:
-                    del self.cache[key]
-        
-        return plan
+            # Cache result
+            with self._lock:
+                self.cache[cache_key] = {
+                    'result': plan,
+                    'timestamp': time.time()
+                }
+                
+                # Evict old entries if cache is too large
+                if len(self.cache) > MAX_CACHE_SIZE:
+                    oldest_keys = sorted(self.cache.items(), key=lambda x: x[1]['timestamp'])[:CACHE_EVICTION_COUNT]
+                    for key, _ in oldest_keys:
+                        del self.cache[key]
+            
+            return plan
+            
+        except Exception as e:
+            # Remove failed computation marker
+            with self._lock:
+                if cache_key in self.cache:
+                    del self.cache[cache_key]
+            raise
     
     def _compute_cache_key(self, problem: Dict) -> str:
         """Compute cache key for problem."""
@@ -2278,10 +2330,11 @@ class DistributedCoordinator:
         def monitor():
             while not self._shutdown_event.is_set():
                 try:
-                    if self._shutdown_event.wait(timeout=5):
+                    if self._shutdown_event.wait(timeout=HEARTBEAT_INTERVAL_SECONDS):
                         break
                     self._check_agent_health()
-                except:
+                except Exception as e:
+                    logger.debug(f"Error in heartbeat monitor: {e}")
                     break
         
         self.heartbeat_thread = threading.Thread(target=monitor, daemon=True)
@@ -2292,7 +2345,7 @@ class DistributedCoordinator:
         current_time = time.time()
         with self.lock:
             for agent_id, info in list(self.agents.items()):
-                if current_time - info['last_heartbeat'] > 30:
+                if current_time - info['last_heartbeat'] > AGENT_TIMEOUT_SECONDS:
                     info['status'] = 'inactive'
                     logger.warning(f"Agent {agent_id} marked inactive")
     
@@ -2402,10 +2455,11 @@ class DistributedCoordinator:
         """Cleanup coordinator resources."""
         self._shutdown_event.set()
         if self.heartbeat_thread and self.heartbeat_thread.is_alive():
-            self.heartbeat_thread.join(timeout=1)
+            self.heartbeat_thread.join(timeout=2)
         
         with self.lock:
-            self.executor.shutdown(wait=False)
+            # Shutdown executor and wait for tasks to complete
+            self.executor.shutdown(wait=True)
             self.agents.clear()
             self.message_queue.clear()
             self.results_cache.clear()
@@ -2414,8 +2468,8 @@ class DistributedCoordinator:
         """Destructor."""
         try:
             self.cleanup()
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error in DistributedCoordinator destructor: {e}")
 
 # ============================================================
 # CONSENSUS PROTOCOL (Same as original)
