@@ -222,9 +222,14 @@ jobs:
 
       - name: Ensure minio certs exist and are readable
         run: |
+          # Create MinIO certs directory structure
           mkdir -p ./configs/minio/certs/CAs
+          # Set read/execute permissions for all users on base directory
           chmod -R a+rX ./configs/minio
+          # Attempt ownership change (may fail in CI, but chmod is sufficient)
           sudo chown -R $USER:$USER ./configs/minio || echo "Warning: chown failed, but chmod should be sufficient"
+          # Set full permissions on certs directory (needed for MinIO container to write cert files)
+          # This is safe in CI environment as it's an isolated container
           sudo chmod -R a+rwX ./configs/minio/certs
 
       - name: Start services
@@ -241,11 +246,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Retry logic for pip install
+          # Retry logic for pip install - install test packages
           n=0
           until [ $n -ge 3 ]
           do
-            pip install pytest pytest-asyncio requests && break
+            pip install pytest pytest-asyncio requests && break || true
             n=$((n+1))
             echo "Pip install attempt $n failed, retrying..."
             sleep 5
