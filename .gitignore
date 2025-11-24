@@ -125,6 +125,9 @@ node_modules/
 # Docker & Compose overrides
 docker-compose.override.yml
 
+# MinIO configs (created by CI)
+configs/minio/
+
 # Secrets / keys (generic patterns)
 *.pem
 *.key

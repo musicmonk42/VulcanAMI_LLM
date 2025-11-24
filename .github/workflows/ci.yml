@@ -190,6 +190,15 @@ jobs:
           # Verify installation
           docker compose version
 
+      - name: Ensure minio certs exist and are readable
+        run: |
+          # Create dir if missing
+          mkdir -p ./configs/minio/certs
+          # Make directories readable and traversable, files readable
+          chmod -R a+rX ./configs/minio
+          # Optionally set ownership to the runner user (sudo available on hosted runners)
+          sudo chown -R $USER:$USER ./configs/minio || true
+
       - name: Start services
         run: |
           docker compose -f docker-compose.dev.yml up -d redis postgres minio
