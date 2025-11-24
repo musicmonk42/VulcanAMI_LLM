@@ -2083,12 +2083,8 @@ class ResourceAwareCompute:
             if cache_key in self.cache:
                 cached = self.cache[cache_key]
                 # Check if it's a valid cached result (not a computation marker)
-                if 'result' in cached and time.time() - cached['timestamp'] < 60:
+                if 'result' in cached and time.time() - cached['timestamp'] < CACHE_TTL_SECONDS:
                     return cached['result']
-                # Check if another thread is computing this
-                elif cached.get('computing'):
-                    # Wait briefly and check again
-                    pass
             
             # Mark as being computed to prevent duplicate work
             self.cache[cache_key] = {'computing': True, 'timestamp': time.time()}

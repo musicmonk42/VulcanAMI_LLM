@@ -36,7 +36,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import time
-import signal
+import platform
+
+# Import signal only on Unix-like systems
+if platform.system() != 'Windows':
+    import signal
+    SIGNAL_AVAILABLE = True
+else:
+    SIGNAL_AVAILABLE = False
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -216,21 +223,30 @@ class ScheduledAdversarialTester:
         attacks = attack_types or self.config['attack_types']
         epsilons = self.config['epsilon_values']
         
-        # Set up timeout
+        # Set up timeout (only on Unix-like systems)
         timeout = self.config.get('timeout_seconds', 3600)
+        timeout_triggered = False
         
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Test suite exceeded time limit")
-        
-        # Set timeout alarm
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(timeout)
+        if SIGNAL_AVAILABLE:
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Test suite exceeded time limit")
+            
+            # Set timeout alarm
+            signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout)
+        else:
+            # On Windows, we'll use a manual timeout check
+            logger.warning("Signal-based timeout not available on Windows, using manual timeout check")
         
         try:
             # Run all combinations of attacks and epsilon values
             self.results = []
             for attack_type in attacks:
                 for epsilon in epsilons:
+                    # Check timeout manually on Windows
+                    if not SIGNAL_AVAILABLE and (time.time() - start_time) > timeout:
+                        raise TimeoutError("Test suite exceeded time limit")
+                    
                     result = self.run_attack(attack_type, epsilon)
                     self.results.append(result)
             
@@ -257,8 +273,9 @@ class ScheduledAdversarialTester:
             return summary
             
         finally:
-            # Cancel the alarm
-            signal.alarm(0)
+            # Cancel the alarm (only on Unix-like systems)
+            if SIGNAL_AVAILABLE:
+                signal.alarm(0)
     
     def _check_and_alert(self, result: Dict[str, Any]):
         """Check result and send alert if needed.
