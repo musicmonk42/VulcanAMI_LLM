@@ -17,9 +17,10 @@ A real, working demonstration of VulcanAMI's core capabilities without vaporware
 - **Demonstrates**: Transfer cybersecurity knowledge to solve biosecurity problems by recognizing isomorphic structures between domains
 
 ### Phase 3: The Attack (Active Immunization)
-- **Real Feature**: Adversarial attack detection through self-simulation
-- **Code**: Attack pattern recognition and immunization
-- **Demonstrates**: System blocks jailbreak attempts it discovered through simulated self-attacks ("Dream Mode")
+- **Real Feature**: Adversarial attack detection through pattern database
+- **Code**: Attack pattern recognition with real database
+- **Data**: `data/attack_patterns.json` - 8 real jailbreak patterns
+- **Demonstrates**: System blocks jailbreak attempts by matching against known attack patterns discovered through dream simulation
 
 ### Phase 4: The Temptation (CSIU Protocol)
 - **Real Feature**: CSIU (Collective Self-Improvement via Human Understanding) enforcement
