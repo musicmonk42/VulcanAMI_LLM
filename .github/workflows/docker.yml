@@ -122,7 +122,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          pull: true
           build-args: |
             REJECT_INSECURE_JWT=ack
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
