@@ -229,16 +229,12 @@ jobs:
         run: |
           # Create MinIO certs directory structure
           mkdir -p ./configs/minio/certs/CAs
-          # Set read/execute permissions for all users on base directory (755 = rwxr-xr-x)
+          # Set read/execute permissions for all users (755 = rwxr-xr-x)
           chmod -R 755 ./configs/minio
           # Attempt ownership change (may fail in CI, but chmod is sufficient)
           sudo chown -R $USER:$USER ./configs/minio || echo "Warning: chown failed, but chmod should be sufficient"
-          # Set 755 permissions on certs directory (needed for MinIO container access)
           # Note: 755 (rwxr-xr-x) allows MinIO container to read/execute while maintaining security
           # This is safe in the isolated GitHub Actions CI environment
-          sudo chmod -R 755 ./configs/minio/certs
-          # Ensure CAs subdirectory is also accessible
-          sudo chmod -R 755 ./configs/minio/certs/CAs 2>/dev/null || true
 
       - name: Start services
         run: |
@@ -254,29 +250,28 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Retry logic for pip install - install test packages
-          n=0
-          until [ $n -ge 3 ]
-          do
-            if pip install pytest pytest-asyncio requests; then
-              break
-            fi
-            n=$((n+1))
-            echo "Pip install attempt $n failed, retrying..."
-            sleep 5
-          done
+          
+          # Define retry function
+          retry_pip_install() {
+            local cmd="$1"
+            local n=0
+            until [ $n -ge 3 ]
+            do
+              if eval "$cmd"; then
+                return 0
+              fi
+              n=$((n+1))
+              echo "Pip install attempt $n failed, retrying..."
+              sleep 5
+            done
+            return 1
+          }
+          
+          # Install test packages with retry
+          retry_pip_install "pip install pytest pytest-asyncio requests"
+          
           # Install requirements with retry
-          n=0
-          until [ $n -ge 3 ]
-          do
-            if pip install -r requirements.txt; then
-              break
-            fi
-            n=$((n+1))
-            echo "Requirements install attempt $n failed, retrying..."
-            sleep 5
-          done
-          if [ $n -ge 3 ]; then
+          if ! retry_pip_install "pip install -r requirements.txt"; then
             echo "Continuing despite dependency issues..."
           fi
 
