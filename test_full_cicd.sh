@@ -63,6 +63,14 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+check_unpinned_dependencies() {
+    # Check for unpinned dependencies in requirements.txt
+    # Returns: list of unpinned dependencies (empty if all pinned)
+    if [ -f "$1" ]; then
+        grep -v "^#" "$1" | grep -v "^$" | grep -v "==" | grep -v ">=" | grep -v "^-" | grep -v "^https://" || true
+    fi
+}
+
 ################################################################################
 # Main Test Suite
 ################################################################################
@@ -528,7 +536,7 @@ fi
 
 log_test "All dependencies have pinned versions"
 if [ -f "requirements.txt" ]; then
-    UNPINNED=$(grep -v "^#" requirements.txt | grep -v "^$" | grep -v "==" | grep -v ">=" | grep -v "^-" | grep -v "^https://" || true)
+    UNPINNED=$(check_unpinned_dependencies "requirements.txt")
     if [ -z "$UNPINNED" ]; then
         log_success "All dependencies have pinned versions"
     else

@@ -4,7 +4,27 @@
 
 This repository includes a comprehensive CI/CD pipeline using GitHub Actions. The pipeline automates testing, building, security scanning, and deployment of the VulcanAMI/Graphix Vulcan platform.
 
-**✅ Validation Status**: All CI/CD configurations have been validated and are production-ready. Use `./validate_cicd_docker.sh` to verify your local setup.
+**✅ Validation Status**: All CI/CD configurations have been validated and are production-ready. 
+
+## Testing and Validation
+
+To validate your local setup and ensure reproducibility:
+
+```bash
+# Quick validation (recommended before commits)
+./quick_test.sh quick
+
+# Full comprehensive test suite
+./test_full_cicd.sh
+
+# Run pytest test suite
+pytest tests/test_cicd_reproducibility.py -v
+
+# Run existing validation script
+./validate_cicd_docker.sh
+```
+
+For detailed testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
 
 ## Pipeline Workflows
 

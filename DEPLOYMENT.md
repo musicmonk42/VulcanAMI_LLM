@@ -4,6 +4,36 @@
 
 This guide covers deploying VulcanAMI/Graphix Vulcan to different environments using various deployment methods.
 
+## Pre-Deployment Validation
+
+Before deploying to any environment, run the comprehensive test suite to ensure everything is configured correctly:
+
+```bash
+# Quick pre-deployment check
+./quick_test.sh quick
+
+# Full validation (recommended)
+./test_full_cicd.sh
+
+# Test specific components
+./quick_test.sh docker      # Docker configurations
+./quick_test.sh k8s         # Kubernetes manifests
+./quick_test.sh security    # Security settings
+
+# Run pytest test suite
+pytest tests/test_cicd_reproducibility.py -v
+```
+
+**Pre-Deployment Checklist:**
+- [ ] All tests pass (`./test_full_cicd.sh`)
+- [ ] Docker builds successfully
+- [ ] All environment variables documented
+- [ ] Secrets stored securely (not in code)
+- [ ] Version tagged in git
+- [ ] Documentation up to date
+
+For detailed testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
+
 ## Prerequisites
 
 - Docker 20.10+

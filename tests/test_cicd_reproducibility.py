@@ -454,9 +454,10 @@ class TestReproducibility:
         assert ":latest" not in content or "python:latest" not in content.lower(), \
             "Dockerfile should not use :latest tag (non-reproducible)"
         
-        # Should have specific version
-        assert "python:3.1" in content.lower(), \
-            "Dockerfile should specify exact Python version"
+        # Should have specific version (3.10, 3.11, 3.12, etc.)
+        import re
+        assert re.search(r'python:3\.\d+', content.lower()), \
+            "Dockerfile should specify exact Python version (e.g., python:3.11)"
     
     def test_makefile_exists(self):
         """Verify Makefile exists for consistent build commands"""
@@ -472,7 +473,8 @@ class TestReproducibility:
         missing = []
         
         for target in required_targets:
-            if f"{target}:" not in content and f".PHONY: {target}" not in content:
+            # Check if target is defined (targets are defined with 'target:')
+            if f"{target}:" not in content:
                 missing.append(target)
         
         assert len(missing) == 0, \

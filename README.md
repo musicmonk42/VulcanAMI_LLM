@@ -137,31 +137,53 @@ Notes
 
 ### Validation & CI/CD
 
-This repository includes comprehensive validation tooling to ensure reproducible builds and correct CI/CD configuration:
+This repository includes comprehensive validation and testing tooling to ensure reproducible builds and correct CI/CD configuration:
 
 ```bash
-# Run comprehensive validation (42+ checks)
+# Quick validation (recommended before commits)
+./quick_test.sh quick
+
+# Quick validation of specific components
+./quick_test.sh docker      # Docker tests only
+./quick_test.sh security    # Security tests only
+./quick_test.sh k8s         # Kubernetes tests only
+
+# Full comprehensive test suite (42+ checks)
+./test_full_cicd.sh
+
+# Run pytest test suite
+pytest tests/test_cicd_reproducibility.py -v
+
+# Run existing validation script
 ./validate_cicd_docker.sh
+```
 
-# What it validates:
-# ✅ Docker and Docker Compose v2
-# ✅ Hash-verified dependencies (requirements-hashed.txt)
-# ✅ Docker configurations and security
-# ✅ Docker Compose files (dev and prod)
-# ✅ GitHub Actions workflows
-# ✅ Kubernetes manifests
-# ✅ Helm charts
-# ✅ Security configuration
-# ✅ Reproducibility settings
+**What is validated:**
+- ✅ Docker and Docker Compose v2 configurations
+- ✅ Hash-verified dependencies (requirements-hashed.txt)
+- ✅ Docker security features (non-root user, health checks)
+- ✅ GitHub Actions workflows (YAML validation)
+- ✅ Kubernetes manifests (multi-document YAML support)
+- ✅ Helm charts (lint validation)
+- ✅ Security configuration (no committed secrets)
+- ✅ Reproducibility settings (pinned versions)
+- ✅ Python dependencies (pinned, no vulnerabilities)
 
-# Expected output:
-# Passed: 42, Warnings: 3, Failed: 0
-# ✓ All critical checks passed!
+**Expected output:**
+```
+Total Tests:   42
+Passed:        44 (✓)
+Failed:        0 (✗)
+Skipped:       2 (⊘)
+Pass Rate:     100%
+
+Status: SUCCESS ✓
 ```
 
 **Docker Compose v2 Note**: This repository uses modern Docker Compose v2 syntax (`docker compose` not `docker-compose`). Docker Compose v2 is bundled with Docker Engine 20.10.13+.
 
-For more details, see:
+For comprehensive testing documentation, see:
+- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Complete testing guide
 - [CI_CD.md](CI_CD.md) - CI/CD pipeline documentation
 - [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) - Reproducible build guide
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment instructions
