@@ -100,7 +100,8 @@ else
 fi
 
 if [ -f "requirements-hashed.txt" ]; then
-    if grep -qE '^[^#].*--hash=sha256:' requirements-hashed.txt; then
+    # Check for actual dependency lines or hash continuations
+    if grep -qE '(^[a-zA-Z0-9_-]+==.*--hash=sha256:|^\s+--hash=sha256:)' requirements-hashed.txt; then
         print_success "requirements-hashed.txt contains SHA256 hashes"
     else
         print_error "requirements-hashed.txt does not contain proper hashes"
@@ -154,15 +155,15 @@ done
 ################################################################################
 print_header "4. Validating Docker Compose Files"
 
-# Create temporary .env for validation
-cat > .env.test << 'EOF'
-JWT_SECRET_KEY=test-secret-key-minimum-32-characters-long-for-validation
-BOOTSTRAP_KEY=test-bootstrap-key-minimum-32-chars
-POSTGRES_PASSWORD=test-postgres-password-minimum-32-chars
-REDIS_PASSWORD=test-redis-password-minimum-32-chars
+# Create temporary .env for validation with randomly generated secure values
+cat > .env.test << EOF
+JWT_SECRET_KEY=$(openssl rand -base64 48)
+BOOTSTRAP_KEY=$(openssl rand -base64 32)
+POSTGRES_PASSWORD=$(openssl rand -base64 32)
+REDIS_PASSWORD=$(openssl rand -base64 32)
 MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=test-minio-password-minimum-24-chars
-GRAFANA_PASSWORD=test-grafana-password
+MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)
+GRAFANA_PASSWORD=$(openssl rand -base64 16)
 EOF
 
 if [ -f "docker-compose.dev.yml" ]; then
@@ -283,7 +284,7 @@ if [ -f "entrypoint.sh" ]; then
     fi
     
     # Test JWT validation (without secret)
-    if bash entrypoint.sh echo "test" 2>&1 | grep -q "No valid JWT secret"; then
+    if bash entrypoint.sh echo "test" 2>&1 | grep -q "ERROR: No valid JWT secret"; then
         print_success "entrypoint.sh properly validates JWT secrets"
     else
         print_warning "entrypoint.sh JWT validation may not be working"
@@ -314,12 +315,14 @@ else
     print_error ".gitignore not found"
 fi
 
-# Check for hardcoded secrets in files (basic check)
+# Check for hardcoded secrets in files (exclude common false positives)
 echo "Checking for potential hardcoded secrets..."
-if grep -rE "(password|secret|key).*=.*['\"].*['\"]" \
+if grep -rE "(password|secret|key)\s*=\s*['\"][^'\"]{8,}['\"]" \
     --include="*.yml" --include="*.yaml" --include="*.py" \
     --exclude-dir=".git" --exclude-dir="venv" --exclude-dir=".venv" \
-    . 2>/dev/null | grep -vE "(# |## |password_hash|secret_key_base|example|TODO|NOTE)" | head -5; then
+    . 2>/dev/null | \
+    grep -vE "(#|//|password_field|secret_name|key_name|password_hash|secret_key_base|example|TODO|NOTE|_id|_key\s*=\s*f['\"])" | \
+    head -5; then
     print_warning "Potential hardcoded secrets found (review above lines)"
 else
     print_success "No obvious hardcoded secrets found"

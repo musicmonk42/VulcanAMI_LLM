@@ -392,6 +392,29 @@ env-example: ## Create .env.example file
 	@echo "LOG_LEVEL=INFO" >> .env.example
 	@echo "ENVIRONMENT=development" >> .env.example
 
+################################################################################
+# CI/CD and Validation
+################################################################################
+
+.PHONY: validate-cicd
+validate-cicd: ## Validate CI/CD, Docker, and reproducibility configuration
+	@echo "$(GREEN)Running comprehensive CI/CD validation...$(NC)"
+	@chmod +x validate_cicd_docker.sh
+	./validate_cicd_docker.sh
+
+.PHONY: validate-docker
+validate-docker: ## Validate Docker and Docker Compose configurations
+	@echo "$(GREEN)Validating Docker configurations...$(NC)"
+	docker compose -f $(DOCKER_COMPOSE_DEV) config > /dev/null && echo "$(GREEN)✓ docker-compose.dev.yml is valid$(NC)"
+	docker compose -f $(DOCKER_COMPOSE_PROD) config > /dev/null && echo "$(GREEN)✓ docker-compose.prod.yml is valid$(NC)"
+
+.PHONY: generate-hashed-requirements
+generate-hashed-requirements: ## Generate requirements-hashed.txt with SHA256 hashes
+	@echo "$(GREEN)Generating hashed requirements...$(NC)"
+	pip install pip-tools
+	pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+	@echo "$(GREEN)✓ requirements-hashed.txt generated$(NC)"
+
 .PHONY: generate-secrets
 generate-secrets: ## Generate secure secrets for .env
 	@echo "$(GREEN)Generating secure secrets...$(NC)"

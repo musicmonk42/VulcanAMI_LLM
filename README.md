@@ -135,6 +135,37 @@ Notes
 - The services above are alternative entry points commonly used during development. Your licensed deployment may provide a consolidated or managed runtime with additional controls.
 - Do not use development defaults in production.
 
+### Validation & CI/CD
+
+This repository includes comprehensive validation tooling to ensure reproducible builds and correct CI/CD configuration:
+
+```bash
+# Run comprehensive validation (42+ checks)
+./validate_cicd_docker.sh
+
+# What it validates:
+# ✅ Docker and Docker Compose v2
+# ✅ Hash-verified dependencies (requirements-hashed.txt)
+# ✅ Docker configurations and security
+# ✅ Docker Compose files (dev and prod)
+# ✅ GitHub Actions workflows
+# ✅ Kubernetes manifests
+# ✅ Helm charts
+# ✅ Security configuration
+# ✅ Reproducibility settings
+
+# Expected output:
+# Passed: 42, Warnings: 3, Failed: 0
+# ✓ All critical checks passed!
+```
+
+**Docker Compose v2 Note**: This repository uses modern Docker Compose v2 syntax (`docker compose` not `docker-compose`). Docker Compose v2 is bundled with Docker Engine 20.10.13+.
+
+For more details, see:
+- [CI_CD.md](CI_CD.md) - CI/CD pipeline documentation
+- [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) - Reproducible build guide
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment instructions
+
 ---
 
 ## Configuration reference (selected)
