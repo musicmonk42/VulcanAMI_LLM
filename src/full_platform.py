@@ -333,34 +333,54 @@ if settings.workers > 1 and settings.warn_on_multi_worker:
 # PROMETHEUS METRICS
 # =============================================================================
 
+# Initialize metrics only once to avoid duplicate registration errors
+request_counter = None
+request_duration = None
+service_health = None
+active_workers = None
+
 if PROMETHEUS_AVAILABLE:
-    request_counter = Counter(
-        'unified_platform_requests_total',
-        'Total requests to unified platform',
-        ['service', 'method', 'endpoint']
-    )
-    request_duration = Histogram(
-        'unified_platform_request_duration_seconds',
-        'Request duration',
-        ['service', 'endpoint']
-    )
-    service_health = Gauge(
-        'unified_platform_service_health',
-        'Service health status (1=healthy, 0=unhealthy)',
-        ['service']
-    )
-    active_workers = Gauge(
-        'unified_platform_active_workers',
-        'Number of active workers'
-    )
-    
-    # Set worker count
-    active_workers.set(settings.workers)
-else:
-    request_counter = None
-    request_duration = None
-    service_health = None
-    active_workers = None
+    try:
+        from prometheus_client import REGISTRY
+        
+        # Check if metrics are already registered
+        metric_names = set()
+        for collector in REGISTRY._collector_to_names.values():
+            metric_names.update(collector)
+        
+        # Only create metrics if not already registered
+        if 'unified_platform_requests_total' not in metric_names:
+            request_counter = Counter(
+                'unified_platform_requests_total',
+                'Total requests to unified platform',
+                ['service', 'method', 'endpoint']
+            )
+            request_duration = Histogram(
+                'unified_platform_request_duration_seconds',
+                'Request duration',
+                ['service', 'endpoint']
+            )
+            service_health = Gauge(
+                'unified_platform_service_health',
+                'Service health status (1=healthy, 0=unhealthy)',
+                ['service']
+            )
+            active_workers = Gauge(
+                'unified_platform_active_workers',
+                'Number of active workers'
+            )
+            
+            # Set worker count
+            active_workers.set(settings.workers)
+        else:
+            # Metrics already registered (module reimported), fetch them
+            print("⚠️  Prometheus metrics already registered, skipping creation")
+    except Exception as e:
+        print(f"⚠️  Failed to initialize Prometheus metrics: {e}")
+        request_counter = None
+        request_duration = None
+        service_health = None
+        active_workers = None
 
 # =============================================================================
 # PATH SETUP WITH ABSOLUTE IMPORT SUPPORT
