@@ -20,6 +20,7 @@ import logging
 import os
 import sys
 import hmac
+import secrets as secrets_module
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple, Union
@@ -871,7 +872,8 @@ async def lifespan(app: FastAPI):
     # If JWT_SECRET_KEY is not set, generate a secure random key
     # This allows the registry service to start without manual configuration
     if not os.getenv("JWT_SECRET_KEY"):
-        import secrets as secrets_module
+        # Generate 32-byte (256-bit) key for HS256 algorithm used by Flask-JWT-Extended
+        # This provides strong cryptographic security for JWT token signing
         jwt_secret = secrets_module.token_urlsafe(32)
         os.environ["JWT_SECRET_KEY"] = jwt_secret
         print("✅ Generated JWT_SECRET_KEY for registry service")
