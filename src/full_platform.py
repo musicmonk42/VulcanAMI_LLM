@@ -150,7 +150,7 @@ class UnifiedPlatformSettings(BaseSettings):
     # Service import paths (support absolute imports like src.vulcan.main)
     vulcan_module: str = "src.vulcan.main"
     vulcan_attr: str = "app"
-    arena_module: str = "graphix_arena"
+    arena_module: str = "src.graphix_arena"
     arena_attr: str = "app"
     registry_module: str = "app"
     registry_attr: str = "app"
