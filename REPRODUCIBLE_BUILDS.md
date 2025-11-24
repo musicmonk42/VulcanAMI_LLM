@@ -8,7 +8,25 @@ This document ensures all builds are reproducible across environments.
 - Comprehensive validation tooling
 - Security best practices
 
-Run `./validate_cicd_docker.sh` to verify reproducibility on your system.
+## Validation and Testing
+
+To verify reproducibility on your system:
+
+```bash
+# Quick validation
+./quick_test.sh dependencies
+
+# Full test suite
+./test_full_cicd.sh
+
+# Run specific reproducibility tests
+pytest tests/test_cicd_reproducibility.py::TestReproducibility -v
+
+# Run existing validation
+./validate_cicd_docker.sh
+```
+
+For comprehensive testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
 
 ## 📦 Dependency Management
 
