@@ -272,6 +272,14 @@ async def lifespan(app: FastAPI):
     
     worker_id = os.getpid()
     
+    # Import and use enhanced startup logger
+    try:
+        from startup_logger import log_vulcan_startup, get_startup_logger
+        # Log comprehensive startup information
+        log_vulcan_startup()
+    except ImportError:
+        logger.info("Enhanced startup logger not available, using basic logging")
+    
     logger.info(f"Starting VULCAN-AGI worker {worker_id} in {settings.deployment_mode} mode")
     
     try:

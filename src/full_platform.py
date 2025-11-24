@@ -875,6 +875,14 @@ async def lifespan(app: FastAPI):
 
     # STARTUP
     worker_id = os.getpid()
+    
+    # Use enhanced startup logger if available
+    try:
+        from startup_logger import log_vulcan_startup
+        log_vulcan_startup()
+    except ImportError:
+        logger.info("Enhanced startup logger not available, using basic logging")
+    
     logger.info("=" * 70)
     logger.info(f"Starting Unified Platform (Worker {worker_id})")
     logger.info("=" * 70)
