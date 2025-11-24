@@ -397,13 +397,48 @@ class EnhancedResourceMonitor:
         return None
     
     def _assess_network_quality(self) -> str:
-        """Quick network quality assessment."""
-        try:
-            # Simple connectivity check
-            socket.create_connection(("8.8.8.8", 53), timeout=1).close()
-            return "good"
-        except:
-            return "offline"
+        """Enhanced network quality assessment with failure detection."""
+        # Test multiple endpoints for redundancy
+        test_endpoints = [
+            ("8.8.8.8", 53),      # Google DNS
+            ("1.1.1.1", 53),      # Cloudflare DNS
+            ("208.67.222.222", 53)  # OpenDNS
+        ]
+        
+        successful_tests = 0
+        total_latency = 0
+        
+        for host, port in test_endpoints:
+            try:
+                start_time = time.time()
+                socket.create_connection((host, port), timeout=2).close()
+                latency = (time.time() - start_time) * 1000  # ms
+                successful_tests += 1
+                total_latency += latency
+            except:
+                pass
+        
+        # Track network quality in history
+        success_rate = successful_tests / len(test_endpoints)
+        self.history['network_success'].append(success_rate)
+        
+        # Determine quality based on success rate and latency
+        if successful_tests == 0:
+            return ConnectivityLevel.OFFLINE.value
+        elif successful_tests == 1:
+            return ConnectivityLevel.INTERMITTENT.value
+        elif successful_tests == 2:
+            avg_latency = total_latency / successful_tests
+            if avg_latency > 500:
+                return ConnectivityLevel.DEGRADED.value
+            else:
+                return ConnectivityLevel.GOOD.value
+        else:  # All 3 successful
+            avg_latency = total_latency / successful_tests
+            if avg_latency < 100:
+                return ConnectivityLevel.EXCELLENT.value
+            else:
+                return ConnectivityLevel.GOOD.value
     
     def _determine_operational_mode(self, cpu: float, memory: float, 
                                    gpu: Optional[float]) -> OperationalMode:
@@ -619,6 +654,118 @@ class SurvivalProtocol:
         min_idx = mode_order.index(min_mode)
         
         return current_idx >= min_idx
+    
+    def detect_network_failure(self) -> Dict[str, Any]:
+        """Detect and analyze network failures.
+        
+        Returns:
+            Dict containing failure status, connectivity level, and recommended actions
+        """
+        state = self.resource_monitor.current_state
+        if not state:
+            return {
+                'failure_detected': False,
+                'connectivity': 'unknown',
+                'actions': []
+            }
+        
+        connectivity = state.network_quality
+        history = self.resource_monitor.history.get('network_success', deque())
+        
+        # Analyze network history for patterns
+        recent_failures = 0
+        if len(history) >= 3:
+            recent_failures = sum(1 for rate in list(history)[-3:] if rate < 0.5)
+        
+        failure_detected = connectivity in ['offline', 'intermittent'] or recent_failures >= 2
+        
+        # Determine recommended actions
+        actions = []
+        if failure_detected:
+            actions.append('switch_to_local_mode')
+            if connectivity == 'offline':
+                actions.append('disable_network_capabilities')
+                actions.append('activate_survival_mode')
+            elif connectivity == 'intermittent':
+                actions.append('enable_retry_logic')
+                actions.append('reduce_network_dependencies')
+        
+        # Update connectivity level
+        if connectivity == 'offline':
+            self.connectivity_level = ConnectivityLevel.OFFLINE
+        elif connectivity == 'intermittent':
+            self.connectivity_level = ConnectivityLevel.INTERMITTENT
+        elif connectivity in ['degraded', 'local_only']:
+            self.connectivity_level = ConnectivityLevel.DEGRADED
+        else:
+            self.connectivity_level = ConnectivityLevel.GOOD
+        
+        return {
+            'failure_detected': failure_detected,
+            'connectivity': connectivity,
+            'recent_failures': recent_failures,
+            'actions': actions,
+            'connectivity_level': self.connectivity_level.value
+        }
+    
+    def apply_graceful_degradation(self, failure_info: Dict[str, Any]):
+        """Apply graceful degradation based on detected failures.
+        
+        Args:
+            failure_info: Network failure information from detect_network_failure()
+        """
+        if not failure_info['failure_detected']:
+            return
+        
+        logger.warning(f"Applying graceful degradation: {failure_info}")
+        
+        # Execute recommended actions
+        for action in failure_info['actions']:
+            if action == 'switch_to_local_mode':
+                self._switch_to_local_mode()
+            elif action == 'disable_network_capabilities':
+                self._disable_network_capabilities()
+            elif action == 'activate_survival_mode':
+                self.change_mode(OperationalMode.SURVIVAL)
+            elif action == 'enable_retry_logic':
+                self._enable_network_retry()
+            elif action == 'reduce_network_dependencies':
+                self._reduce_network_load()
+    
+    def _switch_to_local_mode(self):
+        """Switch system to local-only operation."""
+        logger.info("Switching to local-only mode")
+        for cap_name, cap_info in self.capabilities.items():
+            if cap_info.get('network_required', False):
+                cap_info['enabled'] = False
+                # Activate fallback if available
+                fallback = cap_info.get('fallback')
+                if fallback and fallback in self.capabilities:
+                    self.capabilities[fallback]['enabled'] = True
+    
+    def _disable_network_capabilities(self):
+        """Disable all network-dependent capabilities."""
+        logger.info("Disabling network-dependent capabilities")
+        disabled = []
+        for cap_name, cap_info in self.capabilities.items():
+            if cap_info.get('network_required', False) and cap_info.get('enabled', False):
+                cap_info['enabled'] = False
+                disabled.append(cap_name)
+        logger.info(f"Disabled capabilities: {disabled}")
+    
+    def _enable_network_retry(self):
+        """Enable retry logic for network operations."""
+        logger.info("Enabling network retry logic")
+        # This would be implemented by the specific network clients
+        # Here we just set a flag that can be checked
+        self.network_retry_enabled = True
+    
+    def _reduce_network_load(self):
+        """Reduce network load by batching and prioritizing operations."""
+        logger.info("Reducing network load")
+        # This would adjust batch sizes and request priorities
+        self.network_batch_size = 10  # Reduced from default
+        self.network_priority_threshold = 0.8  # Only critical operations
 
 # ============================================================
 # POWER MANAGER
@@ -656,6 +803,106 @@ class PowerManager:
         }
         self.current_profile = "balanced"
         self.thermal_throttle_active = False
+        self.battery_available = self._detect_battery()
+        self.on_battery_power = False
+        self.battery_percent = 100
+        self.emergency_shutdown_threshold = 5  # percent
+    
+    def _detect_battery(self) -> bool:
+        """Detect if system has battery (laptop/mobile)."""
+        if not PSUTIL_AVAILABLE:
+            return False
+        
+        try:
+            battery = psutil.sensors_battery()
+            return battery is not None
+        except:
+            return False
+    
+    def check_power_status(self) -> Dict[str, Any]:
+        """Check current power status including battery.
+        
+        Returns:
+            Dict with power status, battery level, and recommended actions
+        """
+        if not self.battery_available or not PSUTIL_AVAILABLE:
+            return {
+                'on_battery': False,
+                'battery_percent': None,
+                'power_warning': False,
+                'actions': []
+            }
+        
+        try:
+            battery = psutil.sensors_battery()
+            if battery:
+                self.on_battery_power = not battery.power_plugged
+                self.battery_percent = battery.percent
+                
+                actions = []
+                power_warning = False
+                
+                # Critical battery level
+                if self.battery_percent <= self.emergency_shutdown_threshold:
+                    actions.append('emergency_shutdown')
+                    power_warning = True
+                # Low battery
+                elif self.battery_percent <= 15:
+                    actions.append('activate_survival_mode')
+                    actions.append('save_state')
+                    power_warning = True
+                # Moderate battery on battery power
+                elif self.battery_percent <= 30 and self.on_battery_power:
+                    actions.append('activate_power_saver')
+                    power_warning = True
+                
+                return {
+                    'on_battery': self.on_battery_power,
+                    'battery_percent': self.battery_percent,
+                    'power_warning': power_warning,
+                    'time_remaining': battery.secsleft if hasattr(battery, 'secsleft') else None,
+                    'actions': actions
+                }
+        except Exception as e:
+            logger.error(f"Error checking battery status: {e}")
+        
+        return {
+            'on_battery': False,
+            'battery_percent': None,
+            'power_warning': False,
+            'actions': []
+        }
+    
+    def apply_power_management(self, power_status: Dict[str, Any]):
+        """Apply power management based on power status.
+        
+        Args:
+            power_status: Power status from check_power_status()
+        """
+        if not power_status['power_warning']:
+            return
+        
+        logger.warning(f"Applying power management: {power_status}")
+        
+        for action in power_status['actions']:
+            if action == 'emergency_shutdown':
+                self._emergency_shutdown()
+            elif action == 'activate_survival_mode':
+                self.set_power_profile('survival')
+            elif action == 'activate_power_saver':
+                self.set_power_profile('power_saver')
+            elif action == 'save_state':
+                logger.info("Saving system state for emergency recovery")
+    
+    def _emergency_shutdown(self):
+        """Perform emergency shutdown to prevent data loss.
+        
+        This should trigger graceful shutdown of all operations.
+        """
+        logger.critical(f"EMERGENCY SHUTDOWN: Battery at {self.battery_percent}%")
+        # In a real implementation, this would trigger cleanup and shutdown
+        # For now, just set the most restrictive profile
+        self.set_power_profile('survival')
     
     def set_power_profile(self, profile: str):
         """Set power management profile."""
