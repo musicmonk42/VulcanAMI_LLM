@@ -5,7 +5,6 @@ This script can be run independently without pytest infrastructure.
 """
 
 import sys
-import io
 import logging
 
 # Capture warnings

@@ -37,24 +37,27 @@ try:
     
     # Detect FAISS AVX capabilities
     try:
-        # Check if AVX512 is available by attempting to use AVX512 instruction set
+        # Check if AVX512 is available
         # FAISS will use AVX512 if available, otherwise fall back to AVX2
-        # We can check this by looking at the compiled instruction set support
         has_avx512 = False
         try:
-            # Try to determine if FAISS was compiled with AVX512 support
-            # This is a heuristic check - FAISS doesn't expose this directly
             import platform
-            import subprocess
             if platform.system() == "Linux":
-                # Check CPU flags for avx512f (AVX-512 Foundation)
+                # Check CPU flags for avx512f (AVX-512 Foundation) by reading /proc/cpuinfo directly
                 try:
-                    result = subprocess.run(['grep', '-o', 'avx512f', '/proc/cpuinfo'], 
-                                          capture_output=True, text=True, timeout=1)
-                    has_avx512 = 'avx512f' in result.stdout
-                except:
+                    with open('/proc/cpuinfo', 'r') as f:
+                        cpuinfo = f.read()
+                        has_avx512 = 'avx512f' in cpuinfo
+                except (IOError, OSError):
                     has_avx512 = False
-        except:
+            elif platform.system() in ["Windows", "Darwin"]:
+                # On Windows/macOS, we assume AVX512 is not available
+                # A proper cross-platform solution would require platform-specific libraries
+                has_avx512 = False
+            else:
+                # Unknown platform
+                has_avx512 = False
+        except Exception:
             has_avx512 = False
         
         if not has_avx512:
