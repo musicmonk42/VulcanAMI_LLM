@@ -123,7 +123,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install pytest pytest-cov pytest-asyncio pytest-timeout mock hypothesis faker
-          pip install -r requirements.txt || echo "Some dependencies may have failed, continuing..."
+          # Retry logic for requirements installation
+          n=0
+          until [ $n -ge 3 ]
+          do
+            pip install -r requirements.txt && break || echo "Some dependencies may have failed, retrying..."
+            n=$((n+1))
+            echo "Requirements install attempt $n failed, retrying..."
+            sleep 5
+          done
 
       - name: Set environment variables
         run: |
@@ -176,10 +184,32 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: [test]
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Debug - runner environment
+        run: |
+          echo "=== runner info ==="
+          uname -a || true
+          lsb_release -a || true
+          echo "=== disk usage ==="
+          df -h || true
+          echo "=== free memory ==="
+          free -m || true
+          echo "=== versions ==="
+          python --version || true
+          pip --version || true
+          node --version || true
+          npm --version || true
+          git --version || true
+          docker --version || true
+          docker compose version || true
+          echo "=== workspace listing ==="
+          ls -la $GITHUB_WORKSPACE || true
+        shell: bash
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -189,6 +219,13 @@ jobs:
           # Docker Compose v2 is now included with Docker by default
           # Verify installation
           docker compose version
+
+      - name: Ensure minio certs exist and are readable
+        run: |
+          mkdir -p ./configs/minio/certs/CAs
+          chmod -R a+rX ./configs/minio
+          sudo chown -R $USER:$USER ./configs/minio || echo "Warning: chown failed, but chmod should be sufficient"
+          sudo chmod -R a+rwX ./configs/minio/certs
 
       - name: Start services
         run: |
@@ -204,8 +241,24 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-asyncio requests
-          pip install -r requirements.txt || echo "Continuing despite dependency issues..."
+          # Retry logic for pip install
+          n=0
+          until [ $n -ge 3 ]
+          do
+            pip install pytest pytest-asyncio requests && break
+            n=$((n+1))
+            echo "Pip install attempt $n failed, retrying..."
+            sleep 5
+          done
+          # Install requirements with retry
+          n=0
+          until [ $n -ge 3 ]
+          do
+            pip install -r requirements.txt && break || echo "Continuing despite dependency issues..."
+            n=$((n+1))
+            echo "Requirements install attempt $n failed, retrying..."
+            sleep 5
+          done
 
       - name: Run integration tests
         env:
@@ -216,15 +269,35 @@ jobs:
         run: |
           # Run specific integration test files if they exist
           if [ -d "tests/integration" ]; then
-            pytest tests/integration/ -v --timeout=300 || true
+            pytest tests/integration/ -v --timeout=300 2>&1 | tee integration-test.log || true
           else
-            echo "No integration tests directory found"
+            echo "No integration tests directory found" | tee integration-test.log
           fi
+
+      - name: Upload logs artifact (always run)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-logs-${{ github.job }}
+          path: |
+            integration-test.log
+            ${{ github.workspace }}/**/*.log
+            ${{ github.workspace }}/logs/**/*.log
+          retention-days: 3
 
       - name: Cleanup
         if: always()
         run: |
+          docker compose -f docker-compose.dev.yml logs > docker-compose.log 2>&1 || true
           docker compose -f docker-compose.dev.yml down -v
+
+      - name: Upload docker logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-compose-logs
+          path: docker-compose.log
+          retention-days: 3
 
   build-validation:
     name: Validate Build
