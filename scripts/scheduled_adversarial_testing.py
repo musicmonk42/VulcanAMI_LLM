@@ -36,6 +36,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import time
+import signal
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -44,13 +45,15 @@ sys.path.insert(0, str(project_root))
 try:
     from src.vulcan.safety.adversarial_formal import (
         AdversarialValidator,
-        AttackType,
         initialize_adversarial
     )
     ADVERSARIAL_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"AdversarialValidator not available: {e}")
     ADVERSARIAL_AVAILABLE = False
+
+# Ensure log directory exists
+os.makedirs('logs', exist_ok=True)
 
 # Configure logging
 logging.basicConfig(
@@ -213,34 +216,49 @@ class ScheduledAdversarialTester:
         attacks = attack_types or self.config['attack_types']
         epsilons = self.config['epsilon_values']
         
-        # Run all combinations of attacks and epsilon values
-        self.results = []
-        for attack_type in attacks:
-            for epsilon in epsilons:
-                result = self.run_attack(attack_type, epsilon)
-                self.results.append(result)
+        # Set up timeout
+        timeout = self.config.get('timeout_seconds', 3600)
         
-        duration = time.time() - start_time
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Test suite exceeded time limit")
         
-        # Generate summary
-        summary = {
-            'success': True,
-            'total_tests': len(self.results),
-            'successful_tests': sum(1 for r in self.results if r.get('success')),
-            'failed_tests': sum(1 for r in self.results if not r.get('success')),
-            'total_duration_seconds': duration,
-            'timestamp': datetime.now().isoformat(),
-            'results': self.results
-        }
+        # Set timeout alarm
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout)
         
-        logger.info(f"Completed {summary['total_tests']} tests in {duration:.2f}s")
-        logger.info(f"Success: {summary['successful_tests']}, Failed: {summary['failed_tests']}")
-        
-        # Save results if configured
-        if self.config.get('save_results'):
-            self._save_results(summary)
-        
-        return summary
+        try:
+            # Run all combinations of attacks and epsilon values
+            self.results = []
+            for attack_type in attacks:
+                for epsilon in epsilons:
+                    result = self.run_attack(attack_type, epsilon)
+                    self.results.append(result)
+            
+            duration = time.time() - start_time
+            
+            # Generate summary
+            summary = {
+                'success': True,
+                'total_tests': len(self.results),
+                'successful_tests': sum(1 for r in self.results if r.get('success')),
+                'failed_tests': sum(1 for r in self.results if not r.get('success')),
+                'total_duration_seconds': duration,
+                'timestamp': datetime.now().isoformat(),
+                'results': self.results
+            }
+            
+            logger.info(f"Completed {summary['total_tests']} tests in {duration:.2f}s")
+            logger.info(f"Success: {summary['successful_tests']}, Failed: {summary['failed_tests']}")
+            
+            # Save results if configured
+            if self.config.get('save_results'):
+                self._save_results(summary)
+            
+            return summary
+            
+        finally:
+            # Cancel the alarm
+            signal.alarm(0)
     
     def _check_and_alert(self, result: Dict[str, Any]):
         """Check result and send alert if needed.
@@ -338,12 +356,15 @@ def main():
         logger.info("All tests completed successfully")
         return 0
         
+    except TimeoutError as e:
+        logger.error(f"Test suite timed out: {e}")
+        return 2
     except KeyboardInterrupt:
         logger.info("Testing interrupted by user")
         return 130
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
-        return 1
+        return 2
 
 
 if __name__ == '__main__':
