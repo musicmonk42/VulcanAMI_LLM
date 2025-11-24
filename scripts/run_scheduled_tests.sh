@@ -94,7 +94,7 @@ fi
 echo $$ > "$LOCK_FILE"
 
 # Ensure lock file is removed on exit
-trap "rm -f '$LOCK_FILE'" EXIT INT TERM
+trap 'rm -f "$LOCK_FILE"' EXIT INT TERM
 
 # Function to log messages
 log() {
@@ -103,21 +103,24 @@ log() {
 
 # Function to log errors
 log_error() {
-    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1"
+    local msg
+    msg="[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1"
     echo -e "${RED}${msg}${NC}"  # Colored to terminal
     echo "$msg" >> "$LOG_FILE"   # Plain text to file
 }
 
 # Function to log success
 log_success() {
-    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    local msg
+    msg="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
     echo -e "${GREEN}${msg}${NC}"  # Colored to terminal
     echo "$msg" >> "$LOG_FILE"     # Plain text to file
 }
 
 # Function to log warnings
 log_warning() {
-    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1"
+    local msg
+    msg="[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: $1"
     echo -e "${YELLOW}${msg}${NC}"  # Colored to terminal
     echo "$msg" >> "$LOG_FILE"      # Plain text to file
 }
