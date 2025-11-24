@@ -196,11 +196,25 @@ fi
 
 log_test "docker-compose.prod.yml valid"
 if [ -f "docker-compose.prod.yml" ]; then
+    # Set dummy env vars to avoid interpolation errors
+    export POSTGRES_PASSWORD="dummy"
+    export REDIS_PASSWORD="dummy"
+    export MINIO_ROOT_PASSWORD="dummy"
+    export MINIO_ROOT_USER="dummy"
+    export JWT_SECRET_KEY="dummy"
+    export BOOTSTRAP_KEY="dummy"
+    export GRAFANA_PASSWORD="dummy"
+    export GRAFANA_USER="dummy"
+    
     if docker compose -f docker-compose.prod.yml config >/dev/null 2>&1; then
         log_success "docker-compose.prod.yml is valid"
     else
         log_failure "docker-compose.prod.yml validation failed"
     fi
+    
+    # Unset dummy env vars
+    unset POSTGRES_PASSWORD REDIS_PASSWORD MINIO_ROOT_PASSWORD MINIO_ROOT_USER
+    unset JWT_SECRET_KEY BOOTSTRAP_KEY GRAFANA_PASSWORD GRAFANA_USER
 else
     log_skip "docker-compose.prod.yml not found"
 fi
@@ -344,7 +358,8 @@ if [ -d "k8s" ]; then
     log_test "Kubernetes manifests are valid YAML"
     K8S_ERRORS=0
     for manifest in $(find k8s -name "*.yaml" -type f 2>/dev/null); do
-        if ! python3 -c "import yaml; yaml.safe_load(open('$manifest'))" 2>/dev/null; then
+        # Use yaml.safe_load_all to handle multi-document YAML files
+        if ! python3 -c "import yaml; list(yaml.safe_load_all(open('$manifest')))" 2>/dev/null; then
             ((K8S_ERRORS++))
         fi
     done
