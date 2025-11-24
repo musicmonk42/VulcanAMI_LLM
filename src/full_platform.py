@@ -869,14 +869,19 @@ async def lifespan(app: FastAPI):
         print(f"❌ Error loading .env: {e}")
     
     # SET DEFAULT JWT_SECRET_KEY FOR REGISTRY SERVICE
-    # If JWT_SECRET_KEY is not set, generate a secure random key
-    # This allows the registry service to start without manual configuration
+    # This is a fallback for development/testing environments only.
+    # Production deployments MUST set a persistent JWT_SECRET_KEY in .env
+    # to avoid invalidating tokens on service restarts.
     if not os.getenv("JWT_SECRET_KEY"):
         # Generate 32-byte (256-bit) key for HS256 algorithm used by Flask-JWT-Extended
         # This provides strong cryptographic security for JWT token signing
+        # WARNING: This key is ephemeral and will change on each restart,
+        # invalidating all existing JWT tokens. For production, always set
+        # a persistent JWT_SECRET_KEY in the environment.
         jwt_secret = secrets_module.token_urlsafe(32)
         os.environ["JWT_SECRET_KEY"] = jwt_secret
         print("✅ Generated JWT_SECRET_KEY for registry service")
+        print("⚠️  WARNING: Using ephemeral JWT key - tokens will be invalidated on restart")
         print("💡 For production, set a persistent JWT_SECRET_KEY in .env")
     else:
         print("✅ JWT_SECRET_KEY loaded from environment")
