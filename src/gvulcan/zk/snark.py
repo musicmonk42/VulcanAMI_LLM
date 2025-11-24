@@ -27,6 +27,11 @@ from py_ecc.bn128 import (
     curve_order as CURVE_ORDER
 )
 
+# Import QAP components
+from .field import FieldElement
+from .polynomial import Polynomial
+from .qap import QAP, r1cs_to_qap, compute_h_polynomial
+
 logger = logging.getLogger(__name__)
 
 
@@ -170,6 +175,7 @@ class Groth16Prover:
     
     def __init__(self, circuit: Circuit):
         self.circuit = circuit
+        self.qap: Optional[QAP] = None  # QAP representation
         self.pk: Optional[ProvingKey] = None
         self.vk: Optional[VerificationKey] = None
         logger.info(f"Initialized Groth16 prover with {len(circuit.constraints)} constraints")
@@ -184,6 +190,10 @@ class Groth16Prover:
         For now, we simulate the setup with random values.
         """
         logger.info("Performing trusted setup (single-party for development)")
+        
+        # Step 1: Convert circuit to QAP
+        logger.info("Converting R1CS to QAP...")
+        self.qap = r1cs_to_qap(self.circuit)
         
         # Generate toxic waste (in production, use MPC)
         if toxic_waste is None:
@@ -201,6 +211,9 @@ class Groth16Prover:
         gamma = toxic_waste['gamma']
         delta = toxic_waste['delta']
         
+        # Create FieldElement for tau
+        tau_field = FieldElement(tau)
+        
         # Generate proving key
         alpha_g1 = multiply(G1, alpha)
         beta_g1 = multiply(G1, beta)
@@ -208,32 +221,44 @@ class Groth16Prover:
         delta_g1 = multiply(G1, delta)
         delta_g2 = multiply(G2, delta)
         
-        # For simplicity in this implementation, we use placeholder queries
-        # 
-        # NOTE: In a full production implementation, these would be computed from 
-        # Quadratic Arithmetic Program (QAP) polynomials. The current implementation
-        # uses random values which provides the correct structure and API but not
-        # full cryptographic soundness. For production use:
-        #   1. Convert R1CS to QAP (Lagrange interpolation)
-        #   2. Compute A_i(τ), B_i(τ), C_i(τ) polynomial evaluations
-        #   3. Use actual polynomial evaluations instead of random values
-        #
-        # This implementation demonstrates the Groth16 protocol structure and
-        # provides working elliptic curve operations, suitable for understanding
-        # and integration testing.
+        # Compute queries from QAP polynomials
+        logger.info("Computing proving key queries from QAP...")
         num_vars = self.circuit.num_variables
         
-        a_query = [multiply(G1, secrets.randbelow(CURVE_ORDER)) for _ in range(num_vars)]
-        b_query_g1 = [multiply(G1, secrets.randbelow(CURVE_ORDER)) for _ in range(num_vars)]
-        b_query_g2 = [multiply(G2, secrets.randbelow(CURVE_ORDER)) for _ in range(num_vars)]
+        # a_query[i] = [A_i(τ)]_1  (evaluate polynomial at tau, multiply G1)
+        a_query = []
+        for i in range(num_vars):
+            a_i_at_tau = self.qap.A_polys[i].evaluate(tau_field)
+            a_query.append(multiply(G1, int(a_i_at_tau)))
         
-        # H query for polynomial division
-        degree = len(self.circuit.constraints)
-        h_query = [multiply(G1, pow(tau, i, CURVE_ORDER)) for i in range(degree)]
+        # b_query_g1[i] = [B_i(τ)]_1
+        # b_query_g2[i] = [B_i(τ)]_2
+        b_query_g1 = []
+        b_query_g2 = []
+        for i in range(num_vars):
+            b_i_at_tau = self.qap.B_polys[i].evaluate(tau_field)
+            b_query_g1.append(multiply(G1, int(b_i_at_tau)))
+            b_query_g2.append(multiply(G2, int(b_i_at_tau)))
         
-        # L query for private inputs
-        num_private = num_vars - self.circuit.num_public_inputs
-        l_query = [multiply(G1, secrets.randbelow(CURVE_ORDER)) for _ in range(num_private)]
+        # h_query[i] = [τ^i]_1 for i in 0..degree(t)-1
+        # This is used to compute h(τ) from h polynomial coefficients
+        degree_t = self.qap.t_poly.degree()
+        h_query = [multiply(G1, pow(tau, i, CURVE_ORDER)) for i in range(degree_t)]
+        
+        # l_query[i] = [(β·A_i(τ) + α·B_i(τ) + C_i(τ)) / δ]_1
+        # Only for private variables (public inputs use gamma instead)
+        l_query = []
+        for i in range(self.circuit.num_public_inputs, num_vars):
+            a_i = self.qap.A_polys[i].evaluate(tau_field)
+            b_i = self.qap.B_polys[i].evaluate(tau_field)
+            c_i = self.qap.C_polys[i].evaluate(tau_field)
+            
+            # Compute (β·A_i(τ) + α·B_i(τ) + C_i(τ)) / δ in field
+            numerator = (beta * int(a_i) + alpha * int(b_i) + int(c_i)) % CURVE_ORDER
+            delta_inv = pow(delta, CURVE_ORDER - 2, CURVE_ORDER)
+            value = (numerator * delta_inv) % CURVE_ORDER
+            
+            l_query.append(multiply(G1, value))
         
         self.pk = ProvingKey(
             alpha_g1=alpha_g1,
@@ -252,8 +277,21 @@ class Groth16Prover:
         gamma_g2 = multiply(G2, gamma)
         
         # IC query for public inputs
-        num_public = self.circuit.num_public_inputs
-        ic_query = [multiply(G1, secrets.randbelow(CURVE_ORDER)) for _ in range(num_public + 1)]
+        # ic_query[0] = [(β·A_0(τ) + α·B_0(τ) + C_0(τ)) / γ]_1  (constant term)
+        # ic_query[i] = [(β·A_i(τ) + α·B_i(τ) + C_i(τ)) / γ]_1  (for public inputs)
+        ic_query = []
+        gamma_inv = pow(gamma, CURVE_ORDER - 2, CURVE_ORDER)
+        
+        for i in range(self.circuit.num_public_inputs + 1):
+            a_i = self.qap.A_polys[i].evaluate(tau_field)
+            b_i = self.qap.B_polys[i].evaluate(tau_field)
+            c_i = self.qap.C_polys[i].evaluate(tau_field)
+            
+            # Compute (β·A_i(τ) + α·B_i(τ) + C_i(τ)) / γ
+            numerator = (beta * int(a_i) + alpha * int(b_i) + int(c_i)) % CURVE_ORDER
+            value = (numerator * gamma_inv) % CURVE_ORDER
+            
+            ic_query.append(multiply(G1, value))
         
         self.vk = VerificationKey(
             alpha_g1=alpha_g1,
@@ -277,38 +315,64 @@ class Groth16Prover:
         if self.pk is None:
             raise ValueError("Must run setup() before proving")
         
+        if self.qap is None:
+            raise ValueError("QAP not initialized. Did setup() complete successfully?")
+        
         if not self.circuit.is_satisfied(witness):
             raise ValueError("Witness does not satisfy circuit constraints")
         
         logger.info(f"Generating Groth16 proof for {len(witness)} witness values")
         
+        # Convert witness to FieldElements
+        witness_field = [FieldElement(w) for w in witness]
+        
+        # Compute h(x) polynomial using QAP
+        logger.info("Computing h(x) polynomial...")
+        h_poly = compute_h_polynomial(self.qap, witness_field)
+        
         # Generate random values for zero-knowledge
         r = secrets.randbelow(CURVE_ORDER)
         s = secrets.randbelow(CURVE_ORDER)
         
-        # Compute A = alpha + sum(a_i * witness[i]) + r * delta
+        # Compute A = [α]_1 + Σ witness[i]·[A_i(τ)]_1 + r·[δ]_1
         A = self.pk.alpha_g1
         for i, w in enumerate(witness):
             A = add(A, multiply(self.pk.a_query[i], w))
         A = add(A, multiply(self.pk.delta_g1, r))
         
-        # Compute B = beta + sum(b_i * witness[i]) + s * delta
+        # Compute B = [β]_2 + Σ witness[i]·[B_i(τ)]_2 + s·[δ]_2
         B = self.pk.beta_g2
         for i, w in enumerate(witness):
             B = add(B, multiply(self.pk.b_query_g2[i], w))
         B = add(B, multiply(self.pk.delta_g2, s))
         
-        # Compute C using private inputs and randomness
+        # Compute C:
+        # C = Σ (private witness[i])·l_query[i]  
+        #   + Σ h_coeffs[i]·h_query[i]           # h(τ) contribution
+        #   + s·A + r·B_g1 - r·s·[δ]_1           # randomness
         C = Z1  # Start with identity
         
-        # Add contribution from private inputs
+        # Add contribution from private inputs using l_query
         for i in range(len(self.pk.l_query)):
             private_idx = self.circuit.num_public_inputs + i
             if private_idx < len(witness):
                 C = add(C, multiply(self.pk.l_query[i], witness[private_idx]))
         
-        # Add randomness terms
-        C = add(C, multiply(self.pk.delta_g1, r * s % CURVE_ORDER))
+        # Add h(τ) contribution: Σ h_coeffs[i] * [τ^i]_1
+        for i, h_coeff in enumerate(h_poly.coeffs):
+            if i < len(self.pk.h_query):
+                C = add(C, multiply(self.pk.h_query[i], int(h_coeff)))
+        
+        # Compute B in G1 for randomness term s·A
+        B_g1 = self.pk.beta_g1
+        for i, w in enumerate(witness):
+            B_g1 = add(B_g1, multiply(self.pk.b_query_g1[i], w))
+        B_g1 = add(B_g1, multiply(self.pk.delta_g1, s))
+        
+        # Add randomness terms: s·A + r·B - r·s·δ
+        C = add(C, multiply(A, s))
+        C = add(C, multiply(B_g1, r))
+        C = add(C, multiply(self.pk.delta_g1, (CURVE_ORDER - (r * s % CURVE_ORDER)) % CURVE_ORDER))
         
         proof = Groth16Proof(A=A, B=B, C=C)
         
