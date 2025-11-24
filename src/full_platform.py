@@ -150,7 +150,7 @@ class UnifiedPlatformSettings(BaseSettings):
     # Service import paths (support absolute imports like src.vulcan.main)
     vulcan_module: str = "src.vulcan.main"
     vulcan_attr: str = "app"
-    arena_module: str = "graphix_arena"
+    arena_module: str = "src.graphix_arena"
     arena_attr: str = "app"
     registry_module: str = "app"
     registry_attr: str = "app"
@@ -333,34 +333,52 @@ if settings.workers > 1 and settings.warn_on_multi_worker:
 # PROMETHEUS METRICS
 # =============================================================================
 
+# Initialize metrics only once to avoid duplicate registration errors
+request_counter = None
+request_duration = None
+service_health = None
+active_workers = None
+
 if PROMETHEUS_AVAILABLE:
-    request_counter = Counter(
-        'unified_platform_requests_total',
-        'Total requests to unified platform',
-        ['service', 'method', 'endpoint']
-    )
-    request_duration = Histogram(
-        'unified_platform_request_duration_seconds',
-        'Request duration',
-        ['service', 'endpoint']
-    )
-    service_health = Gauge(
-        'unified_platform_service_health',
-        'Service health status (1=healthy, 0=unhealthy)',
-        ['service']
-    )
-    active_workers = Gauge(
-        'unified_platform_active_workers',
-        'Number of active workers'
-    )
-    
-    # Set worker count
-    active_workers.set(settings.workers)
-else:
-    request_counter = None
-    request_duration = None
-    service_health = None
-    active_workers = None
+    try:
+        # Try to create metrics - if they already exist, prometheus will raise an error
+        # which we'll catch and skip creation
+        request_counter = Counter(
+            'unified_platform_requests_total',
+            'Total requests to unified platform',
+            ['service', 'method', 'endpoint']
+        )
+        request_duration = Histogram(
+            'unified_platform_request_duration_seconds',
+            'Request duration',
+            ['service', 'endpoint']
+        )
+        service_health = Gauge(
+            'unified_platform_service_health',
+            'Service health status (1=healthy, 0=unhealthy)',
+            ['service']
+        )
+        active_workers = Gauge(
+            'unified_platform_active_workers',
+            'Number of active workers'
+        )
+        
+        # Set worker count
+        active_workers.set(settings.workers)
+    except (ValueError, Exception) as e:
+        # Metrics already registered (module reimported) or other error
+        # This is not critical - metrics will just not be collected
+        if "Duplicated timeseries" in str(e):
+            print("⚠️  Prometheus metrics already registered, skipping creation")
+        else:
+            print(f"⚠️  Failed to initialize Prometheus metrics: {e}")
+        request_counter = None
+        request_duration = None
+        service_health = None
+        active_workers = None
+        request_duration = None
+        service_health = None
+        active_workers = None
 
 # =============================================================================
 # PATH SETUP WITH ABSOLUTE IMPORT SUPPORT
@@ -1454,7 +1472,7 @@ async def arena_feedback_dispatch(
         raise HTTPException(status_code=503, detail="Arena not available")
     
     try:
-        from graphix_arena import dispatch_feedback_protocol, MAX_PAYLOAD_SIZE
+        from src.graphix_arena import dispatch_feedback_protocol, MAX_PAYLOAD_SIZE
         data = await request.json()
         
         payload_size = len(json.dumps(data))

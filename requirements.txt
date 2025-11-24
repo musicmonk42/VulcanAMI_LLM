@@ -27,7 +27,7 @@ coverage==7.12.0
 cryptography==46.0.3
 # Industry-standard SNARK libraries for zero-knowledge proofs
 py-ecc==6.0.0  # Elliptic curve cryptography for pairings (Groth16)
-galois==0.3.8  # Finite field arithmetic for zk-SNARKs
+galois==0.4.7  # Finite field arithmetic for zk-SNARKs (updated for numba 0.62+ compatibility)
 cvxpy==1.4.3
 cycler==0.12.1
 cymem==2.0.13
