@@ -24,17 +24,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fix repo permissions (make certs readable)
+      - name: Ensure cert directory readable
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
-          if [ -d "$REPO_CERT_DIR" ]; then
-            echo "Fixing permissions for $REPO_CERT_DIR"
-            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
-            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
-          else
-            echo "$REPO_CERT_DIR not present, skipping"
-          fi
+          # Ensure the path exists and is traversable/readable by the runner
+          mkdir -p "$REPO_CERT_DIR"
+          # Give all users read and directories the execute bit (so runner can scandir)
+          chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -123,17 +120,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fix repo permissions (make certs readable)
+      - name: Ensure cert directory readable
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
-          if [ -d "$REPO_CERT_DIR" ]; then
-            echo "Fixing permissions for $REPO_CERT_DIR"
-            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
-            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
-          else
-            echo "$REPO_CERT_DIR not present, skipping"
-          fi
+          # Ensure the path exists and is traversable/readable by the runner
+          mkdir -p "$REPO_CERT_DIR"
+          # Give all users read and directories the execute bit (so runner can scandir)
+          chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Free up disk space
         run: |
@@ -232,17 +226,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fix repo permissions (make certs readable)
+      - name: Ensure cert directory readable
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
-          if [ -d "$REPO_CERT_DIR" ]; then
-            echo "Fixing permissions for $REPO_CERT_DIR"
-            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
-            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
-          else
-            echo "$REPO_CERT_DIR not present, skipping"
-          fi
+          # Ensure the path exists and is traversable/readable by the runner
+          mkdir -p "$REPO_CERT_DIR"
+          # Give all users read and directories the execute bit (so runner can scandir)
+          chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -317,17 +308,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fix repo permissions (make certs readable)
+      - name: Ensure cert directory readable
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
-          if [ -d "$REPO_CERT_DIR" ]; then
-            echo "Fixing permissions for $REPO_CERT_DIR"
-            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
-            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
-          else
-            echo "$REPO_CERT_DIR not present, skipping"
-          fi
+          # Ensure the path exists and is traversable/readable by the runner
+          mkdir -p "$REPO_CERT_DIR"
+          # Give all users read and directories the execute bit (so runner can scandir)
+          chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Free up disk space
         run: |
@@ -373,17 +361,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Fix repo permissions (make certs readable)
+      - name: Ensure cert directory readable
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
-          if [ -d "$REPO_CERT_DIR" ]; then
-            echo "Fixing permissions for $REPO_CERT_DIR"
-            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
-            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
-          else
-            echo "$REPO_CERT_DIR not present, skipping"
-          fi
+          # Ensure the path exists and is traversable/readable by the runner
+          mkdir -p "$REPO_CERT_DIR"
+          # Give all users read and directories the execute bit (so runner can scandir)
+          chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
