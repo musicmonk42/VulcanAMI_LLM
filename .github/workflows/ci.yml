@@ -29,7 +29,8 @@ jobs:
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
           # Ensure the path exists and is traversable/readable by the runner
-          mkdir -p "$REPO_CERT_DIR"
+          # Include CAs subdirectory to prevent scandir permission errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
@@ -125,7 +126,8 @@ jobs:
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
           # Ensure the path exists and is traversable/readable by the runner
-          mkdir -p "$REPO_CERT_DIR"
+          # Include CAs subdirectory to prevent scandir permission errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
@@ -231,7 +233,8 @@ jobs:
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
           # Ensure the path exists and is traversable/readable by the runner
-          mkdir -p "$REPO_CERT_DIR"
+          # Include CAs subdirectory to prevent scandir permission errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
@@ -313,7 +316,8 @@ jobs:
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
           # Ensure the path exists and is traversable/readable by the runner
-          mkdir -p "$REPO_CERT_DIR"
+          # Include CAs subdirectory to prevent scandir permission errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
@@ -366,7 +370,8 @@ jobs:
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
           # Ensure the path exists and is traversable/readable by the runner
-          mkdir -p "$REPO_CERT_DIR"
+          # Include CAs subdirectory to prevent scandir permission errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
 

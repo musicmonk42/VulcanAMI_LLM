@@ -39,6 +39,8 @@ jobs:
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          # Ensure CAs subdirectory exists to prevent scandir errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           if [ -d "$REPO_CERT_DIR" ]; then
             echo "Fixing permissions for $REPO_CERT_DIR"
             find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
@@ -137,6 +139,8 @@ jobs:
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          # Ensure CAs subdirectory exists to prevent scandir errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           if [ -d "$REPO_CERT_DIR" ]; then
             echo "Fixing permissions for $REPO_CERT_DIR"
             find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
@@ -238,6 +242,8 @@ jobs:
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          # Ensure CAs subdirectory exists to prevent scandir errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           if [ -d "$REPO_CERT_DIR" ]; then
             echo "Fixing permissions for $REPO_CERT_DIR"
             find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
@@ -343,6 +349,8 @@ jobs:
         if: always()
         run: |
           REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          # Ensure CAs subdirectory exists to prevent scandir errors
+          mkdir -p "$REPO_CERT_DIR/CAs"
           if [ -d "$REPO_CERT_DIR" ]; then
             echo "Fixing permissions for $REPO_CERT_DIR"
             find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
