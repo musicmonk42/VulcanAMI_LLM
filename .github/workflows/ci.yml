@@ -230,9 +230,12 @@ jobs:
           # Create MinIO certs directory structure
           mkdir -p ./configs/minio/certs/CAs
           # Set read/execute permissions for all users (755 = rwxr-xr-x)
+          # Note: Using 755 recursively is appropriate for CI environment where
+          # directories need to be accessible by docker containers
           chmod -R 755 ./configs/minio
-          # Attempt ownership change (may fail in CI, but chmod is sufficient)
-          sudo chown -R $USER:$USER ./configs/minio || echo "Warning: chown failed, but chmod should be sufficient"
+          # Attempt ownership change (may fail in CI without root, but chmod is sufficient)
+          # This is expected to fail in GitHub Actions and can be safely ignored
+          sudo chown -R $USER:$USER ./configs/minio 2>/dev/null || echo "Info: chown skipped (not needed in CI environment)"
           # Note: 755 (rwxr-xr-x) allows MinIO container to read/execute while maintaining security
           # This is safe in the isolated GitHub Actions CI environment
 
@@ -251,7 +254,8 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           
-          # Define retry function
+          # Define retry function for pip install operations
+          # Note: eval is safe here as only hardcoded commands are passed
           retry_pip_install() {
             local cmd="$1"
             local n=0
