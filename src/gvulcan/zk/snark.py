@@ -246,9 +246,11 @@ class Groth16Prover:
         h_query = [multiply(G1, pow(tau, i, CURVE_ORDER)) for i in range(degree_t)]
         
         # l_query[i] = [(β·A_i(τ) + α·B_i(τ) + C_i(τ)) / δ]_1
-        # Only for private variables (public inputs use gamma instead)
+        # Only for private variables (after public inputs and constant)
+        # Index 0 is constant, indices 1..num_public_inputs are public
+        # So private variables start at index num_public_inputs+1
         l_query = []
-        for i in range(self.circuit.num_public_inputs, num_vars):
+        for i in range(self.circuit.num_public_inputs + 1, num_vars):
             a_i = self.qap.A_polys[i].evaluate(tau_field)
             b_i = self.qap.B_polys[i].evaluate(tau_field)
             c_i = self.qap.C_polys[i].evaluate(tau_field)
@@ -353,10 +355,11 @@ class Groth16Prover:
         C = Z1  # Start with identity
         
         # Add contribution from private inputs using l_query
+        # l_query[0] corresponds to witness[num_public_inputs + 1], and so on
         for i in range(len(self.pk.l_query)):
-            private_idx = self.circuit.num_public_inputs + i
-            if private_idx < len(witness):
-                C = add(C, multiply(self.pk.l_query[i], witness[private_idx]))
+            witness_idx = self.circuit.num_public_inputs + 1 + i
+            if witness_idx < len(witness):
+                C = add(C, multiply(self.pk.l_query[i], witness[witness_idx]))
         
         # Add h(τ) contribution: Σ h_coeffs[i] * [τ^i]_1
         for i, h_coeff in enumerate(h_poly.coeffs):

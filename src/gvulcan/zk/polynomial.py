@@ -262,3 +262,7 @@ class Polynomial:
             result = result * term
         
         return result
+    
+    def is_zero(self) -> bool:
+        """Check if polynomial is zero."""
+        return self.degree() == -1 or all(c == FieldElement.zero() for c in self.coeffs)

@@ -134,7 +134,8 @@ def compute_h_polynomial(
       C(x) = Σ witness[i] * C_i(x)
     
     If the witness satisfies the constraints, then A(x)*B(x) - C(x) is exactly
-    divisible by t(x), meaning the remainder is zero.
+    divisible by t(x), meaning the remainder is zero. This is the fundamental
+    property that makes zk-SNARKs work.
     
     Args:
         qap: QAP representation
@@ -145,6 +146,10 @@ def compute_h_polynomial(
         
     Raises:
         ValueError: If witness doesn't satisfy constraints (remainder != 0)
+        
+    Performance note:
+        For large circuits, this is the most expensive operation in proof generation.
+        The polynomial multiplication and division dominate the runtime.
     """
     if len(witness) != qap.num_variables:
         raise ValueError(
@@ -180,13 +185,13 @@ def compute_h_polynomial(
     h_poly, remainder = divmod(numerator, qap.t_poly)
     
     # Check that division is exact (remainder should be zero)
-    if remainder.degree() != -1:  # Not zero polynomial
-        # Check if all coefficients are effectively zero
-        is_zero = all(c == FieldElement.zero() for c in remainder.coeffs)
-        if not is_zero:
-            raise ValueError(
-                "Witness does not satisfy constraints: "
-                "A(x)*B(x) - C(x) is not divisible by t(x)"
-            )
+    if not remainder.is_zero():
+        raise ValueError(
+            "Witness does not satisfy constraints: "
+            "A(x)*B(x) - C(x) is not divisible by t(x). "
+            "This indicates the witness does not satisfy all R1CS constraints."
+        )
+    
+    return h_poly
     
     return h_poly

@@ -4,6 +4,16 @@ Finite Field Arithmetic for Groth16
 This module implements field element operations modulo the BN128 curve order.
 All arithmetic operations are performed in the scalar field F_r where r is the
 curve order of the BN128/BN254 elliptic curve.
+
+The BN128 curve is widely used in zk-SNARKs and has the following properties:
+- Curve order (r): ~2^254 (approximately 2^254)
+- Supports efficient pairing operations
+- Used in Ethereum's precompiled contracts
+
+Performance considerations:
+- All operations use Python's built-in modular arithmetic
+- For production use, consider using optimized libraries like gmpy2
+- Inverse operations are the most expensive (using Fermat's little theorem)
 """
 
 from __future__ import annotations
