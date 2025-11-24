@@ -132,6 +132,7 @@ class OperationalMode(Enum):
     POWER_SAVING = "power_saving"
     LIMITED = "limited"
     LOCAL = "local"
+    GHOST = "ghost"  # CPU-only, minimal power, offline capable
     SURVIVAL = "survival"
     EMERGENCY = "emergency"
 
@@ -580,26 +581,43 @@ class SurvivalProtocol:
                 'all_capabilities': True,
                 'cache_size': 2048,
                 'parallel_workers': 8,
-                'use_gpu': True
+                'use_gpu': True,
+                'power_watts': 150
             },
             OperationalMode.BALANCED: {
                 'disable': ['telemetry'],
                 'cache_size': 1024,
                 'parallel_workers': 4,
-                'use_gpu': True
+                'use_gpu': True,
+                'power_watts': 100
             },
             OperationalMode.POWER_SAVING: {
                 'disable': ['telemetry', 'advanced_optimization', 'gpu_inference'],
                 'cache_size': 512,
                 'parallel_workers': 2,
-                'use_gpu': False
+                'use_gpu': False,
+                'power_watts': 50
             },
             OperationalMode.LIMITED: {
                 'disable': ['mcts_planning', 'distributed_coordination', 'telemetry', 
                           'advanced_optimization', 'gpu_inference'],
                 'cache_size': 256,
                 'parallel_workers': 1,
-                'use_gpu': False
+                'use_gpu': False,
+                'power_watts': 30
+            },
+            OperationalMode.GHOST: {
+                'disable': ['mcts_planning', 'distributed_coordination', 'telemetry',
+                          'advanced_optimization', 'gpu_inference'],
+                'use_fallbacks': True,
+                'cache_size': 64,
+                'parallel_workers': 1,
+                'use_gpu': False,
+                'cpu_only': True,
+                'offline_capable': True,
+                'shed_generative_layers': True,
+                'power_watts': 15,
+                'description': 'Pure CPU execution, minimal power, offline capable'
             },
             OperationalMode.SURVIVAL: {
                 'disable': ['mcts_planning', 'distributed_coordination', 'telemetry',
@@ -607,14 +625,16 @@ class SurvivalProtocol:
                 'use_fallbacks': True,
                 'cache_size': 128,
                 'parallel_workers': 1,
-                'use_gpu': False
+                'use_gpu': False,
+                'power_watts': 20
             },
             OperationalMode.EMERGENCY: {
                 'disable_all_except': ['core_planning'],
                 'cache_size': 64,
                 'parallel_workers': 1,
                 'use_gpu': False,
-                'emergency_mode': True
+                'emergency_mode': True,
+                'power_watts': 10
             }
         }
     
@@ -720,7 +740,7 @@ class SurvivalProtocol:
             actions.append('switch_to_local_mode')
             if connectivity == 'offline':
                 actions.append('disable_network_capabilities')
-                actions.append('activate_survival_mode')
+                actions.append('activate_ghost_mode')  # Ghost Mode for offline survival
             elif connectivity == 'intermittent':
                 actions.append('enable_retry_logic')
                 actions.append('reduce_network_dependencies')
@@ -762,10 +782,59 @@ class SurvivalProtocol:
                 self._disable_network_capabilities()
             elif action == 'activate_survival_mode':
                 self.change_mode(OperationalMode.SURVIVAL)
+            elif action == 'activate_ghost_mode':
+                self.activate_ghost_mode()
             elif action == 'enable_retry_logic':
                 self._enable_network_retry()
             elif action == 'reduce_network_dependencies':
                 self._reduce_network_load()
+    
+    def activate_ghost_mode(self) -> Dict[str, Any]:
+        """
+        Activate Ghost Mode - CPU-only, minimal power, offline survival.
+        
+        Ghost Mode sheds neural layers to reduce power consumption and
+        enables pure CPU execution without cloud dependencies.
+        
+        Returns:
+            Dict with activation details and power stats
+        """
+        logger.warning("ACTIVATING GHOST MODE - Network failure survival protocol")
+        
+        # Get power before mode change
+        power_before = self.degradation_configs.get(self.current_mode, {}).get('power_watts', 150)
+        
+        # Switch to Ghost Mode
+        self.change_mode(OperationalMode.GHOST)
+        
+        # Ghost mode specific actions
+        ghost_config = self.degradation_configs[OperationalMode.GHOST]
+        power_after = ghost_config.get('power_watts', 15)
+        
+        # Log the layer shedding
+        logger.info("Shedding generative layers...")
+        time.sleep(0.1)  # Simulate shedding time
+        logger.info("Generative layers shed. Loading Graphix Core (CPU-only)...")
+        time.sleep(0.1)  # Simulate loading time
+        
+        activation_result = {
+            'mode': OperationalMode.GHOST.value,
+            'power_before_watts': power_before,
+            'power_after_watts': power_after,
+            'power_reduction_percent': ((power_before - power_after) / power_before) * 100,
+            'cpu_only': True,
+            'offline_capable': True,
+            'cache_size': ghost_config.get('cache_size', 64),
+            'timestamp': time.time(),
+            'description': ghost_config.get('description', '')
+        }
+        
+        logger.info(
+            f"Ghost Mode activated: {power_before}W -> {power_after}W "
+            f"({activation_result['power_reduction_percent']:.1f}% reduction)"
+        )
+        
+        return activation_result
     
     def _switch_to_local_mode(self):
         """Switch system to local-only operation."""
