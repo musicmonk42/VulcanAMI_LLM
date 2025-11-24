@@ -127,11 +127,16 @@ jobs:
           n=0
           until [ $n -ge 3 ]
           do
-            pip install -r requirements.txt && break || echo "Some dependencies may have failed, retrying..."
+            if pip install -r requirements.txt; then
+              break
+            fi
             n=$((n+1))
             echo "Requirements install attempt $n failed, retrying..."
             sleep 5
           done
+          if [ $n -ge 3 ]; then
+            echo "Some dependencies may have failed after 3 attempts, continuing..."
+          fi
 
       - name: Set environment variables
         run: |
@@ -229,8 +234,11 @@ jobs:
           # Attempt ownership change (may fail in CI, but chmod is sufficient)
           sudo chown -R $USER:$USER ./configs/minio || echo "Warning: chown failed, but chmod should be sufficient"
           # Set full permissions on certs directory (needed for MinIO container to write cert files)
-          # This is safe in CI environment as it's an isolated container
-          sudo chmod -R a+rwX ./configs/minio/certs
+          # Note: a+rwX is required because MinIO runs as a different user inside the container
+          # This is safe in the isolated GitHub Actions CI environment
+          sudo chmod -R 755 ./configs/minio/certs
+          # Ensure CAs subdirectory is also accessible
+          sudo chmod -R 755 ./configs/minio/certs/CAs 2>/dev/null || true
 
       - name: Start services
         run: |
@@ -250,7 +258,9 @@ jobs:
           n=0
           until [ $n -ge 3 ]
           do
-            pip install pytest pytest-asyncio requests && break || true
+            if pip install pytest pytest-asyncio requests; then
+              break
+            fi
             n=$((n+1))
             echo "Pip install attempt $n failed, retrying..."
             sleep 5
@@ -259,11 +269,16 @@ jobs:
           n=0
           until [ $n -ge 3 ]
           do
-            pip install -r requirements.txt && break || echo "Continuing despite dependency issues..."
+            if pip install -r requirements.txt; then
+              break
+            fi
             n=$((n+1))
             echo "Requirements install attempt $n failed, retrying..."
             sleep 5
           done
+          if [ $n -ge 3 ]; then
+            echo "Continuing despite dependency issues..."
+          fi
 
       - name: Run integration tests
         env:
