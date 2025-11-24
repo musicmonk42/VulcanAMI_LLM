@@ -38,6 +38,9 @@ from .snark import (
     Groth16Proof,
     ProvingKey,
     VerificationKey,
+    create_unlearning_circuit,
+    generate_proof_for_unlearning,
+    verify_unlearning_proof,
 )
 
 __all__ = [
@@ -60,6 +63,11 @@ __all__ = [
     'Groth16Proof',
     'ProvingKey',
     'VerificationKey',
+    
+    # Unlearning integration
+    'create_unlearning_circuit',
+    'generate_proof_for_unlearning',
+    'verify_unlearning_proof',
 ]
 
 __version__ = '1.0.0'

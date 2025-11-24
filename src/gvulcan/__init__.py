@@ -1,6 +1,6 @@
 from pathlib import Path
 
-__all__ = ["__version__"]
+__all__ = ["__version__", "zk", "merkle"]
 
 def _read_semver() -> str:
     try:
@@ -10,3 +10,7 @@ def _read_semver() -> str:
         return "0.0.0"
 
 __version__ = _read_semver()
+
+# Expose ZK module for easy access
+from . import zk
+from . import merkle
