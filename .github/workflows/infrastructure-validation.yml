@@ -18,6 +18,10 @@ on:
       - 'Dockerfile'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
   actions: read
@@ -26,6 +30,7 @@ jobs:
   validate-helm:
     name: Validate Helm Charts
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -111,6 +116,7 @@ jobs:
   validate-terraform:
     name: Validate Terraform
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -199,6 +205,7 @@ jobs:
   validate-docker:
     name: Validate Docker Configurations
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -290,6 +297,7 @@ jobs:
   validate-reproducibility:
     name: Validate Reproducible Builds
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [validate-helm, validate-terraform, validate-docker]
     steps:
       - name: Checkout code
@@ -372,6 +380,7 @@ jobs:
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [validate-helm, validate-terraform, validate-docker, validate-reproducibility]
     if: always()
     steps:
