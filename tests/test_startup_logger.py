@@ -126,20 +126,12 @@ def test_safety_layer_logging():
 
 def test_meta_reasoning_logging():
     """Test Meta-reasoning logging."""
-    from startup_logger import StartupLogger
+    from startup_logger import StartupLogger, DEFAULT_OBJECTIVES
     
     sl = StartupLogger()
-    objectives = [
-        "Epistemic curiosity",
-        "Competence improvement",
-        "Social collaboration",
-        "Efficiency optimization",
-        "Safety preservation",
-        "Value alignment"
-    ]
     
     sl.log_meta_reasoning(
-        objectives=objectives,
+        objectives=DEFAULT_OBJECTIVES,
         auto_apply=True,
         approval_required=False,
         available=True
@@ -199,22 +191,14 @@ def test_full_vulcan_startup_logging():
 
 def test_six_objectives_present():
     """Test that exactly 6 objectives are logged for meta-reasoning."""
-    from startup_logger import StartupLogger
+    from startup_logger import StartupLogger, DEFAULT_OBJECTIVES
     
     sl = StartupLogger()
-    objectives = [
-        "Epistemic curiosity (knowledge-seeking)",
-        "Competence improvement (skill acquisition)",
-        "Social collaboration (multi-agent coordination)",
-        "Efficiency optimization (resource utilization)",
-        "Safety preservation (risk mitigation)",
-        "Value alignment (human preference learning)"
-    ]
     
-    assert len(objectives) == 6, "Should have exactly 6 objectives"
+    assert len(DEFAULT_OBJECTIVES) == 6, "Should have exactly 6 objectives"
     
     sl.log_meta_reasoning(
-        objectives=objectives,
+        objectives=DEFAULT_OBJECTIVES,
         auto_apply=True,
         approval_required=False,
         available=True

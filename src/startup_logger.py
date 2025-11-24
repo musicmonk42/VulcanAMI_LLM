@@ -162,6 +162,17 @@ def get_startup_logger() -> StartupLogger:
     return _startup_logger
 
 
+# Default objectives for meta-reasoning system
+DEFAULT_OBJECTIVES = [
+    "Epistemic curiosity (knowledge-seeking)",
+    "Competence improvement (skill acquisition)",
+    "Social collaboration (multi-agent coordination)",
+    "Efficiency optimization (resource utilization)",
+    "Safety preservation (risk mitigation)",
+    "Value alignment (human preference learning)"
+]
+
+
 def log_vulcan_startup():
     """Log comprehensive VULCAN startup information."""
     sl = get_startup_logger()
@@ -246,21 +257,12 @@ def log_vulcan_startup():
     sl.log_safety_layer(safety_components)
     
     # Meta-reasoning
-    objectives = [
-        "Epistemic curiosity (knowledge-seeking)",
-        "Competence improvement (skill acquisition)",
-        "Social collaboration (multi-agent coordination)",
-        "Efficiency optimization (resource utilization)",
-        "Safety preservation (risk mitigation)",
-        "Value alignment (human preference learning)"
-    ]
-    
     try:
         from vulcan.world_model.meta_reasoning.motivational_introspection import MotivationalIntrospection
         from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
-        sl.log_meta_reasoning(objectives, auto_apply=True, approval_required=False, available=True)
+        sl.log_meta_reasoning(DEFAULT_OBJECTIVES, auto_apply=True, approval_required=False, available=True)
     except ImportError:
-        sl.log_meta_reasoning(objectives, auto_apply=True, approval_required=False, available=False)
+        sl.log_meta_reasoning(DEFAULT_OBJECTIVES, auto_apply=True, approval_required=False, available=False)
         sl.log_warning("Meta-reasoning modules not fully available")
     
     # Hardware
@@ -275,46 +277,31 @@ def log_vulcan_startup():
     sl.log_section("Notable warnings:")
     
     # Groth16 SNARK
+    groth16_warning = "Groth16 SNARK module unavailable (falling back to basic implementation)"
     try:
         import py_ecc
-        sl.log_warning(
-            "Groth16 SNARK module unavailable (falling back to basic implementation)",
-            "py-ecc library available for elliptic curve operations"
-        )
+        sl.log_warning(groth16_warning, "py-ecc library available for elliptic curve operations")
     except ImportError:
-        sl.log_warning(
-            "Groth16 SNARK module unavailable (falling back to basic implementation)",
-            "py-ecc library not installed, using pure Python fallback"
-        )
+        sl.log_warning(groth16_warning, "py-ecc library not installed, using pure Python fallback")
     
     # spaCy
+    spacy_warning = "spaCy model not loaded for analogical reasoning"
     try:
         import spacy
         try:
             nlp = spacy.load("en_core_web_sm")
         except OSError:
-            sl.log_warning(
-                "spaCy model not loaded for analogical reasoning",
-                "Run: python -m spacy download en_core_web_sm"
-            )
+            sl.log_warning(spacy_warning, "Run: python -m spacy download en_core_web_sm")
     except ImportError:
-        sl.log_warning(
-            "spaCy model not loaded for analogical reasoning",
-            "spaCy library not installed"
-        )
+        sl.log_warning(spacy_warning, "spaCy library not installed")
     
     # FAISS
+    faiss_warning = "FAISS loaded with AVX2 (AVX512 unavailable)"
     try:
         import faiss
-        sl.log_warning(
-            "FAISS loaded with AVX2 (AVX512 unavailable)",
-            f"FAISS version {faiss.__version__}, using AVX2 instructions"
-        )
+        sl.log_warning(faiss_warning, f"FAISS version {faiss.__version__}, using AVX2 instructions")
     except ImportError:
-        sl.log_warning(
-            "FAISS loaded with AVX2 (AVX512 unavailable)",
-            "FAISS library not installed"
-        )
+        sl.log_warning(faiss_warning, "FAISS library not installed")
     
     # Summary
     sl.log_startup_summary()
