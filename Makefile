@@ -219,30 +219,30 @@ docker-push-all: ## Push all Docker images to registry
 .PHONY: up
 up: ## Start all services with docker-compose (dev)
 	@echo "$(GREEN)Starting development services...$(NC)"
-	docker-compose -f $(DOCKER_COMPOSE_DEV) up -d
+	docker compose -f $(DOCKER_COMPOSE_DEV) up -d
 
 .PHONY: up-build
 up-build: ## Build and start all services
 	@echo "$(GREEN)Building and starting services...$(NC)"
-	docker-compose -f $(DOCKER_COMPOSE_DEV) up -d --build
+	docker compose -f $(DOCKER_COMPOSE_DEV) up -d --build
 
 .PHONY: down
 down: ## Stop all services
 	@echo "$(GREEN)Stopping services...$(NC)"
-	docker-compose -f $(DOCKER_COMPOSE_DEV) down
+	docker compose -f $(DOCKER_COMPOSE_DEV) down
 
 .PHONY: down-volumes
 down-volumes: ## Stop all services and remove volumes
 	@echo "$(YELLOW)Stopping services and removing volumes...$(NC)"
-	docker-compose -f $(DOCKER_COMPOSE_DEV) down -v
+	docker compose -f $(DOCKER_COMPOSE_DEV) down -v
 
 .PHONY: ps
 ps: ## Show running services
-	docker-compose -f $(DOCKER_COMPOSE_DEV) ps
+	docker compose -f $(DOCKER_COMPOSE_DEV) ps
 
 .PHONY: logs-compose
 logs-compose: ## Show logs from all services
-	docker-compose -f $(DOCKER_COMPOSE_DEV) logs -f
+	docker compose -f $(DOCKER_COMPOSE_DEV) logs -f
 
 .PHONY: restart
 restart: down up ## Restart all services
@@ -254,16 +254,16 @@ restart: down up ## Restart all services
 .PHONY: prod-up
 prod-up: ## Start production services
 	@echo "$(GREEN)Starting production services...$(NC)"
-	docker-compose -f $(DOCKER_COMPOSE_PROD) up -d
+	docker compose -f $(DOCKER_COMPOSE_PROD) up -d
 
 .PHONY: prod-down
 prod-down: ## Stop production services
 	@echo "$(GREEN)Stopping production services...$(NC)"
-	docker-compose -f $(DOCKER_COMPOSE_PROD) down
+	docker compose -f $(DOCKER_COMPOSE_PROD) down
 
 .PHONY: prod-logs
 prod-logs: ## Show production logs
-	docker-compose -f $(DOCKER_COMPOSE_PROD) logs -f
+	docker compose -f $(DOCKER_COMPOSE_PROD) logs -f
 
 ################################################################################
 # Kubernetes
@@ -391,6 +391,29 @@ env-example: ## Create .env.example file
 	@echo "# Application" >> .env.example
 	@echo "LOG_LEVEL=INFO" >> .env.example
 	@echo "ENVIRONMENT=development" >> .env.example
+
+################################################################################
+# CI/CD and Validation
+################################################################################
+
+.PHONY: validate-cicd
+validate-cicd: ## Validate CI/CD, Docker, and reproducibility configuration
+	@echo "$(GREEN)Running comprehensive CI/CD validation...$(NC)"
+	@chmod +x validate_cicd_docker.sh
+	./validate_cicd_docker.sh
+
+.PHONY: validate-docker
+validate-docker: ## Validate Docker and Docker Compose configurations
+	@echo "$(GREEN)Validating Docker configurations...$(NC)"
+	docker compose -f $(DOCKER_COMPOSE_DEV) config > /dev/null && echo "$(GREEN)✓ docker-compose.dev.yml is valid$(NC)"
+	docker compose -f $(DOCKER_COMPOSE_PROD) config > /dev/null && echo "$(GREEN)✓ docker-compose.prod.yml is valid$(NC)"
+
+.PHONY: generate-hashed-requirements
+generate-hashed-requirements: ## Generate requirements-hashed.txt with SHA256 hashes
+	@echo "$(GREEN)Generating hashed requirements...$(NC)"
+	pip install pip-tools
+	pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+	@echo "$(GREEN)✓ requirements-hashed.txt generated$(NC)"
 
 .PHONY: generate-secrets
 generate-secrets: ## Generate secure secrets for .env

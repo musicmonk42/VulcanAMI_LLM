@@ -51,34 +51,34 @@ jobs:
           if [ -f "helm/vulcanami/values.yaml" ]; then
             # Check for security issues
             echo "Checking for security anti-patterns..."
-            
+
             # Check that image tag is not 'latest'
             if grep -q 'tag: "latest"' helm/vulcanami/values.yaml; then
               echo "ERROR: Found 'latest' tag in values.yaml - must use specific versions"
               exit 1
             fi
-            
+
             # Check for hardcoded credentials
             if grep -q 'accessKey: minioadmin' helm/vulcanami/values.yaml; then
               echo "ERROR: Found hardcoded MinIO credentials"
               exit 1
             fi
-            
+
             # Check that readOnlyRootFilesystem is enabled
             if grep -q 'readOnlyRootFilesystem: false' helm/vulcanami/values.yaml; then
               echo "ERROR: readOnlyRootFilesystem must be true for security"
               exit 1
             fi
-            
+
             # Check for health probes
             if ! grep -q 'livenessProbe:' helm/vulcanami/values.yaml; then
               echo "WARNING: No liveness probe defined"
             fi
-            
+
             if ! grep -q 'readinessProbe:' helm/vulcanami/values.yaml; then
               echo "WARNING: No readiness probe defined"
             fi
-            
+
             echo "Helm chart validation passed!"
           else
             echo "ERROR: helm/vulcanami/values.yaml not found"
@@ -97,7 +97,7 @@ jobs:
             --set minio.accessKeySecretName=test-minio-access \
             --set minio.secretKeySecretName=test-minio-secret \
             > /tmp/helm-output.yaml
-          
+
           echo "Generated Kubernetes manifests successfully"
           cat /tmp/helm-output.yaml
 
@@ -146,25 +146,25 @@ jobs:
         working-directory: ./infra/terraform
         run: |
           echo "Checking for Terraform security issues..."
-          
+
           # Check for timestamp() in resource attributes
           if grep -r "timestamp()" --include="*.tf" .; then
             echo "ERROR: Found timestamp() function - causes resource recreation"
             exit 1
           fi
-          
+
           # Check for 0.0.0.0/0 in defaults
           if grep -A2 "allowed_ip_ranges" variables.tf | grep -q '"0.0.0.0/0"'; then
             echo "ERROR: Found 0.0.0.0/0 as default for allowed_ip_ranges"
             exit 1
           fi
-          
+
           # Check Lambda@Edge reserved concurrency
           if grep -B5 "edge.*auth\|edge_auth" main.tf | grep -q "reserved_concurrent_executions"; then
             echo "ERROR: Lambda@Edge does not support reserved_concurrent_executions"
             exit 1
           fi
-          
+
           echo "Security checks passed!"
 
       - name: TFLint
@@ -192,7 +192,7 @@ jobs:
           vpc_cidr = "10.0.0.0/16"
           bucket_prefix = "vulcanami-test"
           EOF
-          
+
           echo "Terraform configuration is valid!"
         continue-on-error: true
 
@@ -213,15 +213,15 @@ jobs:
             echo "ERROR: Dockerfile not found"
             exit 1
           fi
-          
+
           # Check for security best practices
           echo "Checking Dockerfile security..."
-          
+
           # Should not run as root
           if ! grep -q "USER" Dockerfile; then
             echo "WARNING: Dockerfile should specify a non-root USER"
           fi
-          
+
           echo "Dockerfile validation passed!"
 
       - name: Lint Dockerfile with Hadolint
@@ -233,46 +233,46 @@ jobs:
       - name: Validate docker-compose files
         run: |
           echo "Validating docker-compose files..."
-          
+
           if [ -f "docker-compose.dev.yml" ]; then
             echo "Validating docker-compose.dev.yml..."
-            docker-compose -f docker-compose.dev.yml config --quiet || {
+            docker compose -f docker-compose.dev.yml config --quiet || {
               echo "ERROR: docker-compose.dev.yml validation failed"
               exit 1
             }
           fi
-          
+
           if [ -f "docker-compose.prod.yml" ]; then
             echo "Validating docker-compose.prod.yml..."
-            docker-compose -f docker-compose.prod.yml config --quiet || {
+            docker compose -f docker-compose.prod.yml config --quiet || {
               echo "ERROR: docker-compose.prod.yml validation failed"
               exit 1
             }
           fi
-          
+
           echo "Docker Compose validation passed!"
 
       - name: Check docker-compose security
         run: |
           echo "Checking docker-compose security..."
-          
+
           # Check for exposed secrets
           for file in docker-compose*.yml; do
             if [ -f "$file" ]; then
               echo "Checking $file..."
-              
+
               # Should not have default passwords
               if grep -i "password.*admin\|password.*root\|password.*123" "$file"; then
                 echo "WARNING: Found default passwords in $file"
               fi
-              
+
               # Check for proper volume permissions
               if grep -q "privileged: true" "$file"; then
                 echo "WARNING: Found privileged containers in $file"
               fi
             fi
           done
-          
+
           echo "Docker Compose security check completed!"
 
       - name: Build test Docker image
@@ -298,13 +298,13 @@ jobs:
       - name: Check for reproducibility
         run: |
           echo "Checking for reproducible build configurations..."
-          
+
           # Check Dockerfile for specific versions
           echo "Checking Dockerfile for pinned versions..."
           if grep -q "FROM.*:latest" Dockerfile; then
             echo "WARNING: Dockerfile uses :latest tag - should use specific versions"
           fi
-          
+
           # Check requirements.txt for pinned versions
           if [ -f "requirements.txt" ]; then
             echo "Checking Python requirements for pinned versions..."
@@ -314,21 +314,21 @@ jobs:
               echo "WARNING: Some Python dependencies may not be pinned"
             fi
           fi
-          
+
           # Check for lock files
           if [ -f "requirements-hashed.txt" ]; then
             echo "✓ Found hashed requirements file"
           fi
-          
+
           echo "Reproducibility check completed!"
 
       - name: Generate infrastructure documentation
         run: |
           echo "Generating infrastructure documentation..."
-          
+
           cat > INFRASTRUCTURE_SECURITY.md << 'EOF'
           # Infrastructure Security Checklist
-          
+
           ## Helm Chart Security
           - [x] Image tags use specific versions (not 'latest')
           - [x] No hardcoded credentials in values.yaml
@@ -337,7 +337,7 @@ jobs:
           - [x] Pod Disruption Budget configured
           - [x] Pod anti-affinity rules configured
           - [x] Rate limiting configured (10 req/sec)
-          
+
           ## Terraform Security
           - [x] No timestamp() in resource attributes
           - [x] No 0.0.0.0/0 in default allowed_ip_ranges
@@ -347,19 +347,19 @@ jobs:
           - [x] CloudFront logs bucket with proper permissions
           - [x] Redis auth tokens with special characters enabled
           - [x] Auto-scaling min/max capacity validation
-          
+
           ## Docker Security
           - [x] Dockerfile linted with Hadolint
           - [x] Non-root user in containers
           - [x] Docker Compose files validated
           - [x] No hardcoded secrets in docker-compose files
-          
+
           ## Reproducibility
           - [x] Pinned dependency versions
           - [x] Hashed requirements file
           - [x] Infrastructure as Code validated
           EOF
-          
+
           cat INFRASTRUCTURE_SECURITY.md
 
       - name: Upload security checklist
@@ -384,7 +384,7 @@ jobs:
           echo "✓ Docker Validation: ${{ needs.validate-docker.result }}"
           echo "✓ Reproducibility Validation: ${{ needs.validate-reproducibility.result }}"
           echo ""
-          
+
           if [[ "${{ needs.validate-helm.result }}" == "failure" ]] || \
              [[ "${{ needs.validate-terraform.result }}" == "failure" ]] || \
              [[ "${{ needs.validate-docker.result }}" == "failure" ]] || \

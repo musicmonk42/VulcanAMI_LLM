@@ -33,7 +33,7 @@ jobs:
     outputs:
       environment: ${{ steps.set-env.outputs.environment }}
       deploy: ${{ steps.set-env.outputs.deploy }}
-    
+
     steps:
       - name: Determine environment
         id: set-env
@@ -61,7 +61,7 @@ jobs:
     needs: determine-environment
     if: needs.determine-environment.outputs.deploy == 'true'
     environment: ${{ needs.determine-environment.outputs.environment }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -87,7 +87,7 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           VERSION="${{ steps.version.outputs.version }}"
-          
+
           if [ -d "k8s/overlays/$ENV" ]; then
             find k8s/overlays/$ENV -type f -name "*.yaml" -exec sed -i \
               -e "s|IMAGE_TAG|$VERSION|g" \
@@ -101,7 +101,7 @@ jobs:
       - name: Deploy with kubectl
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
-          
+
           if [ -d "k8s/overlays/$ENV" ]; then
             kubectl apply -k k8s/overlays/$ENV
           elif [ -d "k8s/base" ]; then
@@ -115,7 +115,7 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           NAMESPACE="vulcanami-$ENV"
-          
+
           kubectl rollout status deployment/vulcanami-api -n $NAMESPACE --timeout=5m
           kubectl rollout status deployment/vulcanami-dqs -n $NAMESPACE --timeout=5m || true
           kubectl rollout status deployment/vulcanami-pii -n $NAMESPACE --timeout=5m || true
@@ -124,10 +124,10 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           NAMESPACE="vulcanami-$ENV"
-          
+
           # Get service endpoint
           API_ENDPOINT=$(kubectl get svc vulcanami-api -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].ip}' || echo "localhost")
-          
+
           # Simple health check
           echo "Testing health endpoint..."
           kubectl run curl-test --image=curlimages/curl:latest --rm -i --restart=Never -- \
@@ -137,7 +137,7 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           NAMESPACE="vulcanami-$ENV"
-          
+
           echo "## Deployment Info" >> $GITHUB_STEP_SUMMARY
           echo "Environment: $ENV" >> $GITHUB_STEP_SUMMARY
           echo "Version: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
@@ -154,7 +154,7 @@ jobs:
     needs: determine-environment
     if: needs.determine-environment.outputs.deploy == 'true'
     environment: ${{ needs.determine-environment.outputs.environment }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -186,15 +186,15 @@ jobs:
           ENV="${{ needs.determine-environment.outputs.environment }}"
           VERSION="${{ steps.version.outputs.version }}"
           NAMESPACE="vulcanami-$ENV"
-          
+
           if [ ! -d "helm/vulcanami" ]; then
             echo "Helm chart not found, skipping Helm deployment"
             exit 0
           fi
-          
+
           # Create namespace
           kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
-          
+
           # Deploy or upgrade
           helm upgrade --install vulcanami ./helm/vulcanami \
             --namespace $NAMESPACE \
@@ -209,7 +209,7 @@ jobs:
         run: |
           ENV="${{ needs.determine-environment.outputs.environment }}"
           NAMESPACE="vulcanami-$ENV"
-          
+
           if [ -d "helm/vulcanami" ]; then
             helm test vulcanami -n $NAMESPACE || echo "No Helm tests defined"
           fi
@@ -220,7 +220,7 @@ jobs:
     needs: determine-environment
     if: needs.determine-environment.outputs.deploy == 'true' && needs.determine-environment.outputs.environment == 'development'
     environment: development
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -233,10 +233,10 @@ jobs:
           key: ${{ secrets.DEV_SSH_KEY }}
           script: |
             cd /opt/vulcanami || exit 1
-            
+
             # Pull latest changes
             git pull origin develop
-            
+
             # Create .env if not exists
             if [ ! -f .env ]; then
               cat > .env << 'EOF'
@@ -247,21 +247,21 @@ jobs:
             MINIO_ROOT_PASSWORD=${{ secrets.MINIO_PASSWORD }}
             EOF
             fi
-            
+
             # Pull and restart services
-            docker-compose -f docker-compose.dev.yml pull
-            docker-compose -f docker-compose.dev.yml up -d --remove-orphans
-            
+            docker compose -f docker-compose.dev.yml pull
+            docker compose -f docker-compose.dev.yml up -d --remove-orphans
+
             # Check health
             sleep 30
-            docker-compose -f docker-compose.dev.yml ps
+            docker compose -f docker-compose.dev.yml ps
 
   notify-deployment:
     name: Notify Deployment Status
     runs-on: ubuntu-latest
     needs: [determine-environment, deploy-kubernetes, deploy-helm, deploy-docker-compose]
     if: always() && needs.determine-environment.outputs.deploy == 'true'
-    
+
     steps:
       - name: Send Slack notification
         if: secrets.SLACK_WEBHOOK_URL != ''

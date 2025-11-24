@@ -16,7 +16,7 @@ networks:
     ipam:
       config:
         - subnet: 172.29.0.0/16
-  
+
   backend:
     driver: bridge
     internal: true
@@ -42,11 +42,11 @@ volumes:
 ################################################################################
 
 services:
-  
+
   ############################################################################
   # Storage Services
   ############################################################################
-  
+
   postgres:
     image: postgres:14-alpine
     container_name: vulcanami-postgres-prod
