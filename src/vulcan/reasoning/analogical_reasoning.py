@@ -50,7 +50,7 @@ try:
     try:
         nlp = spacy.load("en_core_web_sm")
     except:
-        logger.warning("spaCy model not loaded, will use fallback")
+        logger.warning("spaCy model not loaded for analogical reasoning")
         nlp = None
 except ImportError:
     SPACY_AVAILABLE = False

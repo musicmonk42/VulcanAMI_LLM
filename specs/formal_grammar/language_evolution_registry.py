@@ -34,6 +34,34 @@ try:
     import faiss
     import numpy as np
     HAS_FAISS = True
+    
+    # Detect FAISS AVX capabilities
+    try:
+        # Check if AVX512 is available by attempting to use AVX512 instruction set
+        # FAISS will use AVX512 if available, otherwise fall back to AVX2
+        # We can check this by looking at the compiled instruction set support
+        has_avx512 = False
+        try:
+            # Try to determine if FAISS was compiled with AVX512 support
+            # This is a heuristic check - FAISS doesn't expose this directly
+            import platform
+            import subprocess
+            if platform.system() == "Linux":
+                # Check CPU flags for avx512f (AVX-512 Foundation)
+                try:
+                    result = subprocess.run(['grep', '-o', 'avx512f', '/proc/cpuinfo'], 
+                                          capture_output=True, text=True, timeout=1)
+                    has_avx512 = 'avx512f' in result.stdout
+                except:
+                    has_avx512 = False
+        except:
+            has_avx512 = False
+        
+        if not has_avx512:
+            logging.warning("FAISS loaded with AVX2 (AVX512 unavailable)")
+    except Exception as e:
+        logging.debug(f"Could not detect FAISS AVX capabilities: {e}")
+        
 except ImportError:
     HAS_FAISS = False
     logging.error("FAISS is required for production. Install with: pip install faiss-cpu numpy")

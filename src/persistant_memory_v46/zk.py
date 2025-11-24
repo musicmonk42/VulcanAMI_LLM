@@ -56,7 +56,7 @@ try:
     )
     SNARK_AVAILABLE = True
 except ImportError:
-    logger.warning("Groth16 SNARK module not available, falling back to basic implementation")
+    logger.warning("Groth16 SNARK module unavailable (falling back to basic implementation)")
     SNARK_AVAILABLE = False
 
 
