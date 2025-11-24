@@ -256,7 +256,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image with caching
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: false
