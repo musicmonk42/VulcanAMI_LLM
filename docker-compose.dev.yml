@@ -17,11 +17,11 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/16
-  
+
   monitoring-network:
     driver: bridge
     internal: false
-  
+
   storage-network:
     driver: bridge
     internal: true
@@ -40,7 +40,7 @@ volumes:
     driver: local
   milvus_data:
     driver: local
-  
+
   # Monitoring
   prometheus_data:
     driver: local
@@ -48,7 +48,7 @@ volumes:
     driver: local
   elasticsearch_data:
     driver: local
-  
+
   # Caching
   nginx_cache_hot:
     driver: local
@@ -56,7 +56,7 @@ volumes:
     driver: local
   nginx_cache_cold:
     driver: local
-  
+
   # Logs
   logs:
     driver: local
@@ -66,11 +66,11 @@ volumes:
 ################################################################################
 
 services:
-  
+
   ############################################################################
   # Storage Services
   ############################################################################
-  
+
   # MinIO Object Storage (S3-compatible)
   minio:
     image: ${MINIO_IMAGE:-minio/minio:latest}
@@ -105,7 +105,7 @@ services:
     labels:
       - "com.vulcanami.service=storage"
       - "com.vulcanami.type=object-storage"
-  
+
   # MinIO Bucket Initialization
   minio-init:
     image: ${MINIO_MC_IMAGE:-minio/mc:latest}
@@ -133,7 +133,7 @@ services:
       "
     networks:
       - vulcanami-network
-  
+
   # PostgreSQL Database
   postgres:
     image: postgres:14-alpine
@@ -165,7 +165,7 @@ services:
     labels:
       - "com.vulcanami.service=database"
       - "com.vulcanami.type=postgres"
-  
+
   # Redis Cache
   redis:
     image: redis:7-alpine
@@ -193,7 +193,7 @@ services:
     labels:
       - "com.vulcanami.service=cache"
       - "com.vulcanami.type=redis"
-  
+
   # Redis Exporter for Prometheus
   redis-exporter:
     image: oliver006/redis_exporter:v1.62.0
@@ -216,7 +216,7 @@ services:
     labels:
       - "com.vulcanami.service=monitoring"
       - "com.vulcanami.type=exporter"
-  
+
   # Milvus Vector Database
   milvus-etcd:
     image: quay.io/coreos/etcd:v3.5.5
@@ -233,7 +233,7 @@ services:
     networks:
       - storage-network
     restart: unless-stopped
-  
+
   milvus-minio:
     image: ${MILVUS_MINIO_IMAGE:-minio/minio:latest}
     container_name: vulcanami-milvus-minio
@@ -255,7 +255,7 @@ services:
       timeout: 20s
       retries: 3
     restart: unless-stopped
-  
+
   milvus:
     image: milvusdb/milvus:v2.4.6
     container_name: vulcanami-milvus
@@ -288,11 +288,11 @@ services:
     labels:
       - "com.vulcanami.service=vector-db"
       - "com.vulcanami.type=milvus"
-  
+
   ############################################################################
   # VulcanAMI Core Services
   ############################################################################
-  
+
   # Data Quality System (DQS)
   dqs-service:
     build:
@@ -345,7 +345,7 @@ services:
     labels:
       - "com.vulcanami.service=dqs"
       - "com.vulcanami.type=core"
-  
+
   # OPA Policy Engine
   opa-service:
     image: openpolicyagent/opa:0.65.0
@@ -380,7 +380,7 @@ services:
     labels:
       - "com.vulcanami.service=opa"
       - "com.vulcanami.type=policy"
-  
+
   # PII Detection Service
   pii-service:
     build:
@@ -424,7 +424,7 @@ services:
     labels:
       - "com.vulcanami.service=pii"
       - "com.vulcanami.type=ml"
-  
+
   # VulcanAMI API Gateway
   api-gateway:
     build:
@@ -480,7 +480,7 @@ services:
     labels:
       - "com.vulcanami.service=api"
       - "com.vulcanami.type=gateway"
-  
+
   # NGINX Origin Server
   nginx-origin:
     image: nginx:1.27-alpine
@@ -511,7 +511,7 @@ services:
     labels:
       - "com.vulcanami.service=nginx"
       - "com.vulcanami.type=web-server"
-  
+
   # Rescore Cron Service
   rescore-cron:
     build:
@@ -539,11 +539,11 @@ services:
     labels:
       - "com.vulcanami.service=rescore"
       - "com.vulcanami.type=cron"
-  
+
   ############################################################################
   # Monitoring & Observability
   ############################################################################
-  
+
   # Prometheus Monitoring
   prometheus:
     image: prom/prometheus:v2.48.0
@@ -577,7 +577,7 @@ services:
     labels:
       - "com.vulcanami.service=prometheus"
       - "com.vulcanami.type=monitoring"
-  
+
   # Grafana Dashboards
   grafana:
     image: grafana/grafana:10.2.2
@@ -612,7 +612,7 @@ services:
     labels:
       - "com.vulcanami.service=grafana"
       - "com.vulcanami.type=visualization"
-  
+
   # Jaeger Distributed Tracing
   jaeger:
     image: jaegertracing/all-in-one:1.52
@@ -645,7 +645,7 @@ services:
     labels:
       - "com.vulcanami.service=jaeger"
       - "com.vulcanami.type=tracing"
-  
+
   # Elasticsearch for Logs
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
@@ -682,7 +682,7 @@ services:
     labels:
       - "com.vulcanami.service=elasticsearch"
       - "com.vulcanami.type=logging"
-  
+
   # Kibana Log Visualization
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.3
@@ -710,7 +710,7 @@ services:
     labels:
       - "com.vulcanami.service=kibana"
       - "com.vulcanami.type=visualization"
-  
+
   # Alertmanager for Alerts
   alertmanager:
     image: prom/alertmanager:v0.26.0
@@ -730,11 +730,11 @@ services:
     labels:
       - "com.vulcanami.service=alertmanager"
       - "com.vulcanami.type=alerting"
-  
+
   ############################################################################
   # Development Tools
   ############################################################################
-  
+
   # pgAdmin for PostgreSQL Management
   pgadmin:
     image: dpage/pgadmin4:8.0
@@ -758,7 +758,7 @@ services:
     labels:
       - "com.vulcanami.service=pgadmin"
       - "com.vulcanami.type=dev-tool"
-  
+
   # Redis Commander for Redis Management
   redis-commander:
     image: rediscommander/redis-commander:latest
@@ -777,7 +777,7 @@ services:
     labels:
       - "com.vulcanami.service=redis-commander"
       - "com.vulcanami.type=dev-tool"
-  
+
   # Portainer for Container Management
   portainer:
     image: portainer/portainer-ce:2.19.4
@@ -796,7 +796,7 @@ services:
     labels:
       - "com.vulcanami.service=portainer"
       - "com.vulcanami.type=dev-tool"
-  
+
   # MailHog for Email Testing
   mailhog:
     image: mailhog/mailhog:v1.0.1
@@ -811,7 +811,7 @@ services:
     labels:
       - "com.vulcanami.service=mailhog"
       - "com.vulcanami.type=dev-tool"
-  
+
   # Documentation Server
   docs:
     image: nginx:1.27-alpine

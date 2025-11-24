@@ -19,7 +19,7 @@ spec:
     spec:
       # Prevent automatic mounting of the service account token unless explicitly needed
       automountServiceAccountToken: false
-      
+
       # Pod-level security defaults
       securityContext:
         runAsNonRoot: true
@@ -28,7 +28,7 @@ spec:
         fsGroup: 2000
         seccompProfile:
           type: RuntimeDefault
-      
+
       containers:
       - name: api
         # Pin to specific version with digest for production
@@ -42,7 +42,7 @@ spec:
         - containerPort: 9148
           name: metrics
           protocol: TCP
-        
+
         # Container-level security hardening
         securityContext:
           allowPrivilegeEscalation: false
@@ -54,14 +54,14 @@ spec:
           capabilities:
             drop:
               - ALL
-        
+
         # Add volume mounts for writable directories needed by the app
         volumeMounts:
         - name: tmp
           mountPath: /tmp
         - name: app-data
           mountPath: /app/data
-        
+
         env:
         - name: JWT_SECRET_KEY
           valueFrom:
@@ -114,14 +114,14 @@ spec:
           periodSeconds: 5
           timeoutSeconds: 3
           failureThreshold: 3
-      
+
       # Volumes for readOnlyRootFilesystem compatibility
       volumes:
       - name: tmp
         emptyDir: {}
       - name: app-data
         emptyDir: {}
-      
+
       restartPolicy: Always
 ---
 apiVersion: v1

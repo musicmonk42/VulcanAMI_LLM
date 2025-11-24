@@ -19,7 +19,7 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +47,7 @@ jobs:
   dependency-scan:
     name: Dependency Vulnerability Scan
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -90,7 +90,7 @@ jobs:
   secret-scan:
     name: Secret Scanning
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -117,7 +117,7 @@ jobs:
   sast-scan:
     name: SAST Security Scan
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -141,7 +141,7 @@ jobs:
             -f json \
             -o bandit-report.json \
             -c .bandit || true
-          
+
           # Also generate human-readable output for review
           bandit -r src/ -c .bandit -f txt || true
         env:
@@ -168,7 +168,7 @@ jobs:
   container-scan:
     name: Container Security Scan
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -221,7 +221,7 @@ jobs:
   infrastructure-scan:
     name: Infrastructure as Code Scan
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -260,7 +260,7 @@ jobs:
   license-check:
     name: License Compliance Check
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -296,7 +296,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [codeql, dependency-scan, secret-scan, sast-scan, container-scan, infrastructure-scan]
     if: always()
-    
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4

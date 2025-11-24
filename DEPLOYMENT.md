@@ -62,10 +62,10 @@ LOG_LEVEL=INFO
 EOF
 
 # Start production stack
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 
 # Monitor startup
-docker-compose -f docker-compose.prod.yml logs -f
+docker compose -f docker-compose.prod.yml logs -f
 ```
 
 #### Service Ports

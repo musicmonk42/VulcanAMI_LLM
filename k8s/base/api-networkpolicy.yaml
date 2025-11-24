@@ -12,7 +12,7 @@ spec:
   policyTypes:
   - Ingress
   - Egress
-  
+
   ingress:
   # Allow ingress from pods in the same namespace
   - from:
@@ -22,12 +22,12 @@ spec:
       port: 8000
     - protocol: TCP
       port: 9148
-  
+
   egress:
   # Allow egress to pods in the same namespace (e.g., postgres, redis)
   - to:
     - podSelector: {}
-  
+
   # Allow DNS resolution
   - to:
     - namespaceSelector:
@@ -36,7 +36,7 @@ spec:
     ports:
     - protocol: UDP
       port: 53
-  
+
   # Allow HTTPS/HTTP egress for external API calls (OpenAI, model downloads, etc.)
   # This rule allows traffic to IPs outside the cluster (no selectors = all destinations)
   # For production, consider:
