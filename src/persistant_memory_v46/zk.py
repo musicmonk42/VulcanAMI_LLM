@@ -45,6 +45,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
+# Initialize logger before using it
+logger = logging.getLogger(__name__)
+
 # Import industry-standard SNARK implementation
 try:
     from ..gvulcan.zk.snark import (
@@ -55,8 +58,6 @@ try:
 except ImportError:
     logger.warning("Groth16 SNARK module not available, falling back to basic implementation")
     SNARK_AVAILABLE = False
-
-logger = logging.getLogger(__name__)
 
 
 class MerkleTree:
