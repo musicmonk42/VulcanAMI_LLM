@@ -866,6 +866,18 @@ async def lifespan(app: FastAPI):
         print("💡 API keys will need to be set as system environment variables")
     except Exception as e:
         print(f"❌ Error loading .env: {e}")
+    
+    # SET DEFAULT JWT_SECRET_KEY FOR REGISTRY SERVICE
+    # If JWT_SECRET_KEY is not set, generate a secure random key
+    # This allows the registry service to start without manual configuration
+    if not os.getenv("JWT_SECRET_KEY"):
+        import secrets as secrets_module
+        jwt_secret = secrets_module.token_urlsafe(32)
+        os.environ["JWT_SECRET_KEY"] = jwt_secret
+        print("✅ Generated JWT_SECRET_KEY for registry service")
+        print("💡 For production, set a persistent JWT_SECRET_KEY in .env")
+    else:
+        print("✅ JWT_SECRET_KEY loaded from environment")
     # ====================================================================
     
     # [!!!] MOVED LOGGING SETUP HERE [!!!]
