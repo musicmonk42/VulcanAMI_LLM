@@ -12,6 +12,7 @@ optimal instruction set usage and provide detailed diagnostics.
 
 import platform
 import logging
+import threading
 from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
 
@@ -133,6 +134,12 @@ class CPUCapabilities:
                 'SVE2': self.has_sve2,
             }
         }
+    
+    def __repr__(self) -> str:
+        """String representation for debugging"""
+        return (f"CPUCapabilities(arch={self.architecture!r}, "
+                f"best={self.get_best_vector_instruction_set()!r}, "
+                f"tier={self.get_performance_tier()!r})")
 
 
 def detect_cpu_capabilities() -> CPUCapabilities:
@@ -147,7 +154,7 @@ def detect_cpu_capabilities() -> CPUCapabilities:
     try:
         import multiprocessing
         caps.cpu_cores = multiprocessing.cpu_count()
-    except:
+    except (ImportError, NotImplementedError, OSError):
         caps.cpu_cores = 1
     
     # Detect platform and architecture
@@ -221,20 +228,25 @@ def _detect_macos_capabilities(caps: CPUCapabilities) -> None:
         )
         
         if result.returncode == 0:
-            features = result.stdout.lower()
-            caps.cpu_flags = set(features.split())
+            # Parse sysctl output properly to avoid including key names
+            flags = set()
+            for line in result.stdout.lower().split('\n'):
+                if ':' in line:
+                    _, _, value = line.partition(':')
+                    flags.update(value.strip().split())
+            caps.cpu_flags = flags
             
             # Check common features
-            caps.has_sse = 'sse' in features
-            caps.has_sse2 = 'sse2' in features
-            caps.has_sse3 = 'sse3' in features
-            caps.has_ssse3 = 'ssse3' in features
-            caps.has_sse4_1 = 'sse4.1' in features or 'sse4_1' in features
-            caps.has_sse4_2 = 'sse4.2' in features or 'sse4_2' in features
-            caps.has_avx = 'avx' in features
-            caps.has_avx2 = 'avx2' in features
-            caps.has_avx512f = 'avx512f' in features
-            caps.has_fma = 'fma' in features
+            caps.has_sse = 'sse' in caps.cpu_flags
+            caps.has_sse2 = 'sse2' in caps.cpu_flags
+            caps.has_sse3 = 'sse3' in caps.cpu_flags
+            caps.has_ssse3 = 'ssse3' in caps.cpu_flags
+            caps.has_sse4_1 = 'sse4.1' in caps.cpu_flags or 'sse4_1' in caps.cpu_flags
+            caps.has_sse4_2 = 'sse4.2' in caps.cpu_flags or 'sse4_2' in caps.cpu_flags
+            caps.has_avx = 'avx' in caps.cpu_flags
+            caps.has_avx2 = 'avx2' in caps.cpu_flags
+            caps.has_avx512f = 'avx512f' in caps.cpu_flags
+            caps.has_fma = 'fma' in caps.cpu_flags
             
             # ARM features on Apple Silicon
             if 'arm' in caps.architecture.lower() or 'aarch' in caps.architecture.lower():
@@ -250,10 +262,35 @@ def _detect_macos_capabilities(caps: CPUCapabilities) -> None:
 
 def _detect_windows_capabilities(caps: CPUCapabilities) -> None:
     """Detect capabilities on Windows"""
-    # Windows detection is more complex and would typically require
-    # Windows-specific libraries or CPUID instruction access
-    # For now, we provide conservative defaults
+    # Try to use py-cpuinfo if available for better detection
+    try:
+        import cpuinfo
+        info = cpuinfo.get_cpu_info()
+        flags = set(f.lower() for f in info.get('flags', []))
+        caps.cpu_flags = flags
+        
+        # Check x86/x64 features
+        caps.has_sse = 'sse' in flags
+        caps.has_sse2 = 'sse2' in flags
+        caps.has_sse3 = 'sse3' in flags or 'pni' in flags
+        caps.has_ssse3 = 'ssse3' in flags
+        caps.has_sse4_1 = 'sse4_1' in flags
+        caps.has_sse4_2 = 'sse4_2' in flags
+        caps.has_avx = 'avx' in flags
+        caps.has_avx2 = 'avx2' in flags
+        caps.has_avx512f = 'avx512f' in flags
+        caps.has_avx512dq = 'avx512dq' in flags
+        caps.has_avx512bw = 'avx512bw' in flags
+        caps.has_avx512vl = 'avx512vl' in flags
+        caps.has_fma = 'fma' in flags
+        
+        logger.debug("Windows CPU detection: using py-cpuinfo")
+        return
+    except ImportError:
+        # Fall back to conservative defaults
+        pass
     
+    # Conservative defaults when py-cpuinfo is not available
     if 'amd64' in caps.architecture.lower() or 'x86_64' in caps.architecture.lower():
         # Modern x64 CPUs typically have at least SSE2
         caps.has_sse = True
@@ -330,11 +367,15 @@ def get_capability_summary() -> str:
 
 # Global instance for caching
 _cpu_capabilities: Optional[CPUCapabilities] = None
+_cpu_capabilities_lock = threading.Lock()
 
 
 def get_cpu_capabilities() -> CPUCapabilities:
-    """Get cached CPU capabilities (singleton pattern)"""
+    """Get cached CPU capabilities (singleton pattern with thread-safety)"""
     global _cpu_capabilities
     if _cpu_capabilities is None:
-        _cpu_capabilities = detect_cpu_capabilities()
+        with _cpu_capabilities_lock:
+            # Double-check pattern to avoid race conditions
+            if _cpu_capabilities is None:
+                _cpu_capabilities = detect_cpu_capabilities()
     return _cpu_capabilities
