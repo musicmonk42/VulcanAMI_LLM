@@ -1,0 +1,57 @@
+{
+  "attack_types": [
+    "fgsm",
+    "pgd",
+    "semantic"
+  ],
+  "epsilon_values": [
+    0.01,
+    0.05,
+    0.1,
+    0.15
+  ],
+  "num_samples": 100,
+  "timeout_seconds": 3600,
+  "save_results": true,
+  "results_dir": "logs/adversarial_testing",
+  "alert_on_failure": true,
+  "failure_threshold": 0.75,
+  "schedule": {
+    "frequency": "daily",
+    "time": "02:00",
+    "timezone": "UTC"
+  },
+  "notification": {
+    "enabled": true,
+    "channels": [
+      "log",
+      "slack"
+    ],
+    "slack_webhook_env": "SLACK_WEBHOOK_URL",
+    "email_recipients": []
+  },
+  "attack_config": {
+    "fgsm": {
+      "description": "Fast Gradient Sign Method - single-step gradient attack",
+      "enabled": true,
+      "priority": "high"
+    },
+    "pgd": {
+      "description": "Projected Gradient Descent - iterative gradient attack",
+      "enabled": true,
+      "priority": "high",
+      "iterations": 10,
+      "step_size": 0.01
+    },
+    "semantic": {
+      "description": "Semantic perturbations that preserve meaning",
+      "enabled": true,
+      "priority": "medium"
+    }
+  },
+  "reporting": {
+    "include_detailed_results": true,
+    "include_attack_samples": false,
+    "summary_only": false
+  }
+}
