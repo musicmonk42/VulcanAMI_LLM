@@ -1343,9 +1343,9 @@ fsspec==2025.10.0 \
     #   -r requirements.txt
     #   huggingface-hub
     #   torch
-galois==0.4.2 \
-    --hash=sha256:bffdd595a29eefe7234075e508e685e328297b56b0279efa1d83dce2a68d92a7 \
-    --hash=sha256:f8fe38bd45c064ed28cb65df35ba4228010b8fa99e15b982e3aa3826b516d715
+galois==0.4.7 \
+    --hash=sha256:b6dc649f950e61ea2af07314c250c18be456605ac6b8823b701bae7cf7dff69a \
+    --hash=sha256:db71f979ebc99697fdd8c8fcb13529a37e6c0b4117595dc82e0377e2525fc2c3
     # via -r requirements.txt
 graphviz==0.21 \
     --hash=sha256:20743e7183be82aaaa8ad6c93f8893c923bd6658a04c32ee115edb3c8a835f78 \
