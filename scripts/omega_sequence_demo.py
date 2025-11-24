@@ -37,7 +37,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.vulcan.planning import SurvivalProtocol, OperationalMode
 from src.vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
 from src.vulcan.world_model.meta_reasoning.csiu_enforcement import CSIUEnforcement
-from src.adversarial_tester import AdversarialTester
+
+# Optional import - adversarial tester
+try:
+    from src.adversarial_tester import AdversarialTester
+    ADVERSARIAL_TESTER_AVAILABLE = True
+except ImportError:
+    ADVERSARIAL_TESTER_AVAILABLE = False
+    AdversarialTester = None
 
 
 # Terminal colors
@@ -133,6 +140,30 @@ class OmegaSequenceDemo:
         self.print_system("Initiating SURVIVAL PROTOCOL...", "SYSTEM")
         time.sleep(0.5)
         
+        # Simulate network failure by forcing offline state
+        # In a real demo, we would actually disconnect the network
+        # For demo purposes, we force the state to offline
+        from src.vulcan.planning import SystemState, ConnectivityLevel
+        from collections import deque
+        
+        # Force offline state for demo
+        self.survival_protocol.resource_monitor.current_state = SystemState(
+            timestamp=time.time(),
+            cpu_percent=50.0,
+            cpu_freq=2400.0,
+            cpu_temp=None,
+            memory_used_mb=2048.0,
+            memory_percent=50.0,
+            gpu_percent=None,
+            gpu_memory_mb=None,
+            gpu_temp=None,
+            disk_usage_percent=50.0,
+            network_quality='offline',
+            power_watts=150.0,
+            operational_mode=self.survival_protocol.current_mode
+        )
+        self.survival_protocol.resource_monitor.history['network_success'] = deque([0.0, 0.0, 0.0], maxlen=100)
+        
         # Detect network failure
         failure_result = self.survival_protocol.detect_network_failure()
         
@@ -170,20 +201,10 @@ class OmegaSequenceDemo:
         
         self.wait_for_user("Running: vulcan-cli solve --domain BIO_SECURITY --problem 'Novel pathogen 0x99A...'")
         
-        # Initialize semantic bridge if needed
-        if not self.semantic_bridge:
-            from src.vulcan.semantic_bridge.domain_registry import DomainRegistry
-            registry = DomainRegistry()
-            # Add biosecurity domain if not present
-            if "BIO_SECURITY" not in registry.get_all_domains():
-                registry.register_domain(
-                    "BIO_SECURITY",
-                    patterns=["pathogen", "virus", "infection", "contamination", "outbreak"],
-                    metadata={"type": "biological", "risk_level": "high"}
-                )
-            self.semantic_bridge = SemanticBridge(domain_registry=registry)
+        # Simulate semantic bridge reasoning (simplified for demo)
+        # The real semantic bridge exists but is complex to initialize
+        # For demo purposes, we simulate the output
         
-        # Simulate semantic bridge reasoning
         self.print_system("Concept \"Pathogen\" not found in Bio-Index. " + self.colors.CROSS, "ALERT")
         time.sleep(0.5)
         
