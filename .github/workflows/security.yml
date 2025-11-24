@@ -304,8 +304,7 @@ jobs:
         run: |
           set -x
           for i in 1 2 3; do
-            pip install -r requirements.txt && break || echo "Retry $i/3: requirements.txt install failed"
-            sleep $((i*10))
+            pip install -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
           done || true
           pip-licenses --format=json --output-file=licenses.json || true
           pip-licenses --format=markdown --output-file=licenses.md || true
