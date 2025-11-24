@@ -34,6 +34,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
@@ -57,6 +69,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -111,6 +135,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
+
       - name: TruffleHog OSS
         uses: trufflesecurity/trufflehog@main
         with:
@@ -136,6 +172,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -191,6 +239,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
 
       - name: Build Docker image
         run: |
@@ -248,6 +308,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
+
       - name: Run Checkov
         uses: bridgecrewio/checkov-action@master
         with:
@@ -287,6 +359,18 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Fix repo permissions (make certs readable)
+        if: always()
+        run: |
+          REPO_CERT_DIR="${{ github.workspace }}/configs/minio/certs"
+          if [ -d "$REPO_CERT_DIR" ]; then
+            echo "Fixing permissions for $REPO_CERT_DIR"
+            find "$REPO_CERT_DIR" -type d -exec chmod 755 {} \; || true
+            find "$REPO_CERT_DIR" -type f -exec chmod 644 {} \; || true
+          else
+            echo "$REPO_CERT_DIR not present, skipping"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
