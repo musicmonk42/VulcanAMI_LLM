@@ -341,43 +341,41 @@ active_workers = None
 
 if PROMETHEUS_AVAILABLE:
     try:
-        from prometheus_client import REGISTRY
+        # Try to create metrics - if they already exist, prometheus will raise an error
+        # which we'll catch and skip creation
+        request_counter = Counter(
+            'unified_platform_requests_total',
+            'Total requests to unified platform',
+            ['service', 'method', 'endpoint']
+        )
+        request_duration = Histogram(
+            'unified_platform_request_duration_seconds',
+            'Request duration',
+            ['service', 'endpoint']
+        )
+        service_health = Gauge(
+            'unified_platform_service_health',
+            'Service health status (1=healthy, 0=unhealthy)',
+            ['service']
+        )
+        active_workers = Gauge(
+            'unified_platform_active_workers',
+            'Number of active workers'
+        )
         
-        # Check if metrics are already registered
-        metric_names = set()
-        for collector in REGISTRY._collector_to_names.values():
-            metric_names.update(collector)
-        
-        # Only create metrics if not already registered
-        if 'unified_platform_requests_total' not in metric_names:
-            request_counter = Counter(
-                'unified_platform_requests_total',
-                'Total requests to unified platform',
-                ['service', 'method', 'endpoint']
-            )
-            request_duration = Histogram(
-                'unified_platform_request_duration_seconds',
-                'Request duration',
-                ['service', 'endpoint']
-            )
-            service_health = Gauge(
-                'unified_platform_service_health',
-                'Service health status (1=healthy, 0=unhealthy)',
-                ['service']
-            )
-            active_workers = Gauge(
-                'unified_platform_active_workers',
-                'Number of active workers'
-            )
-            
-            # Set worker count
-            active_workers.set(settings.workers)
-        else:
-            # Metrics already registered (module reimported), fetch them
+        # Set worker count
+        active_workers.set(settings.workers)
+    except (ValueError, Exception) as e:
+        # Metrics already registered (module reimported) or other error
+        # This is not critical - metrics will just not be collected
+        if "Duplicated timeseries" in str(e):
             print("⚠️  Prometheus metrics already registered, skipping creation")
-    except Exception as e:
-        print(f"⚠️  Failed to initialize Prometheus metrics: {e}")
+        else:
+            print(f"⚠️  Failed to initialize Prometheus metrics: {e}")
         request_counter = None
+        request_duration = None
+        service_health = None
+        active_workers = None
         request_duration = None
         service_health = None
         active_workers = None
@@ -1474,7 +1472,7 @@ async def arena_feedback_dispatch(
         raise HTTPException(status_code=503, detail="Arena not available")
     
     try:
-        from graphix_arena import dispatch_feedback_protocol, MAX_PAYLOAD_SIZE
+        from src.graphix_arena import dispatch_feedback_protocol, MAX_PAYLOAD_SIZE
         data = await request.json()
         
         payload_size = len(json.dumps(data))
