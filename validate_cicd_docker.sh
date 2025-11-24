@@ -101,7 +101,8 @@ fi
 
 if [ -f "requirements-hashed.txt" ]; then
     # Check for actual dependency lines or hash continuations
-    if grep -qE '(^[a-zA-Z0-9_-]+==.*--hash=sha256:|^\s+--hash=sha256:)' requirements-hashed.txt; then
+    # Package names can contain letters, numbers, dots, hyphens, and underscores
+    if grep -qE '(^[a-zA-Z0-9_.\-]+==.*--hash=sha256:|^\s+--hash=sha256:)' requirements-hashed.txt; then
         print_success "requirements-hashed.txt contains SHA256 hashes"
     else
         print_error "requirements-hashed.txt does not contain proper hashes"
@@ -156,6 +157,11 @@ done
 print_header "4. Validating Docker Compose Files"
 
 # Create temporary .env for validation with randomly generated secure values
+if ! command_exists openssl; then
+    print_error "openssl not found - cannot generate secure secrets for validation"
+    exit 1
+fi
+
 cat > .env.test << EOF
 JWT_SECRET_KEY=$(openssl rand -base64 48)
 BOOTSTRAP_KEY=$(openssl rand -base64 32)
@@ -315,14 +321,33 @@ else
     print_error ".gitignore not found"
 fi
 
-# Check for hardcoded secrets in files (exclude common false positives)
+# Check for hardcoded secrets using improved detection function
+check_hardcoded_secrets() {
+    # Search for patterns like: password="value", secret='value', key="value"
+    # Exclude common false positives:
+    # - Comments (# or //)
+    # - Field names (password_field, secret_name, key_name, etc.)
+    # - Hash values (_id, _key followed by string format)
+    # - Common constants (password_hash, secret_key_base)
+    # - Documentation (example, TODO, NOTE)
+    
+    local findings
+    findings=$(grep -rE "(password|secret|key)\s*=\s*['\"][^'\"]{8,}['\"]" \
+        --include="*.yml" --include="*.yaml" --include="*.py" \
+        --exclude-dir=".git" --exclude-dir="venv" --exclude-dir=".venv" \
+        . 2>/dev/null | \
+        grep -vE "(#|//|password_field|secret_name|key_name|password_hash|secret_key_base|example|TODO|NOTE|_id|_key\s*=\s*f['\"])" || true)
+    
+    if [ -n "$findings" ]; then
+        echo "$findings" | head -5
+        return 0
+    else
+        return 1
+    fi
+}
+
 echo "Checking for potential hardcoded secrets..."
-if grep -rE "(password|secret|key)\s*=\s*['\"][^'\"]{8,}['\"]" \
-    --include="*.yml" --include="*.yaml" --include="*.py" \
-    --exclude-dir=".git" --exclude-dir="venv" --exclude-dir=".venv" \
-    . 2>/dev/null | \
-    grep -vE "(#|//|password_field|secret_name|key_name|password_hash|secret_key_base|example|TODO|NOTE|_id|_key\s*=\s*f['\"])" | \
-    head -5; then
+if check_hardcoded_secrets; then
     print_warning "Potential hardcoded secrets found (review above lines)"
 else
     print_success "No obvious hardcoded secrets found"
