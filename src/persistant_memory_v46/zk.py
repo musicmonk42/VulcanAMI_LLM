@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 # Import performance tracking
 try:
-    from ..utils.performance_metrics import track_zk_proof_generation
+    from utils.performance_metrics import track_zk_proof_generation
     PERFORMANCE_TRACKING_AVAILABLE = True
 except ImportError:
     PERFORMANCE_TRACKING_AVAILABLE = False
@@ -58,7 +58,7 @@ except ImportError:
 
 # Import industry-standard SNARK implementation
 try:
-    from ..gvulcan.zk.snark import (
+    from gvulcan.zk.snark import (
         Groth16Prover, Groth16Proof, VerificationKey,
         create_unlearning_circuit, generate_proof_for_unlearning
     )
