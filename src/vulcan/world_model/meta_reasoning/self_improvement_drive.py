@@ -1047,19 +1047,30 @@ class SelfImprovementDrive:
     
     # ---------- Cost / Resource Limits ----------
 
+    # Hard ceilings for unlimited mode to prevent runaway costs/changes
+    UNLIMITED_MODE_HARD_COST_CEILING_USD = 100.0  # Maximum cost even in unlimited mode
+    UNLIMITED_MODE_HARD_CHANGES_CEILING = 1000  # Maximum changes even in unlimited mode
+
     def _check_resource_limits(self, context: Optional[Dict[str, Any]] = None) -> Tuple[bool, Optional[str]]:
         """Check if resource limits would be exceeded, with warnings.
         
-        When unlimited_mode is enabled, this bypasses all limits but still tracks costs.
+        When unlimited_mode is enabled, this bypasses normal limits but still enforces
+        hard ceilings to prevent runaway costs and system resource exhaustion.
         """
-        # UNLIMITED MODE: Bypass all resource limits
-        if getattr(self, 'unlimited_mode', False):
-            logger.debug("Unlimited mode: bypassing resource limit checks")
-            # Still track costs for logging purposes, but don't enforce limits
+        # UNLIMITED MODE: Bypass normal limits but enforce hard ceilings
+        if self.unlimited_mode:
+            logger.debug("Unlimited mode: bypassing normal resource limit checks")
+            # Still track costs for logging purposes
             if context:
                 inc_tokens = int(context.get('tokens_used_increment', 0))
                 if inc_tokens:
                     self.state.session_tokens += inc_tokens
+            
+            # Hard ceiling check - even unlimited mode has an absolute maximum cost
+            if self.state.total_cost_usd >= self.UNLIMITED_MODE_HARD_COST_CEILING_USD:
+                logger.warning(f"Hard cost ceiling reached in unlimited mode (${self.state.total_cost_usd:.2f})")
+                return False, f"Hard cost ceiling reached (${self.state.total_cost_usd:.2f} >= ${self.UNLIMITED_MODE_HARD_COST_CEILING_USD})"
+            
             return True, None
         
         limits = self.config.get('resource_limits', {}).get('llm_costs', {})
@@ -1254,13 +1265,17 @@ class SelfImprovementDrive:
             logger.info(f"Cannot trigger: {reason}")
             return False
         
-        # Check if we've hit the session limit (bypassed in unlimited_mode)
-        if not getattr(self, 'unlimited_mode', False):
+        # Check if we've hit the session limit (bypassed in unlimited_mode, but with hard ceiling)
+        if not self.unlimited_mode:
             max_changes = int(self.config['constraints']['max_changes_per_session'])
             if self.state.improvements_this_session >= max_changes:
                 logger.info(f"Reached max changes limit ({max_changes}) for this session")
                 return False
         else:
+            # Hard ceiling check even in unlimited mode
+            if self.state.improvements_this_session >= self.UNLIMITED_MODE_HARD_CHANGES_CEILING:
+                logger.warning(f"Hard changes ceiling reached in unlimited mode ({self.state.improvements_this_session})")
+                return False
             logger.debug(f"Unlimited mode: bypassing session change limit (current: {self.state.improvements_this_session})")
         
         # Evaluate all triggers
