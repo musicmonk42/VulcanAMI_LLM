@@ -727,8 +727,7 @@ class CalibratedDecisionMaker:
         # Load calibrators
         calibrators_file = load_path / 'calibrators.pkl'
         if calibrators_file.exists():
-            with open(calibrators_file, 'rb') as f:
-                self.calibrators = defaultdict(dict, safe_pickle_load(f))
+            self.calibrators = defaultdict(dict, safe_pickle_load(str(calibrators_file)))
         
         # Load metrics
         metrics_file = load_path / 'metrics.json'

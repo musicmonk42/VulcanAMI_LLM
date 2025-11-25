@@ -30,6 +30,48 @@ K8S_DIR = REPO_ROOT / "k8s"
 HELM_DIR = REPO_ROOT / "helm"
 
 
+def _docker_available_with_network() -> bool:
+    """Check if Docker is available and can access PyPI from within a build."""
+    try:
+        import tempfile
+        
+        # First check if docker command exists
+        result = subprocess.run(
+            ["docker", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            return False
+        
+        # Test Docker's ability to pip install from PyPI during build
+        # This is the actual operation that fails in the tests
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a minimal Dockerfile that tests pip install
+            dockerfile_content = '''FROM python:3.12-slim
+RUN pip install --no-cache-dir requests==2.32.3
+'''
+            dockerfile_path = Path(tmpdir) / "Dockerfile"
+            dockerfile_path.write_text(dockerfile_content)
+            
+            result = subprocess.run(
+                ["docker", "build", "-t", "network-test:latest", tmpdir],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            return result.returncode == 0
+    except Exception:
+        return False
+
+
+# Don't cache the result - check each time to ensure current state
+def docker_available_with_network() -> bool:
+    """Check for Docker with network availability (uncached)."""
+    return _docker_available_with_network()
+
+
 class TestDockerConfigurations:
     """Test Docker-related configurations and builds"""
     
@@ -529,6 +571,9 @@ class TestEndToEnd:
     @pytest.mark.slow
     def test_docker_build_succeeds(self):
         """Test that Docker image builds successfully"""
+        if not docker_available_with_network():
+            pytest.skip("Docker with network access not available")
+        
         result = subprocess.run(
             [
                 "docker", "build",
@@ -548,6 +593,9 @@ class TestEndToEnd:
     @pytest.mark.slow
     def test_docker_image_runs(self):
         """Test that Docker image can run"""
+        if not docker_available_with_network():
+            pytest.skip("Docker with network access not available")
+        
         # First ensure image is built
         build_result = subprocess.run(
             [

@@ -33,7 +33,7 @@ addopts = [
     "-q",
     "--disable-warnings",      # Disable all warnings including coverage warnings
 ]
-testpaths = ["tests"]
+testpaths = ["tests", "src/vulcan/tests"]
 pythonpath = ["src"]
 filterwarnings = [
     "ignore::coverage.exceptions.CoverageWarning",  # Ignore coverage warnings

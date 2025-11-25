@@ -301,7 +301,21 @@ class TestOpenAIProvider:
         )
         contract = ai.AIContract()
         
-        result = await provider.execute(task, contract)
+        # Mock the aiohttp response
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={
+            "data": [{"embedding": [0.1, 0.2, 0.3, 0.4, 0.5]}],
+            "usage": {"total_tokens": 10}
+        })
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        
+        mock_session = AsyncMock()
+        mock_session.post = Mock(return_value=mock_response)
+        
+        with patch.object(provider, '_get_session', return_value=mock_session):
+            result = await provider.execute(task, contract)
         
         assert result.status == "SUCCESS"
         assert "vector" in result.data
@@ -318,7 +332,21 @@ class TestOpenAIProvider:
         )
         contract = ai.AIContract()
         
-        result = await provider.execute(task, contract)
+        # Mock the aiohttp response
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={
+            "choices": [{"message": {"content": "Hello there!"}}],
+            "usage": {"total_tokens": 15}
+        })
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        
+        mock_session = AsyncMock()
+        mock_session.post = Mock(return_value=mock_response)
+        
+        with patch.object(provider, '_get_session', return_value=mock_session):
+            result = await provider.execute(task, contract)
         
         assert result.status == "SUCCESS"
         assert "text" in result.data
@@ -399,6 +427,7 @@ class TestAnthropicProvider:
         )
         contract = ai.AIContract()
         
+        # AnthropicProvider is already a mock implementation, no need to patch
         result = await provider.execute(task, contract)
         
         assert result.status == "SUCCESS"
@@ -442,6 +471,7 @@ class TestGrokProvider:
         )
         contract = ai.AIContract()
         
+        # GrokProvider is already a mock implementation, no need to patch
         result = await provider.execute(task, contract)
         
         assert result.status == "SUCCESS"
@@ -678,9 +708,9 @@ class TestRateLimiter:
         assert len(limiter.calls["OpenAI"]) == 1
         assert len(limiter.calls["Anthropic"]) == 1
         limiter.reset()
-        # Fix: Check the calls dict
-        assert len(limiter.calls["OpenAI"]) == 0
-        assert len(limiter.calls["Anthropic"]) == 0
+        # After reset(), the calls dict is cleared entirely, so keys don't exist
+        assert "OpenAI" not in limiter.calls
+        assert "Anthropic" not in limiter.calls
 
 
 class TestAIRuntime:

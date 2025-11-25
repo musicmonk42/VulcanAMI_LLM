@@ -42,6 +42,12 @@ else:
     print("[conftest] .env file not found or not loaded.")
 # <<< --- END DOTENV LOADING --- >>>
 
+# <<< --- TEST ENVIRONMENT VARIABLES --- >>>
+# Set environment variables needed for testing if not already set
+if not os.environ.get("GRAPHIX_JWT_SECRET"):
+    os.environ["ALLOW_EPHEMERAL_SECRET"] = "true"
+# <<< --- END TEST ENVIRONMENT VARIABLES --- >>>
+
 # 2) Build a mapping from simple module name -> dotted module path by scanning src
 #    Example: src/unified_runtime/hardware_dispatcher.py
 #    - dotted: "unified_runtime.hardware_dispatcher"
