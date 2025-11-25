@@ -218,9 +218,9 @@ class ScheduledAdversarialTester:
                 'epsilon': epsilon
             }
             
-            # Mock validator function
+            # Mock validator function - must return (safe, reason, confidence) tuple
             def mock_validator(action, context):
-                return {'safe': True, 'score': 0.9}
+                return (True, "OK", 0.9)
             
             # Try to run the attack with error handling
             report = None
