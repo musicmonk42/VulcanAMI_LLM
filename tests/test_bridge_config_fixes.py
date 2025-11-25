@@ -44,14 +44,15 @@ def test_bridge_config_validation_negative_timeout():
     """Test that negative timeout raises ValueError."""
     from src.integration.graphix_vulcan_bridge import BridgeConfig
     
-    with pytest.raises(ValueError, match="async_timeout must be positive"):
+    with pytest.raises(ValueError, match="async_timeout must be non-negative"):
         BridgeConfig(async_timeout=-1.0)
 
 
 def test_bridge_config_validation_zero_timeout():
-    """Test that zero timeout raises ValueError."""
+    """Test that zero timeout raises ValueError (must be positive)."""
     from src.integration.graphix_vulcan_bridge import BridgeConfig
     
+    # Zero is non-negative but not positive, so it should raise
     with pytest.raises(ValueError, match="async_timeout must be positive"):
         BridgeConfig(async_timeout=0.0)
 
@@ -60,7 +61,7 @@ def test_bridge_config_validation_negative_embedding_dim():
     """Test that negative embedding_dim raises ValueError."""
     from src.integration.graphix_vulcan_bridge import BridgeConfig
     
-    with pytest.raises(ValueError, match="embedding_dim must be positive"):
+    with pytest.raises(ValueError, match="embedding_dim must be non-negative"):
         BridgeConfig(embedding_dim=-100)
 
 

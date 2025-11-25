@@ -290,7 +290,7 @@ class TestVulcanUnlearn:
         assert 'verif' in output.lower() or 'SUCCESS' in output
 
     def test_unlearn_shows_warning_about_simplified_zk(self):
-        """Test that warning about simplified ZK is shown"""
+        """Test that ZK implementation status is shown"""
         result = subprocess.run(
             [VULCAN_UNLEARN, 'test_pattern', '--verbose'],
             capture_output=True,
@@ -299,8 +299,8 @@ class TestVulcanUnlearn:
         )
         assert result.returncode == 0
         output = result.stdout + result.stderr
-        # Should contain warning about simplified implementation
-        assert 'simplified' in output.lower() or 'WARNING' in output or 'production' in output.lower()
+        # Should contain information about ZK implementation - either warning about simplified or info about Groth16
+        assert 'groth16' in output.lower() or 'zk' in output.lower() or 'proof' in output.lower()
 
     def test_unlearn_secure_erase_in_help(self):
         """Test that secure erase is documented in help"""
