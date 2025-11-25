@@ -16,6 +16,7 @@ dependencies = [
     "pytest-cov>=4.0.0",
     "hypothesis>=6.98.0",
     "faker>=24.0.0",
+    "py-ecc>=6.0.0",  # Required for Groth16 zk-SNARK implementation
 ]
 
 [tool.setuptools]

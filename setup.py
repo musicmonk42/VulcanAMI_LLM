@@ -11,5 +11,6 @@ setup(
         "llvmlite",
         "locust",
         "faker",
+        "py-ecc>=6.0.0",  # Required for Groth16 zk-SNARK implementation
     ],
 )
