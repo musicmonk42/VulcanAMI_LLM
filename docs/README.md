@@ -1,6 +1,6 @@
 # Graphix Vulcan Documentation Index
 
-Welcome to the root documentation corpus for the Graphix Vulcan Platform (Proprietary & Confidential — Novatrax Labs LLC).  
+Welcome to the root documentation corpus for the Graphix Vulcan Platform (Proprietary & Confidential — Novatrax Labs LTD).  
 This folder aggregates deep technical, governance, safety, execution, optimization, and integration references.
 
 ## Contents Overview
