@@ -26,7 +26,7 @@ from datetime import datetime, timedelta
 import aiohttp
 from aiohttp import web
 from redis import asyncio as aioredis
-from redis.asyncio.exceptions import ConnectionError as RedisConnectionError
+from redis.asyncio import ConnectionError as RedisConnectionError
 import numpy as np
 from functools import wraps
 import traceback
@@ -182,18 +182,63 @@ logger = logging.getLogger(__name__)
 # METRICS
 # ============================================================
 
-request_count = Counter('api_gateway_requests_total', 'Total API requests',
-                        ['method', 'endpoint', 'status'])
-request_duration = Histogram('api_gateway_request_duration_seconds',
-                            'Request duration', ['method', 'endpoint'])
-active_connections = Gauge('api_gateway_active_connections', 'Active connections')
-cache_hits = Counter('api_gateway_cache_hits_total', 'Cache hits', ['cache_type'])
-cache_misses = Counter('api_gateway_cache_misses_total', 'Cache misses', ['cache_type'])
-circuit_breaker_state = Gauge('api_gateway_circuit_breaker_state',
-                              'Circuit breaker state', ['service'])
-auth_failures = Counter('api_gateway_auth_failures_total', 'Authentication failures', ['reason'])
-auth_success = Counter('api_gateway_auth_success_total', 'Authentication successes', ['method'])
-token_revocations = Counter('api_gateway_token_revocations_total', 'Tokens revoked', ['type'])
+# Use try/except to handle duplicate registration during test collection
+try:
+    request_count = Counter('api_gateway_requests_total', 'Total API requests',
+                            ['method', 'endpoint', 'status'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    request_count = REGISTRY._names_to_collectors.get('api_gateway_requests_total')
+
+try:
+    request_duration = Histogram('api_gateway_request_duration_seconds',
+                                'Request duration', ['method', 'endpoint'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    request_duration = REGISTRY._names_to_collectors.get('api_gateway_request_duration_seconds')
+
+try:
+    active_connections = Gauge('api_gateway_active_connections', 'Active connections')
+except ValueError:
+    from prometheus_client import REGISTRY
+    active_connections = REGISTRY._names_to_collectors.get('api_gateway_active_connections')
+
+try:
+    cache_hits = Counter('api_gateway_cache_hits_total', 'Cache hits', ['cache_type'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    cache_hits = REGISTRY._names_to_collectors.get('api_gateway_cache_hits_total')
+
+try:
+    cache_misses = Counter('api_gateway_cache_misses_total', 'Cache misses', ['cache_type'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    cache_misses = REGISTRY._names_to_collectors.get('api_gateway_cache_misses_total')
+
+try:
+    circuit_breaker_state = Gauge('api_gateway_circuit_breaker_state',
+                                  'Circuit breaker state', ['service'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    circuit_breaker_state = REGISTRY._names_to_collectors.get('api_gateway_circuit_breaker_state')
+
+try:
+    auth_failures = Counter('api_gateway_auth_failures_total', 'Authentication failures', ['reason'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    auth_failures = REGISTRY._names_to_collectors.get('api_gateway_auth_failures_total')
+
+try:
+    auth_success = Counter('api_gateway_auth_success_total', 'Authentication successes', ['method'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    auth_success = REGISTRY._names_to_collectors.get('api_gateway_auth_success_total')
+
+try:
+    token_revocations = Counter('api_gateway_token_revocations_total', 'Tokens revoked', ['type'])
+except ValueError:
+    from prometheus_client import REGISTRY
+    token_revocations = REGISTRY._names_to_collectors.get('api_gateway_token_revocations_total')
 
 # ============================================================
 # SERVICE REGISTRY

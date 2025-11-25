@@ -8,6 +8,8 @@ ExecutionOutcome → Crystallization → Validation → Library Promotion → Re
 IMPLEMENTATION COMPLETE - All components functional and integrated
 """
 
+from __future__ import annotations
+
 import numpy as np
 import logging
 from typing import Dict, List, Any, Optional, Tuple, Set
@@ -65,6 +67,18 @@ except ImportError:
         logging.warning("Knowledge crystallizer components not available")
         KnowledgeCrystallizer = None
         KnowledgeValidator = None
+        CrystallizerTrace = None
+        ExecutionTrace = None
+        Principle = None
+        Metric = None
+        MetricType = None
+        Pattern = None
+        PatternType = None
+        ValidationResult = None
+        ValidationResults = None
+        VersionedKnowledgeBase = None
+        KnowledgeIndex = None
+        KnowledgePruner = None
 
 logger = logging.getLogger(__name__)
 

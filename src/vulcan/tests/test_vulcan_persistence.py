@@ -26,7 +26,7 @@ from unittest.mock import Mock, patch
 
 # Import the module under test
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from vulcan.memory.persistence import (
     MemoryPersistence,
