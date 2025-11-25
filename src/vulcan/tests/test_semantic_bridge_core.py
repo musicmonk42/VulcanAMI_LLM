@@ -224,7 +224,11 @@ class TestRealImportsVerification:
         """Test that safety_config is passed to all components"""
         from semantic_bridge.semantic_bridge_core import SemanticBridge
         
-        safety_config = {'max_risk_score': 0.8}
+        # Use valid SafetyConfig parameters with defaults for safety_thresholds
+        safety_config = {
+            'enable_adversarial_testing': True,
+            'enable_compliance_checking': False  # Disable to avoid additional dependencies
+        }
         bridge = SemanticBridge(safety_config=safety_config)
         
         # Verify all components have safety_validator
