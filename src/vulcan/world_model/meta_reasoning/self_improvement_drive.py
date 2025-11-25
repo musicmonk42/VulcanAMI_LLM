@@ -299,6 +299,17 @@ class SelfImprovementDrive:
         self._auto_apply_policy = load_policy(policy_path)
         self._auto_apply_enabled = bool(self._auto_apply_policy.enabled and not getattr(self, "require_human_approval", True))
         
+        # UNLIMITED MODE: When enabled, bypasses limits to "fix everything wrong"
+        # WARNING: Use with caution - removes session limits, cost limits, and change caps
+        self.unlimited_mode = bool(self.config.get('unlimited_mode', False))
+        if self.unlimited_mode:
+            logger.warning("=" * 60)
+            logger.warning("⚠️  UNLIMITED MODE ENABLED ⚠️")
+            logger.warning("Session limits, cost limits, and change caps are BYPASSED")
+            logger.warning("The system will attempt to fix all detected issues")
+            logger.warning("Ensure you have reviewed and approved this configuration")
+            logger.warning("=" * 60)
+        
         logger.info(f"SelfImprovementDrive initialized with {len(self.objectives)} objectives")
         logger.info(f"Priority: {self.config.get('priority', 0.8)}")
         logger.info(f"Requires human approval: {self.require_human_approval}")
@@ -386,6 +397,7 @@ class SelfImprovementDrive:
             "enabled": True,
             "priority": 0.8,
             "description": "Continuous self-improvement and bug fixing",
+            "unlimited_mode": False,  # When True, bypasses session limits, cost limits, and change caps
             "objectives": [
                 {
                     "type": "fix_circular_imports",
@@ -1036,7 +1048,20 @@ class SelfImprovementDrive:
     # ---------- Cost / Resource Limits ----------
 
     def _check_resource_limits(self, context: Optional[Dict[str, Any]] = None) -> Tuple[bool, Optional[str]]:
-        """Check if resource limits would be exceeded, with warnings."""
+        """Check if resource limits would be exceeded, with warnings.
+        
+        When unlimited_mode is enabled, this bypasses all limits but still tracks costs.
+        """
+        # UNLIMITED MODE: Bypass all resource limits
+        if getattr(self, 'unlimited_mode', False):
+            logger.debug("Unlimited mode: bypassing resource limit checks")
+            # Still track costs for logging purposes, but don't enforce limits
+            if context:
+                inc_tokens = int(context.get('tokens_used_increment', 0))
+                if inc_tokens:
+                    self.state.session_tokens += inc_tokens
+            return True, None
+        
         limits = self.config.get('resource_limits', {}).get('llm_costs', {})
         warn_at_pct = float(limits.get('warn_at_percent', 80)) / 100.0
         pause_at_pct = float(limits.get('pause_at_percent', 95)) / 100.0
@@ -1215,6 +1240,8 @@ class SelfImprovementDrive:
         
         This is called by Vulcan's motivational system to decide if the
         system should focus on self-improvement right now.
+        
+        When unlimited_mode is enabled, the session change limit is bypassed.
         """
         # Check if enabled
         if not self.config.get('enabled', True):
@@ -1227,11 +1254,14 @@ class SelfImprovementDrive:
             logger.info(f"Cannot trigger: {reason}")
             return False
         
-        # Check if we've hit the session limit
-        max_changes = int(self.config['constraints']['max_changes_per_session'])
-        if self.state.improvements_this_session >= max_changes:
-            logger.info(f"Reached max changes limit ({max_changes}) for this session")
-            return False
+        # Check if we've hit the session limit (bypassed in unlimited_mode)
+        if not getattr(self, 'unlimited_mode', False):
+            max_changes = int(self.config['constraints']['max_changes_per_session'])
+            if self.state.improvements_this_session >= max_changes:
+                logger.info(f"Reached max changes limit ({max_changes}) for this session")
+                return False
+        else:
+            logger.debug(f"Unlimited mode: bypassing session change limit (current: {self.state.improvements_this_session})")
         
         # Evaluate all triggers
         triggers = self.config.get('triggers', [])
@@ -1882,6 +1912,57 @@ class SelfImprovementDrive:
         except Exception:        
             return {}
 
+    def set_unlimited_mode(self, enabled: bool) -> Dict[str, Any]:
+        """
+        Enable or disable unlimited mode for self-improvement.
+        
+        When unlimited_mode is enabled:
+        - Session change limits are bypassed (max_changes_per_session ignored)
+        - Cost limits are bypassed (cost warnings still tracked but not enforced)
+        - Session duration limits are bypassed
+        - The system will attempt to fix all detected issues
+        
+        WARNING: Use with caution. This removes safety constraints that prevent
+        runaway costs and excessive changes. Ensure you have reviewed and approved
+        enabling this mode.
+        
+        Args:
+            enabled: True to enable unlimited mode, False to disable
+            
+        Returns:
+            Status dict with confirmation
+        """
+        with self._lock:
+            previous_mode = getattr(self, 'unlimited_mode', False)
+            self.unlimited_mode = bool(enabled)
+            
+            if self.unlimited_mode and not previous_mode:
+                logger.warning("=" * 60)
+                logger.warning("⚠️  UNLIMITED MODE ENABLED ⚠️")
+                logger.warning("Session limits, cost limits, and change caps are BYPASSED")
+                logger.warning("The system will attempt to fix all detected issues")
+                logger.warning("=" * 60)
+                
+                self._send_alert('warning', 'Unlimited mode enabled', {
+                    'timestamp': time.time(),
+                    'previous_mode': previous_mode,
+                    'new_mode': self.unlimited_mode
+                })
+            elif not self.unlimited_mode and previous_mode:
+                logger.info("Unlimited mode disabled - normal limits restored")
+                self._send_alert('info', 'Unlimited mode disabled', {
+                    'timestamp': time.time(),
+                    'previous_mode': previous_mode,
+                    'new_mode': self.unlimited_mode
+                })
+            
+            return {
+                'unlimited_mode': self.unlimited_mode,
+                'previous_mode': previous_mode,
+                'changed': self.unlimited_mode != previous_mode,
+                'message': 'Unlimited mode enabled - all limits bypassed' if self.unlimited_mode else 'Normal limits restored'
+            }
+
     def get_status(self) -> Dict[str, Any]:
         # **************************************************************************
         # START FIX 2: Rewrite get_status to include all keys expected by tests
@@ -1948,7 +2029,10 @@ class SelfImprovementDrive:
                 "session_duration_minutes": session_duration_min,
                 
                 # This key is checked by the first failing test
-                "completed_objectives": state_dict.get("completed_objectives", [])
+                "completed_objectives": state_dict.get("completed_objectives", []),
+                
+                # Unlimited mode status - allows fixing everything without limits
+                "unlimited_mode": bool(getattr(self, "unlimited_mode", False))
             }
         # END FIX 2
         # **************************************************************************
