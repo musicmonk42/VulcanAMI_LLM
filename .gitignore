@@ -160,3 +160,6 @@ test_results_*/
 docker_test_results_*/
 full_test_run.log
 comprehensive_test_run.log
+
+# Adversarial testing logs (generated artifacts)
+logs/adversarial_testing/
