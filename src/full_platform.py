@@ -800,6 +800,9 @@ async def lifespan(app: FastAPI):
     Lifecycle management for the unified platform.
     Handles startup and graceful shutdown.
     """
+    startup_complete = False
+    worker_id = os.getpid()
+    
     # ====================================================================
     # [!!!] MOVED BLOCKS HERE TO RUN IN WORKER PROCESS [!!!]
     # ====================================================================
@@ -875,119 +878,132 @@ async def lifespan(app: FastAPI):
 
     # STARTUP
     worker_id = os.getpid()
-    logger.info("=" * 70)
-    logger.info(f"Starting Unified Platform (Worker {worker_id})")
-    logger.info("=" * 70)
-    
-    # Log configuration
-    logger.info(f"Host: {settings.host}:{settings.port}")
-    logger.info(f"Workers: {settings.workers}")
-    logger.info(f"Auth: {settings.auth_method.value}")
-    logger.info(f"Metrics: {'Enabled' if settings.enable_metrics else 'Disabled'}")
-    logger.info(f"Health Checks: {'Enabled' if settings.enable_health_checks else 'Disabled'}")
-
-    # Enforce security-critical configuration
-    if settings.auth_method == AuthMethod.JWT and not settings.jwt_secret:
-        logger.error("JWT auth is enabled but jwt_secret is not configured. Failing startup.")
-        raise RuntimeError("JWT secret is required when AuthMethod is JWT")
-    if settings.cors_enabled and any(o == "*" for o in settings.cors_origins):
-        logger.warning("Wildcard '*' detected in CORS origins; this is discouraged in production. Consider restricting to specific origins.")
-
-    # Import and mount services
-    logger.info("=" * 70)
-    logger.info("Importing services...")
-    logger.info("=" * 70)
-    
-    # Import VULCAN
-    vulcan_result = await import_service_async(
-        "VULCAN",
-        settings.vulcan_module,
-        settings.vulcan_attr,
-        "FastAPI"
-    )
-    await service_manager.register_service(
-        "vulcan",
-        vulcan_result,
-        settings.vulcan_mount,
-        f"{settings.vulcan_mount}/health"
-    )
-    
-    # Import Arena
-    arena_result = await import_service_async(
-        "Arena",
-        settings.arena_module,
-        settings.arena_attr,
-        "FastAPI"
-    )
-    await service_manager.register_service(
-        "arena",
-        arena_result,
-        settings.arena_mount,
-        f"{settings.arena_mount}/health"
-    )
-    
-    # Import Registry
-    registry_result = await import_service_async(
-        "Registry",
-        settings.registry_module,
-        settings.registry_attr,
-        "Flask"
-    )
-    await service_manager.register_service(
-        "registry",
-        registry_result,
-        settings.registry_mount,
-        f"{settings.registry_mount}/health"
-    )
-    
-    # Mount services
-    logger.info("=" * 70)
-    logger.info("Mounting services...")
-    logger.info("=" * 70)
-    
-    # Explicit VULCAN mount per user request
     try:
-        vulcan_module = importlib.import_module("src.vulcan.main")
-        if not hasattr(vulcan_module, "app") or not isinstance(vulcan_module.app, FastAPI):
-            raise RuntimeError("src.vulcan.main does not expose a FastAPI 'app'")
-        app.mount("/vulcan", vulcan_module.app)
-        logger.info("✓ Mounted vulcan at /vulcan")
-        # Manually update service manager state if it was registered
-        if "vulcan" in service_manager.services:
-             service_manager.services["vulcan"]["mounted"] = True
-             
-    except Exception as e:
-        logger.error(f"❌ Failed to mount vulcan at /vulcan: {e}", exc_info=True)
-        logger.info("vulcan: ❌ FAILED")
+        logger.info("=" * 70)
+        logger.info(f"Starting Unified Platform (Worker {worker_id})")
+        logger.info("=" * 70)
+    
+        # Log configuration
+        logger.info(f"Host: {settings.host}:{settings.port}")
+        logger.info(f"Workers: {settings.workers}")
+        logger.info(f"Auth: {settings.auth_method.value}")
+        logger.info(f"Metrics: {'Enabled' if settings.enable_metrics else 'Disabled'}")
+        logger.info(f"Health Checks: {'Enabled' if settings.enable_health_checks else 'Disabled'}")
 
-    await service_manager.mount_service(app, "arena")
-    await service_manager.mount_service(app, "registry", use_wsgi=True)
+        # Enforce security-critical configuration
+        if settings.auth_method == AuthMethod.JWT and not settings.jwt_secret:
+            logger.error("JWT auth is enabled but jwt_secret is not configured. Failing startup.")
+            raise RuntimeError("JWT secret is required when AuthMethod is JWT")
+        if settings.cors_enabled and any(o == "*" for o in settings.cors_origins):
+            logger.warning("Wildcard '*' detected in CORS origins; this is discouraged in production. Consider restricting to specific origins.")
+
+        # Import and mount services
+        logger.info("=" * 70)
+        logger.info("Importing services...")
+        logger.info("=" * 70)
+        
+        # Import VULCAN
+        vulcan_result = await import_service_async(
+            "VULCAN",
+            settings.vulcan_module,
+            settings.vulcan_attr,
+            "FastAPI"
+        )
+        await service_manager.register_service(
+            "vulcan",
+            vulcan_result,
+            settings.vulcan_mount,
+            f"{settings.vulcan_mount}/health"
+        )
+        
+        # Import Arena
+        arena_result = await import_service_async(
+            "Arena",
+            settings.arena_module,
+            settings.arena_attr,
+            "FastAPI"
+        )
+        await service_manager.register_service(
+            "arena",
+            arena_result,
+            settings.arena_mount,
+            f"{settings.arena_mount}/health"
+        )
+        
+        # Import Registry
+        registry_result = await import_service_async(
+            "Registry",
+            settings.registry_module,
+            settings.registry_attr,
+            "Flask"
+        )
+        await service_manager.register_service(
+            "registry",
+            registry_result,
+            settings.registry_mount,
+            f"{settings.registry_mount}/health"
+        )
+        
+        # Mount services
+        logger.info("=" * 70)
+        logger.info("Mounting services...")
+        logger.info("=" * 70)
+        
+        # Explicit VULCAN mount per user request
+        try:
+            vulcan_module = importlib.import_module("src.vulcan.main")
+            if not hasattr(vulcan_module, "app") or not isinstance(vulcan_module.app, FastAPI):
+                raise RuntimeError("src.vulcan.main does not expose a FastAPI 'app'")
+            app.mount("/vulcan", vulcan_module.app)
+            logger.info("✓ Mounted vulcan at /vulcan")
+            # Manually update service manager state if it was registered
+            if "vulcan" in service_manager.services:
+                 service_manager.services["vulcan"]["mounted"] = True
+                 
+        except Exception as e:
+            logger.error(f"❌ Failed to mount vulcan at /vulcan: {e}", exc_info=True)
+            logger.info("vulcan: ❌ FAILED")
+
+        await service_manager.mount_service(app, "arena")
+        await service_manager.mount_service(app, "registry", use_wsgi=True)
+        
+        # Summary
+        logger.info("=" * 70)
+        logger.info("Service Status Summary")
+        logger.info("=" * 70)
+        service_status = await service_manager.get_service_status()
+        for name, service in service_status.items():
+            status_txt = "✅ MOUNTED" if service.get("mounted") else "❌ FAILED"
+            logger.info(f"{name}: {status_txt}")
+            if service.get("mounted"):
+                logger.info(f"  → {service['mount_path']}")
+                logger.info(f"  → Import: {service.get('import_path', 'N/A')}")
+        
+        logger.info("=" * 70)
+        logger.info(f"Platform Ready! (Worker {worker_id})")
+        logger.info("=" * 70)
     
-    # Summary
-    logger.info("=" * 70)
-    logger.info("Service Status Summary")
-    logger.info("=" * 70)
-    service_status = await service_manager.get_service_status()
-    for name, service in service_status.items():
-        status_txt = "✅ MOUNTED" if service.get("mounted") else "❌ FAILED"
-        logger.info(f"{name}: {status_txt}")
-        if service.get("mounted"):
-            logger.info(f"  → {service['mount_path']}")
-            logger.info(f"  → Import: {service.get('import_path', 'N/A')}")
+    except asyncio.CancelledError:
+        logger.warning(f"Unified Platform (Worker {worker_id}) startup cancelled")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start Unified Platform: {e}", exc_info=True)
+        raise
     
-    logger.info("=" * 70)
-    logger.info(f"Platform Ready! (Worker {worker_id})")
-    logger.info("=" * 70)
+    startup_complete = True
     
-    yield
-    
-    # SHUTDOWN
-    logger.info("=" * 70)
-    logger.info(f"Shutting down Unified Platform (Worker {worker_id})...")
-    logger.info("=" * 70)
-    
-    # Cleanup tasks
-    logger.info("Shutdown complete")
+    try:
+        yield
+    except asyncio.CancelledError:
+        logger.info(f"Unified Platform (Worker {worker_id}) received cancellation signal")
+    finally:
+        # SHUTDOWN
+        logger.info("=" * 70)
+        logger.info(f"Shutting down Unified Platform (Worker {worker_id})...")
+        logger.info("=" * 70)
+        
+        # Cleanup tasks
+        logger.info("Shutdown complete")
 
 # =============================================================================
 # FASTAPI APP CREATION
