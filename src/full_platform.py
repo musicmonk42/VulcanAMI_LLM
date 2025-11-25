@@ -877,7 +877,6 @@ async def lifespan(app: FastAPI):
     setup_unified_logging()
 
     # STARTUP
-    worker_id = os.getpid()
     try:
         logger.info("=" * 70)
         logger.info(f"Starting Unified Platform (Worker {worker_id})")

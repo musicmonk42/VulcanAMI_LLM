@@ -30,7 +30,7 @@ import json
 import hashlib
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
@@ -62,6 +62,9 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Constants
+MOCK_RESPONSE_TRUNCATION_LENGTH = 100
 
 
 class GraphixLLMClient:
@@ -153,7 +156,7 @@ class GraphixLLMClient:
 
         # Handle mock mode
         if self.mock_mode:
-            response = f"[Mock Response] This is a simulated response for: {last_content[:100]}..."
+            response = f"[Mock Response] This is a simulated response for: {last_content[:MOCK_RESPONSE_TRUNCATION_LENGTH]}..."
             self.logger.debug(f"Mock chat response generated for agent {self.agent_id}")
         else:
             try:
@@ -184,7 +187,7 @@ class GraphixLLMClient:
             ],
             "metadata": {
                 "agent_id": self.agent_id,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "model": model,
                 "mock_mode": self.mock_mode
             }
