@@ -111,7 +111,7 @@ class TestProposalCreation:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         with pytest.raises(ValueError, match="not registered"):
@@ -172,7 +172,7 @@ class TestProposalCreation:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0], duration_days=14)
@@ -191,7 +191,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -205,7 +205,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -220,7 +220,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -235,7 +235,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -253,7 +253,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -266,7 +266,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -282,7 +282,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -298,7 +298,7 @@ class TestVoting:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -344,7 +344,7 @@ class TestConsensusEvaluation:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -366,7 +366,7 @@ class TestConsensusEvaluation:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -384,7 +384,7 @@ class TestConsensusEvaluation:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -403,7 +403,7 @@ class TestConsensusEvaluation:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -510,7 +510,7 @@ class TestStatisticsAndQueries:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
@@ -538,7 +538,7 @@ class TestStatisticsAndQueries:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         engine.propose(proposal_graph, registered_agents[0])
@@ -595,7 +595,7 @@ class TestThreadSafety:
         proposal_graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [{"id": "p1", "type": "ProposalNode"}]
+            "nodes": [{"id": "p1", "type": "ProposalNode", "proposal_content": {"add": "test_change"}}]
         }
         
         proposal_id = engine.propose(proposal_graph, registered_agents[0])
