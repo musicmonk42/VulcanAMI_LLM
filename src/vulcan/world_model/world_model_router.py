@@ -37,36 +37,43 @@ logger = logging.getLogger(__name__)
 
 # Lazy import for safety validator to avoid circular import issues
 # The actual import is deferred to when the class is instantiated
-_safety_validator_module = None
-_safety_types_module = None
+_safety_validator_class = None
+_safety_config_class = None
+_safety_imports_checked = False
 
 
 def _get_safety_validator():
     """Lazy import of EnhancedSafetyValidator to avoid circular imports."""
-    global _safety_validator_module
-    if _safety_validator_module is None:
-        try:
-            from ..safety import safety_validator as sv_module
-            _safety_validator_module = sv_module
-        except ImportError:
-            _safety_validator_module = False
-    if _safety_validator_module is False:
-        return None
-    return getattr(_safety_validator_module, 'EnhancedSafetyValidator', None)
+    global _safety_validator_class, _safety_imports_checked
+    if not _safety_imports_checked:
+        _check_safety_imports()
+    return _safety_validator_class
 
 
 def _get_safety_config():
     """Lazy import of SafetyConfig to avoid circular imports."""
-    global _safety_types_module
-    if _safety_types_module is None:
-        try:
-            from ..safety import safety_types as st_module
-            _safety_types_module = st_module
-        except ImportError:
-            _safety_types_module = False
-    if _safety_types_module is False:
-        return None
-    return getattr(_safety_types_module, 'SafetyConfig', None)
+    global _safety_config_class, _safety_imports_checked
+    if not _safety_imports_checked:
+        _check_safety_imports()
+    return _safety_config_class
+
+
+def _check_safety_imports():
+    """Check and cache safety module imports."""
+    global _safety_validator_class, _safety_config_class, _safety_imports_checked
+    _safety_imports_checked = True
+    
+    try:
+        from ..safety.safety_validator import EnhancedSafetyValidator
+        _safety_validator_class = EnhancedSafetyValidator
+    except (ImportError, AttributeError):
+        _safety_validator_class = None
+    
+    try:
+        from ..safety.safety_types import SafetyConfig
+        _safety_config_class = SafetyConfig
+    except (ImportError, AttributeError):
+        _safety_config_class = None
 
 
 class UpdateType(Enum):
