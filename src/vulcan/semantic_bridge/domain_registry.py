@@ -20,16 +20,37 @@ from pathlib import Path
 import pickle
 import threading
 
-# Import safety validator
+# Import safety validator with multiple fallback paths
+SAFETY_VALIDATOR_AVAILABLE = False
+EnhancedSafetyValidator = None
+SafetyConfig = None
+
+# Try relative import first (when used as part of vulcan package)
 try:
     from ..safety.safety_validator import EnhancedSafetyValidator
     from ..safety.safety_types import SafetyConfig
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
-    SAFETY_VALIDATOR_AVAILABLE = False
-    # Note: Warning moved to __init__ to avoid spurious warnings at import time
-    EnhancedSafetyValidator = None
-    SafetyConfig = None
+    pass
+
+# Fallback: Try absolute import (when vulcan is in sys.path)
+if not SAFETY_VALIDATOR_AVAILABLE:
+    try:
+        from vulcan.safety.safety_validator import EnhancedSafetyValidator
+        from vulcan.safety.safety_types import SafetyConfig
+        SAFETY_VALIDATOR_AVAILABLE = True
+    except ImportError:
+        pass
+
+# Fallback: Try src-prefixed import (when src is in sys.path)
+if not SAFETY_VALIDATOR_AVAILABLE:
+    try:
+        from src.vulcan.safety.safety_validator import EnhancedSafetyValidator
+        from src.vulcan.safety.safety_types import SafetyConfig
+        SAFETY_VALIDATOR_AVAILABLE = True
+    except ImportError:
+        # Note: Warning moved to __init__ to avoid spurious warnings at import time
+        pass
 
 # Optional import with fallback
 try:
