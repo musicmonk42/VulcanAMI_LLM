@@ -439,11 +439,18 @@ def check_dependencies() -> Dict[str, bool]:
     except ImportError:
         dependencies['statsmodels'] = False
     
-    # Check safety validator
+    # Check safety validator (with protection against circular imports)
     try:
-        from ..safety.safety_validator import EnhancedSafetyValidator
-        dependencies['safety_validator'] = True
-    except ImportError:
+        # Use importlib to check if module exists without triggering full import chain
+        import importlib.util
+        spec = importlib.util.find_spec('vulcan.safety.safety_validator')
+        if spec is not None:
+            # Module exists, try to import to verify it's usable
+            from ..safety.safety_validator import EnhancedSafetyValidator
+            dependencies['safety_validator'] = True
+        else:
+            dependencies['safety_validator'] = False
+    except (ImportError, AttributeError):
         dependencies['safety_validator'] = False
     
     return dependencies
@@ -492,14 +499,22 @@ logger = logging.getLogger(__name__)
 logger.info("World Model module loaded - components: %s", 
            [k for k, v in get_available_components().items() if v])
 
-# Log warnings for missing dependencies
-missing_deps = [k for k, v in check_dependencies().items() if not v]
+# Log warnings for missing dependencies (excluding safety_validator which may be delayed due to circular imports)
+_deps = check_dependencies()
+missing_deps = [k for k, v in _deps.items() if not v and k != 'safety_validator']
 if missing_deps:
     logger.warning("Operating with fallback implementations for: %s", missing_deps)
 
-# Safety validator check
-if not check_dependencies().get('safety_validator', False):
-    logger.warning(
-        "Safety validator not available - operating without safety checks. "
-        "For production use, ensure safety_validator module is available."
-    )
+# Safety validator check - only warn if the module file doesn't exist at all
+# (not if it's temporarily unavailable due to circular imports)
+if not _deps.get('safety_validator', False):
+    # Double-check by looking for the module file
+    import importlib.util
+    safety_spec = importlib.util.find_spec('vulcan.safety.safety_validator')
+    if safety_spec is None:
+        # Module truly doesn't exist
+        logger.warning(
+            "Safety validator not available - operating without safety checks. "
+            "For production use, ensure safety_validator module is available."
+        )
+    # If module exists but couldn't import (circular import), don't warn - it will be available later
