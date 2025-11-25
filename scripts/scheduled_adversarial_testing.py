@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scheduled Adversarial Testing - Phase 3 Implementation
+Scheduled Adversarial Testing - Phase 3 Implementation (FIXED)
 
 This script provides a cron-compatible wrapper for running AdversarialValidator attacks
 on a scheduled basis. It can be called directly or via cron to perform automated
@@ -128,6 +128,62 @@ class ScheduledAdversarialTester:
         
         return default_config
     
+    def _extract_report_data(self, report: Any) -> Dict[str, Any]:
+        """Extract data from SafetyReport or similar object.
+        
+        Args:
+            report: Report object from validator
+            
+        Returns:
+            Dictionary with report data
+        """
+        # Try different methods to extract data from the report object
+        report_dict = {}
+        
+        # If it's already a dictionary, return it
+        if isinstance(report, dict):
+            return report
+        
+        # Try to convert to dictionary using various methods
+        if hasattr(report, 'to_dict'):
+            try:
+                return report.to_dict()
+            except:
+                pass
+        
+        if hasattr(report, '__dict__'):
+            try:
+                # Get all non-private attributes
+                report_dict = {k: v for k, v in vars(report).items() 
+                             if not k.startswith('_')}
+                return report_dict
+            except:
+                pass
+        
+        # Extract known attributes manually
+        known_attributes = [
+            'safe', 'robustness_score', 'violations', 'attack_results',
+            'passed', 'failed', 'error', 'message', 'details',
+            'adversarial_examples', 'success_rate', 'avg_perturbation'
+        ]
+        
+        for attr in known_attributes:
+            if hasattr(report, attr):
+                try:
+                    value = getattr(report, attr)
+                    # Convert non-serializable objects to strings
+                    if hasattr(value, '__dict__') and not isinstance(value, (dict, list, str, int, float, bool)):
+                        value = str(value)
+                    report_dict[attr] = value
+                except:
+                    pass
+        
+        # If we couldn't extract anything meaningful, just convert to string
+        if not report_dict:
+            report_dict = {'report_str': str(report), 'type': type(report).__name__}
+        
+        return report_dict
+    
     def run_attack(self, attack_type: str, epsilon: float) -> Dict[str, Any]:
         """Run a single attack.
         
@@ -157,28 +213,87 @@ class ScheduledAdversarialTester:
             }
             test_context = {
                 'test_mode': True,
-                'scheduled': True
+                'scheduled': True,
+                'attack_type': attack_type,
+                'epsilon': epsilon
             }
             
             # Mock validator function
             def mock_validator(action, context):
                 return {'safe': True, 'score': 0.9}
             
-            # Run the attack
-            report = self.validator.validate_robustness(
-                test_action,
-                test_context,
-                mock_validator
-            )
+            # Try to run the attack with error handling
+            report = None
+            error_msg = None
+            
+            try:
+                # Attempt to run validate_robustness
+                report = self.validator.validate_robustness(
+                    test_action,
+                    test_context,
+                    mock_validator
+                )
+            except TypeError as e:
+                # Handle parameter mismatch
+                if "unpack" in str(e):
+                    # Skip trojan attacks that have the unpacking issue
+                    if attack_type == 'trojan':
+                        logger.warning(f"Skipping trojan attack due to known issue: {e}")
+                        error_msg = f"Trojan attack not supported: {e}"
+                    else:
+                        # Try with different parameters
+                        try:
+                            report = self.validator.validate_robustness(
+                                mock_validator,
+                                test_action,
+                                test_context
+                            )
+                        except:
+                            # Try without the validator function
+                            try:
+                                report = self.validator.validate_robustness(
+                                    test_action,
+                                    test_context
+                                )
+                            except Exception as e2:
+                                error_msg = f"Failed with multiple parameter combinations: {e2}"
+                else:
+                    error_msg = str(e)
+            except AttributeError as e:
+                # Handle missing methods
+                if "validate_robustness" in str(e):
+                    # Try alternative method names
+                    if hasattr(self.validator, 'run_attack'):
+                        report = self.validator.run_attack(attack_type, epsilon)
+                    elif hasattr(self.validator, 'validate'):
+                        report = self.validator.validate(test_action, test_context)
+                    else:
+                        error_msg = f"No suitable validation method found: {e}"
+                else:
+                    error_msg = str(e)
+            
+            if error_msg:
+                logger.error(f"Attack execution error: {error_msg}")
+                return {
+                    'attack_type': attack_type,
+                    'epsilon': epsilon,
+                    'success': False,
+                    'error': error_msg,
+                    'duration_seconds': time.time() - start_time,
+                    'timestamp': datetime.now().isoformat()
+                }
             
             duration = time.time() - start_time
+            
+            # Convert report to dictionary
+            report_dict = self._extract_report_data(report) if report else {}
             
             result = {
                 'attack_type': attack_type,
                 'epsilon': epsilon,
                 'success': True,
                 'duration_seconds': duration,
-                'report': report,
+                'report': report_dict,
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -223,16 +338,17 @@ class ScheduledAdversarialTester:
         attacks = attack_types or self.config['attack_types']
         epsilons = self.config['epsilon_values']
         
-        # Set up timeout (only on Unix-like systems)
+        # Set up timeout
         timeout = self.config.get('timeout_seconds', 3600)
-        timeout_triggered = False
+        timeout_end = start_time + timeout
         
+        # Setup timeout handling
         if SIGNAL_AVAILABLE:
             def timeout_handler(signum, frame):
                 raise TimeoutError("Test suite exceeded time limit")
             
             # Set timeout alarm
-            signal.signal(signal.SIGALRM, timeout_handler)
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
             signal.alarm(timeout)
         else:
             # On Windows, we'll use a manual timeout check
@@ -243,8 +359,8 @@ class ScheduledAdversarialTester:
             self.results = []
             for attack_type in attacks:
                 for epsilon in epsilons:
-                    # Check timeout manually on Windows
-                    if not SIGNAL_AVAILABLE and (time.time() - start_time) > timeout:
+                    # Check timeout manually
+                    if time.time() > timeout_end:
                         raise TimeoutError("Test suite exceeded time limit")
                     
                     result = self.run_attack(attack_type, epsilon)
@@ -272,10 +388,24 @@ class ScheduledAdversarialTester:
             
             return summary
             
+        except TimeoutError as e:
+            logger.error(f"Test suite timed out: {e}")
+            # Save partial results
+            if self.results and self.config.get('save_results'):
+                partial_summary = {
+                    'success': False,
+                    'error': 'Timeout',
+                    'total_tests': len(self.results),
+                    'results': self.results,
+                    'timestamp': datetime.now().isoformat()
+                }
+                self._save_results(partial_summary)
+            raise
         finally:
             # Cancel the alarm (only on Unix-like systems)
             if SIGNAL_AVAILABLE:
                 signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
     
     def _check_and_alert(self, result: Dict[str, Any]):
         """Check result and send alert if needed.
@@ -286,11 +416,27 @@ class ScheduledAdversarialTester:
         # Extract relevant metrics from report
         report = result.get('report', {})
         
-        # Check if robustness is below threshold
-        robustness = report.get('robustness_score', 1.0)
+        # Try to get robustness score from various possible locations
+        robustness = None
+        if isinstance(report, dict):
+            # Try different possible keys
+            for key in ['robustness_score', 'score', 'success_rate', 'safety_score']:
+                if key in report:
+                    robustness = report[key]
+                    break
+        
+        # If we couldn't find a score, try to infer from other fields
+        if robustness is None and isinstance(report, dict):
+            if 'safe' in report:
+                robustness = 1.0 if report['safe'] else 0.0
+            elif 'passed' in report and 'failed' in report:
+                total = report.get('passed', 0) + report.get('failed', 0)
+                if total > 0:
+                    robustness = report.get('passed', 0) / total
+        
         threshold = self.config.get('failure_threshold', 0.8)
         
-        if robustness < threshold:
+        if robustness is not None and robustness < threshold:
             logger.warning(f"ALERT: Robustness below threshold! "
                           f"Attack: {result['attack_type']}, "
                           f"Epsilon: {result['epsilon']}, "
@@ -298,6 +444,33 @@ class ScheduledAdversarialTester:
             
             # In a production system, this would send alerts via Slack, email, etc.
             # For now, we just log the alert
+            self._send_alert(result, robustness)
+    
+    def _send_alert(self, result: Dict[str, Any], robustness: float):
+        """Send alert for failed test (placeholder for production alerting).
+        
+        Args:
+            result: Test result that triggered alert
+            robustness: Robustness score that failed threshold
+        """
+        alert_message = {
+            'severity': 'WARNING',
+            'component': 'AdversarialTesting',
+            'timestamp': datetime.now().isoformat(),
+            'attack_type': result['attack_type'],
+            'epsilon': result['epsilon'],
+            'robustness_score': robustness,
+            'threshold': self.config.get('failure_threshold', 0.8),
+            'message': f"Adversarial attack succeeded with score {robustness:.3f}"
+        }
+        
+        # Log alert to separate file
+        alert_log_path = Path('logs') / 'adversarial_alerts.jsonl'
+        try:
+            with open(alert_log_path, 'a') as f:
+                f.write(json.dumps(alert_message) + '\n')
+        except Exception as e:
+            logger.error(f"Failed to write alert to file: {e}")
     
     def _save_results(self, summary: Dict[str, Any]):
         """Save test results to file.
@@ -313,11 +486,38 @@ class ScheduledAdversarialTester:
         filename = results_dir / f'adversarial_test_results_{timestamp}.json'
         
         try:
+            # Make sure results are JSON serializable
+            def make_serializable(obj):
+                if isinstance(obj, dict):
+                    return {k: make_serializable(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [make_serializable(v) for v in obj]
+                elif hasattr(obj, '__dict__'):
+                    return str(obj)
+                else:
+                    return obj
+            
+            serializable_summary = make_serializable(summary)
+            
             with open(filename, 'w') as f:
-                json.dump(summary, f, indent=2)
+                json.dump(serializable_summary, f, indent=2, default=str)
             logger.info(f"Results saved to {filename}")
         except Exception as e:
             logger.error(f"Failed to save results: {e}")
+            # Try to save a minimal version
+            try:
+                minimal_summary = {
+                    'timestamp': summary.get('timestamp'),
+                    'total_tests': summary.get('total_tests'),
+                    'successful_tests': summary.get('successful_tests'),
+                    'failed_tests': summary.get('failed_tests'),
+                    'error': f'Full results could not be saved: {e}'
+                }
+                with open(filename, 'w') as f:
+                    json.dump(minimal_summary, f, indent=2)
+                logger.info(f"Minimal results saved to {filename}")
+            except Exception as e2:
+                logger.error(f"Failed to save even minimal results: {e2}")
 
 
 def main():
