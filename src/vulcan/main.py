@@ -271,6 +271,7 @@ async def lifespan(app: FastAPI):
     global rate_limit_cleanup_thread
     
     worker_id = os.getpid()
+    startup_complete = False
     
     logger.info(f"Starting VULCAN-AGI worker {worker_id} in {settings.deployment_mode} mode")
     
@@ -419,36 +420,44 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize deployment: {e}", exc_info=True)
         raise
+    except asyncio.CancelledError:
+        logger.warning(f"VULCAN-AGI worker {worker_id} startup cancelled")
+        raise
 
-    yield
-
-    # SHUTDOWN LOGIC
-    if hasattr(app.state, 'deployment'):
-        deployment = app.state.deployment
-        
-        # Stop self-improvement drive if running
-        try:
-            world_model = deployment.collective.deps.world_model
-            if world_model and hasattr(world_model, 'stop_autonomous_improvement'):
-                world_model.stop_autonomous_improvement()
-                logger.info("🛑 Autonomous self-improvement drive stopped")
-        except Exception as e:
-            logger.error(f"Error stopping self-improvement: {e}")
-        
-        try:
-            checkpoint_path = f"shutdown_checkpoint_{int(time.time())}.pkl"
-            deployment.save_checkpoint(checkpoint_path)
-            logger.info(f"Saved shutdown checkpoint to {checkpoint_path}")
-        except Exception as e:
-            logger.error(f"Failed to save shutdown checkpoint: {e}")
-        
-        if redis_client and hasattr(app.state, 'worker_id'):
-            try:
-                redis_client.delete(f"deployment:{app.state.worker_id}")
-            except Exception as e:
-                logger.error(f"Failed to cleanup Redis: {e}")
+    startup_complete = True
     
-    logger.info("VULCAN-AGI API shutdown complete")
+    try:
+        yield
+    except asyncio.CancelledError:
+        logger.info(f"VULCAN-AGI worker {worker_id} received cancellation signal")
+    finally:
+        # SHUTDOWN LOGIC
+        if startup_complete and hasattr(app.state, 'deployment'):
+            deployment = app.state.deployment
+            
+            # Stop self-improvement drive if running
+            try:
+                world_model = deployment.collective.deps.world_model
+                if world_model and hasattr(world_model, 'stop_autonomous_improvement'):
+                    world_model.stop_autonomous_improvement()
+                    logger.info("🛑 Autonomous self-improvement drive stopped")
+            except Exception as e:
+                logger.error(f"Error stopping self-improvement: {e}")
+            
+            try:
+                checkpoint_path = f"shutdown_checkpoint_{int(time.time())}.pkl"
+                deployment.save_checkpoint(checkpoint_path)
+                logger.info(f"Saved shutdown checkpoint to {checkpoint_path}")
+            except Exception as e:
+                logger.error(f"Failed to save shutdown checkpoint: {e}")
+            
+            if redis_client and hasattr(app.state, 'worker_id'):
+                try:
+                    redis_client.delete(f"deployment:{app.state.worker_id}")
+                except Exception as e:
+                    logger.error(f"Failed to cleanup Redis: {e}")
+        
+        logger.info("VULCAN-AGI API shutdown complete")
 
 
 # ============================================================

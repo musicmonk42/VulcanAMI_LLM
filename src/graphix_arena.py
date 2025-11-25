@@ -533,19 +533,17 @@ class GraphixArena:
         if LLM_CLIENT_AVAILABLE and GraphixLLMClient is not None:
             try:
                 self.llm_client = GraphixLLMClient(agent_id="arena-agent")
-                logger.info("✅ GraphixLLMClient initialized successfully")
-            except ValueError as e:
-                logger.warning(f"⚠️ GraphixLLMClient initialization failed: {e}")
-                logger.warning("💡 To enable LLM features:")
-                logger.warning("   1. Ensure .env file exists with OPENAI_API_KEY")
-                logger.warning("   2. Install python-dotenv: pip install python-dotenv")
-                logger.warning("   3. Restart the application")
-                self.llm_client = None
+                if self.llm_client.is_available:
+                    logger.info("✅ GraphixLLMClient initialized successfully (real mode)")
+                else:
+                    logger.info("✅ GraphixLLMClient initialized (mock mode - OPENAI_API_KEY not configured)")
             except Exception as e:
                 logger.error(f"❌ Unexpected error initializing GraphixLLMClient: {e}")
                 self.llm_client = None
         else:
-            logger.warning("GraphixLLMClient not available")
+            # Only log at debug level since this is expected when openai package is not installed
+            logger.debug("GraphixLLMClient not available - openai package may not be installed")
+            logger.debug("💡 To enable: pip install openai tenacity")
             self.llm_client = None
         
         # Agent configuration

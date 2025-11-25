@@ -11,6 +11,7 @@ Key Features:
 - Includes retry logic for transient API errors and comprehensive logging.
 - Generates IR graphs compatible with node_handlers.py (e.g., GenerativeNode).
 - Aligns with platform security (e.g., NSOAligner checks) and observability.
+- Graceful degradation: works in mock mode when OPENAI_API_KEY is not configured.
 
 Dependencies:
 - openai==2.3.0 (latest as of October 2025; pip install openai)
@@ -29,17 +30,51 @@ import json
 import hashlib
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
+from pathlib import Path
+
+# Load .env file if it exists and dotenv is available
+try:
+    from dotenv import load_dotenv
+    # Try multiple paths for .env file
+    env_paths = [
+        Path(__file__).parent.parent / ".env",  # project_root/.env
+        Path(__file__).parent / ".env",  # src/.env
+        Path.cwd() / ".env",  # current working directory
+    ]
+    for env_path in env_paths:
+        if env_path.exists():
+            load_dotenv(dotenv_path=env_path)
+            break
+except ImportError:
+    pass  # dotenv not available, rely on system environment variables
+
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from openai import OpenAI, OpenAIError  # Requires pip install openai==2.3.0
+
+# Try to import OpenAI, handle gracefully if not available
+try:
+    from openai import OpenAI, OpenAIError
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OpenAI = None
+    OpenAIError = Exception  # Fallback for retry decorator
+    OPENAI_AVAILABLE = False
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Constants
+MOCK_RESPONSE_TRUNCATION_LENGTH = 100
+
 
 class GraphixLLMClient:
     """
     Enhanced client for Graphix IR LLM interactions using OpenAI API.
     Designed for GraphixArena integration with generator, evolver, and visualizer agents.
+    
+    Supports graceful degradation: when OPENAI_API_KEY is not configured or OpenAI
+    package is not installed, the client operates in mock mode and returns placeholder
+    responses.
     """
     def __init__(self, agent_id: str = "agent-default", model: str = "gpt-4o", temperature: float = 0.01, max_tokens: int = 4096):
         """
@@ -56,14 +91,31 @@ class GraphixLLMClient:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.logger = logging.getLogger("GraphixLLMClient")
+        self.client = None
+        self.mock_mode = False
         
         api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            self.logger.error("OPENAI_API_KEY not set in environment variables")
-            raise ValueError("OPENAI_API_KEY not set in .env")
         
-        self.client = OpenAI(api_key=api_key)
-        self.logger.info(f"Client initialized for agent: {agent_id} with model: {model}, temperature: {temperature}")
+        if not OPENAI_AVAILABLE:
+            self.logger.warning("OpenAI package not installed. Running in mock mode.")
+            self.logger.warning("To enable real LLM features: pip install openai")
+            self.mock_mode = True
+        elif not api_key:
+            self.logger.warning("OPENAI_API_KEY not set in environment variables. Running in mock mode.")
+            self.logger.warning("To enable real LLM features: set OPENAI_API_KEY in your .env file")
+            self.mock_mode = True
+        else:
+            try:
+                self.client = OpenAI(api_key=api_key)
+                self.logger.info(f"Client initialized for agent: {agent_id} with model: {model}, temperature: {temperature}")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize OpenAI client: {e}. Running in mock mode.")
+                self.mock_mode = True
+    
+    @property
+    def is_available(self) -> bool:
+        """Check if the LLM client is available for real API calls."""
+        return not self.mock_mode and self.client is not None
 
     @retry(
         stop=stop_after_attempt(3),
@@ -87,65 +139,69 @@ class GraphixLLMClient:
             Dict[str, Any]: Contains response, IR graph, and proposal ID.
 
         Raises:
-            OpenAIError: If API call fails after retries.
+            OpenAIError: If API call fails after retries (only in non-mock mode).
         """
-        try:
-            # Use defaults or overrides
-            model = model or self.model
-            temperature = temperature or self.temperature
-            max_tokens = max_tokens or self.max_tokens
+        # Use defaults or overrides
+        model = model or self.model
+        temperature = temperature or self.temperature
+        max_tokens = max_tokens or self.max_tokens
 
-            # Validate messages
-            if not messages or not all('role' in m and 'content' in m for m in messages):
-                self.logger.error("Invalid messages format")
-                raise ValueError("Messages must be a list of dicts with 'role' and 'content'")
+        # Validate messages
+        if not messages or not all('role' in m and 'content' in m for m in messages):
+            self.logger.error("Invalid messages format")
+            raise ValueError("Messages must be a list of dicts with 'role' and 'content'")
 
-            # Call OpenAI API
-            completion = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-            response = completion.choices[0].message.content
+        last_content = messages[-1].get("content", "") if messages else ""
+        proposal_id = hashlib.sha256(last_content.encode()).hexdigest()[:8]
 
-            # Generate IR graph for Graphix platform
-            last_content = messages[-1].get("content", "") if messages else ""
-            proposal_id = hashlib.sha256(last_content.encode()).hexdigest()[:8]
-            ir_graph = {
-                "id": proposal_id,
-                "type": "Graph",
-                "nodes": [
-                    {"id": "prompt", "type": "PromptNode", "value": last_content},
-                    {"id": "generate", "type": "GenerativeNode", "params": {"model": model, "temperature": temperature}},
-                    {"id": "output", "type": "OutputNode", "value": response}
-                ],
-                "edges": [
-                    {"from": "prompt", "to": {"node": "generate", "port": "input"}, "type": "data"},
-                    {"from": "generate", "to": {"node": "output", "port": "input"}, "type": "data"}
-                ],
-                "metadata": {
-                    "agent_id": self.agent_id,
-                    "timestamp": datetime.now().isoformat(),
-                    "model": model
-                }
+        # Handle mock mode
+        if self.mock_mode:
+            response = f"[Mock Response] This is a simulated response for: {last_content[:MOCK_RESPONSE_TRUNCATION_LENGTH]}..."
+            self.logger.debug(f"Mock chat response generated for agent {self.agent_id}")
+        else:
+            try:
+                # Call OpenAI API
+                completion = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                response = completion.choices[0].message.content
+            except Exception as e:
+                self.logger.error(f"OpenAI API error: {str(e)}")
+                raise
+
+        # Generate IR graph for Graphix platform
+        ir_graph = {
+            "id": proposal_id,
+            "type": "Graph",
+            "nodes": [
+                {"id": "prompt", "type": "PromptNode", "value": last_content},
+                {"id": "generate", "type": "GenerativeNode", "params": {"model": model, "temperature": temperature}},
+                {"id": "output", "type": "OutputNode", "value": response}
+            ],
+            "edges": [
+                {"from": "prompt", "to": {"node": "generate", "port": "input"}, "type": "data"},
+                {"from": "generate", "to": {"node": "output", "port": "input"}, "type": "data"}
+            ],
+            "metadata": {
+                "agent_id": self.agent_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "model": model,
+                "mock_mode": self.mock_mode
             }
+        }
 
-            # Log interaction for ObservabilityManager
-            self.logger.info(f"Chat response for agent {self.agent_id}: {response[:50]}... (ID: {proposal_id})")
+        # Log interaction for ObservabilityManager
+        self.logger.info(f"Chat response for agent {self.agent_id}: {response[:50]}... (ID: {proposal_id})")
 
-            return {
-                "response": response,
-                "ir": ir_graph,
-                "proposal_id": proposal_id
-            }
+        return {
+            "response": response,
+            "ir": ir_graph,
+            "proposal_id": proposal_id
+        }
 
-        except OpenAIError as e:
-            self.logger.error(f"OpenAI API error: {str(e)}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error in chat: {str(e)}")
-            raise
 
 if __name__ == "__main__":
     # Demo usage
@@ -153,6 +209,8 @@ if __name__ == "__main__":
     messages = [{"role": "user", "content": "Generate a Python function for matrix multiplication"}]
 
     print("\n--- Demo: OpenAI LLM Interaction ---")
+    print(f"Mock mode: {client.mock_mode}")
+    print(f"Is available: {client.is_available}")
     try:
         result = client.chat(messages)
         print(f"Response: {result['response'][:100]}...")
