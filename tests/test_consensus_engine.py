@@ -151,14 +151,16 @@ class TestProposalCreation:
     
     def test_proposal_too_large(self, engine, registered_agents):
         """Test proposal size limit."""
-        # Create very large proposal
+        # Create very large proposal with valid structure
         large_graph = {
             "id": "test",
             "type": "Graph",
             "nodes": [{
                 "id": "p1",
                 "type": "ProposalNode",
-                "data": "x" * MAX_PROPOSAL_SIZE
+                "proposal_content": {
+                    "add": "x" * MAX_PROPOSAL_SIZE  # Valid structure but too large
+                }
             }]
         }
         

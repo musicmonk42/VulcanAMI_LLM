@@ -50,6 +50,14 @@ class RestrictedUnpickler(pickle.Unpickler):
         'torch.nn.modules',
         'collections',
         'datetime',
+        # Conformal calibration modules for confidence calibration
+        'src.conformal.confidence_calibration',
+        'conformal.confidence_calibration',
+        # Sklearn modules commonly used for calibration
+        'sklearn.isotonic',
+        'sklearn.linear_model',
+        'sklearn.linear_model._logistic',
+        'sklearn.calibration',
         # Add your safe modules here
     }
     
