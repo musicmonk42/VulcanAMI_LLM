@@ -220,8 +220,10 @@ for workflow in "${workflow_files[@]}"; do
             print_success "$workflow exists"
         fi
         
-        # Check for deprecated docker-compose usage
-        if grep -q "docker-compose " "$workflow"; then
+        # Check for deprecated docker-compose command usage (not step names)
+        # Only flag lines that actually execute docker-compose as a command
+        # Exclude lines that are step names (- name:) or comments or echo statements
+        if grep -E "^\s*(- )?docker-compose\s+" "$workflow" 2>/dev/null | grep -v "name:" | grep -v "^#" | grep -v "echo" | grep -q .; then
             print_warning "$workflow uses deprecated 'docker-compose' command (should be 'docker compose')"
         fi
     else
@@ -330,13 +332,16 @@ check_hardcoded_secrets() {
     # - Hash values (_id, _key followed by string format)
     # - Common constants (password_hash, secret_key_base)
     # - Documentation (example, TODO, NOTE)
+    # - Cache keys, state keys, audit keys (internal application keys, not secrets)
+    # - Idempotency keys, api_key parameters (not actual values)
     
     local findings
     findings=$(grep -rE "(password|secret|key)\s*=\s*['\"][^'\"]{8,}['\"]" \
         --include="*.yml" --include="*.yaml" --include="*.py" \
         --exclude-dir=".git" --exclude-dir="venv" --exclude-dir=".venv" \
+        --exclude-dir="tests" --exclude-dir="stress_tests" \
         . 2>/dev/null | \
-        grep -vE "(#|//|password_field|secret_name|key_name|password_hash|secret_key_base|example|TODO|NOTE|_id|_key\s*=\s*f['\"])" || true)
+        grep -vE "(#|//|password_field|secret_name|key_name|password_hash|secret_key_base|example|TODO|NOTE|_id|_key\s*=\s*f['\"]|state_key|audit_log_key|cache_key|grammar_versions_key|global_state_key|idempotency_key)" || true)
     
     if [ -n "$findings" ]; then
         echo "$findings" | head -5

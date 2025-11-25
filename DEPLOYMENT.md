@@ -392,7 +392,7 @@ View application logs:
 
 ```bash
 # Docker Compose
-docker-compose logs -f api-gateway
+docker compose logs -f api-gateway
 
 # Kubernetes
 kubectl logs -f deployment/vulcanami-api -n vulcanami
