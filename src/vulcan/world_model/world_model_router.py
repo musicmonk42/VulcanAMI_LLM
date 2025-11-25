@@ -35,16 +35,45 @@ import pickle
 
 logger = logging.getLogger(__name__)
 
-# Import safety validator
-try:
-    from ..safety.safety_validator import EnhancedSafetyValidator
-    from ..safety.safety_types import SafetyConfig
-    SAFETY_VALIDATOR_AVAILABLE = True
-except ImportError:
-    SAFETY_VALIDATOR_AVAILABLE = False
-    logging.warning("safety_validator not available, router operating without safety checks")
-    EnhancedSafetyValidator = None
-    SafetyConfig = None
+# Lazy import for safety validator to avoid circular import issues
+# The actual import is deferred to when the class is instantiated
+_safety_validator_class = None
+_safety_config_class = None
+_safety_imports_checked = False
+
+
+def _get_safety_validator():
+    """Lazy import of EnhancedSafetyValidator to avoid circular imports."""
+    global _safety_validator_class, _safety_imports_checked
+    if not _safety_imports_checked:
+        _check_safety_imports()
+    return _safety_validator_class
+
+
+def _get_safety_config():
+    """Lazy import of SafetyConfig to avoid circular imports."""
+    global _safety_config_class, _safety_imports_checked
+    if not _safety_imports_checked:
+        _check_safety_imports()
+    return _safety_config_class
+
+
+def _check_safety_imports():
+    """Check and cache safety module imports."""
+    global _safety_validator_class, _safety_config_class, _safety_imports_checked
+    _safety_imports_checked = True
+    
+    try:
+        from ..safety.safety_validator import EnhancedSafetyValidator
+        _safety_validator_class = EnhancedSafetyValidator
+    except (ImportError, AttributeError):
+        _safety_validator_class = None
+    
+    try:
+        from ..safety.safety_types import SafetyConfig
+        _safety_config_class = SafetyConfig
+    except (ImportError, AttributeError):
+        _safety_config_class = None
 
 
 class UpdateType(Enum):
@@ -417,8 +446,11 @@ class WorldModelRouter:
         self.meta_soften_only = self.config.get("meta_soften_only", True)  # never hard-fail plans
         self.meta_reweight_priorities = self.config.get("meta_reweight_priorities", True)
         
-        # Initialize safety validator
-        if SAFETY_VALIDATOR_AVAILABLE:
+        # Initialize safety validator (using lazy imports to avoid circular import issues)
+        EnhancedSafetyValidator = _get_safety_validator()
+        SafetyConfig = _get_safety_config()
+        
+        if EnhancedSafetyValidator is not None and SafetyConfig is not None:
             safety_config = config.get('safety_config', {})
             if isinstance(safety_config, dict) and safety_config:
                 self.safety_validator = EnhancedSafetyValidator(SafetyConfig.from_dict(safety_config))
