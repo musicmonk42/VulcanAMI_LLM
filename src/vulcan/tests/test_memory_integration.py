@@ -13,6 +13,8 @@ Tests all components and their integration:
 Run with: python test_memory_system.py
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import time
