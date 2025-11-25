@@ -538,7 +538,8 @@ class GraphixArena:
                 else:
                     logger.info("✅ GraphixLLMClient initialized (mock mode - OPENAI_API_KEY not configured)")
             except Exception as e:
-                logger.error(f"❌ Unexpected error initializing GraphixLLMClient: {e}")
+                # Log with exc_info=True to capture full traceback even if exception message is empty
+                logger.error(f"❌ Unexpected error initializing GraphixLLMClient: {type(e).__name__}: {e}", exc_info=True)
                 self.llm_client = None
         else:
             # Only log at debug level since this is expected when openai package is not installed
