@@ -361,8 +361,8 @@ The repository includes a comprehensive validation script that checks all aspect
 Validation Summary
 ========================================
 
-Passed:   42
-Warnings: 3
+Passed:   41
+Warnings: 2
 Failed:   0
 
 ✓ All critical checks passed!

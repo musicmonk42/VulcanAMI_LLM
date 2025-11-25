@@ -314,8 +314,8 @@ The repository includes `validate_cicd_docker.sh` which performs 42+ checks:
 
 **Expected Output:**
 ```
-Passed:   42
-Warnings: 3
+Passed:   41
+Warnings: 2
 Failed:   0
 
 ✓ All critical checks passed!

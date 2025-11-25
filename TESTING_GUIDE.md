@@ -87,7 +87,7 @@ pytest tests/test_cicd_reproducibility.py --cov=. --cov-report=html
 ```
 
 **What it checks**:
-- Prerequisites (Docker, docker-compose, yamllint, kubectl, helm)
+- Prerequisites (Docker, Docker Compose v2, yamllint, kubectl, helm)
 - Requirements files (requirements.txt, requirements-hashed.txt)
 - Docker configurations (Dockerfile, service Dockerfiles)
 - Docker Compose files (dev and prod)
@@ -433,6 +433,6 @@ When adding new features:
 
 ---
 
-**Last Updated**: 2025-11-24  
+**Last Updated**: 2025-11-25  
 **Maintained By**: VulcanAMI Team  
 **Status**: ✅ All tests passing, ready for production deployment

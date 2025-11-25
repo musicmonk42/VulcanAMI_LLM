@@ -1,10 +1,15 @@
 #!/bin/sh
 set -e
 
+# MinIO bucket creation script
+# For development: uses default credentials
+# For production: set MINIO_ROOT_USER and MINIO_ROOT_PASSWORD environment variables
+
 MC_ALIAS="local"
-ENDPOINT="http://minio:9000"
-ACCESS="minioadmin"
-SECRET="minioadmin"
+ENDPOINT="${MINIO_ENDPOINT:-http://minio:9000}"
+# Use environment variables with defaults for development only
+ACCESS="${MINIO_ROOT_USER:-minioadmin}"
+SECRET="${MINIO_ROOT_PASSWORD:-minioadmin}"
 
 mc alias set $MC_ALIAS $ENDPOINT $ACCESS $SECRET
 
