@@ -397,6 +397,49 @@ class TestGraphixArena:
         """Test Slack alert when not configured."""
         # Should not raise
         arena.send_slack_alert("Test message")
+    
+    def test_llm_client_init_exception_logging(self):
+        """Test that LLM client initialization exceptions are logged with traceback."""
+        import logging
+        
+        # Capture log records
+        log_records = []
+        
+        class LogCapture(logging.Handler):
+            def emit(self, record):
+                log_records.append(record)
+        
+        handler = LogCapture()
+        handler.setLevel(logging.ERROR)
+        
+        graphix_logger = logging.getLogger("GraphixArena")
+        graphix_logger.addHandler(handler)
+        
+        try:
+            # Mock GraphixLLMClient to raise an exception with empty message
+            with patch('graphix_arena.GraphixLLMClient') as mock_client:
+                mock_client.side_effect = RuntimeError('')
+                
+                # Create new arena - should catch exception and log it
+                arena = GraphixArena(port=8186)
+                
+                # LLM client should be None due to exception
+                assert arena.llm_client is None
+                
+                # Check that an error was logged
+                error_records = [r for r in log_records if r.levelno >= logging.ERROR]
+                assert len(error_records) >= 1, "Expected at least one error log record"
+                
+                # Check that the error message includes exception type
+                error_messages = [r.getMessage() for r in error_records]
+                assert any('RuntimeError' in msg for msg in error_messages), \
+                    f"Expected RuntimeError in error messages, got: {error_messages}"
+                
+                # Check that exc_info was captured
+                assert any(r.exc_info is not None for r in error_records), \
+                    "Expected exc_info to be captured in error log"
+        finally:
+            graphix_logger.removeHandler(handler)
 
 
 class TestExceptionHandlers:
