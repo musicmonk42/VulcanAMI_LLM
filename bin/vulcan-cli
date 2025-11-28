@@ -121,9 +121,9 @@ load_config() {
 }
 
 show_config() {
+    echo "VulcanAMI Configuration"
+    echo "=================================================================="
     cat << EOF
-${BOLD}VulcanAMI Configuration${NC}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Configuration File: ${VULCAN_CONFIG}
 Version: ${SCRIPT_VERSION}
@@ -146,7 +146,7 @@ Paths:
   LOG_DIR=${VULCAN_LOG_DIR:-/var/log/vulcanami}
   CACHE_DIR=${VULCAN_CACHE_DIR:-/var/cache/vulcanami}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+==================================================================
 EOF
 }
 
@@ -155,8 +155,8 @@ EOF
 ################################################################################
 
 show_version() {
-    cat << EOF >&2
-${BOLD}VulcanAMI CLI${NC} version ${SCRIPT_VERSION}
+    cat << 'EOF' >&2
+VulcanAMI CLI version 4.6.0
 Copyright © 2025 VulcanAMI. All rights reserved.
 
 Build Information:
@@ -171,10 +171,10 @@ EOF
 
 show_help() {
     cat << 'EOF' >&2
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                    VulcanAMI CLI v4.6.0                          ┃
-┃              Enterprise Graph Data Platform                      ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
++------------------------------------------------------------------+
+|                    VulcanAMI CLI v4.6.0                          |
+|              Enterprise Graph Data Platform                      |
++------------------------------------------------------------------+
 
 USAGE:
     vulcan-cli [OPTIONS] <COMMAND> [ARGS...]
@@ -406,14 +406,6 @@ dispatch_command() {
 parse_global_options() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -h|--help)
-                show_help
-                exit 0
-                ;;
-            -v|--version)
-                show_version
-                exit 0
-                ;;
             -V|--verbose)
                 export VULCAN_VERBOSE=1
                 shift
@@ -455,6 +447,21 @@ parse_global_options() {
 main() {
     # Load configuration
     load_config
+
+    # Check for --help or --version as first argument (before other processing)
+    # This ensures they work correctly without subshell issues
+    if [[ $# -gt 0 ]]; then
+        case "$1" in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+        esac
+    fi
 
     # Parse global options and get remaining arguments
     local remaining_args
