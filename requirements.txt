@@ -53,6 +53,7 @@ fsspec==2025.10.0
 # graphix - this is the current package, installed from local source via setup.py or editable install
 # Use: pip install -e . (for development) or pip install . (for installation)
 graphviz==0.21
+graphene==3.4.3
 greenlet==3.2.4
 h11==0.16.0
 httpcore==1.0.9
