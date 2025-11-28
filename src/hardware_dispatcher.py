@@ -240,7 +240,8 @@ class HardwareDispatcher:
                  use_mock: bool = False,
                  enable_metrics: bool = True,
                  enable_health_checks: bool = True,
-                 prefer_grpc: bool = False):
+                 prefer_grpc: bool = False,
+                 health_check_interval: float = 10.0):
         """
         Initialize HardwareDispatcher.
         
@@ -253,11 +254,13 @@ class HardwareDispatcher:
             enable_metrics: Enable detailed metrics collection
             enable_health_checks: Enable periodic health checks
             prefer_grpc: Prefer gRPC over REST when available
+            health_check_interval: Interval in seconds between health checks (default 10s, use 1-5s for tests)
         """
         self.use_mock = use_mock
         self.enable_metrics = enable_metrics
         self.enable_health_checks = enable_health_checks
         self.prefer_grpc = prefer_grpc
+        self.health_check_interval = health_check_interval  # ADDED
         
         # Thread safety
         self.lock = threading.RLock()
@@ -500,7 +503,8 @@ class HardwareDispatcher:
         
         while not self._shutdown_event.is_set(): # CHANGED
             try:
-                if self._shutdown_event.wait(timeout=60): # CHANGED
+                # CRITICAL FIX: Use configurable interval for faster shutdown in tests
+                if self._shutdown_event.wait(timeout=self.health_check_interval):
                     break # Shutdown signaled
                 
                 with self.lock:
