@@ -2,6 +2,7 @@
 Tests for vulcan-cli bash script
 
 This version explicitly uses Git Bash on Windows, avoiding broken WSL installations.
+Fixed: Handles None values in stdout/stderr concatenation.
 """
 import subprocess
 import pytest
@@ -121,6 +122,21 @@ def run_vulcan_cli(args, **kwargs):
     return subprocess.run(command, **kwargs)
 
 
+def get_output(result):
+    """
+    Safely concatenate stdout and stderr, handling None values.
+    
+    Args:
+        result: subprocess.CompletedProcess object
+    
+    Returns:
+        str: Combined stdout and stderr output
+    """
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    return stdout + stderr
+
+
 class TestVulcanCLI:
     """Test suite for vulcan-cli"""
 
@@ -137,7 +153,7 @@ class TestVulcanCLI:
         """Test --help flag"""
         result = run_vulcan_cli(['--help'])
         assert result.returncode == 0, f"Command failed with return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'VulcanAMI CLI' in output, "Expected 'VulcanAMI CLI' in output"
         assert 'USAGE' in output, "Expected 'USAGE' in output"
 
@@ -145,42 +161,42 @@ class TestVulcanCLI:
         """Test --version flag"""
         result = run_vulcan_cli(['--version'])
         assert result.returncode == 0, f"Command failed with return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert '4.6.0' in output, f"Expected version '4.6.0' in output, got: {output}"
 
     def test_help_command(self):
         """Test help command"""
         result = run_vulcan_cli(['help'])
         assert result.returncode == 0, f"Command failed with return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'VulcanAMI CLI' in output or 'USAGE' in output
 
     def test_version_command(self):
         """Test version command"""
         result = run_vulcan_cli(['version'])
         assert result.returncode == 0, f"Command failed with return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert '4.6.0' in output
 
     def test_config_command(self):
         """Test config command"""
         result = run_vulcan_cli(['config'])
         assert result.returncode == 0, f"Command failed with return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'Configuration' in output, f"Expected 'Configuration' in output, got: {output}"
 
     def test_no_args(self):
         """Test running with no arguments shows help"""
         result = run_vulcan_cli([])
         assert result.returncode == 0, f"Command failed with return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'VulcanAMI CLI' in output or 'USAGE' in output
 
     def test_invalid_command(self):
         """Test running with invalid command"""
         result = run_vulcan_cli(['invalid-command-xyz'])
         assert result.returncode == 1, f"Expected return code 1, got {result.returncode}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'Unknown command' in output, f"Expected 'Unknown command' in output, got: {output}"
 
     def test_verbose_flag(self):
@@ -209,7 +225,7 @@ class TestVulcanCLI:
         # May fail with "command not yet implemented" but should recognize the command
         # Return code 0 = success, 1 = recognized but not implemented
         assert result.returncode in [0, 1], f"Unexpected return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         # Should not say "Unknown command"
         assert 'Unknown command' not in output or result.returncode == 0
 
@@ -217,28 +233,28 @@ class TestVulcanCLI:
         """Test that verify command is recognized"""
         result = run_vulcan_cli(['verify', '--help'], timeout=10)
         assert result.returncode in [0, 1], f"Unexpected return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'Unknown command' not in output or result.returncode == 0
 
     def test_unlearn_command_exists(self):
         """Test that unlearn command is recognized"""
         result = run_vulcan_cli(['unlearn', '--help'], timeout=10)
         assert result.returncode in [0, 1], f"Unexpected return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'Unknown command' not in output or result.returncode == 0
 
     def test_vector_command_exists(self):
         """Test that vector command is recognized"""
         result = run_vulcan_cli(['vector', '--help'], timeout=10)
         assert result.returncode in [0, 1], f"Unexpected return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'Unknown command' not in output or result.returncode == 0
 
     def test_proof_command_exists(self):
         """Test that proof command is recognized"""
         result = run_vulcan_cli(['proof', '--help'], timeout=10)
         assert result.returncode in [0, 1], f"Unexpected return code {result.returncode}\nStderr: {result.stderr}"
-        output = result.stdout + result.stderr
+        output = get_output(result)
         assert 'Unknown command' not in output or result.returncode == 0
 
     def test_environment_variable_config(self):
