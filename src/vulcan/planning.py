@@ -509,13 +509,17 @@ class EnhancedResourceMonitor:
         """Cleanup monitoring."""
         self.stop_monitoring.set()
         if self.monitor_thread:
-            self.monitor_thread.join(timeout=1)
+            self.monitor_thread.join(timeout=2.0)  # Increased from 1 to 2 seconds
         
         if self.gpu_initialized:
             try:
                 pynvml.nvmlShutdown()
             except Exception as e:
                 logger.debug(f"Failed to shutdown NVML: {e}")
+    
+    def shutdown(self):
+        """Shutdown monitoring (alias for cleanup for consistency with other components)."""
+        self.cleanup()
 
 # ============================================================
 # SURVIVAL PROTOCOL
