@@ -834,7 +834,6 @@ class ValueOfInformationGate:
         # Load cost history
         cost_file = load_path / 'cost_history.pkl'
         if cost_file.exists():
-            with open(cost_file, 'rb') as f:
-                self.cost_estimator.historical_costs = defaultdict(list, safe_pickle_load(f))
+            self.cost_estimator.historical_costs = defaultdict(list, safe_pickle_load(str(cost_file)))
         
         logger.info(f"VOI state loaded from {load_path}")
