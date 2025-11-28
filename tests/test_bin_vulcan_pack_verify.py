@@ -1,12 +1,16 @@
 """
 Tests for vulcan-pack-verify Python script
+
+This version includes Windows compatibility fixes.
 """
 import subprocess
 import pytest
 import os
+import sys
 import tempfile
 import json
 import struct
+import platform
 
 
 BIN_DIR = os.path.join(os.path.dirname(__file__), '..', 'bin')
@@ -14,31 +18,66 @@ VULCAN_PACK = os.path.join(BIN_DIR, 'vulcan-pack')
 VULCAN_PACK_VERIFY = os.path.join(BIN_DIR, 'vulcan-pack-verify')
 
 
+def run_script(script_path, args, **kwargs):
+    """
+    Helper function to run Python scripts with proper platform-specific handling.
+    
+    On Windows, Python scripts can't be executed directly - they need to be
+    run with the Python interpreter.
+    
+    Args:
+        script_path: Path to the Python script
+        args: List of arguments to pass to the script
+        **kwargs: Additional arguments to pass to subprocess.run()
+    
+    Returns:
+        subprocess.CompletedProcess object
+    """
+    if platform.system() == 'Windows':
+        # On Windows, explicitly use Python to run the script
+        command = [sys.executable, script_path] + args
+    else:
+        # On Unix/Linux, the shebang handles it
+        command = [script_path] + args
+    
+    # Set default values for common parameters
+    kwargs.setdefault('capture_output', True)
+    kwargs.setdefault('text', True)
+    
+    return subprocess.run(command, **kwargs)
+
+
+def run_vulcan_pack(args, **kwargs):
+    """Run vulcan-pack with platform-specific handling"""
+    return run_script(VULCAN_PACK, args, **kwargs)
+
+
+def run_vulcan_pack_verify(args, **kwargs):
+    """Run vulcan-pack-verify with platform-specific handling"""
+    return run_script(VULCAN_PACK_VERIFY, args, **kwargs)
+
+
 class TestVulcanPackVerify:
     """Test suite for vulcan-pack-verify"""
 
     def test_verify_exists(self):
-        """Test that vulcan-pack-verify exists and is executable"""
-        assert os.path.exists(VULCAN_PACK_VERIFY)
-        assert os.access(VULCAN_PACK_VERIFY, os.X_OK)
+        """Test that vulcan-pack-verify exists and is readable"""
+        assert os.path.exists(VULCAN_PACK_VERIFY), f"vulcan-pack-verify not found at {VULCAN_PACK_VERIFY}"
+        assert os.path.isfile(VULCAN_PACK_VERIFY), f"vulcan-pack-verify is not a file"
+        
+        # On Unix/Linux, also check if it's executable
+        if platform.system() != 'Windows':
+            assert os.access(VULCAN_PACK_VERIFY, os.X_OK), f"vulcan-pack-verify is not executable"
 
     def test_help_flag(self):
         """Test --help flag"""
-        result = subprocess.run(
-            [VULCAN_PACK_VERIFY, '--help'],
-            capture_output=True,
-            text=True
-        )
+        result = run_vulcan_pack_verify(['--help'])
         assert result.returncode == 0
         assert 'VulcanAMI Pack Verifier' in result.stdout
 
     def test_version_in_help(self):
         """Test version is shown in help"""
-        result = subprocess.run(
-            [VULCAN_PACK_VERIFY, '--help'],
-            capture_output=True,
-            text=True
-        )
+        result = run_vulcan_pack_verify(['--help'])
         assert '4.6.0' in result.stdout
 
     def test_verify_valid_pack(self):
@@ -52,19 +91,15 @@ class TestVulcanPackVerify:
             pack_file = os.path.join(tmpdir, 'test.pack')
             
             # Build pack
-            build_result = subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
-                text=True,
+            build_result = run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             assert build_result.returncode == 0
             
             # Verify pack
-            verify_result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file],
-                capture_output=True,
-                text=True,
+            verify_result = run_vulcan_pack_verify(
+                [pack_file],
                 timeout=30
             )
             
@@ -82,17 +117,14 @@ class TestVulcanPackVerify:
             pack_file = os.path.join(tmpdir, 'test.pack')
             
             # Build pack
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
             # Verify with --full
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file, '--full'],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file, '--full'],
                 timeout=30
             )
             
@@ -107,16 +139,13 @@ class TestVulcanPackVerify:
             
             pack_file = os.path.join(tmpdir, 'test.pack')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file, '--verbose'],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file, '--verbose'],
                 timeout=30
             )
             
@@ -131,16 +160,13 @@ class TestVulcanPackVerify:
             
             pack_file = os.path.join(tmpdir, 'test.pack')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file, '--quiet'],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file, '--quiet'],
                 timeout=30
             )
             
@@ -156,16 +182,13 @@ class TestVulcanPackVerify:
             pack_file = os.path.join(tmpdir, 'test.pack')
             json_output = os.path.join(tmpdir, 'verify.json')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file, '--json', json_output],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file, '--json', json_output],
                 timeout=30
             )
             
@@ -187,10 +210,8 @@ class TestVulcanPackVerify:
             with open(pack_file, 'wb') as f:
                 f.write(b'FAKE' + b'\x00' * 100)
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file],
                 timeout=30
             )
             
@@ -200,10 +221,8 @@ class TestVulcanPackVerify:
 
     def test_verify_nonexistent_file(self):
         """Test verification of non-existent file"""
-        result = subprocess.run(
-            [VULCAN_PACK_VERIFY, '/nonexistent/file.pack'],
-            capture_output=True,
-            text=True,
+        result = run_vulcan_pack_verify(
+            ['/nonexistent/file.pack'],
             timeout=30
         )
         
@@ -219,16 +238,13 @@ class TestVulcanPackVerify:
             
             pack_file = os.path.join(tmpdir, 'test.pack')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file, '--merkle'],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file, '--merkle'],
                 timeout=30
             )
             
@@ -244,16 +260,13 @@ class TestVulcanPackVerify:
             
             pack_file = os.path.join(tmpdir, 'test.pack')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file, '--bloom'],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file, '--bloom'],
                 timeout=30
             )
             
@@ -269,16 +282,13 @@ class TestVulcanPackVerify:
             
             pack_file = os.path.join(tmpdir, 'test.pack')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file, '--checksums'],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file, '--checksums'],
                 timeout=30
             )
             
@@ -295,9 +305,8 @@ class TestVulcanPackVerify:
             
             pack_file = os.path.join(tmpdir, 'test.pack')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
@@ -306,10 +315,8 @@ class TestVulcanPackVerify:
                 f.seek(50)
                 f.write(b'\xFF' * 10)
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file],
                 timeout=30
             )
             
@@ -326,16 +333,13 @@ class TestVulcanPackVerify:
                 
                 pack_file = os.path.join(tmpdir, f'test{i}.pack')
                 
-                subprocess.run(
-                    [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                    capture_output=True,
+                run_vulcan_pack(
+                    ['-i', input_file, '-o', pack_file, '--no-dqs'],
                     timeout=30
                 )
                 
-                result = subprocess.run(
-                    [VULCAN_PACK_VERIFY, pack_file],
-                    capture_output=True,
-                    text=True,
+                result = run_vulcan_pack_verify(
+                    [pack_file],
                     timeout=30
                 )
                 
@@ -350,16 +354,13 @@ class TestVulcanPackVerify:
             
             pack_file = os.path.join(tmpdir, 'test.pack')
             
-            subprocess.run(
-                [VULCAN_PACK, '-i', input_file, '-o', pack_file, '--no-dqs'],
-                capture_output=True,
+            run_vulcan_pack(
+                ['-i', input_file, '-o', pack_file, '--no-dqs'],
                 timeout=30
             )
             
-            result = subprocess.run(
-                [VULCAN_PACK_VERIFY, pack_file],
-                capture_output=True,
-                text=True,
+            result = run_vulcan_pack_verify(
+                [pack_file],
                 timeout=30
             )
             
@@ -369,12 +370,20 @@ class TestVulcanPackVerify:
 
     def test_no_arguments_shows_help(self):
         """Test running with no arguments"""
-        result = subprocess.run(
-            [VULCAN_PACK_VERIFY],
-            capture_output=True,
-            text=True,
+        result = run_vulcan_pack_verify(
+            [],
             timeout=30
         )
         
         # Should show error or help
         assert result.returncode != 0
+
+    def test_python_executable_available(self):
+        """Test that Python executable is available"""
+        result = subprocess.run(
+            [sys.executable, '--version'],
+            capture_output=True,
+            text=True
+        )
+        assert result.returncode == 0
+        assert 'Python' in result.stdout or 'Python' in result.stderr
