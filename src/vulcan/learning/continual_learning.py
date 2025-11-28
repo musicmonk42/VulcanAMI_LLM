@@ -832,12 +832,17 @@ class EnhancedContinualLearner(nn.Module):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
         
-        # Safety check with correct parameter names (reuse validator to avoid thread leaks)
+        # Safety check with correct parameter names
+        # THREAD SAFETY FIX: Reuse validator to prevent thread leaks.
+        # EnhancedSafetyValidator spawns RollbackManager and AuditLogger, each with
+        # background threads (rotation_worker, cleanup_worker). Creating a new validator
+        # on every call causes thread accumulation since threads wait with 1-hour timeouts.
         if EnhancedSafetyValidator:
             try:
-                # Create validator once and reuse (fix for thread leak)
-                if self._safety_validator is None:
-                    self._safety_validator = EnhancedSafetyValidator(SafetyConfig(safety_level='STRICT'))
+                # Thread-safe lazy initialization of validator singleton
+                with self._lock:
+                    if self._safety_validator is None:
+                        self._safety_validator = EnhancedSafetyValidator(SafetyConfig(safety_level='STRICT'))
                 
                 # Collect gradients and model state for validation
                 grads_to_validate = {name: p.grad.clone() for name, p in self.named_parameters() if p.grad is not None}
