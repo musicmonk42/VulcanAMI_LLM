@@ -345,7 +345,15 @@ class TestSimpleCircuit:
 class TestFullGroth16:
     """Test full Groth16 proof system end-to-end."""
     
-    @pytest.mark.skip(reason="Stack overflow on Windows due to py_ecc recursive __pow__ - needs iterative implementation")
+    # TODO: These tests are skipped due to stack overflow caused by py_ecc library's
+    # recursive __pow__ implementation. This affects Windows primarily but may occur
+    # on other platforms with limited stack size. Resolution requires either:
+    # 1. Implementing an iterative exponentiation in a custom field wrapper
+    # 2. Using sys.setrecursionlimit() (not recommended for production)
+    # 3. Waiting for py_ecc library to fix the recursive implementation
+    # See: https://github.com/ethereum/py_ecc for upstream tracking
+    
+    @pytest.mark.skip(reason="Stack overflow due to py_ecc recursive __pow__ in field_elements.py - affects Windows and systems with limited stack")
     def test_groth16_setup_prove_verify(self):
         """Test complete Groth16 flow: setup, prove, verify."""
         # Circuit: x * x = y (prove knowledge of square root)
@@ -388,7 +396,7 @@ class TestFullGroth16:
         # Proof should be valid
         assert is_valid
     
-    @pytest.mark.skip(reason="Stack overflow on Windows due to py_ecc recursive __pow__ - needs iterative implementation")
+    @pytest.mark.skip(reason="Stack overflow due to py_ecc recursive __pow__ in field_elements.py - affects Windows and systems with limited stack")
     def test_groth16_invalid_witness_rejected(self):
         """Test that invalid witness is rejected during prove."""
         constraints = [

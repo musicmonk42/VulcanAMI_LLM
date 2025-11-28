@@ -239,11 +239,15 @@ class TestDependencyManagement:
             if "==" not in line and ">=" not in line and line.strip():
                 # Allow lines that are just comments or special directives
                 if not line.startswith("-") and not line.startswith("https://"):
-                    # Allow URL-based dependencies with @ (they have SHA hashes for reproducibility)
+                    # Allow URL-based dependencies with @ that have verified hashes or commit pins
                     # e.g., "en_core_web_sm @ https://...#sha256=..."
                     # or "graphix @ git+https://...@<commit_hash>"
                     if " @ " in line:
-                        continue
+                        # Verify it has a hash or commit pin for reproducibility
+                        has_sha_hash = "#sha256=" in line or "#sha384=" in line or "#sha512=" in line
+                        has_commit_pin = "@" in line.split(" @ ")[1] if " @ " in line else False
+                        if has_sha_hash or has_commit_pin:
+                            continue
                     unpinned.append(line)
         
         assert len(unpinned) == 0, \
