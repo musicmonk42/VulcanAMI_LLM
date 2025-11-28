@@ -1409,8 +1409,13 @@ class VULCANAGICollective:
             
             return status
     
-    def shutdown(self):
-        """Shutdown orchestrator, agent pool, and all dependent services."""
+    def shutdown(self, timeout: float = 5.0):
+        """
+        Shutdown orchestrator with proper thread cleanup and timeout handling.
+        
+        Args:
+            timeout: Maximum time to wait for each service shutdown (seconds)
+        """
         if self._shutdown_event.is_set():
             logger.warning("Collective already shutting down")
             return
@@ -1418,53 +1423,129 @@ class VULCANAGICollective:
         logger.info("Shutting down VULCAN-AGI Collective...")
         self._shutdown_event.set()
         
-        # --- Propagate shutdown to all dependencies ---
-        # This is the critical fix.
-        # We shut down all services that might be running background threads.
+        # Track shutdown progress
+        shutdown_errors = []
         
+        # ========================================
+        # PHASE 1: Signal shutdown to all services
+        # ========================================
         services_to_shutdown = {
             "agent_pool": getattr(self, 'agent_pool', None),
             "governance": getattr(self.deps, 'governance', None),
             "safety_validator": getattr(self.deps, 'safety_validator', None),
-            # Add other key services that have shutdown methods
             "continual_learner": getattr(self.deps, 'continual', None),
             "world_model": getattr(self.deps, 'world_model', None),
             "meta_cognitive": getattr(self.deps, 'meta_cognitive', None),
             "self_improvement_drive": getattr(self.deps, 'self_improvement_drive', None),
             "distributed_coordinator": getattr(self.deps, 'distributed', None),
         }
-
-        # Find the safety services that contain rollback/audit
-        # We assume safety_validator holds them, but if not, we find them
+        
+        # CRITICAL FIX: Add rollback manager and audit logger
         if hasattr(self.deps, 'rollback_manager'):
-             services_to_shutdown["rollback_manager"] = self.deps.rollback_manager
+            services_to_shutdown["rollback_manager"] = self.deps.rollback_manager
         if hasattr(self.deps, 'audit_logger'):
-             services_to_shutdown["audit_logger"] = self.deps.audit_logger
-
+            services_to_shutdown["audit_logger"] = self.deps.audit_logger
+        
+        # Try to shutdown each service with timeout
         for name, service in services_to_shutdown.items():
-            if service and hasattr(service, 'shutdown') and callable(getattr(service, 'shutdown')):
-                try:
-                    logger.debug(f"Shutting down dependency: {name}...")
-                    service.shutdown()
-                    logger.debug(f"{name} shutdown complete.")
-                except Exception as e:
-                    # Log error but continue shutdown
-                    logger.error(f"Error shutting down dependency '{name}': {e}", exc_info=True)
+            if service is None:
+                continue
+                
+            if not hasattr(service, 'shutdown') or not callable(getattr(service, 'shutdown')):
+                logger.debug(f"Service {name} has no shutdown method, skipping")
+                continue
+            
+            try:
+                logger.debug(f"Shutting down {name}...")
+                
+                # Use threading to enforce timeout
+                shutdown_thread = threading.Thread(
+                    target=service.shutdown,
+                    name=f"shutdown_{name}",
+                    daemon=True  # Ensure it doesn't block program exit
+                )
+                shutdown_thread.start()
+                shutdown_thread.join(timeout=timeout)
+                
+                if shutdown_thread.is_alive():
+                    logger.error(
+                        f"Service {name} shutdown timed out after {timeout}s. "
+                        f"Thread may still be running."
+                    )
+                    shutdown_errors.append(f"{name}: timeout")
+                else:
+                    logger.debug(f"{name} shutdown complete")
+                    
+            except Exception as e:
+                logger.error(f"Error shutting down {name}: {e}", exc_info=True)
+                shutdown_errors.append(f"{name}: {str(e)}")
         
-        # ----------------------------------------------
+        # ========================================
+        # PHASE 2: Force cleanup of any remaining threads
+        # ========================================
+        try:
+            active_threads = threading.enumerate()
+            
+            # Filter for threads we care about (not main thread, not daemon)
+            worker_threads = [
+                t for t in active_threads 
+                if t != threading.main_thread() 
+                and not t.daemon
+                and t.is_alive()
+            ]
+            
+            if worker_threads:
+                logger.warning(
+                    f"Found {len(worker_threads)} non-daemon threads still running. "
+                    f"Waiting {timeout}s for cleanup..."
+                )
+                
+                # Give threads one more chance to finish
+                for thread in worker_threads:
+                    thread.join(timeout=timeout / max(len(worker_threads), 1))
+                
+                # Check again
+                still_alive = [t for t in worker_threads if t.is_alive()]
+                if still_alive:
+                    logger.error(
+                        f"{len(still_alive)} threads still alive after shutdown: "
+                        f"{[t.name for t in still_alive]}"
+                    )
+                    
+        except Exception as e:
+            logger.error(f"Error during thread cleanup: {e}", exc_info=True)
         
-        # Clear large data structures
-        with self._lock:
-            self.reasoning_trace.clear()
-            self.execution_history.clear()
-            self.recent_errors.clear()
-            self.error_count_window.clear()
+        # ========================================
+        # PHASE 3: Clear data structures
+        # ========================================
+        try:
+            with self._lock:
+                self.reasoning_trace.clear()
+                self.execution_history.clear()
+                self.recent_errors.clear()
+                self.error_count_window.clear()
+        except Exception as e:
+            logger.error(f"Error clearing data structures: {e}")
         
-        # Force garbage collection
-        import gc
-        gc.collect()
+        # ========================================
+        # PHASE 4: Force garbage collection
+        # ========================================
+        try:
+            import gc
+            gc.collect()
+        except Exception as e:
+            logger.debug(f"Error during garbage collection: {e}")
         
-        logger.info("VULCAN-AGI Collective shutdown complete")
+        # ========================================
+        # PHASE 5: Report results
+        # ========================================
+        if shutdown_errors:
+            logger.warning(
+                f"Collective shutdown completed with {len(shutdown_errors)} errors: "
+                f"{shutdown_errors}"
+            )
+        else:
+            logger.info("VULCAN-AGI Collective shutdown complete (no errors)")
     
     def __del__(self):
         """Destructor to ensure cleanup"""
