@@ -29,7 +29,8 @@ Apply these fixes systematically across the codebase.
 import pickle
 import io
 import logging
-from typing import Any, Set, Type
+from typing import Any, Set, Type, Union, BinaryIO
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -87,29 +88,59 @@ class RestrictedUnpickler(pickle.Unpickler):
         
         return super().find_class(module, name)
 
-def safe_pickle_load(file_path: str) -> Any:
+
+def safe_pickle_load(file_or_path: Union[str, os.PathLike, BinaryIO]) -> Any:
     """
     Safely load pickled data with restricted unpickler.
     
+    FIXED: Now accepts either a file path OR an already-opened file handle.
+    This fixes the "TypeError: expected str, bytes or os.PathLike object, not BufferedReader" error.
+    
     Args:
-        file_path: Path to pickle file
+        file_or_path: Either a path to pickle file (str/PathLike) or an open file handle (BinaryIO)
         
     Returns:
         Unpickled data
         
     Raises:
         pickle.UnpicklingError: If unsafe class is encountered
-        FileNotFoundError: If file doesn't exist
+        FileNotFoundError: If file doesn't exist (when path is provided)
+        TypeError: If argument is neither a path nor a file handle
+    
+    Examples:
+        # Usage with file path
+        data = safe_pickle_load("/path/to/file.pkl")
+        
+        # Usage with open file handle
+        with open("/path/to/file.pkl", "rb") as f:
+            data = safe_pickle_load(f)
     """
-    try:
-        with open(file_path, 'rb') as f:
-            return RestrictedUnpickler(f).load()
-    except pickle.UnpicklingError as e:
-        logger.error(f"Unsafe pickle load attempt from {file_path}: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Failed to load pickle from {file_path}: {e}")
-        raise
+    # Check if it's a file-like object (has 'read' method)
+    if hasattr(file_or_path, 'read'):
+        # It's already an open file handle
+        try:
+            return RestrictedUnpickler(file_or_path).load()
+        except pickle.UnpicklingError as e:
+            logger.error(f"Unsafe pickle load attempt from file handle: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to load pickle from file handle: {e}")
+            raise
+    else:
+        # It's a file path - open it
+        try:
+            with open(file_or_path, 'rb') as f:
+                return RestrictedUnpickler(f).load()
+        except pickle.UnpicklingError as e:
+            logger.error(f"Unsafe pickle load attempt from {file_or_path}: {e}")
+            raise
+        except FileNotFoundError as e:
+            logger.error(f"Pickle file not found: {file_or_path}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to load pickle from {file_or_path}: {e}")
+            raise
+
 
 # ============================================================================
 # FIX 3: Safe Subprocess Execution
@@ -147,6 +178,7 @@ def validate_file_path(file_path: str, allowed_base: str = None) -> Path:
         raise ValueError(f"Path {path} does not exist")
     
     return path
+
 
 def safe_git_add(file_path: str, repo_root: str = ".") -> subprocess.CompletedProcess:
     """
@@ -186,6 +218,7 @@ def safe_git_add(file_path: str, repo_root: str = ".") -> subprocess.CompletedPr
         logger.error(f"Git add failed: {e.stderr}")
         raise
 
+
 def safe_git_commit(message: str, repo_root: str = ".") -> subprocess.CompletedProcess:
     """
     Safely execute 'git commit' with sanitized message.
@@ -219,6 +252,7 @@ def safe_git_commit(message: str, repo_root: str = ".") -> subprocess.CompletedP
     except subprocess.CalledProcessError as e:
         logger.error(f"Git commit failed: {e.stderr}")
         raise
+
 
 # ============================================================================
 # FIX 4: Enhanced Error Handling Pattern
@@ -276,16 +310,17 @@ def safe_execute(
         return wrapper
     return decorator
 
+
 # ============================================================================
 # FIX 5: Production Configuration Validation
 # ============================================================================
 
-import os
 from typing import Dict, List
 
 class ConfigurationError(Exception):
     """Raised when required configuration is missing or invalid."""
     pass
+
 
 def validate_production_config() -> None:
     """
@@ -337,6 +372,7 @@ def validate_production_config() -> None:
     
     logger.info("✅ Production configuration validated successfully")
 
+
 # ============================================================================
 # FIX 6: Secure Random Token Generation
 # ============================================================================
@@ -355,6 +391,7 @@ def generate_secure_token(length: int = 32) -> str:
         Hex-encoded random token
     """
     return secrets.token_hex(length)
+
 
 def generate_secure_password(length: int = 16) -> str:
     """
@@ -384,17 +421,26 @@ def generate_secure_password(length: int = 16) -> str:
     
     return password
 
+
 # ============================================================================
 # Usage Examples
 # ============================================================================
 
 if __name__ == "__main__":
-    # Example 1: Safe pickle loading
+    # Example 1: Safe pickle loading (both methods)
     try:
+        # Method 1: With file path
         data = safe_pickle_load("/path/to/checkpoint.pkl")
         print("Loaded data safely:", type(data))
+        
+        # Method 2: With open file handle
+        with open("/path/to/checkpoint.pkl", "rb") as f:
+            data = safe_pickle_load(f)
+            print("Loaded data safely from handle:", type(data))
     except pickle.UnpicklingError as e:
         print(f"Unsafe pickle detected: {e}")
+    except FileNotFoundError as e:
+        print(f"File not found: {e}")
     
     # Example 2: Safe git operations
     try:
