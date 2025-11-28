@@ -55,7 +55,6 @@ frozenlist==1.8.0
 fsspec==2025.10.0
 galois==0.4.2
 graphene==3.4.3
-graphix @ git+https://github.com/musicmonk42/VulcanAMI_LLM.git@6d9f03753e97ed6389c3e011728d5f330f8d5031
 graphql-core==3.2.7
 graphql-relay==3.2.0
 graphviz==0.21
