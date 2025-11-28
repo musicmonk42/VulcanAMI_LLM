@@ -341,6 +341,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          load: true
           tags: vulcanami-llm:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
