@@ -289,6 +289,9 @@ class EnhancedContinualLearner(nn.Module):
         # Meta-learner
         self.meta_learner = MetaLearner(self, self.config)
         
+        # Safety validator (singleton to avoid thread leaks)
+        self._safety_validator = None
+        
         # Thread safety - single main lock for operations
         self._lock = threading.RLock()
         self._shutdown = threading.Event()
@@ -830,15 +833,23 @@ class EnhancedContinualLearner(nn.Module):
         torch.nn.utils.clip_grad_norm_(self.parameters(), 1.0)
         
         # Safety check with correct parameter names
+        # THREAD SAFETY FIX: Reuse validator to prevent thread leaks.
+        # EnhancedSafetyValidator spawns RollbackManager and AuditLogger, each with
+        # background threads (rotation_worker, cleanup_worker). Creating a new validator
+        # on every call causes thread accumulation since threads wait with 1-hour timeouts.
         if EnhancedSafetyValidator:
             try:
-                validator = EnhancedSafetyValidator(SafetyConfig(safety_level='STRICT'))
+                # Thread-safe lazy initialization of validator singleton
+                with self._lock:
+                    if self._safety_validator is None:
+                        self._safety_validator = EnhancedSafetyValidator(SafetyConfig(safety_level='STRICT'))
+                
                 # Collect gradients and model state for validation
                 grads_to_validate = {name: p.grad.clone() for name, p in self.named_parameters() if p.grad is not None}
                 model_state = {name: p.data.clone() for name, p in self.named_parameters()}
                 
                 # Use correct parameter names for validator
-                safe, reason = validator.validate_action({
+                safe, reason = self._safety_validator.validate_action({
                     'type': 'MODEL_UPDATE',
                     'gradients': grads_to_validate,
                     'model_state': model_state
@@ -1359,5 +1370,12 @@ class EnhancedContinualLearner(nn.Module):
                 self.meta_learner.shutdown()
             except Exception as e:
                 logger.error(f"Failed to shutdown meta learner: {e}")
+        
+        # Shutdown safety validator (has background threads)
+        if hasattr(self, '_safety_validator') and self._safety_validator:
+            try:
+                self._safety_validator.shutdown()
+            except Exception as e:
+                logger.error(f"Failed to shutdown safety validator: {e}")
         
         logger.info("EnhancedContinualLearner shutdown complete")

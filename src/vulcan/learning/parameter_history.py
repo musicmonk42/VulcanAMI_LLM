@@ -506,11 +506,10 @@ class ParameterHistoryManager:
             trajectory_path = self.trajectory_storage[trajectory_id]
         
         try:
-            # FIXED: Use Path object
+            # FIXED: Use Path object and pass string path to safe_pickle_load
             path = Path(trajectory_path).resolve()
-            with path.open('rb') as f:
-                data = safe_pickle_load(f)
-                return LearningTrajectory(**data)
+            data = safe_pickle_load(str(path))
+            return LearningTrajectory(**data)
         except Exception as e:
             logger.error(f"Failed to load trajectory: {e}")
             return None
