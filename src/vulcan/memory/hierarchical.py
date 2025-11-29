@@ -561,7 +561,7 @@ class HierarchicalMemory(BaseMemorySystem):
                     # Create new pattern
                     pattern = ProblemPattern(
                         pattern_id=pattern_id,
-                        feature_signature=feature_signature,
+                        feature_signature=record.problem_features,
                         typical_tools=typical_tools,
                         success_rate=success_rate,
                         avg_utility=avg_utility,
