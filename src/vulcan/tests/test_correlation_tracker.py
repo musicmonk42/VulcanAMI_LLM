@@ -35,13 +35,58 @@ from vulcan.world_model.correlation_tracker import (
 
 
 # ============================================================================
+# Test Interference Fix
+# ============================================================================
+
+@pytest.fixture(autouse=True, scope="function")
+def cleanup_test_state():
+    """
+    CRITICAL FIX: Reset global state before and after each test.
+    This prevents test interference when running the full test suite.
+    
+    The correlation_tracker module uses global lazy-loaded variables
+    (EnhancedSafetyValidator, SafetyConfig, WorldModel) that persist
+    across test runs, causing failures when tests run together.
+    """
+    import gc
+    import vulcan.world_model.correlation_tracker as ct
+    
+    # Reset globals before test
+    ct.EnhancedSafetyValidator = None
+    ct.SafetyConfig = None
+    ct.WorldModel = None
+    
+    # Let test run
+    yield
+    
+    # Cleanup after test
+    gc.collect()
+    
+    # Reset globals again after test
+    ct.EnhancedSafetyValidator = None
+    ct.SafetyConfig = None
+    ct.WorldModel = None
+
+
+# ============================================================================
 # Fixtures
 # ============================================================================
 
 @pytest.fixture
 def basic_tracker():
     """Basic correlation tracker with default settings"""
-    return CorrelationTracker(method="pearson", min_samples=3)
+    tracker = CorrelationTracker(method="pearson", min_samples=3)
+    yield tracker
+    
+    # Cleanup after test to prevent memory leaks
+    if hasattr(tracker, 'observation_history'):
+        tracker.observation_history.clear()
+    if hasattr(tracker, 'partial_corr_cache'):
+        tracker.partial_corr_cache.clear()
+    if hasattr(tracker, 'safety_blocks'):
+        tracker.safety_blocks.clear()
+    if hasattr(tracker, 'safety_corrections'):
+        tracker.safety_corrections.clear()
 
 
 @pytest.fixture
@@ -52,10 +97,21 @@ def tracker_with_safety():
         # 'max_edges': 1000, <-- This key is invalid for SafetyConfig
         'enable_validation': True
     }
-    return CorrelationTracker(
+    tracker = CorrelationTracker(
         method="pearson",
         safety_config=safety_config
     )
+    yield tracker
+    
+    # Cleanup after test
+    if hasattr(tracker, 'observation_history'):
+        tracker.observation_history.clear()
+    if hasattr(tracker, 'partial_corr_cache'):
+        tracker.partial_corr_cache.clear()
+    if hasattr(tracker, 'safety_blocks'):
+        tracker.safety_blocks.clear()
+    if hasattr(tracker, 'safety_corrections'):
+        tracker.safety_corrections.clear()
 
 
 @pytest.fixture
