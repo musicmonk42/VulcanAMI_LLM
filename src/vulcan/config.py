@@ -679,6 +679,13 @@ class HierarchicalGoalSystem:
             'resources_needed': {}
         }
     
+    def update_progress(self, goal_id: str, progress: float) -> None:
+        """Update progress for a specific goal."""
+        # Basic progress tracking - extend as needed
+        if not hasattr(self, '_progress'):
+            self._progress = {}
+        self._progress[goal_id] = max(0.0, min(1.0, progress))
+    
     def get_goal_status(self) -> Dict[str, Any]:
         """Get status of all goals."""
         return {
@@ -1557,14 +1564,29 @@ def _dict_to_agent_config(raw: dict) -> AgentConfig:
     """
     Given a config dict (result from get_all()), produce an AgentConfig with correct fields from both root and agent_config blocks.
     """
-    agent_cfg = raw.get("agent_config", {})
+    agent_cfg = raw.get("agent_config", {}).copy()  # Make a copy to avoid modifying original
     # Add root-level and nested overrides
     enable_self_improvement = raw.get("enable_self_improvement", False)
     intrinsic_drives = raw.get("intrinsic_drives_config", {})
+    
+    # Define valid AgentConfig fields (excluding fields we'll set explicitly)
+    valid_fields = {
+        'agent_id', 'collective_id', 'version', 'enable_learning', 'enable_adaptation',
+        'enable_self_modification', 'enable_multi_agent', 'enable_explainability',
+        'enable_adversarial_testing', 'enable_multimodal', 'enable_symbolic',
+        'enable_distributed', 'max_parallel_tasks', 'checkpoint_interval', 'log_level',
+        'max_working_memory'
+        # Note: enable_self_improvement, intrinsic_drives_config_file, and intrinsic_drives_state_file
+        # are handled separately below
+    }
+    
+    # Filter agent_cfg to only include valid fields
+    filtered_cfg = {k: v for k, v in agent_cfg.items() if k in valid_fields}
+    
     # Provide more fields as needed for new features
     return AgentConfig(
-        **agent_cfg,
-        enable_self_improvement=enable_self_improvement or agent_cfg.get("enable_self_improvement", False),
+        **filtered_cfg,
+        enable_self_improvement=enable_self_improvement or raw.get("agent_config", {}).get("enable_self_improvement", False),
         intrinsic_drives_config_file=intrinsic_drives.get("config_file", "configs/intrinsic_drives.json"),
         intrinsic_drives_state_file=intrinsic_drives.get("state_file", "data/agent_state.json")
     )
