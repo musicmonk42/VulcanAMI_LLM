@@ -141,17 +141,18 @@ class AdversarialValidator:
             config: Additional configuration
             random_seed: Random seed for reproducibility
         """
+        # Set random seed if provided (always, even for existing singleton instance)
+        if random_seed is not None:
+            np.random.seed(random_seed)
+            random.seed(random_seed)
+            torch.manual_seed(random_seed)
+        
         if getattr(self, "_initialized", False):
             return
         
         self.config = config or {}
         self.epsilon = epsilon
         self.num_attacks = num_attacks
-        
-        # Set random seed if provided
-        if random_seed is not None:
-            np.random.seed(random_seed)
-            random.seed(random_seed)
         
         # Thread safety
         self.lock = threading.RLock()
