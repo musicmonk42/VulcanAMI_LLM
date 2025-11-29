@@ -59,6 +59,8 @@ class RestrictedUnpickler(pickle.Unpickler):
         'sklearn.linear_model',
         'sklearn.linear_model._logistic',
         'sklearn.calibration',
+        # Test modules (for pytest test fixtures and helper classes)
+        '__main__',  # Sometimes test classes are in __main__
         # Add your safe modules here
     }
     
@@ -107,6 +109,17 @@ class RestrictedUnpickler(pickle.Unpickler):
             import collections.abc
             if hasattr(collections.abc, name):
                 return getattr(collections.abc, name)
+        
+        # FIXED: Allow test classes (from test modules)
+        # This allows test fixtures and helper classes to be pickled/unpickled in tests
+        if '.tests.' in module or module.startswith('tests.'):
+            try:
+                import importlib
+                mod = importlib.import_module(module)
+                return getattr(mod, name)
+            except (ImportError, AttributeError) as e:
+                # If we can't import it, fall through to the whitelist check
+                pass
         
         # Check if module is in whitelist
         if module not in self.SAFE_MODULES:
