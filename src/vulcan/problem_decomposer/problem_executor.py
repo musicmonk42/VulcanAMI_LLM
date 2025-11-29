@@ -177,25 +177,42 @@ class ProblemExecutor:
         if SAFETY_VALIDATOR_AVAILABLE:
             config_obj = None
             if safety_config and SafetyConfig:
-                try:
-                    # This call is required by test_executor_with_custom_config
-                    config_obj = SafetyConfig.from_dict(safety_config)
-                    # CRITICAL: Ensure rollback config includes test_mode from safety_config
-                    if hasattr(config_obj, 'rollback_config') and isinstance(safety_config, dict):
-                        if config_obj.rollback_config is None:
-                            config_obj.rollback_config = {}
-                        config_obj.rollback_config.update(safety_config)
-                except Exception as e:
-                    logger.error(f"Failed to create SafetyConfig from dict: {e}")
-                    # Fallback: create a basic SafetyConfig and add rollback_config
-                    config_obj = SafetyConfig() if SafetyConfig else None
-                    if config_obj and isinstance(safety_config, dict):
-                        if not hasattr(config_obj, 'rollback_config'):
-                            config_obj.rollback_config = safety_config
+                # Handle test_mode - don't pass it directly to SafetyConfig
+                if 'test_mode' in safety_config and len(safety_config) == 1:
+                    # Just test_mode config
+                    config_obj = SafetyConfig()
+                    config_obj.rollback_config = {
+                        'test_mode': True,
+                        'max_snapshots': 10,
+                        'enable_storage': False,
+                        'enable_workers': False
+                    }
+                else:
+                    try:
+                        # Filter out test_mode before passing to from_dict
+                        safety_config_filtered = {k: v for k, v in safety_config.items() if k != 'test_mode'}
+                        config_obj = SafetyConfig.from_dict(safety_config_filtered) if safety_config_filtered else SafetyConfig()
+                        # Add rollback_config with defaults
+                        rollback_cfg = {
+                            'max_snapshots': 10 if safety_config.get('test_mode') else 100,
+                            'enable_storage': not safety_config.get('test_mode', False),
+                            'enable_workers': not safety_config.get('test_mode', False)
+                        }
+                        rollback_cfg.update(safety_config)
+                        if not hasattr(config_obj, 'rollback_config') or config_obj.rollback_config is None:
+                            config_obj.rollback_config = rollback_cfg
                         else:
-                            if config_obj.rollback_config is None:
-                                config_obj.rollback_config = {}
-                            config_obj.rollback_config.update(safety_config)
+                            config_obj.rollback_config.update(rollback_cfg)
+                    except Exception as e:
+                        logger.error(f"Failed to create SafetyConfig from dict: {e}")
+                        config_obj = SafetyConfig()
+                        config_obj.rollback_config = {
+                            'test_mode': safety_config.get('test_mode', False),
+                            'max_snapshots': 10,
+                            'enable_storage': False,
+                            'enable_workers': False
+                        }
+                        config_obj.rollback_config.update(safety_config)
             
             # Use the EnhancedSafetyValidator imported at the top of the file
             self.safety_validator = EnhancedSafetyValidator(config=config_obj)
