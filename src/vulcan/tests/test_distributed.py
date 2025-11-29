@@ -534,12 +534,14 @@ class TestDistributedMemory:
             node = MemoryNode(f"node_{i}", "localhost", 5560 + i, 1000)
             distributed_memory.federation.register_node(node)
         
-        content = {"data": "test"}
-        memory = distributed_memory.store(content)
-        
-        # FIX: Should be tracked in replicas (even if just local node)
-        assert memory.id in distributed_memory.replicas
-        assert len(distributed_memory.replicas[memory.id]) >= 1
+        # Mock RPC client to simulate successful replication
+        with patch.object(distributed_memory.rpc_client, 'send_request', return_value={'success': True}):
+            content = {"data": "test"}
+            memory = distributed_memory.store(content)
+            
+            # Should be tracked in replicas (either local or remote nodes)
+            assert memory.id in distributed_memory.replicas
+            assert len(distributed_memory.replicas[memory.id]) >= 1
     
     def test_retrieve_local(self, distributed_memory, sample_memory):
         """Test retrieving from local storage."""
