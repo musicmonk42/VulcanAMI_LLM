@@ -459,8 +459,9 @@ class TestVoting:
             registry_endpoint=mock_server,
             private_key_path=temp_private_key_file
         )
-        response = await client.vote_on_proposal("test-id", "approve", "Looks good")
+        response = await client.vote_on_proposal("test-id", "yes", "Looks good")
         assert response["status"] == "success"
+        assert response["vote"] == "yes"
         await client.close()
     
     @pytest.mark.asyncio
@@ -470,8 +471,9 @@ class TestVoting:
             registry_endpoint=mock_server,
             private_key_path=temp_private_key_file
         )
-        response = await client.vote_on_proposal("test-id", "reject", "Needs work")
+        response = await client.vote_on_proposal("test-id", "no", "Needs work")
         assert response["status"] == "success"
+        assert response["vote"] == "no"
         await client.close()
     
     @pytest.mark.asyncio
@@ -669,8 +671,9 @@ class TestIntegration:
             assert proposal["status"] == "success"
             
             # Vote
-            vote = await client.vote_on_proposal("test-id", "approve", "Good")
+            vote = await client.vote_on_proposal("test-id", "yes", "Good")
             assert vote["status"] == "success"
+            assert vote["vote"] == "yes"
             
             # Execute
             execution = await client.execute_graph(sample_graph)
