@@ -135,7 +135,9 @@ class TestEvidenceWeightedResolverBasics:
     
     def test_initialization_with_safety_config(self):
         """Test initialization with safety config"""
-        safety_config = {'max_risk_score': 0.8}
+        # FIXED: Use valid SafetyConfig parameters (empty dict is valid)
+        # SafetyConfig doesn't accept 'max_risk_score' parameter
+        safety_config = {}  # Empty dict is valid and uses defaults
         resolver = EvidenceWeightedResolver(safety_config=safety_config)
         
         assert resolver is not None
