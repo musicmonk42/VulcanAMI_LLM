@@ -74,6 +74,40 @@ class RestrictedUnpickler(pickle.Unpickler):
         Only allow safe classes to be unpickled.
         Raises pickle.UnpicklingError for unsafe classes.
         """
+        # Allow PyTorch tensor reconstruction functions (critical for model loading)
+        if module == 'torch._utils':
+            if name.startswith('_rebuild_'):
+                import torch._utils
+                return getattr(torch._utils, name)
+        
+        # Allow PyTorch storage types (FloatStorage, LongStorage, etc.)
+        if module == 'torch.storage':
+            import torch.storage
+            if hasattr(torch.storage, name):
+                return getattr(torch.storage, name)
+        
+        # Allow PyTorch parameter
+        if module == 'torch.nn.parameter' and name == 'Parameter':
+            import torch.nn.parameter
+            return torch.nn.parameter.Parameter
+        
+        # Allow PyTorch module internals
+        if module == 'torch.nn.modules.module':
+            import torch.nn.modules.module
+            if hasattr(torch.nn.modules.module, name):
+                return getattr(torch.nn.modules.module, name)
+        
+        # Allow collections.OrderedDict (used in PyTorch state_dict)
+        if module == 'collections' and name == 'OrderedDict':
+            from collections import OrderedDict
+            return OrderedDict
+        
+        # Allow collections.abc classes
+        if module == 'collections.abc':
+            import collections.abc
+            if hasattr(collections.abc, name):
+                return getattr(collections.abc, name)
+        
         # Check if module is in whitelist
         if module not in self.SAFE_MODULES:
             raise pickle.UnpicklingError(
