@@ -166,7 +166,7 @@ class ProblemExecutor:
         Args:
             validator: Optional validator for solution validation
             semantic_bridge: Optional semantic bridge for concept application
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (dict with test_mode, etc.)
         """
         self.validator = validator
         self.semantic_bridge = semantic_bridge
@@ -180,12 +180,27 @@ class ProblemExecutor:
                 try:
                     # This call is required by test_executor_with_custom_config
                     config_obj = SafetyConfig.from_dict(safety_config)
+                    # CRITICAL: Ensure rollback config includes test_mode from safety_config
+                    if hasattr(config_obj, 'rollback_config') and isinstance(safety_config, dict):
+                        if config_obj.rollback_config is None:
+                            config_obj.rollback_config = {}
+                        config_obj.rollback_config.update(safety_config)
                 except Exception as e:
                     logger.error(f"Failed to create SafetyConfig from dict: {e}")
+                    # Fallback: create a basic SafetyConfig and add rollback_config
+                    config_obj = SafetyConfig() if SafetyConfig else None
+                    if config_obj and isinstance(safety_config, dict):
+                        if not hasattr(config_obj, 'rollback_config'):
+                            config_obj.rollback_config = safety_config
+                        else:
+                            if config_obj.rollback_config is None:
+                                config_obj.rollback_config = {}
+                            config_obj.rollback_config.update(safety_config)
             
             # Use the EnhancedSafetyValidator imported at the top of the file
             self.safety_validator = EnhancedSafetyValidator(config=config_obj)
-            logger.info("ProblemExecutor initialized with EnhancedSafetyValidator")
+            logger.info("ProblemExecutor initialized with EnhancedSafetyValidator (test_mode=%s)", 
+                       safety_config.get('test_mode', False) if isinstance(safety_config, dict) else False)
         else:
             # This is required by test_executor_initialization_without_safety
             self.safety_validator = None
