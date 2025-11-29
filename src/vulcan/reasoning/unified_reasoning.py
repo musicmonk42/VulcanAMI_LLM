@@ -53,7 +53,7 @@ class MockLanguageReasoner:
         return ReasoningResult(
             conclusion=conclusion,
             confidence=confidence,
-            reasoning_type=ReasoningType.LANGUAGE,
+            reasoning_type=ReasoningType.SYMBOLIC,
             explanation=f"Executed neural language generation (LLM mode)."
         )
 
@@ -336,7 +336,7 @@ class UnifiedReasoner:
                     enable_learning=enable_learning
                 )
             if 'LanguageReasoner' in reasoning_components:
-                self.reasoners[ReasoningType.LANGUAGE] = reasoning_components['LanguageReasoner']()
+                self.reasoners[ReasoningType.SYMBOLIC] = reasoning_components['LanguageReasoner']()
             if 'AbstractReasoner' in reasoning_components:
                 AbstractReasoner = reasoning_components['AbstractReasoner']
                 # self.reasoners[ReasoningType.ABSTRACT] = AbstractReasoner() # This is an abstract class
@@ -645,9 +645,9 @@ class UnifiedReasoner:
                 self.multimodal.register_modality_reasoner(
                     ModalityType.UNKNOWN, self.reasoners[ReasoningType.PROBABILISTIC]
                 )
-            if ReasoningType.LANGUAGE in self.reasoners:
+            if ReasoningType.SYMBOLIC in self.reasoners:
                 self.multimodal.register_modality_reasoner(
-                    ModalityType.TEXT, self.reasoners[ReasoningType.LANGUAGE]
+                    ModalityType.TEXT, self.reasoners[ReasoningType.SYMBOLIC]
                 )
         except Exception as e:
             logger.warning(f"Error registering modality reasoners: {e}")
@@ -1030,7 +1030,7 @@ class UnifiedReasoner:
                 for reasoning_type in [ReasoningType.PROBABILISTIC, 
                                       ReasoningType.SYMBOLIC,
                                       ReasoningType.CAUSAL,
-                                      ReasoningType.LANGUAGE]: # Added Language to default ensemble
+                                      ReasoningType.SYMBOLIC]: # Added Language to default ensemble
                     if reasoning_type in self.reasoners:
                         sub_task = ReasoningTask(
                             task_id=f"{task.task_id}_{reasoning_type.value}",
@@ -1113,8 +1113,8 @@ class UnifiedReasoner:
                     portfolio.append(ReasoningType.ANALOGICAL)
 
             if 'generate' in query_str or 'summarize' in query_str or 'explain' in query_str:
-                if ReasoningType.LANGUAGE in self.reasoners:
-                    portfolio.append(ReasoningType.LANGUAGE)
+                if ReasoningType.SYMBOLIC in self.reasoners:
+                    portfolio.append(ReasoningType.SYMBOLIC)
         
         max_size = 3
         if task.constraints.get('time_budget_ms', float('inf')) < 2000:
@@ -1474,11 +1474,11 @@ class UnifiedReasoner:
         keyword_map = {
             ReasoningType.PROBABILISTIC: ['probability', 'likelihood', 'chance', 'distribution', 'threshold'],
             ReasoningType.CAUSAL: ['cause', 'effect', 'why', 'impact', 'influence', 'reason'],
-            ReasoningType.SYMBOLIC: ['prove', 'logic', 'valid', 'theorem', 'deduce', 'consistent'],
+            ReasoningType.SYMBOLIC: ['prove', 'logic', 'valid', 'theorem', 'deduce', 'consistent', 
+                                     'generate', 'summarize', 'explain', 'text', 'narrative', 'story'],  # Merged with LLM keywords
             ReasoningType.ANALOGICAL: ['similar', 'analogy', 'like', 'resembles', 'comparison'],
             ReasoningType.COUNTERFACTUAL: ['what if', 'counterfactual', 'had not'],
-            ReasoningType.MULTIMODAL: ['image', 'video', 'audio', 'multimodal'],
-            ReasoningType.LANGUAGE: ['generate', 'summarize', 'explain', 'text', 'narrative', 'story'] # NEW LLM KEYWORDS
+            ReasoningType.MULTIMODAL: ['image', 'video', 'audio', 'multimodal']
         }
         for r_type, keywords in keyword_map.items():
             for keyword in keywords:
@@ -1498,7 +1498,7 @@ class UnifiedReasoner:
         
         # Prefer language mode if input is mostly text and query suggests generation
         if isinstance(input_data, str) and len(input_data) > 200 and 'generate' in query_str:
-            scores[ReasoningType.LANGUAGE] += 0.5
+            scores[ReasoningType.SYMBOLIC] += 0.5
 
         if not scores or max(scores.values()) < 0.3:
             return ReasoningType.PROBABILISTIC
@@ -1674,10 +1674,9 @@ class UnifiedReasoner:
         
         type_profiles = {
             ReasoningType.PROBABILISTIC: {'speed': 0.8, 'accuracy': 0.6, 'energy': 0.7},
-            ReasoningType.SYMBOLIC: {'speed': 0.5, 'accuracy': 0.9, 'energy': 0.6},
+            ReasoningType.SYMBOLIC: {'speed': 0.5, 'accuracy': 0.9, 'energy': 0.6},  # Includes LLM reasoning
             ReasoningType.CAUSAL: {'speed': 0.4, 'accuracy': 0.8, 'energy': 0.5},
-            ReasoningType.ANALOGICAL: {'speed': 0.7, 'accuracy': 0.5, 'energy': 0.8},
-            ReasoningType.LANGUAGE: {'speed': 0.6, 'accuracy': 0.7, 'energy': 0.3}, # NEW LLM PROFILE
+            ReasoningType.ANALOGICAL: {'speed': 0.7, 'accuracy': 0.5, 'energy': 0.8}
         }
         
         profile = type_profiles.get(reasoning_type, {'speed': 0.5, 'accuracy': 0.5, 'energy': 0.5})
@@ -1988,7 +1987,7 @@ class UnifiedReasoner:
                 else:
                     result = self._create_empty_result()
             
-            elif task.task_type == ReasoningType.LANGUAGE:
+            elif task.task_type == ReasoningType.SYMBOLIC:
                  # Direct call to the reasoner's main method, handles chain creation internally
                  result = reasoner.reason(task.input_data, task.query)
                  if not isinstance(result, ReasoningResult):
