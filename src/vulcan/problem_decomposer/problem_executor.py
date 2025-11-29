@@ -99,6 +99,24 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _get_step_value(step, key: str, default=None):
+    """
+    Safely get value from step whether it's a dict or object.
+    
+    Args:
+        step: Either a dict or an object (like DecompositionStep)
+        key: The attribute/key name
+        default: Default value if not found
+        
+    Returns:
+        The value or default
+    """
+    if isinstance(step, dict):
+        return step.get(key, default)
+    else:
+        return getattr(step, key, default)
+
+
 class SolutionType(Enum):
     """Types of solutions"""
     EXACT = "exact"
@@ -430,7 +448,7 @@ class ProblemExecutor:
         # Check for potentially unsafe step types
         unsafe_step_types = ['shell_command', 'system_call', 'file_write', 'network_request']
         for step in plan.steps:
-            step_type = step.get('type', 'unknown')
+            step_type = _get_step_value(step, 'type', 'unknown')
             if step_type in unsafe_step_types:
                 violations.append(f"Potentially unsafe step type: {step_type}")
         
@@ -552,7 +570,7 @@ class ProblemExecutor:
         for i, step in enumerate(steps):
             try:
                 # Get step type
-                step_type = step.get('type', 'unknown')
+                step_type = _get_step_value(step, 'type', 'unknown')
                 
                 # Create execution logic based on step type
                 if step_type == 'structural_match':
@@ -574,7 +592,7 @@ class ProblemExecutor:
                 principle = Principle(
                     id=f"step_{i}_{step_type}",
                     core_pattern=step,
-                    confidence=step.get('confidence', 0.5),
+                    confidence=_get_step_value(step, 'confidence', 0.5),
                     execution_logic=execution_logic,
                     execution_type="function",
                     applicable_domains=[problem_graph.metadata.get('domain', 'general')]
@@ -603,8 +621,8 @@ class ProblemExecutor:
     def _create_structural_solver(self, step: Dict[str, Any], 
                                   problem_graph: "ProblemGraph") -> Callable:
         """Create solver for structural decomposition step"""
-        structure = step.get('structure', 'unknown')
-        nodes = step.get('nodes', [])
+        structure = _get_step_value(step, 'structure', 'unknown')
+        nodes = _get_step_value(step, 'nodes', [])
         
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute structural solving logic"""
@@ -636,9 +654,9 @@ class ProblemExecutor:
     def _create_semantic_solver(self, step: Dict[str, Any],
                                 problem_graph: "ProblemGraph") -> Callable:
         """Create solver for semantic decomposition step"""
-        concept = step.get('concept', 'unknown')
-        similarity = step.get('similarity', 0.5)
-        nodes = step.get('nodes', [])
+        concept = _get_step_value(step, 'concept', 'unknown')
+        similarity = _get_step_value(step, 'similarity', 0.5)
+        nodes = _get_step_value(step, 'nodes', [])
         
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute semantic solving logic"""
@@ -675,8 +693,8 @@ class ProblemExecutor:
     def _create_exact_solver(self, step: Dict[str, Any],
                             problem_graph: "ProblemGraph") -> Callable:
         """Create solver for exact pattern match"""
-        pattern_id = step.get('pattern_id', 'unknown')
-        nodes = step.get('nodes', [])
+        pattern_id = _get_step_value(step, 'pattern_id', 'unknown')
+        nodes = _get_step_value(step, 'nodes', [])
         
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute exact pattern solving"""
@@ -703,7 +721,7 @@ class ProblemExecutor:
     def _create_synthetic_solver(self, step: Dict[str, Any],
                                  problem_graph: "ProblemGraph") -> Callable:
         """Create solver for synthetic bridge"""
-        template = step.get('template', 'unknown')
+        template = _get_step_value(step, 'template', 'unknown')
         
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute synthetic solving logic"""
@@ -727,8 +745,8 @@ class ProblemExecutor:
     def _create_analogical_solver(self, step: Dict[str, Any],
                                   problem_graph: "ProblemGraph") -> Callable:
         """Create solver using analogy"""
-        source_domain = step.get('source_domain', 'unknown')
-        target_mapping = step.get('target_mapping', {})
+        source_domain = _get_step_value(step, 'source_domain', 'unknown')
+        target_mapping = _get_step_value(step, 'target_mapping', {})
         
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute analogical solving"""
@@ -755,8 +773,8 @@ class ProblemExecutor:
     def _create_brute_force_solver(self, step: Dict[str, Any],
                                    problem_graph: "ProblemGraph") -> Callable:
         """Create brute force solver"""
-        part = step.get('part', 0)
-        content = step.get('content', None)
+        part = _get_step_value(step, 'part', 0)
+        content = _get_step_value(step, 'content', None)
         
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute brute force solving"""
@@ -781,8 +799,8 @@ class ProblemExecutor:
     def _create_generic_solver(self, step: Dict[str, Any],
                               problem_graph: "ProblemGraph") -> Callable:
         """Create generic fallback solver"""
-        step_type = step.get('type', 'unknown')
-        component = step.get('component', {})
+        step_type = _get_step_value(step, 'type', 'unknown')
+        component = _get_step_value(step, 'component', {})
         
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute generic solving logic"""
@@ -1228,7 +1246,7 @@ class ProblemExecutor:
         
         # Check for iterative pattern
         for step in plan.steps:
-            if 'recursive' in step.get('type', '') or 'iterative' in step.get('structure', ''):
+            if 'recursive' in _get_step_value(step, 'type', '') or 'iterative' in _get_step_value(step, 'structure', ''):
                 return ExecutionStrategy.ITERATIVE
         
         # Default to sequential
@@ -1511,7 +1529,7 @@ class ProblemExecutor:
     def _apply_recursive_step(self, data: Dict[str, Any],
                              recursive_step: Dict[str, Any]) -> Dict[str, Any]:
         """Apply recursive reduction step"""
-        factor = recursive_step.get('factor', 0.5)
+        factor = recursive__get_step_value(step, 'factor', 0.5)
         
         if 'size' in data:
             reduced_size = int(data['size'] * factor)
