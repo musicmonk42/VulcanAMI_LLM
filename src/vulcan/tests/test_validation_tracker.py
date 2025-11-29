@@ -122,7 +122,7 @@ class TestValidationTracker:
     @pytest.fixture
     def tracker(self):
         """Create a ValidationTracker instance"""
-        return ValidationTracker(max_history=1000)
+        return ValidationTracker(world_model=Mock(), max_history=1000)
     
     def test_initialization(self, tracker):
         """Test tracker initialization"""
@@ -196,7 +196,7 @@ class TestValidationTracker:
     
     def test_max_history_limit(self):
         """Test that history respects max limit"""
-        tracker = ValidationTracker(max_history=10)
+        tracker = ValidationTracker(world_model=Mock(), max_history=10)
         
         for i in range(20):
             proposal = {'id': f'prop_{i}', 'objective': 'test'}
@@ -207,7 +207,7 @@ class TestValidationTracker:
     
     def test_pattern_learning_disabled(self):
         """Test tracker with learning disabled"""
-        tracker = ValidationTracker()
+        tracker = ValidationTracker(world_model=Mock())
         tracker.learning_enabled = False
         
         proposal = {'objective': 'test'}
@@ -632,7 +632,7 @@ class TestIntegration:
     
     def test_full_learning_workflow(self):
         """Test complete learning workflow"""
-        tracker = ValidationTracker()
+        tracker = ValidationTracker(world_model=Mock())
         
         # Phase 1: Initial learning
         for i in range(20):
