@@ -273,6 +273,16 @@ async def lifespan(app: FastAPI):
     worker_id = os.getpid()
     startup_complete = False
     
+    # CRITICAL: Check if we're in test mode (deployment already set)
+    # If deployment exists in app.state, skip initialization (tests use mock)
+    if hasattr(app.state, 'deployment') and app.state.deployment is not None:
+        logger.info(f"Test mode detected - using existing mock deployment")
+        try:
+            yield
+        finally:
+            logger.info("Test mode shutdown - skipping cleanup")
+        return
+    
     logger.info(f"Starting VULCAN-AGI worker {worker_id} in {settings.deployment_mode} mode")
     
     try:
