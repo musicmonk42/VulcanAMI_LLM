@@ -1106,7 +1106,8 @@ class TestDomainValidatorRegistry:
             def validate(self, data, context=None):
                 return ValidationResult(safe=True)
         
-        registry.register('custom', CustomValidator)
+        # Register an instance, not the class (matches pattern in initialize_domain_validators)
+        registry.register('custom', CustomValidator())
         
         validator = registry.get_validator('custom')
         assert validator is not None
