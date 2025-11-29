@@ -39,6 +39,7 @@ class TestProblemDecomposerIntegration:
         """Setup for each test method"""
         self.test_results = []
     
+    @pytest.mark.timeout(10)
     def test_01_module_imports(self):
         """Test 1: Verify all modules can be imported"""
         result = DecomposerTestResult("Module Imports")
@@ -93,6 +94,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Module imports failed: {result.error}"
     
+    @pytest.mark.timeout(15)
     def test_02_component_initialization(self):
         """Test 2: Initialize individual components"""
         result = DecomposerTestResult("Component Initialization")
@@ -140,6 +142,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Component initialization failed: {result.error}"
     
+    @pytest.mark.timeout(15)
     def test_03_strategy_registration(self):
         """Test 3: Create and register strategies"""
         result = DecomposerTestResult("Strategy Registration")
@@ -199,6 +202,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Strategy registration failed: {result.error}"
     
+    @pytest.mark.timeout(30)
     def test_04_bootstrap_creation(self):
         """Test 4: Bootstrap decomposer creation"""
         result = DecomposerTestResult("Bootstrap Creation")
@@ -209,7 +213,7 @@ class TestProblemDecomposerIntegration:
             
             from src.vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             logger.info("  ✓ Decomposer created via bootstrap")
             
             assert hasattr(decomposer, 'library'), "Missing library"
@@ -240,6 +244,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Bootstrap creation failed: {result.error}"
     
+    @pytest.mark.timeout(30)
     def test_05_problem_decomposition(self):
         """Test 5: Create and decompose a problem"""
         result = DecomposerTestResult("Problem Decomposition")
@@ -251,7 +256,7 @@ class TestProblemDecomposerIntegration:
             from src.vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
             from src.vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             
             problem = ProblemGraph(
                 nodes={
@@ -298,6 +303,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Problem decomposition failed: {result.error}"
     
+    @pytest.mark.timeout(30)
     def test_06_plan_execution_safety(self):
         """Test 6: Plan execution requires safety validator"""
         result = DecomposerTestResult("Plan Execution Safety")
@@ -309,7 +315,7 @@ class TestProblemDecomposerIntegration:
             from src.vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
             from src.vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             
             problem = ProblemGraph(
                 nodes={'A': {'type': 'operation', 'value': 5}, 'B': {'type': 'operation', 'value': 3}, 'C': {'type': 'result'}},
@@ -344,6 +350,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Safety enforcement failed: {result.error}"
     
+    @pytest.mark.timeout(30)
     def test_07_full_flow_safety(self):
         """Test 7: Full flow requires safety"""
         result = DecomposerTestResult("Full Flow Safety")
@@ -355,7 +362,7 @@ class TestProblemDecomposerIntegration:
             from src.vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
             from src.vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             
             problem = ProblemGraph(
                 nodes={'input': {'type': 'operation'}, 'transform': {'type': 'transform'}, 'output': {'type': 'result'}},
@@ -383,6 +390,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Full flow safety failed: {result.error}"
     
+    @pytest.mark.timeout(30)
     def test_08_learning_integration(self):
         """Test 8: Learning and adaptation"""
         result = DecomposerTestResult("Learning Integration")
@@ -396,7 +404,7 @@ class TestProblemDecomposerIntegration:
                 ProblemGraph, DecompositionPlan, ExecutionOutcome
             )
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             
             problem = ProblemGraph(nodes={'A': {}, 'B': {}}, edges=[('A', 'B', {})], root='A', metadata={'domain': 'test'})
             problem.complexity_score = 2.0
@@ -424,6 +432,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Learning integration failed: {result.error}"
     
+    @pytest.mark.timeout(20)
     def test_09_fallback_chain(self):
         """Test 9: Fallback chain"""
         result = DecomposerTestResult("Fallback Chain")
@@ -435,7 +444,7 @@ class TestProblemDecomposerIntegration:
             from src.vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
             from src.vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             problem = ProblemGraph(nodes={'X': {}, 'Y': {}, 'Z': {}}, edges=[('X', 'Y', {}), ('Y', 'Z', {})], metadata={'domain': 'unknown'})
             
             plan = decomposer.decompose_with_fallbacks(problem)
@@ -455,6 +464,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Fallback chain failed: {result.error}"
     
+    @pytest.mark.timeout(20)
     def test_10_performance_tracking(self):
         """Test 10: Performance tracking"""
         result = DecomposerTestResult("Performance Tracking")
@@ -495,6 +505,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Performance tracking failed: {result.error}"
     
+    @pytest.mark.timeout(30)
     def test_11_caching(self):
         """Test 11: Caching"""
         result = DecomposerTestResult("Caching")
@@ -506,7 +517,7 @@ class TestProblemDecomposerIntegration:
             from src.vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
             from src.vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             problem = ProblemGraph(nodes={'A': {}, 'B': {}}, edges=[('A', 'B', {})], metadata={'domain': 'test'})
             
             t1 = time.time()
@@ -534,6 +545,7 @@ class TestProblemDecomposerIntegration:
         
         assert result.passed, f"Caching failed: {result.error}"
     
+    @pytest.mark.timeout(30)
     def test_12_error_handling(self):
         """Test 12: Error handling"""
         result = DecomposerTestResult("Error Handling")
@@ -545,7 +557,7 @@ class TestProblemDecomposerIntegration:
             from src.vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
             from src.vulcan.problem_decomposer.problem_decomposer_core import ProblemGraph
             
-            decomposer = create_decomposer()
+            decomposer = create_decomposer(config={'test_mode': True})
             
             # Empty problem
             empty = ProblemGraph(nodes={}, edges=[], metadata={})
