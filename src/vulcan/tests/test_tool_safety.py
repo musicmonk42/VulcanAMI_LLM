@@ -60,17 +60,27 @@ def basic_contract():
 @pytest.fixture
 def tool_safety_manager():
     """Create a tool safety manager."""
+    # Reset singleton state for clean test
+    ToolSafetyManager._instance = None
     manager = ToolSafetyManager()
     yield manager
-    manager.shutdown()
+    # Don't shutdown - it's a singleton and would affect other tests
+    # Just reset for next test
+    ToolSafetyManager._instance = None
 
 
 @pytest.fixture
 def tool_safety_governor():
     """Create a tool safety governor."""
+    # Reset singletons for clean test
+    ToolSafetyManager._instance = None
+    ToolSafetyGovernor._instance = None
     governor = ToolSafetyGovernor()
     yield governor
-    governor.shutdown()
+    # Don't shutdown - it's a singleton and would affect other tests
+    # Just reset for next test
+    ToolSafetyManager._instance = None
+    ToolSafetyGovernor._instance = None
 
 
 @pytest.fixture
@@ -194,12 +204,15 @@ class TestToolSafetyManager:
     
     def test_initialization(self):
         """Test manager initialization."""
+        # Reset singleton for this test (doesn't use fixture)
+        ToolSafetyManager._instance = None
         manager = ToolSafetyManager()
         
         assert len(manager.contracts) > 0  # Has default contracts
         assert manager._shutdown is False
         
-        manager.shutdown()
+        # Clean up singleton for next test
+        ToolSafetyManager._instance = None
     
     def test_default_contracts_initialized(self, tool_safety_manager):
         """Test that default contracts are initialized."""
@@ -781,6 +794,8 @@ class TestIntegration:
     
     def test_rate_limiting_integration(self):
         """Test rate limiting in full flow."""
+        # Reset singleton for this test (doesn't use fixture)
+        ToolSafetyManager._instance = None
         manager = ToolSafetyManager()
         
         # Create contract with very low frequency
@@ -807,7 +822,8 @@ class TestIntegration:
         # At least one should succeed
         assert safe1 or safe2
         
-        manager.shutdown()
+        # Clean up singleton for next test
+        ToolSafetyManager._instance = None
     
     def test_quarantine_workflow(self):
         """Test complete quarantine workflow."""
