@@ -281,6 +281,22 @@ class ModelContext:
     targets: List[str]
     constraints: Dict[str, Any] = field(default_factory=dict)
     features: Optional[np.ndarray] = None
+    
+    def get(self, key: str, default=None):
+        """Dict-like get method for backward compatibility"""
+        return getattr(self, key, default)
+    
+    def keys(self):
+        """Dict-like keys method for backward compatibility"""
+        return self.__dataclass_fields__.keys()
+    
+    def values(self):
+        """Dict-like values method for backward compatibility"""
+        return [getattr(self, k) for k in self.__dataclass_fields__.keys()]
+    
+    def items(self):
+        """Dict-like items method for backward compatibility"""
+        return [(k, getattr(self, k)) for k in self.__dataclass_fields__.keys()]
 
 
 class ObservationProcessor:
