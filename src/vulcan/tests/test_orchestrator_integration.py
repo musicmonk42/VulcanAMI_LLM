@@ -766,7 +766,6 @@ class TestOrchestratorVariants:
 class TestProductionDeployment:
     """Test complete production deployment"""
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing 60s timeout. Needs fix in ProductionDeployment class.")
     def test_deployment_initialization(self, minimal_config, temp_dir):
         """Test production deployment initialization"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -791,7 +790,6 @@ class TestProductionDeployment:
         finally:
             deployment.shutdown()
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_deployment_step_execution(self, minimal_config, temp_dir):
         """Test deployment step execution with monitoring"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -819,7 +817,6 @@ class TestProductionDeployment:
         finally:
             deployment.shutdown()
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_deployment_checkpointing(self, minimal_config, temp_dir):
         """Test checkpoint save and load"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -858,7 +855,6 @@ class TestProductionDeployment:
         finally:
             deployment.shutdown()
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_deployment_health_monitoring(self, minimal_config, temp_dir):
         """Test health monitoring during deployment"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -889,7 +885,6 @@ class TestProductionDeployment:
         finally:
             deployment.shutdown()
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_deployment_with_different_orchestrators(self, minimal_config, temp_dir):
         """Test deployment with different orchestrator types"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -925,7 +920,6 @@ class TestProductionDeployment:
 class TestEndToEndWorkflows:
     """Test complete end-to-end workflows"""
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_complete_agi_cycle(self, minimal_config, temp_dir):
         """Test complete AGI cognitive cycle workflow"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -974,7 +968,6 @@ class TestEndToEndWorkflows:
         finally:
             deployment.shutdown()
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_multi_agent_collaboration(self, minimal_config, temp_dir):
         """Test multiple agents collaborating on tasks"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -1015,7 +1008,6 @@ class TestEndToEndWorkflows:
         finally:
             deployment.shutdown()
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_long_running_operation(self, minimal_config, temp_dir):
         """Test system stability over extended operation"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -1069,7 +1061,6 @@ class TestEndToEndWorkflows:
 class TestStressConditions:
     """Test system behavior under stress"""
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_high_load_handling(self, minimal_config, temp_dir):
         """Test system under high load"""
         minimal_config.checkpoint_dir = str(temp_dir)
@@ -1098,7 +1089,6 @@ class TestStressConditions:
         finally:
             deployment.shutdown()
     
-    @pytest.mark.skip(reason="ProductionDeployment.shutdown() doesn't properly stop all background threads, causing timeout. Needs fix in ProductionDeployment class.")
     def test_error_recovery(self, minimal_config, temp_dir):
         """Test system recovery from errors"""
         minimal_config.checkpoint_dir = str(temp_dir)
