@@ -399,7 +399,8 @@ class DecomposerBootstrap:
             return thresholds
     
     def create_initialized_decomposer(self, semantic_bridge=None, vulcan_memory=None,
-                                     validator=None, storage_path: Optional[Path] = None) -> ProblemDecomposer:
+                                     validator=None, storage_path: Optional[Path] = None,
+                                     config: Optional[Dict[str, Any]] = None) -> ProblemDecomposer:
         """
         Create fully initialized and wired ProblemDecomposer
         
@@ -408,6 +409,7 @@ class DecomposerBootstrap:
             vulcan_memory: Optional VULCAN memory system
             validator: Optional validator for solution validation
             storage_path: Optional path for persistent storage
+            config: Optional configuration dictionary (including test_mode)
             
         Returns:
             Fully initialized ProblemDecomposer
@@ -419,11 +421,12 @@ class DecomposerBootstrap:
             strategies = self.create_strategy_instances()
             self.strategy_registry = strategies
             
-            # Step 2: Create decomposer with components
+            # Step 2: Create decomposer with components - pass config as safety_config
             decomposer = ProblemDecomposer(
                 semantic_bridge=semantic_bridge,
                 vulcan_memory=vulcan_memory,
-                validator=validator
+                validator=validator,
+                safety_config=config  # Pass config to enable test_mode
             )
             
             # Step 3: Register strategies in library
@@ -468,7 +471,7 @@ def get_bootstrap() -> DecomposerBootstrap:
 
 
 def create_decomposer(semantic_bridge=None, vulcan_memory=None, validator=None,
-                     storage_path: Optional[Path] = None) -> ProblemDecomposer:
+                     storage_path: Optional[Path] = None, config: Optional[Dict[str, Any]] = None) -> ProblemDecomposer:
     """
     Factory function to create fully initialized ProblemDecomposer
     
@@ -481,6 +484,7 @@ def create_decomposer(semantic_bridge=None, vulcan_memory=None, validator=None,
         vulcan_memory: Optional VULCAN memory system
         validator: Optional validator for solution validation
         storage_path: Optional path for persistent storage
+        config: Optional configuration dictionary (including test_mode)
         
     Returns:
         Fully initialized and wired ProblemDecomposer
@@ -490,6 +494,9 @@ def create_decomposer(semantic_bridge=None, vulcan_memory=None, validator=None,
         >>> 
         >>> # Create decomposer
         >>> decomposer = create_decomposer()
+        >>> 
+        >>> # Create decomposer in test mode (fast, no storage)
+        >>> decomposer = create_decomposer(config={'test_mode': True})
         >>> 
         >>> # Create problem
         >>> problem = ProblemGraph(
@@ -509,7 +516,8 @@ def create_decomposer(semantic_bridge=None, vulcan_memory=None, validator=None,
         semantic_bridge=semantic_bridge,
         vulcan_memory=vulcan_memory,
         validator=validator,
-        storage_path=storage_path
+        storage_path=storage_path,
+        config=config
     )
 
 
