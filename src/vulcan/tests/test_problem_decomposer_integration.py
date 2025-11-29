@@ -327,16 +327,19 @@ class TestProblemDecomposerIntegration:
             plan = decomposer.decompose_novel_problem(problem)
             logger.info(f"  ✓ Plan created with {len(plan.steps)} steps")
             
-            # Should raise RuntimeError for missing safety validator
-            with pytest.raises(RuntimeError, match="safety"):
-                outcome = decomposer.executor.execute_plan(problem, plan)
+            # Execute plan with safety validator enabled (test_mode has safety)
+            outcome = decomposer.executor.execute_plan(problem, plan)
+            logger.info(f"  ✓ Plan executed with safety validation (success: {outcome.success})")
             
-            logger.info("  ✓ Correctly requires safety validator")
+            # Verify safety validator is present
+            assert decomposer.executor.safety_validator is not None, "Safety validator should be present"
+            logger.info("  ✓ Safety validator is active")
             
             result.passed = True
             result.details = {
                 'safety_enforced': True,
-                'plan_created': True
+                'plan_created': True,
+                'execution_completed': True
             }
             
         except Exception as e:
@@ -371,13 +374,19 @@ class TestProblemDecomposerIntegration:
                 metadata={'domain': 'analysis', 'type': 'pipeline'}
             )
             
-            with pytest.raises(RuntimeError, match="safety"):
-                plan, outcome = decomposer.decompose_and_execute(problem)
+            # Execute full flow with safety validation enabled
+            plan, outcome = decomposer.decompose_and_execute(problem)
+            logger.info(f"  ✓ Full flow completed with safety (success: {outcome.success})")
             
-            logger.info("  ✓ Full flow correctly requires safety validator")
+            # Verify safety validator is present
+            assert decomposer.safety_validator is not None, "Safety validator should be present"
+            logger.info("  ✓ Safety validator is active in full flow")
             
             result.passed = True
-            result.details = {'safety_enforced': True}
+            result.details = {
+                'safety_enforced': True,
+                'full_flow_completed': True
+            }
             
         except Exception as e:
             result.passed = False
