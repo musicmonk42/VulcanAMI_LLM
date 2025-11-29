@@ -6,6 +6,8 @@ This version includes full implementations for advanced discovery and estimation
 FIXED: Consistent return format for _granger_causality_test method.
 """
 
+from __future__ import annotations
+
 from typing import Any, Dict, List, Set, Optional, Callable, Tuple, Union
 import numpy as np
 import logging
