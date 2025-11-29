@@ -47,6 +47,8 @@ def cleanup_test_state():
     The correlation_tracker module uses global lazy-loaded variables
     (EnhancedSafetyValidator, SafetyConfig, WorldModel) that persist
     across test runs, causing failures when tests run together.
+    
+    ALSO cleans up background threads from safety validators.
     """
     import gc
     import vulcan.world_model.correlation_tracker as ct
@@ -61,6 +63,17 @@ def cleanup_test_state():
     
     # Cleanup after test
     gc.collect()
+    
+    # Try to shutdown any lingering threads from safety validators
+    try:
+        import threading
+        # Give threads a moment to clean up
+        active_threads = threading.active_count()
+        if active_threads > 1:  # More than just main thread
+            import time
+            time.sleep(0.1)  # Brief pause for cleanup
+    except Exception:
+        pass
     
     # Reset globals again after test
     ct.EnhancedSafetyValidator = None
@@ -87,6 +100,30 @@ def basic_tracker():
         tracker.safety_blocks.clear()
     if hasattr(tracker, 'safety_corrections'):
         tracker.safety_corrections.clear()
+    
+    # Clean up safety validator threads if present
+    if hasattr(tracker, 'safety_validator') and tracker.safety_validator:
+        try:
+            if hasattr(tracker.safety_validator, 'shutdown'):
+                tracker.safety_validator.shutdown()
+        except Exception:
+            pass
+
+
+@pytest.fixture
+def performance_tracker():
+    """
+    Tracker for performance tests - no safety validation overhead.
+    Safety validation creates background threads that slow down performance tests.
+    """
+    tracker = CorrelationTracker(method="pearson", min_samples=3, safety_config=None)
+    yield tracker
+    
+    # Cleanup
+    if hasattr(tracker, 'observation_history'):
+        tracker.observation_history.clear()
+    if hasattr(tracker, 'partial_corr_cache'):
+        tracker.partial_corr_cache.clear()
 
 
 @pytest.fixture
@@ -909,7 +946,7 @@ class TestIntegration:
 class TestPerformance:
     """Performance and scalability tests"""
     
-    def test_large_scale_updates(self, basic_tracker):
+    def test_large_scale_updates(self, performance_tracker):
         """Test performance with many updates"""
         import time as time_module
         
@@ -924,17 +961,18 @@ class TestPerformance:
                 },
                 'timestamp': time.time()
             })()
-            basic_tracker.update(obs)
+            performance_tracker.update(obs)
         
         elapsed = time_module.time() - start
         
-        # FIXED: Increase timeout to 15s
-        assert elapsed < 15, f"Should process 1000 updates quickly (took {elapsed}s)"
-        assert basic_tracker.observation_count == 1000
+        # FIXED: Use performance_tracker (no safety overhead) for faster execution
+        assert elapsed < 10, f"Should process 1000 updates quickly (took {elapsed}s)"
+        assert performance_tracker.observation_count == 1000
     
     def test_many_variables(self):
         """Test scalability with many variables"""
-        tracker = CorrelationTracker(method="pearson")
+        # FIXED: Disable safety for performance test to avoid thread overhead
+        tracker = CorrelationTracker(method="pearson", safety_config=None)
         
         # Create observation with 50 variables
         obs = type('Obs', (), {
@@ -950,8 +988,8 @@ class TestPerformance:
         
         elapsed = time_module.time() - start
         
-        # FIXED: Increase timeout to 30s
-        assert elapsed < 30, f"Should handle 50 variables efficiently (took {elapsed}s)"
+        # FIXED: Reduced timeout since no safety overhead
+        assert elapsed < 10, f"Should handle 50 variables efficiently (took {elapsed}s)"
 
 
 # ============================================================================
