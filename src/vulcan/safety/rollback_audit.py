@@ -1,1567 +1,1874 @@
-# ============================================================
-# VULCAN-AGI Orchestrator - Collective Module
-# Main orchestrator for the enhanced AGI system with agent pool management
-# FULLY FIXED VERSION - No circular dependencies, proper error handling, bounded memory
-# INTEGRATED: Self-improvement drive with experiment generation and execution
-# ============================================================
+# rollback_audit.py
+"""
+Rollback management and audit logging for VULCAN-AGI Safety Module.
+Provides snapshot-based rollback capabilities and comprehensive audit trail management.
+"""
 
+import os
+import sys
+import json
 import logging
-import threading
 import time
 import hashlib
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple
-from collections import deque
+import uuid
+import copy
+import re
+import threading
+import sqlite3
+import pickle
+import zlib
+import atexit
+from typing import Any, Dict, List, Optional, Tuple, Union
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
+from pathlib import Path
+from dataclasses import dataclass, field, asdict
 from enum import Enum
 
-from .dependencies import EnhancedCollectiveDeps
-from .agent_pool import AgentPoolManager
-from .agent_lifecycle import AgentState, AgentCapability
-
-# Import the WorldModel class to access its internal execution method
-try:
-    from ..world_model.world_model_core import WorldModel
-except ImportError:
-    # Use MagicMock if the world_model is not available (e.g., test environment)
-    from unittest.mock import MagicMock
-    WorldModel = MagicMock
-
+from .safety_types import (
+    RollbackSnapshot,
+    SafetyReport,
+    SafetyViolationType,
+    ActionType
+)
 
 logger = logging.getLogger(__name__)
 
+# Helper function for safe logging during shutdown
+def safe_log(log_func, message):
+    """Log safely during shutdown when logging may be closed."""
+    try:
+        log_func(message)
+    except (ValueError, AttributeError, OSError, RuntimeError):
+        # Silently ignore all logging errors during shutdown
+        # This includes:
+        # - ValueError: I/O operation on closed file
+        # - AttributeError: Logger object has no attribute
+        # - OSError: File operation errors
+        # - RuntimeError: Logger/handler is closed
+        pass
 
 # ============================================================
-# TYPE DEFINITIONS (No circular imports)
+# MEMORY BOUNDED DEQUE
 # ============================================================
 
-class ModalityType(Enum):
-    """Modality types - defined here to avoid circular import"""
-    TEXT = "text"
-    IMAGE = "image"
-    AUDIO = "audio"
-    VIDEO = "video"
-    MULTIMODAL = "multimodal"
-    UNKNOWN = "unknown"
-
-
-class ActionType(Enum):
-    """Action types - defined here to avoid circular import"""
-    EXPLORE = "explore"
-    OPTIMIZE = "optimize"
-    MAINTAIN = "maintain"
-    WAIT = "wait"
-    SAFE_FALLBACK = "safe_fallback"
-    ERROR_FALLBACK = "error_fallback"
-    SELF_IMPROVEMENT = "self_improvement"
-
-
-# ============================================================
-# MAIN ORCHESTRATOR (Enhanced with Agent Pool and Self-Improvement)
-# ============================================================
-
-class VULCANAGICollective:
-    """
-    Main orchestrator for the enhanced AGI system with agent pool management.
+class MemoryBoundedDeque:
+    """Deque with memory limit instead of item count limit.
     
-    Features:
-    - Full cognitive cycle (perception → reasoning → validation → execution → learning → reflection → self-improvement)
-    - Agent pool integration for distributed execution
-    - Autonomous self-improvement via experiment generation
-    - No circular dependencies
-    - Bounded memory usage
-    - Comprehensive error handling
-    - Thread-safe operations
+    Automatically removes oldest items when memory limit is exceeded.
+    Useful for preventing unbounded memory growth in log buffers.
     """
     
-    def __init__(self, config: Any, sys: Any, deps: EnhancedCollectiveDeps):
+    def __init__(self, max_size_mb: int = 10):
         """
-        Initialize VULCAN AGI Collective
+        Initialize memory-bounded deque.
         
         Args:
-            config: Configuration object
-            sys: System state object
-            deps: Dependencies container
+            max_size_mb: Maximum size in megabytes
         """
-        self.config = config
-        self.sys = sys
-        self.deps = deps
+        self.deque = deque()
+        self.max_size_bytes = max_size_mb * 1024 * 1024
+        self.current_size_bytes = 0
+        self.lock = threading.RLock()
+    
+    def append(self, item):
+        """Add item to deque, removing old items if needed."""
+        with self.lock:
+            item_size = self._estimate_size(item)
+            
+            # Remove items until we have space
+            while self.current_size_bytes + item_size > self.max_size_bytes and self.deque:
+                removed = self.deque.popleft()
+                self.current_size_bytes -= self._estimate_size(removed)
+            
+            self.deque.append(item)
+            self.current_size_bytes += item_size
+    
+    def _estimate_size(self, item) -> int:
+        """Estimate size of item in bytes."""
+        try:
+            if isinstance(item, dict):
+                # Rough estimate: JSON size
+                return len(json.dumps(item, default=str))
+            return sys.getsizeof(item)
+        except:
+            return 1024  # Default 1KB if estimation fails
+    
+    def get_memory_usage_mb(self) -> float:
+        """Get current memory usage in MB."""
+        with self.lock:
+            return self.current_size_bytes / (1024 * 1024)
+    
+    def __len__(self):
+        """Return number of items in deque."""
+        with self.lock:
+            return len(self.deque)
+    
+    def __iter__(self):
+        """Iterate over items in deque."""
+        with self.lock:
+            return iter(list(self.deque))
+    
+    def clear(self):
+        """Clear all items from deque."""
+        with self.lock:
+            self.deque.clear()
+            self.current_size_bytes = 0
+    
+    def __bool__(self):
+        """Return True if deque is not empty."""
+        with self.lock:
+            return bool(self.deque)
+
+# ============================================================
+# ROLLBACK MANAGER
+# ============================================================
+
+class RollbackManager:
+    """
+    Manages rollback and quarantine functionality with snapshot-based state recovery.
+    Provides versioned state management, quarantine capabilities, and rollback history.
+    """
+    
+    def __init__(self, max_snapshots: int = 100, config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize rollback manager.
         
-        # FIXED: Bounded reasoning trace to prevent memory growth
-        self.reasoning_trace = deque(maxlen=100)
+        Args:
+            max_snapshots: Maximum number of snapshots to retain
+            config: Additional configuration options
+                - test_mode: Enable fast test mode (no storage, no workers)
+                - worker_check_interval: Worker sleep interval (default 10s, 0.1s in test_mode)
+                - enable_storage: Enable SQLite storage (default True, False in test_mode)
+                - enable_workers: Enable background threads (default True, False in test_mode)
+        """
+        self.config = config or {}
         
-        # FIXED: Already bounded, but reduced from 1000 to 500 for better memory usage
-        self.execution_history = deque(maxlen=500)
+        # TEST MODE SUPPORT - Critical for fast test execution
+        self.test_mode = self.config.get('test_mode', False)
+        if self.test_mode:
+            logger.info("="*60)
+            logger.info("ROLLBACK MANAGER IN TEST MODE")
+            logger.info("Fast shutdown, no storage, no worker threads")
+            logger.info("="*60)
+            # Apply test mode defaults
+            self.config.setdefault('worker_check_interval', 0.1)
+            self.config.setdefault('enable_storage', False)
+            self.config.setdefault('enable_workers', False)
+            self.config.setdefault('auto_cleanup', False)
         
-        # Track recent errors for self-improvement
-        self.recent_errors = deque(maxlen=100)
-        self.error_count_window = deque(maxlen=1000)
+        self.max_snapshots = min(max_snapshots, 1000)  # Cap at 1000
+        self.snapshots = deque(maxlen=self.max_snapshots)
+        self.quarantine = {}
+        self.rollback_history = deque(maxlen=1000)
+        self.snapshot_index = {}  # Fast lookup by ID
+        self.lock = threading.RLock()
+        self.db_lock = threading.RLock()
         
-        self.cycle_count = 0
+        # Shutdown flag
+        self._shutdown = False
         
-        # Thread safety
-        self._lock = threading.RLock()
-        self._sys_lock = threading.RLock()  # Separate lock for system state
-        
-        # Shutdown management
+        # CRITICAL FIX: Add shutdown event for interruptible sleep
         self._shutdown_event = threading.Event()
         
-        # Initialize agent pool
-        self.agent_pool = AgentPoolManager(
-            max_agents=getattr(config, 'max_agents', 100),
-            min_agents=getattr(config, 'min_agents', 10),
-            task_queue_type=getattr(config, 'task_queue_type', "custom")
-        )
+        # Configuration
+        self.compress_snapshots = self.config.get('compress_snapshots', True)
+        self.verify_integrity = self.config.get('verify_integrity', True)
+        self.auto_cleanup = self.config.get('auto_cleanup', True)
+        self.snapshot_retention_days = self.config.get('snapshot_retention_days', 7)
+        self.quarantine_retention_days = self.config.get('quarantine_retention_days', 30)
         
-        # Self-improvement tracking
-        self.improvement_experiments_run = 0
-        self.improvement_successes = 0
+        # CRITICAL FIX: Configurable worker check interval (default 10s for faster shutdown)
+        # Set to 0.1 seconds in test mode
+        self.worker_check_interval = self.config.get('worker_check_interval', 10.0)
         
-        logger.info("VULCANAGICollective initialized")
+        # Storage configuration - MAKE OPTIONAL
+        self.enable_storage = self.config.get('enable_storage', True)
+        self.storage_path = Path(self.config.get('storage_path', 'rollback_storage'))
+        if self.enable_storage:
+            self.storage_path.mkdir(parents=True, exist_ok=True)
+        
+        # Metrics
+        self.metrics = {
+            'total_snapshots': 0,
+            'total_rollbacks': 0,
+            'successful_rollbacks': 0,
+            'failed_rollbacks': 0,
+            'quarantined_actions': 0,
+            'storage_bytes': 0
+        }
+        
+        # Initialize storage - MAKE OPTIONAL AND SAFE
+        self.conn = None
+        if self.enable_storage:
+            try:
+                self._initialize_storage()
+            except Exception as e:
+                logger.error(f"Storage initialization failed: {e}")
+                if not self.test_mode:
+                    raise
+                logger.warning("Continuing in test mode without storage")
+                self.conn = None
+        else:
+            logger.info("Storage disabled (test_mode or explicit config)")
+        
+        # Cleanup thread reference
+        self.cleanup_thread = None
+        
+        # Start cleanup thread - MAKE OPTIONAL
+        self.enable_workers = self.config.get('enable_workers', True)
+        if self.auto_cleanup and self.enable_workers:
+            try:
+                self._start_cleanup_thread()
+            except Exception as e:
+                logger.error(f"Failed to start cleanup thread: {e}")
+                if not self.test_mode:
+                    raise
+        else:
+            logger.info(f"Background workers disabled (test_mode={self.test_mode})")
+        
+        # Register cleanup
+        # atexit.register(self.shutdown) # Removed for test suite compatibility
+        
+        logger.info(f"RollbackManager initialized: test_mode={self.test_mode}, "
+                   f"storage={self.enable_storage}, workers={self.enable_workers}, "
+                   f"interval={self.worker_check_interval}s")
     
-    def step(self, history: List[Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    def _initialize_storage(self):
+        """Initialize persistent storage for snapshots and quarantine."""
+        # SQLite database for metadata
+        self.db_path = self.storage_path / 'rollback.db'
+        
+        with self.db_lock:
+            self.conn = sqlite3.connect(
+                str(self.db_path), 
+                check_same_thread=False,
+                isolation_level='DEFERRED',
+                timeout=30.0
+            )
+            
+            self.conn.execute('''
+                CREATE TABLE IF NOT EXISTS snapshots (
+                    snapshot_id TEXT PRIMARY KEY,
+                    timestamp REAL,
+                    state_size INTEGER,
+                    action_count INTEGER,
+                    checksum TEXT,
+                    compressed INTEGER,
+                    file_path TEXT,
+                    metadata TEXT
+                )
+            ''')
+            
+            self.conn.execute('''
+                CREATE TABLE IF NOT EXISTS quarantine (
+                    quarantine_id TEXT PRIMARY KEY,
+                    action TEXT,
+                    reason TEXT,
+                    timestamp REAL,
+                    expiry REAL,
+                    status TEXT,
+                    reviewed INTEGER,
+                    reviewer TEXT,
+                    review_time REAL
+                )
+            ''')
+            
+            self.conn.execute('''
+                CREATE TABLE IF NOT EXISTS rollback_history (
+                    rollback_id TEXT PRIMARY KEY,
+                    snapshot_id TEXT,
+                    reason TEXT,
+                    timestamp REAL,
+                    success INTEGER,
+                    error_message TEXT
+                )
+            ''')
+            
+            # Create indexes
+            self.conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_snapshots_timestamp 
+                ON snapshots(timestamp)
+            ''')
+            
+            self.conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_quarantine_expiry 
+                ON quarantine(expiry)
+            ''')
+            
+            self.conn.commit()
+        
+        # Load existing snapshots
+        self._load_snapshots_from_storage()
+    
+    def _load_snapshots_from_storage(self):
+        """Load existing snapshots from persistent storage."""
+        with self.db_lock:
+            try:
+                cursor = self.conn.execute(
+                    'SELECT * FROM snapshots ORDER BY timestamp DESC LIMIT ?',
+                    (self.max_snapshots,)
+                )
+                
+                rows = cursor.fetchall()
+            except sqlite3.Error as e:
+                logger.error(f"Database error loading snapshots: {e}")
+                return
+        
+        loaded_count = 0
+        for row in rows:
+            snapshot_id = row[0]
+            # Load snapshot file
+            file_path = Path(row[6])
+            if file_path.exists():
+                try:
+                    with open(file_path, 'rb') as f:
+                        data = f.read()
+                        if row[5]:  # compressed
+                            data = zlib.decompress(data)
+                        snapshot_data = pickle.loads(data)
+                    
+                    snapshot = RollbackSnapshot(
+                        snapshot_id=snapshot_id,
+                        timestamp=row[1],
+                        state=snapshot_data['state'],
+                        action_log=snapshot_data['action_log'],
+                        metadata=json.loads(row[7]) if row[7] else {}
+                    )
+                    
+                    with self.lock:
+                        self.snapshots.append(snapshot)
+                        self.snapshot_index[snapshot_id] = snapshot
+                    
+                    loaded_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"Failed to load snapshot {snapshot_id}: {e}")
+        
+        logger.info(f"Loaded {loaded_count} existing snapshots from storage")
+    
+    def create_snapshot(self, state: Dict[str, Any], 
+                       action_log: List[Dict[str, Any]],
+                       metadata: Optional[Dict[str, Any]] = None) -> str:
         """
-        Execute one step of the AGI system with full cognitive cycle
+        Create a snapshot for potential rollback.
         
         Args:
-            history: List of historical observations
-            context: Context dictionary with additional information
+            state: Current system state to snapshot
+            action_log: Log of actions leading to this state
+            metadata: Additional snapshot metadata
             
         Returns:
-            Dictionary with execution results
+            Snapshot ID
         """
-        if self._shutdown_event.is_set():
-            return self._create_fallback_result("System is shutting down")
+        if self._shutdown:
+            raise RuntimeError("RollbackManager is shut down")
         
-        start_time = time.time()
+        snapshot_id = str(uuid.uuid4())
+        timestamp = time.time()
         
-        with self._lock:
-            self.reasoning_trace.clear()  # Clear for new cycle
-            self.cycle_count += 1
+        # Deep copy to prevent reference issues
+        state_copy = copy.deepcopy(state)
+        action_log_copy = copy.deepcopy(action_log)
         
-        # Initialize default values for error handling
-        perception_result = {'modality': ModalityType.UNKNOWN, 'uncertainty': 1.0}
-        plan = None
-        validated_plan = None
-        execution_result = None
+        # Create snapshot
+        snapshot = RollbackSnapshot(
+            snapshot_id=snapshot_id,
+            timestamp=timestamp,
+            state=state_copy,
+            action_log=action_log_copy,
+            metadata=metadata or {'creation_reason': 'checkpoint'}
+        )
         
-        try:
-            # Phase 1: Perception & Understanding
+        # Verify integrity if enabled
+        if self.verify_integrity and not snapshot.verify_integrity():
+            logger.error(f"Snapshot {snapshot_id} failed integrity check")
+            raise ValueError("Snapshot integrity verification failed")
+        
+        # CRITICAL: Hold lock through entire operation to prevent race conditions
+        with self.lock:
+            # Persist BEFORE adding to memory
             try:
-                if self.deps.multimodal: # ADD THIS CHECK
-                    perception_result = self._perceive_and_understand(history, context)
-                else: # ADD THIS BLOCK
-                    logger.debug("Multimodal dependency missing, skipping perception.")
-                    perception_result = {'modality': ModalityType.UNKNOWN, 'uncertainty': 1.0, 'embedding': np.zeros(384)}
+                self._persist_snapshot(snapshot)
             except Exception as e:
-                logger.error(f"Perception phase error: {e}", exc_info=True)
-                self.deps.metrics.increment_counter('errors_perception')
-                self._record_error(e, 'perception')
-                # Continue with default perception result
+                logger.error(f"Failed to persist snapshot {snapshot_id}: {e}")
+                raise
             
-            # Phase 2: Reasoning & Planning
-            try:
-                # ADD CHECK FOR CORE REASONING DEPS
-                if self.deps.goal_system and self.deps.world_model and self.deps.resource_compute and self.deps.causal and self.deps.probabilistic:
-                    plan = self._reason_and_plan(perception_result, context)
-                else: # ADD THIS BLOCK
-                    logger.debug("Core reasoning dependencies missing, creating wait plan.")
-                    plan = self._create_wait_plan("Reasoning components unavailable")
-            except Exception as e:
-                logger.error(f"Planning phase error: {e}", exc_info=True)
-                self.deps.metrics.increment_counter('errors_planning')
-                self._record_error(e, 'planning')
-                plan = self._create_wait_plan(f"Planning error: {e}")
-            
-            # Phase 3: Validation & Safety
-            try:
-                # ADD CHECK FOR CORE SAFETY DEPS
-                if self.deps.safety_validator and self.deps.governance and self.deps.nso_aligner:
-                    validated_plan = self._validate_and_ensure_safety(plan, context)
-                else: # ADD THIS BLOCK
-                    logger.debug("Safety dependencies missing, skipping validation.")
-                    validated_plan = plan
-                    validated_plan['safety_validated'] = True # Assume safe in degraded mode
-            except Exception as e:
-                logger.error(f"Validation phase error: {e}", exc_info=True)
-                self.deps.metrics.increment_counter('errors_validation')
-                self._record_error(e, 'validation')
-                validated_plan = self._create_safe_fallback(str(e), plan)
-            
-            # Phase 4: Execution
-            try:
-                if self.config.enable_distributed and validated_plan.get('distributed'):
-                    execution_result = self._distributed_execution(validated_plan)
-                else:
-                    execution_result = self._execute_action(validated_plan)
-            except Exception as e:
-                logger.error(f"Execution phase error: {e}", exc_info=True)
-                self.deps.metrics.increment_counter('errors_execution')
-                self._record_error(e, 'execution')
-                execution_result = self._create_fallback_result(str(e))
-            
-            # Phase 5: Learning & Adaptation
-            try:
-                # ADD CHECK FOR CORE LEARNING DEPS
-                if self.deps.continual and self.deps.causal and self.deps.goal_system and self.deps.cross_modal:
-                    self._learn_and_adapt(execution_result, perception_result)
-                else: # ADD THIS BLOCK
-                    logger.debug("Learning dependencies missing, skipping adaptation.")
-            except Exception as e:
-                logger.error(f"Learning phase error: {e}", exc_info=True)
-                self.deps.metrics.increment_counter('errors_learning')
-                self._record_error(e, 'learning')
-            
-            # Phase 6: Meta-cognition & Self-improvement
-            try:
-                if self.deps.meta_cognitive: # ADD THIS CHECK
-                    self._reflect_and_improve()
-                else: # ADD THIS BLOCK
-                    logger.debug("Meta-cognitive dependency missing, skipping reflection.")
-            except Exception as e:
-                logger.error(f"Reflection phase error: {e}", exc_info=True)
-                self.deps.metrics.increment_counter('errors_reflection')
-                self._record_error(e, 'reflection')
-            
-            # Phase 7: Autonomous Self-Improvement (if enabled)
-            if self.config.enable_self_improvement:
-                try:
-                    self._autonomous_improvement(execution_result)
-                except Exception as e:
-                    logger.error(f"Self-improvement phase error: {e}", exc_info=True)
-                    self.deps.metrics.increment_counter('errors_self_improvement')
-                    self._record_error(e, 'self_improvement')
+            # Only add to memory after successful persistence
+            self.snapshots.append(snapshot)
+            self.snapshot_index[snapshot_id] = snapshot
             
             # Update metrics
-            duration = time.time() - start_time
-            self.deps.metrics.record_step(duration, execution_result)
+            self.metrics['total_snapshots'] += 1
+            self.metrics['storage_bytes'] += self._calculate_snapshot_size(snapshot)
             
-            # Update system state
-            self._update_system_state(execution_result, duration)
-            
-            # Add provenance
-            self._add_provenance(execution_result)
-            
-            return execution_result
-            
-        except Exception as e:
-            logger.error(f"Error in cognitive cycle: {e}", exc_info=True)
-            self.deps.metrics.increment_counter('errors_total')
-            self._record_error(e, 'cognitive_cycle')
-            return self._create_fallback_result(str(e))
+            # Clean old snapshots if needed
+            if self.auto_cleanup:
+                self._cleanup_old_snapshots()
+        
+        logger.info(f"Created snapshot {snapshot_id} with {len(action_log_copy)} actions")
+        return snapshot_id
     
-    def _autonomous_improvement(self, execution_result: Dict[str, Any]):
-        """
-        Execute autonomous self-improvement loop
-        
-        Args:
-            execution_result: Result from execution phase
-        """
-        # Check if deps has self_improvement_drive
-        if not hasattr(self.deps, 'self_improvement_drive') or not self.deps.self_improvement_drive:
-            logger.debug("Self-improvement drive not available in deps")
-            return
-        
-        # Build improvement context
-        improvement_context = self._build_improvement_context(execution_result)
-        
-        # Check if improvement should trigger
-        if not self.deps.self_improvement_drive.should_trigger(improvement_context):
-            return
-        
-        logger.info("🚀 Self-improvement drive triggered")
-        
-        # Get improvement action
-        improvement_action = self.deps.self_improvement_drive.step(improvement_context)
-        
-        if not improvement_action:
-            logger.debug("No improvement action generated")
-            return
-        
-        # Check if waiting for approval
-        if improvement_action.get('_wait_for_approval'):
-            approval_id = improvement_action.get('_pending_approval')
-            logger.info(f"⏳ Self-improvement waiting for approval: {approval_id}")
-            return
-        
-        # Generate experiment from improvement objective
-        if hasattr(self.deps, 'experiment_generator') and self.deps.experiment_generator:
-            try:
-                self._execute_improvement_experiment(improvement_action)
-            except Exception as e:
-                logger.error(f"Failed to execute improvement experiment: {e}", exc_info=True)
-        else:
-            # Fallback: execute improvement directly without experiment framework
-            logger.debug("Experiment generator not available, executing improvement directly")
-            self._execute_improvement_direct(improvement_action)
-    
-    def _build_improvement_context(self, execution_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Build context for self-improvement decisions
-        
-        Args:
-            execution_result: Recent execution result
-            
-        Returns:
-            Context dictionary
-        """
-        # Check if startup
-        is_startup = self.cycle_count < 100
-        
-        # Count recent errors
-        current_time = time.time()
-        window = 3600  # 1 hour
-        recent_errors = [
-            e for e in self.recent_errors
-            if e.get('timestamp', 0) > current_time - window
-        ]
-        
-        # Get system resources
-        cpu_percent = self._get_cpu_usage()
-        memory_mb = self._get_memory_usage()
-        
-        # Get performance metrics
-        performance_metrics = self._get_performance_metrics()
-        
-        context = {
-            'is_startup': is_startup,
-            'error_detected': not execution_result.get('success', False),
-            'error_count': len(recent_errors),
-            'system_resources': {
-                'cpu_percent': cpu_percent,
-                'memory_mb': memory_mb,
-                'low_activity_duration_minutes': self._get_low_activity_duration()
-            },
-            'performance_metrics': performance_metrics,
-            'other_drives_total_priority': 0.0,
-            'execution_result': execution_result
+    def _persist_snapshot(self, snapshot: RollbackSnapshot):
+        """Persist snapshot to disk storage."""
+        # Prepare data for storage
+        snapshot_data = {
+            'state': snapshot.state,
+            'action_log': snapshot.action_log
         }
         
-        return context
-    
-    def _execute_improvement_experiment(self, improvement_action: Dict[str, Any]):
-        """
-        Execute improvement via experiment generation framework
+        # Serialize
+        serialized = pickle.dumps(snapshot_data)
         
-        Args:
-            improvement_action: Improvement action from self-improvement drive
-        """
-        objective_type = improvement_action.get('_drive_metadata', {}).get('objective_type', 'unknown')
+        # Compress if enabled
+        compressed = False
+        if self.compress_snapshots:
+            compressed_data = zlib.compress(serialized, level=6)
+            if len(compressed_data) < len(serialized) * 0.9:  # Only use if >10% reduction
+                serialized = compressed_data
+                compressed = True
         
-        logger.info(f"🎯 Executing improvement experiment: {objective_type}")
-        
-        # Check if deps has experiment_generator and problem_executor
-        if not hasattr(self.deps, 'experiment_generator'):
-            logger.warning("experiment_generator not available in deps")
-            # --- START REPLACEMENT ---
-            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
-            # --- END REPLACEMENT ---
-            return
-        
-        if not hasattr(self.deps, 'problem_executor'):
-            logger.warning("problem_executor not available in deps")
-            # --- START REPLACEMENT ---
-            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
-            # --- END REPLACEMENT ---
-            return
-        
-        # Import KnowledgeGap if available
+        # Write to file
+        file_path = self.storage_path / f"snapshot_{snapshot.snapshot_id}.dat"
         try:
-            # Try to import from curiosity_engine
+            with open(file_path, 'wb') as f:
+                f.write(serialized)
+        except IOError as e:
+            logger.error(f"Failed to write snapshot file: {e}")
+            raise
+        
+        # Store metadata in database
+        with self.db_lock:
             try:
-                from ..curiosity_engine.experiment_generator import KnowledgeGap
-            except ImportError:
-                # Fallback: try from curiosity_engine directly
-                from curiosity_engine.experiment_generator import KnowledgeGap
-        except ImportError:
-            logger.warning("KnowledgeGap not available, cannot generate experiments")
-            # --- START REPLACEMENT ---
-            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
-            # --- END REPLACEMENT ---
-            return
-        
-        # Create knowledge gap from improvement objective
-        gap = KnowledgeGap(
-            type=objective_type,
-            domain='system',
-            priority=1.0,
-            estimated_cost=0.1,
-            description=improvement_action.get('high_level_goal', 'System improvement')
-        )
-        
-        # Generate experiments
-        try:
-            experiments = self.deps.experiment_generator.generate_for_gap(gap)
-        except Exception as e:
-            logger.error(f"Failed to generate experiments: {e}", exc_info=True)
-            # --- START REPLACEMENT ---
-            self._execute_improvement_direct(improvement_action) # Fallback to direct execution
-            # --- END REPLACEMENT ---
-            return
-        
-        if not experiments:
-            logger.debug("No experiments generated for improvement")
-            return
-        
-        # Execute first experiment
-        experiment = experiments[0]
-        
-        try:
-            # Convert experiment to problem graph and plan
-            problem_graph = self._experiment_to_problem_graph(experiment)
-            plan = self._experiment_to_plan(experiment)
-            
-            # Execute via problem executor
-            # --- START REPLACEMENT ---
-            # Use the integrated WorldModel execution pipeline for the real improvement attempt
-            success, result = self.deps.world_model._execute_improvement(improvement_action)
-            outcome = MagicMock(success=success, execution_time=result.get('execution_timestamp', time.time()), cost_actual=result.get('cost_usd', 0.0))
-            # --- END REPLACEMENT ---
-            
-            # Record outcome in both systems
-            self.deps.experiment_generator.complete_experiment(
-                experiment.experiment_id,
-                {'success': outcome.success}
-            )
-            
-            self.deps.self_improvement_drive.record_outcome(
-                objective_type,
-                outcome.success,
-                {
-                    'execution_time': getattr(outcome, 'execution_time', 0),
-                    'experiment_id': experiment.experiment_id,
-                    'cost_usd': outcome.cost_actual # Pass actual cost
-                }
-            )
-            
-            # Track improvement metrics
-            with self._lock:
-                self.improvement_experiments_run += 1
-                if outcome.success:
-                    self.improvement_successes += 1
-            
-            logger.info(f"✅ Improvement experiment completed: success={outcome.success}")
-            
-        except Exception as e:
-            logger.error(f"Experiment execution failed: {e}", exc_info=True)
-            
-            # Record failure
-            try:
-                self.deps.experiment_generator.complete_experiment(
-                    experiment.experiment_id,
-                    {'success': False, 'error': str(e)}
-                )
-            except:
-                pass
-            
-            try:
-                self.deps.self_improvement_drive.record_outcome(
-                    objective_type,
-                    False,
-                    {'error': str(e)}
-                )
-            except:
-                pass
+                self.conn.execute('''
+                    INSERT INTO snapshots (snapshot_id, timestamp, state_size, 
+                                          action_count, checksum, compressed, 
+                                          file_path, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    snapshot.snapshot_id,
+                    snapshot.timestamp,
+                    len(json.dumps(snapshot.state, default=str)),
+                    len(snapshot.action_log),
+                    snapshot.checksum,
+                    int(compressed),
+                    str(file_path),
+                    json.dumps(snapshot.metadata)
+                ))
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Database error persisting snapshot: {e}")
+                # Try to clean up file
+                if file_path.exists():
+                    try:
+                        file_path.unlink()
+                    except:
+                        pass
+                raise
     
-    def _execute_improvement_direct(self, improvement_action: Dict[str, Any]):
+    def rollback(self, snapshot_id: Optional[str] = None, 
+                reason: str = "safety_violation") -> Optional[Dict[str, Any]]:
         """
-        Execute improvement directly without experiment framework
+        Rollback to a previous snapshot.
         
         Args:
-            improvement_action: Improvement action from self-improvement drive
-        """
-        objective_type = improvement_action.get('_drive_metadata', {}).get('objective_type', 'unknown')
-        
-        logger.info(f"🔧 Executing improvement directly: {objective_type}")
-        
-        # --- START REPLACEMENT ---
-        # Direct execution must use the integrated WorldModel execution pipeline
-        try:
-            if not hasattr(self.deps, 'world_model') or not hasattr(self.deps.world_model, '_execute_improvement'):
-                raise RuntimeError("WorldModel._execute_improvement dependency not available for direct execution.")
-                
-            success, result = self.deps.world_model._execute_improvement(improvement_action)
-            
-            # Record outcome
-            if hasattr(self.deps, 'self_improvement_drive') and self.deps.self_improvement_drive:
-                self.deps.self_improvement_drive.record_outcome(
-                    objective_type,
-                    success,
-                    result
-                )
-            
-            # Track improvement metrics
-            with self._lock:
-                self.improvement_experiments_run += 1
-                if success:
-                    self.improvement_successes += 1
-            
-            logger.info(f"{'✅' if success else '❌'} Direct improvement completed: {objective_type}")
-            
-        except Exception as e:
-            logger.error(f"Direct improvement execution failed: {e}", exc_info=True)
-            
-            # Record failure
-            if hasattr(self.deps, 'self_improvement_drive') and self.deps.self_improvement_drive:
-                try:
-                    self.deps.self_improvement_drive.record_outcome(
-                        objective_type,
-                        False,
-                        {'error': str(e)}
-                    )
-                except Exception as e_rec:
-                    logger.error(f"Failed to record improvement outcome after failure: {e_rec}")
-        # --- END REPLACEMENT ---
-    
-    def _experiment_to_problem_graph(self, experiment: Any) -> Dict[str, Any]:
-        """
-        Convert experiment to problem graph
-        
-        Args:
-            experiment: Experiment object
+            snapshot_id: Specific snapshot ID to rollback to (None = most recent)
+            reason: Reason for rollback
             
         Returns:
-            Problem graph dictionary
+            Dictionary with restored state and metadata, or None if failed
         """
-        # Extract experiment details
-        exp_id = getattr(experiment, 'experiment_id', f'exp_{self.cycle_count}')
-        exp_type = getattr(experiment, 'type', 'unknown')
-        
-        # Get gap details
-        gap = getattr(experiment, 'gap', None)
-        gap_type = getattr(gap, 'type', 'unknown') if gap else 'unknown'
-        gap_domain = getattr(gap, 'domain', 'system') if gap else 'system'
-        
-        # Create problem graph
-        problem_graph = {
-            'id': f'problem_{exp_id}',
-            'type': gap_type,
-            'domain': gap_domain,
-            'nodes': [
-                {
-                    'id': 'analyze',
-                    'type': 'analysis',
-                    'params': {
-                        'experiment_type': exp_type,
-                        'domain': gap_domain
-                    }
-                },
-                {
-                    'id': 'execute',
-                    'type': 'execution',
-                    'params': {
-                        'experiment_id': exp_id
-                    }
-                },
-                {
-                    'id': 'validate',
-                    'type': 'validation',
-                    'params': {
-                        'threshold': 0.7
-                    }
-                }
-            ],
-            'edges': [
-                {'from': 'analyze', 'to': 'execute'},
-                {'from': 'execute', 'to': 'validate'}
-            ],
-            'metadata': {
-                'experiment_id': exp_id,
-                'gap_type': gap_type
-            }
-        }
-        
-        return problem_graph
-    
-    def _experiment_to_plan(self, experiment: Any) -> Dict[str, Any]:
-        """
-        Convert experiment to execution plan
-        
-        Args:
-            experiment: Experiment object
-            
-        Returns:
-            Execution plan dictionary
-        """
-        # Extract experiment details
-        exp_id = getattr(experiment, 'experiment_id', f'exp_{self.cycle_count}')
-        exp_type = getattr(experiment, 'type', 'unknown')
-        
-        # Get gap details
-        gap = getattr(experiment, 'gap', None)
-        gap_type = getattr(gap, 'type', 'unknown') if gap else 'unknown'
-        estimated_cost = getattr(gap, 'estimated_cost', 0.1) if gap else 0.1
-        
-        # Create execution plan
-        plan = {
-            'experiment_id': exp_id,
-            'type': exp_type,
-            'objective': gap_type,
-            'steps': [
-                {
-                    'action': 'analyze_problem',
-                    'params': {'domain': getattr(gap, 'domain', 'system') if gap else 'system'}
-                },
-                {
-                    'action': 'generate_solution',
-                    'params': {'experiment_type': exp_type}
-                },
-                {
-                    'action': 'validate_solution',
-                    'params': {'threshold': 0.7}
-                },
-                {
-                    'action': 'apply_solution',
-                    'params': {'experiment_id': exp_id}
-                }
-            ],
-            'estimated_cost': estimated_cost,
-            'priority': getattr(gap, 'priority', 1.0) if gap else 1.0,
-            'metadata': {
-                'experiment_id': exp_id,
-                'gap_type': gap_type
-            }
-        }
-        
-        return plan
-    
-    # REMOVED MOCK HANDLERS: _improve_circular_imports, _improve_performance, 
-    # _improve_tests, _improve_safety, _improve_bugs. They are now consolidated 
-    # into the direct call to WorldModel._execute_improvement.
-    
-    def _record_error(self, error: Exception, phase: str):
-        """
-        Record error for self-improvement triggers
-        
-        Args:
-            error: Exception that occurred
-            phase: Phase where error occurred
-        """
-        with self._lock:
-            error_record = {
-                'timestamp': time.time(),
-                'error': str(error),
-                'type': type(error).__name__,
-                'phase': phase,
-                'cycle': self.cycle_count
-            }
-            self.recent_errors.append(error_record)
-            self.error_count_window.append(time.time())
-    
-    def _recent_error_count(self) -> int:
-        """
-        Get count of recent errors
-        
-        Returns:
-            Number of errors in recent window
-        """
-        with self._lock:
-            return len(self.recent_errors)
-    
-    def _get_performance_metrics(self) -> Dict[str, float]:
-        """
-        Get current performance metrics
-        
-        Returns:
-            Dictionary of performance metrics
-        """
-        metrics = {}
-        
-        # Get metrics from deps if available
-        if hasattr(self.deps, 'metrics'):
-            try:
-                metrics['avg_latency_ms'] = self.deps.metrics.get_average('step_duration_ms')
-                metrics['error_rate'] = self.deps.metrics.get_counter('errors_total') / max(1, self.cycle_count)
-                metrics['success_rate'] = 1.0 - metrics['error_rate']
-            except Exception as e:
-                logger.debug(f"Failed to get metrics from deps: {e}")
-        
-        # Add improvement metrics
-        if self.improvement_experiments_run > 0:
-            metrics['improvement_success_rate'] = self.improvement_successes / self.improvement_experiments_run
-        else:
-            metrics['improvement_success_rate'] = 0.0
-        
-        # Add system health metrics
-        try:
-            metrics['cpu_percent'] = self._get_cpu_usage()
-            metrics['memory_mb'] = self._get_memory_usage()
-        except Exception as e:
-            logger.debug(f"Failed to get system metrics: {e}")
-        
-        return metrics
-    
-    def _get_cpu_usage(self) -> float:
-        """Get current CPU usage"""
-        try:
-            import psutil
-            return psutil.cpu_percent(interval=0.1)
-        except ImportError:
-            return 50.0
-    
-    def _get_memory_usage(self) -> float:
-        """Get current memory usage in MB"""
-        try:
-            import psutil
-            process = psutil.Process()
-            return process.memory_info().rss / 1024 / 1024
-        except ImportError:
-            return 1024.0
-    
-    def _get_low_activity_duration(self) -> float:
-        """Get duration of low activity in minutes"""
-        # TODO: Implement actual activity tracking
-        return 0.0
-    
-    def _distributed_execution(self, plan: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute plan using agent pool
-        
-        Args:
-            plan: Validated plan dictionary
-            
-        Returns:
-            Execution result dictionary
-        """
-        graph = self._plan_to_graph(plan)
-        capability = self._determine_capability(plan)
-        
-        try:
-            job_id = self.agent_pool.submit_job(
-                graph=graph,
-                parameters=plan.get('parameters', {}),
-                priority=plan.get('priority', 0),
-                capability_required=capability
-            )
-            
-            # Wait for result with timeout
-            timeout = getattr(self.config, 'slo_p95_latency_ms', 30000) / 1000
-            start_wait = time.time()
-            check_interval = 0.1
-            
-            while time.time() - start_wait < timeout:
-                if self._shutdown_event.is_set():
-                    return self._create_fallback_result("Shutdown during distributed execution")
-                
-                provenance = self.agent_pool.get_job_provenance(job_id)
-                if provenance and provenance.get('outcome'):
-                    result = provenance.get('result')
-                    if result:
-                        return result
-                    else:
-                        return self._create_fallback_result("No result from job")
-                
-                time.sleep(check_interval)
-            
-            return self._create_fallback_result("Execution timeout")
-            
-        except RuntimeError as e:
-            logger.error(f"Distributed execution error (queue full?): {e}")
-            return self._create_fallback_result(str(e))
-        except Exception as e:
-            logger.error(f"Distributed execution error: {e}", exc_info=True)
-            return self._create_fallback_result(str(e))
-    
-    def _plan_to_graph(self, plan: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Convert plan to executable graph
-        
-        Args:
-            plan: Plan dictionary
-            
-        Returns:
-            Graph dictionary
-        """
-        action = plan.get('action', {})
-        action_type = action.get('type', 'unknown')
-        
-        return {
-            "id": f"graph_{self.cycle_count}",
-            "nodes": [
-                {
-                    "id": "action",
-                    "type": action_type,
-                    "params": plan.get('parameters', {})
-                }
-            ],
-            "edges": []
-        }
-    
-    def _determine_capability(self, plan: Dict[str, Any]) -> AgentCapability:
-        """
-        Determine required capability for plan
-        
-        Args:
-            plan: Plan dictionary
-            
-        Returns:
-            Required AgentCapability
-        """
-        action = plan.get('action', {})
-        action_type = str(action.get('type', '')).lower()
-        
-        capability_map = {
-            'perceive': AgentCapability.PERCEPTION,
-            'reason': AgentCapability.REASONING,
-            'learn': AgentCapability.LEARNING,
-            'plan': AgentCapability.PLANNING,
-            'execute': AgentCapability.EXECUTION,
-            'memory': AgentCapability.MEMORY,
-            'safety': AgentCapability.SAFETY,
-            'self_improvement': AgentCapability.GENERAL
-        }
-        
-        for key, cap in capability_map.items():
-            if key in action_type:
-                return cap
-        
-        return AgentCapability.GENERAL
-    
-    def _perceive_and_understand(self, history: List[Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process inputs through multimodal perception
-        
-        Args:
-            history: Historical observations
-            context: Context dictionary
-            
-        Returns:
-            Perception result dictionary
-        """
-        raw_input = context.get('raw_observation', history[-1] if history else None)
-        
-        if raw_input is None:
-            return {
-                'modality': ModalityType.UNKNOWN,
-                'embedding': np.zeros(384),
-                'uncertainty': 1.0
-            }
-        
-        # Process through multimodal processor
-        perception = self.deps.multimodal.process_input(raw_input)
-        
-        # Extract modality (handle both enum and string)
-        if hasattr(perception, 'modality'):
-            modality = perception.modality
-        else:
-            modality = perception.get('modality', ModalityType.UNKNOWN)
-        
-        # Handle TEXT modality with symbolic reasoning
-        if modality == ModalityType.TEXT and isinstance(raw_input, str):
-            try:
-                if self.deps.symbolic: # Check if symbolic exists
-                    self.deps.symbolic.add_fact(f"observed('{raw_input[:50]}')")
-            except Exception as e:
-                logger.debug(f"Failed to add symbolic fact: {e}")
-        
-        # Store in long-term memory
-        memory_key = f"perception_{self.cycle_count}_{time.time()}"
-        
-        if hasattr(perception, 'embedding'):
-            embedding = perception.embedding
-        else:
-            embedding = perception.get('embedding', np.zeros(384))
-        
-        # FIXED: Use correct method for MemoryIndex
-        try:
-            if self.deps.ltm: # Check if ltm exists
-                if hasattr(self.deps.ltm, 'add'):
-                    self.deps.ltm.add(memory_key, embedding)
-                elif hasattr(self.deps.ltm, 'upsert'):
-                    self.deps.ltm.upsert(
-                        memory_key,
-                        embedding,
-                        {
-                            'modality': modality if isinstance(modality, str) else modality.value,
-                            'uncertainty': getattr(perception, 'uncertainty', 0.5),
-                            'cycle': self.cycle_count
-                        }
-                    )
-        except Exception as e:
-            logger.debug(f"Failed to store in LTM: {e}")
-        
-        # Record in reasoning trace
-        with self._lock:
-            self.reasoning_trace.append({
-                'phase': 'perception',
-                'modality': modality.value if hasattr(modality, 'value') else str(modality),
-                'uncertainty': getattr(perception, 'uncertainty', 0.5)
-            })
-        
-        return {
-            'modality': modality,
-            'embedding': embedding,
-            'uncertainty': getattr(perception, 'uncertainty', 0.5)
-        }
-    
-    def _reason_and_plan(self, perception: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Reason about situation and create plan
-        
-        Args:
-            perception: Perception result
-            context: Context dictionary
-            
-        Returns:
-            Plan dictionary
-        """
-        goal = context.get('high_level_goal', 'explore')
-        
-        # Decompose goal into subgoals
-        subgoals = self.deps.goal_system.decompose_goal(goal, context)
-        
-        # Update world model
-        self.deps.world_model.update_state(
-            perception.get('embedding'),
-            {'type': 'observe'},
-            0.0
-        )
-        
-        # Get available resources and prioritize goals
-        available_resources = self.deps.resource_compute.get_resource_availability()
-        prioritized_goals = self.deps.goal_system.prioritize_goals(available_resources)
-        
-        if not prioritized_goals:
-            return self._create_wait_plan("No feasible goals")
-        
-        target_goal = prioritized_goals[0]
-        
-        # Predict effects of different actions using causal reasoning
-        predicted_effects = {}
-        for action_type in [ActionType.EXPLORE, ActionType.OPTIMIZE, ActionType.MAINTAIN]:
-            try:
-                effect = self.deps.causal.estimate_causal_effect(
-                    action_type.value,
-                    target_goal.get('subgoal', 'default')
-                )
-                predicted_effects[action_type.value] = effect.get('total_effect', 0)
-            except Exception as e:
-                logger.debug(f"Failed to estimate causal effect for {action_type}: {e}")
-                predicted_effects[action_type.value] = 0.0
-        
-        # Select best action
-        if predicted_effects:
-            best_action = max(predicted_effects.items(), key=lambda x: x[1])[0]
-        else:
-            best_action = ActionType.EXPLORE.value
-        
-        # Create problem specification for resource planning
-        problem = {
-            'goal': target_goal,
-            'complexity': 1.0 + len(self.execution_history) / 100,
-            'data_size': len(self.execution_history)
-        }
-        
-        # Plan with resource constraints
-        plan = self.deps.resource_compute.plan_with_budget(
-            problem,
-            getattr(self.config, 'slo_p95_latency_ms', 1000),
-            self.sys.health.energy_budget_left_nJ
-        )
-        
-        # Update plan with selected action
-        if 'action' not in plan:
-            plan['action'] = {}
-        plan['action']['type'] = best_action
-        plan['goal'] = target_goal
-        plan['predicted_effects'] = predicted_effects
-        plan['uncertainty'] = perception.get('uncertainty', 0.5)
-        
-        # Add probabilistic confidence if embedding available
-        if perception.get('embedding') is not None:
-            try:
-                prediction, uncertainty = self.deps.probabilistic.predict_with_uncertainty(
-                    perception['embedding']
-                )
-                plan['probabilistic_confidence'] = 1.0 - uncertainty
-            except Exception as e:
-                logger.debug(f"Failed to compute probabilistic confidence: {e}")
-                plan['probabilistic_confidence'] = 0.5
-        
-        # Check if distributed execution is feasible
-        if self.config.enable_distributed:
-            try:
-                pool_status = self.agent_pool.get_pool_status()
-                idle_agents = pool_status['state_distribution'].get(AgentState.IDLE.value, 0)
-                if idle_agents > 0:
-                    plan['distributed'] = True
-            except Exception as e:
-                logger.debug(f"Failed to check pool status: {e}")
-        
-        # Record in reasoning trace
-        with self._lock:
-            self.reasoning_trace.append({
-                'phase': 'planning',
-                'selected_goal': target_goal.get('subgoal', 'unknown'),
-                'selected_action': best_action,
-                'confidence': plan.get('confidence', 0)
-            })
-        
-        return plan
-    
-    def _validate_and_ensure_safety(self, plan: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate plan for safety and compliance
-        
-        Args:
-            plan: Plan to validate
-            context: Context dictionary
-            
-        Returns:
-            Validated plan dictionary
-        """
-        # Build safety context
-        safety_context = {
-            'SA': self.sys.SA.__dict__,
-            'energy_budget_left': self.sys.health.energy_budget_left_nJ,
-            'health': self.sys.health.__dict__
-        }
-        safety_context.update(context)
-        
-        # Validate action safety
-        safe, reason, confidence = self.deps.safety_validator.validate_action(plan, safety_context)
-        
-        if not safe:
-            logger.warning(f"Safety validation failed: {reason}")
-            plan = self._create_safe_fallback(reason, plan)
-        
-        # Check compliance
-        compliance = self.deps.governance.check_compliance(plan, safety_context)
-        
-        if not compliance.get('compliant', True):
-            plan['compliance_warnings'] = compliance.get('violations', [])
-            logger.warning(f"Compliance issues: {compliance.get('violations', [])}")
-        
-        # NSO alignment check
-        try:
-            if not self.deps.nso_aligner.scan_external(plan):
-                plan = self.deps.nso_aligner.align_action(
-                    plan,
-                    self.config.safety_policies.safety_thresholds
-                )
-        except Exception as e:
-            logger.debug(f"NSO alignment check failed: {e}")
-        
-        # Add validation metadata
-        plan['safety_validated'] = safe
-        plan['safety_confidence'] = confidence
-        plan['compliance_score'] = compliance.get('compliance_score', 0.0)
-        
-        # Record in reasoning trace
-        with self._lock:
-            self.reasoning_trace.append({
-                'phase': 'validation',
-                'safe': safe,
-                'compliant': compliance.get('compliant', True),
-                'confidence': confidence
-            })
-        
-        return plan
-    
-    def _execute_action(self, plan: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute validated plan
-        
-        Args:
-            plan: Validated plan
-            
-        Returns:
-            Execution result dictionary
-        """
-        # Check for distributed execution via distributed coordinator
-        if self.config.enable_distributed and self.deps.distributed:
-            try:
-                dist_result = self.deps.distributed.distribute_task(plan)
-                if dist_result.get('status') == 'distributed':
-                    plan['distributed'] = True
-                    plan['assignments'] = dist_result.get('assignments', [])
-            except Exception as e:
-                logger.debug(f"Distributed coordination failed: {e}")
-        
-        action = plan.get('action', {})
-        
-        # Determine success based on safety validation and random factor
-        success = plan.get('safety_validated', False) and np.random.random() > 0.1
-        
-        # Create execution result
-        result = {
-            'action': action,
-            'success': success,
-            'observation': f"Executed {action.get('type', 'unknown')}",
-            'reward': np.random.random() if success else -0.1,
-            'modality': ModalityType.UNKNOWN,
-            'resource_usage': plan.get('resource_usage', {}),
-            'uncertainty': plan.get('uncertainty', 0.5),
-            'goal_progress': plan.get('goal', {}).get('subgoal', '')
-        }
-        
-        # Create episode for autobiographical memory
-        try:
-            # FIXED: Import from parent directory (vulcan/)
-            from ..vulcan_types import Episode
-            
-            episode = Episode(
-                t=time.time(),
-                context=plan,
-                action_bundle=plan,
-                observation=result['observation'],
-                reward_vec={'total': result['reward']},
-                SA_latents=self.sys.SA,
-                expl_uri='',
-                prov_sig='',
-                modalities_used={result['modality']},
-                uncertainty=result['uncertainty']
-            )
-            
-            # FIXED: EpisodicMemory uses add_episode method
-            if self.deps.am: # Check if am exists
-                if hasattr(self.deps.am, 'add_episode'):
-                    self.deps.am.add_episode(episode)
-                elif hasattr(self.deps.am, 'append'):
-                    self.deps.am.append(episode)
-        except ImportError:
-            logger.debug("Episode type not available, skipping episodic memory")
-        except Exception as e:
-            logger.debug(f"Failed to store episode: {e}")
-        
-        # Add to execution history
-        with self._lock:
-            self.execution_history.append(result)
-            self.reasoning_trace.append({
-                'phase': 'execution',
-                'action_type': action.get('type', 'unknown'),
-                'success': success
-            })
-        
-        return result
-    
-    def _learn_and_adapt(self, execution_result: Dict[str, Any], perception: Dict[str, Any]):
-        """
-        Learn from experience and adapt
-        
-        Args:
-            execution_result: Result from execution
-            perception: Perception result
-        """
-        # Prepare learning experience
-        learning_experience = {
-            'embedding': perception.get('embedding', np.zeros(384)),
-            'modality': perception.get('modality'),
-            'reward': execution_result.get('reward', 0)
-        }
-        
-        # Process through continual learner
-        adaptation_result = self.deps.continual.process_experience(learning_experience)
-        
-        # Update causal links
-        action = execution_result.get('action')
-        if action:
-            try:
-                self.deps.causal.update_causal_link(
-                    action.get('type', 'unknown'),
-                    execution_result.get('observation', ''),
-                    execution_result.get('reward', 0),
-                    1.0 - execution_result.get('uncertainty', 0.5)
-                )
-            except Exception as e:
-                logger.debug(f"Failed to update causal link: {e}")
-        
-        # Update goal progress
-        goal_progress = execution_result.get('goal_progress')
-        if goal_progress:
-            try:
-                self.deps.goal_system.update_progress(
-                    goal_progress,
-                    max(0, execution_result.get('reward', 0))
-                )
-            except Exception as e:
-                logger.debug(f"Failed to update goal progress: {e}")
-        
-        # Find cross-modal patterns if multiple modalities active
-        if len(self.sys.active_modalities) > 1:
-            try:
-                patterns = self.deps.cross_modal.find_cross_modal_correspondence(
-                    list(self.execution_history)[-10:]
-                )
-                if patterns:
-                    logger.info(f"Discovered {len(patterns)} cross-modal patterns")
-            except Exception as e:
-                logger.debug(f"Failed to find cross-modal patterns: {e}")
-        
-        # Record in reasoning trace
-        with self._lock:
-            self.reasoning_trace.append({
-                'phase': 'learning',
-                'adaptation_loss': adaptation_result.get('loss', 0),
-                'adapted': adaptation_result.get('adapted', False)
-            })
-    
-    def _reflect_and_improve(self):
-        """Meta-cognitive reflection and self-improvement"""
-        with self._lock:
-            last_trace = dict(self.reasoning_trace[-1]) if self.reasoning_trace else {}
-            last_result = dict(self.execution_history[-1]) if self.execution_history else {}
-        
-        # Update self-model
-        try:
-            self.deps.meta_cognitive.update_self_model({
-                'loss': last_trace.get('adaptation_loss', 0),
-                'reward': last_result.get('reward', 0),
-                'strategy': 'default',
-                'modality': str(last_result.get('modality', 'unknown'))
-            })
-        except Exception as e:
-            logger.debug(f"Failed to update self-model: {e}")
-        
-        # Analyze learning efficiency
-        try:
-            efficiency = self.deps.meta_cognitive.analyze_learning_efficiency()
-            
-            if efficiency.get('status') != 'insufficient_data':
-                avg_loss = efficiency.get('avg_loss', 0)
-                self.sys.SA.learning_efficiency = 1.0 / (1.0 + avg_loss)
-        except Exception as e:
-            logger.debug(f"Failed to analyze learning efficiency: {e}")
-        
-        # Introspect reasoning quality
-        try:
-            reasoning_quality = self.deps.meta_cognitive.introspect_reasoning(
-                list(self.reasoning_trace)
-            )
-            
-            quality_score = reasoning_quality.get('quality_score')
-            if quality_score is not None:
-                self.sys.SA.uncertainty = 1.0 - quality_score
-        except Exception as e:
-            logger.debug(f"Failed to introspect reasoning: {e}")
-        
-        # Compute identity drift from action diversity
-        if len(self.execution_history) > 100:
-            try:
-                recent_actions = [
-                    h.get('action', {}).get('type', '') 
-                    for h in list(self.execution_history)[-100:] 
-                    if 'action' in h
-                ]
-                
-                if recent_actions:
-                    unique_actions = len(set(recent_actions))
-                    total_actions = len(recent_actions)
-                    action_diversity = unique_actions / total_actions
-                    self.sys.SA.identity_drift = 1.0 - action_diversity
-            except Exception as e:
-                logger.debug(f"Failed to compute identity drift: {e}")
-    
-    def _update_system_state(self, result: Dict[str, Any], duration: float):
-        """
-        Update system state after execution
-        
-        Args:
-            result: Execution result
-            duration: Execution duration in seconds
-        """
-        with self._sys_lock:
-            self.sys.step += 1
-            self.sys.last_obs = result.get('observation')
-            self.sys.last_reward = result.get('reward')
-            
-            # Update health metrics
-            self.sys.health.latency_ms = duration * 1000
-            energy_used = result.get('resource_usage', {}).get('energy_nJ', 0)
-            self.sys.health.energy_budget_left_nJ -= energy_used
-            
-            # Track active modalities
-            modality = result.get('modality', ModalityType.UNKNOWN)
-            if modality != ModalityType.UNKNOWN:
-                self.sys.active_modalities.add(modality)
-            
-            # Store uncertainty estimate
-            step_key = f"step_{self.sys.step}"
-            self.sys.uncertainty_estimates[step_key] = result.get('uncertainty', 0.5)
-            
-            # Bounded uncertainty estimates (keep last 1000)
-            if len(self.sys.uncertainty_estimates) > 1000:
-                # Remove oldest entries
-                keys_to_remove = sorted(self.sys.uncertainty_estimates.keys())[:-1000]
-                for key in keys_to_remove:
-                    del self.sys.uncertainty_estimates[key]
-    
-    def _add_provenance(self, result: Dict[str, Any]):
-        """
-        Add provenance record
-        
-        Args:
-            result: Execution result
-        """
-        try:
-            # FIXED: Import from parent directory (vulcan/)
-            from ..vulcan_types import ProvRecord
-            
-            prov = ProvRecord(
-                t=time.time(),
-                graph_id=f"graph_{self.sys.step}",
-                agent_version="VULCAN_AGI_1.0",
-                policy_versions=self.sys.policies,
-                input_hash=hashlib.md5(str(result).encode()).hexdigest(),
-                kernel_sig=None,
-                explainer_uri='',
-                ecdsa_sig='',
-                modality=result.get('modality', ModalityType.UNKNOWN),
-                uncertainty=result.get('uncertainty', 0.5)
-            )
-            
-            self.sys.provenance_chain.append(prov)
-            
-            # FIXED: Bound provenance chain to prevent memory growth
-            if len(self.sys.provenance_chain) > 1000:
-                self.sys.provenance_chain = self.sys.provenance_chain[-1000:]
-                
-        except ImportError:
-            logger.debug("ProvRecord type not available, skipping provenance")
-        except Exception as e:
-            logger.debug(f"Failed to add provenance: {e}")
-    
-    def _create_wait_plan(self, reason: str) -> Dict[str, Any]:
-        """
-        Create wait action plan
-        
-        Args:
-            reason: Reason for waiting
-            
-        Returns:
-            Wait plan dictionary
-        """
-        return {
-            'action': {'type': ActionType.WAIT.value},
-            'reason': reason,
-            'confidence': 0.1,
-            'parameters': {}
-        }
-    
-    def _create_safe_fallback(self, reason: str, original_plan: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Create safe fallback plan
-        
-        Args:
-            reason: Reason for fallback
-            original_plan: Original plan that failed validation
-            
-        Returns:
-            Safe fallback plan dictionary
-        """
-        return {
-            'action': {'type': ActionType.SAFE_FALLBACK.value},
-            'reason': f"Safety violation: {reason}",
-            'original_plan': original_plan,
-            'confidence': 0.5,
-            'parameters': {}
-        }
-    
-    def _create_fallback_result(self, error: str) -> Dict[str, Any]:
-        """
-        Create fallback result for errors
-        
-        Args:
-            error: Error message
-            
-        Returns:
-            Fallback result dictionary
-        """
-        return {
-            'action': {'type': ActionType.ERROR_FALLBACK.value},
-            'error': error,
-            'success': False,
-            'observation': f'Error occurred: {error}',
-            'reward': -1.0,
-            'modality': ModalityType.UNKNOWN,
-            'uncertainty': 1.0,
-            'resource_usage': {}
-        }
-    
-    def get_status(self) -> Dict[str, Any]:
-        """
-        Get comprehensive status of the collective
-        
-        Returns:
-            Status dictionary
-        """
-        with self._lock:
-            status = {
-                'cycle_count': self.cycle_count,
-                'execution_history_size': len(self.execution_history),
-                'reasoning_trace_size': len(self.reasoning_trace),
-                'agent_pool_status': self.agent_pool.get_pool_status(),
-                'system_step': self.sys.step,
-                'shutdown': self._shutdown_event.is_set(),
-                'recent_errors': len(self.recent_errors)
-            }
-            
-            # Add self-improvement stats if enabled
-            if self.config.enable_self_improvement:
-                status['self_improvement'] = {
-                    'enabled': True,
-                    'experiments_run': self.improvement_experiments_run,
-                    'successes': self.improvement_successes,
-                    'success_rate': (self.improvement_successes / self.improvement_experiments_run) 
-                                   if self.improvement_experiments_run > 0 else 0.0
-                }
+        rollback_id = str(uuid.uuid4())
+        
+        with self.lock:
+            # Find snapshot
+            if snapshot_id:
+                snapshot = self.snapshot_index.get(snapshot_id)
             else:
-                status['self_improvement'] = {'enabled': False}
+                # Use most recent snapshot
+                snapshot = self.snapshots[-1] if self.snapshots else None
             
-            return status
+            if not snapshot:
+                logger.error(f"No snapshot found for rollback (requested: {snapshot_id})")
+                self._record_rollback(rollback_id, snapshot_id, reason, False, 
+                                    "Snapshot not found")
+                # CRITICAL FIX: Update metrics before returning
+                self.metrics['total_rollbacks'] += 1
+                self.metrics['failed_rollbacks'] += 1
+                return None
+            
+            # Verify integrity before rollback
+            if self.verify_integrity and not snapshot.verify_integrity():
+                logger.error(f"Snapshot {snapshot.snapshot_id} failed integrity check")
+                self._record_rollback(rollback_id, snapshot.snapshot_id, reason, False, 
+                                    "Integrity check failed")
+                # CRITICAL FIX: Update metrics before returning
+                self.metrics['total_rollbacks'] += 1
+                self.metrics['failed_rollbacks'] += 1
+                return None
+            
+            try:
+                # Create rollback result
+                rollback_result = {
+                    'state': copy.deepcopy(snapshot.state),
+                    'action_log': copy.deepcopy(snapshot.action_log),
+                    'rollback_metadata': {
+                        'rollback_id': rollback_id,
+                        'snapshot_id': snapshot.snapshot_id,
+                        'snapshot_timestamp': snapshot.timestamp,
+                        'reason': reason,
+                        'timestamp': time.time()
+                    }
+                }
+                
+                # Record successful rollback
+                self._record_rollback(rollback_id, snapshot.snapshot_id, reason, True, None)
+                
+                # Update metrics
+                self.metrics['total_rollbacks'] += 1
+                self.metrics['successful_rollbacks'] += 1
+                
+                logger.warning(f"Successfully rolled back to snapshot {snapshot.snapshot_id} "
+                             f"(reason: {reason})")
+                
+                return rollback_result
+                
+            except Exception as e:
+                logger.error(f"Rollback failed: {e}")
+                self._record_rollback(rollback_id, snapshot.snapshot_id, reason, False, str(e))
+                self.metrics['total_rollbacks'] += 1
+                self.metrics['failed_rollbacks'] += 1
+                return None
     
-    def shutdown(self, timeout: float = 5.0):
+    def _record_rollback(self, rollback_id: str, snapshot_id: Optional[str], 
+                        reason: str, success: bool, error_message: Optional[str]):
+        """Record rollback attempt in history."""
+        # Add to memory
+        with self.lock:
+            self.rollback_history.append({
+                'rollback_id': rollback_id,
+                'timestamp': time.time(),
+                'snapshot_id': snapshot_id,
+                'reason': reason,
+                'success': success,
+                'error_message': error_message
+            })
+        
+        # Persist to database
+        with self.db_lock:
+            try:
+                self.conn.execute('''
+                    INSERT INTO rollback_history (rollback_id, snapshot_id, reason, 
+                                                timestamp, success, error_message)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (rollback_id, snapshot_id, reason, time.time(), int(success), error_message))
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Database error recording rollback: {e}")
+    
+    def quarantine_action(self, action: Dict[str, Any], reason: str, 
+                         duration_seconds: float = 3600) -> str:
         """
-        Shutdown orchestrator with proper thread cleanup and timeout handling.
+        Quarantine an action for review.
         
         Args:
-            timeout: Maximum time to wait for each service shutdown (seconds)
+            action: Action to quarantine
+            reason: Reason for quarantine
+            duration_seconds: Quarantine duration in seconds
+            
+        Returns:
+            Quarantine ID
         """
-        if self._shutdown_event.is_set():
-            logger.warning("Collective already shutting down")
+        quarantine_id = str(uuid.uuid4())
+        timestamp = time.time()
+        expiry = timestamp + duration_seconds
+        
+        # Convert ActionType enums to strings for JSON serialization
+        action_serializable = self._make_json_serializable(copy.deepcopy(action))
+        
+        with self.lock:
+            # Store in memory
+            self.quarantine[quarantine_id] = {
+                'action': action_serializable,
+                'reason': reason,
+                'timestamp': timestamp,
+                'expiry': expiry,
+                'status': 'quarantined',
+                'reviewed': False,
+                'reviewer': None,
+                'review_time': None
+            }
+            
+            # Update metrics
+            self.metrics['quarantined_actions'] += 1
+        
+        # Persist to database
+        with self.db_lock:
+            try:
+                self.conn.execute('''
+                    INSERT INTO quarantine (quarantine_id, action, reason, timestamp, 
+                                          expiry, status, reviewed, reviewer, review_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    quarantine_id,
+                    json.dumps(action_serializable, default=str),
+                    reason,
+                    timestamp,
+                    expiry,
+                    'quarantined',
+                    0,
+                    None,
+                    None
+                ))
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Database error quarantining action: {e}")
+        
+        logger.warning(f"Action quarantined: {quarantine_id} for reason: {reason} "
+                      f"(duration: {duration_seconds}s)")
+        
+        # Send notification
+        self._send_quarantine_notification(quarantine_id, action_serializable, reason)
+        
+        return quarantine_id
+    
+    def _make_json_serializable(self, obj: Any) -> Any:
+        """Convert objects to JSON-serializable format."""
+        if isinstance(obj, dict):
+            return {k: self._make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(item) for item in obj]
+        elif isinstance(obj, Enum):
+            return obj.value
+        elif isinstance(obj, (ActionType,)):
+            return obj.value
+        else:
+            return obj
+    
+    def review_quarantine(self, quarantine_id: str, 
+                         approved: bool, 
+                         reviewer: str = "system",
+                         notes: Optional[str] = None) -> bool:
+        """
+        Review a quarantined action.
+        
+        Args:
+            quarantine_id: ID of quarantined action
+            approved: Whether action is approved
+            reviewer: Identifier of reviewer
+            notes: Review notes
+            
+        Returns:
+            True if review successful, False otherwise
+        """
+        with self.lock:
+            if quarantine_id not in self.quarantine:
+                logger.warning(f"Quarantine ID {quarantine_id} not found")
+                return False
+            
+            review_time = time.time()
+            status = 'approved' if approved else 'rejected'
+            
+            # Update memory
+            self.quarantine[quarantine_id]['reviewed'] = True
+            self.quarantine[quarantine_id]['reviewer'] = reviewer
+            self.quarantine[quarantine_id]['review_time'] = review_time
+            self.quarantine[quarantine_id]['status'] = status
+            
+            if notes:
+                self.quarantine[quarantine_id]['notes'] = notes
+        
+        # Update database
+        with self.db_lock:
+            try:
+                self.conn.execute('''
+                    UPDATE quarantine 
+                    SET status = ?, reviewed = 1, reviewer = ?, review_time = ?
+                    WHERE quarantine_id = ?
+                ''', (status, reviewer, review_time, quarantine_id))
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Database error updating quarantine: {e}")
+        
+        logger.info(f"Quarantined action {quarantine_id} {status} by {reviewer}")
+        
+        return True
+    
+    def get_quarantine_item(self, quarantine_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get details of a quarantined action.
+        
+        Args:
+            quarantine_id: ID of quarantined action
+            
+        Returns:
+            Quarantine details or None if not found
+        """
+        with self.lock:
+            item = self.quarantine.get(quarantine_id)
+            return copy.deepcopy(item) if item else None
+    
+    def cleanup_expired_quarantine(self):
+        """Remove expired quarantine entries."""
+        current_time = time.time()
+        
+        with self.lock:
+            expired = []
+            for qid, q in self.quarantine.items():
+                if q['expiry'] < current_time:
+                    expired.append(qid)
+            
+            for qid in expired:
+                del self.quarantine[qid]
+                logger.info(f"Removed expired quarantine entry: {qid}")
+        
+        # Clean from database
+        with self.db_lock:
+            try:
+                self.conn.execute(
+                    'DELETE FROM quarantine WHERE expiry < ?',
+                    (current_time,)
+                )
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Database error cleaning quarantine: {e}")
+    
+    def _cleanup_old_snapshots(self):
+        """Clean up old snapshots based on retention policy."""
+        cutoff_time = time.time() - (self.snapshot_retention_days * 86400)
+        
+        # Find old snapshots
+        with self.db_lock:
+            try:
+                cursor = self.conn.execute(
+                    'SELECT snapshot_id, file_path FROM snapshots WHERE timestamp < ?',
+                    (cutoff_time,)
+                )
+                old_snapshots = cursor.fetchall()
+            except sqlite3.Error as e:
+                logger.error(f"Database error finding old snapshots: {e}")
+                return
+        
+        for row in old_snapshots:
+            snapshot_id, file_path = row
+            
+            # Remove from memory
+            with self.lock:
+                if snapshot_id in self.snapshot_index:
+                    snapshot = self.snapshot_index[snapshot_id]
+                    if snapshot in self.snapshots:
+                        self.snapshots.remove(snapshot)
+                    del self.snapshot_index[snapshot_id]
+            
+            # Delete file
+            file_path = Path(file_path)
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                except Exception as e:
+                    logger.error(f"Error deleting snapshot file {file_path}: {e}")
+            
+            logger.info(f"Cleaned up old snapshot: {snapshot_id}")
+        
+        # Clean from database
+        with self.db_lock:
+            try:
+                self.conn.execute(
+                    'DELETE FROM snapshots WHERE timestamp < ?',
+                    (cutoff_time,)
+                )
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.error(f"Database error deleting old snapshots: {e}")
+    
+    def _start_cleanup_thread(self):
+        """Start background thread for cleanup tasks."""
+        def cleanup_worker():
+            while not self._shutdown:
+                try:
+                    # CRITICAL FIX: Use configurable timeout for faster shutdown in tests
+                    # Default is 10s, can be set to 1-5s for test environments
+                    if self._shutdown_event.wait(timeout=self.worker_check_interval):
+                        break  # Shutdown requested
+                    
+                    if self._shutdown:
+                        break
+                    
+                    self.cleanup_expired_quarantine()
+                    if self.auto_cleanup and not self._shutdown:
+                        self._cleanup_old_snapshots()
+                except Exception as e:
+                    logger.error(f"Cleanup thread error: {e}")
+        
+        self.cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True, name="RollbackCleanup")
+        self.cleanup_thread.start()
+    
+    def _calculate_snapshot_size(self, snapshot: RollbackSnapshot) -> int:
+        """Calculate approximate size of snapshot in bytes."""
+        try:
+            # Serialize to estimate size
+            data = pickle.dumps({
+                'state': snapshot.state,
+                'action_log': snapshot.action_log
+            })
+            return len(data)
+        except:
+            return 0
+    
+    def _send_quarantine_notification(self, quarantine_id: str, 
+                                     action: Dict[str, Any], reason: str):
+        """Send notification about quarantined action."""
+        notification = {
+            'type': 'quarantine_alert',
+            'quarantine_id': quarantine_id,
+            'action_type': str(action.get('type', 'unknown')),
+            'reason': reason,
+            'timestamp': time.time(),
+            'severity': 'high' if 'safety' in reason.lower() else 'medium'
+        }
+        
+        # Log critical notification
+        logger.critical(f"QUARANTINE NOTIFICATION: {json.dumps(notification)}")
+        
+        # In production, this would integrate with notification systems
+        # (email, Slack, PagerDuty, etc.)
+    
+    def get_snapshot_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get recent snapshot history.
+        
+        Args:
+            limit: Maximum number of snapshots to return
+            
+        Returns:
+            List of snapshot summaries
+        """
+        with self.lock:
+            history = []
+            for snapshot in list(self.snapshots)[-limit:]:
+                history.append(snapshot.to_dict())
+            return history
+    
+    def get_rollback_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get recent rollback history.
+        
+        Args:
+            limit: Maximum number of rollbacks to return
+            
+        Returns:
+            List of rollback records
+        """
+        with self.lock:
+            return list(self.rollback_history)[-limit:]
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get rollback manager metrics."""
+        with self.lock:
+            return {
+                **self.metrics,
+                'current_snapshots': len(self.snapshots),
+                'quarantine_size': len(self.quarantine),
+                'rollback_success_rate': (
+                    self.metrics['successful_rollbacks'] / 
+                    max(1, self.metrics['total_rollbacks'])
+                )
+            }
+    
+    def export_snapshot(self, snapshot_id: str, export_path: str) -> bool:
+        """
+        Export a snapshot to a file.
+        
+        Args:
+            snapshot_id: ID of snapshot to export
+            export_path: Path to export file
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        with self.lock:
+            snapshot = self.snapshot_index.get(snapshot_id)
+            if not snapshot:
+                logger.error(f"Snapshot {snapshot_id} not found for export")
+                return False
+            
+            try:
+                export_data = {
+                    'snapshot_id': snapshot.snapshot_id,
+                    'timestamp': snapshot.timestamp,
+                    'state': snapshot.state,
+                    'action_log': snapshot.action_log,
+                    'metadata': snapshot.metadata,
+                    'checksum': snapshot.checksum
+                }
+                
+                with open(export_path, 'w') as f:
+                    json.dump(export_data, f, indent=2, default=str)
+                
+                logger.info(f"Exported snapshot {snapshot_id} to {export_path}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to export snapshot: {e}")
+                return False
+    
+    def import_snapshot(self, import_path: str) -> Optional[str]:
+        """
+        Import a snapshot from a file.
+        
+        Args:
+            import_path: Path to import file
+            
+        Returns:
+            Snapshot ID if successful, None otherwise
+        """
+        try:
+            with open(import_path, 'r') as f:
+                import_data = json.load(f)
+            
+            # Create new snapshot from imported data
+            snapshot_id = self.create_snapshot(
+                state=import_data['state'],
+                action_log=import_data['action_log'],
+                metadata={
+                    **import_data.get('metadata', {}),
+                    'imported': True,
+                    'import_time': time.time(),
+                    'original_id': import_data['snapshot_id']
+                }
+            )
+            
+            logger.info(f"Imported snapshot from {import_path} as {snapshot_id}")
+            return snapshot_id
+            
+        except Exception as e:
+            logger.error(f"Failed to import snapshot: {e}")
+            return None
+    
+    def shutdown(self):
+        """Shutdown rollback manager and cleanup resources."""
+        if self._shutdown:
             return
         
-        logger.info("Shutting down VULCAN-AGI Collective...")
+        # Disable logging error output during shutdown
+        logging.raiseExceptions = False
+        
+        safe_log(logger.info, "Shutting down RollbackManager...")
+        self._shutdown = True
+        
+        # CRITICAL FIX: Signal the event to wake up sleeping thread
         self._shutdown_event.set()
         
-        # Track shutdown progress
-        shutdown_errors = []
+        # Wait for cleanup thread
+        if self.cleanup_thread and self.cleanup_thread.is_alive():
+            self.cleanup_thread.join(timeout=2.0)
         
-        # ========================================
-        # PHASE 1: Signal shutdown to all services
-        # ========================================
-        services_to_shutdown = {
-            "agent_pool": getattr(self, 'agent_pool', None),
-            "governance": getattr(self.deps, 'governance', None),
-            "safety_validator": getattr(self.deps, 'safety_validator', None),
-            "continual_learner": getattr(self.deps, 'continual', None),
-            "world_model": getattr(self.deps, 'world_model', None),
-            "meta_cognitive": getattr(self.deps, 'meta_cognitive', None),
-            "self_improvement_drive": getattr(self.deps, 'self_improvement_drive', None),
-            "distributed_coordinator": getattr(self.deps, 'distributed', None),
+        # Close database connection
+        with self.db_lock:
+            if self.conn:
+                try:
+                    self.conn.close()
+                    self.conn = None
+                except Exception as e:
+                    logger.error(f"Error closing database: {e}")
+        
+        safe_log(logger.info, "RollbackManager shutdown complete")
+
+# ============================================================
+# AUDIT LOGGER
+# ============================================================
+
+class AuditLogger:
+    """
+    Comprehensive audit logging system with redaction, rotation, and search capabilities.
+    Provides tamper-evident logging with cryptographic verification.
+    """
+    
+    # Whitelist of allowed filter fields for SQL injection protection
+    ALLOWED_FILTER_FIELDS = {
+        'entry_type', 'severity', 'action_type', 'safe', 
+        'timestamp', 'entry_id'
+    }
+    
+    # Whitelist of allowed sort fields
+    ALLOWED_SORT_FIELDS = {
+        'timestamp', 'severity', 'entry_type'
+    }
+    
+    def __init__(self, log_path: str = "safety_audit", config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize audit logger.
+        
+        Args:
+            log_path: Base path for audit logs
+            config: Additional configuration
+        """
+        self.config = config or {}
+        self.log_path = Path(log_path)
+        self.log_path.mkdir(parents=True, exist_ok=True)
+        
+        # Shutdown flag
+        self._shutdown = False
+        
+        # CRITICAL FIX: Add shutdown event for interruptible sleep
+        self._shutdown_event = threading.Event()
+        
+        # Configuration
+        self.redact_sensitive = self.config.get('redact_sensitive', True)
+        self.rotation_days = self.config.get('rotation_days', 30)
+        self.compress_old_logs = self.config.get('compress_old_logs', True)
+        self.enable_signing = self.config.get('enable_signing', True)
+        self.max_log_size_mb = self.config.get('max_log_size_mb', 100)
+        
+        # CRITICAL FIX: Configurable worker check interval (default 10s for faster shutdown)
+        # Set to 1-5 seconds in test environments, longer in production
+        self.worker_check_interval = self.config.get('worker_check_interval', 10.0)
+        
+        # CRITICAL FIX: Initialize locks BEFORE any operations that use them
+        self.lock = threading.RLock()
+        self.db_lock = threading.RLock()
+        
+        # Current log file
+        self.current_log_file = self._get_log_file()
+        
+        # Memory-aware buffer with 10MB limit
+        self.log_buffer = MemoryBoundedDeque(max_size_mb=10)
+        
+        # Add memory monitoring
+        self.memory_check_interval = 100  # Check every 100 entries
+        self.entries_since_check = 0
+        
+        self.redaction_patterns = self._initialize_redaction_patterns()
+        
+        # Hash chain for tamper detection
+        self.last_hash = self._get_last_hash()
+        
+        # SQLite database for indexing
+        self.db_path = self.log_path / 'audit_index.db'
+        self.conn = None
+        
+        # NOW it's safe to initialize database (db_lock exists)
+        self._initialize_database()
+        
+        # Metrics
+        self.metrics = {
+            'total_entries': 0,
+            'redactions': 0,
+            'rotations': 0,
+            'searches': 0,
+            'verifications': 0
         }
         
-        # CRITICAL FIX: Add rollback manager and audit logger
-        if hasattr(self.deps, 'rollback_manager'):
-            services_to_shutdown["rollback_manager"] = self.deps.rollback_manager
-        if hasattr(self.deps, 'audit_logger'):
-            services_to_shutdown["audit_logger"] = self.deps.audit_logger
+        # Rotation thread reference
+        self.rotation_thread = None
         
-        # Try to shutdown each service with timeout
-        for name, service in services_to_shutdown.items():
-            if service is None:
-                continue
-                
-            if not hasattr(service, 'shutdown') or not callable(getattr(service, 'shutdown')):
-                logger.debug(f"Service {name} has no shutdown method, skipping")
-                continue
+        # Start rotation thread
+        self._start_rotation_thread()
+        
+        # Register cleanup
+        # atexit.register(self.shutdown) # Removed for test suite compatibility
+        
+        logger.info(f"AuditLogger initialized with path: {self.log_path}")
+    
+    def _initialize_database(self):
+        """Initialize SQLite database for log indexing."""
+        with self.db_lock:
+            self.conn = sqlite3.connect(
+                str(self.db_path), 
+                check_same_thread=False,
+                isolation_level='DEFERRED',
+                timeout=30.0
+            )
             
-            try:
-                logger.debug(f"Shutting down {name}...")
-                
-                # Use threading to enforce timeout
-                shutdown_thread = threading.Thread(
-                    target=service.shutdown,
-                    name=f"shutdown_{name}",
-                    daemon=True  # Ensure it doesn't block program exit
+            self.conn.execute('''
+                CREATE TABLE IF NOT EXISTS audit_entries (
+                    entry_id TEXT PRIMARY KEY,
+                    timestamp REAL,
+                    entry_type TEXT,
+                    severity TEXT,
+                    action_type TEXT,
+                    safe INTEGER,
+                    violations TEXT,
+                    file_path TEXT,
+                    line_number INTEGER,
+                    hash TEXT
                 )
-                shutdown_thread.start()
-                shutdown_thread.join(timeout=timeout)
+            ''')
+            
+            self.conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_timestamp ON audit_entries(timestamp)
+            ''')
+            
+            self.conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_type ON audit_entries(entry_type)
+            ''')
+            
+            self.conn.execute('''
+                CREATE INDEX IF NOT EXISTS idx_severity ON audit_entries(severity)
+            ''')
+            
+            self.conn.commit()
+    
+    def _get_log_file(self) -> Path:
+        """Get current log file path based on date."""
+        date_str = datetime.now().strftime("%Y%m%d")
+        return self.log_path / f"safety_audit_{date_str}.jsonl"
+    
+    def _get_last_hash(self) -> str:
+        """Get the last hash from existing log for chain continuity."""
+        if self.current_log_file.exists():
+            try:
+                with open(self.current_log_file, 'r') as f:
+                    # Read last line
+                    last_line = None
+                    for line in f:
+                        last_line = line
+                    if last_line:
+                        entry = json.loads(last_line)
+                        return entry.get('hash', '')
+            except:
+                pass
+        return hashlib.sha256(b'genesis').hexdigest()
+    
+    def _initialize_redaction_patterns(self) -> List[Dict[str, Any]]:
+        """Initialize patterns for redacting sensitive information."""
+        patterns = [
+            {
+                'name': 'ssn',
+                'pattern': r'\b\d{3}-\d{2}-\d{4}\b',
+                'replacement': '[SSN_REDACTED]'
+            },
+            {
+                'name': 'email',
+                'pattern': r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+                'replacement': '[EMAIL_REDACTED]'
+            },
+            {
+                'name': 'credit_card',
+                'pattern': r'\b(?:\d{4}[-\s]?){3}\d{4}\b',
+                'replacement': '[CC_REDACTED]'
+            },
+            {
+                'name': 'phone',
+                'pattern': r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b',
+                'replacement': '[PHONE_REDACTED]'
+            },
+            {
+                'name': 'ip_address',
+                'pattern': r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
+                'replacement': '[IP_REDACTED]'
+            },
+            {
+                'name': 'api_key',
+                'pattern': r'\b[A-Za-z0-9]{32,}\b',
+                'replacement': '[API_KEY_REDACTED]'
+            },
+            {
+                'name': 'password',
+                'pattern': r'(?i)(password|passwd|pwd)[\s]*[=:]\s*[^\s]+',
+                'replacement': 'password=[PASSWORD_REDACTED]'
+            }
+        ]
+        
+        # Add custom patterns from config
+        custom_patterns = self.config.get('custom_redaction_patterns', [])
+        patterns.extend(custom_patterns)
+        
+        return patterns
+    
+    def log_safety_decision(self, decision: Dict[str, Any], 
+                           report: SafetyReport, 
+                           redact: bool = None) -> str:
+        """
+        Log a safety decision with full traceability.
+        
+        Args:
+            decision: Decision details
+            report: Safety report
+            redact: Whether to redact sensitive data (None = use default)
+            
+        Returns:
+            Entry ID
+        """
+        if redact is None:
+            redact = self.redact_sensitive
+        
+        entry_id = str(uuid.uuid4())
+        timestamp = time.time()
+        
+        # Prepare log entry
+        log_entry = {
+            'entry_id': entry_id,
+            'timestamp': timestamp,
+            'iso_timestamp': datetime.fromtimestamp(timestamp).isoformat(),
+            'entry_type': 'safety_decision',
+            'decision': self._redact_sensitive(decision) if redact else decision,
+            'safety_report': report.to_audit_log(),
+            'severity': self._determine_severity(report),
+            'process_info': {
+                'thread_id': threading.current_thread().ident,
+                'thread_name': threading.current_thread().name,
+                'process_id': os.getpid()
+            }
+        }
+        
+        # Add hash chain
+        if self.enable_signing:
+            with self.lock:
+                log_entry['previous_hash'] = self.last_hash
+                log_entry['hash'] = self._calculate_hash(log_entry)
+                self.last_hash = log_entry['hash']
+        
+        with self.lock:
+            # Add to buffer
+            self.log_buffer.append(log_entry)
+            self.entries_since_check += 1
+            self.metrics['total_entries'] += 1
+            
+            # Periodic flush (batch write)
+            if self.entries_since_check >= 10:  # Flush every 10 entries
+                self._flush_buffer_batch()
+                self.entries_since_check = 0
+                self._check_rotation()
+        
+        return entry_id
+    
+    def _flush_buffer_batch(self):
+        """Flush log buffer in batch for better performance."""
+        if not self.log_buffer:
+            return
+        
+        with self.log_buffer.lock:
+            entries_to_write = list(self.log_buffer.deque)
+            self.log_buffer.clear()
+        
+        if not entries_to_write:
+            return
+        
+        # Write all entries at once
+        try:
+            with open(self.current_log_file, 'a') as f:
+                for entry in entries_to_write:
+                    f.write(json.dumps(entry, default=str) + '\n')
+            
+            # Batch insert into database
+            with self.db_lock:
+                try:
+                    for entry in entries_to_write:
+                        self._index_entry(entry, -1)  # Line number not critical for index
+                    self.conn.commit()
+                except sqlite3.Error as e:
+                    logger.error(f"Database error indexing entries: {e}")
+        except Exception as e:
+            logger.error(f"Failed to flush log buffer: {e}")
+    
+    def log_event(self, event_type: str, event_data: Dict[str, Any], 
+                 severity: str = "info") -> str:
+        """
+        Log a general audit event.
+        
+        Args:
+            event_type: Type of event
+            event_data: Event data
+            severity: Event severity (debug, info, warning, error, critical)
+            
+        Returns:
+            Entry ID
+        """
+        entry_id = str(uuid.uuid4())
+        timestamp = time.time()
+        
+        log_entry = {
+            'entry_id': entry_id,
+            'timestamp': timestamp,
+            'iso_timestamp': datetime.fromtimestamp(timestamp).isoformat(),
+            'entry_type': event_type,
+            'severity': severity,
+            'event_data': self._redact_sensitive(event_data) if self.redact_sensitive else event_data
+        }
+        
+        # Add hash chain
+        if self.enable_signing:
+            with self.lock:
+                log_entry['previous_hash'] = self.last_hash
+                log_entry['hash'] = self._calculate_hash(log_entry)
+                self.last_hash = log_entry['hash']
+        
+        with self.lock:
+            self.log_buffer.append(log_entry)
+            self.entries_since_check += 1
+            self.metrics['total_entries'] += 1
+            
+            # Periodic flush
+            if self.entries_since_check >= 10:
+                self._flush_buffer_batch()
+                self.entries_since_check = 0
+                self._check_rotation()
+        
+        return entry_id
+    
+    def log_redaction(self, original: str, redacted: str, reason: str):
+        """
+        Log a redaction action for transparency.
+        
+        Args:
+            original: Original text
+            redacted: Redacted text
+            reason: Reason for redaction
+        """
+        # Hash original for reference without storing it
+        original_hash = hashlib.sha256(original.encode()).hexdigest()
+        
+        redaction_entry = {
+            'entry_id': str(uuid.uuid4()),
+            'timestamp': time.time(),
+            'entry_type': 'redaction',
+            'severity': 'info',
+            'original_hash': original_hash,
+            'redacted_value': redacted,
+            'reason': reason
+        }
+        
+        with self.lock:
+            self._write_log_entry(redaction_entry)
+            self.metrics['redactions'] += 1
+    
+    def _redact_sensitive(self, data: Any) -> Any:
+        """Redact sensitive information from data."""
+        if isinstance(data, str):
+            redacted = data
+            for pattern_info in self.redaction_patterns:
+                pattern = pattern_info['pattern']
+                replacement = pattern_info['replacement']
                 
-                if shutdown_thread.is_alive():
-                    logger.error(
-                        f"Service {name} shutdown timed out after {timeout}s. "
-                        f"Thread may still be running."
-                    )
-                    shutdown_errors.append(f"{name}: timeout")
-                else:
-                    logger.debug(f"{name} shutdown complete")
+                # Find matches
+                try:
+                    matches = re.findall(pattern, redacted)
+                    if matches:
+                        for match in matches:
+                            # Log the redaction (avoid recursion)
+                            pass  # Simplified to prevent infinite recursion
+                        
+                        # Apply redaction
+                        redacted = re.sub(pattern, replacement, redacted)
+                except Exception as e:
+                    logger.error(f"Error applying redaction pattern {pattern_info['name']}: {e}")
+            
+            return redacted
+        
+        elif isinstance(data, dict):
+            return {k: self._redact_sensitive(v) for k, v in data.items()}
+        
+        elif isinstance(data, list):
+            return [self._redact_sensitive(item) for item in data]
+        
+        return data
+    
+    def _calculate_hash(self, entry: Dict[str, Any]) -> str:
+        """Calculate cryptographic hash for log entry."""
+        # Remove hash field for calculation
+        entry_copy = {k: v for k, v in entry.items() if k != 'hash'}
+        entry_str = json.dumps(entry_copy, sort_keys=True, default=str)
+        return hashlib.sha256(entry_str.encode()).hexdigest()
+    
+    def _write_log_entry(self, entry: Dict[str, Any]) -> int:
+        """Write log entry to file and return line number."""
+        try:
+            # Get current file size
+            if self.current_log_file.exists():
+                with open(self.current_log_file, 'r') as f:
+                    line_number = sum(1 for _ in f)
+            else:
+                line_number = 0
+            
+            # Write entry
+            with open(self.current_log_file, 'a') as f:
+                f.write(json.dumps(entry, default=str) + '\n')
+            
+            return line_number
+            
+        except Exception as e:
+            logger.error(f"Failed to write audit log: {e}")
+            return -1
+    
+    def _index_entry(self, entry: Dict[str, Any], line_number: int):
+        """Index log entry in database for fast searching (must be called with db_lock held)."""
+        try:
+            # Extract key fields
+            entry_id = entry.get('entry_id', '')
+            timestamp = entry.get('timestamp', 0)
+            entry_type = entry.get('entry_type', '')
+            severity = entry.get('severity', 'info')
+            
+            # Extract from nested structures
+            action_type = ''
+            safe = None
+            violations = ''
+            
+            if 'decision' in entry:
+                action_type = str(entry['decision'].get('type', ''))
+            
+            if 'safety_report' in entry:
+                report = entry['safety_report']
+                safe = int(report.get('safe', True))
+                violations = ','.join(str(v) for v in report.get('violations', []))
+            
+            # Insert into database
+            self.conn.execute('''
+                INSERT OR REPLACE INTO audit_entries 
+                (entry_id, timestamp, entry_type, severity, action_type, 
+                 safe, violations, file_path, line_number, hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                entry_id, timestamp, entry_type, severity, action_type,
+                safe, violations, str(self.current_log_file), line_number,
+                entry.get('hash', '')
+            ))
+            
+        except Exception as e:
+            logger.error(f"Failed to index audit entry: {e}")
+    
+    def _determine_severity(self, report: SafetyReport) -> str:
+        """Determine severity level from safety report."""
+        if not report.safe:
+            if SafetyViolationType.ADVERSARIAL in report.violations:
+                return 'critical'
+            elif SafetyViolationType.COMPLIANCE in report.violations:
+                return 'error'
+            else:
+                return 'warning'
+        return 'info'
+    
+    def _check_rotation(self):
+        """Check if log rotation is needed."""
+        # Check file size
+        if self.current_log_file.exists():
+            size_mb = self.current_log_file.stat().st_size / (1024 * 1024)
+            
+            if size_mb > self.max_log_size_mb:
+                self._rotate_log()
+                return
+        
+        # Check date change
+        expected_file = self._get_log_file()
+        if expected_file != self.current_log_file:
+            self._rotate_log()
+    
+    def _rotate_log(self):
+        """Rotate current log file."""
+        logger.info(f"Rotating log file: {self.current_log_file}")
+        
+        # Compress old log if enabled
+        if self.compress_old_logs and self.current_log_file.exists():
+            self._compress_log(self.current_log_file)
+        
+        # Update current log file
+        self.current_log_file = self._get_log_file()
+        
+        # Reset hash chain for new file
+        self.last_hash = hashlib.sha256(b'genesis').hexdigest()
+        
+        # Update metrics
+        with self.lock:
+            self.metrics['rotations'] += 1
+    
+    def _compress_log(self, log_file: Path):
+        """Compress a log file."""
+        import gzip
+        
+        compressed_file = log_file.with_suffix('.jsonl.gz')
+        
+        try:
+            with open(log_file, 'rb') as f_in:
+                with gzip.open(compressed_file, 'wb', compresslevel=9) as f_out:
+                    f_out.write(f_in.read())
+            
+            # Remove original after successful compression
+            log_file.unlink()
+            
+            logger.info(f"Compressed log file: {log_file} -> {compressed_file}")
+            
+        except Exception as e:
+            logger.error(f"Failed to compress log file: {e}")
+    
+    def _start_rotation_thread(self):
+        """Start background thread for log rotation."""
+        def rotation_worker():
+            while not self._shutdown:
+                try:
+                    # CRITICAL FIX: Use configurable timeout for faster shutdown in tests
+                    # Default is 10s, can be set to 1-5s for test environments
+                    if self._shutdown_event.wait(timeout=self.worker_check_interval):
+                        break  # Shutdown requested
+                    
+                    if self._shutdown:
+                        break
+                    
+                    self._check_rotation()
+                    self._cleanup_old_logs()
+                except Exception as e:
+                    logger.error(f"Rotation thread error: {e}")
+        
+        self.rotation_thread = threading.Thread(target=rotation_worker, daemon=True, name="AuditRotation")
+        self.rotation_thread.start()
+    
+    def _cleanup_old_logs(self):
+        """Clean up old log files based on retention policy."""
+        cutoff_date = datetime.now() - timedelta(days=self.rotation_days)
+        
+        for log_file in self.log_path.glob("safety_audit_*.jsonl*"):
+            # Parse date from filename
+            try:
+                date_str = log_file.stem.split('_')[2].split('.')[0]
+                file_date = datetime.strptime(date_str, "%Y%m%d")
+                
+                if file_date < cutoff_date:
+                    log_file.unlink()
+                    logger.info(f"Deleted old log file: {log_file}")
                     
             except Exception as e:
-                logger.error(f"Error shutting down {name}: {e}", exc_info=True)
-                shutdown_errors.append(f"{name}: {str(e)}")
+                logger.error(f"Error processing log file {log_file}: {e}")
+    
+    def query_logs(self, start_time: Optional[float] = None, 
+                  end_time: Optional[float] = None,
+                  filters: Optional[Dict[str, Any]] = None,
+                  limit: int = 100,
+                  sort_by: str = 'timestamp',
+                  sort_order: str = 'DESC') -> List[Dict[str, Any]]:
+        """
+        Query audit logs with filters.
         
-        # ========================================
-        # PHASE 2: Force cleanup of any remaining threads
-        # ========================================
+        Args:
+            start_time: Start timestamp
+            end_time: End timestamp
+            filters: Additional filters
+            limit: Maximum results (1-10000)
+            sort_by: Field to sort by
+            sort_order: Sort order (ASC or DESC)
+            
+        Returns:
+            List of matching log entries
+        """
+        # CRITICAL: Validate inputs to prevent SQL injection
+        if limit < 1 or limit > 10000:
+            raise ValueError(f"Limit must be 1-10000, got {limit}")
+        
+        if sort_by not in self.ALLOWED_SORT_FIELDS:
+            raise ValueError(f"Invalid sort field: {sort_by}. Allowed: {self.ALLOWED_SORT_FIELDS}")
+        
+        if sort_order not in ('ASC', 'DESC'):
+            raise ValueError(f"Invalid sort order: {sort_order}. Must be ASC or DESC")
+        
+        with self.lock:
+            self.metrics['searches'] += 1
+            
+            # Build query with parameterized statements
+            query = 'SELECT * FROM audit_entries WHERE 1=1'
+            params = []
+            
+            if start_time:
+                query += ' AND timestamp >= ?'
+                params.append(start_time)
+            
+            if end_time:
+                query += ' AND timestamp <= ?'
+                params.append(end_time)
+            
+            if filters:
+                for key, value in filters.items():
+                    # CRITICAL: Validate field name against whitelist
+                    if key not in self.ALLOWED_FILTER_FIELDS:
+                        logger.warning(f"Ignoring invalid filter field: {key}")
+                        continue
+                    
+                    query += f' AND {key} = ?'  # Now safe since key is validated
+                    params.append(value)
+            
+            # Use validated sort field (safe from injection)
+            query += f' ORDER BY {sort_by} {sort_order} LIMIT ?'
+            params.append(limit)
+            
+            # Execute query
+            with self.db_lock:
+                try:
+                    cursor = self.conn.execute(query, params)
+                    rows = cursor.fetchall()
+                except sqlite3.Error as e:
+                    logger.error(f"Database error querying logs: {e}")
+                    return []
+            
+            # Fetch entries from files
+            results = []
+            for row in rows:
+                entry_id, timestamp, entry_type, severity, action_type, safe, \
+                violations, file_path, line_number, hash_val = row
+                
+                # Read actual entry from file
+                try:
+                    file_path = Path(file_path)
+                    if file_path.exists():
+                        with open(file_path, 'r') as f:
+                            for i, line in enumerate(f):
+                                if i == line_number or line_number == -1:
+                                    # Try to find by entry_id if line_number is -1
+                                    try:
+                                        entry = json.loads(line)
+                                        if line_number == -1:
+                                            if entry.get('entry_id') == entry_id:
+                                                results.append(entry)
+                                                break
+                                        else:
+                                            results.append(entry)
+                                            break
+                                    except json.JSONDecodeError:
+                                        continue
+                except Exception as e:
+                    logger.error(f"Error reading log entry: {e}")
+            
+            return results
+    
+    def verify_integrity(self, start_time: Optional[float] = None,
+                        end_time: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Verify integrity of audit logs using hash chain.
+        
+        Args:
+            start_time: Start timestamp for verification
+            end_time: End timestamp for verification
+            
+        Returns:
+            Verification results
+        """
+        if not self.enable_signing:
+            return {
+                'verified': False,
+                'error': 'Signing not enabled'
+            }
+        
+        with self.lock:
+            self.metrics['verifications'] += 1
+            
+            # Get entries to verify
+            entries = self.query_logs(start_time, end_time, limit=10000, sort_order='ASC')
+            
+            if not entries:
+                return {
+                    'verified': True,
+                    'entries_checked': 0
+                }
+            
+            # Verify hash chain
+            previous_hash = None
+            broken_at = None
+            
+            for i, entry in enumerate(entries):
+                if 'hash' not in entry:
+                    continue
+                
+                # Check hash
+                calculated_hash = self._calculate_hash(entry)
+                if calculated_hash != entry['hash']:
+                    broken_at = i
+                    break
+                
+                # Check chain (allow for genesis or file rotation breaks)
+                if previous_hash and entry.get('previous_hash') != previous_hash:
+                    # Check if this is a rotation boundary (genesis hash)
+                    genesis_hash = hashlib.sha256(b'genesis').hexdigest()
+                    if entry.get('previous_hash') != genesis_hash:
+                        broken_at = i
+                        break
+                
+                previous_hash = entry['hash']
+            
+            return {
+                'verified': broken_at is None,
+                'entries_checked': len(entries),
+                'broken_at': broken_at,
+                'error': f'Chain broken at entry {broken_at}' if broken_at is not None else None
+            }
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get audit logger metrics."""
+        with self.lock:
+            return {
+                **self.metrics,
+                'buffer_size': len(self.log_buffer),
+                'current_log_file': str(self.current_log_file),
+                'log_size_mb': (
+                    self.current_log_file.stat().st_size / (1024 * 1024)
+                    if self.current_log_file.exists() else 0
+                )
+            }
+    
+    def export_logs(self, export_path: str, start_time: Optional[float] = None,
+                   end_time: Optional[float] = None, format: str = 'json') -> bool:
+        """
+        Export audit logs to a file.
+        
+        Args:
+            export_path: Path for export file
+            start_time: Start timestamp
+            end_time: End timestamp
+            format: Export format (json, csv)
+            
+        Returns:
+            True if successful
+        """
         try:
-            active_threads = threading.enumerate()
+            # CRITICAL FIX: Use pagination for large exports instead of exceeding limit
+            all_entries = []
+            offset = 0
+            batch_size = 10000
             
-            # Filter for threads we care about (not main thread, not daemon)
-            worker_threads = [
-                t for t in active_threads 
-                if t != threading.main_thread() 
-                and not t.daemon
-                and t.is_alive()
-            ]
-            
-            if worker_threads:
-                logger.warning(
-                    f"Found {len(worker_threads)} non-daemon threads still running. "
-                    f"Waiting {timeout}s for cleanup..."
+            while True:
+                # Query in batches
+                batch_entries = self.query_logs(
+                    start_time=start_time, 
+                    end_time=end_time, 
+                    limit=batch_size,
+                    sort_order='ASC'
                 )
                 
-                # Give threads one more chance to finish
-                for thread in worker_threads:
-                    thread.join(timeout=timeout / max(len(worker_threads), 1))
+                if not batch_entries:
+                    break
                 
-                # Check again
-                still_alive = [t for t in worker_threads if t.is_alive()]
-                if still_alive:
-                    logger.error(
-                        f"{len(still_alive)} threads still alive after shutdown: "
-                        f"{[t.name for t in still_alive]}"
-                    )
+                all_entries.extend(batch_entries)
+                
+                # If we got fewer than batch_size, we're done
+                if len(batch_entries) < batch_size:
+                    break
+                
+                # Update start_time for next batch to avoid duplicates
+                if batch_entries:
+                    start_time = batch_entries[-1]['timestamp'] + 0.000001
+                
+                offset += batch_size
+                
+                # Safety limit to prevent infinite loops
+                if len(all_entries) >= 1000000:  # 1M entries max
+                    logger.warning("Export reached 1M entry limit")
+                    break
+            
+            entries = all_entries
+            
+            if format == 'json':
+                with open(export_path, 'w') as f:
+                    json.dump(entries, f, indent=2, default=str)
                     
+            elif format == 'csv':
+                import csv
+                
+                if entries:
+                    with open(export_path, 'w', newline='') as f:
+                        # Use first entry to get field names
+                        fieldnames = list(entries[0].keys())
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        
+                        for entry in entries:
+                            # Flatten nested structures
+                            flat_entry = {}
+                            for key, value in entry.items():
+                                if isinstance(value, (dict, list)):
+                                    flat_entry[key] = json.dumps(value)
+                                else:
+                                    flat_entry[key] = value
+                            writer.writerow(flat_entry)
+            else:
+                logger.error(f"Unsupported export format: {format}")
+                return False
+            
+            logger.info(f"Exported {len(entries)} audit entries to {export_path}")
+            return True
+            
         except Exception as e:
-            logger.error(f"Error during thread cleanup: {e}", exc_info=True)
-        
-        # ========================================
-        # PHASE 3: Clear data structures
-        # ========================================
-        try:
-            with self._lock:
-                self.reasoning_trace.clear()
-                self.execution_history.clear()
-                self.recent_errors.clear()
-                self.error_count_window.clear()
-        except Exception as e:
-            logger.error(f"Error clearing data structures: {e}")
-        
-        # ========================================
-        # PHASE 4: Force garbage collection
-        # ========================================
-        try:
-            import gc
-            gc.collect()
-        except Exception as e:
-            logger.debug(f"Error during garbage collection: {e}")
-        
-        # ========================================
-        # PHASE 5: Report results
-        # ========================================
-        if shutdown_errors:
-            logger.warning(
-                f"Collective shutdown completed with {len(shutdown_errors)} errors: "
-                f"{shutdown_errors}"
-            )
-        else:
-            logger.info("VULCAN-AGI Collective shutdown complete (no errors)")
+            logger.error(f"Failed to export audit logs: {e}")
+            return False
     
-    def __del__(self):
-        """Destructor to ensure cleanup"""
-        try:
-            if not self._shutdown_event.is_set():
-                self.shutdown()
-        except Exception as e:
-            logger.debug(f"Error in destructor: {e}")
-
-
-# ============================================================
-# MODULE EXPORTS
-# ============================================================
-
-__all__ = [
-    'VULCANAGICollective',
-    'ModalityType',
-    'ActionType'
-]
+    def get_summary(self, start_time: Optional[float] = None,
+                   end_time: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Get summary statistics of audit logs.
+        
+        Args:
+            start_time: Start timestamp
+            end_time: End timestamp
+            
+        Returns:
+            Summary statistics
+        """
+        entries = self.query_logs(start_time, end_time, limit=10000)
+        
+        summary = {
+            'total_entries': len(entries),
+            'time_range': {
+                'start': start_time or (entries[0]['timestamp'] if entries else None),
+                'end': end_time or (entries[-1]['timestamp'] if entries else None)
+            },
+            'entry_types': {},
+            'severities': {},
+            'safety_stats': {
+                'safe_decisions': 0,
+                'unsafe_decisions': 0
+            },
+            'violations': defaultdict(int)
+        }
+        
+        for entry in entries:
+            # Count entry types
+            entry_type = entry.get('entry_type', 'unknown')
+            summary['entry_types'][entry_type] = summary['entry_types'].get(entry_type, 0) + 1
+            
+            # Count severities
+            severity = entry.get('severity', 'unknown')
+            summary['severities'][severity] = summary['severities'].get(severity, 0) + 1
+            
+            # Safety statistics
+            if 'safety_report' in entry:
+                report = entry['safety_report']
+                if report.get('safe', True):
+                    summary['safety_stats']['safe_decisions'] += 1
+                else:
+                    summary['safety_stats']['unsafe_decisions'] += 1
+                
+                # Count violations
+                for violation in report.get('violations', []):
+                    summary['violations'][str(violation)] += 1
+        
+        # Convert defaultdict to regular dict for JSON serialization
+        summary['violations'] = dict(summary['violations'])
+        
+        return summary
+    
+    def shutdown(self):
+        """Shutdown audit logger and cleanup resources."""
+        if self._shutdown:
+            return
+        
+        # Disable logging error output during shutdown
+        logging.raiseExceptions = False
+        
+        safe_log(logger.info, "Shutting down AuditLogger...")
+        self._shutdown = True
+        
+        # CRITICAL FIX: Signal the event to wake up sleeping thread
+        self._shutdown_event.set()
+        
+        # Flush remaining buffer
+        self._flush_buffer_batch()
+        
+        # Wait for rotation thread
+        if self.rotation_thread and self.rotation_thread.is_alive():
+            self.rotation_thread.join(timeout=2.0)
+        
+        # Close database connection
+        with self.db_lock:
+            if self.conn:
+                try:
+                    self.conn.close()
+                    self.conn = None
+                except Exception as e:
+                    logger.error(f"Error closing database: {e}")
+        
+        safe_log(logger.info, "AuditLogger shutdown complete")
