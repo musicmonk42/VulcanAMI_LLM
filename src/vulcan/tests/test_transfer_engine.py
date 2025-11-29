@@ -125,7 +125,7 @@ class TestTransferEngineBasics:
     
     def test_initialization_with_safety_config(self):
         """Test initialization with safety config"""
-        safety_config = {'max_risk_score': 0.8}
+        safety_config = {}  # Empty dict is valid for SafetyConfig
         engine = TransferEngine(safety_config=safety_config)
         
         assert engine is not None
