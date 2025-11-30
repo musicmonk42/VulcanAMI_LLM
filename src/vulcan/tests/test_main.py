@@ -215,9 +215,41 @@ class TestAPIEndpoints:
         
         response = client.get("/health")
         
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert 'status' in data
+        assert data['status'] == 'unhealthy'
+    
+    def test_health_check_not_initialized(self, mock_deployment):
+        """Test health check when deployment not initialized returns 503."""
+        # Temporarily remove deployment to simulate uninitialized state
+        original_deployment = getattr(app.state, 'deployment', None)
+        original_worker_id = getattr(app.state, 'worker_id', None)
+        original_startup_time = getattr(app.state, 'startup_time', None)
+        
+        if hasattr(app.state, 'deployment'):
+            delattr(app.state, 'deployment')
+        
+        try:
+            with TestClient(app, raise_server_exceptions=False) as test_client:
+                # Ensure deployment is still None
+                if hasattr(app.state, 'deployment'):
+                    delattr(app.state, 'deployment')
+                
+                response = test_client.get("/health")
+                
+                assert response.status_code == 503
+                data = response.json()
+                assert data['status'] == 'unhealthy'
+                assert data['error'] == 'Deployment not initialized'
+        finally:
+            # Restore original state
+            if original_deployment is not None:
+                app.state.deployment = original_deployment
+            if original_worker_id is not None:
+                app.state.worker_id = original_worker_id
+            if original_startup_time is not None:
+                app.state.startup_time = original_startup_time
     
     def test_metrics_endpoint(self, client):
         """Test Prometheus metrics endpoint."""
@@ -1051,7 +1083,7 @@ class TestErrorHandling:
         
         response = client.get("/health")
         
-        assert response.status_code == 200
+        assert response.status_code == 503
         data = response.json()
         assert data['status'] == 'unhealthy'
 

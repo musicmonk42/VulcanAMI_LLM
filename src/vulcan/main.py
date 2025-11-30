@@ -1260,10 +1260,11 @@ async def metrics():
     return Response(generate_latest(), media_type="text/plain")
 
 @app.get("/health")
-async def health_check():
+async def health_check(response: Response):
     """Comprehensive health check endpoint."""
     try:
-        if not hasattr(app.state, 'deployment'):
+        if not hasattr(app.state, 'deployment') or app.state.deployment is None:
+            response.status_code = 503
             return {
                 "status": "unhealthy",
                 "error": "Deployment not initialized",
@@ -1293,6 +1294,9 @@ async def health_check():
         
         healthy = all(health_checks.values())
         
+        if not healthy:
+            response.status_code = 503
+        
         return {
             "status": "healthy" if healthy else "unhealthy",
             "checks": health_checks,
@@ -1302,6 +1306,7 @@ async def health_check():
         
     except Exception as e:
         logger.error(f"Health check failed: {e}")
+        response.status_code = 503
         return {
             "status": "unhealthy",
             "error": str(e),
