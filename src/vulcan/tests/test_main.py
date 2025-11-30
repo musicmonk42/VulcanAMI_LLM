@@ -232,7 +232,8 @@ class TestAPIEndpoints:
         
         try:
             with TestClient(app, raise_server_exceptions=False) as test_client:
-                # Ensure deployment is still None
+                # TestClient lifespan may re-set deployment, so check/remove again
+                # This is necessary because the lifespan manager may restore state
                 if hasattr(app.state, 'deployment'):
                     delattr(app.state, 'deployment')
                 
