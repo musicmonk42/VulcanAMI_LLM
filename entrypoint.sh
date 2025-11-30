@@ -1,8 +1,10 @@
-#!/usr/bin/env sh
+#!/bin/sh
 # Hardened runtime entrypoint for Graphix / Vulcan platform
 # Validates presence & strength of JWT secrets before starting.
 
-set -euo pipefail
+# Use POSIX-compliant shell options only
+# -e: exit on error, -u: treat unset variables as error
+set -eu
 
 echo "Container startup at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
