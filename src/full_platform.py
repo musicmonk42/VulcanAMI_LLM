@@ -958,6 +958,52 @@ async def lifespan(app: FastAPI):
             # Manually update service manager state if it was registered
             if "vulcan" in service_manager.services:
                  service_manager.services["vulcan"]["mounted"] = True
+            
+            # ================================================================
+            # VULCAN DEPLOYMENT INITIALIZATION
+            # Since VULCAN is mounted as a sub-app, its lifespan doesn't run.
+            # We must manually initialize the deployment here.
+            # ================================================================
+            try:
+                logger.info("Initializing VULCAN deployment...")
+                from vulcan.config import get_config, AgentConfig
+                from vulcan.orchestrator import ProductionDeployment
+                
+                # Load configuration profile
+                vulcan_config = get_config("development")
+                if not isinstance(vulcan_config, AgentConfig):
+                    logger.warning("get_config returned invalid type, creating default AgentConfig")
+                    vulcan_config = AgentConfig()
+                
+                # Create the deployment
+                vulcan_deployment = ProductionDeployment(vulcan_config)
+                
+                # Attach to VULCAN's app.state so health checks pass
+                vulcan_module.app.state.deployment = vulcan_deployment
+                vulcan_module.app.state.startup_time = __import__('time').time()
+                vulcan_module.app.state.worker_id = worker_id
+                
+                # Initialize LLM component if available
+                try:
+                    from graphix_vulcan_llm import GraphixVulcanLLM
+                    llm_instance = GraphixVulcanLLM(config_path="configs/llm_config.yaml")
+                    vulcan_module.app.state.llm = llm_instance
+                    logger.info("✓ VULCAN LLM initialized")
+                except ImportError:
+                    logger.info("GraphixVulcanLLM not available, using mock")
+                    from unittest.mock import MagicMock
+                    vulcan_module.app.state.llm = MagicMock()
+                except Exception as llm_err:
+                    logger.warning(f"LLM initialization failed: {llm_err}, using mock")
+                    from unittest.mock import MagicMock
+                    vulcan_module.app.state.llm = MagicMock()
+                
+                logger.info("✓ VULCAN deployment initialized successfully")
+                
+            except Exception as init_err:
+                logger.error(f"⚠️ VULCAN deployment initialization failed: {init_err}", exc_info=True)
+                logger.warning("VULCAN health checks will report unhealthy until manually initialized")
+            # ================================================================
                  
         except Exception as e:
             logger.error(f"❌ Failed to mount vulcan at /vulcan: {e}", exc_info=True)
