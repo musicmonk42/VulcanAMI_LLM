@@ -208,8 +208,25 @@ try:
     from language_evolution_registry import LanguageEvolutionRegistry
     REGISTRY_AVAILABLE = True
 except ImportError:
-    LanguageEvolutionRegistry = None
-    REGISTRY_AVAILABLE = False
+    # LanguageEvolutionRegistry is in specs/formal_grammar/ - add to path and retry
+    try:
+        _specs_path = Path(__file__).resolve().parent.parent / "specs" / "formal_grammar"
+        if str(_specs_path) not in sys.path:
+            sys.path.insert(0, str(_specs_path))
+        from language_evolution_registry import LanguageEvolutionRegistry
+        REGISTRY_AVAILABLE = True
+    except ImportError:
+        LanguageEvolutionRegistry = None
+        REGISTRY_AVAILABLE = False
+
+# Import registry backends for initialization (needed for v4.0.0+ API)
+try:
+    from language_evolution_registry import InMemoryBackend, DevelopmentKMS
+    REGISTRY_BACKENDS_AVAILABLE = True
+except ImportError:
+    InMemoryBackend = None
+    DevelopmentKMS = None
+    REGISTRY_BACKENDS_AVAILABLE = False
 
 # DataAugmentor
 try:
@@ -553,7 +570,32 @@ class GraphixArena:
         
         # Optional components
         self.llm_models = {}
-        self.registry = LanguageEvolutionRegistry() if REGISTRY_AVAILABLE and LanguageEvolutionRegistry else None
+        
+        # Initialize registry with backends (v4.0.0+ API requires backend and kms)
+        self.registry = None
+        if REGISTRY_AVAILABLE and LanguageEvolutionRegistry:
+            if REGISTRY_BACKENDS_AVAILABLE and InMemoryBackend and DevelopmentKMS:
+                try:
+                    backend = InMemoryBackend()
+                    kms = DevelopmentKMS()
+                    self.registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
+                    logger.info("✅ LanguageEvolutionRegistry initialized with InMemoryBackend")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize LanguageEvolutionRegistry with backends: {e}")
+                    self.registry = None
+            else:
+                # Try legacy initialization (for older versions that don't require backend/kms)
+                try:
+                    self.registry = LanguageEvolutionRegistry()
+                    logger.info("✅ LanguageEvolutionRegistry initialized (legacy mode)")
+                except TypeError:
+                    # v4.0.0+ requires backend/kms but we couldn't import them
+                    logger.warning("LanguageEvolutionRegistry v4.0.0+ requires backend and kms arguments - backends not available for import")
+                    self.registry = None
+                except Exception as e:
+                    logger.warning(f"Failed to initialize LanguageEvolutionRegistry: {e}")
+                    self.registry = None
+        
         self.data_augmentor = DataAugmentor() if AUGMENTOR_AVAILABLE and DataAugmentor else None
         self.drift_detector = DriftDetector() if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
         self.tournament_manager = TournamentManager() if TOURNAMENT_AVAILABLE and TournamentManager else None

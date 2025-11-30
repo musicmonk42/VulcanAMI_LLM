@@ -50,7 +50,43 @@ try:
 except ImportError:
     pass  # dotenv not available, rely on system environment variables
 
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+# Try to import tenacity for retry logic, handle gracefully if not available
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+    TENACITY_AVAILABLE = True
+except ImportError:
+    TENACITY_AVAILABLE = False
+    
+    # Create a no-op decorator as fallback when tenacity is not installed.
+    # This enables the @retry(...) decorator syntax to work without tenacity.
+    #
+    # Handles two decorator usage patterns:
+    # 1. @retry - decorator without parentheses (args[0] is the function)
+    # 2. @retry(...) - decorator with arguments (returns a decorator)
+    def retry(*args, **kwargs):
+        """No-op retry decorator when tenacity is not installed."""
+        def decorator(func):
+            return func
+        # Pattern 1: @retry - first arg is the decorated function itself
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+        # Pattern 2: @retry(...) - return a decorator that will receive the function
+        return decorator
+    
+    # No-op functions for tenacity configuration parameters.
+    # These are passed as arguments to retry() and their return values
+    # are ignored by the no-op retry decorator above.
+    def stop_after_attempt(attempts):
+        """No-op stop condition."""
+        return None
+    
+    def wait_exponential(**kwargs):
+        """No-op wait strategy."""
+        return None
+    
+    def retry_if_exception_type(exception_types):
+        """No-op retry condition."""
+        return None
 
 # Try to import OpenAI, handle gracefully if not available
 try:
