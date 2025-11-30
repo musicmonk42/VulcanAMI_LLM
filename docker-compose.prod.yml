@@ -2,9 +2,9 @@
 # VulcanAMI Production Environment - Docker Compose
 # Version: 1.0.0
 # Description: Production-ready stack with security hardening
+#
+# Note: The 'version' attribute is omitted as it's obsolete in Docker Compose v2+
 ################################################################################
-
-version: "3.9"
 
 ################################################################################
 # Networks

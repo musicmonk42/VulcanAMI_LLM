@@ -406,7 +406,16 @@ validate-cicd: ## Validate CI/CD, Docker, and reproducibility configuration
 validate-docker: ## Validate Docker and Docker Compose configurations
 	@echo "$(GREEN)Validating Docker configurations...$(NC)"
 	docker compose -f $(DOCKER_COMPOSE_DEV) config > /dev/null && echo "$(GREEN)✓ docker-compose.dev.yml is valid$(NC)"
-	docker compose -f $(DOCKER_COMPOSE_PROD) config > /dev/null && echo "$(GREEN)✓ docker-compose.prod.yml is valid$(NC)"
+	@# Production compose requires env vars; use dummy values for validation syntax check
+	@# Note: These values are for syntax validation only and meet minimum length requirements
+	@JWT_SECRET_KEY=dummy-jwt-secret-key-for-validation-only-32-chars-minimum \
+	 BOOTSTRAP_KEY=dummy-bootstrap-key-for-validation-only-32-chars-min \
+	 POSTGRES_PASSWORD=dummy-postgres-password-validation-32char \
+	 REDIS_PASSWORD=dummy-redis-password-validation-32chars \
+	 MINIO_ROOT_USER=minioadmin \
+	 MINIO_ROOT_PASSWORD=dummy-minio-password-validation-32char \
+	 GRAFANA_PASSWORD=dummy-grafana-password-validation-32chars \
+	 docker compose -f $(DOCKER_COMPOSE_PROD) config > /dev/null && echo "$(GREEN)✓ docker-compose.prod.yml is valid$(NC)"
 
 .PHONY: generate-hashed-requirements
 generate-hashed-requirements: ## Generate requirements-hashed.txt with SHA256 hashes

@@ -3,9 +3,9 @@
 # Version: 4.6.0
 # Description: Complete development stack with all services, monitoring,
 #              and development tools
+#
+# Note: The 'version' attribute is omitted as it's obsolete in Docker Compose v2+
 ################################################################################
-
-version: "3.9"
 
 ################################################################################
 # Networks
