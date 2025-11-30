@@ -20,7 +20,7 @@ output "environment" {
 
 output "version" {
   description = "VulcanAMI version"
-  value       = var.version
+  value       = var.vulcanami_version
 }
 
 output "aws_account_id" {
@@ -602,10 +602,10 @@ output "cloudfront_url" {
 output "database_connection_info" {
   description = "Database connection information"
   value = var.enable_rds ? {
-    endpoint  = aws_db_instance.main[0].endpoint
-    port      = aws_db_instance.main[0].port
-    database  = aws_db_instance.main[0].db_name
-    username  = aws_db_instance.main[0].username
+    endpoint   = aws_db_instance.main[0].endpoint
+    port       = aws_db_instance.main[0].port
+    database   = aws_db_instance.main[0].db_name
+    username   = aws_db_instance.main[0].username
     secret_arn = aws_secretsmanager_secret.rds_password[0].arn
   } : null
   sensitive = true
@@ -616,7 +616,7 @@ output "redis_connection_info" {
   value = var.enable_redis ? {
     primary_endpoint = aws_elasticache_replication_group.main[0].primary_endpoint_address
     reader_endpoint  = aws_elasticache_replication_group.main[0].reader_endpoint_address
-    port            = aws_elasticache_replication_group.main[0].port
+    port             = aws_elasticache_replication_group.main[0].port
   } : null
   sensitive = true
 }
@@ -628,21 +628,21 @@ output "redis_connection_info" {
 output "infrastructure_summary" {
   description = "Summary of deployed infrastructure"
   value = {
-    project             = var.project
-    environment         = var.environment
-    version             = var.version
-    primary_region      = var.primary_region
-    secondary_region    = var.secondary_region
-    vpc_id              = aws_vpc.main.id
-    vpc_cidr            = aws_vpc.main.cidr_block
-    availability_zones  = local.azs
-    rds_enabled         = var.enable_rds
-    redis_enabled       = var.enable_redis
-    ecs_enabled         = var.enable_ecs
-    cloudfront_enabled  = var.enable_cloudfront
-    backup_enabled      = var.enable_aws_backup
-    cloudtrail_enabled  = var.enable_cloudtrail
-    waf_enabled         = var.enable_cloudfront_waf
+    project            = var.project
+    environment        = var.environment
+    version            = var.vulcanami_version
+    primary_region     = var.primary_region
+    secondary_region   = var.secondary_region
+    vpc_id             = aws_vpc.main.id
+    vpc_cidr           = aws_vpc.main.cidr_block
+    availability_zones = local.azs
+    rds_enabled        = var.enable_rds
+    redis_enabled      = var.enable_redis
+    ecs_enabled        = var.enable_ecs
+    cloudfront_enabled = var.enable_cloudfront
+    backup_enabled     = var.enable_aws_backup
+    cloudtrail_enabled = var.enable_cloudtrail
+    waf_enabled        = var.enable_cloudfront_waf
   }
 }
 
@@ -676,13 +676,13 @@ output "terraform_version" {
 output "quick_reference" {
   description = "Quick reference URLs for common operations"
   value = {
-    s3_console            = "https://s3.console.aws.amazon.com/s3/buckets/${local.bucket_primary}"
-    cloudfront_console    = var.enable_cloudfront ? "https://console.aws.amazon.com/cloudfront/v3/home#/distributions/${aws_cloudfront_distribution.cdn[0].id}" : null
-    rds_console           = var.enable_rds ? "https://console.aws.amazon.com/rds/home?region=${var.primary_region}#database:id=${aws_db_instance.main[0].id}" : null
-    elasticache_console   = var.enable_redis ? "https://console.aws.amazon.com/elasticache/home?region=${var.primary_region}#redis-group-nodes:id=${aws_elasticache_replication_group.main[0].id}" : null
-    ecs_console           = var.enable_ecs ? "https://console.aws.amazon.com/ecs/home?region=${var.primary_region}#/clusters/${aws_ecs_cluster.main[0].name}" : null
-    cloudwatch_console    = "https://console.aws.amazon.com/cloudwatch/home?region=${var.primary_region}"
-    vpc_console           = "https://console.aws.amazon.com/vpc/home?region=${var.primary_region}#vpcs:VpcId=${aws_vpc.main.id}"
+    s3_console          = "https://s3.console.aws.amazon.com/s3/buckets/${local.bucket_primary}"
+    cloudfront_console  = var.enable_cloudfront ? "https://console.aws.amazon.com/cloudfront/v3/home#/distributions/${aws_cloudfront_distribution.cdn[0].id}" : null
+    rds_console         = var.enable_rds ? "https://console.aws.amazon.com/rds/home?region=${var.primary_region}#database:id=${aws_db_instance.main[0].id}" : null
+    elasticache_console = var.enable_redis ? "https://console.aws.amazon.com/elasticache/home?region=${var.primary_region}#redis-group-nodes:id=${aws_elasticache_replication_group.main[0].id}" : null
+    ecs_console         = var.enable_ecs ? "https://console.aws.amazon.com/ecs/home?region=${var.primary_region}#/clusters/${aws_ecs_cluster.main[0].name}" : null
+    cloudwatch_console  = "https://console.aws.amazon.com/cloudwatch/home?region=${var.primary_region}"
+    vpc_console         = "https://console.aws.amazon.com/vpc/home?region=${var.primary_region}#vpcs:VpcId=${aws_vpc.main.id}"
   }
 }
 
@@ -692,7 +692,7 @@ output "quick_reference" {
 
 output "next_steps" {
   description = "Recommended next steps after deployment"
-  value = <<-EOT
+  value       = <<-EOT
     VulcanAMI Infrastructure Deployment Complete!
     
     Next Steps:

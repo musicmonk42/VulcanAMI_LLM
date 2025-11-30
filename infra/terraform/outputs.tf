@@ -20,7 +20,7 @@ output "environment" {
 
 output "version" {
   description = "VulcanAMI version"
-  value       = var.version
+  value       = var.vulcanami_version
 }
 
 output "aws_account_id" {
@@ -580,7 +580,7 @@ output "infrastructure_summary" {
   value = {
     project            = var.project
     environment        = var.environment
-    version            = var.version
+    version            = var.vulcanami_version
     primary_region     = var.primary_region
     secondary_region   = var.secondary_region
     vpc_id             = aws_vpc.main.id
