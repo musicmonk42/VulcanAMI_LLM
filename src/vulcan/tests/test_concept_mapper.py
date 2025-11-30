@@ -119,7 +119,9 @@ class TestConceptMapperBasics:
     
     def test_initialization_with_safety_config(self):
         """Test initialization with safety config"""
-        safety_config = {'max_risk_score': 0.8}
+        # FIXED: Use empty dict instead of invalid parameter 'max_risk_score'
+        # SafetyConfig doesn't have a 'max_risk_score' parameter
+        safety_config = {}
         mapper = ConceptMapper(safety_config=safety_config)
         
         # Should initialize without error
