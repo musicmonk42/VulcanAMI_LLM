@@ -208,8 +208,16 @@ try:
     from language_evolution_registry import LanguageEvolutionRegistry
     REGISTRY_AVAILABLE = True
 except ImportError:
-    LanguageEvolutionRegistry = None
-    REGISTRY_AVAILABLE = False
+    # LanguageEvolutionRegistry is in specs/formal_grammar/ - add to path and retry
+    try:
+        _specs_path = Path(__file__).resolve().parent.parent / "specs" / "formal_grammar"
+        if str(_specs_path) not in sys.path:
+            sys.path.insert(0, str(_specs_path))
+        from language_evolution_registry import LanguageEvolutionRegistry
+        REGISTRY_AVAILABLE = True
+    except ImportError:
+        LanguageEvolutionRegistry = None
+        REGISTRY_AVAILABLE = False
 
 # DataAugmentor
 try:

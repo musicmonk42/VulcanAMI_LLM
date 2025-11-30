@@ -50,7 +50,21 @@ try:
 except ImportError:
     pass  # dotenv not available, rely on system environment variables
 
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+# Try to import tenacity for retry logic, handle gracefully if not available
+try:
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+    TENACITY_AVAILABLE = True
+except ImportError:
+    TENACITY_AVAILABLE = False
+    # Create a no-op decorator as fallback when tenacity is not installed
+    def retry(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+    # Provide dummy values for the other imports used in decorator
+    stop_after_attempt = lambda x: None
+    wait_exponential = lambda **kwargs: None
+    retry_if_exception_type = lambda x: None
 
 # Try to import OpenAI, handle gracefully if not available
 try:
