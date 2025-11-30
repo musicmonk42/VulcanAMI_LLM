@@ -563,9 +563,9 @@ output "database_connection_info" {
 output "redis_connection_info" {
   description = "Redis connection information"
   value = var.enable_redis ? {
-    primary_endpoint = aws_elasticache_replication_group.main[0].primary_endpoint_address
-    reader_endpoint  = aws_elasticache_replication_group.main[0].reader_endpoint_address
-    port             = aws_elasticache_replication_group.main[0].port
+    primary_endpoint      = aws_elasticache_replication_group.main[0].primary_endpoint_address
+    reader_endpoint       = aws_elasticache_replication_group.main[0].reader_endpoint_address
+    port                  = aws_elasticache_replication_group.main[0].port
     auth_token_secret_arn = aws_secretsmanager_secret.redis_auth_token[0].arn
   } : null
   sensitive = true
@@ -642,7 +642,7 @@ output "quick_reference" {
 
 output "next_steps" {
   description = "Recommended next steps after deployment"
-  value = <<-EOT
+  value       = <<-EOT
     VulcanAMI Infrastructure Deployment Complete!
     
     Next Steps:

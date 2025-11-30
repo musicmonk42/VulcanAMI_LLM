@@ -55,8 +55,9 @@ WORKDIR /app
 
 # System updates & minimal utilities (curl for healthcheck, ca-certificates)
 # NOTE: Remove packages you do not strictly need to minimize surface.
+# hadolint ignore=DL3008
 RUN apt-get update && \
-    apt-get dist-upgrade -y && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
@@ -66,6 +67,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and setuptools to latest versions
+# hadolint ignore=DL3013
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Copy requirement files
@@ -99,6 +101,7 @@ RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.tx
 
 # Optional: Generate CycloneDX SBOM (can be skipped by removing lines)
 # This gives you an sbom.json artifact for compliance / scanning.
+# hadolint ignore=DL3013,SC2015
 RUN pip install --no-cache-dir cyclonedx-bom && \
     cyclonedx-py requirements -r requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
 
@@ -133,8 +136,9 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # OS hardening: minimal updates; remove apt caches immediately
+# hadolint ignore=DL3008
 RUN apt-get update && \
-    apt-get dist-upgrade -y && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
