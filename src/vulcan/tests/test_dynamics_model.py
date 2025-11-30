@@ -20,6 +20,7 @@ import numpy as np
 import time
 import threading
 from typing import Dict, Any, List
+from unittest.mock import Mock, patch
 
 # FIXED: Correct import path for vulcan project structure
 from vulcan.world_model.dynamics_model import (
@@ -37,6 +38,33 @@ from vulcan.world_model.dynamics_model import (
     DynamicsApplier,
     Prediction
 )
+
+
+# ============================================================================
+# Mock Safety Validator (prevents background thread creation)
+# ============================================================================
+
+@pytest.fixture(scope="module", autouse=True)
+def mock_safety_validator():
+    """
+    Mock EnhancedSafetyValidator to prevent spawning 70+ background threads.
+    
+    Without this mock, each DynamicsModel instance creates:
+    - 50+ rollback_audit rotation_worker threads
+    - 10+ rollback_audit cleanup_worker threads  
+    - 2+ distributed.py monitor_loop threads
+    
+    These threads never get cleaned up and cause timeouts in performance tests.
+    """
+    mock_validator_instance = Mock()
+    mock_validator_instance.analyze_observation_safety.return_value = {"safe": True}
+    mock_validator_instance.validate_state_vector.return_value = {"safe": True}
+    mock_validator_instance.clamp_to_safe_region.side_effect = lambda state_vec, *args, **kwargs: state_vec
+    
+    mock_validator_class = Mock(return_value=mock_validator_instance)
+    
+    with patch('vulcan.safety.safety_validator.EnhancedSafetyValidator', mock_validator_class):
+        yield mock_validator_class
 
 
 # ============================================================================
