@@ -17,6 +17,7 @@ import time
 import threading
 from collections import defaultdict
 from typing import Dict, Any
+from unittest.mock import Mock, patch
 
 # FIXED: Correct import paths for vulcan project structure
 from vulcan.world_model.correlation_tracker import (
@@ -32,6 +33,55 @@ from vulcan.world_model.correlation_tracker import (
     CausalityTracker,
     BaselineTracker
 )
+
+
+# ============================================================================
+# Thread Leak Prevention - Mock Safety Validator
+# ============================================================================
+
+@pytest.fixture(scope="module", autouse=True)
+def mock_safety_validator():
+    """
+    Mock EnhancedSafetyValidator to prevent spawning 70+ background threads.
+    
+    Without this mock, each CorrelationTracker instance creates:
+    - 50+ rollback_audit rotation_worker threads
+    - 10+ rollback_audit cleanup_worker threads  
+    - 2+ distributed.py monitor_loop threads
+    
+    CRITICAL: The lazy import may have already run during module import.
+    We need to FORCE it to run first, then replace with our mock.
+    """
+    # Import the module
+    import vulcan.world_model.correlation_tracker as ct_module
+    
+    # Force the lazy import to complete if it hasn't already
+    # This ensures EnhancedSafetyValidator is loaded (not None)
+    if ct_module.EnhancedSafetyValidator is None:
+        ct_module._lazy_import_safety_validator()
+    
+    # NOW it's definitely loaded. Save the original.
+    original_validator = ct_module.EnhancedSafetyValidator
+    original_config = ct_module.SafetyConfig
+    
+    # Create mock
+    mock_validator_instance = Mock()
+    mock_validator_instance.analyze_observation_safety.return_value = {"safe": True}
+    mock_validator_instance.validate_state_vector.return_value = {"safe": True}
+    mock_validator_instance.clamp_to_safe_region.side_effect = lambda state_vec, *args, **kwargs: state_vec
+    
+    mock_validator_class = Mock(return_value=mock_validator_instance)
+    
+    # Replace with mock - this prevents future lazy imports from running
+    # because the check `if EnhancedSafetyValidator is None` will be False
+    ct_module.EnhancedSafetyValidator = mock_validator_class
+    ct_module.SafetyConfig = Mock  # Also mock SafetyConfig
+    
+    yield mock_validator_class
+    
+    # Restore originals after all tests in module
+    ct_module.EnhancedSafetyValidator = original_validator
+    ct_module.SafetyConfig = original_config
 
 
 # ============================================================================
@@ -968,7 +1018,8 @@ class TestPerformance:
         
         # FIXED: Use performance_tracker (no safety overhead) + reduced iterations
         assert elapsed < 5, f"Should process 100 updates quickly (took {elapsed}s)"
-        assert performance_tracker.observation_count == 1000
+        # FIXED: Loop runs 100 times (line 956), not 1000
+        assert performance_tracker.observation_count == 100
     
     def test_many_variables(self):
         """Test scalability with many variables"""
