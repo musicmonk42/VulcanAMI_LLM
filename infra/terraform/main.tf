@@ -108,7 +108,7 @@ locals {
     {
       "Project"     = var.project
       "Environment" = var.environment
-      "Version"     = var.version
+      "Version"     = var.vulcanami_version
       "Owner"       = var.owner
       "CostCenter"  = var.cost_center
       "ManagedBy"   = "Terraform"

@@ -30,13 +30,13 @@ variable "environment" {
   }
 }
 
-variable "version" {
+variable "vulcanami_version" {
   description = "VulcanAMI version for tagging and resource identification"
   type        = string
   default     = "4.6.0"
 
   validation {
-    condition     = can(regex("^\\d+\\.\\d+\\.\\d+$", var.version))
+    condition     = can(regex("^\\d+\\.\\d+\\.\\d+$", var.vulcanami_version))
     error_message = "Version must follow semantic versioning format (e.g., 4.6.0)."
   }
 }

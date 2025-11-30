@@ -88,31 +88,31 @@ data "aws_ami" "amazon_linux_2" {
 locals {
   # Resource naming
   name_prefix = "${var.project}-${var.environment}"
-  
+
   # Bucket names
   bucket_primary         = "${var.bucket_prefix}-${var.primary_region}-${var.environment}"
   bucket_secondary       = "${var.bucket_prefix}-${var.secondary_region}-${var.environment}"
   bucket_logs            = "${var.bucket_prefix}-logs-${var.primary_region}-${var.environment}"
   bucket_cloudfront_logs = "${var.bucket_prefix}-cf-logs-${var.primary_region}-${var.environment}"
   bucket_backups         = "${var.bucket_prefix}-backups-${var.primary_region}-${var.environment}"
-  
+
   # Network configuration
-  azs             = slice(data.aws_availability_zones.available.names, 0, var.availability_zones)
-  private_subnets = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k)]
-  public_subnets  = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k + 10)]
+  azs              = slice(data.aws_availability_zones.available.names, 0, var.availability_zones)
+  private_subnets  = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k)]
+  public_subnets   = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k + 10)]
   database_subnets = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k + 20)]
-  
+
   # Common tags
   common_tags = merge(
     {
-      "Project"        = var.project
-      "Environment"    = var.environment
-      "Version"        = var.version
-      "Owner"          = var.owner
-      "CostCenter"     = var.cost_center
-      "ManagedBy"      = "Terraform"
-      "Contact"        = var.contact_email
-      "LastUpdated"    = timestamp()
+      "Project"     = var.project
+      "Environment" = var.environment
+      "Version"     = var.vulcanami_version
+      "Owner"       = var.owner
+      "CostCenter"  = var.cost_center
+      "ManagedBy"   = "Terraform"
+      "Contact"     = var.contact_email
+      "LastUpdated" = timestamp()
     },
     var.tag_compliance,
     var.additional_tags
@@ -139,19 +139,19 @@ resource "aws_default_security_group" "main" {
 
   # Restrict ingress to self only
   ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
     description = "Restrict default SG ingress to self"
   }
 
   # Restrict egress to self only
   egress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
     description = "Restrict default SG egress to self"
   }
 
@@ -270,11 +270,11 @@ resource "aws_route_table_association" "private" {
 
 # VPC Flow Logs
 resource "aws_flow_log" "main" {
-  count                = var.enable_vpc_flow_logs ? 1 : 0
-  iam_role_arn         = aws_iam_role.vpc_flow_logs[0].arn
-  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs[0].arn
-  traffic_type         = "ALL"
-  vpc_id               = aws_vpc.main.id
+  count                    = var.enable_vpc_flow_logs ? 1 : 0
+  iam_role_arn             = aws_iam_role.vpc_flow_logs[0].arn
+  log_destination          = aws_cloudwatch_log_group.vpc_flow_logs[0].arn
+  traffic_type             = "ALL"
+  vpc_id                   = aws_vpc.main.id
   max_aggregation_interval = 600
 
   tags = merge(local.common_tags, {
@@ -296,7 +296,7 @@ resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
 
 resource "aws_security_group" "alb" {
   name_description = "${local.name_prefix}-alb-sg"
-  vpc_id      = aws_vpc.main.id
+  vpc_id           = aws_vpc.main.id
 
   ingress {
     from_port   = 80
@@ -326,7 +326,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs_tasks" {
   name_description = "${local.name_prefix}-ecs-tasks-sg"
-  vpc_id      = aws_vpc.main.id
+  vpc_id           = aws_vpc.main.id
 
   ingress {
     from_port       = 0
@@ -627,12 +627,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     expiration {
       days = var.lifecycle_expiration_days
     }
-    
+
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
   }
-  
+
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
@@ -814,7 +814,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
     expiration {
       days = 365
     }
-    
+
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
@@ -852,7 +852,7 @@ resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   is_ipv6_enabled     = var.enable_ipv6
   http_version        = var.enable_http3 ? "http3" : (var.enable_http2 ? "http2" : "http1.1")
-  comment             = "${local.name_prefix} v${var.version} CDN"
+  comment             = "${local.name_prefix} v${var.vulcanami_version} CDN"
   aliases             = concat([var.domain_name], var.additional_domains)
   default_root_object = ""
   price_class         = var.cloudfront_price_class
@@ -864,7 +864,7 @@ resource "aws_cloudfront_distribution" "cdn" {
 
     custom_header {
       name  = "X-Pack-Version"
-      value = var.version
+      value = var.vulcanami_version
     }
   }
 
@@ -913,9 +913,9 @@ resource "aws_cloudfront_distribution" "cdn" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = var.ssl_certificate_arn != "" ? var.ssl_certificate_arn : null
-    ssl_support_method       = var.ssl_certificate_arn != "" ? "sni-only" : null
-    minimum_protocol_version = var.minimum_tls_version
+    acm_certificate_arn            = var.ssl_certificate_arn != "" ? var.ssl_certificate_arn : null
+    ssl_support_method             = var.ssl_certificate_arn != "" ? "sni-only" : null
+    minimum_protocol_version       = var.minimum_tls_version
     cloudfront_default_certificate = var.ssl_certificate_arn == "" ? true : false
   }
 
@@ -986,17 +986,17 @@ resource "aws_secretsmanager_secret_version" "rds_password" {
 }
 
 resource "aws_db_instance" "main" {
-  count                  = var.enable_rds ? 1 : 0
-  identifier             = "${local.name_prefix}-db"
-  engine                 = "postgres"
-  engine_version         = var.rds_engine_version
-  instance_class         = var.rds_instance_class
-  allocated_storage      = var.rds_allocated_storage
-  max_allocated_storage  = var.rds_max_allocated_storage
-  storage_type           = "gp3"
-  storage_encrypted      = true
-  kms_key_id             = aws_kms_key.rds[0].arn
-  
+  count                 = var.enable_rds ? 1 : 0
+  identifier            = "${local.name_prefix}-db"
+  engine                = "postgres"
+  engine_version        = var.rds_engine_version
+  instance_class        = var.rds_instance_class
+  allocated_storage     = var.rds_allocated_storage
+  max_allocated_storage = var.rds_max_allocated_storage
+  storage_type          = "gp3"
+  storage_encrypted     = true
+  kms_key_id            = aws_kms_key.rds[0].arn
+
   db_name  = "vulcanami"
   username = "admin"
   password = random_password.rds_password[0].result
@@ -1007,14 +1007,14 @@ resource "aws_db_instance" "main" {
   publicly_accessible    = false
   multi_az               = var.rds_multi_az
 
-  backup_retention_period      = var.rds_backup_retention_days
-  backup_window                = var.rds_backup_window
-  maintenance_window           = var.rds_maintenance_window
-  auto_minor_version_upgrade   = true
-  deletion_protection          = var.rds_deletion_protection
-  skip_final_snapshot          = false
-  final_snapshot_identifier    = "${local.name_prefix}-db-final-snapshot"
-  copy_tags_to_snapshot        = true
+  backup_retention_period    = var.rds_backup_retention_days
+  backup_window              = var.rds_backup_window
+  maintenance_window         = var.rds_maintenance_window
+  auto_minor_version_upgrade = true
+  deletion_protection        = var.rds_deletion_protection
+  skip_final_snapshot        = false
+  final_snapshot_identifier  = "${local.name_prefix}-db-final-snapshot"
+  copy_tags_to_snapshot      = true
 
   performance_insights_enabled    = var.rds_performance_insights_enabled
   performance_insights_kms_key_id = aws_kms_key.rds[0].arn
@@ -1161,22 +1161,22 @@ resource "aws_ecs_task_definition" "dqs" {
 
   container_definitions = jsonencode([{
     name  = "dqs"
-    image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.primary_region}.amazonaws.com/${local.name_prefix}-dqs:${var.version}"
-    
+    image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.primary_region}.amazonaws.com/${local.name_prefix}-dqs:${var.vulcanami_version}"
+
     essential = true
-    
+
     portMappings = [{
       containerPort = 8080
       protocol      = "tcp"
     }]
-    
+
     environment = [
       { name = "POSTGRES_HOST", value = var.enable_rds ? aws_db_instance.main[0].address : "" },
       { name = "REDIS_HOST", value = var.enable_redis ? aws_elasticache_replication_group.main[0].primary_endpoint_address : "" },
       { name = "ENVIRONMENT", value = var.environment },
-      { name = "VERSION", value = var.version }
+      { name = "VERSION", value = var.vulcanami_version }
     ]
-    
+
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -1237,16 +1237,16 @@ resource "aws_ecs_task_definition" "opa" {
   container_definitions = jsonencode([{
     name  = "opa"
     image = "openpolicyagent/opa:0.65.0"
-    
+
     essential = true
-    
+
     command = ["run", "--server", "--addr=0.0.0.0:8181"]
-    
+
     portMappings = [{
       containerPort = 8181
       protocol      = "tcp"
     }]
-    
+
     logConfiguration = {
       logDriver = "awslogs"
       options = {
