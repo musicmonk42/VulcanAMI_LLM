@@ -56,20 +56,26 @@ try:
     TENACITY_AVAILABLE = True
 except ImportError:
     TENACITY_AVAILABLE = False
-    # Create a no-op decorator as fallback when tenacity is not installed
-    # This allows the @retry(...) decorator to work without tenacity
+    
+    # Create a no-op decorator as fallback when tenacity is not installed.
+    # This enables the @retry(...) decorator syntax to work without tenacity.
+    #
+    # Handles two decorator usage patterns:
+    # 1. @retry - decorator without parentheses (args[0] is the function)
+    # 2. @retry(...) - decorator with arguments (returns a decorator)
     def retry(*args, **kwargs):
         """No-op retry decorator when tenacity is not installed."""
         def decorator(func):
             return func
-        # Handle both @retry and @retry() usage patterns
+        # Pattern 1: @retry - first arg is the decorated function itself
         if len(args) == 1 and callable(args[0]):
             return args[0]
+        # Pattern 2: @retry(...) - return a decorator that will receive the function
         return decorator
     
-    # Provide no-op functions for the tenacity configuration parameters
-    # These are used as arguments to retry() and can return any value
-    # since they're ignored by the no-op retry decorator
+    # No-op functions for tenacity configuration parameters.
+    # These are passed as arguments to retry() and their return values
+    # are ignored by the no-op retry decorator above.
     def stop_after_attempt(attempts):
         """No-op stop condition."""
         return None

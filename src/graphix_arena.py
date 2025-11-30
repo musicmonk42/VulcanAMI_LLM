@@ -584,12 +584,13 @@ class GraphixArena:
                     logger.warning(f"Failed to initialize LanguageEvolutionRegistry with backends: {e}")
                     self.registry = None
             else:
-                # Try legacy initialization (for older versions)
+                # Try legacy initialization (for older versions that don't require backend/kms)
                 try:
                     self.registry = LanguageEvolutionRegistry()
                     logger.info("✅ LanguageEvolutionRegistry initialized (legacy mode)")
                 except TypeError:
-                    logger.warning("LanguageEvolutionRegistry requires backend and kms, but backends not available")
+                    # v4.0.0+ requires backend/kms but we couldn't import them
+                    logger.warning("LanguageEvolutionRegistry v4.0.0+ requires backend and kms arguments - backends not available for import")
                     self.registry = None
                 except Exception as e:
                     logger.warning(f"Failed to initialize LanguageEvolutionRegistry: {e}")
