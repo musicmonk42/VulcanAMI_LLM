@@ -58,8 +58,9 @@ def _lazy_import_world_model():
             from .world_model_core import WorldModel
             logger.info("Lazy-loaded WorldModel in CorrelationTracker")
         except ImportError as e:
-            logger.critical(f"Failed to lazy-load WorldModel for circular dependency: {e}")
-            raise
+            # Allow standalone usage without WorldModel
+            logger.debug(f"WorldModel not available (standalone mode): {e}")
+            WorldModel = None  # Mark as attempted but unavailable
 
 # Protected imports with fallbacks
 try:
@@ -1001,31 +1002,92 @@ class DataBuffer:
         self.window_size = window_size
         self.buffers = defaultdict(lambda: deque(maxlen=window_size))
         self.lock = threading.Lock()
+        # Cache for numpy arrays - invalidated on add
+        self._array_cache = {}
+        self._cache_valid = {}
 
     def add(self, variable: str, value: float):
         """Add value to buffer"""
 
         with self.lock:
             self.buffers[variable].append(value)
+            # Invalidate cache for this variable
+            self._cache_valid[variable] = False
+
+    def add_batch(self, data: Dict[str, float]):
+        """Add multiple values at once (more efficient)"""
+        
+        with self.lock:
+            for variable, value in data.items():
+                self.buffers[variable].append(value)
+                self._cache_valid[variable] = False
 
     def get(self, variable: str) -> np.ndarray:
         """Get buffer as array"""
 
         with self.lock:
-            return np.array(self.buffers[variable])
+            if self._cache_valid.get(variable, False):
+                return self._array_cache[variable]
+            
+            arr = np.array(self.buffers[variable])
+            self._array_cache[variable] = arr
+            self._cache_valid[variable] = True
+            return arr
+
+    def get_length(self, variable: str) -> int:
+        """Get buffer length without creating array"""
+        
+        with self.lock:
+            return len(self.buffers[variable])
 
     def get_pair(self, var_a: str, var_b: str) -> Tuple[np.ndarray, np.ndarray]:
         """Get aligned data for two variables"""
 
         with self.lock:
-            data_a = list(self.buffers[var_a])
-            data_b = list(self.buffers[var_b])
-
-            min_len = min(len(data_a), len(data_b))
+            len_a = len(self.buffers[var_a])
+            len_b = len(self.buffers[var_b])
+            min_len = min(len_a, len_b)
+            
             if min_len == 0:
                 return np.array([]), np.array([])
 
-            return np.array(data_a[-min_len:]), np.array(data_b[-min_len:])
+            # Use cached arrays if valid, otherwise create new ones
+            if self._cache_valid.get(var_a, False):
+                data_a = self._array_cache[var_a][-min_len:]
+            else:
+                data_a = np.array(list(self.buffers[var_a])[-min_len:])
+            
+            if self._cache_valid.get(var_b, False):
+                data_b = self._array_cache[var_b][-min_len:]
+            else:
+                data_b = np.array(list(self.buffers[var_b])[-min_len:])
+
+            return data_a, data_b
+
+    def get_all_as_matrix(self, variables: List[str]) -> Tuple[np.ndarray, int]:
+        """Get all variable data as a matrix for batch processing.
+        
+        Returns:
+            Tuple of (matrix of shape [min_len, n_vars], min_len)
+        """
+        with self.lock:
+            if not variables:
+                return np.array([[]]), 0
+            
+            # Find minimum length
+            min_len = min(len(self.buffers[var]) for var in variables)
+            
+            if min_len == 0:
+                return np.array([[]]), 0
+            
+            # Build matrix efficiently
+            matrix = np.empty((min_len, len(variables)))
+            for i, var in enumerate(variables):
+                buf = self.buffers[var]
+                # Get last min_len elements
+                matrix[:, i] = list(buf)[-min_len:]
+            
+            return matrix, min_len
 
     def get_multiple(self, variables: List[str]) -> Dict[str, np.ndarray]:
         """Get aligned data for multiple variables"""
@@ -1279,9 +1341,17 @@ class BaselineTracker:
 class CorrelationMatrix:
     """Manages correlation matrix operations"""
 
-    def __init__(self, max_variables: int = 1000):
-        """Initialize correlation matrix"""
+    def __init__(self, max_variables: int = 1000, update_interval: int = 1):
+        """Initialize correlation matrix
+        
+        Args:
+            max_variables: Maximum number of variables to track
+            update_interval: Number of updates before recalculating correlations
+                            (higher = better performance, lower = fresher correlations)
+        """
         self.max_variables = max_variables
+        self.update_interval = update_interval
+        self._update_counter = 0
 
         self.calculator = CorrelationCalculator()
         self.storage = CorrelationStorage(max_variables=max_variables)
@@ -1306,12 +1376,19 @@ class CorrelationMatrix:
                         continue
                     self.variables.add(var)
 
-            for var, value in new_data.items():
-                if var in self.variables:
-                    self.data_buffer.add(var, value)
-                    self.stats_tracker.update(var, value)
+            # Use batch add for efficiency
+            filtered_data = {var: value for var, value in new_data.items() if var in self.variables}
+            self.data_buffer.add_batch(filtered_data)
+            
+            for var, value in filtered_data.items():
+                self.stats_tracker.update(var, value)
 
-            self._update_correlations(new_data)
+            self._update_counter += 1
+            
+            # Only recalculate correlations periodically based on update_interval
+            if self._update_counter >= self.update_interval:
+                self._update_correlations_batch(filtered_data)
+                self._update_counter = 0
 
     def get_correlation(self, var_a: str, var_b: str) -> Optional[float]:
         """Get correlation between two variables"""
@@ -1378,8 +1455,78 @@ class CorrelationMatrix:
 
             return cov_matrix
 
+    def _update_correlations_batch(self, new_data: Dict[str, float]):
+        """Update correlations using batch processing for efficiency"""
+        
+        variables = list(new_data.keys())
+        n_vars = len(variables)
+        
+        if n_vars < 2:
+            return
+        
+        # Get all data as a matrix for efficient processing
+        matrix, min_len = self.data_buffer.get_all_as_matrix(variables)
+        
+        if min_len < 3:
+            return
+        
+        # Calculate correlations using numpy's corrcoef for efficiency
+        # This is O(n²) but highly optimized
+        try:
+            # corrcoef returns correlation matrix
+            corr_matrix = np.corrcoef(matrix, rowvar=False)
+            
+            # Extract pairwise correlations
+            for i in range(n_vars):
+                for j in range(i + 1, n_vars):
+                    corr = corr_matrix[i, j]
+                    
+                    if not np.isnan(corr):
+                        var_a = variables[i]
+                        var_b = variables[j]
+                        
+                        # Calculate p-value using the sample size
+                        p_value = self._calculate_p_value(corr, min_len)
+                        
+                        self.storage.store(var_a, var_b, float(corr), p_value, min_len)
+                        self.change_detector.update(var_a, var_b, float(corr))
+        except (np.linalg.LinAlgError, ValueError) as e:
+            # Fall back to pairwise calculation if batch fails
+            logger.debug(f"Batch correlation failed, falling back to pairwise: {e}")
+            self._update_correlations(new_data)
+
+    def _calculate_p_value(self, r: float, n: int) -> float:
+        """Calculate p-value for Pearson correlation"""
+        
+        if n <= 2:
+            return 1.0
+        
+        if abs(r) >= 1.0:
+            return 0.0
+        
+        # t-statistic
+        df = n - 2
+        t_stat = r * sqrt(df / (1.0 - r * r))
+        
+        # Use scipy if available, otherwise approximate
+        if SCIPY_AVAILABLE:
+            try:
+                p_value = 2.0 * (1.0 - t_dist.cdf(abs(t_stat), df))
+                return float(p_value)
+            except:
+                pass
+        
+        # Approximate using normal distribution for large df
+        if df > 30:
+            # For large df, t-distribution approximates normal
+            p_value = 2.0 * (1.0 - 0.5 * (1.0 + erf(abs(t_stat) / sqrt(2.0))))
+            return max(0.0, min(1.0, p_value))
+        
+        # Use robust implementation for small df
+        return 2.0 * RobustPearsonCorrelation._t_cdf_complement(abs(t_stat), df)
+
     def _update_correlations(self, new_data: Dict[str, float]):
-        """Update correlations for new data"""
+        """Update correlations for new data (fallback pairwise method)"""
 
         variables = list(new_data.keys())
 
@@ -1555,7 +1702,7 @@ class CorrelationTracker:
 
                 p_value = self.correlation_matrix.get_p_value(var_a, var_b)
 
-                if p_value and p_value < self.significance_level:
+                if p_value is not None and p_value < self.significance_level:
                     entry = CorrelationEntry(
                         var_a=var_a,
                         var_b=var_b,
