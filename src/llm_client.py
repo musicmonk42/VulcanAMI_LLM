@@ -57,14 +57,30 @@ try:
 except ImportError:
     TENACITY_AVAILABLE = False
     # Create a no-op decorator as fallback when tenacity is not installed
+    # This allows the @retry(...) decorator to work without tenacity
     def retry(*args, **kwargs):
+        """No-op retry decorator when tenacity is not installed."""
         def decorator(func):
             return func
+        # Handle both @retry and @retry() usage patterns
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
         return decorator
-    # Provide dummy values for the other imports used in decorator
-    stop_after_attempt = lambda x: None
-    wait_exponential = lambda **kwargs: None
-    retry_if_exception_type = lambda x: None
+    
+    # Provide no-op functions for the tenacity configuration parameters
+    # These are used as arguments to retry() and can return any value
+    # since they're ignored by the no-op retry decorator
+    def stop_after_attempt(attempts):
+        """No-op stop condition."""
+        return None
+    
+    def wait_exponential(**kwargs):
+        """No-op wait strategy."""
+        return None
+    
+    def retry_if_exception_type(exception_types):
+        """No-op retry condition."""
+        return None
 
 # Try to import OpenAI, handle gracefully if not available
 try:

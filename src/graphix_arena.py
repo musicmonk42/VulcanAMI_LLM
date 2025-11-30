@@ -219,6 +219,15 @@ except ImportError:
         LanguageEvolutionRegistry = None
         REGISTRY_AVAILABLE = False
 
+# Import registry backends for initialization (needed for v4.0.0+ API)
+try:
+    from language_evolution_registry import InMemoryBackend, DevelopmentKMS
+    REGISTRY_BACKENDS_AVAILABLE = True
+except ImportError:
+    InMemoryBackend = None
+    DevelopmentKMS = None
+    REGISTRY_BACKENDS_AVAILABLE = False
+
 # DataAugmentor
 try:
     from data_augmentor import DataAugmentor
@@ -561,7 +570,31 @@ class GraphixArena:
         
         # Optional components
         self.llm_models = {}
-        self.registry = LanguageEvolutionRegistry() if REGISTRY_AVAILABLE and LanguageEvolutionRegistry else None
+        
+        # Initialize registry with backends (v4.0.0+ API requires backend and kms)
+        self.registry = None
+        if REGISTRY_AVAILABLE and LanguageEvolutionRegistry:
+            if REGISTRY_BACKENDS_AVAILABLE and InMemoryBackend and DevelopmentKMS:
+                try:
+                    backend = InMemoryBackend()
+                    kms = DevelopmentKMS()
+                    self.registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
+                    logger.info("✅ LanguageEvolutionRegistry initialized with InMemoryBackend")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize LanguageEvolutionRegistry with backends: {e}")
+                    self.registry = None
+            else:
+                # Try legacy initialization (for older versions)
+                try:
+                    self.registry = LanguageEvolutionRegistry()
+                    logger.info("✅ LanguageEvolutionRegistry initialized (legacy mode)")
+                except TypeError:
+                    logger.warning("LanguageEvolutionRegistry requires backend and kms, but backends not available")
+                    self.registry = None
+                except Exception as e:
+                    logger.warning(f"Failed to initialize LanguageEvolutionRegistry: {e}")
+                    self.registry = None
+        
         self.data_augmentor = DataAugmentor() if AUGMENTOR_AVAILABLE and DataAugmentor else None
         self.drift_detector = DriftDetector() if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
         self.tournament_manager = TournamentManager() if TOURNAMENT_AVAILABLE and TournamentManager else None
