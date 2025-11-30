@@ -1236,10 +1236,9 @@ class CodeLLMClient:
     """Production wrapper for the LLM API, using OpenAI's structure."""
     
     def __init__(self, api_key: str):
+        self.api_key = api_key
         if not api_key:
             logger.error("VULCAN_LLM_API_KEY is missing. LLM calls will fail.")
-            # Set API key to MagicMock to prevent initialization error, but calls will likely fail.
-            self.api_key = api_key 
         else:
             openai.api_key = api_key
         
