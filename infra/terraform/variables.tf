@@ -221,7 +221,7 @@ variable "allowed_ip_ranges" {
     WARNING: Using ["0.0.0.0/0"] allows unrestricted internet access
   EOT
   type        = list(string)
-  default     = []  # Empty default requires explicit IP range specification
+  default     = [] # Empty default requires explicit IP range specification
 
   validation {
     condition = alltrue([
@@ -1092,7 +1092,7 @@ variable "alarm_email_endpoints" {
 variable "cloudwatch_retention_days" {
   description = "CloudWatch Logs retention in days. Note: Production deployments enforce minimum 365 days regardless of this value."
   type        = number
-  default     = 365  # Changed default to 365 to match enforced minimum
+  default     = 365 # Changed default to 365 to match enforced minimum
 
   validation {
     condition = contains([

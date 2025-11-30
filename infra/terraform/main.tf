@@ -88,7 +88,7 @@ data "aws_ami" "amazon_linux_2" {
 locals {
   # Resource naming
   name_prefix = "${var.project}-${var.environment}"
-  
+
   # Bucket names
   bucket_primary         = "${var.bucket_prefix}-${var.primary_region}-${var.environment}"
   bucket_secondary       = "${var.bucket_prefix}-${var.secondary_region}-${var.environment}"
@@ -96,24 +96,24 @@ locals {
   bucket_logs_secondary  = "${var.bucket_prefix}-logs-${var.secondary_region}-${var.environment}"
   bucket_cloudfront_logs = "${var.bucket_prefix}-cf-logs-${var.primary_region}-${var.environment}"
   bucket_backups         = "${var.bucket_prefix}-backups-${var.primary_region}-${var.environment}"
-  
+
   # Network configuration
-  azs             = slice(data.aws_availability_zones.available.names, 0, var.availability_zones)
-  private_subnets = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k)]
-  public_subnets  = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k + 10)]
+  azs              = slice(data.aws_availability_zones.available.names, 0, var.availability_zones)
+  private_subnets  = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k)]
+  public_subnets   = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k + 10)]
   database_subnets = [for k, v in local.azs : cidrsubnet(var.vpc_cidr, 4, k + 20)]
-  
+
   # Common tags
   common_tags = merge(
     {
-      "Project"        = var.project
-      "Environment"    = var.environment
-      "Version"        = var.version
-      "Owner"          = var.owner
-      "CostCenter"     = var.cost_center
-      "ManagedBy"      = "Terraform"
-      "Contact"        = var.contact_email
-      "LastUpdated"    = timestamp()
+      "Project"     = var.project
+      "Environment" = var.environment
+      "Version"     = var.version
+      "Owner"       = var.owner
+      "CostCenter"  = var.cost_center
+      "ManagedBy"   = "Terraform"
+      "Contact"     = var.contact_email
+      "LastUpdated" = timestamp()
     },
     var.tag_compliance,
     var.additional_tags
@@ -140,19 +140,19 @@ resource "aws_default_security_group" "main" {
 
   # Restrict ingress to self only
   ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
     description = "Restrict default SG ingress to self"
   }
 
   # Restrict egress to self only
   egress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
     description = "Restrict default SG egress to self"
   }
 
@@ -174,7 +174,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = local.public_subnets[count.index]
   availability_zone       = local.azs[count.index]
-  map_public_ip_on_launch = false  # Fixed: Don't auto-assign public IPs
+  map_public_ip_on_launch = false # Fixed: Don't auto-assign public IPs
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-public-${local.azs[count.index]}"
@@ -271,11 +271,11 @@ resource "aws_route_table_association" "private" {
 
 # VPC Flow Logs
 resource "aws_flow_log" "main" {
-  count                = var.enable_vpc_flow_logs ? 1 : 0
-  iam_role_arn         = aws_iam_role.vpc_flow_logs[0].arn
-  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs[0].arn
-  traffic_type         = "ALL"
-  vpc_id               = aws_vpc.main.id
+  count                    = var.enable_vpc_flow_logs ? 1 : 0
+  iam_role_arn             = aws_iam_role.vpc_flow_logs[0].arn
+  log_destination          = aws_cloudwatch_log_group.vpc_flow_logs[0].arn
+  traffic_type             = "ALL"
+  vpc_id                   = aws_vpc.main.id
   max_aggregation_interval = 600
 
   tags = merge(local.common_tags, {
@@ -290,7 +290,7 @@ resource "aws_kms_key" "logs" {
   enable_key_rotation     = var.kms_key_rotation
 
   tags = merge(local.common_tags, {
-    Name = "${local.name_prefix}-logs-kms"
+    Name    = "${local.name_prefix}-logs-kms"
     Purpose = "CloudWatch Logs Encryption"
   })
 }
@@ -303,8 +303,8 @@ resource "aws_kms_alias" "logs" {
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   count             = var.enable_vpc_flow_logs ? 1 : 0
   name              = "${local.name_prefix}-vpc-flow-logs"
-  retention_in_days = max(var.cloudwatch_retention_days, 365)  # Fixed: Minimum 1 year retention
-  kms_key_id        = aws_kms_key.logs.arn  # Fixed: Added KMS encryption
+  retention_in_days = max(var.cloudwatch_retention_days, 365) # Fixed: Minimum 1 year retention
+  kms_key_id        = aws_kms_key.logs.arn                    # Fixed: Added KMS encryption
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-vpc-flow-logs"
@@ -317,27 +317,27 @@ resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
 
 resource "aws_security_group" "alb" {
   name        = "${local.name_prefix}-alb-sg"
-  description = "Security group for Application Load Balancer"  # Fixed: Added description
+  description = "Security group for Application Load Balancer" # Fixed: Added description
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "HTTPS from allowed IPs"  # Fixed: Added description
+    description = "HTTPS from allowed IPs" # Fixed: Added description
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = var.allowed_ip_ranges  # Fixed: Using configured IP ranges instead of 0.0.0.0/0
+    cidr_blocks = var.allowed_ip_ranges # Fixed: Using configured IP ranges instead of 0.0.0.0/0
   }
 
   ingress {
-    description = "HTTP from allowed IPs for redirect"  # Fixed: Added description
+    description = "HTTP from allowed IPs for redirect" # Fixed: Added description
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.allowed_ip_ranges  # Fixed: Using configured IP ranges
+    cidr_blocks = var.allowed_ip_ranges # Fixed: Using configured IP ranges
   }
 
   egress {
-    description = "Allow all outbound traffic"  # Fixed: Added description
+    description = "Allow all outbound traffic" # Fixed: Added description
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -351,19 +351,19 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "${local.name_prefix}-ecs-tasks-sg"
-  description = "Security group for ECS tasks"  # Fixed: Added description
+  description = "Security group for ECS tasks" # Fixed: Added description
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Traffic from ALB"  # Fixed: Added description
+    description     = "Traffic from ALB" # Fixed: Added description
     from_port       = 0
     to_port         = 65535
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]  # Fixed: Only from ALB, not from anywhere
+    security_groups = [aws_security_group.alb.id] # Fixed: Only from ALB, not from anywhere
   }
 
   egress {
-    description = "Allow all outbound traffic"  # Fixed: Added description
+    description = "Allow all outbound traffic" # Fixed: Added description
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -378,11 +378,11 @@ resource "aws_security_group" "ecs_tasks" {
 resource "aws_security_group" "rds" {
   count       = var.enable_rds ? 1 : 0
   name        = "${local.name_prefix}-rds-sg"
-  description = "Security group for RDS database"  # Fixed: Added description
+  description = "Security group for RDS database" # Fixed: Added description
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "PostgreSQL from ECS tasks"  # Fixed: Added description
+    description     = "PostgreSQL from ECS tasks" # Fixed: Added description
     from_port       = var.rds_port
     to_port         = var.rds_port
     protocol        = "tcp"
@@ -397,11 +397,11 @@ resource "aws_security_group" "rds" {
 resource "aws_security_group" "redis" {
   count       = var.enable_redis ? 1 : 0
   name        = "${local.name_prefix}-redis-sg"
-  description = "Security group for Redis ElastiCache"  # Fixed: Added description
+  description = "Security group for Redis ElastiCache" # Fixed: Added description
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Redis from ECS tasks"  # Fixed: Added description
+    description     = "Redis from ECS tasks" # Fixed: Added description
     from_port       = var.redis_port
     to_port         = var.redis_port
     protocol        = "tcp"
@@ -484,7 +484,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "primary" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3.arn  # Fixed: Using KMS instead of AES256
+      kms_master_key_id = aws_kms_key.s3.arn # Fixed: Using KMS instead of AES256
       sse_algorithm     = "aws:kms"
     }
   }
@@ -594,7 +594,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "secondary" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3.arn  # Fixed: Using KMS
+      kms_master_key_id = aws_kms_key.s3.arn # Fixed: Using KMS
       sse_algorithm     = "aws:kms"
     }
   }
@@ -640,7 +640,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "logs" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3.arn  # Fixed: Using KMS
+      kms_master_key_id = aws_kms_key.s3.arn # Fixed: Using KMS
       sse_algorithm     = "aws:kms"
     }
   }
@@ -666,7 +666,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     expiration {
       days = 365
     }
-    
+
     # Add noncurrent version expiration for compliance
     noncurrent_version_expiration {
       noncurrent_days = 30
@@ -722,7 +722,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "logs_secondary" {
     apply_server_side_encryption_by_default {
       # Note: Using default AWS-managed key (SSE-S3) for cross-region compatibility
       # For customer-managed keys, create a separate KMS key in secondary region
-      sse_algorithm     = "AES256"
+      sse_algorithm = "AES256"
     }
   }
 }
@@ -748,7 +748,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs_secondary" {
     expiration {
       days = 365
     }
-    
+
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
@@ -770,7 +770,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs_secondary" {
 
 data "aws_iam_policy_document" "primary_bucket" {
   statement {
-    sid = "EnforceSecureTransport"
+    sid    = "EnforceSecureTransport"
     effect = "Deny"
     principals {
       type        = "*"
@@ -943,7 +943,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
     expiration {
       days = 365
     }
-    
+
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
@@ -1023,7 +1023,7 @@ resource "aws_cloudfront_distribution" "cdn" {
   enabled             = true
   is_ipv6_enabled     = var.enable_ipv6
   comment             = "CloudFront distribution for ${local.name_prefix}"
-  default_root_object = "index.html"  # Fixed: Added default root object
+  default_root_object = "index.html" # Fixed: Added default root object
   price_class         = var.cloudfront_price_class
   aliases             = concat([var.domain_name], var.additional_domains)
   web_acl_id          = var.enable_cloudfront_waf ? aws_wafv2_web_acl.cloudfront[0].arn : null
@@ -1066,7 +1066,7 @@ resource "aws_cloudfront_distribution" "cdn" {
   default_cache_behavior {
     allowed_methods  = var.cloudfront_allowed_methods
     cached_methods   = var.cloudfront_cached_methods
-    target_origin_id = "S3-origin-group"  # Fixed: Using origin group for failover
+    target_origin_id = "S3-origin-group" # Fixed: Using origin group for failover
 
     forwarded_values {
       query_string = var.cloudfront_forward_query_string
@@ -1078,7 +1078,7 @@ resource "aws_cloudfront_distribution" "cdn" {
       headers = var.cloudfront_forward_headers
     }
 
-    viewer_protocol_policy = "redirect-to-https"  # Fixed: Always redirect to HTTPS
+    viewer_protocol_policy = "redirect-to-https" # Fixed: Always redirect to HTTPS
     min_ttl                = var.cloudfront_min_ttl
     default_ttl            = var.cloudfront_default_ttl
     max_ttl                = var.cloudfront_max_ttl
@@ -1101,8 +1101,8 @@ resource "aws_cloudfront_distribution" "cdn" {
   viewer_certificate {
     cloudfront_default_certificate = var.acm_certificate_arn == "" ? true : false
     acm_certificate_arn            = var.acm_certificate_arn != "" ? var.acm_certificate_arn : null
-    ssl_support_method              = var.acm_certificate_arn != "" ? "sni-only" : null
-    minimum_protocol_version        = "TLSv1.2_2021"  # Fixed: Using TLS 1.2 minimum
+    ssl_support_method             = var.acm_certificate_arn != "" ? "sni-only" : null
+    minimum_protocol_version       = "TLSv1.2_2021" # Fixed: Using TLS 1.2 minimum
   }
 
   logging_config {
@@ -1144,7 +1144,7 @@ resource "aws_secretsmanager_secret" "rds_password" {
   name                    = "${local.name_prefix}-rds-password"
   description             = "Password for RDS database"
   recovery_window_in_days = 30
-  kms_key_id              = aws_kms_key.rds[0].arn  # Fixed: Added KMS encryption for secrets
+  kms_key_id              = aws_kms_key.rds[0].arn # Fixed: Added KMS encryption for secrets
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-rds-password"
@@ -1174,34 +1174,34 @@ resource "aws_db_subnet_group" "main" {
 }
 
 resource "aws_db_instance" "main" {
-  count                     = var.enable_rds ? 1 : 0
-  identifier                = "${local.name_prefix}-db"
-  engine                    = var.rds_engine
-  engine_version            = var.rds_engine_version
-  instance_class            = var.rds_instance_class
-  allocated_storage         = var.rds_allocated_storage
-  max_allocated_storage     = var.rds_max_allocated_storage
-  storage_type              = var.rds_storage_type
-  storage_encrypted         = true
-  kms_key_id                = aws_kms_key.rds[0].arn
-  db_name                   = var.rds_database_name
-  username                  = var.rds_username
-  password                  = random_password.rds[0].result
-  port                      = var.rds_port
-  multi_az                  = var.rds_multi_az
-  publicly_accessible       = false
-  backup_retention_period   = var.rds_backup_retention_period
-  backup_window             = var.rds_backup_window
-  maintenance_window        = var.rds_maintenance_window
-  auto_minor_version_upgrade = var.rds_auto_minor_version_upgrade
-  deletion_protection       = var.rds_deletion_protection
-  skip_final_snapshot       = var.environment == "dev" ? true : false
-  final_snapshot_identifier = var.environment == "dev" ? null : "${local.name_prefix}-db-final-snapshot"
-  copy_tags_to_snapshot     = true
-  db_subnet_group_name      = aws_db_subnet_group.main[0].name
-  vpc_security_group_ids    = [aws_security_group.rds[0].id]
-  enabled_cloudwatch_logs_exports = var.rds_cloudwatch_logs_exports
-  iam_database_authentication_enabled = true  # Fixed: Enabled IAM authentication
+  count                               = var.enable_rds ? 1 : 0
+  identifier                          = "${local.name_prefix}-db"
+  engine                              = var.rds_engine
+  engine_version                      = var.rds_engine_version
+  instance_class                      = var.rds_instance_class
+  allocated_storage                   = var.rds_allocated_storage
+  max_allocated_storage               = var.rds_max_allocated_storage
+  storage_type                        = var.rds_storage_type
+  storage_encrypted                   = true
+  kms_key_id                          = aws_kms_key.rds[0].arn
+  db_name                             = var.rds_database_name
+  username                            = var.rds_username
+  password                            = random_password.rds[0].result
+  port                                = var.rds_port
+  multi_az                            = var.rds_multi_az
+  publicly_accessible                 = false
+  backup_retention_period             = var.rds_backup_retention_period
+  backup_window                       = var.rds_backup_window
+  maintenance_window                  = var.rds_maintenance_window
+  auto_minor_version_upgrade          = var.rds_auto_minor_version_upgrade
+  deletion_protection                 = var.rds_deletion_protection
+  skip_final_snapshot                 = var.environment == "dev" ? true : false
+  final_snapshot_identifier           = var.environment == "dev" ? null : "${local.name_prefix}-db-final-snapshot"
+  copy_tags_to_snapshot               = true
+  db_subnet_group_name                = aws_db_subnet_group.main[0].name
+  vpc_security_group_ids              = [aws_security_group.rds[0].id]
+  enabled_cloudwatch_logs_exports     = var.rds_cloudwatch_logs_exports
+  iam_database_authentication_enabled = true # Fixed: Enabled IAM authentication
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-db"
@@ -1209,13 +1209,13 @@ resource "aws_db_instance" "main" {
 }
 
 resource "aws_db_instance" "read_replica" {
-  count                     = var.enable_rds && var.rds_create_read_replica ? 1 : 0
-  identifier                = "${local.name_prefix}-db-read-replica"
-  replicate_source_db       = aws_db_instance.main[0].identifier
-  instance_class            = var.rds_instance_class
-  publicly_accessible       = false
+  count                      = var.enable_rds && var.rds_create_read_replica ? 1 : 0
+  identifier                 = "${local.name_prefix}-db-read-replica"
+  replicate_source_db        = aws_db_instance.main[0].identifier
+  instance_class             = var.rds_instance_class
+  publicly_accessible        = false
   auto_minor_version_upgrade = var.rds_auto_minor_version_upgrade
-  copy_tags_to_snapshot     = true
+  copy_tags_to_snapshot      = true
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-db-read-replica"
@@ -1276,7 +1276,7 @@ resource "aws_kms_alias" "redis" {
 resource "random_password" "redis_auth_token" {
   count   = var.enable_redis ? 1 : 0
   length  = 32
-  special = true  # Redis supports special characters in auth tokens
+  special = true # Redis supports special characters in auth tokens
 }
 
 resource "aws_secretsmanager_secret" "redis_auth_token" {
@@ -1308,9 +1308,9 @@ resource "aws_elasticache_replication_group" "main" {
   subnet_group_name          = aws_elasticache_subnet_group.main[0].name
   security_group_ids         = [aws_security_group.redis[0].id]
   at_rest_encryption_enabled = true
-  transit_encryption_enabled = true  # Fixed: Enabled transit encryption
-  auth_token                 = random_password.redis_auth_token[0].result  # Fixed: Added auth token
-  kms_key_id                 = aws_kms_key.redis[0].arn  # Fixed: Added KMS key
+  transit_encryption_enabled = true                                       # Fixed: Enabled transit encryption
+  auth_token                 = random_password.redis_auth_token[0].result # Fixed: Added auth token
+  kms_key_id                 = aws_kms_key.redis[0].arn                   # Fixed: Added KMS key
   automatic_failover_enabled = var.redis_automatic_failover
   multi_az_enabled           = var.redis_multi_az
   num_cache_clusters         = var.redis_num_cache_clusters
@@ -1336,8 +1336,8 @@ resource "aws_elasticache_replication_group" "main" {
 resource "aws_cloudwatch_log_group" "redis" {
   count             = var.enable_redis ? 1 : 0
   name              = "${local.name_prefix}-redis-logs"
-  retention_in_days = max(var.cloudwatch_retention_days, 365)  # Fixed: Minimum 1 year retention
-  kms_key_id        = aws_kms_key.logs.arn  # Fixed: Added KMS encryption
+  retention_in_days = max(var.cloudwatch_retention_days, 365) # Fixed: Minimum 1 year retention
+  kms_key_id        = aws_kms_key.logs.arn                    # Fixed: Added KMS encryption
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-redis-logs"
@@ -1424,8 +1424,8 @@ resource "aws_iam_role" "ecs_task" {
 resource "aws_cloudwatch_log_group" "ecs_dqs" {
   count             = var.enable_ecs ? 1 : 0
   name              = "/ecs/${local.name_prefix}/dqs"
-  retention_in_days = max(var.cloudwatch_retention_days, 365)  # Fixed: Minimum 1 year retention
-  kms_key_id        = aws_kms_key.logs.arn  # Fixed: Added KMS encryption
+  retention_in_days = max(var.cloudwatch_retention_days, 365) # Fixed: Minimum 1 year retention
+  kms_key_id        = aws_kms_key.logs.arn                    # Fixed: Added KMS encryption
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-ecs-dqs-logs"
@@ -1446,7 +1446,7 @@ resource "aws_ecs_task_definition" "dqs" {
     name      = "dqs"
     image     = var.dqs_image
     essential = true
-    
+
     portMappings = [{
       containerPort = var.dqs_container_port
       protocol      = "tcp"
@@ -1463,8 +1463,8 @@ resource "aws_ecs_task_definition" "dqs" {
       }
     }
 
-    readonlyRootFilesystem = true  # Fixed: Read-only root filesystem for security
-    
+    readonlyRootFilesystem = true # Fixed: Read-only root filesystem for security
+
     # NOTE: Health check requires curl to be installed in the container image
     healthCheck = {
       command     = ["CMD-SHELL", "curl -f http://localhost:${var.dqs_container_port}/health || exit 1"]
@@ -1494,7 +1494,7 @@ resource "aws_ecs_task_definition" "opa" {
     name      = "opa"
     image     = var.opa_image
     essential = true
-    
+
     portMappings = [{
       containerPort = var.opa_container_port
       protocol      = "tcp"
@@ -1511,8 +1511,8 @@ resource "aws_ecs_task_definition" "opa" {
       }
     }
 
-    readonlyRootFilesystem = true  # Fixed: Read-only root filesystem for security
-    
+    readonlyRootFilesystem = true # Fixed: Read-only root filesystem for security
+
     # NOTE: Health check requires curl to be installed in the container image
     healthCheck = {
       command     = ["CMD-SHELL", "curl -f http://localhost:${var.opa_container_port}/health || exit 1"]
@@ -1531,8 +1531,8 @@ resource "aws_ecs_task_definition" "opa" {
 resource "aws_cloudwatch_log_group" "ecs_opa" {
   count             = var.enable_ecs ? 1 : 0
   name              = "/ecs/${local.name_prefix}/opa"
-  retention_in_days = max(var.cloudwatch_retention_days, 365)  # Fixed: Minimum 1 year retention
-  kms_key_id        = aws_kms_key.logs.arn  # Fixed: Added KMS encryption
+  retention_in_days = max(var.cloudwatch_retention_days, 365) # Fixed: Minimum 1 year retention
+  kms_key_id        = aws_kms_key.logs.arn                    # Fixed: Added KMS encryption
 
   tags = merge(local.common_tags, {
     Name = "${local.name_prefix}-ecs-opa-logs"
@@ -1605,10 +1605,10 @@ resource "aws_lb" "main" {
   security_groups    = [aws_security_group.alb.id]
   subnets            = aws_subnet.public[*].id
 
-  enable_deletion_protection = var.alb_deletion_protection
-  enable_http2               = true
+  enable_deletion_protection       = var.alb_deletion_protection
+  enable_http2                     = true
   enable_cross_zone_load_balancing = true
-  drop_invalid_header_fields = true  # Fixed: Added dropping invalid headers
+  drop_invalid_header_fields       = true # Fixed: Added dropping invalid headers
 
   access_logs {
     bucket  = aws_s3_bucket.logs.bucket
@@ -1683,7 +1683,7 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type = "fixed-response"
-    
+
     fixed_response {
       content_type = "text/plain"
       message_body = "404: Not Found"
@@ -1704,7 +1704,7 @@ resource "aws_lb_listener" "http" {
 
   default_action {
     type = "redirect"
-    
+
     redirect {
       port        = "443"
       protocol    = "HTTPS"
@@ -1829,7 +1829,7 @@ resource "aws_appautoscaling_policy" "ecs_opa_cpu" {
 data "aws_iam_policy_document" "vpc_flow_logs_assume" {
   statement {
     actions = ["sts:AssumeRole"]
-    
+
     principals {
       type        = "Service"
       identifiers = ["vpc-flow-logs.amazonaws.com"]
@@ -1899,7 +1899,7 @@ resource "aws_iam_role" "lambda_edge" {
 resource "aws_sqs_queue" "lambda_dlq" {
   count                     = var.enable_cloudfront ? 1 : 0
   name                      = "${local.name_prefix}-lambda-dlq"
-  message_retention_seconds = 1209600  # 14 days
+  message_retention_seconds = 1209600 # 14 days
   kms_master_key_id         = aws_kms_key.main.arn
 
   tags = merge(local.common_tags, {
@@ -1928,7 +1928,7 @@ resource "aws_lambda_function" "edge_auth" {
   # NOTE: Lambda@Edge does not support reserved_concurrent_executions
 
   dead_letter_config {
-    target_arn = aws_sqs_queue.lambda_dlq[0].arn  # Fixed: Added DLQ
+    target_arn = aws_sqs_queue.lambda_dlq[0].arn # Fixed: Added DLQ
   }
 
   environment {
@@ -1992,7 +1992,7 @@ resource "aws_wafv2_web_acl" "cloudfront" {
 resource "aws_sns_topic" "alarms" {
   count             = var.enable_cloudwatch_alarms && length(var.alarm_email_endpoints) > 0 ? 1 : 0
   name              = "${local.name_prefix}-alarms"
-  kms_master_key_id = aws_kms_key.main.arn  # Fixed: Added KMS encryption for SNS
+  kms_master_key_id = aws_kms_key.main.arn # Fixed: Added KMS encryption for SNS
 
   tags = local.common_tags
 }
@@ -2056,7 +2056,7 @@ resource "aws_cloudtrail" "main" {
   is_multi_region_trail         = var.cloudtrail_multi_region
   enable_logging                = true
   enable_log_file_validation    = true
-  kms_key_id                    = aws_kms_key.main.arn  # Fixed: Added KMS encryption
+  kms_key_id                    = aws_kms_key.main.arn # Fixed: Added KMS encryption
 
   event_selector {
     read_write_type           = "All"
@@ -2071,9 +2071,9 @@ resource "aws_cloudtrail" "main" {
 ################################################################################
 
 resource "aws_backup_vault" "main" {
-  count        = var.enable_aws_backup ? 1 : 0
-  name         = "${local.name_prefix}-backup-vault"
-  kms_key_id   = aws_kms_key.main.arn  # Fixed: Added KMS encryption
+  count      = var.enable_aws_backup ? 1 : 0
+  name       = "${local.name_prefix}-backup-vault"
+  kms_key_id = aws_kms_key.main.arn # Fixed: Added KMS encryption
 
   tags = local.common_tags
 }
