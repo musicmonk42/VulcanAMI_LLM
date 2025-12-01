@@ -42,7 +42,7 @@ from src.vulcan.config import AgentConfig
 # EVENT LOOP FIXTURE - Removed, pytest-asyncio handles this
 # ============================================================
 # Custom event_loop fixture removed to avoid conflicts with pytest-asyncio 1.3.0
-# pytest-asyncio with asyncio_mode=strict automatically manages event loops
+# pytest-asyncio with asyncio_mode=auto automatically manages event loops
 # Having a custom fixture causes tests to stop/crash when run together
 
 # ============================================================
