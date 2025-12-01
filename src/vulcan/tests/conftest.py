@@ -64,9 +64,13 @@ def cleanup_resources():
             # Give tasks a moment to cancel - only if loop is not running
             if pending and not loop.is_running():
                 try:
-                    # Use wait with timeout to prevent deadlocks
+                    # Use wait_for with timeout to prevent deadlocks
+                    # asyncio.wait returns a tuple of (done, pending) sets
                     loop.run_until_complete(
-                        asyncio.wait(pending, timeout=1.0, return_when=asyncio.ALL_COMPLETED)
+                        asyncio.wait_for(
+                            asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED),
+                            timeout=1.0
+                        )
                     )
                 except (RuntimeError, asyncio.TimeoutError):
                     # Loop might be closed, running, or tasks took too long - that's okay
