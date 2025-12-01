@@ -49,33 +49,30 @@ def mock_safety_validator():
     - 10+ rollback_audit cleanup_worker threads  
     - 2+ distributed.py monitor_loop threads
     
-    CRITICAL: The lazy import may have already run during module import.
-    We need to FORCE it to run first, then replace with our mock.
+    CRITICAL: Do NOT call _lazy_import_safety_validator() - that imports
+    the REAL validator which spawns threads. Just set the mock directly.
     """
     # Import the module
     import vulcan.world_model.correlation_tracker as ct_module
     
-    # Force the lazy import to complete if it hasn't already
-    # This ensures EnhancedSafetyValidator is loaded (not None)
-    if ct_module.EnhancedSafetyValidator is None:
-        ct_module._lazy_import_safety_validator()
-    
-    # NOW it's definitely loaded. Save the original.
+    # Save whatever is currently there (likely None, but could be already loaded)
     original_validator = ct_module.EnhancedSafetyValidator
     original_config = ct_module.SafetyConfig
     
-    # Create mock
+    # Create mock - DO NOT import the real validator!
     mock_validator_instance = Mock()
     mock_validator_instance.analyze_observation_safety.return_value = {"safe": True}
     mock_validator_instance.validate_state_vector.return_value = {"safe": True}
     mock_validator_instance.clamp_to_safe_region.side_effect = lambda state_vec, *args, **kwargs: state_vec
     
     mock_validator_class = Mock(return_value=mock_validator_instance)
+    mock_config_class = Mock()
     
-    # Replace with mock - this prevents future lazy imports from running
-    # because the check `if EnhancedSafetyValidator is None` will be False
+    # Replace with mock BEFORE any lazy import can happen
+    # This prevents the lazy import from ever running because
+    # the check `if EnhancedSafetyValidator is None` will be False
     ct_module.EnhancedSafetyValidator = mock_validator_class
-    ct_module.SafetyConfig = Mock  # Also mock SafetyConfig
+    ct_module.SafetyConfig = mock_config_class
     
     yield mock_validator_class
     
@@ -89,23 +86,22 @@ def mock_safety_validator():
 # ============================================================================
 
 @pytest.fixture(autouse=True, scope="function")
-def cleanup_test_state():
+def cleanup_test_state(mock_safety_validator):
     """
-    CRITICAL FIX: Reset global state before and after each test.
-    This prevents test interference when running the full test suite.
+    CRITICAL FIX: Clean up test state while PRESERVING the mock safety validator.
     
     The correlation_tracker module uses global lazy-loaded variables
     (EnhancedSafetyValidator, SafetyConfig, WorldModel) that persist
     across test runs, causing failures when tests run together.
     
-    ALSO cleans up background threads from safety validators.
+    IMPORTANT: We must NOT reset EnhancedSafetyValidator to None, as that
+    would undo the mock and cause the real validator to spawn 70+ threads.
+    Instead, we keep the mock in place and only reset WorldModel.
     """
     import gc
     import vulcan.world_model.correlation_tracker as ct
     
-    # Reset globals before test
-    ct.EnhancedSafetyValidator = None
-    ct.SafetyConfig = None
+    # Only reset WorldModel - keep the mocked safety validator!
     ct.WorldModel = None
     
     # Let test run
@@ -125,9 +121,7 @@ def cleanup_test_state():
     except Exception:
         pass
     
-    # Reset globals again after test
-    ct.EnhancedSafetyValidator = None
-    ct.SafetyConfig = None
+    # Only reset WorldModel after test - keep the mock!
     ct.WorldModel = None
 
 
