@@ -199,11 +199,18 @@ async def auth_manager():
 
 @pytest.fixture
 def rate_limiter(redis):
-    """Synchronous fixture returning RateLimiter with redis client."""
+    """
+    Synchronous fixture returning RateLimiter with redis client.
+    
+    Note: This sync fixture depends on the async 'redis' fixture.
+    This is valid - pytest-asyncio correctly resolves async fixtures
+    for sync fixtures that depend on them.
+    """
     return RateLimiter(redis)
 
 @pytest.fixture
 def circuit_breaker():
+    """Synchronous fixture returning CircuitBreaker instance."""
     return CircuitBreaker(failure_threshold=5, recovery_timeout=3)
 
 @pytest.fixture

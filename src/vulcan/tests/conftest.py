@@ -48,6 +48,10 @@ def cleanup_resources():
     
     # Cleanup after test
     # 1. Clean up asyncio event loop
+    # NOTE: We use run_until_complete here because this cleanup fixture is sync.
+    # This is the correct pattern for cleaning up async resources from a sync context.
+    # The alternative (making this fixture async) would not work as pytest needs
+    # to run cleanup after the test completes, which requires sync context.
     try:
         loop = asyncio.get_event_loop()
         if loop and not loop.is_closed():
@@ -64,16 +68,11 @@ def cleanup_resources():
             # Give tasks a moment to cancel - only if loop is not running
             if pending and not loop.is_running():
                 try:
-                    # Use wait_for with timeout to prevent deadlocks
-                    # asyncio.wait returns a tuple of (done, pending) sets
-                    loop.run_until_complete(
-                        asyncio.wait_for(
-                            asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED),
-                            timeout=1.0
-                        )
-                    )
-                except (RuntimeError, asyncio.TimeoutError):
-                    # Loop might be closed, running, or tasks took too long - that's okay
+                    # Gather all tasks to cancel them properly
+                    # This is safe in cleanup context as we're in a sync fixture
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except (RuntimeError, asyncio.TimeoutError, Exception):
+                    # Loop might be closed, running, or tasks failed - that's okay in cleanup
                     pass
     except RuntimeError:
         # No event loop in current thread - that's fine
