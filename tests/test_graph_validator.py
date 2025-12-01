@@ -8,8 +8,8 @@ import tempfile
 import os
 from unittest.mock import Mock, patch, MagicMock # Added patch
 
-# Import the module to test
-import graph_validator as gv
+# Import the module to test - use full path since short aliasing is disabled
+from unified_runtime import graph_validator as gv
 
 
 class TestResourceLimits:
