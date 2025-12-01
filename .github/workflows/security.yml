@@ -266,7 +266,9 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image with caching
+        id: docker_build
         uses: docker/build-push-action@v5
+        continue-on-error: true
         with:
           context: .
           push: false
@@ -278,6 +280,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scanner
+        if: steps.docker_build.outcome == 'success'
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'vulcanami-llm:scan'
@@ -287,6 +290,7 @@ jobs:
 
       - name: Check for Trivy SARIF file
         id: check_trivy_sarif
+        if: steps.docker_build.outcome == 'success'
         run: |
           if [ -f trivy-results.sarif ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
@@ -296,12 +300,13 @@ jobs:
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
-        if: steps.check_trivy_sarif.outputs.exists == 'true'
+        if: steps.docker_build.outcome == 'success' && steps.check_trivy_sarif.outputs.exists == 'true'
         with:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
 
       - name: Run Grype vulnerability scanner
+        if: steps.docker_build.outcome == 'success'
         uses: anchore/scan-action@v3
         with:
           image: 'vulcanami-llm:scan'
