@@ -299,6 +299,7 @@ jobs:
             echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/integration-exitcode.txt
           else
             echo "No integration tests directory found"
+            echo "PYTEST_EXIT=0 (no tests)" > $GITHUB_WORKSPACE/results/integration-exitcode.txt
           fi
           echo "Integration test exit code: $exit_code"
 
