@@ -46,13 +46,22 @@ def cleanup_resources():
         loop = asyncio.get_event_loop()
         if loop and not loop.is_closed():
             # Cancel all pending tasks
-            pending = asyncio.all_tasks(loop)
+            try:
+                pending = asyncio.all_tasks(loop)
+            except RuntimeError:
+                # If we can't get tasks, that's okay
+                pending = []
+            
             for task in pending:
                 task.cancel()
             
             # Give tasks a moment to cancel
             if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                try:
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except RuntimeError:
+                    # Loop might be closed or not running, that's okay
+                    pass
     except RuntimeError:
         # No event loop in current thread - that's fine
         pass
