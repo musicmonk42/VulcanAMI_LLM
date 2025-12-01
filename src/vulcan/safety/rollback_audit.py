@@ -713,7 +713,7 @@ class RollbackManager:
         # Early exit if shutdown requested
         if self._shutdown:
             return
-            
+
         current_time = time.time()
         
         with self.lock:
@@ -746,7 +746,7 @@ class RollbackManager:
         # Early exit if shutdown requested
         if self._shutdown:
             return
-            
+
         cutoff_time = time.time() - (self.snapshot_retention_days * 86400)
         
         # Find old snapshots
@@ -1464,7 +1464,7 @@ class AuditLogger:
         # Early exit if shutdown requested
         if self._shutdown:
             return
-            
+
         # Check file size
         if self.current_log_file.exists():
             size_mb = self.current_log_file.stat().st_size / (1024 * 1024)
@@ -1483,7 +1483,7 @@ class AuditLogger:
         # Early exit if shutdown requested
         if self._shutdown:
             return
-            
+
         logger.info(f"Rotating log file: {self.current_log_file}")
         
         # Compress old log if enabled
@@ -1545,7 +1545,7 @@ class AuditLogger:
         # Early exit if shutdown requested
         if self._shutdown:
             return
-            
+
         cutoff_date = datetime.now() - timedelta(days=self.rotation_days)
         
         for log_file in self.log_path.glob("safety_audit_*.jsonl*"):
