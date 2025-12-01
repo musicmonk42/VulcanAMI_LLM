@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Ensure cert directory readable
         if: always()
@@ -120,6 +122,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Ensure cert directory readable
         if: always()
@@ -184,16 +188,21 @@ jobs:
       - name: Run tests with coverage
         run: |
           set -x
+          mkdir -p $GITHUB_WORKSPACE/results
           mkdir -p $GITHUB_WORKSPACE/logs
+          exit_code=0
           pytest tests/ \
             --cov=src \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
-            --junitxml=pytest-report.xml \
+            --junitxml=results/junit.xml \
             --timeout=300 \
             -v \
-            2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log || echo "Some tests failed, but continuing..."
+            2>&1 | tee $GITHUB_WORKSPACE/logs/pytest-output.log || exit_code=$?
+          echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/exitcode.txt
+          echo "Test exit code: $exit_code"
+          exit $exit_code
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -212,7 +221,7 @@ jobs:
         with:
           name: test-results-${{ matrix.python-version }}
           path: |
-            pytest-report.xml
+            results/
             htmlcov/
             coverage.xml
             logs/
@@ -227,6 +236,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Ensure cert directory readable
         if: always()
@@ -280,12 +291,17 @@ jobs:
         run: |
           set -x
           mkdir -p $GITHUB_WORKSPACE/logs
+          mkdir -p $GITHUB_WORKSPACE/results
+          exit_code=0
           # Run specific integration test files if they exist
           if [ -d "tests/integration" ]; then
-            pytest tests/integration/ -v --timeout=300 2>&1 | tee $GITHUB_WORKSPACE/logs/integration-test-output.log || true
+            pytest tests/integration/ -v --timeout=300 --junitxml=results/integration-junit.xml 2>&1 | tee $GITHUB_WORKSPACE/logs/integration-test-output.log || exit_code=$?
+            echo "PYTEST_EXIT=$exit_code" > $GITHUB_WORKSPACE/results/integration-exitcode.txt
           else
             echo "No integration tests directory found"
+            echo "PYTEST_EXIT=0 (no tests)" > $GITHUB_WORKSPACE/results/integration-exitcode.txt
           fi
+          echo "Integration test exit code: $exit_code"
 
       - name: Cleanup
         if: always()
@@ -298,7 +314,9 @@ jobs:
         if: always()
         with:
           name: integration-test-logs
-          path: logs/
+          path: |
+            logs/
+            results/
           retention-days: 30
 
   build-validation:
@@ -310,6 +328,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Ensure cert directory readable
         if: always()
@@ -365,6 +385,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Ensure cert directory readable
         if: always()
