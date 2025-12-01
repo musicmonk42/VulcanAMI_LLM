@@ -6,6 +6,9 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+# Skip entire module if torch is not available (graphix_vulcan_bridge requires torch)
+torch = pytest.importorskip("torch", reason="PyTorch required for bridge config tests")
+
 
 def test_bridge_config_validation_positive():
     """Test that valid configurations pass validation."""
