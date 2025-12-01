@@ -11,6 +11,9 @@ import copy
 from unittest.mock import Mock, patch, MagicMock
 from collections import defaultdict
 
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for adversarial_formal tests")
+
 from vulcan.safety.adversarial_formal import (
     AdversarialValidator,
     FormalVerifier,

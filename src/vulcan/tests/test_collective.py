@@ -22,7 +22,9 @@ print("=" * 70 + "\n")
 # ============================================================================
 
 import pytest
-import torch
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for collective tests")
 import torch.nn as nn
 import numpy as np
 import time

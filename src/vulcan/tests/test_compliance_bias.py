@@ -4,8 +4,11 @@ Tests regulatory compliance validation and multi-model bias detection.
 """
 
 import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for compliance_bias tests")
+
 import numpy as np
-import torch
 import time
 import tempfile
 import threading

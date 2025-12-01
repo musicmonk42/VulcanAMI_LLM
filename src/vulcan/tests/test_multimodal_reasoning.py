@@ -6,6 +6,10 @@ and numerical stability fixes.
 """
 
 import pytest
+
+# Skip entire module if torch is not available (multimodal_reasoning uses torch internally)
+torch = pytest.importorskip("torch", reason="PyTorch required for multimodal_reasoning tests")
+
 import numpy as np
 import tempfile
 import shutil
