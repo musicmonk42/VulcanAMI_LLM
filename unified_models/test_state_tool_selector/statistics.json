@@ -102,32 +102,10 @@
     "recent_executions": []
   },
   "bandit_stats": {
-    "active_bandit": "epsilon_greedy",
-    "bandit_performance": {
-      "epsilon_greedy": {
-        "total_actions": 0,
-        "total_reward": 0.0,
-        "exploration_actions": 0,
-        "exploitation_actions": 0,
-        "average_reward": 0.0
-      },
-      "ucb": {
-        "total_actions": 0,
-        "total_reward": 0.0,
-        "exploration_actions": 0,
-        "exploitation_actions": 0,
-        "average_reward": 0.0
-      },
-      "thompson": {
-        "total_actions": 0,
-        "total_reward": 0.0,
-        "exploration_actions": 0,
-        "exploitation_actions": 0,
-        "average_reward": 0.0
-      },
-      "linucb": {},
-      "neural": {}
-    }
+    "status": "disabled",
+    "reason": "contextual_bandit module not found",
+    "exploration_rate": 0.1,
+    "arm_stats": {}
   },
   "voi_stats": {
     "probes": 0,

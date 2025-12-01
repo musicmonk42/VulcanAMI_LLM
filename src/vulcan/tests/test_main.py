@@ -4,6 +4,12 @@
 # Run: pytest src/vulcan/tests/test_main.py -v --tb=short --cov=src.vulcan.main --cov-report=html
 
 import pytest
+
+# Skip entire module if torch is not available (main imports vulcan modules that require torch)
+torch = pytest.importorskip("torch", reason="PyTorch required for main tests")
+# Also skip if fastapi is not available
+fastapi = pytest.importorskip("fastapi", reason="FastAPI required for main tests")
+
 import os
 import sys
 import json

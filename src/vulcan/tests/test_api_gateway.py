@@ -3,6 +3,10 @@
 # Run: pytest src/vulcan/tests/test_api_gateway.py -v --tb=short --cov=src.vulcan.api_gateway --cov-report=html
 
 import pytest
+
+# Skip entire module if torch is not available (api_gateway imports vulcan modules that require torch)
+torch = pytest.importorskip("torch", reason="PyTorch required for api_gateway tests")
+
 import asyncio
 import json
 import time

@@ -3,6 +3,10 @@ Test suite for curriculum learning module
 """
 
 import pytest
+
+# Skip entire module if torch is not available (curriculum_learning imports learning modules that require torch)
+torch = pytest.importorskip("torch", reason="PyTorch required for curriculum_learning tests")
+
 import numpy as np
 from pathlib import Path
 import tempfile

@@ -3,6 +3,10 @@ Test suite for learning types module
 """
 
 import pytest
+
+# Skip entire module if torch is not available (learning_types module requires torch)
+torch = pytest.importorskip("torch", reason="PyTorch required for learning_types tests")
+
 import numpy as np
 import time
 from dataclasses import asdict, fields
