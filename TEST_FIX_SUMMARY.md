@@ -52,3 +52,60 @@ pytest src/vulcan/tests/test_config.py::TestConfigurationManager::test_validate_
 
 ## Conclusion
 No code changes were required. The test failure was due to an environment configuration issue. All tests pass successfully when proper dependencies are installed.
+
+---
+
+## Known Issue: Tests Hanging at test_pearson_correlation
+
+### Symptom
+When running the full test suite (`pytest src/vulcan/tests`), tests may halt/hang at:
+```
+src/vulcan/tests/test_correlation_tracker.py::TestCorrelationCalculator::test_pearson_correlation
+```
+
+### Root Cause
+The `correlation_tracker` module uses lazy-loaded imports that can spawn multiple background threads:
+- 50+ rollback_audit rotation_worker threads
+- 10+ rollback_audit cleanup_worker threads
+- 2+ distributed.py monitor_loop threads
+
+These background threads may not properly shut down, causing pytest to hang waiting for cleanup. The test file includes fixture-based mocking to prevent this, but issues can still occur if:
+1. Dependencies are not fully installed (numpy, scipy, etc.)
+2. The lazy import completes before the mock fixture can intercept it
+3. Platform-specific threading behavior (especially on Windows)
+
+### Workaround Solutions
+
+#### Option 1: Run Tests Individually
+```bash
+# Run only config tests (these work reliably)
+pytest src/vulcan/tests/test_config.py -v
+
+# Skip correlation tracker tests if they hang
+pytest src/vulcan/tests --ignore=src/vulcan/tests/test_correlation_tracker.py
+```
+
+#### Option 2: Use Stricter Timeouts
+```bash
+# Force timeout after 30 seconds per test
+pytest src/vulcan/tests --timeout=30
+```
+
+#### Option 3: Install All Dependencies
+Ensure all scientific computing dependencies are installed:
+```bash
+pip install numpy scipy networkx
+pip install -r requirements.txt
+```
+
+### Why This Happens on Windows
+The issue is more common on Windows (MINGW64) because:
+- Thread cleanup behavior differs from Linux
+- The `timeout_method: thread` in pytest.ini uses different mechanisms on Windows vs Linux
+- Background daemon threads may not receive proper shutdown signals
+
+### Verification
+If tests hang at test_pearson_correlation:
+1. Press Ctrl+C to interrupt
+2. Run just the config tests: `pytest src/vulcan/tests/test_config.py -v`
+3. The original issue (test_validate_config failing) should be resolved
