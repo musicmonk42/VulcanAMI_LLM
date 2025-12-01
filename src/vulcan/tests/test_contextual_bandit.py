@@ -6,8 +6,11 @@ and numerical stability fixes.
 """
 
 import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for contextual_bandit tests")
+
 import numpy as np
-import torch
 import tempfile
 import shutil
 from pathlib import Path

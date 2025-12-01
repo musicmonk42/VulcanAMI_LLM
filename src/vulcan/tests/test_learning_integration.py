@@ -13,8 +13,11 @@ Tests:
 """
 
 import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for learning_integration tests")
+
 import numpy as np
-import torch
 import logging
 import sys
 import time

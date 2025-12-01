@@ -73,6 +73,9 @@ BLOCKLIST_BASENAMES = {
 # that might not be available or might cause import errors
 SKIP_ALIAS_MODULES = {
     "persistence",  # Uses cryptography which may have import issues
+    # Modules that use complex mocking in tests - aliasing causes mock pollution
+    "unified_runtime_core",
+    "execution_engine",
 }
 
 def _is_python_file(p: pathlib.Path) -> bool:

@@ -3,7 +3,10 @@ Test suite for RLHF feedback module
 """
 
 import pytest
-import torch
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for rlhf_feedback tests")
+
 import torch.nn as nn
 import numpy as np
 import asyncio

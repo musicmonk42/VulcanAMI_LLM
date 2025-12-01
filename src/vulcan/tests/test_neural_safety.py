@@ -5,7 +5,10 @@ Tests neural network models, validators, and safety assessment functionality.
 """
 
 import pytest
-import torch
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for neural_safety tests")
+
 import torch.nn as nn
 import numpy as np
 import asyncio

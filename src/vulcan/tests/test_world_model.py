@@ -3,7 +3,10 @@ Test suite for unified world model
 """
 
 import pytest
-import torch
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for world_model tests")
+
 import torch.nn as nn
 import numpy as np
 import time

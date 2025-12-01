@@ -59,6 +59,9 @@ class RestrictedUnpickler(pickle.Unpickler):
         'sklearn.linear_model',
         'sklearn.linear_model._logistic',
         'sklearn.calibration',
+        # Cost model module for serialization
+        'src.strategies.cost_model',
+        'strategies.cost_model',
         # Test modules (for pytest test fixtures and helper classes)
         '__main__',  # Sometimes test classes are in __main__
         # Add your safe modules here

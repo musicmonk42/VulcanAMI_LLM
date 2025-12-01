@@ -2,11 +2,7 @@
   "active": false,
   "current_objective": null,
   "completed_objectives": [
-    "fix_circular_imports",
-    "enhance_safety_systems",
-    "fix_known_bugs",
-    "optimize_performance",
-    "improve_test_coverage"
+    "test_objective"
   ],
   "pending_approvals": [
     {
@@ -732,16 +728,16 @@
   ],
   "last_improvement": 1761897210.0668685,
   "last_trigger_check": 1761897210.0595057,
-  "total_cost_usd": 0.8,
+  "total_cost_usd": 1.5,
   "daily_cost_usd": 0.0,
   "monthly_cost_usd": 0.8,
   "last_cost_reset": 1763357284.9116735,
-  "state_save_count": 74,
-  "timestamp": 1763357284.9126732,
+  "state_save_count": 76,
+  "timestamp": 1764566537.5148423,
   "session_tokens": 60000,
   "cost_history": [],
   "csiu_weights": {
-    "w1": 0.5993999999999999,
+    "w1": 0.9,
     "w2": 0.5993999999999999,
     "w3": 0.5993999999999999,
     "w4": 0.5993999999999999,

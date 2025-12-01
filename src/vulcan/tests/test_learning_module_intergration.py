@@ -4,7 +4,10 @@ Tests individual components and their integration
 """
 
 import pytest
-import torch
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for learning_module tests")
+
 import torch.nn as nn
 import numpy as np
 import time

@@ -5,11 +5,14 @@
 # Run: pytest src/vulcan/tests/test_processing.py -v --tb=short --cov=src.vulcan.processing --cov-report=html
 
 import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for processing tests")
+
 import time
 import asyncio
 import threading
 import numpy as np
-import torch
 import PIL.Image
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock

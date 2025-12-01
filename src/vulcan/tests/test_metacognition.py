@@ -3,7 +3,10 @@ Test suite for metacognition module
 """
 
 import pytest
-import torch
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for metacognition tests")
+
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np

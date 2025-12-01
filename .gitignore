@@ -176,3 +176,11 @@ comprehensive_test_run.log
 
 # Adversarial testing logs (generated artifacts)
 logs/adversarial_testing/
+
+# Test artifacts
+rollback_storage/
+unified_models/
+probabilistic_models/
+data/backups/
+*.pkl
+*.dat
