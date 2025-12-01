@@ -591,7 +591,7 @@ class UnifiedLearningSystem:
                     except Exception as e:
                         logger.error(f"✗ Component '{name}' shutdown error: {e}")
         
-        # ADDED: Wait for external background threads to terminate
+        # IMPROVED: Wait for external background threads with parallel joining and shared timeout
         logger.info("Waiting for background service threads to terminate...")
         external_threads = [
             "HardwareHealthCheck", 
@@ -600,15 +600,47 @@ class UnifiedLearningSystem:
             "AuditRotation", 
             "RollbackCleanup"
         ]
-        for thread in threading.enumerate():
-            if thread is not threading.current_thread() and thread.name in external_threads:
-                logger.debug(f"Waiting for thread: {thread.name}")
+        
+        # Find matching threads
+        threads_to_join = [
+            thread for thread in threading.enumerate()
+            if thread is not threading.current_thread() and thread.name in external_threads
+        ]
+        
+        if threads_to_join:
+            # Use a shared timeout for all thread joins (max 3 seconds total)
+            shared_timeout = min(3.0, timeout / 3)
+            
+            def join_thread(thread):
                 try:
-                    thread.join(timeout=5.0)  # Wait up to 5 seconds
-                    if thread.is_alive():
-                        logger.warning(f"Thread {thread.name} did not terminate in time")
+                    thread.join(timeout=shared_timeout)
+                    return thread.name, not thread.is_alive()
                 except Exception as e:
                     logger.error(f"Error joining thread {thread.name}: {e}")
+                    return thread.name, False
+            
+            # Join all threads in parallel with timeout
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(threads_to_join)) as executor:
+                futures = {executor.submit(join_thread, t): t for t in threads_to_join}
+                done, not_done = concurrent.futures.wait(
+                    futures.keys(), 
+                    timeout=shared_timeout + 1  # Allow a little extra for thread overhead
+                )
+                
+                for future in done:
+                    try:
+                        name, success = future.result(timeout=0.1)
+                        if success:
+                            logger.debug(f"Thread {name} terminated")
+                        else:
+                            logger.warning(f"Thread {name} did not terminate in time")
+                    except Exception as e:
+                        logger.error(f"Error getting thread join result: {e}")
+                
+                for future in not_done:
+                    future.cancel()
+                    logger.warning(f"Thread join timed out")
+        
         logger.info("Background service thread join complete.")
 
         # Step 4: Save state AFTER components are stable

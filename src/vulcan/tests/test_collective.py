@@ -829,14 +829,27 @@ class TestUnifiedSystem(unittest.TestCase):
             ppo_epochs=1,
             meta_batch_size=2
         )
+        # Track system instance for cleanup
+        self._system = None
     
     def tearDown(self):
-        """Clean up test fixtures"""
+        """Clean up test fixtures - ensure system is shut down even on test failure"""
+        # Shutdown any system created in the test to prevent thread leaks
+        if hasattr(self, '_system') and self._system is not None:
+            try:
+                self._system.shutdown()
+            except Exception:
+                pass  # Best effort cleanup
+            finally:
+                self._system = None
+        # Small delay for thread cleanup
         time.sleep(0.1)
+        # Force garbage collection to help clean up resources
+        gc.collect()
     
     def test_full_integration(self):
         """Test full system integration"""
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=True,
@@ -852,7 +865,7 @@ class TestUnifiedSystem(unittest.TestCase):
                 'action': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
                 'next_embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32)
             }
-            result = system.process_experience(exp)
+            result = self._system.process_experience(exp)
             
             # Result should contain key fields
             self.assertIn('adapted', result)
@@ -860,7 +873,7 @@ class TestUnifiedSystem(unittest.TestCase):
             self.assertTrue('loss' in result or 'error' in result)
         
         # Get stats
-        stats = system.get_unified_stats()
+        stats = self._system.get_unified_stats()
         self.assertIn('continual', stats)
         # curriculum and metacognition may be optional depending on implementation
         # self.assertIn('curriculum', stats)  # May not be present in all implementations
@@ -869,12 +882,13 @@ class TestUnifiedSystem(unittest.TestCase):
         # Check that at least the essential stats exist
         self.assertIn('timestamp', stats)
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
     
     def test_component_coordination(self):
         """Test coordination between components"""
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_curriculum=True,
@@ -889,25 +903,26 @@ class TestUnifiedSystem(unittest.TestCase):
                 'reward': 1.0 - difficulty,  # Harder tasks get lower reward
                 'metadata': {'complexity': difficulty}
             }
-            result = system.process_experience(exp)
+            result = self._system.process_experience(exp)
         
         # Check components are coordinating
-        stats = system.get_unified_stats()
+        stats = self._system.get_unified_stats()
         self.assertGreater(stats['continual']['total_experiences'], 0)
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
     
     def test_error_handling(self):
         """Test system handles errors gracefully"""
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM
         )
         
         # Send invalid experience
         invalid_exp = {'invalid': 'data'}
-        result = system.process_experience(invalid_exp)
+        result = self._system.process_experience(invalid_exp)
         
         # Should handle gracefully
         self.assertIn('error', result)
@@ -917,15 +932,16 @@ class TestUnifiedSystem(unittest.TestCase):
             'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
             'reward': 0.5
         }
-        result = system.process_experience(valid_exp)
+        result = self._system.process_experience(valid_exp)
         self.assertTrue('adapted' in result or 'error' in result)
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
     
     def test_save_and_load(self):
         """Test saving and loading complete state"""
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM
         )
@@ -936,21 +952,21 @@ class TestUnifiedSystem(unittest.TestCase):
                 'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
                 'reward': 0.5
             }
-            system.process_experience(exp)
+            self._system.process_experience(exp)
         
         # Save state - try different method names
         with tempfile.TemporaryDirectory() as tmpdir:
             save_path = Path(tmpdir) / "system_state.pt"
             
             # Try different save method names
-            if hasattr(system, 'save_state'):
-                system.save_state(save_path)
-            elif hasattr(system, 'save'):
-                system.save(save_path)
-            elif hasattr(system, 'save_checkpoint'):
-                system.save_checkpoint(save_path)
-            elif hasattr(system, 'checkpoint'):
-                system.checkpoint(save_path)
+            if hasattr(self._system, 'save_state'):
+                self._system.save_state(save_path)
+            elif hasattr(self._system, 'save'):
+                self._system.save(save_path)
+            elif hasattr(self._system, 'save_checkpoint'):
+                self._system.save_checkpoint(save_path)
+            elif hasattr(self._system, 'checkpoint'):
+                self._system.checkpoint(save_path)
             else:
                 # Skip test if no save method available
                 self.skipTest("No save_state or equivalent method found on UnifiedLearningSystem")
@@ -974,18 +990,20 @@ class TestUnifiedSystem(unittest.TestCase):
             # Cleanup
             new_system.shutdown()
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
     
     def test_concurrent_experiences(self):
         """Test processing experiences from multiple threads"""
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM
         )
         
         results = []
         errors = []
+        system_ref = self._system  # Capture reference for threads
         
         def process_batch(batch_id):
             try:
@@ -995,7 +1013,7 @@ class TestUnifiedSystem(unittest.TestCase):
                         'reward': 0.5,
                         'batch_id': batch_id
                     }
-                    result = system.process_experience(exp)
+                    result = system_ref.process_experience(exp)
                     results.append(result)
             except Exception as e:
                 errors.append(e)
@@ -1015,8 +1033,9 @@ class TestUnifiedSystem(unittest.TestCase):
         self.assertEqual(len(errors), 0, f"Thread errors: {errors}")
         self.assertEqual(len(results), 15)  # 3 threads * 5 experiences
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
     
     def test_memory_management(self):
         """Test memory doesn't grow unbounded"""
@@ -1026,7 +1045,7 @@ class TestUnifiedSystem(unittest.TestCase):
         self.fast_learning_config.replay_buffer_size = 50
         self.fast_learning_config.max_checkpoints = 3
         
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=False,  # Disable for speed
@@ -1043,7 +1062,7 @@ class TestUnifiedSystem(unittest.TestCase):
                 'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
                 'reward': np.random.random()
             }
-            system.process_experience(exp)
+            self._system.process_experience(exp)
             
             if i % 20 == 0:
                 gc.collect()
@@ -1057,10 +1076,11 @@ class TestUnifiedSystem(unittest.TestCase):
         self.assertLess(memory_growth, 100, f"Memory grew by {memory_growth:.1f}MB")
         
         # Check buffers are bounded
-        self.assertLessEqual(len(system.continual_learner.replay_buffer), 50)
+        self.assertLessEqual(len(self._system.continual_learner.replay_buffer), 50)
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
 
 
 # ============================================================
@@ -1087,14 +1107,27 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
             ppo_epochs=1,
             meta_batch_size=2
         )
+        # Track system instance for cleanup
+        self._system = None
     
     def tearDown(self):
-        """Clean up test fixtures"""
-        time.sleep(0.1) # Give threads a moment to close
+        """Clean up test fixtures - ensure system is shut down even on test failure"""
+        # Shutdown any system created in the test to prevent thread leaks
+        if hasattr(self, '_system') and self._system is not None:
+            try:
+                self._system.shutdown()
+            except Exception:
+                pass  # Best effort cleanup
+            finally:
+                self._system = None
+        # Small delay for thread cleanup
+        time.sleep(0.1)
+        # Force garbage collection to help clean up resources
+        gc.collect()
 
     def test_rapid_task_switching(self):
         """Test rapid switching between tasks"""
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=False,  # Disable for speed
@@ -1109,20 +1142,21 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
                 'reward': task_id / 5.0,
                 'task_hint': f'task_{task_id}'
             }
-            result = system.process_experience(exp)
+            result = self._system.process_experience(exp)
             # Check for either adapted=True or error in result
             self.assertTrue(result.get('adapted', False) or 'error' in result)
         
         # System should have detected multiple tasks
-        self.assertGreaterEqual(len(system.continual_learner.task_models), 1)
+        self.assertGreaterEqual(len(self._system.continual_learner.task_models), 1)
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
     
     def test_error_recovery(self):
         """Test system recovers from errors"""
         # Create a fresh system for this test
-        system = UnifiedLearningSystem(
+        self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=False,  # Disable for speed
@@ -1138,7 +1172,7 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
         ]
         
         for exp in invalid_exps:
-            result = system.process_experience(exp)
+            result = self._system.process_experience(exp)
             # System should handle gracefully
             self.assertTrue('error' in result or 'adapted' in result)
         
@@ -1152,7 +1186,7 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
                 'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
                 'reward': 0.5
             }
-            result = system.process_experience(valid_exp)
+            result = self._system.process_experience(valid_exp)
             # Check if system recovered (either adapted successfully or at least no error)
             if result.get('adapted', False) and 'loss' in result:
                 recovered = True
@@ -1162,8 +1196,9 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
         self.assertTrue(recovered or recovery_attempts == max_attempts,
             f"System failed to recover after {recovery_attempts} attempts")
         
-        # Cleanup
-        system.shutdown()
+        # Cleanup (tearDown will also call shutdown as backup)
+        self._system.shutdown()
+        self._system = None
 
 
 # ============================================================
