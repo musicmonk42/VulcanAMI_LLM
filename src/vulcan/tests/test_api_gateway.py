@@ -39,16 +39,11 @@ from src.vulcan.api_gateway import (
 from src.vulcan.config import AgentConfig
 
 # ============================================================
-# EVENT LOOP FIXTURE
+# EVENT LOOP FIXTURE - Removed, pytest-asyncio handles this
 # ============================================================
-
-@pytest.fixture(scope="function")
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
+# Custom event_loop fixture removed to avoid conflicts with pytest-asyncio 1.3.0
+# pytest-asyncio with asyncio_mode=strict automatically manages event loops
+# Having a custom fixture causes tests to stop/crash when run together
 
 # ============================================================
 # PRODUCTION REDIS MOCK
@@ -192,14 +187,14 @@ def redis():
 # ============================================================
 
 @pytest.fixture
-def auth_manager(event_loop):
-    """Create AuthManager with UserStore."""
+async def auth_manager():
+    """Create AuthManager with UserStore (async fixture)."""
     from src.vulcan.api_gateway import UserStore
     
     user_store = UserStore()
-    event_loop.run_until_complete(user_store.add_user("testuser", "testpass123", roles=["user"], scopes=["read", "write"]))
-    event_loop.run_until_complete(user_store.add_user("admin", "adminpass123", roles=["admin"], scopes=["read", "write", "admin"]))
-    event_loop.run_until_complete(user_store.add_user("production_user_001", "pass123", roles=["user"], scopes=["read", "write"]))
+    await user_store.add_user("testuser", "testpass123", roles=["user"], scopes=["read", "write"])
+    await user_store.add_user("admin", "adminpass123", roles=["admin"], scopes=["read", "write", "admin"])
+    await user_store.add_user("production_user_001", "pass123", roles=["user"], scopes=["read", "write"])
     
     return AuthManager(user_store=user_store, redis_client=None)
 
