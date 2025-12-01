@@ -65,6 +65,7 @@ jobs:
           flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics || true
 
       - name: Run Pylint (code quality check)
+        timeout-minutes: 10
         run: |
           set -x
           for i in 1 2 3; do
