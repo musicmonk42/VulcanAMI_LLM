@@ -725,11 +725,7 @@ class RollbackManager:
             for qid in expired:
                 del self.quarantine[qid]
                 logger.info(f"Removed expired quarantine entry: {qid}")
-        
-        # Check again before database operation
-        if self._shutdown:
-            return
-        
+
         # Clean from database
         with self.db_lock:
             try:
@@ -785,11 +781,7 @@ class RollbackManager:
                     logger.error(f"Error deleting snapshot file {file_path}: {e}")
             
             logger.info(f"Cleaned up old snapshot: {snapshot_id}")
-        
-        # Check again before final database operation
-        if self._shutdown:
-            return
-        
+
         # Clean from database
         with self.db_lock:
             try:
