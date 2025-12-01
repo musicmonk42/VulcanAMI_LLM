@@ -171,14 +171,13 @@ class ProductionRedis:
             raise Exception("Simulated network error")
 
 @pytest.fixture
-def redis():
-    """Synchronous fixture that returns a ProductionRedis instance."""
+async def redis():
+    """Async fixture that returns a ProductionRedis instance with proper cleanup."""
     client = ProductionRedis()
     yield client
+    # Async cleanup - no need for run_until_complete
     try:
-        loop = asyncio.get_event_loop()
-        if not loop.is_closed():
-            loop.run_until_complete(client.close())
+        await client.close()
     except:
         pass
 
@@ -208,29 +207,28 @@ def circuit_breaker():
     return CircuitBreaker(failure_threshold=5, recovery_timeout=3)
 
 @pytest.fixture
-def cache_manager(redis):
-    """Synchronous fixture returning CacheManager."""
+async def cache_manager(redis):
+    """Async fixture returning CacheManager with proper cleanup."""
     manager = CacheManager(redis)
     yield manager
+    # Async cleanup - no need for run_until_complete
     try:
-        loop = asyncio.get_event_loop()
-        if not loop.is_closed():
-            loop.run_until_complete(manager.cleanup())
+        await manager.cleanup()
     except:
         pass
 
 @pytest.fixture
-def service_registry():
-    """Create service registry without starting async tasks."""
+async def service_registry():
+    """Create service registry without starting async tasks, with proper cleanup."""
     with patch('asyncio.create_task') as mock_create_task:
         mock_create_task.return_value = AsyncMock()
         registry = ServiceRegistry()
         registry._health_check_task = None
     yield registry
+    # Async cleanup - no need for run_until_complete
     try:
-        loop = asyncio.get_event_loop()
-        if registry._http_session and not registry._http_session.closed and not loop.is_closed():
-            loop.run_until_complete(registry._http_session.close())
+        if registry._http_session and not registry._http_session.closed:
+            await registry._http_session.close()
     except:
         pass
 
