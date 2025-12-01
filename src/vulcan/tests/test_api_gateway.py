@@ -39,16 +39,11 @@ from src.vulcan.api_gateway import (
 from src.vulcan.config import AgentConfig
 
 # ============================================================
-# EVENT LOOP FIXTURE
+# EVENT LOOP FIXTURE - Removed, pytest-asyncio handles this
 # ============================================================
-
-@pytest.fixture(scope="function")
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
+# Custom event_loop fixture removed to avoid conflicts with pytest-asyncio 1.3.0
+# pytest-asyncio with asyncio_mode=auto automatically manages event loops
+# Having a custom fixture causes tests to stop/crash when run together
 
 # ============================================================
 # PRODUCTION REDIS MOCK
@@ -176,14 +171,13 @@ class ProductionRedis:
             raise Exception("Simulated network error")
 
 @pytest.fixture
-def redis():
-    """Synchronous fixture that returns a ProductionRedis instance."""
+async def redis():
+    """Async fixture that returns a ProductionRedis instance with proper cleanup."""
     client = ProductionRedis()
     yield client
+    # Async cleanup - no need for run_until_complete
     try:
-        loop = asyncio.get_event_loop()
-        if not loop.is_closed():
-            loop.run_until_complete(client.close())
+        await client.close()
     except:
         pass
 
@@ -192,50 +186,56 @@ def redis():
 # ============================================================
 
 @pytest.fixture
-def auth_manager(event_loop):
-    """Create AuthManager with UserStore."""
+async def auth_manager():
+    """Create AuthManager with UserStore (async fixture)."""
     from src.vulcan.api_gateway import UserStore
     
     user_store = UserStore()
-    event_loop.run_until_complete(user_store.add_user("testuser", "testpass123", roles=["user"], scopes=["read", "write"]))
-    event_loop.run_until_complete(user_store.add_user("admin", "adminpass123", roles=["admin"], scopes=["read", "write", "admin"]))
-    event_loop.run_until_complete(user_store.add_user("production_user_001", "pass123", roles=["user"], scopes=["read", "write"]))
+    await user_store.add_user("testuser", "testpass123", roles=["user"], scopes=["read", "write"])
+    await user_store.add_user("admin", "adminpass123", roles=["admin"], scopes=["read", "write", "admin"])
+    await user_store.add_user("production_user_001", "pass123", roles=["user"], scopes=["read", "write"])
     
     return AuthManager(user_store=user_store, redis_client=None)
 
 @pytest.fixture
 def rate_limiter(redis):
-    """Synchronous fixture returning RateLimiter with redis client."""
+    """
+    Synchronous fixture returning RateLimiter with redis client.
+    
+    Note: This sync fixture depends on the async 'redis' fixture.
+    This is valid - pytest-asyncio correctly resolves async fixtures
+    for sync fixtures that depend on them.
+    """
     return RateLimiter(redis)
 
 @pytest.fixture
 def circuit_breaker():
+    """Synchronous fixture returning CircuitBreaker instance."""
     return CircuitBreaker(failure_threshold=5, recovery_timeout=3)
 
 @pytest.fixture
-def cache_manager(redis):
-    """Synchronous fixture returning CacheManager."""
+async def cache_manager(redis):
+    """Async fixture returning CacheManager with proper cleanup."""
     manager = CacheManager(redis)
     yield manager
+    # Async cleanup - no need for run_until_complete
     try:
-        loop = asyncio.get_event_loop()
-        if not loop.is_closed():
-            loop.run_until_complete(manager.cleanup())
+        await manager.cleanup()
     except:
         pass
 
 @pytest.fixture
-def service_registry():
-    """Create service registry without starting async tasks."""
+async def service_registry():
+    """Create service registry without starting async tasks, with proper cleanup."""
     with patch('asyncio.create_task') as mock_create_task:
         mock_create_task.return_value = AsyncMock()
         registry = ServiceRegistry()
         registry._health_check_task = None
     yield registry
+    # Async cleanup - no need for run_until_complete
     try:
-        loop = asyncio.get_event_loop()
-        if registry._http_session and not registry._http_session.closed and not loop.is_closed():
-            loop.run_until_complete(registry._http_session.close())
+        if registry._http_session and not registry._http_session.closed:
+            await registry._http_session.close()
     except:
         pass
 

@@ -8,6 +8,10 @@ so that `from vulcan.xxx import yyy` style imports work correctly.
 import sys
 import pathlib
 import pytest
+import asyncio
+import warnings
+import threading
+import gc
 from unittest.mock import Mock
 
 # Add src directory to Python path
@@ -15,6 +19,77 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]  # Go up to repo root
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+
+# Thread leak tolerance - Allow up to 2 extra threads after test
+# This accounts for:
+# - Temporary daemon threads that may not have exited yet
+# - Background cleanup threads from pytest plugins
+THREAD_LEAK_TOLERANCE = 2
+
+
+@pytest.fixture(scope="function", autouse=True)
+def cleanup_resources():
+    """
+    Cleanup resources after each test to prevent leaks and crashes.
+    
+    This fixture ensures:
+    1. Each test starts with a clean event loop state
+    2. Any pending tasks are properly cancelled after test
+    3. Event loop is properly closed to prevent resource leaks
+    4. Orphaned threads are tracked (but not forcefully killed)
+    5. Garbage collection runs to free memory
+    
+    This prevents tests from stopping/crashing when run together.
+    """
+    # Track threads before test
+    initial_thread_count = threading.active_count()
+    
+    yield
+    
+    # Cleanup after test
+    # 1. Clean up asyncio event loop
+    # NOTE: We use run_until_complete here because this cleanup fixture is sync.
+    # This is the correct pattern for cleaning up async resources from a sync context.
+    # The alternative (making this fixture async) would not work as pytest needs
+    # to run cleanup after the test completes, which requires sync context.
+    try:
+        loop = asyncio.get_event_loop()
+        if loop and not loop.is_closed():
+            # Cancel all pending tasks
+            try:
+                pending = asyncio.all_tasks(loop)
+            except RuntimeError:
+                # If we can't get tasks, that's okay
+                pending = []
+            
+            for task in pending:
+                task.cancel()
+            
+            # Give tasks a moment to cancel - only if loop is not running
+            if pending and not loop.is_running():
+                try:
+                    # Gather all tasks to cancel them properly
+                    # This is safe in cleanup context as we're in a sync fixture
+                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                except (RuntimeError, asyncio.TimeoutError, Exception):
+                    # Loop might be closed, running, or tasks failed - that's okay in cleanup
+                    pass
+    except RuntimeError:
+        # No event loop in current thread - that's fine
+        pass
+    except Exception as e:
+        # Log but don't fail the test
+        warnings.warn(f"Event loop cleanup error: {e}")
+    
+    # 2. Force garbage collection to free resources
+    gc.collect()
+    
+    # 3. Check for thread leaks (warn only, don't fail)
+    final_thread_count = threading.active_count()
+    if final_thread_count > initial_thread_count + THREAD_LEAK_TOLERANCE:
+        warnings.warn(
+            f"Possible thread leak: {initial_thread_count} -> {final_thread_count} threads"
+        )
 
 
 @pytest.fixture(scope="session", autouse=True)
