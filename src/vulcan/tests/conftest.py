@@ -20,6 +20,12 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+# Thread leak tolerance - Allow up to 2 extra threads after test
+# This accounts for:
+# - Temporary daemon threads that may not have exited yet
+# - Background cleanup threads from pytest plugins
+THREAD_LEAK_TOLERANCE = 2
+
 
 @pytest.fixture(scope="function", autouse=True)
 def cleanup_resources():
@@ -55,12 +61,15 @@ def cleanup_resources():
             for task in pending:
                 task.cancel()
             
-            # Give tasks a moment to cancel
-            if pending:
+            # Give tasks a moment to cancel - only if loop is not running
+            if pending and not loop.is_running():
                 try:
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                except RuntimeError:
-                    # Loop might be closed or not running, that's okay
+                    # Use wait with timeout to prevent deadlocks
+                    loop.run_until_complete(
+                        asyncio.wait(pending, timeout=1.0, return_when=asyncio.ALL_COMPLETED)
+                    )
+                except (RuntimeError, asyncio.TimeoutError):
+                    # Loop might be closed, running, or tasks took too long - that's okay
                     pass
     except RuntimeError:
         # No event loop in current thread - that's fine
@@ -74,7 +83,7 @@ def cleanup_resources():
     
     # 3. Check for thread leaks (warn only, don't fail)
     final_thread_count = threading.active_count()
-    if final_thread_count > initial_thread_count + 2:  # Allow small variance
+    if final_thread_count > initial_thread_count + THREAD_LEAK_TOLERANCE:
         warnings.warn(
             f"Possible thread leak: {initial_thread_count} -> {final_thread_count} threads"
         )
