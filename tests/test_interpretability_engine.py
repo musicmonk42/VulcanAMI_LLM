@@ -11,6 +11,9 @@ import sys
 from unittest.mock import Mock, MagicMock, patch
 from pathlib import Path
 
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for interpretability engine tests")
+
 # FIX: Import the module to access the internal _SingletonMeta
 import interpretability_engine as ie 
 from interpretability_engine import (

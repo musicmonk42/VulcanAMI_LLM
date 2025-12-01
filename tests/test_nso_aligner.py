@@ -11,6 +11,9 @@ import hashlib # FIX: Added missing import for cache test
 from unittest.mock import Mock, MagicMock, patch
 from pathlib import Path
 
+# Skip entire module if torch is not available (nso_aligner requires torch)
+torch = pytest.importorskip("torch", reason="PyTorch required for nso_aligner tests")
+
 # Assuming nso_aligner.py is in the same directory or accessible via PYTHONPATH
 # If it's in a 'src' directory, adjust import accordingly (e.g., from src.nso_aligner import ...)
 from nso_aligner import (

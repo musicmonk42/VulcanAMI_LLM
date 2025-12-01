@@ -4,12 +4,14 @@ Comprehensive test suite for analog_photonic_emulator.py
 
 import pytest
 import numpy as np
-import torch
 import tempfile
 import shutil
 import time
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for analog photonic emulator tests")
 
 from analog_photonic_emulator import (
     AnalogPhotonicEmulator,

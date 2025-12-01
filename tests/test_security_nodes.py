@@ -11,6 +11,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
+# Skip entire module if torch is not available (security_nodes imports nso_aligner which requires torch)
+torch = pytest.importorskip("torch", reason="PyTorch required for security_nodes tests (via nso_aligner)")
+
 from security_nodes import (
     EncryptNode,
     PolicyNode,
