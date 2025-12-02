@@ -72,11 +72,9 @@ def test_session_finish_will_clear_handlers():
     """
     
     # Check that we can access the atexit internals
-    import atexit as atexit_module
-    
-    if hasattr(atexit_module, '_exithandlers'):
+    if hasattr(atexit, '_exithandlers'):
         # We can see the handlers list exists
-        handlers = atexit_module._exithandlers
+        handlers = atexit._exithandlers
         assert isinstance(handlers, list), \
             "_exithandlers should be a list"
         
