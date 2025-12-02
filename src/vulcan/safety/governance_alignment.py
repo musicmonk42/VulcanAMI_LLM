@@ -131,12 +131,29 @@ class GovernanceManager:
             cls._instance = super().__new__(cls)
         return cls._instance
     
+    @classmethod
+    def reset_instance(cls):
+        """Reset the singleton instance. Used for testing."""
+        if cls._instance is not None:
+            # Try to shutdown cleanly if possible
+            try:
+                if hasattr(cls._instance, '_shutdown_event') and not cls._instance._shutdown_event.is_set():
+                    cls._instance.shutdown()
+            except Exception:
+                pass
+        cls._instance = None
+    
+    @property
+    def _shutdown(self) -> bool:
+        """Property to check if manager is shutdown."""
+        return self._shutdown_event.is_set() if hasattr(self, '_shutdown_event') else False
+    
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize governance manager.
         
         Args:
-            config: Configuration options
+            config: Configuration options (set 'skip_default_policies': True to skip)
         """
         # Prevent re-running __init__ logic on re-import
         if getattr(self, "_initialized", False):
@@ -190,8 +207,9 @@ class GovernanceManager:
             'average_response_time': deque(maxlen=100)
         })
         
-        # NOTE: Initialization of default policies is now handled
-        # by the external initialize_governance() function.
+        # Initialize default policies unless explicitly disabled
+        if not self.config.get('skip_default_policies', False):
+            self._initialize_default_policies()
         
         # Register cleanup
         # atexit.register(self.shutdown) # Removed for test suite compatibility
@@ -276,6 +294,84 @@ class GovernanceManager:
             'human_override': self._escalate_to_human,
             'regulatory_review': self._escalate_to_regulatory
         }
+    
+    def _initialize_default_policies(self):
+        """Initialize default governance policies."""
+        # Autonomous operation policy
+        self.add_policy(GovernancePolicy(
+            policy_id="autonomous_default",
+            name="Autonomous Operation",
+            description="Default policy for autonomous operation",
+            level=GovernanceLevel.AUTONOMOUS,
+            stakeholders=[StakeholderType.AI_SYSTEM],
+            approval_threshold=0.0,
+            timeout_seconds=1.0
+        ))
+        
+        # Human supervision policy
+        self.add_policy(GovernancePolicy(
+            policy_id="human_supervised",
+            name="Human Supervised",
+            description="Requires human supervision for critical decisions",
+            level=GovernanceLevel.SUPERVISED,
+            stakeholders=[StakeholderType.OPERATOR, StakeholderType.AI_SYSTEM],
+            approval_threshold=0.5,
+            timeout_seconds=30.0,
+            escalation_policy="committee_review"
+        ))
+        
+        # Human assisted policy
+        self.add_policy(GovernancePolicy(
+            policy_id="human_assisted",
+            name="Human Assisted",
+            description="Human assistance for important decisions",
+            level=GovernanceLevel.HUMAN_ASSISTED,
+            stakeholders=[StakeholderType.OPERATOR],
+            approval_threshold=0.5,
+            timeout_seconds=60.0,
+            escalation_policy="human_supervised"
+        ))
+        
+        # Safety-critical policy
+        self.add_policy(GovernancePolicy(
+            policy_id="safety_critical",
+            name="Safety Critical",
+            description="High-risk actions requiring safety officer approval",
+            level=GovernanceLevel.HUMAN_CONTROLLED,
+            stakeholders=[StakeholderType.SAFETY_OFFICER],
+            approval_threshold=1.0,
+            timeout_seconds=60.0,
+            escalation_policy="emergency_stop"
+        ))
+        
+        # Committee decision policy
+        self.add_policy(GovernancePolicy(
+            policy_id="committee_review",
+            name="Committee Review",
+            description="Requires ethics board review",
+            level=GovernanceLevel.COMMITTEE,
+            stakeholders=[
+                StakeholderType.ETHICS_BOARD,
+                StakeholderType.SAFETY_OFFICER,
+                StakeholderType.OPERATOR
+            ],
+            approval_threshold=0.66,  # 2/3 majority
+            timeout_seconds=300.0,
+            escalation_policy="emergency_stop"
+        ))
+        
+        # Emergency governance
+        self.add_policy(GovernancePolicy(
+            policy_id="emergency_stop",
+            name="Emergency Protocol",
+            description="Emergency shutdown protocol",
+            level=GovernanceLevel.EMERGENCY,
+            stakeholders=[StakeholderType.SAFETY_OFFICER],
+            approval_threshold=0.0,  # Immediate action
+            timeout_seconds=0.1
+        ))
+        
+        logger.info("Default governance policies initialized")
     
     def _start_cleanup_thread(self):
         """Start background thread for cleaning old data."""
