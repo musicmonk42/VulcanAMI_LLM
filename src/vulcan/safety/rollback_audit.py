@@ -247,6 +247,14 @@ class RollbackManager:
                 timeout=30.0
             )
             
+            # Enable WAL mode for better concurrency
+            try:
+                self.conn.execute('PRAGMA journal_mode=WAL')
+                self.conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.warning(f"Could not enable WAL mode: {e}")
+            
             self.conn.execute('''
                 CREATE TABLE IF NOT EXISTS snapshots (
                     snapshot_id TEXT PRIMARY KEY,
@@ -300,6 +308,44 @@ class RollbackManager:
         
         # Load existing snapshots
         self._load_snapshots_from_storage()
+    
+    def _execute_with_retry(self, operation, max_retries=3, initial_delay=0.1):
+        """
+        Execute a database operation with retry logic for handling locks.
+        
+        Args:
+            operation: Callable that performs the database operation
+            max_retries: Maximum number of retry attempts
+            initial_delay: Initial delay between retries (doubles each time)
+        
+        Returns:
+            Result of the operation, or None if all retries failed
+        """
+        delay = initial_delay
+        
+        for attempt in range(max_retries):
+            try:
+                return operation()
+            except sqlite3.OperationalError as e:
+                # Check specifically for "database is locked"
+                if "database is locked" in str(e):
+                    if attempt < max_retries - 1:
+                        # Don't log on every retry, only after final failure
+                        time.sleep(delay)
+                        delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        # Final attempt failed, log the error
+                        logger.error(f"Database operation failed after {max_retries} retries: {e}")
+                        return None
+                else:
+                    # Different error, don't retry
+                    logger.error(f"Database error: {e}")
+                    return None
+            except Exception as e:
+                # Unexpected error, don't retry
+                logger.error(f"Unexpected error in database operation: {e}")
+                return None
     
     def _load_snapshots_from_storage(self):
         """Load existing snapshots from persistent storage."""
@@ -726,16 +772,19 @@ class RollbackManager:
                 del self.quarantine[qid]
                 logger.info(f"Removed expired quarantine entry: {qid}")
 
-        # Clean from database
-        with self.db_lock:
-            try:
+        # Clean from database with retry logic
+        def cleanup_operation():
+            with self.db_lock:
                 self.conn.execute(
                     'DELETE FROM quarantine WHERE expiry < ?',
                     (current_time,)
                 )
                 self.conn.commit()
-            except sqlite3.Error as e:
-                logger.error(f"Database error cleaning quarantine: {e}")
+                return True
+        
+        result = self._execute_with_retry(cleanup_operation)
+        if result is None:
+            logger.error("Failed to clean expired quarantine from database after retries")
     
     def _cleanup_old_snapshots(self):
         """Clean up old snapshots based on retention policy."""
@@ -745,17 +794,19 @@ class RollbackManager:
 
         cutoff_time = time.time() - (self.snapshot_retention_days * 86400)
         
-        # Find old snapshots
-        with self.db_lock:
-            try:
+        # Find old snapshots with retry logic
+        def find_old_snapshots():
+            with self.db_lock:
                 cursor = self.conn.execute(
                     'SELECT snapshot_id, file_path FROM snapshots WHERE timestamp < ?',
                     (cutoff_time,)
                 )
-                old_snapshots = cursor.fetchall()
-            except sqlite3.Error as e:
-                logger.error(f"Database error finding old snapshots: {e}")
-                return
+                return cursor.fetchall()
+        
+        old_snapshots = self._execute_with_retry(find_old_snapshots)
+        if old_snapshots is None:
+            logger.error("Failed to find old snapshots from database after retries")
+            return
         
         for row in old_snapshots:
             # Check shutdown flag before processing each snapshot
@@ -782,16 +833,19 @@ class RollbackManager:
             
             logger.info(f"Cleaned up old snapshot: {snapshot_id}")
 
-        # Clean from database
-        with self.db_lock:
-            try:
+        # Clean from database with retry logic
+        def cleanup_operation():
+            with self.db_lock:
                 self.conn.execute(
                     'DELETE FROM snapshots WHERE timestamp < ?',
                     (cutoff_time,)
                 )
                 self.conn.commit()
-            except sqlite3.Error as e:
-                logger.error(f"Database error deleting old snapshots: {e}")
+                return True
+        
+        result = self._execute_with_retry(cleanup_operation)
+        if result is None:
+            logger.error("Failed to delete old snapshots from database after retries")
     
     def _start_cleanup_thread(self):
         """Start background thread for cleanup tasks."""
@@ -1091,6 +1145,14 @@ class AuditLogger:
                 isolation_level='DEFERRED',
                 timeout=30.0
             )
+            
+            # Enable WAL mode for better concurrency
+            try:
+                self.conn.execute('PRAGMA journal_mode=WAL')
+                self.conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
+                self.conn.commit()
+            except sqlite3.Error as e:
+                logger.warning(f"Could not enable WAL mode: {e}")
             
             self.conn.execute('''
                 CREATE TABLE IF NOT EXISTS audit_entries (
