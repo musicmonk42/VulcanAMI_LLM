@@ -152,12 +152,15 @@ class AdversarialValidator:
             random.seed(random_seed)
             torch.manual_seed(random_seed)
         
+        # Always update core parameters even for existing singleton instance
+        # This allows tests to create instances with different parameters
+        self.epsilon = epsilon
+        self.num_attacks = num_attacks
+        
         if getattr(self, "_initialized", False):
             return
         
         self.config = config or {}
-        self.epsilon = epsilon
-        self.num_attacks = num_attacks
         
         # Thread safety
         self.lock = threading.RLock()

@@ -523,6 +523,10 @@ class TestToolSafetyGovernor:
     
     def test_initialization(self):
         """Test governor initialization."""
+        # Reset singleton first for clean state
+        ToolSafetyManager._instance = None
+        ToolSafetyGovernor._instance = None
+        
         governor = ToolSafetyGovernor()
         
         assert governor.tool_safety_manager is not None
@@ -530,6 +534,10 @@ class TestToolSafetyGovernor:
         assert governor._shutdown is False
         
         governor.shutdown()
+        
+        # Reset singleton after shutdown so it doesn't affect other tests
+        ToolSafetyManager._instance = None
+        ToolSafetyGovernor._instance = None
     
     def test_govern_tool_selection_basic(self, tool_safety_governor):
         """Test basic tool selection governance."""
