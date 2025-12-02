@@ -1,12 +1,18 @@
 """
 test_semantic_bridge_integration.py - PURE MOCK VERSION
 Integration tests for semantic bridge without spawning threads.
+
+FIXES APPLIED (corrected version):
+1. Concept class: Fixed concept_id generation to use a thread-safe counter instead of
+   id(object()) which was producing duplicate IDs due to memory address reuse.
+   This fixes test_multiple_outcomes and test_concurrent_learning.
 """
 
 import pytest
 import numpy as np
 import time
 import threading
+import itertools
 import tempfile
 import shutil
 from pathlib import Path
@@ -20,6 +26,15 @@ from unittest.mock import Mock
 # ============================================================================
 # Mock Enums
 # ============================================================================
+
+# Thread-safe counter for generating unique concept IDs
+_concept_id_counter = itertools.count(1)
+_concept_id_lock = threading.Lock()
+
+def _generate_concept_id():
+    """Generate a unique concept ID in a thread-safe manner."""
+    with _concept_id_lock:
+        return f"concept_{next(_concept_id_counter)}_{int(time.time()*1000000)%1000000}"
 
 class GroundingStatus(Enum):
     UNGROUNDED = "ungrounded"
@@ -70,7 +85,7 @@ class Concept:
     pattern_signature: str
     grounded_effects: List[MeasurableEffect] = field(default_factory=list)
     confidence: float = 0.8
-    concept_id: str = field(default_factory=lambda: f"concept_{id(object())}_{int(time.time()*1000000)%1000000}")
+    concept_id: str = field(default_factory=_generate_concept_id)  # Fixed: use thread-safe counter
     domains: Set[str] = field(default_factory=set)
     usage_count: int = 0
     success_rate: float = 0.8
