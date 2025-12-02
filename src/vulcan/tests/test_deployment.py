@@ -1,5 +1,5 @@
 # ============================================================
-# VULCAN-AGI Orchestrator - Deployment Tests (SIMPLIFIED)
+# VULCAN-AGI Orchestrator - Deployment Tests 
 # Avoids thread spawning by delaying imports and using simpler mocks
 # ============================================================
 
