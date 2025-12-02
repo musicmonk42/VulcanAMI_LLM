@@ -117,6 +117,11 @@ class AttackConfig:
     confidence: float = 0.0  # Confidence for C&W attack
     max_iterations: int = 100  # Maximum iterations for optimization-based attacks
     early_stop: bool = True  # Early stopping for efficiency
+    
+    @property
+    def step_size(self) -> float:
+        """Alias for alpha (step size for iterative attacks)."""
+        return self.alpha
 
 class AdversarialValidator:
     """
@@ -257,6 +262,43 @@ class AdversarialValidator:
             'certified_defense': self._defense_certified,
             'detection': self._defense_detection
         }
+    
+    def _perturb_embedding(self, action: Dict[str, Any], epsilon: float = 0.1, 
+                          num_perturbations: int = 5) -> List[Dict[str, Any]]:
+        """
+        Perturb action embedding with bounded noise.
+        
+        Args:
+            action: Action containing embedding to perturb
+            epsilon: Maximum perturbation magnitude
+            num_perturbations: Number of perturbations to generate
+            
+        Returns:
+            List of perturbed actions
+        """
+        perturbations = []
+        
+        if 'embedding' not in action or action['embedding'] is None:
+            return perturbations
+        
+        embedding = np.array(action['embedding'])
+        
+        for _ in range(num_perturbations):
+            # Generate random perturbation within epsilon ball
+            perturbation = np.random.uniform(-epsilon, epsilon, size=embedding.shape)
+            
+            # Apply perturbation
+            perturbed_embedding = embedding + perturbation
+            
+            # Create perturbed action
+            perturbed_action = copy.deepcopy(action)
+            perturbed_action['embedding'] = perturbed_embedding.tolist()
+            perturbed_action['perturbed'] = True
+            perturbed_action['perturbation_epsilon'] = epsilon
+            
+            perturbations.append(perturbed_action)
+        
+        return perturbations
     
     def validate_robustness(self, action: Dict[str, Any], context: Dict[str, Any], 
                            validator: Optional[Callable] = None,
@@ -1137,16 +1179,36 @@ class AdversarialValidator:
         
         return float(changes)
     
-    def _calculate_robustness_score(self, attack_results: List[Dict[str, Any]]) -> float:
+    def _calculate_robustness_score(self, attack_results: Union[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]) -> float:
         """
         Calculate overall robustness score.
         
         Args:
-            attack_results: Results from attacks
+            attack_results: Results from attacks (list of dicts or dict of attack_type->results)
             
         Returns:
             Robustness score (0-1)
         """
+        if not attack_results:
+            return 1.0
+        
+        # Handle dict input format: {'fgsm': {'success_rate': 0.2, ...}, ...}
+        if isinstance(attack_results, dict):
+            # Convert dict format to list format for processing
+            results_list = []
+            for attack_type, result_data in attack_results.items():
+                if isinstance(result_data, dict):
+                    # Convert success_rate to successful flag
+                    success_rate = result_data.get('success_rate', 0)
+                    successful = success_rate > 0.5  # Consider attack successful if >50% success rate
+                    results_list.append({
+                        'attack_type': attack_type,
+                        'successful': successful,
+                        'success_rate': success_rate,
+                        **result_data
+                    })
+            attack_results = results_list
+        
         if not attack_results:
             return 1.0
         
