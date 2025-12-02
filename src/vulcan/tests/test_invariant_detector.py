@@ -1,5 +1,5 @@
 """
-test_invariant_detector.py -
+test_invariant_detector.py - PURE MOCK VERSION
 Tests invariant detector functionality without spawning threads.
 """
 
@@ -35,7 +35,7 @@ class Invariant:
     parameters: Dict[str, Any] = field(default_factory=dict)
     violation_count: int = 0
     validation_count: int = 0
-    id: str = field(default_factory=lambda: f"inv_{int(time.time()*1000)%100000}")
+    id: str = field(default_factory=lambda: f"inv_{id(object())}_{int(time.time()*1000000)%1000000}")
     
     def to_dict(self) -> Dict:
         return {
@@ -526,7 +526,8 @@ class TestInvariantRegistry:
         assert registry.remove(inv_id) == True
         assert registry.get(inv_id) is None
     
-    def test_statistics(self, registry, multiple_invariants):
+    def test_statistics(self, multiple_invariants):
+        registry = MockInvariantRegistry()  # Fresh registry
         for inv in multiple_invariants:
             registry.register(inv)
         
@@ -586,7 +587,8 @@ class TestInvariantDetector:
         result = detector.validate_state({'x': 5.0, 'y': 6.0})
         assert result['valid'] == False
     
-    def test_get_statistics(self, detector, multiple_invariants):
+    def test_get_statistics(self, multiple_invariants):
+        detector = MockInvariantDetector()  # Fresh detector
         for inv in multiple_invariants:
             detector.registry.register(inv)
         
@@ -595,7 +597,9 @@ class TestInvariantDetector:
 
 
 class TestThreadSafety:
-    def test_concurrent_registration(self, registry):
+    def test_concurrent_registration(self):
+        registry = MockInvariantRegistry()  # Fresh registry
+        
         def register_invariants(thread_id):
             for i in range(10):
                 inv = Invariant(
