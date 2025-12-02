@@ -168,7 +168,10 @@ class MockRuntime(MagicMock):
 
         # Validator mock setup
         # Use the imported or fallback GraphValidator_class for spec if available
-        validator_spec = GraphValidator_class if GraphValidator_class else object
+        # FIX: Don't use GraphValidator_class as spec if it's already a Mock to avoid InvalidSpecError
+        validator_spec = object  # Default to object
+        if GraphValidator_class is not None and not isinstance(GraphValidator_class, (Mock, MagicMock)):
+            validator_spec = GraphValidator_class
         self.validator = MagicMock(name='mock.validator', spec=validator_spec)
         self.validator.validate_graph = Mock(return_value=ValidationResult(True, [], {}))
         self.validator.validate_graph.return_value.to_dict = Mock(return_value={'valid': True, 'errors': [], 'warnings': {}})
@@ -235,10 +238,21 @@ class MockRuntime(MagicMock):
         return mock_gen()
 
 
-@pytest.fixture(scope="function")
-def patch_runtime_class_for_tests():
+# Unified autouse fixture for all test classes - patches UnifiedRuntime and cleans up global state
+@pytest.fixture(scope="function", autouse=True)
+def patch_and_cleanup_runtime():
+    """Patch UnifiedRuntime with MockRuntime and cleanup global state for all tests."""
+    urc._global_runtime = None
     with patch('src.unified_runtime.unified_runtime_core.UnifiedRuntime', MockRuntime) as mock_rt:
         yield mock_rt
+    urc._global_runtime = None
+
+
+@pytest.fixture(scope="function")
+def patch_runtime_class_for_tests():
+    """Legacy fixture for backward compatibility - delegates to autouse fixture."""
+    # This fixture is now redundant but kept for any tests that explicitly request it
+    yield  # The patching is done by patch_and_cleanup_runtime
 
 @pytest.fixture
 def mocked_runtime_instance(patch_runtime_class_for_tests, config):
@@ -510,15 +524,9 @@ class TestUnifiedRuntime:
         runtime.execution_cache.clear.assert_called_once()
 
 
-# Fixture to handle patching and cleanup for module-level tests
-@pytest.fixture(scope="function", autouse=True)
-def cleanup_global_runtime_state_module():
-    urc._global_runtime = None
-    with patch('src.unified_runtime.unified_runtime_core.UnifiedRuntime', MockRuntime) as MockRuntime_mock:
-         yield MockRuntime_mock
-    urc._global_runtime = None
 
 
+@pytest.mark.usefixtures("patch_runtime_class_for_tests")
 class TestModuleLevelFunctions:
 
     def test_get_runtime_creates_instance(self):
@@ -613,7 +621,7 @@ class TestIOGovernance:
 
 
 # Fixture to handle patching for Component Integration tests
-@pytest.fixture(scope="class", autouse=True)
+@pytest.fixture(scope="class", autouse=False)
 def patch_runtime_for_ci_class(request): # request needed for class scope
     patcher = patch('src.unified_runtime.unified_runtime_core.UnifiedRuntime', MockRuntime)
     MockRuntime_mock = patcher.start()
@@ -623,6 +631,7 @@ def patch_runtime_for_ci_class(request): # request needed for class scope
     urc._global_runtime = None
 
 
+@pytest.mark.usefixtures("patch_runtime_for_ci_class")
 class TestComponentIntegration:
     @pytest.fixture
     def temp_dir_ci(self):
@@ -653,12 +662,12 @@ class TestComponentIntegration:
         assert isinstance(runtime.extensions, MagicMock)
 
 
-# Use the function-scoped patcher/cleaner for subsequent classes
-@pytest.fixture(scope="function", autouse=True)
+# Fixture for cleaning up global runtime state without patching (manual MockRuntime usage)
+@pytest.fixture(scope="function", autouse=False)
 def cleanup_global_runtime_state_func(): # Renamed to avoid conflicts
+    """Clean up global runtime state between tests without applying patches."""
     urc._global_runtime = None
-    with patch('src.unified_runtime.unified_runtime_core.UnifiedRuntime', MockRuntime) as MockRuntime_mock:
-         yield MockRuntime_mock
+    yield
     urc._global_runtime = None
 
 
