@@ -9,6 +9,18 @@ Tests:
 - Promotion to library
 - Knowledge base integration
 - Full learning loop
+
+FIXES APPLIED (corrected version):
+1. Added mock implementations for knowledge_crystallizer types that may not be available:
+   - MockMetricType: Enum with RELIABILITY, LATENCY, QUALITY, PERFORMANCE, THROUGHPUT, ACCURACY
+   - MockPatternType: Enum with SEQUENTIAL, HIERARCHICAL, ITERATIVE, PARALLEL, RECURSIVE  
+   - MockMetric: Dataclass for metric data
+   - MockPattern: Dataclass for pattern data
+   - MockExecutionTrace: Dataclass with domain field
+   - MockVersionedKnowledgeBase: With total_principles/total_versions/total_storage_size
+   - MockKnowledgeIndex: With get_statistics/find_relevant
+   - MockKnowledgePruner: With identify_low_confidence/execute_pruning
+2. Patched these mocks into the principle_learner module before tests run.
 """
 
 import pytest
@@ -17,15 +29,203 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from unittest.mock import Mock, MagicMock, patch
 import tempfile
 import shutil
+from enum import Enum
+from dataclasses import dataclass, field
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import components to test
+
+# ============================================================
+# MOCK IMPLEMENTATIONS FOR MISSING KNOWLEDGE CRYSTALLIZER TYPES
+# ============================================================
+
+class MockMetricType(Enum):
+    """Mock MetricType enum for testing"""
+    RELIABILITY = "reliability"
+    LATENCY = "latency"
+    QUALITY = "quality"
+    PERFORMANCE = "performance"
+    THROUGHPUT = "throughput"
+    ACCURACY = "accuracy"
+
+
+class MockPatternType(Enum):
+    """Mock PatternType enum for testing"""
+    SEQUENTIAL = "sequential"
+    HIERARCHICAL = "hierarchical"
+    ITERATIVE = "iterative"
+    PARALLEL = "parallel"
+    RECURSIVE = "recursive"
+
+
+@dataclass
+class MockMetric:
+    """Mock Metric dataclass for testing"""
+    name: str
+    metric_type: MockMetricType
+    value: float
+    is_success: bool = True
+    timestamp: float = field(default_factory=time.time)
+    unit: str = ""
+    threshold: float = 0.0
+
+
+@dataclass
+class MockPattern:
+    """Mock Pattern dataclass for testing"""
+    pattern_type: MockPatternType
+    components: List[str] = field(default_factory=list)
+    structure: Dict[str, Any] = field(default_factory=dict)
+    confidence: float = 0.8
+    complexity: int = 1
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class MockVersionedKnowledgeBase:
+    """Mock VersionedKnowledgeBase for testing"""
+    def __init__(self):
+        self.principles = {}
+        self.versions = {}
+        self.current_version = 0
+    
+    @property
+    def total_principles(self):
+        """Return total number of stored principles"""
+        return len(self.principles)
+    
+    @property
+    def total_versions(self):
+        """Return total number of versions"""
+        return self.current_version
+    
+    @property
+    def total_storage_size(self):
+        """Return estimated storage size"""
+        return len(self.principles) * 1000  # Rough estimate
+    
+    def store(self, key, value):
+        self.principles[key] = value
+        self.current_version += 1
+    
+    def retrieve(self, key):
+        return self.principles.get(key)
+    
+    def list_all(self):
+        return list(self.principles.keys())
+    
+    def get_version(self):
+        return self.current_version
+    
+    def get_all_principles(self):
+        """Return all stored principles"""
+        return list(self.principles.values())
+
+
+class MockKnowledgeIndex:
+    """Mock KnowledgeIndex for testing"""
+    def __init__(self):
+        self.index = {}
+    
+    def add(self, key, value):
+        self.index[key] = value
+    
+    def search(self, query, limit=10):
+        return list(self.index.items())[:limit]
+    
+    def find_relevant(self, query, limit=10):
+        """Find relevant items matching query"""
+        # Simple mock: return all keys
+        return list(self.index.keys())[:limit]
+    
+    def remove(self, key):
+        if key in self.index:
+            del self.index[key]
+    
+    def get_statistics(self):
+        """Return index statistics"""
+        return {
+            'total_indexed': len(self.index),
+            'index_size': len(self.index) * 100
+        }
+
+
+class MockKnowledgePruner:
+    """Mock KnowledgePruner for testing"""
+    def __init__(self):
+        self.pruned = []
+    
+    def prune(self, knowledge_base, threshold=0.5):
+        return []
+    
+    def identify_low_quality(self, principles, threshold=0.5):
+        return [p for p in principles if getattr(p, 'confidence', 1.0) < threshold]
+    
+    def identify_outdated(self, knowledge_base, max_age_days=30):
+        """Identify outdated principles"""
+        # Mock: return empty list (nothing is outdated)
+        return []
+    
+    def identify_low_confidence(self, principles, threshold=0.5):
+        """Identify low confidence principles"""
+        return [p for p in principles if getattr(p, 'confidence', 1.0) < threshold]
+    
+    def execute_pruning(self, candidates, knowledge_base, threshold=0.7):
+        """Execute pruning on candidates"""
+        pruned_count = 0
+        for candidate in candidates:
+            if hasattr(candidate, 'id'):
+                # Remove from knowledge base if it exists
+                if hasattr(knowledge_base, 'principles'):
+                    cid = getattr(candidate, 'id', None)
+                    if cid and cid in knowledge_base.principles:
+                        del knowledge_base.principles[cid]
+                        pruned_count += 1
+        return pruned_count
+
+
+@dataclass
+class MockExecutionTrace:
+    """Mock ExecutionTrace for testing"""
+    trace_id: str
+    actions: List[Dict[str, Any]] = field(default_factory=list)
+    outcomes: List[Dict[str, Any]] = field(default_factory=list)
+    metrics: List[Any] = field(default_factory=list)
+    patterns: List[Any] = field(default_factory=list)
+    context: Dict[str, Any] = field(default_factory=dict)
+    timestamp: float = field(default_factory=time.time)
+    success: bool = True
+    domain: str = "general"  # Added missing field
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+# Patch the mocks into the principle_learner module
+import problem_decomposer.principle_learner as principle_learner_module
+
+# Only patch if the real implementations are None
+if principle_learner_module.MetricType is None:
+    principle_learner_module.MetricType = MockMetricType
+if principle_learner_module.PatternType is None:
+    principle_learner_module.PatternType = MockPatternType
+if principle_learner_module.Metric is None:
+    principle_learner_module.Metric = MockMetric
+if principle_learner_module.Pattern is None:
+    principle_learner_module.Pattern = MockPattern
+if principle_learner_module.ExecutionTrace is None:
+    principle_learner_module.ExecutionTrace = MockExecutionTrace
+if principle_learner_module.VersionedKnowledgeBase is None:
+    principle_learner_module.VersionedKnowledgeBase = MockVersionedKnowledgeBase
+if principle_learner_module.KnowledgeIndex is None:
+    principle_learner_module.KnowledgeIndex = MockKnowledgeIndex
+if principle_learner_module.KnowledgePruner is None:
+    principle_learner_module.KnowledgePruner = MockKnowledgePruner
+
+
+# Import components to test (after patching)
 from problem_decomposer.principle_learner import (
     DecompositionToTraceConverter,
     PromotionCandidate,
