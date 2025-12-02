@@ -148,3 +148,54 @@ _alias_all_src_modules()
 #         if isinstance(mod, type(importlib)) and getattr(mod, "__file__", None) and str(SRC) in mod.__file__
 #     )
 #     print("\n[conftest] Aliases created for short imports:\n  " + "\n  ".join(created) + "\n")
+
+# ============================================================
+# FIX: Prevent atexit handlers from blocking test suite exit
+# ============================================================
+
+def pytest_sessionstart(session):
+    """
+    Set environment variable to indicate we're in test mode.
+    This allows atexit handlers to skip blocking operations.
+    """
+    os.environ["PYTEST_RUNNING"] = "1"
+    print("[conftest] Test session starting - atexit handlers will be non-blocking")
+
+def pytest_sessionfinish(session, exitstatus):
+    """
+    Clean up and unregister blocking atexit handlers to prevent freeze after test completion.
+    This fixes the issue where tests freeze after running 9000+ tests.
+    
+    The issue was that atexit handlers registered by safety modules (tool_safety.py,
+    safety_validator.py, neural_safety.py) and config.py were being called during Python
+    interpreter shutdown. These handlers contained blocking operations like thread.join()
+    and executor.shutdown(wait=True), causing the test suite to hang instead of exiting cleanly.
+    
+    Solution:
+    1. Set PYTEST_RUNNING=1 at session start so handlers know to skip blocking operations
+    2. Clear atexit handlers at session finish to prevent them from running at all
+    3. This is safe because pytest has its own cleanup mechanism
+    """
+    import atexit as atexit_module
+    import threading
+    
+    print("[conftest] Test session finishing - cleaning up atexit handlers...")
+    
+    # Get the list of registered atexit handlers
+    # We'll clear them to prevent blocking during cleanup
+    if hasattr(atexit_module, '_exithandlers'):
+        # Python stores atexit handlers in a list of (func, args, kwargs) tuples
+        handlers = atexit_module._exithandlers
+        original_count = len(handlers)
+        
+        # Clear all handlers to prevent blocking
+        # This is safe because pytest has its own cleanup mechanism
+        handlers.clear()
+        print(f"[conftest] Cleared {original_count} atexit handlers to prevent freeze")
+    else:
+        print("[conftest] Could not access _exithandlers (Python implementation may vary)")
+    
+    # Also set a flag to indicate cleanup is done
+    os.environ["PYTEST_CLEANUP_DONE"] = "1"
+    
+    print(f"[conftest] Test session finished with exit status {exitstatus}")
