@@ -346,8 +346,6 @@ class RollbackManager:
                 # Unexpected error, don't retry
                 logger.error(f"Unexpected error in database operation: {e}")
                 return None
-        
-        return None
     
     def _load_snapshots_from_storage(self):
         """Load existing snapshots from persistent storage."""
