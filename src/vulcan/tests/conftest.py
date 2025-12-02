@@ -47,11 +47,7 @@ def cleanup_resources():
     yield
     
     # Cleanup after test
-    # 1. Clean up asyncio event loop
-    # NOTE: We use run_until_complete here because this cleanup fixture is sync.
-    # This is the correct pattern for cleaning up async resources from a sync context.
-    # The alternative (making this fixture async) would not work as pytest needs
-    # to run cleanup after the test completes, which requires sync context.
+    # 1. Clean up asyncio event loop with timeout to prevent hanging
     try:
         loop = asyncio.get_event_loop()
         if loop and not loop.is_closed():
@@ -66,13 +62,18 @@ def cleanup_resources():
                 task.cancel()
             
             # Give tasks a moment to cancel - only if loop is not running
+            # Use a short timeout to prevent hanging
             if pending and not loop.is_running():
                 try:
-                    # Gather all tasks to cancel them properly
-                    # This is safe in cleanup context as we're in a sync fixture
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                except (RuntimeError, asyncio.TimeoutError, Exception):
-                    # Loop might be closed, running, or tasks failed - that's okay in cleanup
+                    # Use wait_for with timeout to prevent hanging indefinitely
+                    loop.run_until_complete(
+                        asyncio.wait_for(
+                            asyncio.gather(*pending, return_exceptions=True),
+                            timeout=2.0
+                        )
+                    )
+                except (RuntimeError, asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                    # Loop might be closed, running, tasks failed, or timeout - that's okay in cleanup
                     pass
     except RuntimeError:
         # No event loop in current thread - that's fine
@@ -140,3 +141,57 @@ def mock_correlation_tracker_safety_validator():
     # Restore originals after all tests in session
     ct_module.EnhancedSafetyValidator = original_validator
     ct_module.SafetyConfig = original_config
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_session_resources():
+    """
+    Cleanup resources at session end to prevent hanging after all tests complete.
+    
+    This fixture ensures:
+    1. All background threads are given time to complete
+    2. Event loops are properly closed
+    3. Resources are freed before pytest exits
+    
+    This prevents the test runner from hanging after all tests pass.
+    """
+    yield
+    
+    # Cleanup at session end with timeout
+    import time
+    
+    # 1. Force garbage collection to trigger cleanup finalizers
+    gc.collect()
+    
+    # 2. Give background threads a moment to clean up (but don't wait forever)
+    time.sleep(0.5)
+    
+    # 3. Clean up any remaining event loops
+    try:
+        loop = asyncio.get_event_loop()
+        if loop and not loop.is_closed():
+            # Cancel all pending tasks with timeout
+            try:
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                
+                if pending and not loop.is_running():
+                    try:
+                        loop.run_until_complete(
+                            asyncio.wait_for(
+                                asyncio.gather(*pending, return_exceptions=True),
+                                timeout=1.0
+                            )
+                        )
+                    except (asyncio.TimeoutError, asyncio.CancelledError, RuntimeError):
+                        pass
+            except RuntimeError:
+                pass
+    except RuntimeError:
+        pass
+    except Exception:
+        pass
+    
+    # 4. Final garbage collection
+    gc.collect()
