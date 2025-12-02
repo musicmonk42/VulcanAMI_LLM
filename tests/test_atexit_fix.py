@@ -48,12 +48,7 @@ def test_mock_blocking_operation():
             return
         
         # This would block if not in pytest mode
-        # time.sleep(300)  # Simulated long-running cleanup
         pass
-    
-    # Register a cleanup handler (like our safety modules do)
-    # Note: We don't actually register it to avoid interfering with other tests
-    # atexit.register(blocking_cleanup)
     
     # Just verify the logic works
     blocking_cleanup()  # Should return immediately in pytest mode
