@@ -165,6 +165,16 @@ def pytest_sessionfinish(session, exitstatus):
     """
     Clean up and unregister blocking atexit handlers to prevent freeze after test completion.
     This fixes the issue where tests freeze after running 9000+ tests.
+    
+    The issue was that atexit handlers registered by safety modules (tool_safety.py,
+    safety_validator.py, neural_safety.py) and config.py were being called during Python
+    interpreter shutdown. These handlers contained blocking operations like thread.join()
+    and executor.shutdown(wait=True), causing the test suite to hang instead of exiting cleanly.
+    
+    Solution:
+    1. Set PYTEST_RUNNING=1 at session start so handlers know to skip blocking operations
+    2. Clear atexit handlers at session finish to prevent them from running at all
+    3. This is safe because pytest has its own cleanup mechanism
     """
     import atexit as atexit_module
     import threading
@@ -182,6 +192,8 @@ def pytest_sessionfinish(session, exitstatus):
         # This is safe because pytest has its own cleanup mechanism
         handlers.clear()
         print(f"[conftest] Cleared {original_count} atexit handlers to prevent freeze")
+    else:
+        print("[conftest] Could not access _exithandlers (Python implementation may vary)")
     
     # Also set a flag to indicate cleanup is done
     os.environ["PYTEST_CLEANUP_DONE"] = "1"
