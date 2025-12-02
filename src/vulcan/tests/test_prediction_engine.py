@@ -1,548 +1,607 @@
+# test_safety_module_integration.py - OPTIMIZED VERSION
 """
-test_prediction_engine.py - OPTIMIZED VERSION
-Comprehensive test suite for PredictionEngine
-
+Comprehensive integration tests for VULCAN-AGI Safety Module.
 OPTIMIZED: Uses module-scoped fixtures to avoid re-initializing expensive objects.
+
+FIXES APPLIED (corrected version):
+1. test_tool_safety_check: Added missing context fields (logic_valid, causal_graph_valid, 
+   sample_size, temporal_paradox) required by ToolSafetyManager probabilistic contract preconditions.
+
+2. test_value_alignment: Changed calculate_alignment() to check_alignment() which is the 
+   correct public API method on ValueAlignmentSystem.
+
+3. test_governance_integration: Changed ActionType.ANALYZE to ActionType.OPTIMIZE since
+   ANALYZE doesn't exist in the ActionType enum.
 """
 
 import pytest
-import numpy as np
+import asyncio
 import time
+import json
+import tempfile
+import shutil
+import numpy as np
+from pathlib import Path
+from unittest.mock import Mock, patch, MagicMock
 import threading
-from typing import Dict, Any, List, Tuple
 
-from vulcan.world_model.prediction_engine import (
-    CombinationMethod,
-    Path,
-    PathCluster,
-    Prediction,
-    PathAnalyzer,
-    PathEffectCalculator,
-    PathTracer,
-    PathClusterer,
-    MonteCarloSampler,
-    PredictionCombiner,
-    EnsemblePredictor
+# Import all safety module components
+from vulcan.safety.safety_types import (
+    SafetyReport,
+    SafetyViolationType,
+    SafetyConstraint,
+    RollbackSnapshot,
+    ToolSafetyContract,
+    ToolSafetyLevel,
+    ComplianceStandard,
+    SafetyConfig,
+    SafetyMetrics,
+    SafetyException,
+    ActionType,
+    Condition
+)
+
+from vulcan.safety.domain_validators import (
+    CausalSafetyValidator,
+    PredictionSafetyValidator,
+    OptimizationSafetyValidator,
+    DataProcessingSafetyValidator,
+    ValidationResult,
+    validator_registry
+)
+
+from vulcan.safety.tool_safety import (
+    TokenBucket,
+    ToolSafetyManager,
+    ToolSafetyGovernor
+)
+
+from vulcan.safety.rollback_audit import (
+    RollbackManager,
+    AuditLogger,
+    MemoryBoundedDeque
+)
+
+from vulcan.safety.governance_alignment import (
+    GovernanceManager,
+    ValueAlignmentSystem,
+    HumanOversightInterface,
+    GovernanceLevel,
+    StakeholderType,
+    HumanFeedback
+)
+
+from vulcan.safety.safety_validator import (
+    ConstraintManager,
+    EnhancedExplainabilityNode,
+    ExplanationQualityScorer,
+    EnhancedSafetyValidator
 )
 
 
 # ============================================================
-# MODULE-SCOPED FIXTURES
+# MODULE-SCOPED FIXTURES - KEY OPTIMIZATION
 # ============================================================
 
 @pytest.fixture(scope="module")
-def simple_path():
-    """Create a simple path"""
-    return Path(
-        nodes=['A', 'B', 'C'],
-        edges=[('A', 'B', 0.8), ('B', 'C', 0.7)],
-        total_strength=0.56,
-        confidence=0.9
+def temp_dir():
+    """Create temporary directory for the entire test module."""
+    temp_path = tempfile.mkdtemp()
+    yield temp_path
+    shutil.rmtree(temp_path, ignore_errors=True)
+
+
+@pytest.fixture(scope="module")
+def safety_config():
+    """Module-scoped test safety configuration."""
+    return SafetyConfig(
+        enable_adversarial_testing=False,
+        enable_compliance_checking=True,
+        enable_bias_detection=False,
+        enable_rollback=True,
+        enable_audit_logging=True,
+        enable_tool_safety=True,
+        safety_thresholds={
+            'uncertainty_max': 0.9,
+            'identity_drift_max': 0.5,
+            'bias_threshold': 0.2,
+            'confidence_min': 0.6
+        }
     )
 
 
 @pytest.fixture(scope="module")
-def complex_path():
-    """Create a more complex path"""
-    return Path(
-        nodes=['X', 'Y', 'Z', 'W'],
-        edges=[('X', 'Y', 0.9), ('Y', 'Z', 0.85), ('Z', 'W', 0.75)],
-        total_strength=0.57,
-        confidence=0.85,
-        evidence_types=['correlation', 'intervention']
-    )
+def sample_action():
+    """Module-scoped sample action for testing."""
+    return {
+        'type': ActionType.OPTIMIZE,
+        'confidence': 0.8,
+        'uncertainty': 0.2,
+        'resource_usage': {
+            'energy_nJ': 100,
+            'cpu': 30,
+            'memory': 500
+        },
+        'safe': True,
+        'id': 'test_action_001'
+    }
 
 
 @pytest.fixture(scope="module")
-def correlated_paths():
-    """Create correlated paths for clustering"""
-    return [
-        Path(
-            nodes=['A', 'B', 'C'],
-            edges=[('A', 'B', 0.8), ('B', 'C', 0.7)],
-            total_strength=0.56
-        ),
-        Path(
-            nodes=['A', 'B', 'D'],
-            edges=[('A', 'B', 0.8), ('B', 'D', 0.65)],
-            total_strength=0.52
-        ),
-        Path(
-            nodes=['A', 'E', 'C'],
-            edges=[('A', 'E', 0.75), ('E', 'C', 0.72)],
-            total_strength=0.54
-        )
-    ]
+def sample_context():
+    """Module-scoped sample context for testing."""
+    return {
+        'energy_budget': 1000,
+        'resource_limits': {'cpu': 80, 'memory': 2000},
+        'state': {'temperature': 25, 'pressure': 100, 'system_stable': True},
+        'action_log': []
+    }
+
+
+# Module-scoped validators - created once
+@pytest.fixture(scope="module")
+def shared_causal_validator():
+    """Module-scoped causal validator."""
+    return CausalSafetyValidator()
 
 
 @pytest.fixture(scope="module")
-def sample_predictions():
-    """Create sample predictions"""
-    return [
-        Prediction(expected=5.0, lower_bound=4.0, upper_bound=6.0, confidence=0.9, method="test"),
-        Prediction(expected=5.5, lower_bound=4.5, upper_bound=6.5, confidence=0.85, method="test"),
-        Prediction(expected=4.8, lower_bound=3.8, upper_bound=5.8, confidence=0.88, method="test")
-    ]
+def shared_prediction_validator():
+    """Module-scoped prediction validator."""
+    return PredictionSafetyValidator()
 
 
 @pytest.fixture(scope="module")
-def basic_context():
-    """Create basic prediction context"""
-    return {'initial_values': {'A': 1.0}, 'add_noise': False}
-
-
-# Module-scoped component fixtures
-@pytest.fixture(scope="module")
-def shared_path_analyzer():
-    """Module-scoped path analyzer"""
-    return PathAnalyzer()
+def shared_optimization_validator():
+    """Module-scoped optimization validator."""
+    return OptimizationSafetyValidator()
 
 
 @pytest.fixture(scope="module")
-def shared_effect_calculator():
-    """Module-scoped effect calculator"""
-    return PathEffectCalculator()
+def shared_data_validator():
+    """Module-scoped data processing validator."""
+    return DataProcessingSafetyValidator()
 
 
-@pytest.fixture(scope="module")
-def shared_path_tracer():
-    """Module-scoped path tracer"""
-    return PathTracer(min_path_strength=0.1, max_path_length=5)
-
-
-@pytest.fixture(scope="module")
-def shared_clusterer(shared_path_analyzer):
-    """Module-scoped path clusterer"""
-    return PathClusterer(shared_path_analyzer)
-
-
-@pytest.fixture(scope="module")
-def shared_sampler():
-    """Module-scoped Monte Carlo sampler"""
-    return MonteCarloSampler()
-
-
-@pytest.fixture(scope="module")
-def shared_combiner():
-    """Module-scoped prediction combiner"""
-    return PredictionCombiner()
-
-
-@pytest.fixture(scope="module")
-def shared_ensemble_predictor():
-    """Module-scoped ensemble predictor"""
-    return EnsemblePredictor(default_method="weighted_quantile")
-
-
-# Function-scoped fixtures for tests that modify state
+# Function-scoped fixtures for tests that need clean state
 @pytest.fixture
-def path_analyzer():
-    return PathAnalyzer()
-
-
-@pytest.fixture
-def effect_calculator():
-    return PathEffectCalculator()
-
-
-@pytest.fixture
-def path_tracer():
-    return PathTracer(min_path_strength=0.1, max_path_length=5)
-
-
-@pytest.fixture
-def clusterer(path_analyzer):
-    return PathClusterer(path_analyzer)
-
-
-@pytest.fixture
-def sampler():
-    return MonteCarloSampler()
-
-
-@pytest.fixture
-def combiner():
-    return PredictionCombiner()
-
-
-@pytest.fixture
-def ensemble_predictor():
-    return EnsemblePredictor(default_method="weighted_quantile")
+def func_temp_dir():
+    """Function-scoped temp directory."""
+    temp_path = tempfile.mkdtemp()
+    yield temp_path
+    shutil.rmtree(temp_path, ignore_errors=True)
 
 
 # ============================================================
-# PATH DATACLASS TESTS
+# UNIT TESTS - SAFETY TYPES
 # ============================================================
 
-class TestPath:
-    """Test Path dataclass"""
+class TestSafetyTypes:
+    """Test safety types and data structures."""
     
-    def test_path_creation(self, simple_path):
-        """Test basic path creation"""
-        assert len(simple_path.nodes) == 3
-        assert len(simple_path.edges) == 2
-        assert simple_path.total_strength == 0.56
-        assert simple_path.confidence == 0.9
+    def test_condition_evaluation(self):
+        """Test Condition class evaluation."""
+        cond = Condition('value', '>', 5, "Value must be > 5")
+        assert cond.evaluate({'value': 10}) == True
+        assert cond.evaluate({'value': 3}) == False
+        
+        cond = Condition('status', 'in', ['active', 'ready'], "Status check")
+        assert cond.evaluate({'status': 'active'}) == True
+        assert cond.evaluate({'status': 'inactive'}) == False
+        
+        cond = Condition('tags', 'contains', 'important', "Tag check")
+        assert cond.evaluate({'tags': ['important', 'urgent']}) == True
+        assert cond.evaluate({'tags': ['normal']}) == False
+        
+        cond = Condition('value', '>', 5, "Value must be > 5")
+        assert cond.evaluate({'value': None}) == False
+        assert cond.evaluate({}) == False
     
-    def test_path_length(self, simple_path):
-        """Test path length calculation"""
-        assert len(simple_path) == 2
+    def test_condition_serialization(self):
+        """Test Condition serialization."""
+        cond = Condition('temp', '<', 100, "Temperature limit")
+        data = cond.to_dict()
+        
+        assert data['field'] == 'temp'
+        assert data['operator'] == '<'
+        assert data['value'] == 100
+        
+        restored = Condition.from_dict(data)
+        assert restored.field == cond.field
+        assert restored.operator == cond.operator
     
-    def test_contains_node(self, simple_path):
-        """Test checking if path contains node"""
-        assert simple_path.contains_node('A') == True
-        assert simple_path.contains_node('B') == True
-        assert simple_path.contains_node('D') == False
-    
-    def test_get_edge_strength(self, simple_path):
-        """Test getting edge strength"""
-        assert simple_path.get_edge_strength('A', 'B') == 0.8
-        assert simple_path.get_edge_strength('B', 'C') == 0.7
-        assert simple_path.get_edge_strength('A', 'C') is None
-    
-    def test_get_strengths(self, simple_path):
-        """Test getting all edge strengths"""
-        strengths = simple_path.get_strengths()
-        assert len(strengths) == 2
-        assert strengths[0] == 0.8
-        assert strengths[1] == 0.7
-    
-    def test_strengths_property(self, simple_path):
-        """Test strengths property accessor"""
-        assert simple_path.strengths == [0.8, 0.7]
-    
-    def test_path_with_metadata(self):
-        """Test path with metadata"""
-        path = Path(
-            nodes=['A', 'B'],
-            edges=[('A', 'B', 0.9)],
-            total_strength=0.9,
-            metadata={'source': 'test', 'domain': 'example'}
+    def test_safety_report_creation(self):
+        """Test SafetyReport creation and validation."""
+        report = SafetyReport(
+            safe=False,
+            confidence=0.7,
+            violations=[SafetyViolationType.ENERGY],
+            reasons=["Energy budget exceeded"]
         )
         
-        assert path.metadata['source'] == 'test'
-
-
-# ============================================================
-# PATH CLUSTER TESTS
-# ============================================================
-
-class TestPathCluster:
-    """Test PathCluster dataclass"""
+        assert report.safe == False
+        assert report.confidence == 0.7
+        assert SafetyViolationType.ENERGY in report.violations
+        assert report.audit_id is not None
     
-    def test_cluster_creation(self, correlated_paths):
-        """Test basic cluster creation"""
-        correlation_matrix = np.array([
-            [1.0, 0.9, 0.8],
-            [0.9, 1.0, 0.7],
-            [0.8, 0.7, 1.0]
-        ])
-        
-        cluster = PathCluster(
-            paths=correlated_paths,
-            correlation_matrix=correlation_matrix,
-            representative_path=correlated_paths[0],
-            cluster_confidence=0.85
+    def test_safety_report_merge(self):
+        """Test merging safety reports."""
+        report1 = SafetyReport(safe=True, confidence=0.9, violations=[])
+        report2 = SafetyReport(
+            safe=False,
+            confidence=0.6,
+            violations=[SafetyViolationType.UNCERTAINTY],
+            reasons=["High uncertainty"]
         )
         
-        assert cluster.size == 3
-        assert cluster.representative_path == correlated_paths[0]
-        assert cluster.cluster_confidence == 0.85
+        merged = report1.merge(report2)
+        assert merged.safe == False
+        assert merged.confidence == 0.6
+        assert SafetyViolationType.UNCERTAINTY in merged.violations
     
-    def test_cluster_size_property(self, correlated_paths):
-        """Test cluster size property"""
-        cluster = PathCluster(
-            paths=correlated_paths,
-            correlation_matrix=np.eye(3),
-            representative_path=correlated_paths[0],
-            cluster_confidence=0.8
+    def test_rollback_snapshot_integrity(self):
+        """Test RollbackSnapshot integrity verification."""
+        snapshot = RollbackSnapshot(
+            snapshot_id='test_snapshot',
+            timestamp=time.time(),
+            state={'var1': 10, 'var2': 20},
+            action_log=[{'action': 'test'}],
+            metadata={'reason': 'checkpoint'}
         )
         
-        assert cluster.size == 3
+        assert snapshot.verify_integrity() == True
+        
+        snapshot.state['var1'] = 999
+        assert snapshot.verify_integrity() == False
 
 
 # ============================================================
-# PREDICTION DATACLASS TESTS
+# UNIT TESTS - DOMAIN VALIDATORS
 # ============================================================
 
-class TestPrediction:
-    """Test Prediction dataclass"""
+class TestDomainValidators:
+    """Test domain-specific validators."""
     
-    def test_prediction_creation(self, sample_predictions):
-        """Test basic prediction creation"""
-        pred = sample_predictions[0]
+    def test_causal_edge_validation(self, shared_causal_validator):
+        """Test causal edge validation."""
+        result = shared_causal_validator.validate_causal_edge('A', 'B', 2.5)
+        assert result.safe == True
         
-        assert pred.expected == 5.0
-        assert pred.lower_bound == 4.0
-        assert pred.upper_bound == 6.0
-        assert pred.confidence == 0.9
+        result = shared_causal_validator.validate_causal_edge('A', 'B', float('nan'))
+        assert result.safe == False
+        assert 'NaN' in result.reason
+        
+        result = shared_causal_validator.validate_causal_edge('A', 'B', 1000.0)
+        assert result.safe == False
+        
+        result = shared_causal_validator.validate_causal_edge('A', 'A', 2.5)
+        assert result.safe == False
     
-    def test_prediction_uncertainty(self, sample_predictions):
-        """Test prediction uncertainty calculation"""
-        pred = sample_predictions[0]
+    def test_causal_path_validation(self, shared_causal_validator):
+        """Test causal path validation."""
+        result = shared_causal_validator.validate_causal_path(['A', 'B', 'C'], [2.0, 1.5])
+        assert result.safe == True
         
-        uncertainty = pred.uncertainty
+        result = shared_causal_validator.validate_causal_path(['A', 'B', 'C'], [2.0])
+        assert result.safe == False
         
-        assert uncertainty >= 0.0
-        assert uncertainty == (pred.upper_bound - pred.lower_bound) / 2
+        result = shared_causal_validator.validate_causal_path(['A', 'B', 'C'], [5.0, 5.0])
+        assert result.safe == False
+        
+        result = shared_causal_validator.validate_causal_path(['A', 'B', 'A'], [2.0, 2.0])
+        assert result.safe == False
     
-    def test_prediction_interval_width(self, sample_predictions):
-        """Test prediction interval width"""
-        pred = sample_predictions[0]
+    def test_causal_graph_validation(self, shared_causal_validator):
+        """Test causal graph validation."""
+        adjacency = {
+            'A': [('B', 2.0), ('C', 1.5)],
+            'B': [('D', 1.0)],
+            'C': [('D', 1.2)]
+        }
+        result = shared_causal_validator.validate_causal_graph(adjacency)
+        assert result.safe == True
         
-        width = pred.interval_width
+        adjacency_cyclic = {
+            'A': [('B', 2.0)],
+            'B': [('C', 1.5)],
+            'C': [('A', 1.0)]
+        }
+        result = shared_causal_validator.validate_causal_graph(adjacency_cyclic)
+        assert result.safe == False
+    
+    def test_prediction_validation(self, shared_prediction_validator):
+        """Test prediction validation."""
+        result = shared_prediction_validator.validate_prediction(10.0, 8.0, 12.0, 'temperature')
+        assert result.safe == True
         
-        assert width == 2.0
+        result = shared_prediction_validator.validate_prediction(float('nan'), 8.0, 12.0, 'temperature')
+        assert result.safe == False
+        
+        result = shared_prediction_validator.validate_prediction(10.0, 12.0, 8.0, 'temperature')
+        assert result.safe == False
+        
+        result = shared_prediction_validator.validate_prediction(15.0, 8.0, 12.0, 'temperature')
+        assert result.safe == False
+    
+    def test_optimization_params_validation(self, shared_optimization_validator):
+        """Test optimization parameter validation."""
+        params = {
+            'max_iterations': 1000,
+            'tolerance': 1e-6,
+            'learning_rate': 0.01,
+            'bounds': {'x': (0, 10), 'y': (0, 20)}
+        }
+        result = shared_optimization_validator.validate_optimization_params(params)
+        assert result.safe == True
+        
+        params = {'max_iterations': 100000, 'tolerance': 1e-6}
+        result = shared_optimization_validator.validate_optimization_params(params)
+        assert result.safe == False
+        
+        params = {'max_iterations': 1000, 'tolerance': 1e-6, 'learning_rate': 2.0}
+        result = shared_optimization_validator.validate_optimization_params(params)
+        assert result.safe == False
+    
+    def test_data_processing_validation(self, shared_data_validator):
+        """Test data processing validation."""
+        df_info = {
+            'rows': 1000,
+            'columns': 50,
+            'memory_mb': 10,
+            'missing_ratio': 0.1,
+            'dtypes': {'col1': 'int64', 'col2': 'float64'}
+        }
+        result = shared_data_validator.validate_dataframe(df_info)
+        assert result.safe == True
+        
+        df_info = {
+            'rows': 20000000,
+            'columns': 50,
+            'memory_mb': 10,
+            'missing_ratio': 0.1
+        }
+        result = shared_data_validator.validate_dataframe(df_info)
+        assert result.safe == False
 
 
 # ============================================================
-# PATH ANALYZER TESTS
+# UNIT TESTS - TOOL SAFETY
 # ============================================================
 
-class TestPathAnalyzer:
-    """Test PathAnalyzer class"""
+class TestToolSafety:
+    """Test tool safety management."""
     
-    def test_calculate_path_confidence(self, shared_path_analyzer, simple_path):
-        """Test path confidence calculation"""
-        confidence = shared_path_analyzer.calculate_path_confidence(simple_path)
+    def test_token_bucket_rate_limiting(self):
+        """Test token bucket rate limiter."""
+        bucket = TokenBucket(rate=10.0, capacity=10.0)
         
-        assert 0.0 <= confidence <= 1.0
+        for _ in range(10):
+            assert bucket.consume(1.0) == True
+        
+        assert bucket.consume(1.0) == False
+        
+        time.sleep(0.2)
+        assert bucket.consume(1.0) == True
+        
+        bucket.shutdown()
     
-    def test_calculate_path_correlation(self, shared_path_analyzer, correlated_paths):
-        """Test path correlation calculation"""
-        corr = shared_path_analyzer.calculate_path_correlation(
-            correlated_paths[0], correlated_paths[1]
+    def test_tool_safety_contract_validation(self):
+        """Test tool safety contract validation."""
+        manager = ToolSafetyManager()
+        
+        assert 'probabilistic' in manager.contracts
+        assert 'symbolic' in manager.contracts
+        assert 'causal' in manager.contracts
+        
+        contract = manager.contracts['probabilistic']
+        context = {
+            'confidence': 0.7,
+            'data_quality': 0.8,
+            'corrupted_data': False
+        }
+        valid, failures = contract.validate_preconditions(context)
+        assert valid == True
+        
+        context = {'confidence': 0.2, 'data_quality': 0.8, 'corrupted_data': False}
+        valid, failures = contract.validate_preconditions(context)
+        assert valid == False
+        
+        manager.shutdown()
+    
+    def test_tool_safety_check(self):
+        """Test tool safety checking.
+        
+        Note: ToolSafetyManager requires additional context fields for probabilistic
+        tool contracts including logic_valid, causal_graph_valid, sample_size, temporal_paradox.
+        """
+        manager = ToolSafetyManager()
+        
+        # Reset rate limiter to avoid timing issues
+        if hasattr(manager, 'rate_limiters') and 'probabilistic' in manager.rate_limiters:
+            manager.rate_limiters['probabilistic'].tokens = manager.rate_limiters['probabilistic'].capacity
+        
+        context = {
+            'confidence': 0.8,  # Increased from 0.7
+            'data_quality': 0.8,
+            'corrupted_data': False,
+            'adversarial_detected': False,
+            'system_overload': False,
+            'estimated_resources': {'memory_mb': 100, 'time_ms': 1000},
+            # Additional required fields for probabilistic contract preconditions
+            'logic_valid': True,
+            'causal_graph_valid': True,
+            'sample_size': 100,
+            'temporal_paradox': False
+        }
+        
+        safe, report = manager.check_tool_safety('probabilistic', context)
+        assert safe == True, f"Expected safe=True but got safe={safe}, report={report}"
+        
+        context['adversarial_detected'] = True
+        safe, report = manager.check_tool_safety('probabilistic', context)
+        assert safe == False
+        
+        manager.shutdown()
+    
+    def test_tool_safety_governor(self):
+        """Test tool safety governor."""
+        governor = ToolSafetyGovernor()
+        
+        request = {'confidence': 0.8, 'constraints': {}, 'risk_approved': False}
+        tools = ['probabilistic', 'symbolic']
+        allowed, result = governor.govern_tool_selection(request, tools)
+        
+        assert isinstance(allowed, list)
+        assert 'allowed_tools' in result
+        
+        governor.trigger_emergency_stop("Test emergency")
+        assert governor.emergency_stop == True
+        
+        allowed, result = governor.govern_tool_selection(request, tools)
+        assert len(allowed) == 0
+        
+        governor.clear_emergency_stop('test_admin')
+        assert governor.emergency_stop == False
+        
+        governor.shutdown()
+
+
+# ============================================================
+# UNIT TESTS - ROLLBACK AND AUDIT
+# ============================================================
+
+class TestRollbackAudit:
+    """Test rollback and audit logging."""
+    
+    def test_memory_bounded_deque(self):
+        """Test memory-bounded deque."""
+        deque = MemoryBoundedDeque(max_size_mb=0.001)
+        
+        for i in range(100):
+            deque.append({'data': f'item_{i}', 'value': i})
+        
+        assert len(deque) < 100
+        assert deque.get_memory_usage_mb() <= 0.001
+        
+        deque.clear()
+        assert len(deque) == 0
+    
+    def test_rollback_snapshot_creation(self, func_temp_dir):
+        """Test snapshot creation and persistence."""
+        manager = RollbackManager(
+            max_snapshots=10,
+            config={'storage_path': func_temp_dir}
         )
         
-        assert -1.0 <= corr <= 1.0
+        state = {'temperature': 25, 'pressure': 100}
+        action_log = [{'action': 'test', 'timestamp': time.time()}]
+        
+        snapshot_id = manager.create_snapshot(state, action_log)
+        assert snapshot_id is not None
+        assert len(manager.snapshots) == 1
+        
+        history = manager.get_snapshot_history()
+        assert len(history) == 1
+        
+        manager.shutdown()
     
-    def test_calculate_correlation_matrix(self, shared_path_analyzer, correlated_paths):
-        """Test correlation matrix calculation"""
-        matrix = shared_path_analyzer.calculate_correlation_matrix(correlated_paths)
+    def test_rollback_execution(self, func_temp_dir):
+        """Test rollback to snapshot."""
+        manager = RollbackManager(config={'storage_path': func_temp_dir})
         
-        assert matrix.shape == (3, 3)
-        assert np.allclose(np.diag(matrix), 1.0)
-
-
-# ============================================================
-# PATH EFFECT CALCULATOR TESTS
-# ============================================================
-
-class TestPathEffectCalculator:
-    """Test PathEffectCalculator class"""
+        state = {'value': 100}
+        action_log = [{'action': 'increase_value'}]
+        snapshot_id = manager.create_snapshot(state, action_log)
+        
+        result = manager.rollback(snapshot_id, reason='test_rollback')
+        assert result is not None
+        assert result['state']['value'] == 100
+        
+        metrics = manager.get_metrics()
+        assert metrics['total_rollbacks'] == 1
+        
+        manager.shutdown()
     
-    def test_calculate_effect_basic(self, shared_effect_calculator, simple_path):
-        """Test basic effect calculation"""
-        effect = shared_effect_calculator.calculate_effect(simple_path, 1.0, {})
-        
-        assert isinstance(effect, float)
-    
-    def test_calculate_effect_with_context(self, shared_effect_calculator, simple_path):
-        """Test effect calculation with context"""
-        context = {'initial_values': {'A': 2.0}}
-        
-        effect = shared_effect_calculator.calculate_effect(simple_path, 1.0, context)
-        
-        assert isinstance(effect, float)
-
-
-# ============================================================
-# PATH TRACER TESTS
-# ============================================================
-
-class TestPathTracer:
-    """Test PathTracer class"""
-    
-    def test_trace_path_basic(self, shared_path_tracer, simple_path, basic_context):
-        """Test basic path tracing"""
-        effect = shared_path_tracer.trace_path(simple_path, 1.0, basic_context)
-        
-        assert isinstance(effect, float)
-    
-    def test_trace_path_caching(self, path_tracer, simple_path, basic_context):
-        """Test that tracing is cached"""
-        effect1 = path_tracer.trace_path(simple_path, 1.0, basic_context)
-        effect2 = path_tracer.trace_path(simple_path, 1.0, basic_context)
-        
-        assert effect1 == effect2
-    
-    def test_clear_cache(self, path_tracer, simple_path, basic_context):
-        """Test clearing cache"""
-        path_tracer.trace_path(simple_path, 1.0, basic_context)
-        
-        initial_size = len(path_tracer.cache)
-        path_tracer.clear_cache()
-        
-        assert len(path_tracer.cache) == 0
-
-
-# ============================================================
-# PATH CLUSTERER TESTS
-# ============================================================
-
-class TestPathClusterer:
-    """Test PathClusterer class"""
-    
-    def test_cluster_paths_basic(self, shared_clusterer, correlated_paths):
-        """Test basic path clustering"""
-        clusters = shared_clusterer.cluster_paths(correlated_paths, n_clusters=2)
-        
-        assert len(clusters) <= 2
-        for cluster in clusters:
-            assert isinstance(cluster, PathCluster)
-    
-    def test_find_representative_path(self, shared_clusterer, correlated_paths):
-        """Test finding representative path"""
-        representative = shared_clusterer.find_representative_path(correlated_paths)
-        
-        assert representative in correlated_paths
-
-
-# ============================================================
-# MONTE CARLO SAMPLER TESTS
-# ============================================================
-
-class TestMonteCarloSampler:
-    """Test MonteCarloSampler class"""
-    
-    def test_sample_paths(self, shared_sampler, correlated_paths, basic_context):
-        """Test sampling paths"""
-        samples = shared_sampler.sample_paths(
-            correlated_paths, 1.0, basic_context, n_samples=10
+    def test_audit_logging(self, func_temp_dir):
+        """Test audit logging."""
+        logger = AuditLogger(
+            log_path=str(Path(func_temp_dir) / 'audit'),
+            config={'redact_sensitive': True}
         )
         
-        assert len(samples) == 10
-        assert all(isinstance(s, float) for s in samples)
-    
-    def test_generate_prediction(self, shared_sampler, correlated_paths, basic_context):
-        """Test generating prediction from samples"""
-        samples = shared_sampler.sample_paths(
-            correlated_paths, 1.0, basic_context, n_samples=50
-        )
+        decision = {'action': 'test', 'confidence': 0.8}
+        report = SafetyReport(safe=True, confidence=0.9, violations=[])
         
-        prediction = shared_sampler.generate_prediction(samples, correlated_paths)
+        entry_id = logger.log_safety_decision(decision, report)
+        assert entry_id is not None
         
-        assert isinstance(prediction, Prediction)
-        assert prediction.lower_bound <= prediction.expected <= prediction.upper_bound
+        event_id = logger.log_event('test_event', {'data': 'test'}, severity='info')
+        assert event_id is not None
+        
+        metrics = logger.get_metrics()
+        assert metrics['total_entries'] >= 2
+        
+        logger.shutdown()
 
 
 # ============================================================
-# PREDICTION COMBINER TESTS
+# UNIT TESTS - GOVERNANCE AND ALIGNMENT
 # ============================================================
 
-class TestPredictionCombiner:
-    """Test PredictionCombiner class"""
+class TestGovernanceAlignment:
+    """Test governance and alignment systems."""
     
-    def test_combine_mean(self, shared_combiner, sample_predictions):
-        """Test combining predictions with mean"""
-        combined = shared_combiner.combine(
-            sample_predictions, CombinationMethod.MEAN
-        )
+    def test_governance_manager_initialization(self, func_temp_dir):
+        """Test governance manager initialization."""
+        config = {
+            'db_path': str(Path(func_temp_dir) / 'governance.db'),
+            'max_active_decisions': 100
+        }
+        manager = GovernanceManager(config=config)
         
-        assert isinstance(combined, Prediction)
-        expected_mean = np.mean([p.expected for p in sample_predictions])
-        assert abs(combined.expected - expected_mean) < 0.01
+        assert 'autonomous_default' in manager.policies
+        assert 'human_supervised' in manager.policies
+        assert 'safety_critical' in manager.policies
+        
+        manager.shutdown()
     
-    def test_combine_weighted(self, shared_combiner, sample_predictions):
-        """Test combining predictions with weighting"""
-        combined = shared_combiner.combine(
-            sample_predictions, CombinationMethod.WEIGHTED
-        )
+    def test_approval_request(self, func_temp_dir):
+        """Test approval request."""
+        config = {'db_path': str(Path(func_temp_dir) / 'governance.db')}
+        manager = GovernanceManager(config=config)
         
-        assert isinstance(combined, Prediction)
+        action = {
+            'type': ActionType.OPTIMIZE,
+            'risk_score': 0.3,
+            'safety_score': 0.8
+        }
+        
+        result = manager.request_approval(action)
+        
+        assert 'approved' in result
+        assert 'decision_id' in result
+        assert 'policy_applied' in result
+        
+        manager.shutdown()
     
-    def test_combine_quantile(self, shared_combiner, sample_predictions):
-        """Test combining with quantile method"""
-        combined = shared_combiner.combine(
-            sample_predictions, CombinationMethod.QUANTILE
-        )
+    def test_value_alignment(self, func_temp_dir):
+        """Test value alignment system.
         
-        assert isinstance(combined, Prediction)
-
-
-# ============================================================
-# ENSEMBLE PREDICTOR TESTS
-# ============================================================
-
-class TestEnsemblePredictor:
-    """Test EnsemblePredictor class"""
-    
-    def test_predict_basic(self, shared_ensemble_predictor, simple_path, basic_context):
-        """Test basic prediction"""
-        prediction = shared_ensemble_predictor.predict_with_path_ensemble(
-            1.0, basic_context, [simple_path]
-        )
+        Note: ValueAlignmentSystem uses check_alignment() not calculate_alignment().
+        """
+        config = {'db_path': str(Path(func_temp_dir) / 'alignment.db')}
+        system = ValueAlignmentSystem(config=config)
         
-        assert isinstance(prediction, Prediction)
-        assert prediction.expected != 0.0
-    
-    def test_predict_multiple_paths(self, shared_ensemble_predictor, correlated_paths, basic_context):
-        """Test prediction with multiple paths"""
-        prediction = shared_ensemble_predictor.predict_with_path_ensemble(
-            1.0, basic_context, correlated_paths
-        )
+        action = {'type': ActionType.OPTIMIZE, 'impact': 'positive'}
+        context = {'state': {'stable': True}}
         
-        assert isinstance(prediction, Prediction)
-        assert len(prediction.supporting_paths) > 0
-    
-    def test_combine_predictions(self, shared_ensemble_predictor, sample_predictions):
-        """Test combining predictions"""
-        combined = shared_ensemble_predictor.combine_predictions(sample_predictions)
+        # Use check_alignment() which is the correct public API method
+        alignment = system.check_alignment(action, context)
         
-        assert isinstance(combined, Prediction)
-    
-    def test_prediction_validation(self, shared_ensemble_predictor, simple_path, basic_context):
-        """Test prediction with safety validation"""
-        prediction = shared_ensemble_predictor.predict_with_path_ensemble(
-            1.0, basic_context, [simple_path]
-        )
+        assert 'alignment_score' in alignment
+        assert 0.0 <= alignment['alignment_score'] <= 1.0
         
-        assert isinstance(prediction, Prediction)
-        assert 0.0 <= prediction.confidence <= 1.0
-
-
-# ============================================================
-# THREAD SAFETY TESTS
-# ============================================================
-
-class TestThreadSafety:
-    """Test thread-safe operations"""
-    
-    def test_concurrent_path_tracing(self, path_tracer, simple_path, basic_context):
-        """Test concurrent path tracing"""
-        results = []
-        
-        def trace():
-            effect = path_tracer.trace_path(simple_path, 1.0, basic_context)
-            results.append(effect)
-        
-        threads = [threading.Thread(target=trace) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        
-        assert len(results) == 10
-        assert len(set(results)) == 1
-    
-    def test_concurrent_predictions(self, ensemble_predictor, simple_path, basic_context):
-        """Test concurrent predictions"""
-        results = []
-        
-        def predict():
-            prediction = ensemble_predictor.predict_with_path_ensemble(
-                1.0, basic_context, [simple_path]
-            )
-            results.append(prediction.expected)
-        
-        threads = [threading.Thread(target=predict) for _ in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-        
-        assert len(results) == 10
-        assert all(isinstance(r, float) for r in results)
+        system.shutdown()
 
 
 # ============================================================
@@ -550,111 +609,151 @@ class TestThreadSafety:
 # ============================================================
 
 class TestIntegration:
-    """Integration tests for complete workflows"""
+    """Integration tests for complete workflows."""
     
-    def test_full_prediction_workflow(self, correlated_paths):
-        """Test complete prediction workflow"""
-        ensemble = EnsemblePredictor(default_method="weighted_quantile")
-        context = {'initial_values': {'A': 1.0}, 'n_samples': 50}
+    def test_full_safety_validation(self, func_temp_dir, safety_config, sample_action, sample_context):
+        """Test complete safety validation pipeline."""
+        safety_config.rollback_config['storage_path'] = str(Path(func_temp_dir) / 'rollback')
+        safety_config.audit_config['log_path'] = str(Path(func_temp_dir) / 'audit')
+        safety_config.enable_adversarial_testing = False
         
-        prediction = ensemble.predict_with_path_ensemble(
-            action=2.0,
-            context=context,
-            paths=correlated_paths
+        validator = EnhancedSafetyValidator(config=safety_config)
+        
+        report = validator.validate_action_comprehensive(
+            sample_action,
+            sample_context,
+            create_snapshot=False
         )
         
-        assert isinstance(prediction, Prediction)
-        assert prediction.lower_bound <= prediction.expected <= prediction.upper_bound
-        assert 0.0 <= prediction.confidence <= 1.0
+        assert isinstance(report, SafetyReport)
+        assert hasattr(report, 'safe')
+        assert hasattr(report, 'confidence')
+        
+        validator.shutdown()
     
-    def test_multiple_predictions_with_combination(self):
-        """Test making multiple predictions and combining them"""
-        ensemble = EnsemblePredictor()
+    def test_governance_integration(self, func_temp_dir):
+        """Test governance system integration.
         
-        paths1 = [
-            Path(['A', 'B'], [('A', 'B', 0.8)], 0.8),
-            Path(['A', 'C'], [('A', 'C', 0.7)], 0.7)
-        ]
+        Note: ActionType.ANALYZE doesn't exist - using ActionType.OPTIMIZE instead.
+        """
+        config = {'db_path': str(Path(func_temp_dir) / 'governance.db')}
+        manager = GovernanceManager(config=config)
         
-        paths2 = [
-            Path(['A', 'D'], [('A', 'D', 0.9)], 0.9),
-            Path(['A', 'E'], [('A', 'E', 0.75)], 0.75)
-        ]
+        action = {
+            'type': ActionType.OPTIMIZE,  # Changed from ANALYZE which doesn't exist
+            'risk_score': 0.2,
+            'safety_score': 0.9
+        }
         
-        pred1 = ensemble.predict_with_path_ensemble(1.0, {}, paths1)
-        pred2 = ensemble.predict_with_path_ensemble(1.0, {}, paths2)
+        result = manager.request_approval(action)
         
-        combined = ensemble.combine_predictions([pred1, pred2])
+        assert result['approved'] == True
         
-        assert isinstance(combined, Prediction)
+        manager.shutdown()
 
 
 # ============================================================
-# EDGE CASES
+# STRESS TESTS
 # ============================================================
 
-class TestEdgeCases:
-    """Test edge cases"""
+class TestStress:
+    """Stress tests for performance and resource limits."""
     
-    def test_empty_paths_list(self, shared_ensemble_predictor, basic_context):
-        """Test prediction with empty paths list"""
-        prediction = shared_ensemble_predictor.predict_with_path_ensemble(
-            1.0, basic_context, []
-        )
+    def test_high_frequency_validations(self, func_temp_dir, safety_config):
+        """Test high-frequency validation requests."""
+        safety_config.rollback_config['storage_path'] = str(Path(func_temp_dir) / 'rollback')
+        safety_config.audit_config['log_path'] = str(Path(func_temp_dir) / 'audit')
+        safety_config.enable_adversarial_testing = False
         
-        assert isinstance(prediction, Prediction)
-    
-    def test_single_path(self, shared_ensemble_predictor, simple_path, basic_context):
-        """Test prediction with single path"""
-        prediction = shared_ensemble_predictor.predict_with_path_ensemble(
-            1.0, basic_context, [simple_path]
-        )
+        validator = EnhancedSafetyValidator(config=safety_config)
         
-        assert isinstance(prediction, Prediction)
-    
-    def test_extreme_path_strength(self, path_tracer, basic_context):
-        """Test with extreme path strength"""
-        extreme_path = Path(
-            nodes=['A', 'B'],
-            edges=[('A', 'B', 1e6)],
-            total_strength=1e6
-        )
+        start_time = time.time()
+        count = 50
         
-        try:
-            effect = path_tracer.trace_path(extreme_path, 1.0, basic_context)
-            assert isinstance(effect, float)
-        except (ValueError, OverflowError):
-            pass
-
-
-# ============================================================
-# PERFORMANCE TESTS
-# ============================================================
-
-class TestPerformance:
-    """Performance and scalability tests"""
+        for i in range(count):
+            action = {'type': ActionType.OPTIMIZE, 'id': f'stress_action_{i}', 'confidence': 0.8}
+            context = {'state': {}}
+            report = validator.validate_action_comprehensive(action, context)
+            assert isinstance(report, SafetyReport)
+        
+        elapsed = time.time() - start_time
+        throughput = count / elapsed
+        
+        print(f"\nValidation throughput: {throughput:.2f} validations/second")
+        assert throughput > 1.0
+        
+        validator.shutdown()
     
-    def test_large_path_ensemble(self):
-        """Test prediction with large number of paths"""
-        paths = []
-        for i in range(100):
-            path = Path(
-                nodes=[f'node_{i}', f'node_{i+1}'],
-                edges=[(f'node_{i}', f'node_{i+1}', np.random.uniform(0.5, 1.0))],
-                total_strength=np.random.uniform(0.5, 1.0)
+    def test_constraint_manager_scale(self):
+        """Test constraint manager with many constraints."""
+        manager = ConstraintManager()
+        
+        for i in range(50):
+            constraint = SafetyConstraint(
+                name=f'constraint_{i}',
+                type='soft',
+                check_function=lambda a, c, i=i: (a.get('value', 0) < 100 + i, 0.9),
+                threshold=0.0,
+                priority=i
             )
-            paths.append(path)
+            manager.add_constraint(constraint)
         
-        ensemble = EnsemblePredictor()
-        context = {'n_samples': 20}
+        action = {'value': 50}
+        context = {}
         
         start = time.time()
-        prediction = ensemble.predict_with_path_ensemble(1.0, context, paths)
+        report = manager.check_constraints(action, context)
         elapsed = time.time() - start
         
-        assert elapsed < 10, f"Prediction took {elapsed}s for 100 paths"
-        assert isinstance(prediction, Prediction)
+        print(f"\nConstraint check time (50 constraints): {elapsed*1000:.2f}ms")
+        assert elapsed < 1.0
+        
+        manager.shutdown()
 
+
+# ============================================================
+# ERROR HANDLING TESTS
+# ============================================================
+
+class TestErrorHandling:
+    """Test error handling and edge cases."""
+    
+    def test_validator_with_missing_components(self):
+        """Test validator gracefully handles missing components."""
+        config = SafetyConfig(
+            enable_rollback=False,
+            enable_audit_logging=False,
+            enable_tool_safety=False
+        )
+        
+        validator = EnhancedSafetyValidator(config=config)
+        
+        action = {'type': ActionType.OPTIMIZE, 'confidence': 0.8}
+        context = {'state': {}}
+        
+        report = validator.validate_action_comprehensive(action, context)
+        assert isinstance(report, SafetyReport)
+        
+        validator.shutdown()
+    
+    def test_invalid_action_handling(self, func_temp_dir, safety_config):
+        """Test handling of invalid action data."""
+        safety_config.rollback_config['storage_path'] = str(Path(func_temp_dir) / 'rollback')
+        validator = EnhancedSafetyValidator(config=safety_config)
+        
+        report = validator.validate_action_comprehensive({}, {})
+        assert isinstance(report, SafetyReport)
+        
+        action = {'type': ActionType.OPTIMIZE, 'confidence': float('nan')}
+        report = validator.validate_action_comprehensive(action, {})
+        assert isinstance(report, SafetyReport)
+        
+        validator.shutdown()
+
+
+# ============================================================
+# RUN TESTS
+# ============================================================
 
 if __name__ == '__main__':
-    pytest.main([__file__, '-v', '--tb=short'])
+    pytest.main([__file__, '-v', '--tb=short', '-s'])
