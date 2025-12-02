@@ -74,6 +74,9 @@ def temp_db_dir():
 @pytest.fixture
 def governance_manager(temp_db_dir):
     """Create a GovernanceManager instance."""
+    # Reset the singleton before each test to ensure clean state
+    GovernanceManager.reset_instance()
+    
     config = {
         'db_path': str(temp_db_dir / 'test_governance.db'),
         'max_active_decisions': 100,
@@ -82,6 +85,8 @@ def governance_manager(temp_db_dir):
     manager = GovernanceManager(config=config)
     yield manager
     manager.shutdown()
+    # Reset singleton after test as well
+    GovernanceManager.reset_instance()
 
 
 @pytest.fixture
@@ -400,6 +405,9 @@ class TestGovernanceManager:
     
     def test_shutdown(self, temp_db_dir):
         """Test manager shutdown."""
+        # Reset singleton to ensure fresh instance
+        GovernanceManager.reset_instance()
+        
         config = {'db_path': str(temp_db_dir / 'test_shutdown.db')}
         manager = GovernanceManager(config=config)
         
@@ -409,6 +417,9 @@ class TestGovernanceManager:
         
         # Should be marked as shutdown
         assert manager._shutdown is True
+        
+        # Reset singleton for other tests
+        GovernanceManager.reset_instance()
 
 
 # ============================================================================
@@ -884,6 +895,9 @@ class TestEdgeCases:
     
     def test_governance_database_error_handling(self, temp_db_dir):
         """Test handling of database errors."""
+        # Reset singleton to ensure fresh instance
+        GovernanceManager.reset_instance()
+        
         config = {'db_path': str(temp_db_dir / 'test.db')}
         manager = GovernanceManager(config=config)
         
