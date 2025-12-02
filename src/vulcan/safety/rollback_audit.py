@@ -322,13 +322,11 @@ class RollbackManager:
             Result of the operation, or None if all retries failed
         """
         delay = initial_delay
-        last_error = None
         
         for attempt in range(max_retries):
             try:
                 return operation()
             except sqlite3.OperationalError as e:
-                last_error = e
                 # Check specifically for "database is locked"
                 if "database is locked" in str(e):
                     if attempt < max_retries - 1:
