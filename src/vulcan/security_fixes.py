@@ -46,6 +46,10 @@ class RestrictedUnpickler(pickle.Unpickler):
         'numpy',
         'numpy.core',
         'numpy.core.multiarray',
+        'numpy._core',  # numpy >= 2.0 uses _core instead of core
+        'numpy._core.multiarray',
+        'numpy._core.multiarray.scalar',
+        'numpy._core.multiarray._reconstruct',
         'torch',
         'torch.nn',
         'torch.nn.modules',

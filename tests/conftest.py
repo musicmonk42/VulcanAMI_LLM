@@ -79,6 +79,12 @@ SKIP_ALIAS_MODULES = {
 }
 
 def _is_python_file(p: pathlib.Path) -> bool:
+    # Skip __init__.py and test files
+    if p.name.startswith("test_") or p.name.endswith("_test.py"):
+        return False
+    # Skip files in test directories
+    if "tests" in p.parts or "test" in p.parts:
+        return False
     return p.is_file() and p.suffix == ".py" and p.name not in {"__init__.py"}
 
 def _to_dotted_module(path: pathlib.Path) -> str:
