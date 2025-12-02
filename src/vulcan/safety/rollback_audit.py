@@ -710,6 +710,10 @@ class RollbackManager:
     
     def cleanup_expired_quarantine(self):
         """Remove expired quarantine entries."""
+        # Early exit if shutdown requested
+        if self._shutdown:
+            return
+
         current_time = time.time()
         
         with self.lock:
@@ -721,7 +725,7 @@ class RollbackManager:
             for qid in expired:
                 del self.quarantine[qid]
                 logger.info(f"Removed expired quarantine entry: {qid}")
-        
+
         # Clean from database
         with self.db_lock:
             try:
@@ -735,6 +739,10 @@ class RollbackManager:
     
     def _cleanup_old_snapshots(self):
         """Clean up old snapshots based on retention policy."""
+        # Early exit if shutdown requested
+        if self._shutdown:
+            return
+
         cutoff_time = time.time() - (self.snapshot_retention_days * 86400)
         
         # Find old snapshots
@@ -750,6 +758,10 @@ class RollbackManager:
                 return
         
         for row in old_snapshots:
+            # Check shutdown flag before processing each snapshot
+            if self._shutdown:
+                return
+                
             snapshot_id, file_path = row
             
             # Remove from memory
@@ -769,7 +781,7 @@ class RollbackManager:
                     logger.error(f"Error deleting snapshot file {file_path}: {e}")
             
             logger.info(f"Cleaned up old snapshot: {snapshot_id}")
-        
+
         # Clean from database
         with self.db_lock:
             try:
@@ -1441,6 +1453,10 @@ class AuditLogger:
     
     def _check_rotation(self):
         """Check if log rotation is needed."""
+        # Early exit if shutdown requested
+        if self._shutdown:
+            return
+
         # Check file size
         if self.current_log_file.exists():
             size_mb = self.current_log_file.stat().st_size / (1024 * 1024)
@@ -1456,6 +1472,10 @@ class AuditLogger:
     
     def _rotate_log(self):
         """Rotate current log file."""
+        # Early exit if shutdown requested
+        if self._shutdown:
+            return
+
         logger.info(f"Rotating log file: {self.current_log_file}")
         
         # Compress old log if enabled
@@ -1514,9 +1534,17 @@ class AuditLogger:
     
     def _cleanup_old_logs(self):
         """Clean up old log files based on retention policy."""
+        # Early exit if shutdown requested
+        if self._shutdown:
+            return
+
         cutoff_date = datetime.now() - timedelta(days=self.rotation_days)
         
         for log_file in self.log_path.glob("safety_audit_*.jsonl*"):
+            # Check shutdown before processing each file
+            if self._shutdown:
+                return
+                
             # Parse date from filename
             try:
                 date_str = log_file.stem.split('_')[2].split('.')[0]
