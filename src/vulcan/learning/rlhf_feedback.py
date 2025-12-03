@@ -224,10 +224,11 @@ class RLHFManager:
         if not inputs:
             return
         
-        inputs = torch.stack(inputs).to(self.device)
+        inputs = torch.stack(inputs).to(self.device).detach()  # Detach inputs, they're not trainable
         targets = torch.tensor(targets, dtype=torch.float32, device=self.device).unsqueeze(1)
         
         # Update reward model
+        self.reward_model.train()  # Ensure model is in training mode
         for _ in range(self.config.ppo_epochs):
             pred_rewards = self.reward_model(inputs)
             loss = F.mse_loss(pred_rewards, targets)
@@ -244,15 +245,18 @@ class RLHFManager:
         preference_loss = 0
         num_pairs = 0
         
+        # Ensure model is in training mode
+        self.reward_model.train()
+        
         for feedback in batch:
             try:
                 if 'preferred_over' not in feedback.metadata:
                     continue
                 
                 # Get features for preferred and rejected
-                preferred_feat = self._extract_features(feedback.agent_response)
-                rejected_feat = self._extract_features(feedback.metadata['preferred_over'])
-                context_feat = self._extract_features(feedback.context)
+                preferred_feat = self._extract_features(feedback.agent_response).detach()
+                rejected_feat = self._extract_features(feedback.metadata['preferred_over']).detach()
+                context_feat = self._extract_features(feedback.context).detach()
                 
                 # Compute rewards
                 preferred_input = torch.cat([preferred_feat, context_feat]).to(self.device)
@@ -387,12 +391,17 @@ class RLHFManager:
             logger.warning("No valid trajectories to process")
             return
         
-        # Concatenate all data
-        all_states = torch.cat(all_states, dim=0)
-        all_actions = torch.cat(all_actions, dim=0)
-        all_old_log_probs = torch.cat(all_old_log_probs, dim=0)
-        all_rewards = torch.cat(all_rewards, dim=0)
-        all_advantages = torch.cat(all_advantages, dim=0)
+        # Concatenate all data - detach since they're inputs
+        all_states = torch.cat(all_states, dim=0).detach()
+        all_actions = torch.cat(all_actions, dim=0).detach()
+        all_old_log_probs = torch.cat(all_old_log_probs, dim=0).detach()
+        all_rewards = torch.cat(all_rewards, dim=0).detach()
+        all_advantages = torch.cat(all_advantages, dim=0).detach()
+        
+        # Ensure models are in training mode
+        self.base_model.train()
+        self.policy_head.train()
+        self.value_model.train()
         
         # PPO epochs
         for epoch in range(self.config.ppo_epochs):

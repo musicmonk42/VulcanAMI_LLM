@@ -125,6 +125,9 @@ class ToolSafetyManager:
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize tool safety manager with configuration."""
+        # Reset shutdown flag even if already initialized (for tests)
+        self._shutdown = False
+        
         if getattr(self, "_initialized", False):
             return
         
@@ -138,7 +141,6 @@ class ToolSafetyManager:
         self.resource_usage_tracker = defaultdict(lambda: deque(maxlen=100))
         self.performance_metrics = defaultdict(dict)
         self.lock = threading.RLock()
-        self._shutdown = False
         
         self.max_veto_history = self.config.get('max_veto_history', 1000)
         self.safety_score_decay = self.config.get('safety_score_decay', 0.95)

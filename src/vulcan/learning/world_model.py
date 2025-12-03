@@ -456,10 +456,14 @@ class UnifiedWorldModel(nn.Module):
     
     def train_step(self, batch: Dict[str, torch.Tensor]) -> Dict[str, float]:
         """FIXED: Enhanced training step with device management"""
-        state = batch['state'].to(self.device)
-        action = batch['action'].to(self.device)
-        next_state = batch['next_state'].to(self.device)
-        reward = batch['reward'].to(self.device)
+        # Detach inputs since they're not trainable
+        state = batch['state'].to(self.device).detach()
+        action = batch['action'].to(self.device).detach()
+        next_state = batch['next_state'].to(self.device).detach()
+        reward = batch['reward'].to(self.device).detach()
+        
+        # Ensure model is in training mode
+        self.train()
         
         losses = {}
         
