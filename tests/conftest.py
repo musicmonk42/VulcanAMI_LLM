@@ -8,6 +8,7 @@ import os
 import pathlib
 import importlib
 import traceback
+import time
 from unittest.mock import MagicMock
 from dotenv import load_dotenv # <<< --- ADDED DOTENV --- >>>
 
@@ -174,10 +175,12 @@ def pytest_sessionfinish(session, exitstatus):
     Solution:
     1. Set PYTEST_RUNNING=1 at session start so handlers know to skip blocking operations
     2. Clear atexit handlers at session finish to prevent them from running at all
-    3. This is safe because pytest has its own cleanup mechanism
+    3. Terminate any remaining multiprocessing child processes to prevent hanging
+    4. This is safe because pytest has its own cleanup mechanism
     """
     import atexit as atexit_module
     import threading
+    import multiprocessing
     
     print("[conftest] Test session finishing - cleaning up atexit handlers...")
     
@@ -194,6 +197,35 @@ def pytest_sessionfinish(session, exitstatus):
         print(f"[conftest] Cleared {original_count} atexit handlers to prevent freeze")
     else:
         print("[conftest] Could not access _exithandlers (Python implementation may vary)")
+    
+    # Clean up any remaining multiprocessing child processes
+    # This prevents pytest from hanging while waiting for child processes to exit
+    print("[conftest] Terminating remaining multiprocessing child processes...")
+    active_children = multiprocessing.active_children()
+    if active_children:
+        print(f"[conftest] Found {len(active_children)} active child processes")
+        for child in active_children:
+            try:
+                print(f"[conftest] Terminating child process {child.pid} ({child.name})")
+                child.terminate()
+            except Exception as e:
+                print(f"[conftest] Error terminating child process {child.pid}: {e}")
+        
+        # Give processes a moment to terminate gracefully
+        time.sleep(0.5)
+        
+        # Force kill any that didn't terminate
+        remaining = multiprocessing.active_children()
+        if remaining:
+            print(f"[conftest] Force killing {len(remaining)} remaining processes")
+            for child in remaining:
+                try:
+                    child.kill()
+                    child.join(timeout=1)
+                except Exception as e:
+                    print(f"[conftest] Error killing child process {child.pid}: {e}")
+    else:
+        print("[conftest] No active child processes found")
     
     # Also set a flag to indicate cleanup is done
     os.environ["PYTEST_CLEANUP_DONE"] = "1"
