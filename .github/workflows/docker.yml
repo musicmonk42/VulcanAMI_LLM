@@ -73,7 +73,10 @@ jobs:
           echo "Removing unnecessary files to free up disk space..."
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
           sudo docker system prune -af
+          sudo docker image prune -af
           sudo rm -rf /opt/hostedtoolcache/*
+          sudo apt-get clean
+          sudo rm -rf /tmp/*
           echo "Disk space after cleanup:"
           df -h
 
@@ -215,6 +218,20 @@ jobs:
           else
             echo "$REPO_CERT_DIR not present, skipping"
           fi
+
+      - name: Free up disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          echo "Removing unnecessary files to free up disk space..."
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          sudo docker system prune -af
+          sudo docker image prune -af
+          sudo rm -rf /opt/hostedtoolcache/*
+          sudo apt-get clean
+          sudo rm -rf /tmp/*
+          echo "Disk space after cleanup:"
+          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
