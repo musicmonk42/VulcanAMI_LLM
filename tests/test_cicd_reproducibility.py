@@ -465,18 +465,26 @@ class TestSecurityConfiguration:
             f".gitignore missing critical patterns: {missing}"
     
     def test_no_committed_env_files(self):
-        """Verify no .env files are committed"""
-        # Use glob("**/.env") which already includes root .env
-        env_files = list(REPO_ROOT.glob("**/.env"))
+        """Verify no .env files are committed to git"""
+        # Check git-tracked files, not filesystem files (which may be gitignored)
+        result = subprocess.run(
+            ["git", "ls-files", "--cached"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if result.returncode != 0:
+            pytest.skip("Git not available or not a git repository")
+        
+        tracked_files = result.stdout.strip().split('\n') if result.stdout.strip() else []
         
         # Filter to only files named exactly .env (not .env.example or other variants)
-        env_files = [f for f in env_files if f.name == ".env"]
-        
-        # Deduplicate in case of any edge cases
-        env_files = list(set(env_files))
+        env_files = [f for f in tracked_files if f.endswith('/.env') or f == '.env']
         
         assert len(env_files) == 0, \
-            f"Found committed .env files: {env_files}"
+            f"Found committed .env files in git: {env_files}"
     
     def test_no_hardcoded_secrets_in_code(self):
         """Scan for potential hardcoded secrets in Python files"""
