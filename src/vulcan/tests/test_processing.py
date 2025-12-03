@@ -70,8 +70,16 @@ def model_manager():
 
 @pytest.fixture
 def workload_manager():
-    """Create workload manager."""
+    """Create workload manager.
+    
+    FIXED: Set max_memory_percent to 99 to prevent test failures when 
+    the test machine has high memory usage. The default is 80%, but tests
+    need to verify submit functionality regardless of system memory state.
+    """
     manager = WorkloadManager(max_batch_size=8, num_workers=2)
+    # CRITICAL FIX: Allow higher memory usage during tests
+    # Without this, tests fail on machines with >80% memory usage
+    manager.max_memory_percent = 99
     yield manager
     manager.shutdown()
 
