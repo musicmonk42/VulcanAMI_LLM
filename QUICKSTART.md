@@ -4,6 +4,11 @@
 
 ### Generate Secrets
 ```bash
+# Option 1: Use .env.example as template
+cp .env.example .env
+# Then edit .env file and replace placeholder values
+
+# Option 2: Auto-generate secrets
 make generate-secrets > .env
 # Edit .env file with your favorite editor
 ```
