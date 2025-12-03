@@ -92,10 +92,10 @@ RUN chmod 0555 /app/entrypoint.sh
 
 EXPOSE 8082 9147
 
+USER pii
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8082/health || exit 1
-
-USER pii
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["python", "-m", "uvicorn", "src.pii_service:app", "--host", "0.0.0.0", "--port", "8082"]
