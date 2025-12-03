@@ -43,6 +43,19 @@ _MODULES_TO_MOCK = [
     'src.security_audit_engine',
 ]
 
+
+def _restore_modules(original_modules):
+    """Helper function to restore original modules after mocking."""
+    for mod_name, original_mod in original_modules.items():
+        if original_mod is None:
+            # Remove the mock if module wasn't imported before
+            if mod_name in sys.modules:
+                del sys.modules[mod_name]
+        else:
+            # Restore the original module
+            sys.modules[mod_name] = original_mod
+
+
 # Temporarily mock for import of demo_graphix, then restore
 _temp_mocks = {}
 for mod_name in _MODULES_TO_MOCK:
@@ -62,14 +75,7 @@ from demo_graphix import (
 )
 
 # IMMEDIATELY restore original modules after import to prevent pollution
-for mod_name, original_mod in _temp_mocks.items():
-    if original_mod is None:
-        # Remove the temporary mock
-        if mod_name in sys.modules:
-            del sys.modules[mod_name]
-    else:
-        # Restore original
-        sys.modules[mod_name] = original_mod
+_restore_modules(_temp_mocks)
 
 
 # ============================================================================
@@ -92,13 +98,8 @@ def mock_demo_modules():
     
     yield mocks
     
-    # Restore after each test
-    for mod_name, original_mod in original_modules.items():
-        if original_mod is None:
-            if mod_name in sys.modules:
-                del sys.modules[mod_name]
-        else:
-            sys.modules[mod_name] = original_mod
+    # Restore after each test using the helper function
+    _restore_modules(original_modules)
 
 
 @pytest.fixture
