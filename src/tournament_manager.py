@@ -30,12 +30,84 @@ except ImportError:
     DistributedSharder = None
 
 # --- Observability metrics ---
-tournament_latency = Histogram('tournament_latency_seconds', 'Time for tournament selection (seconds)')
-tournament_invocations = Counter('tournament_invocations_total', 'Total tournaments run')
-diversity_penalty_events = Counter('tournament_diversity_penalty_total', 'Total diversity penalties applied')
-innovation_score_gauge = Gauge('tournament_innovation_score', 'Mean diversity among selected winners')
-coherence_score_gauge = Gauge('tournament_coherence_score', 'Mean pairwise similarity among winners')
-adaptive_penalty_gauge = Gauge('tournament_adaptive_penalty_value', 'The current value of the adaptive diversity penalty')
+# Use try-except to handle duplicate registration gracefully
+# This prevents errors when module is imported multiple times (e.g., via test runner aliases)
+# Note: Prometheus automatically adds suffixes (_total for Counter, _seconds for Histogram, etc.)
+# so we need to match on the base name without suffix when retrieving metrics
+tournament_latency = None
+try:
+    tournament_latency = Histogram('tournament_latency_seconds', 'Time for tournament selection (seconds)')
+except ValueError:
+    # Metric already registered, retrieve it from the registry
+    from prometheus_client import REGISTRY
+    for collector in REGISTRY._collector_to_names.keys():
+        if hasattr(collector, '_name') and collector._name == 'tournament_latency_seconds':
+            tournament_latency = collector
+            break
+    if tournament_latency is None:
+        raise RuntimeError("Failed to retrieve existing tournament_latency metric from registry")
+
+tournament_invocations = None
+try:
+    tournament_invocations = Counter('tournament_invocations_total', 'Total tournaments run')
+except ValueError:
+    from prometheus_client import REGISTRY
+    for collector in REGISTRY._collector_to_names.keys():
+        # Counter strips _total suffix, so match on base name
+        if hasattr(collector, '_name') and collector._name == 'tournament_invocations':
+            tournament_invocations = collector
+            break
+    if tournament_invocations is None:
+        raise RuntimeError("Failed to retrieve existing tournament_invocations metric from registry")
+
+diversity_penalty_events = None
+try:
+    diversity_penalty_events = Counter('tournament_diversity_penalty_total', 'Total diversity penalties applied')
+except ValueError:
+    from prometheus_client import REGISTRY
+    for collector in REGISTRY._collector_to_names.keys():
+        # Counter strips _total suffix, so match on base name
+        if hasattr(collector, '_name') and collector._name == 'tournament_diversity_penalty':
+            diversity_penalty_events = collector
+            break
+    if diversity_penalty_events is None:
+        raise RuntimeError("Failed to retrieve existing diversity_penalty_events metric from registry")
+
+innovation_score_gauge = None
+try:
+    innovation_score_gauge = Gauge('tournament_innovation_score', 'Mean diversity among selected winners')
+except ValueError:
+    from prometheus_client import REGISTRY
+    for collector in REGISTRY._collector_to_names.keys():
+        if hasattr(collector, '_name') and collector._name == 'tournament_innovation_score':
+            innovation_score_gauge = collector
+            break
+    if innovation_score_gauge is None:
+        raise RuntimeError("Failed to retrieve existing innovation_score_gauge metric from registry")
+
+coherence_score_gauge = None
+try:
+    coherence_score_gauge = Gauge('tournament_coherence_score', 'Mean pairwise similarity among winners')
+except ValueError:
+    from prometheus_client import REGISTRY
+    for collector in REGISTRY._collector_to_names.keys():
+        if hasattr(collector, '_name') and collector._name == 'tournament_coherence_score':
+            coherence_score_gauge = collector
+            break
+    if coherence_score_gauge is None:
+        raise RuntimeError("Failed to retrieve existing coherence_score_gauge metric from registry")
+
+adaptive_penalty_gauge = None
+try:
+    adaptive_penalty_gauge = Gauge('tournament_adaptive_penalty_value', 'The current value of the adaptive diversity penalty')
+except ValueError:
+    from prometheus_client import REGISTRY
+    for collector in REGISTRY._collector_to_names.keys():
+        if hasattr(collector, '_name') and collector._name == 'tournament_adaptive_penalty_value':
+            adaptive_penalty_gauge = collector
+            break
+    if adaptive_penalty_gauge is None:
+        raise RuntimeError("Failed to retrieve existing adaptive_penalty_gauge metric from registry")
 
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
