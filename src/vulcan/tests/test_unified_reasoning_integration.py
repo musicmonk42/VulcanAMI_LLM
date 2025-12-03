@@ -25,6 +25,9 @@ FIXES APPLIED (corrected version):
 
 2. test_end_to_end_symbolic_reasoning: Added skip condition when MockLanguageReasoner
    is used instead of SymbolicReasoner, since the mock doesn't have the add_rule method.
+
+3. CRITICAL FIX: Added proper fixture teardown with shutdown() call to prevent
+   the test process from hanging after completion.
 """
 
 import pytest
@@ -80,9 +83,22 @@ def is_mock_symbolic_reasoner(reasoner):
 
 @pytest.fixture(scope="module")
 def unified_reasoner():
-    """Provides a single, reusable instance of the UnifiedReasoner."""
+    """Provides a single, reusable instance of the UnifiedReasoner.
+    
+    CRITICAL FIX: Added proper teardown with shutdown() to prevent test hanging.
+    The UnifiedReasoner starts background threads that must be stopped.
+    """
     # We disable learning and safety for deterministic testing of core logic
-    return UnifiedReasoner(enable_learning=False, enable_safety=False)
+    reasoner = UnifiedReasoner(enable_learning=False, enable_safety=False)
+    
+    yield reasoner
+    
+    # CRITICAL: Properly shutdown the reasoner to stop background threads
+    # This prevents the test process from hanging after all tests complete
+    try:
+        reasoner.shutdown(timeout=5.0, skip_save=True)
+    except Exception as e:
+        print(f"\n[CLEANUP] Shutdown warning (may be expected): {e}")
 
 
 # ============================================================================
