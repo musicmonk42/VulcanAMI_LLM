@@ -95,7 +95,7 @@ class RLHFManager:
     
     def _build_reward_model(self) -> nn.Module:
         """Build reward model for human preferences"""
-        return nn.Sequential(
+        model = nn.Sequential(
             nn.Linear(EMBEDDING_DIM * 2, HIDDEN_DIM),
             nn.LayerNorm(HIDDEN_DIM),
             nn.ReLU(),
@@ -105,10 +105,14 @@ class RLHFManager:
             nn.Linear(HIDDEN_DIM // 2, 1),
             nn.Tanh()  # Bound rewards to [-1, 1]
         ).to(self.device)
+        # Ensure all parameters have gradients enabled
+        for param in model.parameters():
+            param.requires_grad = True
+        return model
     
     def _build_value_model(self) -> nn.Module:
         """Build value model for PPO"""
-        return nn.Sequential(
+        model = nn.Sequential(
             nn.Linear(EMBEDDING_DIM, HIDDEN_DIM),
             nn.LayerNorm(HIDDEN_DIM),
             nn.ReLU(),
@@ -117,16 +121,24 @@ class RLHFManager:
             nn.ReLU(),
             nn.Linear(HIDDEN_DIM // 2, 1)
         ).to(self.device)
+        # Ensure all parameters have gradients enabled
+        for param in model.parameters():
+            param.requires_grad = True
+        return model
     
     def _build_policy_head(self) -> nn.Module:
         """Build policy head for action distribution"""
-        return nn.Sequential(
+        model = nn.Sequential(
             nn.Linear(EMBEDDING_DIM, HIDDEN_DIM),
             nn.LayerNorm(HIDDEN_DIM),
             nn.ReLU(),
             nn.Linear(HIDDEN_DIM, EMBEDDING_DIM),  # Output action space
             nn.Tanh()
         ).to(self.device)
+        # Ensure all parameters have gradients enabled
+        for param in model.parameters():
+            param.requires_grad = True
+        return model
     
     def receive_feedback(self, feedback: FeedbackData):
         """FIXED: Receive and queue human feedback with proper locking"""
