@@ -1047,6 +1047,13 @@ class HardwareDispatcherIntegration:
     
     def cleanup(self):
         """Cleanup resources"""
+        # Shutdown hardware dispatcher if it exists
+        if self.hardware_dispatcher is not None:
+            try:
+                self.hardware_dispatcher.shutdown()
+            except Exception as e:
+                logger.warning(f"Error shutting down hardware dispatcher: {e}")
+        
         self.executor.shutdown(wait=False)
         self.cache.clear()
 
