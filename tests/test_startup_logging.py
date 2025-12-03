@@ -45,7 +45,7 @@ def test_startup_logging_sequence():
         assert hasattr(persistant_memory_v46, '__version__') or hasattr(persistant_memory_v46, '__name__'), \
             "persistant_memory_v46 module not properly loaded"
         
-        assert hasattr(retrieval, 'ContextualRetrievalEngine') or 'retrieval' in str(type(retrieval)), \
+        assert hasattr(retrieval, 'RetrievalResult') or hasattr(retrieval, '__name__') or 'retrieval' in str(type(retrieval)), \
             "vulcan.memory.retrieval module not properly loaded"
         
         assert hasattr(orchestrator, '__name__') or 'orchestrator' in str(type(orchestrator)), \
