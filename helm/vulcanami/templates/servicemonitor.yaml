@@ -1,0 +1,16 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "vulcanami.fullname" . }}
+  labels:
+    {{- include "vulcanami.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "vulcanami.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.monitoring.serviceMonitor.interval }}
+    path: /metrics
+{{- end }}

@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vulcanami.fullname" . }}
+  labels:
+    {{- include "vulcanami.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "vulcanami.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "vulcanami.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "vulcanami.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        - name: metrics
+          containerPort: {{ .Values.service.metricsPort }}
+          protocol: TCP
+        {{- if .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        env:
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: jwtSecretKey
+        - name: BOOTSTRAP_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: bootstrapKey
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: postgresPassword
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: redisPassword
+        {{- if .Values.postgres.enabled }}
+        - name: POSTGRES_HOST
+          value: {{ .Values.postgres.host | quote }}
+        - name: POSTGRES_PORT
+          value: {{ .Values.postgres.port | quote }}
+        - name: POSTGRES_DB
+          value: {{ .Values.postgres.database | quote }}
+        - name: POSTGRES_USER
+          value: {{ .Values.postgres.user | quote }}
+        {{- end }}
+        {{- if .Values.redis.enabled }}
+        - name: REDIS_HOST
+          value: {{ .Values.redis.host | quote }}
+        - name: REDIS_PORT
+          value: {{ .Values.redis.port | quote }}
+        {{- end }}
+        {{- if .Values.minio.enabled }}
+        - name: MINIO_ENDPOINT
+          value: {{ .Values.minio.endpoint | quote }}
+        {{- end }}
+        {{- with .Values.config }}
+        - name: ENVIRONMENT
+          value: {{ .environment | quote }}
+        - name: LOG_LEVEL
+          value: {{ .logLevel | quote }}
+        - name: PYTHON_UNBUFFERED
+          value: {{ .pythonUnbuffered | quote }}
+        {{- end }}
+        # Volumes for readOnlyRootFilesystem compatibility
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-data
+          mountPath: /app/data
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-data
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
