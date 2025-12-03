@@ -153,6 +153,7 @@ def cleanup_session_resources():
     2. Event loops are properly closed
     3. Resources are freed before pytest exits
     4. Monitoring threads are stopped
+    5. Multiprocessing child processes are terminated
     
     This prevents the test runner from hanging after all tests pass.
     """
@@ -160,8 +161,34 @@ def cleanup_session_resources():
     
     # Cleanup at session end with timeout
     import time
+    import multiprocessing
     
-    # 1. Stop any EnhancedResourceMonitor threads
+    # 1. Terminate any multiprocessing child processes first
+    # This is critical to prevent hanging after tests complete
+    active_children = multiprocessing.active_children()
+    if active_children:
+        warnings.warn(
+            f"Found {len(active_children)} active child processes during cleanup, terminating..."
+        )
+        for child in active_children:
+            try:
+                child.terminate()
+            except Exception:
+                pass
+        
+        # Give processes a moment to terminate
+        time.sleep(0.2)
+        
+        # Force kill any that didn't terminate
+        remaining = multiprocessing.active_children()
+        for child in remaining:
+            try:
+                child.kill()
+                child.join(timeout=0.5)
+            except Exception:
+                pass
+    
+    # 2. Stop any EnhancedResourceMonitor threads
     try:
         from vulcan import planning
         # Find and stop all monitor instances
@@ -177,13 +204,13 @@ def cleanup_session_resources():
     except Exception:
         pass  # Module might not be loaded
     
-    # 2. Force garbage collection to trigger cleanup finalizers
+    # 3. Force garbage collection to trigger cleanup finalizers
     gc.collect()
     
-    # 3. Give background threads a moment to clean up (but don't wait forever)
+    # 4. Give background threads a moment to clean up (but don't wait forever)
     time.sleep(0.5)
     
-    # 4. Clean up any remaining event loops
+    # 5. Clean up any remaining event loops
     try:
         loop = asyncio.get_event_loop()
         if loop and not loop.is_closed():
@@ -210,5 +237,5 @@ def cleanup_session_resources():
     except Exception:
         pass
     
-    # 5. Final garbage collection
+    # 6. Final garbage collection
     gc.collect()
