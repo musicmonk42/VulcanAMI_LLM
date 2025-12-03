@@ -24,6 +24,7 @@ RUN apt-get update && \
         ca-certificates \
         build-essential \
         git && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and setuptools to latest versions
@@ -73,6 +74,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user

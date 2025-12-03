@@ -64,6 +64,7 @@ RUN apt-get update && \
         build-essential \
         git && \
     update-ca-certificates && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and setuptools to latest versions
@@ -140,6 +141,7 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends curl ca-certificates && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (uid 1001) and group

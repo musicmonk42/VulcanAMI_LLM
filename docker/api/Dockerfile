@@ -25,6 +25,7 @@ RUN apt-get update && \
         build-essential \
         git \
         libpq-dev && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and setuptools to latest versions
@@ -76,6 +77,7 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         libpq5 && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
