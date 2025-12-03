@@ -57,7 +57,6 @@ jobs:
         run: |
           mkdir -p data/corpus
           mkdir -p logs
-          mkdir -p checkpoints
 
       - name: Prepare demo corpus
         run: |
@@ -91,8 +90,7 @@ jobs:
             --auto-create-corpus \
             --auto-adjust-seq-len \
             --data-path data/corpus \
-            --log-dir logs \
-            --checkpoint-dir checkpoints \
+            --out-dir logs \
             ${{ github.event.inputs.meta_apply == 'true' && '--meta-apply' || '' }} \
             2>&1 | tee training_output.log
           
@@ -137,12 +135,12 @@ jobs:
           retention-days: 30
 
       - name: Upload trained models
-        if: always() && hashFiles('checkpoints/*.pt') != ''
+        if: always() && hashFiles('logs/*.pt') != ''
         uses: actions/upload-artifact@v4
         with:
           name: trained-models-${{ github.run_number }}
           path: |
-            checkpoints/
+            logs/*.pt
           retention-days: 30
 
       - name: Comment on PR with training results
