@@ -95,10 +95,10 @@ RUN chmod 0555 /app/entrypoint.sh
 
 EXPOSE 8000 9148
 
+USER apiuser
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8000/health || exit 1
-
-USER apiuser
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["python", "-m", "uvicorn", "src.api_gateway:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -93,10 +93,10 @@ RUN chmod 0555 /app/entrypoint.sh
 
 EXPOSE 8080 9145
 
+USER dqs
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8080/health || exit 1
-
-USER dqs
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["python", "-m", "uvicorn", "src.dqs_service:app", "--host", "0.0.0.0", "--port", "8080"]

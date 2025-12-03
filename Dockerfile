@@ -170,13 +170,13 @@ ENV PYTHONPATH=/app
 # Expose application port (Flask / FastAPI / Graphix API Server)
 EXPOSE 5000
 
+# Switch to non-root user
+USER graphix
+
 # Healthcheck using curl (depends on app exposing /health endpoint)
 # If your health endpoint differs, modify accordingly.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:5000/health || exit 1
-
-# Switch to non-root user
-USER graphix
 
 # Entrypoint ensures runtime secrets are provided securely
 ENTRYPOINT ["/app/entrypoint.sh"]
