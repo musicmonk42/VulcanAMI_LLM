@@ -68,9 +68,11 @@ jobs:
         timeout-minutes: 10
         run: |
           set -x
-          for i in 1 2 3; do
-            pip install -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
-          done || true
+          # Skip installing heavy dependencies for linting - not needed
+          # for i in 1 2 3; do
+          #   pip install -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
+          # done || true
+          echo "Skipping heavy dependencies installation for linting"
           pylint src/ --exit-zero || true
 
       - name: Run Bandit (security linting)
@@ -142,7 +144,11 @@ jobs:
           df -h
           echo "Removing unnecessary files to free up disk space..."
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/share/chrome_driver
           sudo docker system prune -af
+          sudo apt-get clean
           echo "Disk space after cleanup:"
           df -h
 
@@ -350,6 +356,9 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
           sudo docker system prune -af
           sudo rm -rf /opt/hostedtoolcache/*
+          sudo rm -rf /usr/local/share/chromium
+          sudo rm -rf /usr/local/share/chrome_driver
+          sudo apt-get clean
           echo "Disk space after cleanup:"
           df -h
 

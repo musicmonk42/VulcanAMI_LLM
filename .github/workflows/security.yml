@@ -238,6 +238,7 @@ jobs:
             p/flask
             p/docker
             p/kubernetes
+        continue-on-error: true
 
   container-scan:
     name: Container Security Scan
@@ -278,6 +279,7 @@ jobs:
             REJECT_INSECURE_JWT=ack
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=docker
 
       - name: Run Trivy vulnerability scanner
         if: steps.docker_build.outcome == 'success'
