@@ -7,6 +7,7 @@ import numpy as np
 import sqlite3
 import tempfile
 import os
+import time
 import threading
 from unittest.mock import Mock, MagicMock, patch
 from pathlib import Path
@@ -68,7 +69,6 @@ def temp_db():
             FeedbackProtocol._instances.clear()
         
         # Small delay to allow file handles to be released (Windows-specific)
-        import time
         time.sleep(0.1)
         
         # Attempt to remove the database file
