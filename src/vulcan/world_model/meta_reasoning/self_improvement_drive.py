@@ -237,6 +237,7 @@ class SelfImprovementDrive:
         self.backup_interval = int(persistence_cfg.get("backup_state_every_n_actions", 5))
 
         # CSIU: Granular kill switches
+        # Enabled by default (when env var is "0" or not set), disabled when set to "1"
         self._csiu_enabled = (os.getenv("INTRINSIC_CSIU_OFF", "0") != "1")
         self._csiu_calc_enabled = (os.getenv("INTRINSIC_CSIU_CALC_OFF", "0") != "1")
         self._csiu_regs_enabled = (os.getenv("INTRINSIC_CSIU_REGS_OFF", "0") != "1")
