@@ -865,15 +865,10 @@ class ToolSafetyManager:
         if self._shutdown:
             return
         
-        # FIXED: Skip blocking operations during pytest runs
-        is_pytest = os.environ.get("PYTEST_RUNNING") == "1"
-        if is_pytest:
-            self._shutdown = True
-            return
-        
-        logging.raiseExceptions = False
-        safe_log(logger.info, "Shutting down ToolSafetyManager...")
+        # FIXED: Always set shutdown flag and clear data structures
         self._shutdown = True
+        
+        # Clear all data structures (safe for pytest)
         with self.lock:
             for limiter in self.rate_limiters.values():
                 limiter.shutdown()
@@ -885,6 +880,14 @@ class ToolSafetyManager:
             self.rate_limiters.clear()
             self.resource_usage_tracker.clear()
             self.performance_metrics.clear()
+        
+        # Skip blocking operations during pytest runs
+        is_pytest = os.environ.get("PYTEST_RUNNING") == "1"
+        if is_pytest:
+            return
+        
+        logging.raiseExceptions = False
+        safe_log(logger.info, "Shutting down ToolSafetyManager...")
         safe_log(logger.info, "ToolSafetyManager shutdown complete")
 
 # ============================================================
@@ -1235,21 +1238,23 @@ class ToolSafetyGovernor:
         if self._shutdown:
             return
         
-        # FIXED: Skip blocking operations during pytest runs
-        is_pytest = os.environ.get("PYTEST_RUNNING") == "1"
-        if is_pytest:
-            self._shutdown = True
-            return
-        
-        logging.raiseExceptions = False
-        safe_log(logger.info, "Shutting down ToolSafetyGovernor...")
+        # FIXED: Always set shutdown flag and cleanup
         self._shutdown = True
+        
+        # Always shutdown the manager (which handles pytest mode internally)
         self.tool_safety_manager.shutdown()
+        
+        # Clear data structures
         with self.lock:
             threads_to_wait = list(self.quarantine_threads)
-        for thread in threads_to_wait:
-            if thread.is_alive():
-                thread.join(timeout=1.0)
+        
+        # Skip thread waiting during pytest runs
+        is_pytest = os.environ.get("PYTEST_RUNNING") == "1"
+        if not is_pytest:
+            for thread in threads_to_wait:
+                if thread.is_alive():
+                    thread.join(timeout=1.0)
+        
         with self.lock:
             self.governance_history.clear()
             self.quarantine_list.clear()
@@ -1257,7 +1262,12 @@ class ToolSafetyGovernor:
             self.blacklist.clear()
             self.governance_policies.clear()
             self.quarantine_threads.clear()
-        safe_log(logger.info, "ToolSafetyGovernor shutdown complete")
+        
+        # Skip logging during pytest runs
+        if not is_pytest:
+            logging.raiseExceptions = False
+            safe_log(logger.info, "Shutting down ToolSafetyGovernor...")
+            safe_log(logger.info, "ToolSafetyGovernor shutdown complete")
 
 def initialize_tool_safety():
     global _TOOL_SAFETY_INIT_DONE

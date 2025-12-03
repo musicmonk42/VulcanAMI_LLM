@@ -285,6 +285,10 @@ class UnifiedWorldModel(nn.Module):
         # Move all modules to device
         self.to(self.device)
         
+        # FIXED: Explicitly ensure all parameters have gradients enabled
+        for param in self.parameters():
+            param.requires_grad = True
+        
         # Optimizers
         self.optimizer = optim.Adam(self.parameters(), lr=0.001)
         self.scheduler = CosineAnnealingLR(self.optimizer, T_max=100)
