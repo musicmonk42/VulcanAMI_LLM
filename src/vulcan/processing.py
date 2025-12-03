@@ -2217,10 +2217,12 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
                             slo: Optional[SLOConfig] = None) -> ProcessingResult:
         """Process with priority and SLO support."""
         if self.workload_manager:
-            result_future = asyncio.Future()
+            # Use threading Event for synchronous waiting
+            result_container = {'result': None, 'ready': threading.Event()}
             
             def callback(work_id, result):
-                result_future.set_result(result)
+                result_container['result'] = result
+                result_container['ready'].set()
             
             work_id = self.workload_manager.submit(
                 data=data,
@@ -2233,13 +2235,9 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
                 # Wait for result (with timeout based on SLO)
                 timeout = (slo.max_latency_ms / 1000) if slo else 10.0
                 
-                try:
-                    loop = asyncio.get_event_loop()
-                    result = loop.run_until_complete(
-                        asyncio.wait_for(result_future, timeout=timeout)
-                    )
-                    return result
-                except asyncio.TimeoutError:
+                if result_container['ready'].wait(timeout=timeout):
+                    return result_container['result']
+                else:
                     logger.error(f"Processing timeout for work_id {work_id}")
                     return ProcessingResult(
                         embedding=np.zeros(self.common_dim),
