@@ -468,8 +468,15 @@ python3 demos/omega_phase4_csiu.py
 **Step 5.1: Setup ZK Circuit (One-time)**
 
 ```bash
-# Install circom tools (if not already installed)
-npm install -g circom snarkjs
+set -e  # Exit on error
+
+# Check for circom installation
+if ! command -v circom &> /dev/null; then
+    echo "Installing circom tools..."
+    npm install -g circom snarkjs
+else
+    echo "✅ Circom already installed"
+fi
 
 # Navigate to circuits directory
 cd configs/zk/circuits

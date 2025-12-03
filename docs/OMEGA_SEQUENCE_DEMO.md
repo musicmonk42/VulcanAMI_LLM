@@ -8,10 +8,9 @@
 
 ## ⚠️ CRITICAL: This is Real, Working Code
 
-**ALL components referenced in this document EXIST in the codebase at:**
-```
-/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/
-```
+**ALL components referenced in this document EXIST in the codebase.**
+
+Clone the repository to your local environment to work with these files.
 
 **Component Status:**
 - ✅ Phase 1: Dynamic Architecture - **EXISTS** (51KB)
@@ -535,7 +534,7 @@ def display_phase3():
     print("[SYSTEM] 🛡️ INTERCEPTED. Attack neutralized.")
     print()
     
-    # Simul ate patch application
+    # Simulate patch application
     print("[PATCH] Updating security filters:")
     patches = [
         "input_sanitizer.py",
