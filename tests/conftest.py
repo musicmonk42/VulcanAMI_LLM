@@ -8,6 +8,7 @@ import os
 import pathlib
 import importlib
 import traceback
+import time
 from unittest.mock import MagicMock
 from dotenv import load_dotenv # <<< --- ADDED DOTENV --- >>>
 
@@ -211,7 +212,6 @@ def pytest_sessionfinish(session, exitstatus):
                 print(f"[conftest] Error terminating child process {child.pid}: {e}")
         
         # Give processes a moment to terminate gracefully
-        import time
         time.sleep(0.5)
         
         # Force kill any that didn't terminate
