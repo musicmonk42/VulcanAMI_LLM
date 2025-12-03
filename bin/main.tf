@@ -487,6 +487,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
     id     = "glacier_transition"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = var.lifecycle_transition_glacier_days
       storage_class = "GLACIER"
@@ -614,6 +616,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     id     = "log_retention"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -636,6 +640,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -801,6 +807,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
     id     = "expire-old-cloudfront-logs"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -823,6 +831,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7

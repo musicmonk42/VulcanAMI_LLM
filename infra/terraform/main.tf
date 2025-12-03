@@ -508,6 +508,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
     id     = "transition-to-ia"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -518,6 +520,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
     id     = "transition-to-glacier"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = var.lifecycle_transition_glacier_days
       storage_class = "GLACIER"
@@ -527,6 +531,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "primary" {
   rule {
     id     = "transition-to-deep-archive"
     status = "Enabled"
+
+    filter {}
 
     transition {
       days          = var.lifecycle_transition_deep_archive_days
@@ -653,6 +659,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
     id     = "expire-old-logs"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -677,6 +685,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs" {
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -735,6 +745,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs_secondary" {
     id     = "expire-old-logs"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -757,6 +769,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "logs_secondary" {
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -930,6 +944,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
     id     = "expire-old-cloudfront-logs"
     status = "Enabled"
 
+    filter {}
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"
@@ -952,6 +968,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
   rule {
     id     = "abort-incomplete-multipart-uploads"
     status = "Enabled"
+
+    filter {}
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -2071,9 +2089,9 @@ resource "aws_cloudtrail" "main" {
 ################################################################################
 
 resource "aws_backup_vault" "main" {
-  count      = var.enable_aws_backup ? 1 : 0
-  name       = "${local.name_prefix}-backup-vault"
-  kms_key_id = aws_kms_key.main.arn # Fixed: Added KMS encryption
+  count       = var.enable_aws_backup ? 1 : 0
+  name        = "${local.name_prefix}-backup-vault"
+  kms_key_arn = aws_kms_key.main.arn # Fixed: Added KMS encryption
 
   tags = local.common_tags
 }
