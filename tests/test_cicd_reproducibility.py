@@ -466,11 +466,14 @@ class TestSecurityConfiguration:
     
     def test_no_committed_env_files(self):
         """Verify no .env files are committed"""
+        # Use glob("**/.env") which already includes root .env
         env_files = list(REPO_ROOT.glob("**/.env"))
-        env_files.extend(REPO_ROOT.glob(".env"))
         
         # Filter to only files named exactly .env (not .env.example or other variants)
         env_files = [f for f in env_files if f.name == ".env"]
+        
+        # Deduplicate in case of any edge cases
+        env_files = list(set(env_files))
         
         assert len(env_files) == 0, \
             f"Found committed .env files: {env_files}"
