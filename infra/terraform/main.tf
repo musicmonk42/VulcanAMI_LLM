@@ -113,7 +113,6 @@ locals {
       "CostCenter"  = var.cost_center
       "ManagedBy"   = "Terraform"
       "Contact"     = var.contact_email
-      "LastUpdated" = timestamp()
     },
     var.tag_compliance,
     var.additional_tags

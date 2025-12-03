@@ -610,8 +610,8 @@ output "common_tags" {
 ################################################################################
 
 output "deployment_timestamp" {
-  description = "Timestamp of this deployment"
-  value       = timestamp()
+  description = "Timestamp of this deployment - use 'terraform output -json deployment_timestamp' to get current time"
+  value       = "Use 'date -u +\"%Y-%m-%dT%H:%M:%SZ\"' or check resource creation times"
 }
 
 output "terraform_version" {
