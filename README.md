@@ -95,9 +95,13 @@ pip install -r requirements.txt
 
 3) Configure environment
 Set required secrets via environment variables or a secure secret manager. At minimum:
-- JWT_SECRET_KEY=<strong-unique-secret>
-- BOOTSTRAP_KEY=<one-time-bootstrap-secret>  # only needed to create the initial admin/agent
-- REDIS_URL=redis://<host>:<port>            # optional; falls back to in-memory rate limiting
+```bash
+# Use .env.example as a template
+cp .env.example .env
+# Edit .env and set the following variables:
+# - JWT_SECRET_KEY=<strong-unique-secret>
+# - BOOTSTRAP_KEY=<one-time-bootstrap-secret>  # only needed to create the initial admin/agent
+# - REDIS_URL=redis://<host>:<port>            # optional; falls back to in-memory rate limiting
 - AUDIT_DB_PATH=./audit.db                   # default shown; secure paths recommended in production
 - SLACK_WEBHOOK_URL=<optional-for-alerts>
 

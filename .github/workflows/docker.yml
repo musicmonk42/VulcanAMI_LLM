@@ -227,7 +227,8 @@ jobs:
           POSTGRES_PASSWORD=$(openssl rand -base64 32)
           MINIO_ROOT_USER=minioadmin
           MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)
-          REDIS_PASSWORD=
+          REDIS_PASSWORD=$(openssl rand -base64 32)
+          GRAFANA_PASSWORD=$(openssl rand -base64 16)
           EOF
 
       - name: Validate docker-compose files
