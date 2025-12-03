@@ -138,7 +138,38 @@ For detailed testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
 - `PYPI_API_TOKEN` (optional): For PyPI publishing
 - `SLACK_WEBHOOK_URL` (optional): For notifications
 
-### 6. Dependabot Configuration (`.github/dependabot.yml`)
+### 6. LLM Training Workflow (`.github/workflows/llm-training.yml`)
+
+**Triggers:**
+- Pull requests to `main` and `develop`
+- Manual workflow dispatch with configurable parameters
+
+**Jobs:**
+- **Train LLM Model**: Executes LLM training with governance and self-improvement
+  - Installs PyTorch and dependencies
+  - Creates training corpus (or uses provided data)
+  - Runs training script with configurable steps and parameters
+  - Uploads training logs and model checkpoints as artifacts
+  - Posts training results as PR comment
+
+**Manual Workflow Parameters:**
+- `training_steps`: Number of training steps (default: 1000)
+- `seq_length`: Sequence length for training (default: 128)
+- `meta_apply`: Enable meta self-improvement apply (default: false)
+
+**Features:**
+- Automatic demo corpus creation for testing
+- Auto-adjusts sequence length if corpus is too small
+- Uploads training logs and checkpoints as artifacts
+- Posts training summary as PR comment
+- Timeout protection (120 minutes)
+- Concurrent run cancellation for same PR
+
+**Artifacts Generated:**
+- `training-logs-{run_number}`: Training logs and summary
+- `trained-models-{run_number}`: Model checkpoints (if generated)
+
+### 7. Dependabot Configuration (`.github/dependabot.yml`)
 
 **Automated Dependency Updates:**
 - Python packages (weekly on Monday)

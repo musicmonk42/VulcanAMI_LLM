@@ -189,6 +189,7 @@ Status: SUCCESS ✓
 For comprehensive testing documentation, see:
 - **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Complete testing guide
 - [CI_CD.md](CI_CD.md) - CI/CD pipeline documentation
+- [docs/LLM_TRAINING_WORKFLOW.md](docs/LLM_TRAINING_WORKFLOW.md) - LLM training on PRs
 - [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) - Reproducible build guide
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment instructions
 
