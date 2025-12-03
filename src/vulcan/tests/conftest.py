@@ -152,6 +152,7 @@ def cleanup_session_resources():
     1. All background threads are given time to complete
     2. Event loops are properly closed
     3. Resources are freed before pytest exits
+    4. Monitoring threads are stopped
     
     This prevents the test runner from hanging after all tests pass.
     """
@@ -160,13 +161,29 @@ def cleanup_session_resources():
     # Cleanup at session end with timeout
     import time
     
-    # 1. Force garbage collection to trigger cleanup finalizers
+    # 1. Stop any EnhancedResourceMonitor threads
+    try:
+        from vulcan import planning
+        # Find and stop all monitor instances
+        for obj in gc.get_objects():
+            if hasattr(obj, '__class__') and obj.__class__.__name__ == 'EnhancedResourceMonitor':
+                try:
+                    if hasattr(obj, 'stop_monitoring'):
+                        obj.stop_monitoring.set()
+                    if hasattr(obj, 'cleanup'):
+                        obj.cleanup()
+                except Exception:
+                    pass  # Best effort cleanup
+    except Exception:
+        pass  # Module might not be loaded
+    
+    # 2. Force garbage collection to trigger cleanup finalizers
     gc.collect()
     
-    # 2. Give background threads a moment to clean up (but don't wait forever)
+    # 3. Give background threads a moment to clean up (but don't wait forever)
     time.sleep(0.5)
     
-    # 3. Clean up any remaining event loops
+    # 4. Clean up any remaining event loops
     try:
         loop = asyncio.get_event_loop()
         if loop and not loop.is_closed():
@@ -193,5 +210,5 @@ def cleanup_session_resources():
     except Exception:
         pass
     
-    # 4. Final garbage collection
+    # 5. Final garbage collection
     gc.collect()
