@@ -469,8 +469,8 @@ class TestSecurityConfiguration:
         env_files = list(REPO_ROOT.glob("**/.env"))
         env_files.extend(REPO_ROOT.glob(".env"))
         
-        # Filter out .env.example which is okay
-        env_files = [f for f in env_files if ".example" not in f.name]
+        # Filter to only files named exactly .env (not .env.example or other variants)
+        env_files = [f for f in env_files if f.name == ".env"]
         
         assert len(env_files) == 0, \
             f"Found committed .env files: {env_files}"

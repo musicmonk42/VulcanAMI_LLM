@@ -30,15 +30,38 @@ for path in [str(project_root), str(demo_dir), str(src_dir), str(test_dir)]:
     if path not in sys.path:
         sys.path.insert(0, path)
 
-# Pre-mock problematic imports before they're loaded
-sys.modules['src.graphix_client'] = MagicMock()
-sys.modules['src.tournament_manager'] = MagicMock()
-sys.modules['src.unified_runtime'] = MagicMock()
-sys.modules['src.nso_aligner'] = MagicMock()
-sys.modules['src.observability_manager'] = MagicMock()
-sys.modules['src.stdio_policy'] = MagicMock()
-sys.modules['src.hardware_dispatcher'] = MagicMock()
-sys.modules['src.security_audit_engine'] = MagicMock()
+# Store modules to mock - DON'T mock them at module level!
+# They'll be mocked by the mock_demo_modules fixture
+_MODULES_TO_MOCK = [
+    'src.graphix_client',
+    'src.tournament_manager',
+    'src.unified_runtime',
+    'src.nso_aligner',
+    'src.observability_manager',
+    'src.stdio_policy',
+    'src.hardware_dispatcher',
+    'src.security_audit_engine',
+]
+
+
+def _restore_modules(original_modules):
+    """Helper function to restore original modules after mocking."""
+    for mod_name, original_mod in original_modules.items():
+        if original_mod is None:
+            # Remove the mock if module wasn't imported before
+            if mod_name in sys.modules:
+                del sys.modules[mod_name]
+        else:
+            # Restore the original module
+            sys.modules[mod_name] = original_mod
+
+
+# Temporarily mock for import of demo_graphix, then restore
+_temp_mocks = {}
+for mod_name in _MODULES_TO_MOCK:
+    _temp_mocks[mod_name] = sys.modules.get(mod_name)
+    # Always mock, regardless of whether the module exists
+    sys.modules[mod_name] = MagicMock()
 
 # Import the module under test
 import demo_graphix
@@ -51,10 +74,33 @@ from demo_graphix import (
     setup_logging
 )
 
+# IMMEDIATELY restore original modules after import to prevent pollution
+_restore_modules(_temp_mocks)
+
 
 # ============================================================================
 # Fixtures
 # ============================================================================
+
+@pytest.fixture(autouse=True)
+def mock_demo_modules():
+    """
+    Mock external modules for each test in this module.
+    This ensures mocks are active during test execution.
+    """
+    mocks = {}
+    original_modules = {}
+    
+    for mod_name in _MODULES_TO_MOCK:
+        original_modules[mod_name] = sys.modules.get(mod_name)
+        mocks[mod_name] = MagicMock()
+        sys.modules[mod_name] = mocks[mod_name]
+    
+    yield mocks
+    
+    # Restore after each test using the helper function
+    _restore_modules(original_modules)
+
 
 @pytest.fixture
 def temp_output_dir(tmp_path):

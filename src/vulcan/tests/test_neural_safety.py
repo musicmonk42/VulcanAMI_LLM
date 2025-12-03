@@ -88,6 +88,9 @@ def sample_context():
 @pytest.fixture
 def neural_validator(model_config):
     """Create a neural safety validator."""
+    # Reset singleton before creating new instance to prevent cross-test pollution
+    NeuralSafetyValidator._instance = None
+    
     model_configs = {
         ModelType.CLASSIFIER: model_config,
         ModelType.ANOMALY_DETECTOR: model_config
@@ -99,6 +102,8 @@ def neural_validator(model_config):
     )
     yield validator
     validator.shutdown()
+    # Reset singleton after test to ensure clean state for next test
+    NeuralSafetyValidator._instance = None
 
 
 @pytest.fixture
@@ -577,6 +582,9 @@ class TestNeuralSafetyValidator:
     
     def test_initialization(self, model_config):
         """Test validator initialization."""
+        # Reset singleton to ensure clean state
+        NeuralSafetyValidator._instance = None
+        
         model_configs = {
             ModelType.CLASSIFIER: model_config,
             ModelType.ANOMALY_DETECTOR: model_config
@@ -589,6 +597,12 @@ class TestNeuralSafetyValidator:
         )
         
         assert len(validator.models) == 2
+        assert ModelType.CLASSIFIER in validator.models
+        assert ModelType.ANOMALY_DETECTOR in validator.models
+        
+        validator.shutdown()
+        # Clean up singleton after test
+        NeuralSafetyValidator._instance = None
         assert ModelType.CLASSIFIER in validator.models
         assert ModelType.ANOMALY_DETECTOR in validator.models
         
@@ -780,6 +794,9 @@ class TestNeuralSafetyIntegration:
     @pytest.mark.asyncio
     async def test_end_to_end_validation(self, model_config):
         """Test complete validation pipeline."""
+        # Reset singleton to ensure clean state
+        NeuralSafetyValidator._instance = None
+        
         # Setup validator with multiple models
         model_configs = {
             ModelType.CLASSIFIER: model_config,
@@ -813,6 +830,8 @@ class TestNeuralSafetyIntegration:
             
         finally:
             validator.shutdown()
+            # Clean up singleton after test
+            NeuralSafetyValidator._instance = None
     
     def test_multiple_validation_calls(self, neural_validator):
         """Test multiple sequential validations."""
@@ -875,6 +894,9 @@ class TestEdgeCasesAndErrors:
     
     def test_large_ensemble(self, model_config):
         """Test that ensemble size is limited."""
+        # Reset singleton to ensure clean state
+        NeuralSafetyValidator._instance = None
+        
         validator = NeuralSafetyValidator(
             model_configs={ModelType.CLASSIFIER: model_config},
             ensemble_size=100  # Unreasonably large
@@ -883,6 +905,8 @@ class TestEdgeCasesAndErrors:
         # Should be clamped to max
         assert validator.ensemble_size <= 10
         validator.shutdown()
+        # Clean up singleton after test
+        NeuralSafetyValidator._instance = None
     
     def test_training_with_empty_data(self, neural_validator):
         """Test training with empty dataset."""
