@@ -1,0 +1,198 @@
+name: LLM Training on Pull Request
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [ opened, synchronize, reopened ]
+  workflow_dispatch:
+    inputs:
+      training_steps:
+        description: 'Number of training steps'
+        required: false
+        default: '1000'
+      seq_length:
+        description: 'Sequence length'
+        required: false
+        default: '128'
+      meta_apply:
+        description: 'Enable meta self-improvement apply'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11'
+  TRAINING_STEPS: ${{ github.event.inputs.training_steps || '1000' }}
+  SEQ_LENGTH: ${{ github.event.inputs.seq_length || '128' }}
+
+jobs:
+  llm-training:
+    name: Train LLM Model
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt || pip install numpy pandas tqdm transformers
+
+      - name: Create training data directory
+        run: |
+          mkdir -p data/corpus
+          mkdir -p logs
+          mkdir -p checkpoints
+
+      - name: Prepare demo corpus
+        run: |
+          # Create a demo corpus file if it doesn't exist
+          if [ ! -f data/corpus/train.txt ]; then
+            cat > data/corpus/train.txt << 'EOF'
+          The quick brown fox jumps over the lazy dog.
+          Machine learning is a subset of artificial intelligence.
+          Natural language processing enables computers to understand human language.
+          Deep learning uses neural networks with multiple layers.
+          Training large language models requires significant computational resources.
+          The transformer architecture revolutionized natural language processing.
+          Attention mechanisms allow models to focus on relevant parts of input.
+          Self-supervised learning learns from unlabeled data.
+          Pre-training and fine-tuning are common strategies in modern NLP.
+          Large language models can generate human-like text.
+          EOF
+          fi
+
+      - name: Run LLM Training
+        id: training
+        continue-on-error: true
+        run: |
+          echo "Starting LLM training with ${{ env.TRAINING_STEPS }} steps..."
+          
+          # Run training with automatic corpus creation
+          python src/training/train_llm_with_self_improvement.py \
+            --steps ${{ env.TRAINING_STEPS }} \
+            --val-interval 200 \
+            --seq-len ${{ env.SEQ_LENGTH }} \
+            --auto-create-corpus \
+            --auto-adjust-seq-len \
+            --data-path data/corpus \
+            --log-dir logs \
+            --checkpoint-dir checkpoints \
+            ${{ github.event.inputs.meta_apply == 'true' && '--meta-apply' || '' }} \
+            2>&1 | tee training_output.log
+          
+          echo "Training completed"
+
+      - name: Generate training summary
+        if: always()
+        run: |
+          echo "## LLM Training Summary" > training_summary.md
+          echo "" >> training_summary.md
+          echo "**PR:** #${{ github.event.pull_request.number }}" >> training_summary.md
+          echo "**Branch:** ${{ github.head_ref }}" >> training_summary.md
+          echo "**Training Steps:** ${{ env.TRAINING_STEPS }}" >> training_summary.md
+          echo "**Sequence Length:** ${{ env.SEQ_LENGTH }}" >> training_summary.md
+          echo "**Meta Apply:** ${{ github.event.inputs.meta_apply || 'false' }}" >> training_summary.md
+          echo "" >> training_summary.md
+          
+          if [ -f training_output.log ]; then
+            echo "### Training Output (Last 50 lines)" >> training_summary.md
+            echo '```' >> training_summary.md
+            tail -n 50 training_output.log >> training_summary.md
+            echo '```' >> training_summary.md
+          fi
+          
+          if [ -d logs ]; then
+            echo "" >> training_summary.md
+            echo "### Generated Artifacts" >> training_summary.md
+            ls -lh logs/ >> training_summary.md 2>&1 || echo "No log files generated" >> training_summary.md
+          fi
+          
+          cat training_summary.md
+
+      - name: Upload training logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-logs-${{ github.run_number }}
+          path: |
+            logs/
+            training_output.log
+            training_summary.md
+          retention-days: 30
+
+      - name: Upload trained models
+        if: always() && hashFiles('checkpoints/*.pt') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-models-${{ github.run_number }}
+          path: |
+            checkpoints/
+          retention-days: 30
+
+      - name: Comment on PR with training results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let summary = '## 🤖 LLM Training Results\n\n';
+            
+            if (fs.existsSync('training_summary.md')) {
+              summary += fs.readFileSync('training_summary.md', 'utf8');
+            } else {
+              summary += '⚠️ Training summary not available\n';
+            }
+            
+            summary += '\n\n---\n';
+            summary += `**Workflow Run:** [#${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId})\n`;
+            summary += `**Status:** ${{ steps.training.outcome }}\n`;
+            
+            // Find or create comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('🤖 LLM Training Results')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: summary
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary
+              });
+            }
+
+      - name: Check training success
+        if: steps.training.outcome != 'success'
+        run: |
+          echo "::warning::Training completed with status: ${{ steps.training.outcome }}"
+          echo "Check the artifacts and logs for more details."
