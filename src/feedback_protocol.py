@@ -634,8 +634,32 @@ class FeedbackProtocol:
             raise
     
     def cleanup(self):
-        """Cleanup old rate limit entries."""
+        """Cleanup old rate limit entries and close resources."""
         self.rate_limiter.cleanup_old_entries()
+        
+        # Shutdown hardware dispatcher to stop background threads
+        if self.hardware is not None and hasattr(self.hardware, 'shutdown'):
+            try:
+                self.hardware.shutdown()
+                logger.info("HardwareDispatcher shutdown successfully")
+            except Exception as e:
+                logger.warning(f"Error shutting down HardwareDispatcher: {e}")
+        
+        # Close audit engine database connections
+        if self.audit_engine is not None and hasattr(self.audit_engine, 'close'):
+            try:
+                self.audit_engine.close()
+                logger.info("SecurityAuditEngine connections closed successfully")
+            except Exception as e:
+                logger.warning(f"Error closing SecurityAuditEngine: {e}")
+    
+    def __del__(self):
+        """Destructor to ensure cleanup on garbage collection."""
+        try:
+            self.cleanup()
+        except Exception:
+            # Silently ignore errors during garbage collection
+            pass
 
 
 class FeedbackQueryNode:

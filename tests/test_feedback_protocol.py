@@ -42,12 +42,44 @@ def rate_limiter():
 
 @pytest.fixture
 def temp_db():
-    """Create temporary database."""
+    """
+    Create temporary database with proper cleanup.
+    
+    Note: On Windows, SQLite file locking can prevent deletion during teardown.
+    This fixture ensures all FeedbackProtocol instances are cleaned up before
+    attempting to delete the database file.
+    """
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.db') as f:
         db_path = f.name
+    
     yield db_path
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    
+    # Cleanup: Ensure all FeedbackProtocol instances are cleaned up
+    # This is critical on Windows where file handles may still be open
+    try:
+        # Clear the singleton instances to trigger cleanup
+        if hasattr(FeedbackProtocol, '_instances'):
+            for instance in list(FeedbackProtocol._instances.values()):
+                if hasattr(instance, 'cleanup'):
+                    try:
+                        instance.cleanup()
+                    except Exception as e:
+                        print(f"Warning: Error during instance cleanup: {e}")
+            FeedbackProtocol._instances.clear()
+        
+        # Small delay to allow file handles to be released (Windows-specific)
+        import time
+        time.sleep(0.1)
+        
+        # Attempt to remove the database file
+        if os.path.exists(db_path):
+            os.remove(db_path)
+    except PermissionError as e:
+        # On Windows, this can happen if file is still locked
+        print(f"Warning: Could not delete temporary database {db_path}: {e}")
+        print("This is a known Windows file locking issue and does not affect test validity.")
+    except Exception as e:
+        print(f"Warning: Unexpected error during temp_db cleanup: {e}")
 
 
 @pytest.fixture
