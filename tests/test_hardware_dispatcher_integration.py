@@ -607,6 +607,9 @@ class TestIntegration:
         if EMULATOR_AVAILABLE:
             assert len(dispatcher.cache) > 0
         # If emulator not available, cache may be empty due to fallback behavior
+        
+        # Cleanup
+        dispatcher.cleanup()
 
 
 if __name__ == '__main__':
