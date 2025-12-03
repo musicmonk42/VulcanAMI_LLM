@@ -60,8 +60,8 @@ def _restore_modules(original_modules):
 _temp_mocks = {}
 for mod_name in _MODULES_TO_MOCK:
     _temp_mocks[mod_name] = sys.modules.get(mod_name)
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = MagicMock()
+    # Always mock, regardless of whether the module exists
+    sys.modules[mod_name] = MagicMock()
 
 # Import the module under test
 import demo_graphix
