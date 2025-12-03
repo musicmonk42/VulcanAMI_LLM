@@ -30,12 +30,86 @@ except ImportError:
     DistributedSharder = None
 
 # --- Observability metrics ---
-tournament_latency = Histogram('tournament_latency_seconds', 'Time for tournament selection (seconds)')
-tournament_invocations = Counter('tournament_invocations_total', 'Total tournaments run')
-diversity_penalty_events = Counter('tournament_diversity_penalty_total', 'Total diversity penalties applied')
-innovation_score_gauge = Gauge('tournament_innovation_score', 'Mean diversity among selected winners')
-coherence_score_gauge = Gauge('tournament_coherence_score', 'Mean pairwise similarity among winners')
-adaptive_penalty_gauge = Gauge('tournament_adaptive_penalty_value', 'The current value of the adaptive diversity penalty')
+# Use try-except to handle duplicate registration gracefully
+# This prevents errors when module is imported multiple times (e.g., via test runner aliases)
+# Note: Prometheus automatically adds suffixes (_total for Counter, _seconds for Histogram, etc.)
+# so we need to match on the base name without suffix when retrieving metrics
+
+def _get_existing_metric(metric_name: str) -> Optional[Any]:
+    """
+    Retrieve an existing metric from the registry.
+    
+    Note: We use REGISTRY._collector_to_names which is technically private,
+    but prometheus_client doesn't provide a public API to retrieve registered
+    collectors by name. This is a common pattern when dealing with module-level
+    metrics that may be registered multiple times.
+    
+    Args:
+        metric_name: The metric name to search for
+        
+    Returns:
+        The existing metric collector, or None if not found
+    """
+    from prometheus_client import REGISTRY
+    
+    # Access the registry's collectors
+    # Note: _collector_to_names is private but is the standard way to access collectors
+    for collector in list(REGISTRY._collector_to_names.keys()):
+        if hasattr(collector, '_name') and collector._name == metric_name:
+            return collector
+    return None
+
+def _register_or_get_metric(metric_type, name: str, description: str, base_name: str = None):
+    """
+    Register a new metric or retrieve existing one if already registered.
+    
+    Args:
+        metric_type: The metric class (Histogram, Counter, Gauge)
+        name: The metric name
+        description: The metric description
+        base_name: The base name without suffix (for Counter which strips _total)
+        
+    Returns:
+        The metric instance
+        
+    Raises:
+        RuntimeError: If metric cannot be created or retrieved
+    """
+    try:
+        return metric_type(name, description)
+    except ValueError:
+        # Metric already registered, retrieve it
+        search_name = base_name if base_name else name
+        metric = _get_existing_metric(search_name)
+        if metric is None:
+            raise RuntimeError(f"Failed to retrieve existing metric '{search_name}' from registry")
+        return metric
+
+tournament_latency = _register_or_get_metric(
+    Histogram, 'tournament_latency_seconds', 'Time for tournament selection (seconds)'
+)
+
+tournament_invocations = _register_or_get_metric(
+    Counter, 'tournament_invocations_total', 'Total tournaments run', 
+    base_name='tournament_invocations'
+)
+
+diversity_penalty_events = _register_or_get_metric(
+    Counter, 'tournament_diversity_penalty_total', 'Total diversity penalties applied',
+    base_name='tournament_diversity_penalty'
+)
+
+innovation_score_gauge = _register_or_get_metric(
+    Gauge, 'tournament_innovation_score', 'Mean diversity among selected winners'
+)
+
+coherence_score_gauge = _register_or_get_metric(
+    Gauge, 'tournament_coherence_score', 'Mean pairwise similarity among winners'
+)
+
+adaptive_penalty_gauge = _register_or_get_metric(
+    Gauge, 'tournament_adaptive_penalty_value', 'The current value of the adaptive diversity penalty'
+)
 
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
