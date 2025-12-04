@@ -1,0 +1,41 @@
+# Development Dependencies for VulcanAMI LLM
+# This file contains tools used for development, testing, and code quality
+
+# Testing
+pytest==9.0.1
+pytest-asyncio==1.3.0
+pytest-cov==7.0.0
+pytest-timeout==2.4.0
+coverage==7.12.0
+
+# Code Formatting
+black==24.10.0
+isort==5.13.2
+
+# Linting and Code Quality
+flake8==7.1.1
+pylint==3.3.2
+mypy==1.13.0
+
+# Security Scanning
+bandit==1.7.10
+
+# Dependency Management
+pip-tools==7.4.1
+
+# Type Checking Support
+types-PyYAML==6.0.12.20240917
+types-requests==2.32.0.20241016
+types-redis==4.6.0.20241004
+
+# Additional Development Tools
+ipython==8.29.0
+ipdb==0.13.13
+
+# Documentation
+sphinx==8.1.3
+sphinx-rtd-theme==3.0.2
+
+# Mocking and Test Utilities (already in main requirements)
+# hypothesis==6.148.2 (in requirements.txt)
+# Faker==38.2.0 (in requirements.txt)

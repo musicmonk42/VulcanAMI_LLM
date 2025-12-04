@@ -87,9 +87,15 @@ For detailed testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
 2. **Dependency Scan**: Check Python packages with pip-audit and Safety
 3. **Secret Scan**: Detect exposed secrets with TruffleHog and GitLeaks
 4. **SAST Scan**: Security scanning with Bandit and Semgrep
-5. **Container Scan**: Docker image scanning with Trivy and Grype
+5. **Container Scan**: Docker image scanning with Trivy and Grype for OS and application vulnerabilities
 6. **Infrastructure Scan**: IaC scanning with Checkov and Kubesec
 7. **License Check**: Verify license compliance
+
+**Docker Image Scanning**: The security workflow includes comprehensive container scanning:
+- **Trivy**: Scans for OS package vulnerabilities, known CVEs, and misconfigurations
+- **Grype**: Additional vulnerability scanning for container images
+- Severity levels: CRITICAL, HIGH, MEDIUM
+- Results uploaded to GitHub Security tab as SARIF reports
 
 **Results Location:**
 - GitHub Security tab
@@ -214,8 +220,8 @@ The project includes a comprehensive Makefile for local development:
 
 ```bash
 # Development
-make install          # Install dependencies
-make install-dev      # Install dev dependencies
+make install          # Install dependencies from requirements.txt
+make install-dev      # Install dev dependencies from requirements-dev.txt
 make setup           # Setup dev environment
 
 # Code Quality
@@ -254,6 +260,55 @@ make generate-secrets  # Generate secrets
 ```
 
 **New**: Use `make validate-cicd` to run comprehensive validation of Docker, Docker Compose, GitHub Actions, Kubernetes, and Helm configurations.
+
+## Dependency Management
+
+### Development Dependencies
+
+The project uses separate dependency files for production and development:
+
+- **requirements.txt**: Production dependencies (pinned versions)
+- **requirements-hashed.txt**: Production dependencies with SHA256 hashes for security
+- **requirements-dev.txt**: Development tools (testing, linting, code quality)
+
+### Installing Dependencies
+
+```bash
+# Install production dependencies
+pip install -r requirements.txt
+
+# Install development dependencies
+pip install -r requirements-dev.txt
+```
+
+### Regenerating Hashed Requirements
+
+The project uses pip-tools to generate hashed requirements for enhanced security:
+
+```bash
+# Install pip-tools (included in requirements-dev.txt)
+pip install pip-tools
+
+# Generate hashed requirements from requirements.txt
+pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+
+# Update requirements (upgrade packages)
+pip-compile --upgrade requirements.txt -o requirements-hashed.txt
+```
+
+**Security Note**: Hashed requirements help ensure dependency integrity by verifying that downloaded packages match expected checksums, preventing supply chain attacks.
+
+### Development Tools Included
+
+The `requirements-dev.txt` file includes:
+- **Testing**: pytest, pytest-cov, pytest-asyncio, pytest-timeout
+- **Code Formatting**: black, isort
+- **Linting**: flake8, pylint, mypy
+- **Security**: bandit
+- **Dependency Management**: pip-tools
+- **Type Checking**: mypy with type stubs
+- **Development**: ipython, ipdb
+- **Documentation**: sphinx, sphinx-rtd-theme
 
 ## Monitoring and Observability
 

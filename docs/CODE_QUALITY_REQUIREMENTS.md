@@ -2,6 +2,68 @@
 
 This document outlines critical bugs and code quality issues that must be avoided when implementing the messaging and integration components.
 
+## Development Environment and Tools
+
+### Required Tools Installation
+
+Before starting development, install all required tools:
+
+```bash
+# Install production dependencies
+pip install -r requirements.txt
+
+# Install development dependencies (includes all quality tools)
+pip install -r requirements-dev.txt
+```
+
+### Development Dependencies
+
+The `requirements-dev.txt` includes all tools needed for code quality:
+
+- **Testing**: pytest, pytest-cov, pytest-asyncio, pytest-timeout, coverage
+- **Code Formatting**: black, isort
+- **Linting**: flake8, pylint, mypy
+- **Security Scanning**: bandit
+- **Dependency Management**: pip-tools
+- **Type Checking**: mypy with type stubs for common libraries
+- **Development**: ipython, ipdb for debugging
+- **Documentation**: sphinx, sphinx-rtd-theme
+
+### Running Code Quality Checks
+
+```bash
+# Format code
+black src/ tests/
+isort src/ tests/
+
+# Run linters
+flake8 src/ tests/
+pylint src/
+
+# Type checking
+mypy src/
+
+# Security scanning
+bandit -r src/ -ll
+
+# Run all tests
+pytest tests/ -v --cov=src
+```
+
+### Dependency Management
+
+Use pip-tools to maintain hashed requirements:
+
+```bash
+# Regenerate hashed requirements after updating dependencies
+pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+
+# Upgrade all dependencies
+pip-compile --upgrade requirements.txt -o requirements-hashed.txt
+```
+
+**Security Note**: Hashed requirements help prevent supply chain attacks by verifying package integrity.
+
 ## Overview
 
 The following components are planned for future implementation:
