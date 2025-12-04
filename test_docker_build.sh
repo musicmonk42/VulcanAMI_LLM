@@ -5,6 +5,7 @@
 ################################################################################
 
 # Don't exit immediately on error, collect all results
+# This allows us to run all tests and report comprehensive results
 set +e
 
 # Colors for output
@@ -46,7 +47,7 @@ print_info() {
     echo -e "${BLUE}ℹ${NC} $1"
 }
 
-# Cleanup function - runs at the end
+# Cleanup function - runs at the end and on interrupts
 cleanup() {
     if [ "$1" != "skip_msg" ]; then
         print_info "Cleaning up test containers and images..."
@@ -54,7 +55,8 @@ cleanup() {
     docker container prune -f > /dev/null 2>&1 || true
 }
 
-# Don't use trap, call cleanup manually at the end
+# Setup trap to ensure cleanup on script exit or interruption
+trap cleanup EXIT SIGINT SIGTERM
 
 ################################################################################
 # Prerequisites Check
@@ -184,7 +186,7 @@ if [ -f "entrypoint.sh" ]; then
     
     # Test with valid JWT secret (should succeed)
     print_info "Testing entrypoint with valid JWT secret (should succeed)..."
-    VALID_SECRET=$(openssl rand -base64 48 | tr -d '+/')
+    VALID_SECRET=$(openssl rand -hex 32)
     if JWT_SECRET_KEY="$VALID_SECRET" bash entrypoint.sh echo "test" >/dev/null 2>&1; then
         print_success "Entrypoint accepts valid JWT secret"
     else
@@ -290,7 +292,7 @@ if [ -f "docker-compose.prod.yml" ]; then
     # Check if .env exists, if not create minimal one for validation
     if [ ! -f ".env" ]; then
         print_info "Creating temporary .env for validation..."
-        cat > /tmp/.env.test << 'TMPENV'
+        (umask 077; cat > /tmp/.env.test << 'TMPENV'
 JWT_SECRET_KEY=test-secret-key-for-validation-only-min32chars
 BOOTSTRAP_KEY=test-bootstrap-key-validation
 POSTGRES_PASSWORD=test-postgres-password-validation
@@ -299,6 +301,7 @@ MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=test-minio-password
 GRAFANA_PASSWORD=test-grafana-password
 TMPENV
+)
         if docker compose -f docker-compose.prod.yml --env-file /tmp/.env.test config > /dev/null 2>&1; then
             print_success "docker-compose.prod.yml is valid"
         else
@@ -430,8 +433,7 @@ echo -e "${GREEN}Passed:${NC}  $PASSED"
 echo -e "${RED}Failed:${NC}  $FAILED"
 echo -e "${BLUE}Total:${NC}   $TOTAL"
 
-# Cleanup
-cleanup skip_msg
+# Note: cleanup will be called automatically via trap
 
 if [ $FAILED -eq 0 ]; then
     echo -e "\n${GREEN}✓ All Docker build tests passed!${NC}"

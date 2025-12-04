@@ -63,8 +63,8 @@ done
 echo ""
 echo "4. Validating Docker Compose configurations..."
 if [ -f ".env" ] || [ -f ".env.example" ]; then
-    # Create temp .env for testing
-    cat > /tmp/.env.docker.test << 'EOF'
+    # Create temp .env for testing with restricted permissions
+    (umask 077; cat > /tmp/.env.docker.test << 'EOF'
 JWT_SECRET_KEY=test-jwt-secret-key-minimum-32-characters-long
 BOOTSTRAP_KEY=test-bootstrap-key-32chars-long
 POSTGRES_PASSWORD=test-postgres-password
@@ -73,6 +73,7 @@ MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=test-minio-password
 GRAFANA_PASSWORD=test-grafana-password
 EOF
+)
 
     if docker compose -f docker-compose.dev.yml config >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} docker-compose.dev.yml is valid"
@@ -95,7 +96,7 @@ if [ -f "entrypoint.sh" ]; then
     fi
     
     # Test valid secret acceptance
-    VALID_SECRET=$(openssl rand -base64 48 | tr -d '+/')
+    VALID_SECRET=$(openssl rand -hex 32)
     if JWT_SECRET_KEY="$VALID_SECRET" bash entrypoint.sh echo "test" >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} Entrypoint accepts valid JWT secrets"
     fi
