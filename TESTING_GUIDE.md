@@ -35,12 +35,14 @@ pip-compile --version
 
 ### Development Dependencies
 
-The `requirements-dev.txt` file includes all tools needed for development:
-- **Testing**: pytest, pytest-cov, pytest-asyncio, pytest-timeout
+The `requirements-dev.txt` file includes additional development tools:
 - **Code Quality**: black, isort, flake8, pylint, mypy
 - **Security**: bandit
 - **Dependency Management**: pip-tools (for regenerating hashed requirements)
+- **Development Tools**: ipython, ipdb
 - **Documentation**: sphinx, sphinx-rtd-theme
+
+**Note**: Testing tools (pytest, pytest-cov, pytest-asyncio, pytest-timeout, coverage) are already included in requirements.txt
 
 ### Regenerating Hashed Requirements
 

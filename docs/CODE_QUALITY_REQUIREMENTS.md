@@ -18,9 +18,8 @@ pip install -r requirements-dev.txt
 
 ### Development Dependencies
 
-The `requirements-dev.txt` includes all tools needed for code quality:
+The `requirements-dev.txt` includes additional development tools for code quality:
 
-- **Testing**: pytest, pytest-cov, pytest-asyncio, pytest-timeout, coverage
 - **Code Formatting**: black, isort
 - **Linting**: flake8, pylint, mypy
 - **Security Scanning**: bandit
@@ -28,6 +27,8 @@ The `requirements-dev.txt` includes all tools needed for code quality:
 - **Type Checking**: mypy with type stubs for common libraries
 - **Development**: ipython, ipdb for debugging
 - **Documentation**: sphinx, sphinx-rtd-theme
+
+**Note**: Testing tools (pytest, pytest-cov, pytest-asyncio, pytest-timeout, coverage) are already included in requirements.txt
 
 ### Running Code Quality Checks
 

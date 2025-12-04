@@ -43,29 +43,41 @@ Flask==3.1.2 \
 
 ### requirements-dev.txt
 
-Contains development tools that are NOT needed in production:
+Contains additional development tools that are NOT needed in production:
 
 ```
-# Testing
-pytest==9.0.1
-pytest-cov==7.0.0
-coverage==7.12.0
-
-# Code Quality
+# Code Formatting
 black==24.10.0
 isort==5.13.2
+
+# Linting and Code Quality
 flake8==7.1.1
 pylint==3.3.2
 mypy==1.13.0
 
-# Security
+# Security Scanning
 bandit==1.7.10
 
 # Dependency Management
 pip-tools==7.4.1
+
+# Type Checking Support
+types-PyYAML==6.0.12.20240917
+types-requests==2.32.0.20241016
+types-redis==4.6.0.20241004
+
+# Additional Development Tools
+ipython==8.29.0
+ipdb==0.13.13
+
+# Documentation
+sphinx==8.1.3
+sphinx-rtd-theme==3.0.2
 ```
 
-**Purpose**: Provides all tools developers need for testing, linting, and code quality.
+**Purpose**: Provides additional tools developers need for code quality, linting, and documentation.
+
+**Note**: Testing tools (pytest, pytest-cov, pytest-asyncio, pytest-timeout, coverage) are already included in requirements.txt and do not need to be in requirements-dev.txt.
 
 ## Installation
 

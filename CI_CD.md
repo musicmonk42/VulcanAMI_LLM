@@ -300,8 +300,7 @@ pip-compile --upgrade requirements.txt -o requirements-hashed.txt
 
 ### Development Tools Included
 
-The `requirements-dev.txt` file includes:
-- **Testing**: pytest, pytest-cov, pytest-asyncio, pytest-timeout
+The `requirements-dev.txt` file includes additional development tools:
 - **Code Formatting**: black, isort
 - **Linting**: flake8, pylint, mypy
 - **Security**: bandit
@@ -309,6 +308,8 @@ The `requirements-dev.txt` file includes:
 - **Type Checking**: mypy with type stubs
 - **Development**: ipython, ipdb
 - **Documentation**: sphinx, sphinx-rtd-theme
+
+**Note**: Testing tools (pytest, pytest-cov, pytest-asyncio, pytest-timeout, coverage) are already included in requirements.txt
 
 ## Monitoring and Observability
 
