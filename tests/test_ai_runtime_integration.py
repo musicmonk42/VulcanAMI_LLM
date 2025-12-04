@@ -266,7 +266,7 @@ class TestOpenAIProvider:
     @pytest.fixture
     def provider(self):
         """Create OpenAI provider"""
-        # Use a mock key for testing
+        # Use a mock key for testing - NOT A REAL API KEY
         return ai.OpenAIProvider(api_key="test-key-openai")
     
     def test_provider_creation(self, provider):
@@ -392,6 +392,7 @@ class TestAnthropicProvider:
     @pytest.fixture
     def provider(self):
         """Create Anthropic provider"""
+        # NOT A REAL API KEY - Test value only
         return ai.AnthropicProvider(api_key="test-key-anthropic")
     
     def test_provider_creation(self, provider):
@@ -440,6 +441,7 @@ class TestGrokProvider:
     @pytest.fixture
     def provider(self):
         """Create Grok provider"""
+        # NOT A REAL API KEY - Test value only
         return ai.GrokProvider(api_key="test-key-grok")
     
     def test_provider_creation(self, provider):
