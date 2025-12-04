@@ -173,6 +173,7 @@ class TestGraphixClientInit:
     
     def test_init_with_api_key(self):
         """Test client initialization with API key."""
+        # NOT A REAL API KEY - Test value only
         client = GraphixClient(api_key="test-key-123")
         assert client.api_key == "test-key-123"
     
@@ -225,7 +226,7 @@ class TestTokenManagement:
     async def test_token_is_expired_valid_token(self):
         """Test token expiry check with valid token."""
         client = GraphixClient()
-        client.auth_token = "test-token"
+        client.auth_token = "test-token"  # NOT A REAL TOKEN - Test value only
         client.token_expiry = datetime.utcnow() + timedelta(hours=1)
         assert client._token_is_expired() is False
     
@@ -233,7 +234,7 @@ class TestTokenManagement:
     async def test_token_is_expired_expired_token(self):
         """Test token expiry check with expired token."""
         client = GraphixClient()
-        client.auth_token = "test-token"
+        client.auth_token = "test-token"  # NOT A REAL TOKEN - Test value only
         client.token_expiry = datetime.utcnow() - timedelta(hours=1)
         assert client._token_is_expired() is True
     
@@ -274,6 +275,7 @@ class TestTokenManagement:
     @pytest.mark.asyncio
     async def test_get_headers_with_api_key(self):
         """Test header construction with API key."""
+        # NOT A REAL API KEY - Test value only
         client = GraphixClient(api_key="test-key")
         headers = await client._get_headers()
         assert headers["X-API-KEY"] == "test-key"

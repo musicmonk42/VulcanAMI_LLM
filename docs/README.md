@@ -20,6 +20,8 @@ This folder aggregates deep technical, governance, safety, execution, optimizati
 | Observability | OBSERVABILITY.md | Metrics, tracing, audit, provenance & anomaly detection |
 | Operations | OPERATIONS.md | Deployment, HA, DR runbook |
 | Development | DEVELOPMENT.md | Local workflow, testing & performance profiling |
+| Dependency Management | DEPENDENCY_MANAGEMENT.md | pip-tools, hashed requirements, security practices |
+| Code Quality | CODE_QUALITY_REQUIREMENTS.md | Development tools, linting, testing standards |
 | Explanations & Interpretability | EXPLANATIONS.md | Execution explanation system |
 | VULCAN Integration | VULCAN_BRIDGE.md | World model alignment, consensus & semantic transfer |
 | Legal & Compliance | LEGAL_NOTICES.md | Proprietary rights & restrictions |

@@ -12,6 +12,53 @@ Run all tests with a single command:
 
 This executes a comprehensive test suite covering all aspects of CI/CD and reproducibility.
 
+## Development Environment Setup
+
+Before running tests, set up your development environment:
+
+```bash
+# 1. Create a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# 2. Install production dependencies
+pip install -r requirements.txt
+
+# 3. Install development dependencies (testing, linting, code quality tools)
+pip install -r requirements-dev.txt
+
+# 4. Verify installation
+pytest --version
+black --version
+pip-compile --version
+```
+
+### Development Dependencies
+
+The `requirements-dev.txt` file includes additional development tools:
+- **Code Quality**: black, isort, flake8, pylint, mypy
+- **Security**: bandit
+- **Dependency Management**: pip-tools (for regenerating hashed requirements)
+- **Development Tools**: ipython, ipdb
+- **Documentation**: sphinx, sphinx-rtd-theme
+
+**Note**: Testing tools (pytest, pytest-cov, pytest-asyncio, pytest-timeout, coverage) are already included in requirements.txt
+
+### Regenerating Hashed Requirements
+
+When dependencies change, regenerate the hashed requirements file:
+
+```bash
+# Install pip-tools (included in requirements-dev.txt)
+pip install pip-tools
+
+# Generate hashed requirements
+pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
+
+# Update to latest versions
+pip-compile --upgrade requirements.txt -o requirements-hashed.txt
+```
+
 ## Test Suites Available
 
 ### 1. Full Shell-Based Test Suite (`test_full_cicd.sh`)

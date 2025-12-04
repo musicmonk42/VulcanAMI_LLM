@@ -36,11 +36,13 @@ This repository has been comprehensively validated for 100% reproducibility with
 - ✅ .dockerignore properly configured
 
 ### 2. Dependency Management ✅
-- ✅ requirements.txt with 198 pinned dependencies
+- ✅ requirements.txt with 198 pinned production dependencies
 - ✅ requirements-hashed.txt with 4,877 lines including SHA256 hashes
+- ✅ requirements-dev.txt with development tools (linters, formatters, type checkers)
 - ✅ All Python dependencies use exact versions (==)
 - ✅ Spacy model pinned with version 3.8.0 and SHA256 hash
-- ✅ pip-tools available for maintaining hashed requirements
+- ✅ pip-tools included in requirements-dev.txt for maintaining hashed requirements
+- ✅ Test secrets marked with comments to prevent false positive security alerts
 
 ### 3. CI/CD Workflows ✅
 - ✅ All 6 GitHub Actions workflows valid YAML
@@ -73,13 +75,15 @@ This repository has been comprehensively validated for 100% reproducibility with
 - ✅ Non-root users in all containers
 
 ### 6. Documentation ✅
-- ✅ README.md complete with setup instructions
+- ✅ README.md complete with setup instructions and status badges
 - ✅ CI_CD.md comprehensive CI/CD documentation
 - ✅ DEPLOYMENT.md deployment guide
 - ✅ REPRODUCIBLE_BUILDS.md reproducibility guide
-- ✅ TESTING_GUIDE.md testing documentation
+- ✅ TESTING_GUIDE.md testing documentation with development setup
 - ✅ QUICKSTART.md quick start guide
-- ✅ .env.example newly created with all required variables
+- ✅ .env.example with all required variables and security notes
+- ✅ docs/DEPENDENCY_MANAGEMENT.md comprehensive dependency management guide
+- ✅ docs/CODE_QUALITY_REQUIREMENTS.md with development tools guidance
 
 ### 7. Validation Scripts ✅
 - ✅ validate_cicd_docker.sh (42 checks, 1 warning)
@@ -191,10 +195,12 @@ Status: ✅ All critical tests passed!
 ## 🎯 Reproducibility Checklist
 
 ### Python Dependencies ✅
-- [x] requirements.txt with pinned versions (==)
+- [x] requirements.txt with pinned production versions (==)
 - [x] requirements-hashed.txt with SHA256 hashes
+- [x] requirements-dev.txt with development tools
 - [x] No unpinned dependencies (>=, ~=)
-- [x] pip-tools available for maintenance
+- [x] pip-tools included in requirements-dev.txt for maintenance
+- [x] Test secrets marked with comments to prevent false positives
 
 ### Docker ✅
 - [x] Base images use specific version tags (not :latest)
@@ -252,6 +258,14 @@ Status: ✅ All critical tests passed!
 git clone <repository-url>
 cd VulcanAMI_LLM
 
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt          # Production dependencies
+pip install -r requirements-dev.txt      # Development tools
+
 # Create environment from template
 cp .env.example .env
 # Edit .env with your actual values
@@ -308,6 +322,9 @@ All critical items have been addressed. The repository is production-ready and 1
 
 ### Update Dependencies
 ```bash
+# Install pip-tools (included in requirements-dev.txt)
+pip install pip-tools
+
 # Update requirements with hashes
 pip-compile --upgrade --generate-hashes requirements.txt -o requirements-hashed.txt
 
@@ -345,6 +362,7 @@ make validate-cicd
 - **CI/CD Guide:** [CI_CD.md](./CI_CD.md)
 - **Reproducible Builds:** [REPRODUCIBLE_BUILDS.md](./REPRODUCIBLE_BUILDS.md)
 - **Testing Guide:** [TESTING_GUIDE.md](./TESTING_GUIDE.md)
+- **Dependency Management:** [docs/DEPENDENCY_MANAGEMENT.md](./docs/DEPENDENCY_MANAGEMENT.md)
 
 ---
 

@@ -31,12 +31,13 @@ For comprehensive testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.m
 ## 📦 Dependency Management
 
 ### Python Dependencies
-- **File**: `requirements.txt` - Human-readable dependencies
+- **File**: `requirements.txt` - Production dependencies with pinned versions
 - **File**: `requirements-hashed.txt` - Hash-verified dependencies for reproducibility (✅ Generated with SHA256)
+- **File**: `requirements-dev.txt` - Development tools (linters, formatters, type checkers, documentation tools)
 
 #### Generate Hashed Requirements:
 ```bash
-# Install pip-tools
+# Install pip-tools (included in requirements-dev.txt)
 pip install pip-tools
 
 # Generate hashed requirements (DONE - file already exists with 175+ dependencies)
@@ -47,6 +48,31 @@ pip-compile --upgrade --generate-hashes requirements.txt -o requirements-hashed.
 ```
 
 **Current Status**: ✅ `requirements-hashed.txt` contains 175+ dependencies with SHA256 hashes for cryptographic verification.
+
+#### Development Dependencies
+
+For local development, install additional tools from `requirements-dev.txt`:
+
+```bash
+# Install production dependencies
+pip install -r requirements.txt
+
+# Install development tools (linters, formatters, type checkers)
+pip install -r requirements-dev.txt
+```
+
+The development dependencies file includes:
+- Code formatting: black, isort
+- Linting: flake8, pylint, mypy
+- Security: bandit
+- Dependency management: pip-tools
+- Type checking: mypy with type stubs
+- Development: ipython, ipdb
+- Documentation: sphinx, sphinx-rtd-theme
+
+**Note**: Testing tools (pytest, coverage) are already in `requirements.txt` and not duplicated in `requirements-dev.txt`.
+
+For comprehensive dependency management guidance, see **[docs/DEPENDENCY_MANAGEMENT.md](docs/DEPENDENCY_MANAGEMENT.md)**.
 
 ## 🐳 Docker Image Versioning
 

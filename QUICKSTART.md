@@ -15,6 +15,12 @@ make generate-secrets > .env
 
 ### Local Development
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Install development dependencies (testing, linting, code quality tools)
+pip install -r requirements-dev.txt
+
 # Start all services
 make up
 
@@ -83,6 +89,8 @@ Run `make help` to see all available commands.
 - **Utilities**: clean, version, generate-secrets, env-example
 
 ## 🔐 Required Secrets
+
+**Important Security Note:** All placeholder values in `.env.example` and test files are clearly marked with comments indicating they are not real secrets. This helps prevent false positive security alerts during automated scanning.
 
 ### GitHub Repository Secrets
 

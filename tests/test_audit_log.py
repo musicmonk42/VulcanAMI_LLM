@@ -129,7 +129,7 @@ def encrypted_config(temp_log_dir):
     return AuditLoggerConfig(
         log_path=temp_log_dir / "encrypted_audit.jsonl",
         encrypt_logs=True,
-        encryption_key="test-encryption-key-12345678",
+        encryption_key="test-encryption-key-12345678",  # NOT A REAL KEY - Test value only
         dlt_enabled=False,
         syslog_enabled=False,
         metrics_enabled=False,
