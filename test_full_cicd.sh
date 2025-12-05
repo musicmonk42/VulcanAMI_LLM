@@ -67,7 +67,7 @@ check_unpinned_dependencies() {
     # Check for unpinned dependencies in requirements.txt
     # Returns: list of unpinned dependencies (empty if all pinned)
     if [ -f "$1" ]; then
-        grep -v "^#" "$1" | grep -v "^$" | grep -v "==" | grep -v ">=" | grep -v "^-" | grep -v "^https://" || true
+        grep -v "^#" "$1" | grep -v "^$" | grep -v "==" | grep -v ">=" | grep -v "^-" | grep -v "^https://" | grep -v " @ " || true
     fi
 }
 
