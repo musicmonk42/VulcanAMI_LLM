@@ -116,36 +116,60 @@ docker compose -f docker-compose.prod.yml logs -f
 
 #### Using kubectl with Kustomize
 
-```bash
-# Create namespace
-kubectl create namespace vulcanami
+##### Development Deployment
 
-# Create secrets
+```bash
+# Create namespace (kustomize will create vulcanami-development)
+# Create secrets in development namespace
 kubectl create secret generic vulcanami-secrets \
   --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
   --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
   --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
   --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
   --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
-  -n vulcanami
+  -n vulcanami-development
 
-# Development
+# Apply development configuration
 kubectl apply -k k8s/overlays/development/
 
-# Production
+# Check deployment status
+kubectl get all -n vulcanami-development
+
+# Check pods
+kubectl get pods -n vulcanami-development
+
+# View logs
+kubectl logs -f deployment/dev-vulcanami-api -n vulcanami-development
+```
+
+##### Production Deployment
+
+```bash
+# Create secrets in production namespace
+kubectl create secret generic vulcanami-secrets \
+  --from-literal=JWT_SECRET_KEY=$(openssl rand -base64 48) \
+  --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
+  --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
+  --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
+  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+  -n vulcanami-production
+
+# Apply production configuration
 kubectl apply -k k8s/overlays/production/
 
 # Check deployment status
-kubectl get all -n vulcanami
+kubectl get all -n vulcanami-production
 
 # Check pods
-kubectl get pods -n vulcanami
+kubectl get pods -n vulcanami-production
 
 # View logs
-kubectl logs -f deployment/vulcanami-api -n vulcanami
+kubectl logs -f deployment/prod-vulcanami-api -n vulcanami-production
 ```
 
 #### Using Helm
+
+**Note:** Helm deployments can use any namespace you choose. The examples below use `vulcanami` namespace, which is independent of the kustomize overlay namespaces (`vulcanami-development` and `vulcanami-production`). You can choose a different namespace based on your requirements.
 
 ```bash
 # Add repository (if published)
@@ -326,10 +350,15 @@ PYTHONUNBUFFERED=1
 #### Kubernetes Secrets
 
 ```bash
-# Using kubectl
+# Using kubectl (development)
 kubectl create secret generic vulcanami-secrets \
   --from-env-file=.env \
-  -n vulcanami
+  -n vulcanami-development
+
+# Using kubectl (production)
+kubectl create secret generic vulcanami-secrets \
+  --from-env-file=.env \
+  -n vulcanami-production
 
 # Using sealed-secrets
 kubeseal --format yaml < secret.yaml > sealed-secret.yaml
@@ -343,7 +372,7 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: vulcanami-secrets
-  namespace: vulcanami
+  namespace: vulcanami-production  # or vulcanami-development
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -369,7 +398,11 @@ Access Prometheus:
 - Kubernetes: Port-forward or use Ingress
 
 ```bash
-kubectl port-forward -n vulcanami svc/prometheus 9090:9090
+# For development
+kubectl port-forward -n vulcanami-development svc/prometheus 9090:9090
+
+# For production
+kubectl port-forward -n vulcanami-production svc/prometheus 9090:9090
 ```
 
 ### Grafana
@@ -379,7 +412,11 @@ Access Grafana:
 - Kubernetes: Port-forward or use Ingress
 
 ```bash
-kubectl port-forward -n vulcanami svc/grafana 3000:3000
+# For development
+kubectl port-forward -n vulcanami-development svc/grafana 3000:3000
+
+# For production
+kubectl port-forward -n vulcanami-production svc/grafana 3000:3000
 ```
 
 Default credentials:
@@ -394,11 +431,17 @@ View application logs:
 # Docker Compose
 docker compose logs -f api-gateway
 
-# Kubernetes
-kubectl logs -f deployment/vulcanami-api -n vulcanami
+# Kubernetes - Development
+kubectl logs -f deployment/dev-vulcanami-api -n vulcanami-development
 
-# Stream logs from all pods
-kubectl logs -f -l app=vulcanami-api -n vulcanami --all-containers=true
+# Kubernetes - Production
+kubectl logs -f deployment/prod-vulcanami-api -n vulcanami-production
+
+# Stream logs from all pods (development)
+kubectl logs -f -l app=vulcanami-api -n vulcanami-development --all-containers=true
+
+# Stream logs from all pods (production)
+kubectl logs -f -l app=vulcanami-api -n vulcanami-production --all-containers=true
 ```
 
 ## Scaling
@@ -408,11 +451,17 @@ kubectl logs -f -l app=vulcanami-api -n vulcanami --all-containers=true
 HPA is configured automatically with Helm/Kustomize:
 
 ```bash
-# Check HPA status
-kubectl get hpa -n vulcanami
+# Check HPA status (development)
+kubectl get hpa -n vulcanami-development
 
-# Manually scale
-kubectl scale deployment vulcanami-api --replicas=10 -n vulcanami
+# Check HPA status (production)
+kubectl get hpa -n vulcanami-production
+
+# Manually scale (development)
+kubectl scale deployment dev-vulcanami-api --replicas=3 -n vulcanami-development
+
+# Manually scale (production)
+kubectl scale deployment prod-vulcanami-api --replicas=10 -n vulcanami-production
 ```
 
 ### Vertical Scaling
@@ -434,11 +483,17 @@ resources:
 ### Database Backup
 
 ```bash
-# Backup PostgreSQL
-kubectl exec -n vulcanami postgres-0 -- pg_dump -U vulcanami vulcanami > backup.sql
+# Backup PostgreSQL (development)
+kubectl exec -n vulcanami-development postgres-0 -- pg_dump -U vulcanami vulcanami > backup.sql
 
-# Restore
-kubectl exec -i -n vulcanami postgres-0 -- psql -U vulcanami vulcanami < backup.sql
+# Backup PostgreSQL (production)
+kubectl exec -n vulcanami-production postgres-0 -- pg_dump -U vulcanami vulcanami > backup.sql
+
+# Restore (development)
+kubectl exec -i -n vulcanami-development postgres-0 -- psql -U vulcanami vulcanami < backup.sql
+
+# Restore (production)
+kubectl exec -i -n vulcanami-production postgres-0 -- psql -U vulcanami vulcanami < backup.sql
 ```
 
 ### Application State
@@ -456,41 +511,50 @@ mc mirror ./backup/ minio/vulcanami-hot
 ### Pod Not Starting
 
 ```bash
-# Check pod status
-kubectl describe pod <pod-name> -n vulcanami
+# Check pod status (replace namespace as needed)
+kubectl describe pod <pod-name> -n vulcanami-development  # or vulcanami-production
 
 # Check events
-kubectl get events -n vulcanami --sort-by='.lastTimestamp'
+kubectl get events -n vulcanami-development --sort-by='.lastTimestamp'
 
 # Check logs
-kubectl logs <pod-name> -n vulcanami
+kubectl logs <pod-name> -n vulcanami-development
 ```
 
 ### Service Not Accessible
 
 ```bash
-# Check service
-kubectl get svc -n vulcanami
+# Check service (replace namespace as needed)
+kubectl get svc -n vulcanami-development  # or vulcanami-production
 
 # Check ingress
-kubectl get ingress -n vulcanami
-kubectl describe ingress vulcanami-ingress -n vulcanami
+kubectl get ingress -n vulcanami-development
+kubectl describe ingress vulcanami-ingress -n vulcanami-development
 
-# Test from inside cluster
-kubectl run -it --rm debug --image=alpine --restart=Never -- sh
+# Test from inside cluster (development)
+kubectl run -it --rm debug --image=alpine --restart=Never -n vulcanami-development -- sh
 apk add curl
-curl http://vulcanami-api.vulcanami.svc.cluster.local:8000/health
+curl http://dev-vulcanami-api.vulcanami-development.svc.cluster.local:8000/health
+
+# Test from inside cluster (production)
+kubectl run -it --rm debug --image=alpine --restart=Never -n vulcanami-production -- sh
+apk add curl
+curl http://prod-vulcanami-api.vulcanami-production.svc.cluster.local:8000/health
 ```
 
 ### Database Connection Issues
 
 ```bash
-# Test database connectivity
-kubectl run -it --rm psql --image=postgres:14 --restart=Never -- \
-  psql -h postgres-service.vulcanami.svc.cluster.local -U vulcanami -d vulcanami
+# Test database connectivity (development)
+kubectl run -it --rm psql --image=postgres:14 --restart=Never -n vulcanami-development -- \
+  psql -h postgres-service.vulcanami-development.svc.cluster.local -U vulcanami -d vulcanami
 
-# Check database logs
-kubectl logs -n vulcanami postgres-0
+# Test database connectivity (production)
+kubectl run -it --rm psql --image=postgres:14 --restart=Never -n vulcanami-production -- \
+  psql -h postgres-service.vulcanami-production.svc.cluster.local -U vulcanami -d vulcanami
+
+# Check database logs (replace namespace as needed)
+kubectl logs -n vulcanami-development postgres-0  # or vulcanami-production
 ```
 
 ## Security Hardening
@@ -515,16 +579,27 @@ kubectl logs -n vulcanami postgres-0
 ## Rolling Updates
 
 ```bash
-# Update image version
-kubectl set image deployment/vulcanami-api \
+# Update image version (development)
+kubectl set image deployment/dev-vulcanami-api \
   api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
-  -n vulcanami
+  -n vulcanami-development
 
-# Check rollout status
-kubectl rollout status deployment/vulcanami-api -n vulcanami
+# Update image version (production)
+kubectl set image deployment/prod-vulcanami-api \
+  api=ghcr.io/musicmonk42/vulcanami_llm-api:v1.1.0 \
+  -n vulcanami-production
 
-# Rollback if needed
-kubectl rollout undo deployment/vulcanami-api -n vulcanami
+# Check rollout status (development)
+kubectl rollout status deployment/dev-vulcanami-api -n vulcanami-development
+
+# Check rollout status (production)
+kubectl rollout status deployment/prod-vulcanami-api -n vulcanami-production
+
+# Rollback if needed (development)
+kubectl rollout undo deployment/dev-vulcanami-api -n vulcanami-development
+
+# Rollback if needed (production)
+kubectl rollout undo deployment/prod-vulcanami-api -n vulcanami-production
 ```
 
 ## Health Checks

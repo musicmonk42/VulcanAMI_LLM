@@ -3,7 +3,7 @@ kind: Kustomization
 
 namespace: vulcanami-development
 
-bases:
+resources:
   - ../../base
 
 namePrefix: dev-

@@ -3,7 +3,7 @@ kind: Kustomization
 
 namespace: vulcanami-production
 
-bases:
+resources:
   - ../../base
 
 namePrefix: prod-
