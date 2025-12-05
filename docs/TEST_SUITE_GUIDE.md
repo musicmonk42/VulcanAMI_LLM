@@ -1,7 +1,7 @@
 # Graphix IR Test Suite Guide
 
 **Version:** 2.2.0  
-**Date:** 2025-11-11
+**Date:** 2024-11-11
 
 This guide explains how to run and interpret test suites validating Graphix IR’s schema, ethics, execution stability, and photonic emulation fidelity.
 
@@ -109,7 +109,7 @@ Run any test with: `pytest tests/<test_file>.py -v`
 
 ---
 
-## 9. 2025 Feature Coverage
+## 9. 2024 Feature Coverage
 
 - ITU F.748.53 compression validation
 - Multi-model audit & bias taxonomy tagging

@@ -1,6 +1,6 @@
 📊 Graphix & VULCAN-AI Visualization Guide  
 Version: 2.1.0  
-Date: September 08, 2025
+Date: September 08, 2024
 
 This guide details the setup and interpretation of visual outputs for the Graphix/VULCAN-AI platform. Visualizing the system's operational metrics is crucial for monitoring its health, performance, and ethical alignment during development. The primary tools are Prometheus for metrics collection and Grafana for dashboarding.
 
