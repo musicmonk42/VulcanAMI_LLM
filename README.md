@@ -112,8 +112,8 @@ cp .env.example .env
 # - JWT_SECRET_KEY=<strong-unique-secret>
 # - BOOTSTRAP_KEY=<one-time-bootstrap-secret>  # only needed to create the initial admin/agent
 # - REDIS_URL=redis://<host>:<port>            # optional; falls back to in-memory rate limiting
-- AUDIT_DB_PATH=./audit.db                   # default shown; secure paths recommended in production
-- SLACK_WEBHOOK_URL=<optional-for-alerts>
+# - AUDIT_DB_PATH=./audit.db                   # default shown; secure paths recommended in production
+# - SLACK_WEBHOOK_URL=<optional-for-alerts>
 
 Example (development only):
 ```bash

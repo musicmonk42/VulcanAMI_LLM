@@ -184,7 +184,8 @@ test_dependencies() {
     fi
     
     # Check for unpinned dependencies
-    UNPINNED=$(grep -v "^#" requirements.txt | grep -v "^$" | grep -v "==" | grep -v ">=" | grep -v "^-" | grep -v "^https://" || true)
+    # Note: Lines with '@' (e.g., package @ https://...) are pinned via URL with hash
+    UNPINNED=$(grep -v "^#" requirements.txt | grep -v "^$" | grep -v "==" | grep -v ">=" | grep -v "^-" | grep -v "^https://" | grep -v " @ " || true)
     if [ -z "$UNPINNED" ]; then
         echo "✓ All dependencies are pinned"
     else
