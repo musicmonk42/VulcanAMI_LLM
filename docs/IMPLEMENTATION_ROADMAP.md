@@ -8,12 +8,12 @@
 
 | Phase | Focus Area | Key Files | Milestones |
 |-------|------------|-----------|-----------|
-| 1 | Unified Arena & Tensor Fusion | `graphix_arena.py`, `unified_runtime.py` | FastAPI orchestration; validated schema dispatch |
-| 2 | Distributed Fabric | `distributed_sharder.py`, `test_distributed_fabric.py` | vLLM sharding, dynamic batching, pruning |
-| 3 | Analog-Photonic Emulation | `analog_photonic_emulator.py`, tests | Noise modeling, in-situ training |
-| 4 | Real Hardware Dispatch & Sustainability | `hardware_dispatcher.py` | Backend API handshake, energy benchmarks |
+| 1 | Unified Arena & Tensor Fusion | `src/graphix_arena.py`, `src/unified_runtime/` | FastAPI orchestration; validated schema dispatch |
+| 2 | Distributed Fabric | `src/distributed_sharder.py`, `tests/test_distributed_fabric.py` | vLLM sharding, dynamic batching, pruning |
+| 3 | Analog-Photonic Emulation | `src/analog_photonic_emulator.py`, tests | Noise modeling, in-situ training |
+| 4 | Real Hardware Dispatch & Sustainability | `src/hardware_dispatcher.py` | Backend API handshake, energy benchmarks |
 | 5 | Recursive Integration | `unified_runtime.py` | Meta-graph recursion with strict I/O governance |
-| 6 | Advanced Optimization | `superoptimizer.py` | LLM-guided fused kernel generation |
+| 6 | Advanced Optimization | `src/superoptimizer.py` | LLM-guided fused kernel generation |
 | 7 | Federated Execution | (future) | Multi-instance dispatch & provenance merging |
 
 ---
@@ -49,10 +49,10 @@
 
 | Test | Purpose | Target |
 |------|---------|--------|
-| `test_distributed_fabric.py` | Shard correctness & throughput | Stable at configured concurrency |
-| `test_analog_photonic.py` | Noise tolerance, drift modeling | Accuracy within variance envelope |
-| `test_hardware_dispatcher.py` | API dispatch correctness | Graceful fallback on outage |
-| `test_meta_graph_generator.py` | Recursion depth safety | No runaway beyond limit |
+| `tests/test_distributed_sharder.py` | Shard correctness & throughput | Stable at configured concurrency |
+| `tests/test_analog_photonic_emulator.py` | Noise tolerance, drift modeling | Accuracy within variance envelope |
+| `tests/test_hardware_dispatcher.py` | API dispatch correctness | Graceful fallback on outage |
+| `tests/test_meta_graph_generator.py` | Recursion depth safety | No runaway beyond limit |
 | Performance micro-bench | Kernel latency improvement | ≥ (defined % reduction) |
 
 ---
@@ -70,11 +70,11 @@
 
 | Component | File |
 |-----------|------|
-| Runtime Hub | `unified_runtime.py` |
-| Superoptimizer | `superoptimizer.py` |
-| Photonic Emulation | `analog_photonic_emulator.py` |
-| Dispatch | `hardware_dispatcher.py` |
-| Tests | `tests/test_analog_photonic.py`, `tests/test_distributed_fabric.py` |
+| Runtime Hub | `src/unified_runtime/` |
+| Superoptimizer | `src/superoptimizer.py` |
+| Photonic Emulation | `src/analog_photonic_emulator.py` |
+| Dispatch | `src/hardware_dispatcher.py` |
+| Tests | `tests/test_analog_photonic_emulator.py`, `tests/test_distributed_sharder.py` |
 
 ---
 

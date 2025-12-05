@@ -17,13 +17,14 @@ Graphix Arena is the FastAPI-based coordination surface for the VULCAN-AI cognit
 ## 2. Installation
 
 ```bash
-git clone https://your-repo-url/Graphix.git D:/Graphix
-cd D:/Graphix
+git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
+cd VulcanAMI_LLM
 
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
-pip install -r requirements-all.txt
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 export PYTHONPATH=.
 
 cat > .env <<'ENV'

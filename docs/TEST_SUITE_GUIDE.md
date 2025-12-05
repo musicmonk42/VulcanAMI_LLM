@@ -12,12 +12,11 @@ This guide explains how to run and interpret test suites validating Graphix IR�
 | File | Purpose |
 |------|---------|
 | `src/run_validation_test.py` | Unified validation (schema, signature, ethics, execution, photonic params) |
-| `tests/test_ir_validation.py` | Schema & structural assertions for golden graphs |
-| `tests/run_stress_tests.py` | Async orchestration & concurrency stress |
-| `tests/test_analog_photonic.py` | Photonic emulation benchmarks (<0.4 nJ/op) |
-| `tests/test_end_to_end.py` | Full lifecycle (proposal → execution) |
-| `tests/graphix_conformance/test_conformance.py` (placeholder) | Basic conformance sanity |
-| `tests/test_hardware_dispatcher.py` (future) | Real hardware/dispatch reliability |
+| `tests/test_graph_validation.py` | Schema & structural assertions for golden graphs |
+| `tests/test_analog_photonic_emulator.py` | Photonic emulation benchmarks (<0.4 nJ/op) |
+| `tests/test_graphix_arena.py` | Full lifecycle (proposal → execution) |
+| `tests/test_governance_loop.py` | Governance and consensus validation |
+| `tests/test_hardware_dispatcher.py` | Hardware dispatch reliability |
 
 ---
 
@@ -86,15 +85,16 @@ Extend for:
 
 ---
 
-## 7. Mock Missing Tests
+## 7. Available Test Files
 
-If a file is absent, create minimal placeholder:
+All core test files are available in the `tests/` directory:
+- `test_graph_validation.py` - Graph structure and validation
+- `test_graphix_arena.py` - Arena orchestration
+- `test_governance_loop.py` - Governance and consensus
+- `test_hardware_dispatcher.py` - Hardware dispatcher tests
+- `test_execution_engine.py` - Execution engine tests
 
-```python
-# tests/graphix_conformance/test_conformance.py
-def test_basic_conformance():
-    assert True
-```
+Run any test with: `pytest tests/<test_file>.py -v`
 
 ---
 

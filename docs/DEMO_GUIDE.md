@@ -23,14 +23,16 @@ Two paths:
 ## 2. Common Setup
 
 ```bash
-cd /d
-git clone https://your-repo-url/Graphix.git D:/Graphix || true
-cd D:/Graphix
+# Clone the repository
+git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
+cd VulcanAMI_LLM
 
-py -3.11 -m venv .venv
+# Create virtual environment (Python 3.11 or 3.12)
+py -3.12 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
-pip install -r requirements-all.txt
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 export PYTHONPATH=.
 ```
 
@@ -326,7 +328,7 @@ The SSE stream shows VULCAN's internal cognitive processes:
 
 ```bash
 python scripts/run_sentiment_tournament.py --mode offline --generations 3 --population 6
-python governance_loop.py --equiv-check
+python src/governance_loop.py --equiv-check
 ```
 
 Explain:

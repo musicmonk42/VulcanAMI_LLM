@@ -41,14 +41,14 @@ Graphix is an AI-native execution & evolution fabric for JSON-based directed gra
 ## 4. Getting Started (Dev Workstation / Windows + Git Bash)
 
 ```bash
-cd /d
-git clone https://your-repo-url/Graphix.git D:/Graphix || true
-cd D:/Graphix
+git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
+cd VulcanAMI_LLM
 
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
-pip install -r requirements-all.txt
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 export PYTHONPATH=.
 ```
 
