@@ -1,7 +1,7 @@
 # 🧠 AI Training & Self-Evolution Guide (Graphix / VULCAN-AI)
 
 **Version:** 2.2.0  
-**Updated:** 2025-11-11
+**Updated:** 2024-11-11
 
 ---
 

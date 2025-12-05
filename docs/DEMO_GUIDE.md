@@ -1,7 +1,7 @@
 # 🌈 Definitive Demo Guide – Graphix IR & VULCAN-AI
 
 **Version:** 2.2.0  
-**Date:** 2025-11-11
+**Date:** 2024-11-11
 
 ---
 

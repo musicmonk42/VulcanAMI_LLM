@@ -9,7 +9,7 @@
 
 Proprietary software owned and created by Novatrax Labs LTD. All rights reserved.
 
-Copyright © 2025 Novatrax Labs LTD. All rights reserved.
+Copyright © 2024 Novatrax Labs LTD. All rights reserved.
 
 Important legal notice
 - This software and documentation are the confidential and proprietary information of Novatrax Labs LTD (“Novatrax”).
@@ -17,7 +17,7 @@ Important legal notice
 - Do not distribute, disclose, copy, or host this code or documentation outside of approved environments and recipients identified in your agreement.
 - If you received this in error, notify Novatrax and delete all copies.
 
-Last updated: 2025-11-11
+Last updated: 2024-12-05
 
 ---
 
