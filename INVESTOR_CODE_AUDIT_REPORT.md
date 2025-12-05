@@ -440,7 +440,7 @@ VULCAN is a **hybrid symbolic-subsymbolic cognitive architecture** designed for 
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ WORLD MODEL (10 files, ~740K LOC)                   │   │
+│  │ WORLD MODEL (27 files, ~90K LOC)                    │   │
 │  │ - Causal DAG reasoning (causal_graph.py)            │   │
 │  │ - Confidence calibration & uncertainty               │   │
 │  │ - Correlation tracking & dynamics                    │   │
@@ -456,7 +456,7 @@ VULCAN is a **hybrid symbolic-subsymbolic cognitive architecture** designed for 
 │  └─────────────────────────────────────────────────────┘   │
 │                                                               │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ REASONING SYSTEM (27 files, ~600K LOC)              │   │
+│  │ REASONING SYSTEM (27 files, ~70K LOC)               │   │
 │  │ - Unified reasoning portfolio (10 modes)             │   │
 │  │ - Symbolic reasoning (FOL provers, advanced logic)   │   │
 │  │ - Probabilistic reasoning (Bayesian inference)       │   │
@@ -752,7 +752,7 @@ Beyond VULCAN, the platform includes graph execution and governance:
 
 **Dependency Freshness (Sample Check):**
 - `cryptography==46.0.3` (recent, Dec 2024)
-- `certifi==2025.11.12` (future-dated? likely typo for 2024.11.12)
+- `certifi==2024.11.12` (recent, November 2024)
 - `pytest==9.0.1` (recent)
 - `flask==3.1.0` (recent)
 
