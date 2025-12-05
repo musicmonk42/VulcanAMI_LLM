@@ -37,9 +37,8 @@ Install with default options. Open “Git Bash” from Start Menu (black termina
 In Git Bash:
 
 ```bash
-cd /d
-git clone https://your-repo-url/Graphix.git Graphix || true
-cd Graphix
+git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
+cd VulcanAMI_LLM
 ```
 
 ---
@@ -69,10 +68,11 @@ Check “Add Python to PATH” during installation.
 ## 7. Install Demo Tools
 
 ```bash
-py -3.11 -m venv .venv311
-source .venv311/Scripts/activate
+py -3.11 -m venv .venv
+source .venv/Scripts/activate
 python -m pip install --upgrade pip wheel setuptools
-pip install -r requirements.txt -r requirements-all.txt
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 export PYTHONPATH=.
 ```
 
@@ -93,16 +93,16 @@ python src/setup_agent.py validation_agent executor validator
 **Window 1: Registry**
 
 ```bash
-cd /d/Graphix
-source .venv311/Scripts/activate
+cd VulcanAMI_LLM
+source .venv/Scripts/activate
 python app.py
 ```
 
 **Window 2: Arena**
 
 ```bash
-cd /d/Graphix
-source .venv311/Scripts/activate
+cd VulcanAMI_LLM
+source .venv/Scripts/activate
 uvicorn src.graphix_arena:app --reload
 ```
 
@@ -192,8 +192,8 @@ Open generated PNG in `observability_logs/`.
 | Problem | Fix |
 |---------|-----|
 | No output from curl | Ensure services running; test `curl http://localhost:5000/health` |
-| Python error | Confirm Python 3.11 installed correctly |
-| Missing dependency | Re-run `pip install -r requirements-all.txt` |
+| Python error | Confirm Python 3.11 or 3.12 installed correctly |
+| Missing dependency | Re-run `pip install -r requirements.txt` |
 | Graph not evolving | Increase generations or population size |
 | Visual script missing file | Ensure `observability_logs/` folder exists or created on first run |
 
