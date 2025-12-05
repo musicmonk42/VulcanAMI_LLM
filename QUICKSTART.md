@@ -9,8 +9,8 @@ cp .env.example .env
 # Then edit .env file and replace placeholder values
 
 # Option 2: Auto-generate secrets
-make generate-secrets > .env
-# Edit .env file with your favorite editor
+make generate-secrets
+# Copy the output values and add them to your .env file
 ```
 
 ### Local Development
@@ -101,7 +101,7 @@ JWT_SECRET_KEY          # Generate with: openssl rand -base64 48
 BOOTSTRAP_KEY           # Generate with: openssl rand -base64 32
 POSTGRES_PASSWORD       # Generate with: openssl rand -base64 32
 REDIS_PASSWORD          # Generate with: openssl rand -base64 32
-MINIO_PASSWORD          # Generate with: openssl rand -base64 24
+MINIO_ROOT_PASSWORD     # Generate with: openssl rand -base64 24
 GRAFANA_PASSWORD        # Generate with: openssl rand -base64 16
 ```
 
@@ -123,7 +123,7 @@ kubectl create secret generic vulcanami-secrets \
   --from-literal=BOOTSTRAP_KEY=$(openssl rand -base64 32) \
   --from-literal=POSTGRES_PASSWORD=$(openssl rand -base64 32) \
   --from-literal=REDIS_PASSWORD=$(openssl rand -base64 32) \
-  --from-literal=MINIO_SECRET_KEY=$(openssl rand -base64 24) \
+  --from-literal=MINIO_ROOT_PASSWORD=$(openssl rand -base64 24) \
   -n vulcanami
 ```
 
