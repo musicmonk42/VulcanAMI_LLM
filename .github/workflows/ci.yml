@@ -24,7 +24,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Clear apt cache and package lists
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Purge pip cache
+          python -m pip cache purge || true
+          # Remove common runner caches that may be large
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          # Prune Docker images / containers / volumes
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
 
       - name: Ensure cert directory readable
         if: always()
@@ -126,7 +143,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Clear apt cache and package lists
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Purge pip cache
+          python -m pip cache purge || true
+          # Remove common runner caches that may be large
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          # Prune Docker images / containers / volumes
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
 
       - name: Ensure cert directory readable
         if: always()
@@ -137,22 +171,6 @@ jobs:
           mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
-
-      - name: Free up disk space
-        run: |
-          echo "Disk space before cleanup:"
-          df -h
-          echo "Removing unnecessary files to free up disk space..."
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
-          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
-          sudo rm -rf /usr/local/share/chromium || true
-          sudo rm -rf /usr/local/share/chrome_driver || true
-          sudo docker system prune -af || true
-          sudo docker image prune -af || true
-          sudo apt-get clean || true
-          sudo rm -rf /tmp/* || true
-          echo "Disk space after cleanup:"
-          df -h
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -246,7 +264,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Clear apt cache and package lists
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Purge pip cache
+          python -m pip cache purge || true
+          # Remove common runner caches that may be large
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          # Prune Docker images / containers / volumes
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
 
       - name: Ensure cert directory readable
         if: always()
@@ -257,20 +292,6 @@ jobs:
           mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
-
-      - name: Free up disk space
-        run: |
-          echo "Disk space before cleanup:"
-          df -h
-          echo "Removing unnecessary files to free up disk space..."
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
-          sudo docker system prune -af || true
-          sudo docker image prune -af || true
-          sudo rm -rf /opt/hostedtoolcache/* || true
-          sudo apt-get clean || true
-          sudo rm -rf /tmp/* || true
-          echo "Disk space after cleanup:"
-          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -352,7 +373,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Clear apt cache and package lists
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Purge pip cache
+          python -m pip cache purge || true
+          # Remove common runner caches that may be large
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          # Prune Docker images / containers / volumes
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
 
       - name: Ensure cert directory readable
         if: always()
@@ -363,22 +401,6 @@ jobs:
           mkdir -p "$REPO_CERT_DIR/CAs"
           # Give all users read and directories the execute bit (so runner can scandir)
           chmod -R a+rX "$REPO_CERT_DIR" || true
-
-      - name: Free up disk space
-        run: |
-          echo "Disk space before cleanup:"
-          df -h
-          echo "Removing unnecessary files to free up disk space..."
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
-          sudo docker system prune -af || true
-          sudo docker image prune -af || true
-          sudo rm -rf /opt/hostedtoolcache/* || true
-          sudo rm -rf /usr/local/share/chromium || true
-          sudo rm -rf /usr/local/share/chrome_driver || true
-          sudo apt-get clean || true
-          sudo rm -rf /tmp/* || true
-          echo "Disk space after cleanup:"
-          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -414,7 +436,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Clear apt cache and package lists
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Purge pip cache
+          python -m pip cache purge || true
+          # Remove common runner caches that may be large
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          # Prune Docker images / containers / volumes
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
 
       - name: Ensure cert directory readable
         if: always()
