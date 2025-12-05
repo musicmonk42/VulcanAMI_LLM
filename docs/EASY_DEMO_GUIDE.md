@@ -113,8 +113,8 @@ uvicorn src.graphix_arena:app --reload
 Activate environment:
 
 ```bash
-cd /d/Graphix
-source .venv311/Scripts/activate
+cd VulcanAMI_LLM
+source .venv/Scripts/activate
 export API_KEY=$(grep -E '^GRAPHIX_API_KEY=' .env | cut -d= -f2-)
 ```
 
