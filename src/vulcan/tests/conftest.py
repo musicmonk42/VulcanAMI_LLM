@@ -14,9 +14,7 @@ import warnings
 import threading
 import gc
 import uuid
-import tempfile
 from unittest.mock import Mock
-from _pytest.monkeypatch import MonkeyPatch
 
 # Add src directory to Python path
 ROOT = pathlib.Path(__file__).resolve().parents[3]  # Go up to repo root
@@ -210,7 +208,7 @@ def fresh_tensors():
         return None
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(autouse=True)
 def reset_pytorch_state():
     """
     Reset PyTorch state before and after each test.

@@ -9,6 +9,7 @@ import pathlib
 import importlib
 import traceback
 import time
+import uuid
 from unittest.mock import MagicMock
 from dotenv import load_dotenv # <<< --- ADDED DOTENV --- >>>
 
@@ -154,10 +155,6 @@ _alias_all_src_modules()
 # FIX: Test Isolation - Reset State Between Tests
 # ============================================================
 
-import pytest
-import uuid
-import tempfile
-
 @pytest.fixture(autouse=True)
 def reset_environment_state(tmp_path, monkeypatch):
     """
@@ -271,7 +268,7 @@ def fresh_tensors():
         return None
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(autouse=True)
 def reset_pytorch_state():
     """
     Reset PyTorch state before and after each test.
