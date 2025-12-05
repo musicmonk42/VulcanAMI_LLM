@@ -169,6 +169,8 @@ kubectl logs -f deployment/prod-vulcanami-api -n vulcanami-production
 
 #### Using Helm
 
+**Note:** Helm deployments can use any namespace you choose. The examples below use `vulcanami` namespace, which is independent of the kustomize overlay namespaces (`vulcanami-development` and `vulcanami-production`). You can choose a different namespace based on your requirements.
+
 ```bash
 # Add repository (if published)
 helm repo add vulcanami https://charts.vulcanami.io
