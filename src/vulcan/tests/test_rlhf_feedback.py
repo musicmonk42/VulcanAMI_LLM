@@ -36,8 +36,10 @@ class TestRLHFManager:
     
     @pytest.fixture
     def model(self):
-        """Create test model"""
-        return SimpleModel()
+        """Create test model - fresh instance with train() mode enabled"""
+        model = SimpleModel()
+        model.train()  # Explicitly set to train mode to prevent gradient issues
+        return model
     
     @pytest.fixture
     def config(self):
@@ -55,6 +57,12 @@ class TestRLHFManager:
     def manager(self, model, config):
         """Create RLHFManager instance with mocked shutdown"""
         manager = RLHFManager(model, config)
+        
+        # Explicitly ensure all models are in train mode
+        manager.base_model.train()
+        manager.reward_model.train()
+        manager.value_model.train()
+        manager.policy_head.train()
         
         # Ensure _buffer_lock exists (in case of initialization issues)
         if not hasattr(manager, '_buffer_lock'):

@@ -116,8 +116,10 @@ class TestUnifiedWorldModel:
     
     @pytest.fixture
     def model(self):
-        """Create world model instance"""
-        return UnifiedWorldModel(state_dim=EMBEDDING_DIM, ensemble_size=3, use_attention=True)
+        """Create world model instance - fresh instance with train() mode enabled"""
+        model = UnifiedWorldModel(state_dim=EMBEDDING_DIM, ensemble_size=3, use_attention=True)
+        model.train()  # Explicitly set to train mode to prevent gradient issues
+        return model
     
     @pytest.fixture
     def temp_dir(self):
@@ -134,6 +136,8 @@ class TestUnifiedWorldModel:
         assert len(model.dynamics_ensemble) == 3
         assert len(model.reward_ensemble) == 3
         assert model.device in [torch.device('cuda'), torch.device('cpu')]
+        # Verify model is in train mode
+        assert model.training is True
     
     def test_forward_single_model(self, model):
         """Test forward pass with single model"""
