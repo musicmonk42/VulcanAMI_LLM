@@ -324,3 +324,23 @@ This product may integrate with or interoperate alongside third-party components
 ## Feedback
 
 For feature requests or questions, contact your Novatrax Labs representative. Please do not open public issues or discussions unless explicitly permitted in your agreement.
+
+---
+
+## 📊 For Potential Investors
+
+**Engineering Audit Available:** A comprehensive technical due diligence audit has been completed for potential investors. The audit includes detailed analysis of code quality, architecture, testing, security, team capacity, and investment recommendations.
+
+### Audit Documents
+
+- **[Executive Summary](INVESTOR_EXECUTIVE_SUMMARY.md)** - 15 minute overview for decision-makers
+- **[Complete Engineering Audit](INVESTOR_ENGINEERING_AUDIT.md)** - 60-90 minute comprehensive analysis
+- **[Audit Guide](INVESTOR_AUDIT_README.md)** - How to use the audit reports
+- **[Quick Reference](AUDIT_COMPLETION_SUMMARY.txt)** - One-page summary
+
+**Overall Assessment:** A- (87/100) - CONDITIONAL PROCEED  
+**Recommended Valuation:** $10M-$18M pre-money  
+**Investment Amount:** $2.5M-$4M (Series Seed/A)  
+
+For investor inquiries, please contact your Novatrax Labs representative.
+
