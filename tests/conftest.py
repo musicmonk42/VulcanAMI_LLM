@@ -165,8 +165,8 @@ def reset_environment_state(tmp_path, monkeypatch):
     - Environment variables persisting between tests
     - Database locking by ensuring unique storage paths per test
     """
-    # Store original environment state
-    original_env = {}
+    # Remove CSIU environment variables to ensure clean state
+    # monkeypatch automatically restores original values after test
     env_vars_to_reset = [
         'INTRINSIC_CSIU_OFF',
         'INTRINSIC_CSIU_REGS_OFF',
@@ -174,10 +174,7 @@ def reset_environment_state(tmp_path, monkeypatch):
     ]
     
     for var in env_vars_to_reset:
-        original_env[var] = os.environ.get(var)
-        # Remove the variable to ensure clean state
-        if var in os.environ:
-            del os.environ[var]
+        monkeypatch.delenv(var, raising=False)
     
     # Set unique storage path for this test to prevent database conflicts
     # This ensures each test gets its own isolated database
@@ -186,13 +183,7 @@ def reset_environment_state(tmp_path, monkeypatch):
     monkeypatch.setenv('VULCAN_STORAGE_PATH', str(test_storage_path))
     
     yield
-    
-    # Restore original environment state after test
-    for var, value in original_env.items():
-        if value is not None:
-            os.environ[var] = value
-        elif var in os.environ:
-            del os.environ[var]
+    # monkeypatch automatically restores environment on cleanup
 
 
 @pytest.fixture
