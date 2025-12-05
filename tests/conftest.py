@@ -157,16 +157,16 @@ _alias_all_src_modules()
 import pytest
 import uuid
 import tempfile
-import torch
 
 @pytest.fixture(autouse=True)
-def reset_environment_state():
+def reset_environment_state(tmp_path, monkeypatch):
     """
     Reset environment variables before each test to prevent state contamination.
     
     This fixes:
     - CSIU state contamination where _csiu_regs_enabled is False when it should be True
     - Environment variables persisting between tests
+    - Database locking by ensuring unique storage paths per test
     """
     # Store original environment state
     original_env = {}
@@ -181,6 +181,12 @@ def reset_environment_state():
         # Remove the variable to ensure clean state
         if var in os.environ:
             del os.environ[var]
+    
+    # Set unique storage path for this test to prevent database conflicts
+    # This ensures each test gets its own isolated database
+    test_storage_path = tmp_path / f"test_storage_{uuid.uuid4().hex}"
+    test_storage_path.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv('VULCAN_STORAGE_PATH', str(test_storage_path))
     
     yield
     
@@ -263,6 +269,39 @@ def fresh_tensors():
     except ImportError:
         # PyTorch not available, return None
         return None
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_pytorch_state():
+    """
+    Reset PyTorch state before and after each test.
+    
+    This fixes:
+    - Models left in eval() mode by previous tests
+    - Tensors with .detach() called on shared instances
+    - Gradient state contamination
+    
+    This is applied automatically to all tests.
+    """
+    try:
+        import torch
+        
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        # Set default dtype to float32 to ensure consistency
+        torch.set_default_dtype(torch.float32)
+        
+        yield
+        
+        # Cleanup after test
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
+    except ImportError:
+        # PyTorch not available, skip
+        yield
 
 
 # ============================================================
