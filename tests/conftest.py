@@ -151,6 +151,121 @@ _alias_all_src_modules()
 #     print("\n[conftest] Aliases created for short imports:\n  " + "\n  ".join(created) + "\n")
 
 # ============================================================
+# FIX: Test Isolation - Reset State Between Tests
+# ============================================================
+
+import pytest
+import uuid
+import tempfile
+import torch
+
+@pytest.fixture(autouse=True)
+def reset_environment_state():
+    """
+    Reset environment variables before each test to prevent state contamination.
+    
+    This fixes:
+    - CSIU state contamination where _csiu_regs_enabled is False when it should be True
+    - Environment variables persisting between tests
+    """
+    # Store original environment state
+    original_env = {}
+    env_vars_to_reset = [
+        'INTRINSIC_CSIU_OFF',
+        'INTRINSIC_CSIU_REGS_OFF',
+        'INTRINSIC_CSIU_CALC_OFF',
+    ]
+    
+    for var in env_vars_to_reset:
+        original_env[var] = os.environ.get(var)
+        # Remove the variable to ensure clean state
+        if var in os.environ:
+            del os.environ[var]
+    
+    yield
+    
+    # Restore original environment state after test
+    for var, value in original_env.items():
+        if value is not None:
+            os.environ[var] = value
+        elif var in os.environ:
+            del os.environ[var]
+
+
+@pytest.fixture
+def isolated_db_path(tmp_path):
+    """
+    Create isolated temporary database path for each test.
+    
+    This fixes:
+    - SQLite database locking issues from concurrent access
+    - "database is locked" errors during teardown/setup overlap
+    
+    Each test gets its own unique database file to prevent contention.
+    """
+    db_file = tmp_path / f"test_{uuid.uuid4().hex}.db"
+    return str(db_file)
+
+
+@pytest.fixture
+def fresh_pytorch_model():
+    """
+    Create a fresh PyTorch model in training mode for each test.
+    
+    This fixes:
+    - PyTorch gradient state contamination
+    - "element 0 of tensors does not require grad" errors
+    - Models stuck in eval() mode from previous tests
+    
+    The model is explicitly set to train() mode and is NOT shared across tests.
+    """
+    try:
+        import torch
+        import torch.nn as nn
+        
+        class FreshTestModel(nn.Module):
+            def __init__(self, input_dim=512, hidden_dim=256):
+                super().__init__()
+                self.fc1 = nn.Linear(input_dim, hidden_dim)
+                self.fc2 = nn.Linear(hidden_dim, input_dim)
+            
+            def forward(self, x):
+                return self.fc2(torch.relu(self.fc1(x)))
+        
+        model = FreshTestModel()
+        model.train()  # Explicitly set to train mode
+        return model
+    except ImportError:
+        # PyTorch not available, return None
+        return None
+
+
+@pytest.fixture
+def fresh_tensors():
+    """
+    Create fresh PyTorch tensors with gradients enabled for each test.
+    
+    This fixes:
+    - Tensor gradient state contamination
+    - Reused tensors without requires_grad
+    - Shared tensor instances across tests
+    
+    Each test gets NEW tensors with requires_grad=True.
+    """
+    try:
+        import torch
+        
+        def create_tensor(shape, requires_grad=True):
+            """Create a new tensor with specified shape and gradient tracking"""
+            return torch.randn(*shape, requires_grad=requires_grad)
+        
+        return create_tensor
+    except ImportError:
+        # PyTorch not available, return None
+        return None
+
+
+# ============================================================
 # FIX: Prevent atexit handlers from blocking test suite exit
 # ============================================================
 

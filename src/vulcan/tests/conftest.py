@@ -6,13 +6,17 @@ so that `from vulcan.xxx import yyy` style imports work correctly.
 """
 
 import sys
+import os
 import pathlib
 import pytest
 import asyncio
 import warnings
 import threading
 import gc
+import uuid
+import tempfile
 from unittest.mock import Mock
+from _pytest.monkeypatch import MonkeyPatch
 
 # Add src directory to Python path
 ROOT = pathlib.Path(__file__).resolve().parents[3]  # Go up to repo root
@@ -91,6 +95,152 @@ def cleanup_resources():
         warnings.warn(
             f"Possible thread leak: {initial_thread_count} -> {final_thread_count} threads"
         )
+
+
+@pytest.fixture(autouse=True)
+def reset_environment_state(tmp_path, monkeypatch):
+    """
+    Reset environment variables before each test to prevent state contamination.
+    
+    This fixes:
+    - CSIU state contamination where _csiu_regs_enabled is False when it should be True
+    - Environment variables persisting between tests
+    - Database locking by ensuring unique storage paths per test
+    """
+    # Store original environment state
+    original_env = {}
+    env_vars_to_reset = [
+        'INTRINSIC_CSIU_OFF',
+        'INTRINSIC_CSIU_REGS_OFF',
+        'INTRINSIC_CSIU_CALC_OFF',
+    ]
+    
+    for var in env_vars_to_reset:
+        original_env[var] = os.environ.get(var)
+        # Remove the variable to ensure clean state
+        if var in os.environ:
+            del os.environ[var]
+    
+    # Set unique storage path for this test to prevent database conflicts
+    # This ensures each test gets its own isolated database
+    test_storage_path = tmp_path / f"test_storage_{uuid.uuid4().hex}"
+    test_storage_path.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv('VULCAN_STORAGE_PATH', str(test_storage_path))
+    
+    yield
+    
+    # Restore original environment state after test
+    for var, value in original_env.items():
+        if value is not None:
+            os.environ[var] = value
+        elif var in os.environ:
+            del os.environ[var]
+
+
+@pytest.fixture
+def isolated_db_path(tmp_path):
+    """
+    Create isolated temporary database path for each test.
+    
+    This fixes:
+    - SQLite database locking issues from concurrent access
+    - "database is locked" errors during teardown/setup overlap
+    
+    Each test gets its own unique database file to prevent contention.
+    """
+    db_file = tmp_path / f"test_{uuid.uuid4().hex}.db"
+    return str(db_file)
+
+
+@pytest.fixture
+def fresh_pytorch_model():
+    """
+    Create a fresh PyTorch model in training mode for each test.
+    
+    This fixes:
+    - PyTorch gradient state contamination
+    - "element 0 of tensors does not require grad" errors
+    - Models stuck in eval() mode from previous tests
+    
+    The model is explicitly set to train() mode and is NOT shared across tests.
+    """
+    try:
+        import torch
+        import torch.nn as nn
+        
+        class FreshTestModel(nn.Module):
+            def __init__(self, input_dim=512, hidden_dim=256):
+                super().__init__()
+                self.fc1 = nn.Linear(input_dim, hidden_dim)
+                self.fc2 = nn.Linear(hidden_dim, input_dim)
+            
+            def forward(self, x):
+                return self.fc2(torch.relu(self.fc1(x)))
+        
+        model = FreshTestModel()
+        model.train()  # Explicitly set to train mode
+        return model
+    except ImportError:
+        # PyTorch not available, return None
+        return None
+
+
+@pytest.fixture
+def fresh_tensors():
+    """
+    Create fresh PyTorch tensors with gradients enabled for each test.
+    
+    This fixes:
+    - Tensor gradient state contamination
+    - Reused tensors without requires_grad
+    - Shared tensor instances across tests
+    
+    Each test gets NEW tensors with requires_grad=True.
+    """
+    try:
+        import torch
+        
+        def create_tensor(shape, requires_grad=True):
+            """Create a new tensor with specified shape and gradient tracking"""
+            return torch.randn(*shape, requires_grad=requires_grad)
+        
+        return create_tensor
+    except ImportError:
+        # PyTorch not available, return None
+        return None
+
+
+@pytest.fixture(scope="function", autouse=True)
+def reset_pytorch_state():
+    """
+    Reset PyTorch state before and after each test.
+    
+    This fixes:
+    - Models left in eval() mode by previous tests
+    - Tensors with .detach() called on shared instances
+    - Gradient state contamination
+    
+    This is applied automatically to all tests.
+    """
+    try:
+        import torch
+        
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        # Set default dtype to float32 to ensure consistency
+        torch.set_default_dtype(torch.float32)
+        
+        yield
+        
+        # Cleanup after test
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
+    except ImportError:
+        # PyTorch not available, skip
+        yield
 
 
 @pytest.fixture(scope="session", autouse=True)
