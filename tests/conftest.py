@@ -10,6 +10,7 @@ import importlib
 import traceback
 import time
 import uuid
+import pytest
 from unittest.mock import MagicMock
 from dotenv import load_dotenv # <<< --- ADDED DOTENV --- >>>
 
