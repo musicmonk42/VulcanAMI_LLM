@@ -32,6 +32,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
+          # Remove large pre-installed packages
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
@@ -151,6 +153,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
+          # Remove large pre-installed packages
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
@@ -272,6 +276,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
+          # Remove large pre-installed packages
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
@@ -381,6 +387,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
+          # Remove large pre-installed packages
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
@@ -444,6 +452,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
+          # Remove large pre-installed packages
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
