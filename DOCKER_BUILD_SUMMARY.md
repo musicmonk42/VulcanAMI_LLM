@@ -79,7 +79,7 @@ Comprehensive documentation covering:
 - ✅ Ensures identical builds across environments
 
 #### Pinned Versions
-- ✅ Python base image: `python:3.11-slim`
+- ✅ Python base image: `python:3.10.11-slim`
 - ✅ PostgreSQL: `postgres:14-alpine`
 - ✅ Redis: `redis:7-alpine`
 - ✅ MinIO: `minio/minio:RELEASE.2025-01-10T00-00-00Z`

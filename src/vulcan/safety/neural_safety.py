@@ -1646,7 +1646,7 @@ class NeuralSafetyValidator:
         logger.info("Shutting down NeuralSafetyValidator...")
         self._shutdown = True
         
-        # Shutdown executor (without timeout parameter for Python 3.11 compatibility)
+        # Shutdown executor (without timeout parameter for Python 3.10.11 compatibility)
         try:
             self.executor.shutdown(wait=True)
         except Exception as e:

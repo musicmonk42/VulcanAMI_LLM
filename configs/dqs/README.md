@@ -270,7 +270,7 @@ python dqs_test_suite.py -v
 ### Docker
 
 ```dockerfile
-FROM python:3.11-slim
+FROM python:3.10.11-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -444,7 +444,7 @@ This software is proprietary and confidential. Unauthorized copying, modificatio
 ## Acknowledgments
 
 Built with:
-- Python 3.11
+- Python 3.10.11
 - PostgreSQL 14
 - Redis 6
 - PyTorch

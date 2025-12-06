@@ -112,7 +112,7 @@ All tests passed:
 
 #### Pinned Versions
 All base images use exact versions:
-- ✅ Python: `3.11-slim`
+- ✅ Python: `3.10.11-slim`
 - ✅ PostgreSQL: `14-alpine`
 - ✅ Redis: `7-alpine`
 - ✅ MinIO: `RELEASE.2025-01-10T00-00-00Z`

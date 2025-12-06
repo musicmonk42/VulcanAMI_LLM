@@ -620,7 +620,7 @@ src/vulcan/                     285,069 LOC total
 
 **Code Quality Evidence:**
 - Extensive docstrings and comments
-- Type hints throughout (Python 3.11+)
+- Type hints throughout (Python 3.10.11+)
 - Error handling and recovery
 - Logging and observability
 - Configuration management

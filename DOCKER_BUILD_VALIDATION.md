@@ -24,7 +24,7 @@ This document validates that all Docker configurations in the VulcanAMI_LLM repo
 - ✅ Security: Requires `REJECT_INSECURE_JWT=ack` build arg
 - ✅ Reproducibility: Uses `requirements-hashed.txt` with SHA256 hashes
 - ✅ Healthcheck configured (port 5000)
-- ✅ Python 3.11-slim base image (pinned version)
+- ✅ Python 3.10.11-slim base image (pinned version)
 - ✅ Proper cleanup and minimal attack surface
 
 **Build Command**:
@@ -160,7 +160,7 @@ pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
 ✅ **Status**: All versions pinned
 
 **Verified**:
-- ✅ Python base image: `python:3.11-slim`
+- ✅ Python base image: `python:3.10.11-slim`
 - ✅ PostgreSQL: `postgres:14-alpine`
 - ✅ Redis: `redis:7-alpine`
 - ✅ MinIO: `minio/minio:RELEASE.2025-01-10T00-00-00Z`

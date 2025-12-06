@@ -70,7 +70,7 @@ Typical use cases
 ## System requirements
 
 - Operating system: Linux x86_64 (recommended), macOS (development)
-- Python: 3.11 or newer
+- Python: 3.10.11
 - Optional services:
   - Redis (rate limiting and caching)
   - Prometheus (metrics scrape) and Grafana (dashboards)

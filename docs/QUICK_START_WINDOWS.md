@@ -1,14 +1,14 @@
 # Graphix IR Quick Start (Windows + Git Bash)
 
 **Audience:** Developers & evaluators needing a fast setup path  
-**Python Targets:** 3.11 or 3.12 (recommended)
+**Python Targets:** 3.10.11 (required)
 
 ---
 
 ## 0) Prerequisites
 
 - Windows + Git Bash  
-- Python 3.11 or 3.12 installed  
+- Python 3.10.11 installed  
 - `py` launcher available (comes with Python for Windows)
 
 ---
@@ -32,8 +32,8 @@ ENV
 ## 2) Core Setup
 
 ```bash
-# Create virtual environment (use 3.11 or 3.12)
-py -3.12 -m venv .venv
+# Create virtual environment (use 3.10.11)
+py -3.10 -m venv .venv
 source .venv/Scripts/activate
 
 # Upgrade pip and install dependencies
@@ -47,7 +47,7 @@ pip install -r requirements-dev.txt
 export PYTHONPATH=.
 ```
 
-> **Note:** The project requires Python >=3.11. Use Python 3.11 or 3.12 for best compatibility.
+> **Note:** The project requires Python 3.10.11.
 
 ---
 

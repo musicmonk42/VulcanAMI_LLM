@@ -12,7 +12,7 @@ A complete, production-ready CI/CD pipeline has been implemented for the VulcanA
 - **Purpose**: Automated testing and code quality checks
 - **Triggers**: Push, PR, manual
 - **Features**:
-  - Multi-version Python testing (3.11, 3.12)
+  - Multi-version Python testing (3.10.11)
   - Linting (Black, isort, Flake8, Pylint)
   - Security scanning (Bandit)
   - Test services (PostgreSQL, Redis)

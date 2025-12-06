@@ -21,7 +21,7 @@
 - Windows computer
 - ~2 GB free space on `D:` drive
 - Internet access
-- Git Bash & Python 3.11
+- Git Bash & Python 3.10.11
 
 ---
 
@@ -58,9 +58,9 @@ ENV
 
 ---
 
-## 6. Install Python 3.11
+## 6. Install Python 3.10.11
 
-Download from: https://www.python.org/downloads/release/python-31110/  
+Download from: https://www.python.org/downloads/release/python-31011/  
 Check “Add Python to PATH” during installation.
 
 ---
@@ -68,7 +68,7 @@ Check “Add Python to PATH” during installation.
 ## 7. Install Demo Tools
 
 ```bash
-py -3.11 -m venv .venv
+py -3.10 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip wheel setuptools
 pip install -r requirements.txt
@@ -192,7 +192,7 @@ Open generated PNG in `observability_logs/`.
 | Problem | Fix |
 |---------|-----|
 | No output from curl | Ensure services running; test `curl http://localhost:5000/health` |
-| Python error | Confirm Python 3.11 or 3.12 installed correctly |
+| Python error | Confirm Python 3.10.11 installed correctly |
 | Missing dependency | Re-run `pip install -r requirements.txt` |
 | Graph not evolving | Increase generations or population size |
 | Visual script missing file | Ensure `observability_logs/` folder exists or created on first run |
