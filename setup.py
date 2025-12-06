@@ -9,8 +9,12 @@ setup(
         "networkx",
         "numpy",
         "llvmlite",
-        "locust",
         "faker",
         "py-ecc>=6.0.0",  # Required for Groth16 zk-SNARK implementation
     ],
+    extras_require={
+        "dev": [
+            "locust>=2.38.1",  # Load testing (moved from install_requires)
+        ]
+    },
 )
