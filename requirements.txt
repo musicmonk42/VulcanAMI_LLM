@@ -433,8 +433,6 @@ sarif-om==1.0.4
 scikit-learn==1.7.2
 scipy==1.13.1
 scs==3.2.9
-# Editable install with no version control (self_fixing_engineer==0.1.0)
--e c:\users\thego\downloads\the_code_factory-master\self_fixing_engineer
 semantic-version==2.10.0
 semopy==2.3.11
 sentence-transformers==5.1.2
