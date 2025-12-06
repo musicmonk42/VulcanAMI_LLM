@@ -207,8 +207,11 @@ def reset_pytorch_state():
     This fixes:
     - Models left in eval() mode by previous tests
     - Tensors with .detach() called on shared instances
-    - Gradient state contamination from torch.no_grad() or .eval() calls
-    - Global gradient state being disabled
+    - Global gradient state contamination from torch.no_grad() or torch.set_grad_enabled(False)
+    - Gradient state left disabled by previous tests
+    
+    Note: .eval() affects model behavior but not global gradient state directly.
+    However, this fixture ensures a clean state for all PyTorch operations.
     
     This is applied automatically to all tests.
     """
