@@ -2,7 +2,7 @@
 # API Gateway Service Dockerfile
 # =============================================================================
 
-FROM python:3.11-slim AS builder
+FROM python:3.10.11-slim AS builder
 
 ARG REJECT_INSECURE_JWT="default-super-secret-key-change-me"
 
@@ -59,7 +59,7 @@ RUN python -m compileall -q src app.py
 # Runtime Stage
 # =============================================================================
 
-FROM python:3.11-slim AS runtime
+FROM python:3.10.11-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -85,7 +85,7 @@ RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin apiuser && \
     mkdir -p /app && chown -R apiuser:apiuser /app
 
 # Copy from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/app.py ./

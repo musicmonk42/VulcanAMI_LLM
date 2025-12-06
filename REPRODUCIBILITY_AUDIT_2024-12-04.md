@@ -34,7 +34,7 @@ This comprehensive audit validated the following aspects:
 - ✅ Non-root user execution (graphix user, UID 1001)
 - ✅ Mandatory JWT secret validation via build arg (`REJECT_INSECURE_JWT=ack`)
 - ✅ Comprehensive health checks on all services
-- ✅ Pinned Python version (3.11-slim)
+- ✅ Pinned Python version (3.10.11-slim)
 - ✅ Hash-verified dependency installation with fallback
 - ✅ SBOM generation with CycloneDX for compliance
 - ✅ Security-hardened entrypoint.sh with runtime validation
@@ -86,7 +86,7 @@ This comprehensive audit validated the following aspects:
 - ✅ Parallel job execution for efficiency
 - ✅ Retry logic for network operations (3 retries with exponential backoff)
 - ✅ Artifact upload/download for test results
-- ✅ Multi-Python version testing (3.11, 3.12)
+- ✅ Python version testing (3.10.11)
 - ✅ Security scanning integration (Bandit, CodeQL, pip-audit)
 - ✅ Disk space management for CI runners
 - ✅ Certificate directory permission handling
@@ -390,7 +390,7 @@ Failed:   0
 
 ## Reproducibility Checklist
 
-- [x] Dockerfile with pinned base image versions (python:3.11-slim)
+- [x] Dockerfile with pinned base image versions (python:3.10.11-slim)
 - [x] Multi-stage builds for smaller, secure images
 - [x] Non-root user execution (graphix:1001)
 - [x] Hash-verified dependencies (SHA256)

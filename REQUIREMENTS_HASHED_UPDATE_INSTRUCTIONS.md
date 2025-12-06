@@ -6,7 +6,7 @@ The `requirements-hashed.txt` file is generated using `pip-compile` with hash ve
 
 ## Prerequisites
 
-1. Python 3.12 environment
+1. Python 3.10.11 environment
 2. `pip-tools` installed
 3. All dependencies available for download
 
@@ -113,7 +113,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.10.11'
       
       - name: Install pip-tools
         run: pip install pip-tools

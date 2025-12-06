@@ -27,8 +27,8 @@ Two paths:
 git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
 cd VulcanAMI_LLM
 
-# Create virtual environment (Python 3.11 or 3.12)
-py -3.12 -m venv .venv
+# Create virtual environment (Python 3.10.11)
+py -3.10 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt

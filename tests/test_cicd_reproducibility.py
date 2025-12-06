@@ -50,7 +50,7 @@ def _docker_available_with_network() -> bool:
         # This is the actual operation that fails in the tests
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a minimal Dockerfile that tests pip install
-            dockerfile_content = '''FROM python:3.12-slim
+            dockerfile_content = '''FROM python:3.10.11-slim
 RUN pip install --no-cache-dir requests==2.32.3
 '''
             dockerfile_path = Path(tmpdir) / "Dockerfile"
@@ -542,7 +542,7 @@ class TestReproducibility:
         # Should have specific version (3.10, 3.11, 3.12, etc.)
         import re
         assert re.search(r'python:3\.\d+', content.lower()), \
-            "Dockerfile should specify exact Python version (e.g., python:3.11)"
+            "Dockerfile should specify exact Python version (e.g., python:3.10.11)"
     
     def test_makefile_exists(self):
         """Verify Makefile exists for consistent build commands"""

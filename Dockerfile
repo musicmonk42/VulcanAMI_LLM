@@ -37,7 +37,7 @@
 # -----------------------------
 # Stage 1: Builder
 # -----------------------------
-FROM python:3.11-slim AS builder
+FROM python:3.10.11-slim AS builder
 
 ARG REJECT_INSECURE_JWT="default-super-secret-key-change-me"
 
@@ -124,7 +124,7 @@ RUN python -m compileall -q src
 # -----------------------------
 # Stage 2: Runtime (slim)
 # -----------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.10.11-slim AS runtime
 
 # Runtime environment settings
 ENV PYTHONUNBUFFERED=1 \
@@ -150,7 +150,7 @@ RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin graphix && \
 
 # Copy only necessary Python site-packages and application code from builder
 # This reduces image size and avoids build tools presence.
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src ./src
 # Copy generated SBOM (optional)
