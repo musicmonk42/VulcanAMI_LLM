@@ -4,7 +4,11 @@ Comprehensive test suite for unified_reasoning.py
 Tests the unified reasoning system with multiple strategies, tool selection,
 and portfolio execution, handling optional dependencies gracefully.
 
-NUCLEAR SHUTDOWN VERSION - All threads forced to daemon mode for immediate cleanup
+PERFORMANCE OPTIMIZED VERSION:
+- Uses MODULE-SCOPED fixture to create ONE UnifiedReasoner for all 45 tests
+- Previous version created 32+ UnifiedReasoner instances (one per test), causing timeouts
+- Added skip_runtime config to avoid heavy initialization
+- State is reset between tests via autouse fixture
 
 CRITICAL NOTES:
 - The test_state_persistence test is SKIPPED because it creates a real UnifiedReasoner
@@ -23,6 +27,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 from unittest.mock import Mock, MagicMock, patch
 import numpy as np
+import gc
 
 # CRITICAL: Mock problematic components BEFORE any imports that might load them
 import sys
@@ -58,6 +63,78 @@ from vulcan.reasoning.reasoning_types import (
     ReasoningChain,
     ReasoningResult
 )
+
+
+# =============================================================================
+# MODULE-LEVEL SHARED REASONER (CRITICAL PERFORMANCE OPTIMIZATION)
+# =============================================================================
+# Creating UnifiedReasoner is EXPENSIVE (spawns threads, loads components).
+# Instead of creating one per test (32+ instances), we create ONE for the module.
+
+_SHARED_REASONER = None
+_ORIGINAL_REASONERS = None
+
+
+@pytest.fixture(scope="module")
+def shared_reasoner():
+    """
+    MODULE-SCOPED fixture - creates ONE UnifiedReasoner for ALL tests.
+    
+    This is the key performance optimization. Previous version created a new
+    UnifiedReasoner for each of 32+ tests, causing massive slowdown and timeouts.
+    """
+    global _SHARED_REASONER, _ORIGINAL_REASONERS
+    
+    gc.collect()
+    
+    config = {
+        'confidence_threshold': 0.5,
+        'max_reasoning_time': 5.0,
+        'default_timeout': 5.0,
+        'skip_runtime': True,  # Skip heavy runtime initialization
+    }
+    
+    _SHARED_REASONER = UnifiedReasoner(
+        enable_learning=False,
+        enable_safety=False,
+        max_workers=2,
+        config=config
+    )
+    
+    # Save original reasoners dict for restoration
+    _ORIGINAL_REASONERS = dict(_SHARED_REASONER.reasoners)
+    
+    yield _SHARED_REASONER
+    
+    # Cleanup at end of module
+    force_shutdown_reasoner(_SHARED_REASONER, timeout=1.0)
+    gc.collect()
+
+
+@pytest.fixture(autouse=True)
+def reset_shared_reasoner_state(shared_reasoner):
+    """
+    Auto-use fixture that resets reasoner state between tests.
+    This allows tests to modify the reasoner without affecting other tests.
+    """
+    # Save original values before test
+    original_timeout = getattr(shared_reasoner, 'default_timeout', 5.0)
+    original_max_cache_size = getattr(shared_reasoner, 'max_cache_size', 1000)
+    
+    # Run the test
+    yield
+    
+    # Reset state after test
+    if shared_reasoner and _ORIGINAL_REASONERS is not None:
+        # Restore original values (various tests modify these)
+        shared_reasoner.default_timeout = original_timeout
+        shared_reasoner.max_cache_size = original_max_cache_size
+        
+        # Restore original reasoners
+        shared_reasoner.reasoners = dict(_ORIGINAL_REASONERS)
+        # Clear caches
+        shared_reasoner.result_cache.clear()
+        shared_reasoner.plan_cache.clear()
 
 
 # FIXED: Helper function to create valid ReasoningChain for tests
@@ -286,32 +363,14 @@ class TestUnifiedReasoner:
     """Test main UnifiedReasoner class"""
     
     @pytest.fixture
-    def reasoner(self):
-        """Create fresh reasoner for each test - NUCLEAR CLEANUP VERSION"""
-        # First, aggressively clean any existing threads
-        import gc
-        gc.collect()
+    def reasoner(self, shared_reasoner):
+        """
+        Use the module-level shared reasoner instead of creating a new one.
         
-        config = {
-            'confidence_threshold': 0.5,
-            'max_reasoning_time': 5.0,
-            'default_timeout': 5.0
-        }
-        
-        reasoner = UnifiedReasoner(
-            enable_learning=False,
-            enable_safety=False,
-            max_workers=2,
-            config=config
-        )
-        
-        yield reasoner
-        
-        # NUCLEAR CLEANUP - force all threads to daemon mode
-        force_shutdown_reasoner(reasoner, timeout=0.1)
-        
-        # Extra aggressive cleanup after each test
-        gc.collect()
+        PERFORMANCE FIX: This was creating a new UnifiedReasoner for each of 32 tests,
+        causing massive slowdown. Now uses a single shared instance.
+        """
+        return shared_reasoner
     
     def test_reasoner_initialization(self, reasoner):
         """Test reasoner initialization"""
@@ -919,20 +978,37 @@ class TestUnifiedReasoner:
         # Should complete quickly due to timeout
         assert elapsed < 2.0
     
-    def test_shutdown(self, reasoner):
-        """Test proper shutdown"""
-        # Perform some operations
-        reasoner.performance_metrics['test'] = 123
+    def test_shutdown(self):
+        """Test proper shutdown.
         
-        # Shutdown with skip_save=True
-        reasoner.shutdown(timeout=0.5, skip_save=True)
+        NOTE: This test creates its OWN reasoner instead of using the shared one
+        because it needs to test shutdown behavior, which would break the shared
+        instance for subsequent tests.
+        """
+        # Create an isolated reasoner just for this test
+        isolated_reasoner = UnifiedReasoner(
+            enable_learning=False,
+            enable_safety=False,
+            max_workers=1,
+            config={'skip_runtime': True}
+        )
         
-        assert reasoner._is_shutdown
-        
-        # Should not allow reasoning after shutdown
-        result = reasoner.reason(input_data="test")
-        
-        assert 'shutdown' in str(result.conclusion).lower()
+        try:
+            # Perform some operations
+            isolated_reasoner.performance_metrics['test'] = 123
+            
+            # Shutdown with skip_save=True
+            isolated_reasoner.shutdown(timeout=0.5, skip_save=True)
+            
+            assert isolated_reasoner._is_shutdown
+            
+            # Should not allow reasoning after shutdown
+            result = isolated_reasoner.reason(input_data="test")
+            
+            assert 'shutdown' in str(result.conclusion).lower()
+        finally:
+            # Ensure cleanup even if test fails
+            force_shutdown_reasoner(isolated_reasoner, timeout=0.1)
     
     def test_create_utility_context(self, reasoner):
         """Test utility context creation"""
@@ -1005,15 +1081,9 @@ class TestSpecializedReasoning:
     """Test specialized reasoning methods"""
     
     @pytest.fixture
-    def reasoner(self):
-        """Create reasoner with mocked components"""
-        import gc
-        gc.collect()
-        
-        reasoner = UnifiedReasoner(enable_learning=False, enable_safety=False)
-        yield reasoner
-        force_shutdown_reasoner(reasoner, timeout=0.1)
-        gc.collect()
+    def reasoner(self, shared_reasoner):
+        """Use the module-level shared reasoner - PERFORMANCE OPTIMIZED"""
+        return shared_reasoner
     
     def test_reason_by_analogy(self, reasoner):
         """Test analogical reasoning method"""
@@ -1068,15 +1138,9 @@ class TestEdgeCases:
     """Test edge cases and error conditions"""
     
     @pytest.fixture
-    def reasoner(self):
-        """Create reasoner for edge case testing"""
-        import gc
-        gc.collect()
-        
-        reasoner = UnifiedReasoner(enable_learning=False, enable_safety=False)
-        yield reasoner
-        force_shutdown_reasoner(reasoner, timeout=0.1)
-        gc.collect()
+    def reasoner(self, shared_reasoner):
+        """Use the module-level shared reasoner - PERFORMANCE OPTIMIZED"""
+        return shared_reasoner
     
     def test_empty_input(self, reasoner):
         """Test with empty input"""
@@ -1093,22 +1157,18 @@ class TestEdgeCases:
         
         assert isinstance(result, ReasoningResult)
     
-    def test_no_reasoners_available(self):
-        """Test when no reasoners are available"""
-        import gc
+    def test_no_reasoners_available(self, reasoner):
+        """Test when no reasoners are available.
         
-        reasoner = UnifiedReasoner(enable_learning=False, enable_safety=False)
+        NOTE: This test clears all reasoners temporarily. The autouse fixture
+        will restore the original reasoners after the test completes.
+        """
+        # Clear all reasoners (will be restored by autouse fixture)
+        reasoner.reasoners = {}
         
-        try:
-            # Clear all reasoners
-            reasoner.reasoners = {}
-            
-            result = reasoner.reason(input_data="test")
-            
-            assert isinstance(result, ReasoningResult)
-        finally:
-            force_shutdown_reasoner(reasoner, timeout=0.1)
-            gc.collect()
+        result = reasoner.reason(input_data="test")
+        
+        assert isinstance(result, ReasoningResult)
     
     def test_concurrent_cache_access(self, reasoner):
         """Test concurrent cache access"""
@@ -1138,188 +1198,156 @@ class TestEdgeCases:
 class TestIntegration:
     """Integration tests for complete workflows"""
     
+    @pytest.fixture
+    def reasoner(self, shared_reasoner):
+        """Use the module-level shared reasoner - PERFORMANCE OPTIMIZED"""
+        return shared_reasoner
+    
     @pytest.mark.timeout(20)
-    def test_end_to_end_reasoning_workflow(self):
+    def test_end_to_end_reasoning_workflow(self, reasoner):
         """Test complete reasoning workflow"""
-        import gc
+        # Mock a reasoner
+        mock_reasoner = Mock()
+        mock_reasoner.reason_with_uncertainty = Mock(return_value={
+            'conclusion': 'integrated',
+            'confidence': 0.85
+        })
+        register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
         
-        reasoner = UnifiedReasoner(
-            enable_learning=False,
-            enable_safety=False,
-            max_workers=2
+        # Perform reasoning
+        result = reasoner.reason(
+            input_data=[1, 2, 3, 4, 5],
+            query={'threshold': 0.7},
+            reasoning_type=ReasoningType.PROBABILISTIC,
+            strategy=ReasoningStrategy.SEQUENTIAL
         )
         
-        try:
-            # Mock a reasoner
-            mock_reasoner = Mock()
-            mock_reasoner.reason_with_uncertainty = Mock(return_value={
-                'conclusion': 'integrated',
-                'confidence': 0.85
-            })
-            register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
-            
-            # Perform reasoning
-            result = reasoner.reason(
-                input_data=[1, 2, 3, 4, 5],
-                query={'threshold': 0.7},
-                reasoning_type=ReasoningType.PROBABILISTIC,
-                strategy=ReasoningStrategy.SEQUENTIAL
-            )
-            
-            # Verify result
-            assert isinstance(result, ReasoningResult)
-            assert result.confidence >= 0.7
-            assert result.reasoning_chain is not None
-            
-            # Get statistics
-            stats = reasoner.get_statistics()
-            assert stats['performance']['total_reasonings'] > 0
-            assert stats['execution_count'] > 0
-            
-        finally:
-            force_shutdown_reasoner(reasoner, timeout=0.1)
-            gc.collect()
+        # Verify result
+        assert isinstance(result, ReasoningResult)
+        assert result.confidence >= 0.7
+        assert result.reasoning_chain is not None
+        
+        # Get statistics
+        stats = reasoner.get_statistics()
+        assert stats['performance']['total_reasonings'] > 0
+        assert stats['execution_count'] > 0
     
     @pytest.mark.timeout(30)
-    def test_multi_strategy_workflow(self):
+    def test_multi_strategy_workflow(self, reasoner):
         """Test workflow using multiple strategies"""
-        import gc
+        # Mock reasoner
+        mock_reasoner = Mock()
+        mock_reasoner.reason_with_uncertainty = Mock(return_value={
+            'conclusion': 'multi_strategy',
+            'confidence': 0.8
+        })
+        register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
         
-        reasoner = UnifiedReasoner(enable_learning=False, enable_safety=False)
+        strategies = [
+            ReasoningStrategy.SEQUENTIAL,
+            ReasoningStrategy.ADAPTIVE,
+            ReasoningStrategy.UTILITY_BASED
+        ]
         
-        try:
-            # Mock reasoner
-            mock_reasoner = Mock()
-            mock_reasoner.reason_with_uncertainty = Mock(return_value={
-                'conclusion': 'multi_strategy',
-                'confidence': 0.8
-            })
-            register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
-            
-            strategies = [
-                ReasoningStrategy.SEQUENTIAL,
-                ReasoningStrategy.ADAPTIVE,
-                ReasoningStrategy.UTILITY_BASED
-            ]
-            
-            results = []
-            for strategy in strategies:
-                result = reasoner.reason(
-                    input_data=[1, 2, 3],
-                    reasoning_type=ReasoningType.PROBABILISTIC,
-                    strategy=strategy
-                )
-                results.append(result)
-            
-            # All should succeed
-            assert all(isinstance(r, ReasoningResult) for r in results)
-            assert all(r.confidence > 0 for r in results)
-            
-            # Check strategy usage
-            stats = reasoner.get_statistics()
-            assert len(stats['performance']['strategy_usage']) > 0
-            
-        finally:
-            force_shutdown_reasoner(reasoner, timeout=0.1)
-            gc.collect()
+        results = []
+        for strategy in strategies:
+            result = reasoner.reason(
+                input_data=[1, 2, 3],
+                reasoning_type=ReasoningType.PROBABILISTIC,
+                strategy=strategy
+            )
+            results.append(result)
+        
+        # All should succeed
+        assert all(isinstance(r, ReasoningResult) for r in results)
+        assert all(r.confidence > 0 for r in results)
+        
+        # Check strategy usage
+        stats = reasoner.get_statistics()
+        assert len(stats['performance']['strategy_usage']) > 0
 
 
 # Performance tests
 class TestPerformance:
     """Performance and stress tests"""
     
+    @pytest.fixture
+    def reasoner(self, shared_reasoner):
+        """Use the module-level shared reasoner - PERFORMANCE OPTIMIZED"""
+        return shared_reasoner
+    
     @pytest.mark.timeout(40)
-    def test_high_volume_reasoning(self):
+    def test_high_volume_reasoning(self, reasoner):
         """Test high volume of reasoning requests"""
-        import gc
+        # Mock reasoner
+        mock_reasoner = Mock()
+        mock_reasoner.reason_with_uncertainty = Mock(return_value={
+            'conclusion': 'volume_test',
+            'confidence': 0.8
+        })
+        register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
         
-        reasoner = UnifiedReasoner(
-            enable_learning=False,
-            enable_safety=False,
-            max_workers=4
-        )
+        # Perform many reasoning operations
+        start = time.time()
+        for i in range(50):
+            reasoner.reason(
+                input_data=f"test_{i}",
+                reasoning_type=ReasoningType.PROBABILISTIC
+            )
+        elapsed = time.time() - start
         
-        try:
-            # Mock reasoner
-            mock_reasoner = Mock()
-            mock_reasoner.reason_with_uncertainty = Mock(return_value={
-                'conclusion': 'volume_test',
-                'confidence': 0.8
-            })
-            register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
-            
-            # Perform many reasoning operations
-            start = time.time()
-            for i in range(50):
-                reasoner.reason(
-                    input_data=f"test_{i}",
-                    reasoning_type=ReasoningType.PROBABILISTIC
-                )
-            elapsed = time.time() - start
-            
-            # Should complete in reasonable time
-            assert elapsed < 30.0
-            
-            stats = reasoner.get_statistics()
-            assert stats['performance']['total_reasonings'] >= 50
-            
-        finally:
-            force_shutdown_reasoner(reasoner, timeout=0.1)
-            gc.collect()
+        # Should complete in reasonable time
+        assert elapsed < 30.0
+        
+        stats = reasoner.get_statistics()
+        assert stats['performance']['total_reasonings'] >= 50
     
     @pytest.mark.timeout(15)
-    def test_cache_performance(self):
+    def test_cache_performance(self, reasoner):
         """Test cache improves performance"""
-        import gc
+        # Clear cache to ensure clean state for this test
+        reasoner.clear_caches()
         
-        reasoner = UnifiedReasoner(enable_learning=False, enable_safety=False)
+        # Mock slow reasoner
+        call_count = [0]
         
-        try:
-            # Mock slow reasoner
-            call_count = [0]
-            
-            def slow_reasoning(*args, **kwargs):
-                call_count[0] += 1
-                time.sleep(0.05)  # Reduced sleep time for faster test
-                return {'conclusion': 'cached', 'confidence': 0.8}
-            
-            mock_reasoner = Mock()
-            mock_reasoner.reason_with_uncertainty = slow_reasoning
-            register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
-            
-            # First call
-            start = time.perf_counter()  # Use perf_counter for better precision
-            reasoner.reason(
-                input_data="test_cache_unique",  # Make input unique
-                query={'same': 'query', 'unique': 'first'},  # Make query unique
-                reasoning_type=ReasoningType.PROBABILISTIC
-            )
-            first_time = time.perf_counter() - start
-            
-            # Second call (cached)
-            start = time.perf_counter()
-            reasoner.reason(
-                input_data="test_cache_unique",
-                query={'same': 'query', 'unique': 'first'},  # Same query
-                reasoning_type=ReasoningType.PROBABILISTIC
-            )
-            second_time = time.perf_counter() - start
-            
-            # Primary check: Should only call slow function once (cache working)
-            assert call_count[0] == 1, f"Expected 1 call, got {call_count[0]}"
-            
-            # Secondary check: Cached call should be faster or equal (allow for timing imprecision)
-            # Only check if we have measurable time
-            if first_time > 0 and second_time > 0:
-                assert second_time <= first_time, f"Cached call ({second_time}s) should be <= first call ({first_time}s)"
-            
-            # The cache definitely worked if we only called the slow function once
-            stats = reasoner.get_statistics()
-            assert stats['performance']['total_reasonings'] >= 2
-            
-        finally:
-            force_shutdown_reasoner(reasoner, timeout=0.1)
-            gc.collect()
+        def slow_reasoning(*args, **kwargs):
+            call_count[0] += 1
+            time.sleep(0.05)  # Reduced sleep time for faster test
+            return {'conclusion': 'cached', 'confidence': 0.8}
+        
+        mock_reasoner = Mock()
+        mock_reasoner.reason_with_uncertainty = slow_reasoning
+        register_mock_reasoner(reasoner, ReasoningType.PROBABILISTIC, mock_reasoner)
+        
+        # First call
+        start = time.perf_counter()
+        reasoner.reason(
+            input_data="test_cache_unique_perf",
+            query={'same': 'query', 'unique': 'perf_test'},
+            reasoning_type=ReasoningType.PROBABILISTIC
+        )
+        first_time = time.perf_counter() - start
+        
+        # Second call (cached)
+        start = time.perf_counter()
+        reasoner.reason(
+            input_data="test_cache_unique_perf",
+            query={'same': 'query', 'unique': 'perf_test'},
+            reasoning_type=ReasoningType.PROBABILISTIC
+        )
+        second_time = time.perf_counter() - start
+        
+        # Primary check: Should only call slow function once (cache working)
+        assert call_count[0] == 1, f"Expected 1 call, got {call_count[0]}"
+        
+        # Secondary check: Cached call should be faster or equal
+        if first_time > 0 and second_time > 0:
+            assert second_time <= first_time, f"Cached call ({second_time}s) should be <= first call ({first_time}s)"
+        
+        # The cache definitely worked if we only called the slow function once
+        stats = reasoner.get_statistics()
+        assert stats['performance']['total_reasonings'] >= 2
 
 
 # Run tests
