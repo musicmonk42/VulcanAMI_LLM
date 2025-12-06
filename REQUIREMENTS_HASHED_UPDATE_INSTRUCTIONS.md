@@ -74,6 +74,23 @@ The `--generate-hashes` flag provides:
 
 Each package version has its SHA256 hash verified during installation.
 
+⚠️ **IMPORTANT**: Until requirements-hashed.txt is regenerated, hash verification is bypassed. This creates a security risk. Do not deploy to production until the hashed requirements are updated.
+
+## CI/CD Integration
+
+Consider adding a check to prevent deployment with outdated hashed requirements:
+
+```yaml
+# Add to your CI/CD pipeline
+- name: Check hashed requirements
+  run: |
+    if [ -f requirements-hashed.txt.NEEDS_REGENERATION ]; then
+      echo "❌ ERROR: requirements-hashed.txt needs regeneration!"
+      echo "Run: pip-compile --generate-hashes --output-file=requirements-hashed.txt requirements.txt"
+      exit 1
+    fi
+```
+
 ## Alternative: Automated Regeneration
 
 You can add this to your CI/CD pipeline:
@@ -91,10 +108,10 @@ jobs:
   update-hashed:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       

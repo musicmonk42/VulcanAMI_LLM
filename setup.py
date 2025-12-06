@@ -14,7 +14,7 @@ setup(
     ],
     extras_require={
         "dev": [
-            "locust>=2.38.1",  # Load testing (moved from install_requires)
+            "locust==2.38.1",  # Load testing (moved from install_requires)
         ]
     },
 )
