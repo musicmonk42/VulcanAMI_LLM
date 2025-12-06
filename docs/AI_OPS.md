@@ -44,7 +44,7 @@ Graphix is an AI-native execution & evolution fabric for JSON-based directed gra
 git clone https://github.com/musicmonk42/VulcanAMI_LLM.git
 cd VulcanAMI_LLM
 
-py -3.12 -m venv .venv
+py -3.10 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt

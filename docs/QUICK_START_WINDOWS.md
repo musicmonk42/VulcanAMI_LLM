@@ -32,8 +32,8 @@ ENV
 ## 2) Core Setup
 
 ```bash
-# Create virtual environment (use 3.11 or 3.12)
-py -3.12 -m venv .venv
+# Create virtual environment (use 3.10.11)
+py -3.10 -m venv .venv
 source .venv/Scripts/activate
 
 # Upgrade pip and install dependencies

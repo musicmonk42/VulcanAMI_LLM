@@ -20,7 +20,7 @@ This guide describes advanced training and continual self-improvement workflows 
 ## 2. Environment Setup
 
 ```bash
-py -3.12 -m venv .venv
+py -3.10 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt

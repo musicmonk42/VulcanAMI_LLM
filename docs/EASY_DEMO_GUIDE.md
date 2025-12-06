@@ -68,7 +68,7 @@ Check “Add Python to PATH” during installation.
 ## 7. Install Demo Tools
 
 ```bash
-py -3.11 -m venv .venv
+py -3.10 -m venv .venv
 source .venv/Scripts/activate
 python -m pip install --upgrade pip wheel setuptools
 pip install -r requirements.txt
