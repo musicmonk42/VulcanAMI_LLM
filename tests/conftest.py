@@ -268,12 +268,18 @@ def reset_pytorch_state():
     This fixes:
     - Models left in eval() mode by previous tests
     - Tensors with .detach() called on shared instances
-    - Gradient state contamination
+    - Gradient state contamination from torch.no_grad() or .eval() calls
+    - Global gradient state being disabled
     
     This is applied automatically to all tests.
     """
     try:
         import torch
+        
+        # CRITICAL: Explicitly enable gradients before each test
+        # This prevents "element 0 of tensors does not require grad" errors
+        # when tests run together (test pollution from previous tests)
+        torch.set_grad_enabled(True)
         
         # Clear CUDA cache if available
         if torch.cuda.is_available():
@@ -283,6 +289,10 @@ def reset_pytorch_state():
         torch.set_default_dtype(torch.float32)
         
         yield
+        
+        # CRITICAL: Re-enable gradients after each test as well
+        # This ensures the next test starts with a clean gradient state
+        torch.set_grad_enabled(True)
         
         # Cleanup after test
         if torch.cuda.is_available():
