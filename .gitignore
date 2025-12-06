@@ -17,6 +17,8 @@ processing_logs/
 shutdown_state/
 unified_learning_state/
 world_model_params/
+build_simulation_*/
+test_results_*/
 
 # C extensions
 *.so
