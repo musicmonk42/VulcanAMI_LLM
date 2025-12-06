@@ -1,5 +1,5 @@
 """
-test_orchestrator_integration.py - PURE MOCK VERSION
+test_orchestrator_integration.py 
 Comprehensive integration tests without vulcan imports (no thread spawning)
 """
 
