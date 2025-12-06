@@ -34,7 +34,8 @@ azure-keyvault-secrets==4.10.0
 azure-storage-blob==12.26.0
 backoff==1.11.1
 backports-datetime-fromisoformat==2.0.3
-backports.asyncio.runner==1.2.0
+# backports.asyncio.runner not needed on Python 3.11+ (built-in)
+# backports.asyncio.runner==1.2.0
 bandit==1.9.2
 base58==2.1.1
 bcrypt==4.3.0
