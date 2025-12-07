@@ -343,16 +343,21 @@ def cleanup_session_resources():
     # 2. Stop any EnhancedResourceMonitor threads
     try:
         from vulcan import planning
-        # Find and stop all monitor instances
-        for obj in gc.get_objects():
-            if hasattr(obj, '__class__') and obj.__class__.__name__ == 'EnhancedResourceMonitor':
-                try:
-                    if hasattr(obj, 'stop_monitoring'):
-                        obj.stop_monitoring.set()
-                    if hasattr(obj, 'cleanup'):
-                        obj.cleanup()
-                except Exception:
-                    pass  # Best effort cleanup
+        # Suppress torch.distributed deprecation warnings during cleanup
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*torch.distributed.reduce_op.*", category=FutureWarning)
+            warnings.filterwarnings("ignore", message=".*torch.distributed.ReduceOp.*", category=FutureWarning)
+            # Find and stop all monitor instances
+            for obj in gc.get_objects():
+                if hasattr(obj, '__class__') and obj.__class__.__name__ == 'EnhancedResourceMonitor':
+                    try:
+                        if hasattr(obj, 'stop_monitoring'):
+                            obj.stop_monitoring.set()
+                        if hasattr(obj, 'cleanup'):
+                            obj.cleanup()
+                    except Exception:
+                        pass  # Best effort cleanup
     except Exception:
         pass  # Module might not be loaded
     

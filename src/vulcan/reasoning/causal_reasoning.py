@@ -1218,8 +1218,12 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                     'causality': False,
                     'error': 'Insufficient data for the given lag.'
                 }
-                
-            gc_result = grangercausalitytests(data, maxlag=max_lag, verbose=False)
+            
+            # Suppress FutureWarning about verbose parameter being deprecated
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*verbose is deprecated.*", category=FutureWarning)
+                gc_result = grangercausalitytests(data, maxlag=max_lag, verbose=False)
             
             # Extract the p-value for the specified lag
             lag_result = gc_result[max_lag][0]
@@ -1272,7 +1276,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
         if self.causal_dag and NETWORKX_AVAILABLE:
             try:
                 graph_file = self.model_path / f"{name}_graph.json"
-                graph_data = nx.node_link_data(self.causal_dag)
+                graph_data = nx.node_link_data(self.causal_dag, edges="edges")
                 with open(graph_file, 'w') as f:
                     json.dump(graph_data, f)
             except Exception as e:
@@ -1309,7 +1313,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                 if graph_file.exists():
                     with open(graph_file, 'r') as f:
                         graph_data = json.load(f)
-                    self.causal_dag = nx.node_link_graph(graph_data)
+                    self.causal_dag = nx.node_link_graph(graph_data, edges="edges")
             
             logger.info(f"Causal model loaded from {model_file}")
         except Exception as e:

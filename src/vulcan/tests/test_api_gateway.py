@@ -228,15 +228,44 @@ async def cache_manager(redis):
 async def service_registry():
     """Create service registry without starting async tasks, with proper cleanup."""
     with patch('asyncio.create_task') as mock_create_task:
-        mock_create_task.return_value = AsyncMock()
+        # Create mock tasks that can be cancelled
+        mock_discover_task = AsyncMock()
+        mock_health_task = AsyncMock()
+        mock_create_task.side_effect = [mock_discover_task, mock_health_task]
+        
         registry = ServiceRegistry()
-        registry._health_check_task = None
+        
+        # Store the mock tasks for cleanup
+        registry._discover_services_task = mock_discover_task
+        registry._health_check_task = mock_health_task
+    
     yield registry
-    # Async cleanup - no need for run_until_complete
+    
+    # Async cleanup - cancel and await any pending health check tasks
+    try:
+        if hasattr(registry, '_health_check_task') and registry._health_check_task:
+            registry._health_check_task.cancel()
+            try:
+                await registry._health_check_task
+            except (asyncio.CancelledError, Exception):
+                pass
+    except Exception:
+        pass
+    
+    try:
+        if hasattr(registry, '_discover_services_task') and registry._discover_services_task:
+            registry._discover_services_task.cancel()
+            try:
+                await registry._discover_services_task
+            except (asyncio.CancelledError, Exception):
+                pass
+    except Exception:
+        pass
+    
     try:
         if registry._http_session and not registry._http_session.closed:
             await registry._http_session.close()
-    except:
+    except Exception:
         pass
 
 @pytest.fixture

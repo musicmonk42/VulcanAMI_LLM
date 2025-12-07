@@ -799,9 +799,14 @@ class MultimodalFeatureExtractor(FeatureExtractor):
                 # Transitivity
                 features.append(nx.transitivity(G))
                 
-                # Assortativity
+                # Assortativity (with variance check to avoid division by zero)
                 try:
-                    features.append(nx.degree_assortativity_coefficient(G))
+                    # Check if there's variance in the degrees before computing assortativity
+                    degrees = [G.degree(n) for n in G.nodes()]
+                    if len(degrees) > 1 and np.var(degrees) > 0:
+                        features.append(nx.degree_assortativity_coefficient(G))
+                    else:
+                        features.append(0.0)
                 except Exception as e:                    features.append(0.0)
                 
                 # Spectral properties

@@ -34,7 +34,7 @@ import gc
 import shutil
 
 # REMOVED: sentence_transformers import - will use internal LLM-based encoder
-from transformers import AutoModel, AutoTokenizer, AutoFeatureExtractor
+from transformers import AutoModel, AutoTokenizer, AutoImageProcessor
 import PIL.Image
 
 # FIXED: Import from src.vulcan.config instead of config
@@ -664,7 +664,7 @@ class DynamicModelManager:
         
         elif modality in ['vision', 'audio']:
             model = AutoModel.from_pretrained(model_name)
-            processor = AutoFeatureExtractor.from_pretrained(model_name)
+            processor = AutoImageProcessor.from_pretrained(model_name)
             
             if device != 'cpu' and torch.cuda.is_available():
                 model = model.to(device)
