@@ -934,6 +934,12 @@ class TestMain:
     @patch('sys.argv', ['demo_graphix.py', '--graph-type', 'sentiment_3d'])
     def test_main_basic(self, mock_asyncio_run):
         """Test main with basic arguments."""
+        # Configure mock to properly consume the coroutine
+        def consume_coro(coro):
+            # Close the coroutine to prevent warning
+            coro.close()
+        mock_asyncio_run.side_effect = consume_coro
+        
         demo_graphix.main()
         
         assert mock_asyncio_run.called
@@ -942,23 +948,41 @@ class TestMain:
     @patch('sys.argv', ['demo_graphix.py', '--photonic', '--parallel', '--verbose'])
     def test_main_with_options(self, mock_asyncio_run):
         """Test main with multiple options."""
+        # Configure mock to properly consume the coroutine
+        def consume_coro(coro):
+            # Close the coroutine to prevent warning
+            coro.close()
+        mock_asyncio_run.side_effect = consume_coro
+        
         demo_graphix.main()
         
         assert mock_asyncio_run.called
     
-    @patch('demo_graphix.asyncio.run', side_effect=KeyboardInterrupt)
+    @patch('demo_graphix.asyncio.run')
     @patch('sys.argv', ['demo_graphix.py'])
     def test_main_keyboard_interrupt(self, mock_asyncio_run):
         """Test main with keyboard interrupt."""
+        # Configure mock to properly consume the coroutine before raising
+        def consume_and_raise(coro):
+            coro.close()
+            raise KeyboardInterrupt()
+        mock_asyncio_run.side_effect = consume_and_raise
+        
         with pytest.raises(SystemExit) as exc_info:
             demo_graphix.main()
         
         assert exc_info.value.code == 130
     
-    @patch('demo_graphix.asyncio.run', side_effect=Exception("Fatal error"))
+    @patch('demo_graphix.asyncio.run')
     @patch('sys.argv', ['demo_graphix.py'])
     def test_main_exception(self, mock_asyncio_run):
         """Test main with exception."""
+        # Configure mock to properly consume the coroutine before raising
+        def consume_and_raise(coro):
+            coro.close()
+            raise Exception("Fatal error")
+        mock_asyncio_run.side_effect = consume_and_raise
+        
         with pytest.raises(SystemExit) as exc_info:
             demo_graphix.main()
         

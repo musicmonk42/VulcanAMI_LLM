@@ -744,27 +744,30 @@ class TestUnifiedSystem(unittest.TestCase): # CHANGED to use unittest.TestCase
         except Exception as e:
             self.fail(f"Shutdown failed unexpectedly: {e}")
     
-    @pytest.mark.asyncio # Keep pytest marker if mixing frameworks
-    async def test_async_operations(self):
+    def test_async_operations(self):
         """Test async operations don't cause issues"""
-        system = UnifiedLearningSystem(
-            config=self.fast_learning_config,
-            embedding_dim=TEST_EMBEDDING_DIM
-        )
+        async def _test_async():
+            system = UnifiedLearningSystem(
+                config=self.fast_learning_config,
+                embedding_dim=TEST_EMBEDDING_DIM
+            )
+            
+            # Process some experiences
+            for i in range(3):
+                exp = {
+                    'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                    'reward': 0.5
+                }
+                system.process_experience(exp)
+            
+            # Give async operations time to run
+            await asyncio.sleep(0.1)
+            
+            # Cleanup should handle async operations properly
+            system.shutdown()
         
-        # Process some experiences
-        for i in range(3):
-            exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': 0.5
-            }
-            system.process_experience(exp)
-        
-        # Give async operations time to run
-        await asyncio.sleep(0.1)
-        
-        # Cleanup should handle async operations properly
-        system.shutdown()
+        # Run the async test
+        asyncio.run(_test_async())
     
     def test_save_and_load(self):
         """Test saving and loading complete state"""

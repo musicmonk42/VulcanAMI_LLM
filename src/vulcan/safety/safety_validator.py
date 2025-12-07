@@ -1371,12 +1371,20 @@ class EnhancedSafetyValidator(SafetyValidator):
             )
 
     async def _run_with_timeout(self, func: Callable, timeout: float, *args, **kwargs):
-        loop = asyncio.get_event_loop()
         try:
-            result = await asyncio.wait_for(
-                loop.run_in_executor(None, func, *args, **kwargs),
-                timeout=timeout
-            )
+            # Check if func is a coroutine function and call it appropriately
+            if asyncio.iscoroutinefunction(func):
+                result = await asyncio.wait_for(
+                    func(*args, **kwargs),
+                    timeout=timeout
+                )
+            else:
+                # For sync functions, run in executor
+                loop = asyncio.get_event_loop()
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(None, func, *args, **kwargs),
+                    timeout=timeout
+                )
             return result
         except asyncio.TimeoutError:
             logger.warning(f"Function {func.__name__} timed out after {timeout}s")
