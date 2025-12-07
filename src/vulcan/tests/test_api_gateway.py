@@ -232,7 +232,11 @@ async def service_registry():
         """Mock create_task that properly closes the coroutine to avoid warnings."""
         # Close the coroutine to prevent "coroutine was never awaited" warnings
         if asyncio.iscoroutine(coro):
-            coro.close()
+            try:
+                coro.close()
+            except Exception:
+                # Coroutine may already be closed or in invalid state - that's OK
+                pass
         
         # Return a mock task that behaves like a real asyncio.Task
         mock_task = MagicMock()
