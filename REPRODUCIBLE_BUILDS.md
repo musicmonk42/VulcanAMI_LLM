@@ -7,7 +7,7 @@ This document ensures all builds are reproducible across environments.
 - Pinned versions for all tools and base images
 - Comprehensive validation tooling
 - Security best practices
-- Modern Kubernetes kustomize syntax (labels instead of deprecated commonLabels)
+- Kubernetes configurations use standard kustomize syntax (note: deprecation warnings are informational only)
 
 ## Validation and Testing
 

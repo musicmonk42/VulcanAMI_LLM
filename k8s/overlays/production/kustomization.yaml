@@ -8,9 +8,8 @@ resources:
 
 namePrefix: prod-
 
-labels:
-  - pairs:
-      environment: production
+commonLabels:
+  environment: production
 
 patches:
   - patch: |-
