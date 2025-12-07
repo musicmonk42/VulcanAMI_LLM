@@ -46,6 +46,34 @@ from src.vulcan.config import AgentConfig
 # Having a custom fixture causes tests to stop/crash when run together
 
 # ============================================================
+# HELPER FUNCTIONS
+# ============================================================
+
+def create_mock_task_for_test(coro):
+    """Helper function to mock asyncio.create_task properly without warnings.
+    
+    This function closes coroutines passed to create_task to prevent
+    "coroutine was never awaited" RuntimeWarning messages.
+    
+    Args:
+        coro: The coroutine to be mocked.
+        
+    Returns:
+        MagicMock: A mock task object that behaves like asyncio.Task.
+    """
+    if asyncio.iscoroutine(coro):
+        try:
+            coro.close()
+        except (RuntimeError, GeneratorExit):
+            pass
+    
+    mock_task = MagicMock()
+    mock_task.cancel.return_value = None  # cancel() is synchronous for real tasks
+    mock_task.done.return_value = True
+    return mock_task
+
+
+# ============================================================
 # PRODUCTION REDIS MOCK
 # ============================================================
 
@@ -227,38 +255,21 @@ async def cache_manager(redis):
 @pytest.fixture
 async def service_registry():
     """Create service registry without starting async tasks, with proper cleanup."""
-    with patch('asyncio.create_task') as mock_create_task:
-        # Create mock tasks that can be cancelled
-        mock_discover_task = AsyncMock()
-        mock_health_task = AsyncMock()
-        mock_create_task.side_effect = [mock_discover_task, mock_health_task]
-        
+    with patch('asyncio.create_task', side_effect=create_mock_task_for_test) as mock_create_task:
         registry = ServiceRegistry()
-        
-        # Store the mock tasks for cleanup
-        registry._discover_services_task = mock_discover_task
-        registry._health_check_task = mock_health_task
     
     yield registry
     
-    # Async cleanup - cancel and await any pending health check tasks
+    # Async cleanup - cancel any pending tasks (mock cancel is synchronous, so no await needed)
     try:
         if hasattr(registry, '_health_check_task') and registry._health_check_task:
             registry._health_check_task.cancel()
-            try:
-                await registry._health_check_task
-            except (asyncio.CancelledError, Exception):
-                pass
     except Exception:
         pass
     
     try:
         if hasattr(registry, '_discover_services_task') and registry._discover_services_task:
             registry._discover_services_task.cancel()
-            try:
-                await registry._discover_services_task
-            except (asyncio.CancelledError, Exception):
-                pass
     except Exception:
         pass
     
@@ -1290,7 +1301,7 @@ class TestWebSocket:
             mock_deployment.return_value = mock_instance
             
             with patch('src.vulcan.api_gateway.ServiceRegistry'):
-                with patch('asyncio.create_task', return_value=AsyncMock()):
+                with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
                     config = AgentConfig()
                     gateway = APIGateway(config)
                     
@@ -1312,7 +1323,7 @@ class TestWebSocket:
             mock_deployment.return_value = mock_instance
             
             with patch('src.vulcan.api_gateway.ServiceRegistry'):
-                with patch('asyncio.create_task', return_value=AsyncMock()):
+                with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
                     config = AgentConfig()
                     gateway = APIGateway(config)
                     
@@ -1332,7 +1343,7 @@ class TestWebSocket:
             mock_deployment.return_value = mock_instance
             
             with patch('src.vulcan.api_gateway.ServiceRegistry'):
-                with patch('asyncio.create_task', return_value=AsyncMock()):
+                with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
                     config = AgentConfig()
                     gateway = APIGateway(config)
                     
@@ -1352,7 +1363,7 @@ class TestWebSocket:
             mock_deployment.return_value = mock_instance
             
             with patch('src.vulcan.api_gateway.ServiceRegistry'):
-                with patch('asyncio.create_task', return_value=AsyncMock()):
+                with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
                     config = AgentConfig()
                     gateway = APIGateway(config)
                     
@@ -1387,7 +1398,7 @@ class TestMiddleware:
             mock_deployment.return_value = mock_instance
             
             with patch('src.vulcan.api_gateway.ServiceRegistry'):
-                with patch('asyncio.create_task', return_value=AsyncMock()):
+                with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
                     config = AgentConfig()
                     gateway = APIGateway(config)
                     
@@ -1412,7 +1423,7 @@ class TestMiddleware:
             mock_deployment.return_value = mock_instance
             
             with patch('src.vulcan.api_gateway.ServiceRegistry'):
-                with patch('asyncio.create_task', return_value=AsyncMock()):
+                with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
                     config = AgentConfig()
                     gateway = APIGateway(config)
                     
@@ -1458,7 +1469,7 @@ class TestCleanup:
                 
                 mock_registry_class.return_value = mock_registry
                 
-                with patch('asyncio.create_task', return_value=AsyncMock()):
+                with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
                     config = AgentConfig()
                     gateway = APIGateway(config)
                     
@@ -1470,8 +1481,7 @@ class TestCleanup:
     @pytest.mark.asyncio
     async def test_service_registry_cleanup(self):
         """Test service registry cleanup."""
-        with patch('asyncio.create_task') as mock_create_task:
-            mock_create_task.return_value = AsyncMock()
+        with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
             registry = ServiceRegistry()
             registry._health_check_task = None
             
@@ -1581,8 +1591,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_empty_service_registry(self):
         """Test service selection with no services."""
-        with patch('asyncio.create_task') as mock_create_task:
-            mock_create_task.return_value = AsyncMock()
+        with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
             registry = ServiceRegistry()
             registry._health_check_task = None
             
@@ -1592,8 +1601,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_all_services_unhealthy(self):
         """Test service selection when all are unhealthy."""
-        with patch('asyncio.create_task') as mock_create_task:
-            mock_create_task.return_value = AsyncMock()
+        with patch('asyncio.create_task', side_effect=create_mock_task_for_test):
             registry = ServiceRegistry()
             registry._health_check_task = None
             
