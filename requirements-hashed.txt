@@ -1083,6 +1083,11 @@ eth-utils==2.3.2 \
     --hash=sha256:1986d704b29202386c9bc4b27b948a134320c11c8104c45ca367e4663ae7d10e \
     --hash=sha256:4470be372674a25b8440b69cb35bda634a079876930853814ea307248c3d198b
     # via py-ecc
+exceptiongroup==1.3.1 \
+    --hash=sha256:a7a39a3bd276781e98394987d3a5701d0c4edffb633bb7a5144577f82c773598
+    # via
+    #   -r requirements.txt
+    #   anyio
 faiss-cpu==1.13.0 \
     --hash=sha256:0ccd33708f71607b6859c6d7a5a9e7f0f59f1741ccf6b70597f2276769886768 \
     --hash=sha256:0cffbac3a89da937d6415e2183379360787baf0b783e1d2b155533df2ab3e1d1 \
