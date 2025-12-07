@@ -31,6 +31,9 @@ pytest tests/test_cicd_reproducibility.py -v
 - [ ] Secrets stored securely (not in code)
 - [ ] Version tagged in git
 - [ ] Documentation up to date
+- [x] Requirements-hashed.txt up-to-date with SHA256 hashes
+- [x] Kubernetes manifests use current kustomize syntax (labels instead of commonLabels)
+- [x] All Docker Compose files validated
 
 For detailed testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
 
