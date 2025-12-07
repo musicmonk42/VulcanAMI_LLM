@@ -186,3 +186,5 @@ probabilistic_models/
 data/backups/
 *.pkl
 *.dat
+*.whl
+*.tar.gz

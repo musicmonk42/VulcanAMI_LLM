@@ -416,7 +416,7 @@ timm==1.0.22
 tldextract==5.3.0
 tokenizers==0.21.4
 toml==0.10.2
-tomli==2.2.1
+tomli==2.3.0
 tomli_w==1.2.0
 tomlkit==0.13.3
 toolz==1.0.0
