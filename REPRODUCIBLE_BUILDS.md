@@ -3,10 +3,11 @@
 This document ensures all builds are reproducible across environments.
 
 **✅ Status**: All reproducibility requirements are met and validated. The repository includes:
-- Hash-verified dependencies (`requirements-hashed.txt`)
+- Hash-verified dependencies (`requirements-hashed.txt`) - **Updated December 2024**
 - Pinned versions for all tools and base images
 - Comprehensive validation tooling
 - Security best practices
+- Kubernetes configurations use standard kustomize syntax (note: deprecation warnings are informational only)
 
 ## Validation and Testing
 
@@ -40,14 +41,14 @@ For comprehensive testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.m
 # Install pip-tools (included in requirements-dev.txt)
 pip install pip-tools
 
-# Generate hashed requirements (DONE - file already exists with 175+ dependencies)
+# Generate hashed requirements (UPDATED - file regenerated with latest dependencies)
 pip-compile --generate-hashes requirements.txt -o requirements-hashed.txt
 
 # Update hashed requirements when dependencies change
 pip-compile --upgrade --generate-hashes requirements.txt -o requirements-hashed.txt
 ```
 
-**Current Status**: ✅ `requirements-hashed.txt` contains 175+ dependencies with SHA256 hashes for cryptographic verification.
+**Current Status**: ✅ `requirements-hashed.txt` regenerated December 2024 with 440+ dependencies and SHA256 hashes for cryptographic verification.
 
 #### Development Dependencies
 
