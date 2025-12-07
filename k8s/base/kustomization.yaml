@@ -26,9 +26,10 @@ configMapGenerator:
       - MINIO_ENDPOINT=http://minio-service:9000
       - MINIO_ACCESS_KEY=minioadmin
 
-commonLabels:
-  app.kubernetes.io/name: vulcanami
-  app.kubernetes.io/managed-by: kustomize
+labels:
+  - pairs:
+      app.kubernetes.io/name: vulcanami
+      app.kubernetes.io/managed-by: kustomize
 
 images:
   - name: ghcr.io/musicmonk42/vulcanami_llm-api
