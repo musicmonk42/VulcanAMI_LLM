@@ -56,7 +56,7 @@ jobs:
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -177,7 +177,7 @@ jobs:
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
@@ -314,7 +314,7 @@ jobs:
           sleep 30
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
@@ -475,7 +475,7 @@ jobs:
           chmod -R a+rX "$REPO_CERT_DIR" || true
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
