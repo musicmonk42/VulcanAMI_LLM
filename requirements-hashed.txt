@@ -2262,9 +2262,9 @@ google-cloud-resource-manager==1.14.2 \
     # via
     #   -r requirements.txt
     #   google-cloud-aiplatform
-google-cloud-run==0.10.19 \
-    --hash=sha256:cf9feea66898d57ef8c2d6095d599cab2c013750aef71c58f04a88495e370fca \
-    --hash=sha256:e95f9337c4a66c8a094881864c86f708b6a519b938bef890eef43606e44e7538
+google-cloud-run==0.12.0 \
+    --hash=sha256:396d52c366a2febdd9be806813f71fc7701262458674f376fe649f92a25652f1 \
+    --hash=sha256:b97ac4c4abdb495f49163105494cc9f95d7a07b9dd8d5f4fdb3fb0f3a674325e
     # via -r requirements.txt
 google-cloud-secret-manager==2.24.0 \
     --hash=sha256:9bea1254827ecc14874bc86c63b899489f8f50bfe1442bfb2517530b30b3a89b \
