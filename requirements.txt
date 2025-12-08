@@ -349,7 +349,7 @@ python-utils==3.9.1
 pytz==2025.2
 pyunormalize==16.0.0
 PyYAML==6.0.3
-pyzmq==26.2.0
+pyzmq==26.4.0
 radon==6.0.1
 rank-bm25==0.2.2
 ratelimit==2.2.1
