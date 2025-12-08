@@ -37,7 +37,7 @@
 # -----------------------------
 # Stage 1: Builder
 # -----------------------------
-FROM python:3.10.11-slim AS builder
+FROM python:3.14.1-slim AS builder
 
 ARG REJECT_INSECURE_JWT="default-super-secret-key-change-me"
 
@@ -124,7 +124,7 @@ RUN python -m compileall -q src
 # -----------------------------
 # Stage 2: Runtime (slim)
 # -----------------------------
-FROM python:3.10.11-slim AS runtime
+FROM python:3.14.1-slim AS runtime
 
 # Runtime environment settings
 ENV PYTHONUNBUFFERED=1 \
