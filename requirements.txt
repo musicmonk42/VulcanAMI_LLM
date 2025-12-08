@@ -337,7 +337,7 @@ python-consul==1.1.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 Python-EasyConfig==0.1.7
-python-engineio==4.12.2
+python-engineio==4.12.3
 python-hcl2==7.3.1
 python-jose==3.5.0
 python-json-logger==3.3.0

@@ -5904,9 +5904,9 @@ python-easyconfig==0.1.7 \
     # via
     #   -r requirements.txt
     #   resource
-python-engineio==4.12.2 \
-    --hash=sha256:8218ab66950e179dfec4b4bbb30aecf3f5d86f5e58e6fc1aa7fde2c698b2804f \
-    --hash=sha256:e7e712ffe1be1f6a05ee5f951e72d434854a32fcfc7f6e4d9d3cae24ec70defa
+python-engineio==4.12.3 \
+    --hash=sha256:35633e55ec30915e7fc8f7e34ca8d73ee0c080cec8a8cd04faf2d7396f0a7a7a \
+    --hash=sha256:7c099abb2a27ea7ab429c04da86ab2d82698cdd6c52406cb73766fe454feb7e1
     # via
     #   -r requirements.txt
     #   python-socketio
