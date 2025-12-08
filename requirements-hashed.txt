@@ -2218,9 +2218,9 @@ google-auth-httplib2==0.2.0 \
     # via
     #   -r requirements.txt
     #   google-api-python-client
-google-cloud-aiplatform==1.109.0 \
-    --hash=sha256:c995c9a7e86ba55e4c68a1d0c72f9994e7c5b30a421d8febaf5fe8caaadbbd0b \
-    --hash=sha256:e39838fd088de4faa6a3fce4a2b4ce5cada5b1e6b92dea4951395c574591f70c
+google-cloud-aiplatform==1.129.0 \
+    --hash=sha256:b0052143a1bc05894e59fc6f910e84c504e194fadf877f84fc790b38a2267739 \
+    --hash=sha256:c53b9d6c529b4de2962b34425b0116f7a382a926b26e02c2196e372f9a31d196
     # via -r requirements.txt
 google-cloud-appengine-logging==1.6.2 \
     --hash=sha256:2b28ed715e92b67e334c6fcfe1deb523f001919560257b25fc8fcda95fd63938 \
