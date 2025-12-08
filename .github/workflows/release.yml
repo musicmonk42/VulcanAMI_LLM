@@ -80,7 +80,7 @@ jobs:
           echo "changelog_file=CHANGELOG.md" >> $GITHUB_OUTPUT
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ steps.version.outputs.version }}
           body_path: ${{ steps.changelog.outputs.changelog_file }}
@@ -139,7 +139,7 @@ jobs:
             .
 
       - name: Upload artifacts to release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.whl
