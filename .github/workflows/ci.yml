@@ -222,6 +222,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/results
           mkdir -p $GITHUB_WORKSPACE/logs
           exit_code=0
+          ulimit -Sn 10240 || true
           pytest --cov=src \
             --cov-report=xml \
             --cov-report=html \
