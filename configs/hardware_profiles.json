@@ -8,7 +8,7 @@
     "max_tensor_size_mb": 512,
     "dynamic_metrics": {
       "bus_saturation": 0.85,
-      "last_updated": "2025-08-27"
+      "last_updated": "2025-12-09"
     }
   },
   "gpu": {
@@ -20,7 +20,7 @@
     "max_tensor_size_mb": 40960,
     "dynamic_metrics": {
       "bus_saturation": 0.72,
-      "last_updated": "2025-08-27"
+      "last_updated": "2025-12-09"
     }
   },
   "vllm": {
@@ -32,7 +32,7 @@
     "max_tensor_size_mb": 20480,
     "dynamic_metrics": {
       "bus_saturation": 0.68,
-      "last_updated": "2025-08-27"
+      "last_updated": "2025-12-09"
     }
   },
   "photonic": {
@@ -45,7 +45,7 @@
     "max_tensor_size_mb": 2048,
     "dynamic_metrics": {
       "bus_saturation": 0.45,
-      "last_updated": "2025-08-27"
+      "last_updated": "2025-12-09"
     }
   },
   "memristor": {
@@ -58,7 +58,7 @@
     "max_tensor_size_mb": 1024,
     "dynamic_metrics": {
       "bus_saturation": 0.55,
-      "last_updated": "2025-08-27"
+      "last_updated": "2025-12-09"
     }
   },
   "aws-f1-fpga": {
@@ -70,7 +70,7 @@
     "max_tensor_size_mb": 10240,
     "dynamic_metrics": {
       "bus_saturation": 0.60,
-      "last_updated": "2025-08-27"
+      "last_updated": "2025-12-09"
     }
   }
 }
