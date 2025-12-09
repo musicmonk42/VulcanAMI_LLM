@@ -29,6 +29,7 @@ import sys
 import platform
 import inspect
 import threading
+import re
 
 # Platform-specific imports with fallbacks
 try:
@@ -157,7 +158,6 @@ class Principle:
             
             # Validate code doesn't have dangerous operations
             # Use word boundaries to avoid false positives (e.g., 'input' as a dict key)
-            import re
             dangerous_keywords = ['import', '__import__', 'eval', 'exec', 'compile', 
                                  'open', 'file', '__builtins__', 'globals', 'locals',
                                  'vars', 'dir', 'getattr', 'setattr', 'delattr',
@@ -167,7 +167,7 @@ class Principle:
             for keyword in dangerous_keywords:
                 # Check for keyword as a standalone word or function call (not in strings)
                 # Pattern matches: keyword( or keyword. or keyword[ or keyword as a word boundary
-                pattern = r'\b' + re.escape(keyword) + r'(?:\s*[(.\[]|\s|$)'
+                pattern = r'\b' + re.escape(keyword) + r'(?:\s*[(\.\[]|\s|$)'
                 if re.search(pattern, code_str, re.IGNORECASE):
                     raise ValueError(f"Dangerous operation '{keyword}' not allowed in code strings")
             
