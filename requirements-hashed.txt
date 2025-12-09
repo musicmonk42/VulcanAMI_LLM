@@ -439,6 +439,9 @@ backports-datetime-fromisoformat==2.0.3 \
     --hash=sha256:fb35f607bd1cbe37b896379d5f5ed4dc298b536f4b959cb63180e05cacc0539d \
     --hash=sha256:ffe5f793db59e2f1d45ec35a1cf51404fdd69df9f6952a0c87c3060af4c00e32
     # via -r requirements.txt
+backports-asyncio-runner==1.2.0 \
+    --hash=sha256:0da0a936a8aeb554eccb426dc55af3ba63bcdc69fa1a600b5bb305413a4477b5
+    # via pytest-asyncio
 bandit==1.9.2 \
     --hash=sha256:32410415cd93bf9c8b91972159d5cf1e7f063a9146d70345641cd3877de348ce \
     --hash=sha256:bda8d68610fc33a6e10b7a8f1d61d92c8f6c004051d5e946406be1fb1b16a868
