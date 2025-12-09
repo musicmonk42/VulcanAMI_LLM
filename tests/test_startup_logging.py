@@ -58,14 +58,25 @@ def test_startup_logging_sequence():
         # If modules were pre-imported, logs won't appear but module verification above ensures correctness
         if log_output:
             expected_logs = [
+                # FAISS loading messages (note: AVX512 may or may not be attempted)
+                "faiss",  # Any faiss log indicates FAISS module is being loaded
+                # Persistent Memory v46 loaded
                 "persistant_memory_v46",
                 "Vulcan Persistent Memory v46.0.0 loaded",
-                "vulcan.memory.retrieval",
-                "vulcan.orchestrator",
+                # FAISS library imported successfully
+                "FAISS library imported successfully",
+                # Agent lifecycle state machine validated
+                "Agent lifecycle state machine validated successfully",
             ]
             
             found_logs = sum(1 for expected in expected_logs if expected in log_output)
             print(f"✓ Found {found_logs}/{len(expected_logs)} expected startup logs")
+            
+            # Print the actual log output for debugging if not all logs are found
+            if found_logs < len(expected_logs):
+                print("\n--- Captured Log Output ---")
+                print(log_output)
+                print("--- End Log Output ---\n")
         else:
             # Modules were pre-imported by conftest.py
             print("✓ Modules verified (pre-imported by test framework)")
