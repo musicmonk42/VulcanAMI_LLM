@@ -14,19 +14,20 @@ from pathlib import Path
 import re
 import math
 
-# FAISS for vector search - CRITICAL: Initialize to None first
-import logging
-logger = logging.getLogger(__name__)
-faiss = None
-FAISS_AVAILABLE = False
+# FAISS for vector search - Robust loader to prevent shadow variable bug
+# --- FIX START ---
 try:
     import faiss
-    FAISS_AVAILABLE = True
-    logger.info("FAISS loaded successfully")
-except Exception as e:
-    faiss = None
-    FAISS_AVAILABLE = False
-    logger.warning(f"FAISS not available ({type(e).__name__}: {e}), using numpy-based search")
+    logging.info("FAISS library imported successfully")
+    HAS_FAISS = True
+except (ImportError, ModuleNotFoundError) as e:
+    logging.warning(f"Could not import FAISS: {e}. Falling back to NumPy-based retrieval")
+    HAS_FAISS = False
+    faiss = None  # Define faiss as None so references don't crash
+# --- FIX END ---
+
+# Maintain backward compatibility with existing FAISS_AVAILABLE usage
+FAISS_AVAILABLE = HAS_FAISS
 
 # Additional indexing libraries
 try:
