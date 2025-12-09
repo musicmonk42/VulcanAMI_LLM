@@ -393,102 +393,89 @@ class TestMetaLearning:
     
     def test_maml_adaptation(self, fast_learning_config):
         """Test MAML few-shot adaptation"""
-        try:
-            # Create meta-learner - try different API signatures
-            try:
-                meta_learner = MetaLearner(
-                    config=fast_learning_config,
-                    algorithm=MetaLearningAlgorithm.MAML,
-                    embedding_dim=TEST_EMBEDDING_DIM
-                )
-            except TypeError:
-                try:
-                    meta_learner = MetaLearner(
-                        config=fast_learning_config,
-                        algorithm=MetaLearningAlgorithm.MAML
-                    )
-                except TypeError:
-                    meta_learner = MetaLearner(fast_learning_config)
-            
-            # Create base learner
-            base_learner = EnhancedContinualLearner(
-                config=fast_learning_config,
-                embedding_dim=TEST_EMBEDDING_DIM,
-                use_hierarchical=False,
-                use_progressive=False
-            )
-            
-            # Create few-shot task
-            support_set = [
-                {'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32), 'reward': 0.8}
-                for _ in range(5)
-            ]
-            
-            # Adapt to task
-            adapted_model = meta_learner.adapt_to_task(base_learner.model, support_set)
-            assert adapted_model is not None
-            
-            # Cleanup
-            meta_learner.shutdown()
-            base_learner.shutdown()
-            
-        except Exception as e:
-            pytest.skip(f"MAML test skipped due to: {e}")
+        # Create base learner (which is a nn.Module)
+        base_learner = EnhancedContinualLearner(
+            config=fast_learning_config,
+            embedding_dim=TEST_EMBEDDING_DIM,
+            use_hierarchical=False,
+            use_progressive=False
+        )
+        
+        # Create meta-learner with base learner
+        meta_learner = MetaLearner(
+            base_model=base_learner,
+            config=fast_learning_config,
+            algorithm=MetaLearningAlgorithm.MAML
+        )
+        
+        # Create few-shot task - adapt() expects Dict[str, torch.Tensor]
+        # Create synthetic input (x) and target (y) tensors
+        batch_size = 5
+        support_set = {
+            'x': torch.randn(batch_size, TEST_EMBEDDING_DIM),
+            'y': torch.randn(batch_size, TEST_EMBEDDING_DIM)
+        }
+        
+        # Adapt to task - method is 'adapt', not 'adapt_to_task'
+        adapted_model, stats = meta_learner.adapt(support_set, num_steps=3, task_id='test_task')
+        
+        assert adapted_model is not None
+        assert isinstance(stats, dict)
+        
+        # Cleanup
+        meta_learner.shutdown()
+        base_learner.shutdown()
     
     def test_meta_update(self, fast_learning_config):
         """Test meta-update across tasks"""
-        try:
-            # Create meta-learner - try different API signatures
-            try:
-                meta_learner = MetaLearner(
-                    config=fast_learning_config,
-                    algorithm=MetaLearningAlgorithm.MAML,
-                    embedding_dim=TEST_EMBEDDING_DIM
-                )
-            except TypeError:
-                try:
-                    meta_learner = MetaLearner(
-                        config=fast_learning_config,
-                        algorithm=MetaLearningAlgorithm.MAML
-                    )
-                except TypeError:
-                    meta_learner = MetaLearner(fast_learning_config)
-            
-            base_learner = EnhancedContinualLearner(
-                config=fast_learning_config,
-                embedding_dim=TEST_EMBEDDING_DIM,
-                use_hierarchical=False,
-                use_progressive=False
-            )
-            
-            # Create multiple tasks
-            tasks = []
-            for i in range(3):
-                task = [
-                    {'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32), 'reward': 0.5 + i * 0.1}
-                    for _ in range(5)
-                ]
-                tasks.append(task)
-            
-            # Perform meta-update
-            initial_params = {k: v.clone() for k, v in base_learner.model.state_dict().items()}
-            meta_learner.meta_update(base_learner.model, tasks)
-            
-            # Parameters should have changed
-            params_changed = False
-            for k, v in base_learner.model.state_dict().items():
-                if not torch.allclose(v, initial_params[k], atol=1e-6):
-                    params_changed = True
-                    break
-            
-            assert params_changed, "Meta-update should change model parameters"
-            
-            # Cleanup
-            meta_learner.shutdown()
-            base_learner.shutdown()
-            
-        except Exception as e:
-            pytest.skip(f"Meta-update test skipped due to: {e}")
+        # Create base learner (which is a nn.Module)
+        base_learner = EnhancedContinualLearner(
+            config=fast_learning_config,
+            embedding_dim=TEST_EMBEDDING_DIM,
+            use_hierarchical=False,
+            use_progressive=False
+        )
+        
+        # Create meta-learner with base learner
+        meta_learner = MetaLearner(
+            base_model=base_learner,
+            config=fast_learning_config,
+            algorithm=MetaLearningAlgorithm.MAML
+        )
+        
+        # Create multiple tasks - meta_update expects list of dicts with 'support' and 'query' keys
+        batch_size = 5
+        tasks = []
+        for i in range(3):
+            task = {
+                'task_id': f'task_{i}',
+                'support': {
+                    'x': torch.randn(batch_size, TEST_EMBEDDING_DIM),
+                    'y': torch.randn(batch_size, TEST_EMBEDDING_DIM)
+                },
+                'query': {
+                    'x': torch.randn(batch_size, TEST_EMBEDDING_DIM),
+                    'y': torch.randn(batch_size, TEST_EMBEDDING_DIM)
+                }
+            }
+            tasks.append(task)
+        
+        # Perform meta-update
+        initial_params = {k: v.clone() for k, v in base_learner.state_dict().items()}
+        meta_learner.meta_update(tasks)
+        
+        # Parameters should have changed
+        params_changed = False
+        for k, v in base_learner.state_dict().items():
+            if not torch.allclose(v, initial_params[k], atol=1e-6):
+                params_changed = True
+                break
+        
+        assert params_changed, "Meta-update should change model parameters"
+        
+        # Cleanup
+        meta_learner.shutdown()
+        base_learner.shutdown()
 
 
 class TestRLHF:
@@ -954,41 +941,20 @@ class TestUnifiedSystem(unittest.TestCase):
             }
             self._system.process_experience(exp)
         
-        # Save state - try different method names
+        # Save state using save_complete_state method
         with tempfile.TemporaryDirectory() as tmpdir:
-            save_path = Path(tmpdir) / "system_state.pt"
+            save_path = Path(tmpdir) / "system_state"
             
-            # Try different save method names
-            if hasattr(self._system, 'save_state'):
-                self._system.save_state(save_path)
-            elif hasattr(self._system, 'save'):
-                self._system.save(save_path)
-            elif hasattr(self._system, 'save_checkpoint'):
-                self._system.save_checkpoint(save_path)
-            elif hasattr(self._system, 'checkpoint'):
-                self._system.checkpoint(save_path)
-            else:
-                # Skip test if no save method available
-                self.skipTest("No save_state or equivalent method found on UnifiedLearningSystem")
+            # Use the actual save_complete_state method
+            saved_dir = self._system.save_complete_state(str(save_path))
             
-            self.assertTrue(save_path.exists())
+            # Check that the saved directory exists
+            self.assertTrue(Path(saved_dir).exists())
             
-            # Create new system and load state
-            new_system = UnifiedLearningSystem(
-                config=self.fast_learning_config,
-                embedding_dim=TEST_EMBEDDING_DIM
-            )
-            
-            # Try different load method names
-            if hasattr(new_system, 'load_state'):
-                new_system.load_state(save_path)
-            elif hasattr(new_system, 'load'):
-                new_system.load(save_path)
-            elif hasattr(new_system, 'load_checkpoint'):
-                new_system.load_checkpoint(save_path)
-            
-            # Cleanup
-            new_system.shutdown()
+            # Verify key files were created
+            saved_path = Path(saved_dir)
+            self.assertTrue((saved_path / "continual_state.pkl").exists())
+            self.assertTrue((saved_path / "unified_stats.json").exists())
         
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
