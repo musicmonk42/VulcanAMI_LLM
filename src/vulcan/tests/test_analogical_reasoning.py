@@ -878,15 +878,15 @@ class TestSpacyModelLoading:
         from vulcan.reasoning import analogical_reasoning
         
         # Check if spaCy is available
+        assert isinstance(analogical_reasoning.SPACY_AVAILABLE, bool)
+        
         if analogical_reasoning.SPACY_AVAILABLE:
-            # If spaCy is available, nlp should be loaded if any model is installed
-            # The fix tries en_core_web_lg, en_core_web_md, then en_core_web_sm
-            assert analogical_reasoning.nlp is not None or analogical_reasoning.nlp is None
-            # We can't assert nlp is not None because models might not be installed
-            # But we can check that SPACY_AVAILABLE is consistent
-            assert isinstance(analogical_reasoning.SPACY_AVAILABLE, bool)
+            # If spaCy is available, the fix should have tried loading models
+            # nlp may be None if no models are installed, but that's acceptable
+            # The important thing is SPACY_AVAILABLE=True means spacy module exists
+            pass  # No failure means the import succeeded
         else:
-            # If spaCy is not available, nlp should be None
+            # If spaCy is not available, nlp must be None
             assert analogical_reasoning.nlp is None
     
     def test_semantic_enricher_with_spacy(self):
