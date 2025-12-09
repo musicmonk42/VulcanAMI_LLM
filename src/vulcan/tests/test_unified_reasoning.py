@@ -937,7 +937,7 @@ class TestUnifiedReasoner:
         test_history_item = {
             'type': 'test',
             'data': 'test_data',
-            'timestamp': time.time()
+            'timestamp': 1234567890.0  # Fixed timestamp for test reliability
         }
         reasoner.reasoning_history.append(test_history_item)
         initial_history_len = len(reasoner.reasoning_history)
