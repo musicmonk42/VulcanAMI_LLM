@@ -1,11 +1,6 @@
 # Graphix Vulcan (Proprietary)
 
-<!-- Build and Quality Status Badges -->
-[![CI - Test and Lint](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/ci.yml/badge.svg)](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/ci.yml)
-[![Docker Build](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/docker.yml/badge.svg)](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/docker.yml)
-[![Security Scanning](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/security.yml/badge.svg)](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/security.yml)
-[![Infrastructure Validation](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/infrastructure-validation.yml/badge.svg)](https://github.com/musicmonk42/VulcanAMI_LLM/actions/workflows/infrastructure-validation.yml)
-[![codecov](https://codecov.io/gh/musicmonk42/VulcanAMI_LLM/branch/main/graph/badge.svg)](https://codecov.io/gh/musicmonk42/VulcanAMI_LLM)
+
 
 Proprietary software owned and created by Novatrax Labs LTD. All rights reserved.
 
