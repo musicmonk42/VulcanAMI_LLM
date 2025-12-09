@@ -1,12 +1,7 @@
 """
 Test suite for meta-learning module
-
-FIXES APPLIED (corrected version):
-1. test_save_and_load: SKIPPED - security_fixes.py blocks pickle loads of numpy arrays
-   with error "Attempted to unpickle unsafe module: numpy._core.multiarray._reconstruct".
-   This is a source code bug where security hardening is too restrictive for legitimate
-   numpy array serialization used by TaskDetector.save/load functionality.
 """
+
 
 import pytest
 
@@ -264,11 +259,6 @@ class TestTaskDetector:
         # Should have created clusters
         assert len(detector.cluster_centers) > 0
     
-    @pytest.mark.skip(reason="""SOURCE CODE BUG: security_fixes.py blocks pickle loads of numpy arrays.
-        Error: 'Attempted to unpickle unsafe module: numpy._core.multiarray._reconstruct'
-        The security hardening in security_fixes.py is too restrictive and blocks legitimate
-        numpy array serialization used by TaskDetector._save_signatures() and loading.
-        Fix requires modifying security_fixes.py to allow numpy._core.multiarray._reconstruct.""")
     def test_save_and_load(self, detector, temp_dir):
         """Test saving and loading task signatures"""
         # Create some tasks
