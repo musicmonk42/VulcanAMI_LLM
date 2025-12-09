@@ -12,7 +12,6 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, asdict
 import logging
 import time
-import copy
 import json
 import pickle
 from pathlib import Path
