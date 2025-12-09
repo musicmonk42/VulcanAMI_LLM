@@ -460,13 +460,13 @@ class TestMetaLearning:
             }
             tasks.append(task)
         
-        # Perform meta-update
-        initial_params = {k: v.clone() for k, v in base_learner.state_dict().items()}
+        # Perform meta-update - note: meta_learner.base_model is base_learner
+        initial_params = {k: v.clone() for k, v in meta_learner.base_model.state_dict().items()}
         meta_learner.meta_update(tasks)
         
-        # Parameters should have changed
+        # Parameters should have changed (meta_update operates on meta_learner.base_model)
         params_changed = False
-        for k, v in base_learner.state_dict().items():
+        for k, v in meta_learner.base_model.state_dict().items():
             if not torch.allclose(v, initial_params[k], atol=1e-6):
                 params_changed = True
                 break
