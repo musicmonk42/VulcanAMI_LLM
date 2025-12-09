@@ -335,7 +335,8 @@ class UnifiedReasoner:
                 self.reasoners[ReasoningType.ANALOGICAL] = reasoning_components['AnalogicalReasoner'](
                     enable_learning=enable_learning
                 )
-            if 'LanguageReasoner' in reasoning_components:
+            # Use LanguageReasoner as fallback only if SymbolicReasoner is not available
+            if 'LanguageReasoner' in reasoning_components and ReasoningType.SYMBOLIC not in self.reasoners:
                 self.reasoners[ReasoningType.SYMBOLIC] = reasoning_components['LanguageReasoner']()
             if 'AbstractReasoner' in reasoning_components:
                 AbstractReasoner = reasoning_components['AbstractReasoner']
