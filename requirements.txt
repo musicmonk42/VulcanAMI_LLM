@@ -90,7 +90,7 @@ dill==0.3.9
 diskcache==5.6.3
 distro==1.9.0
 dm-tree==0.1.9
-dowhy==0.10.2
+dowhy==0.14
 docker==7.1.0
 docstring_parser==0.17.0
 docutils==0.22.3
