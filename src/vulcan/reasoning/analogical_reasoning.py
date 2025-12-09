@@ -61,7 +61,12 @@ try:
             continue
     
     if nlp is None:
-        logger.warning("spaCy model not loaded for analogical reasoning. Install a spaCy model with: python -m spacy download en_core_web_sm")
+        logger.warning(
+            "spaCy model not loaded for analogical reasoning. "
+            "Install a model with: python -m spacy download en_core_web_lg (recommended) "
+            "or: python -m spacy download en_core_web_md "
+            "or: python -m spacy download en_core_web_sm"
+        )
 except ImportError:
     SPACY_AVAILABLE = False
     nlp = None
