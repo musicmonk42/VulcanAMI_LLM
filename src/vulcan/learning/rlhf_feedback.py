@@ -44,6 +44,9 @@ class RLHFManager:
         # FIXED: Get device from base model
         self.device = next(base_model.parameters()).device if hasattr(base_model, 'parameters') else torch.device('cpu')
         
+        # FIX: Get embedding dimension from base model, fallback to global constant
+        self.embedding_dim = getattr(base_model, 'embedding_dim', EMBEDDING_DIM)
+        
         # Feedback buffer
         self.feedback_buffer = deque(maxlen=self.config.feedback_buffer_size)
         self.processed_feedback = deque(maxlen=10000)
@@ -96,7 +99,7 @@ class RLHFManager:
     def _build_reward_model(self) -> nn.Module:
         """Build reward model for human preferences"""
         model = nn.Sequential(
-            nn.Linear(EMBEDDING_DIM * 2, HIDDEN_DIM),
+            nn.Linear(self.embedding_dim * 2, HIDDEN_DIM),
             nn.LayerNorm(HIDDEN_DIM),
             nn.ReLU(),
             nn.Dropout(0.1),
@@ -113,7 +116,7 @@ class RLHFManager:
     def _build_value_model(self) -> nn.Module:
         """Build value model for PPO"""
         model = nn.Sequential(
-            nn.Linear(EMBEDDING_DIM, HIDDEN_DIM),
+            nn.Linear(self.embedding_dim, HIDDEN_DIM),
             nn.LayerNorm(HIDDEN_DIM),
             nn.ReLU(),
             nn.Dropout(0.1),
@@ -129,10 +132,10 @@ class RLHFManager:
     def _build_policy_head(self) -> nn.Module:
         """Build policy head for action distribution"""
         model = nn.Sequential(
-            nn.Linear(EMBEDDING_DIM, HIDDEN_DIM),
+            nn.Linear(self.embedding_dim, HIDDEN_DIM),
             nn.LayerNorm(HIDDEN_DIM),
             nn.ReLU(),
-            nn.Linear(HIDDEN_DIM, EMBEDDING_DIM),  # Output action space
+            nn.Linear(HIDDEN_DIM, self.embedding_dim),  # Output action space
             nn.Tanh()
         ).to(self.device)
         # Ensure all parameters have gradients enabled
@@ -298,29 +301,29 @@ class RLHFManager:
     def _extract_features(self, data: Any) -> torch.Tensor:
         """FIXED: Extract features with device management and consistent dimensions"""
         if isinstance(data, torch.Tensor):
-            # Ensure 1D tensor of size EMBEDDING_DIM
-            if data.numel() == EMBEDDING_DIM:
-                result = data.reshape(EMBEDDING_DIM)
-            elif data.numel() < EMBEDDING_DIM:
+            # Ensure 1D tensor of size embedding_dim
+            if data.numel() == self.embedding_dim:
+                result = data.reshape(self.embedding_dim)
+            elif data.numel() < self.embedding_dim:
                 # Pad with zeros
-                result = F.pad(data.flatten(), (0, EMBEDDING_DIM - data.numel()))
+                result = F.pad(data.flatten(), (0, self.embedding_dim - data.numel()))
             else:
                 # Truncate
-                result = data.flatten()[:EMBEDDING_DIM]
+                result = data.flatten()[:self.embedding_dim]
             return result.to(self.device)
         elif isinstance(data, np.ndarray):
             # Convert numpy array to tensor and resize
             flat_data = data.flatten()
-            if len(flat_data) < EMBEDDING_DIM:
-                flat_data = np.pad(flat_data, (0, EMBEDDING_DIM - len(flat_data)))
-            elif len(flat_data) > EMBEDDING_DIM:
-                flat_data = flat_data[:EMBEDDING_DIM]
+            if len(flat_data) < self.embedding_dim:
+                flat_data = np.pad(flat_data, (0, self.embedding_dim - len(flat_data)))
+            elif len(flat_data) > self.embedding_dim:
+                flat_data = flat_data[:self.embedding_dim]
             return torch.tensor(flat_data, dtype=torch.float32, device=self.device)
         elif isinstance(data, dict) and 'embedding' in data:
             return self._extract_features(data['embedding'])
         else:
             # Default to random features (should be replaced with proper encoding)
-            return torch.randn(EMBEDDING_DIM, device=self.device)
+            return torch.randn(self.embedding_dim, device=self.device)
     
     def update_policy_with_ppo(self, trajectories: List[Dict[str, Any]]):
         """FIXED: Update policy using PPO with proper dimension handling and gradient management"""
@@ -357,29 +360,29 @@ class RLHFManager:
                 log_probs = log_probs.to(self.device)
                 
                 # FIXED: Ensure states and actions have correct dimensions
-                # States should be [seq_len, EMBEDDING_DIM]
+                # States should be [seq_len, embedding_dim]
                 if states.dim() == 1:
                     states = states.unsqueeze(0)
                 if actions.dim() == 1:
                     actions = actions.unsqueeze(0)
                 
                 # Ensure correct feature dimension
-                if states.shape[-1] != EMBEDDING_DIM:
-                    # Pad or truncate to EMBEDDING_DIM
-                    if states.shape[-1] < EMBEDDING_DIM:
-                        states = F.pad(states, (0, EMBEDDING_DIM - states.shape[-1]))
+                if states.shape[-1] != self.embedding_dim:
+                    # Pad or truncate to embedding_dim
+                    if states.shape[-1] < self.embedding_dim:
+                        states = F.pad(states, (0, self.embedding_dim - states.shape[-1]))
                     else:
-                        states = states[..., :EMBEDDING_DIM]
+                        states = states[..., :self.embedding_dim]
                 
-                if actions.shape[-1] != EMBEDDING_DIM:
-                    if actions.shape[-1] < EMBEDDING_DIM:
-                        actions = F.pad(actions, (0, EMBEDDING_DIM - actions.shape[-1]))
+                if actions.shape[-1] != self.embedding_dim:
+                    if actions.shape[-1] < self.embedding_dim:
+                        actions = F.pad(actions, (0, self.embedding_dim - actions.shape[-1]))
                     else:
-                        actions = actions[..., :EMBEDDING_DIM]
+                        actions = actions[..., :self.embedding_dim]
                 
                 # Get rewards from reward model
                 with torch.no_grad():
-                    # FIXED: Concatenate for reward model (expects 2*EMBEDDING_DIM)
+                    # FIXED: Concatenate for reward model (expects 2*embedding_dim)
                     state_action_pairs = torch.cat([states, actions], dim=-1)
                     human_rewards = self.reward_model(state_action_pairs).squeeze(-1)
                 
@@ -494,11 +497,11 @@ class RLHFManager:
             state_features = states
         
         # Ensure state_features has correct dimensions
-        if state_features.shape[-1] != EMBEDDING_DIM:
-            if state_features.shape[-1] < EMBEDDING_DIM:
-                state_features = F.pad(state_features, (0, EMBEDDING_DIM - state_features.shape[-1]))
+        if state_features.shape[-1] != self.embedding_dim:
+            if state_features.shape[-1] < self.embedding_dim:
+                state_features = F.pad(state_features, (0, self.embedding_dim - state_features.shape[-1]))
             else:
-                state_features = state_features[..., :EMBEDDING_DIM]
+                state_features = state_features[..., :self.embedding_dim]
         
         # Get action distribution from policy head
         action_means = self.policy_head(state_features)
