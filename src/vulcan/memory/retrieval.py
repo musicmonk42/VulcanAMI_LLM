@@ -15,16 +15,13 @@ import re
 import math
 
 # FAISS for vector search - Robust loader to prevent shadow variable bug
-import logging
-logger = logging.getLogger(__name__)
-
 # --- FIX START ---
 try:
     import faiss
-    logger.info("FAISS library imported successfully.")
+    logging.info("FAISS library imported successfully")
     HAS_FAISS = True
 except (ImportError, ModuleNotFoundError) as e:
-    logger.warning(f"Could not import FAISS: {e}. Falling back to NumPy-based retrieval.")
+    logging.warning(f"Could not import FAISS: {e}. Falling back to NumPy-based retrieval")
     HAS_FAISS = False
     faiss = None  # Define faiss as None so references don't crash
 # --- FIX END ---
