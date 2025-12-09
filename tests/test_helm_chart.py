@@ -671,7 +671,7 @@ class TestConfigurationIssues:
         assert 'your_dockerhub_user' not in image, \
             "Replace 'your_dockerhub_user' with actual Docker registry"
     
-    def test_secret_actually_exists_warning(self, deployment):
+    def test_secret_actually_exists_warning(self, deployment, helm_chart):
         """Test that referenced secrets exist (warning)."""
         container = deployment['spec']['template']['spec']['containers'][0]
         env_vars = container.get('env', [])
@@ -684,10 +684,15 @@ class TestConfigurationIssues:
                     secret_names.append(secret_name)
         
         if secret_names:
-            pytest.skip(
-                f"Warning: Secrets referenced but not defined: {', '.join(secret_names)}. "
-                "Create these secrets before deploying."
-            )
+            # Check if the secrets are defined in the helm chart
+            defined_secrets = [doc['metadata']['name'] for doc in helm_chart if doc.get('kind') == 'Secret']
+            undefined_secrets = [s for s in secret_names if s not in defined_secrets]
+            
+            if undefined_secrets:
+                pytest.skip(
+                    f"Warning: Secrets referenced but not defined: {', '.join(undefined_secrets)}. "
+                    "Create these secrets before deploying."
+                )
     
     def test_service_type_appropriate(self, service):
         """Test that service type is appropriate for environment."""
