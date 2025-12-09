@@ -100,6 +100,7 @@ class SimpleTestModel(nn.Module):
     """Simple model for testing"""
     def __init__(self, input_dim=TEST_EMBEDDING_DIM, output_dim=TEST_EMBEDDING_DIM):
         super().__init__()
+        self.embedding_dim = output_dim  # Add embedding_dim attribute for MetaLearner
         self.fc = nn.Linear(input_dim, output_dim)
     
     def forward(self, x):
