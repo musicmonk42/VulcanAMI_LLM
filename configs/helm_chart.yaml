@@ -19,6 +19,7 @@ metadata:
     app.kubernetes.io/name: graphix-arena
     app.kubernetes.io/instance: dev
 spec:
+  # Note: HPA will manage replicas dynamically; this serves as the initial count
   replicas: 2
   selector:
     matchLabels:
@@ -148,7 +149,7 @@ metadata:
     app.kubernetes.io/instance: dev
 type: Opaque
 stringData:
-  api-key: "change-me-in-production"
+  api-key: "REPLACE_WITH_ACTUAL_API_KEY"
 ---
 # PodDisruptionBudget to ensure availability during cluster maintenance
 apiVersion: policy/v1
@@ -232,9 +233,9 @@ spec:
     - Egress
   ingress:
     - from:
-        - namespaceSelector:
+        - podSelector:
             matchLabels:
-              name: graphix-dev
+              app.kubernetes.io/name: graphix-arena
       ports:
         - protocol: TCP
           port: 8181
