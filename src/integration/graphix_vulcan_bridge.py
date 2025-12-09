@@ -15,6 +15,7 @@ import asyncio
 import time
 import logging
 import inspect
+import threading
 from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from dataclasses import dataclass, field, asdict
 import math
@@ -353,15 +354,35 @@ class BridgeContext:
 class GraphixVulcanBridge:
     """
     Connects Graphix execution with VULCAN cognitive control phases.
+    Implements Singleton pattern to ensure only one instance exists.
     """
     # Store the instance reference for the WorldModelCore to access for logging/bridge calls
     _instance: Optional[GraphixVulcanBridge] = None
+    _lock: threading.Lock = threading.Lock()
+    _initialized: bool = False
+    
+    def __new__(cls, *args, **kwargs):
+        """
+        Thread-safe Singleton implementation.
+        Ensures only one instance of the bridge exists in the runtime.
+        """
+        if not cls._instance:
+            with cls._lock:
+                # Double-checked locking to ensure thread safety
+                if not cls._instance:
+                    cls._instance = super(GraphixVulcanBridge, cls).__new__(cls)
+        return cls._instance
     
     def __init__(self, config: Optional[BridgeConfig] = None) -> None:
-        if GraphixVulcanBridge._instance is not None:
-             log.warning("GraphixVulcanBridge initialized multiple times. This may indicate a state problem.")
+        """
+        Initialize the bridge.
+        Note: The check for _initialized prevents re-running the setup logic
+        if the object is retrieved a second time.
+        """
+        if getattr(self, "_initialized", False):
+            log.warning("GraphixVulcanBridge accessed (already initialized). Returning existing instance.")
+            return
              
-        GraphixVulcanBridge._instance = self
         self.config = config or BridgeConfig()
         
         self.world_model: WorldModelCore = WorldModelCore()
@@ -377,7 +398,12 @@ class GraphixVulcanBridge:
         self._last_context: Optional[BridgeContext] = None
         
         # Link WorldModelCore back to this bridge for logging purposes
-        WorldModelCore._get_bridge = lambda: self 
+        WorldModelCore._get_bridge = lambda: self
+        
+        # Mark as initialized to prevent re-execution of this block
+        self._initialized = True
+        
+        log.info("Initializing GraphixVulcanBridge (Singleton Created)") 
 
     # ------------------------ Setup/injection helpers ------------------------ #
 
