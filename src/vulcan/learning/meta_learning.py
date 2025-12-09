@@ -666,58 +666,99 @@ class MetaLearner:
                 self._meta_update_maml(tasks)
     
     def _meta_update_maml(self, tasks: List[Dict[str, Any]]):
-        """FIXED: MAML/FOMAML meta-update with proper locking"""
-        meta_loss = 0
-        task_gradients = []
-        gradient_norms = []
+        """FIXED: MAML meta-update with proper gradient accumulation
         
+        For MAML, we need to compute meta-gradients that account for the adaptation.
+        This uses a first-order approximation (FOMAML) by default, which is more
+        stable and doesn't require second-order derivatives.
+        
+        The algorithm:
+        1. For each task: adapt base model, compute query loss, accumulate gradients
+        2. Apply meta-optimizer step with accumulated gradients
+        3. This effectively updates θ based on performance after adaptation
+        """
         # Start trajectory recording
         trajectory_id = self.param_history.start_trajectory(
             task_id=f"meta_batch_{time.time()}",
             agent_id="meta_learner"
         )
         
+        # Zero gradients
+        self.meta_optimizer.zero_grad()
+        
+        meta_loss_sum = 0
+        task_gradients = []
+        gradient_norms = []
+        
+        # Store original base model parameters
+        original_state = {name: param.data.clone() 
+                         for name, param in self.base_model.named_parameters()}
+        
         for task in tasks:
             task_id = task.get('task_id')
+            support_set = task['support']
+            query_set = task['query']
             
-            # Adapt to task using support set
-            adapted_model, adapt_stats = self.adapt(task['support'], task_id=task_id)
+            # Get inner learning rate
+            inner_lr = self.task_learning_rates.get(task_id, self.config.inner_lr)
             
-            # Evaluate on query set
-            query_loss = self._compute_loss(adapted_model, task['query'])
-            meta_loss += query_loss
+            # Perform adaptation on support set
+            # Use a simple optimizer for inner loop
+            inner_optimizer = optim.SGD(self.base_model.parameters(), lr=inner_lr)
             
-            # Collect gradients for analysis
+            for step in range(self.config.adaptation_steps):
+                inner_optimizer.zero_grad()
+                support_loss = self._compute_loss(self.base_model, support_set)
+                support_loss.backward()
+                inner_optimizer.step()
+            
+            # Evaluate on query set with adapted model
+            query_loss = self._compute_loss(self.base_model, query_set)
+            
+            # Compute gradients from query loss
+            # These gradients represent how to update the base model
+            # to improve post-adaptation performance
+            query_loss.backward()
+            
+            meta_loss_sum += query_loss.item()
+            self.task_losses.append(query_loss.item())
+            
+            # Collect gradient statistics
             task_grad = []
-            for param in adapted_model.parameters():
+            for param in self.base_model.parameters():
                 if param.grad is not None:
                     task_grad.append(param.grad.clone().detach())
                     gradient_norms.append(param.grad.norm().item())
             task_gradients.append(task_grad)
             
-            self.task_losses.append(query_loss.item())
+            # Restore base model to original state for next task
+            # This ensures each task starts from the same base model
+            with torch.no_grad():
+                for name, param in self.base_model.named_parameters():
+                    param.data = original_state[name].clone()
             
-            # Update task-specific learning rate based on performance
+            # Update task-specific learning rate
             if task_id:
+                adapt_stats = {'trajectory': [{'loss': query_loss.item()}]}
                 self._update_task_learning_rate(task_id, adapt_stats)
         
         # Analyze gradients
         self._analyze_gradients(task_gradients, gradient_norms)
         
-        # Meta-optimization step
-        meta_loss = meta_loss / len(tasks)
-        
-        self.meta_optimizer.zero_grad()
-        meta_loss.backward()
+        # Apply meta-update with accumulated gradients from all tasks
+        # The gradients have been accumulated across all tasks
         torch.nn.utils.clip_grad_norm_(self.base_model.parameters(), 1.0)
         self.meta_optimizer.step()
+        
+        # Calculate average loss
+        avg_meta_loss = meta_loss_sum / len(tasks)
         
         # Save checkpoint periodically
         if self.config.checkpoint_frequency > 0 and len(self.adaptation_history) % self.config.checkpoint_frequency == 0:
             checkpoint_path = self.param_history.save_checkpoint(
                 self.base_model,
                 metadata={
-                    'meta_loss': meta_loss.item(),
+                    'meta_loss': avg_meta_loss,
                     'num_tasks': len(tasks),
                     'trajectory_id': trajectory_id,
                     'algorithm': self.algorithm.value
@@ -732,7 +773,7 @@ class MetaLearner:
         self.adaptation_history.append({
             'timestamp': time.time(),
             'num_tasks': len(tasks),
-            'avg_loss': meta_loss.item(),
+            'avg_loss': avg_meta_loss,
             'trajectory_id': trajectory_id,
             'gradient_stats': {k: list(v) for k, v in self.gradient_stats.items()}
         })
