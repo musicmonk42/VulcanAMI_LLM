@@ -156,14 +156,19 @@ class Principle:
             }
             
             # Validate code doesn't have dangerous operations
+            # Use word boundaries to avoid false positives (e.g., 'input' as a dict key)
+            import re
             dangerous_keywords = ['import', '__import__', 'eval', 'exec', 'compile', 
                                  'open', 'file', '__builtins__', 'globals', 'locals',
                                  'vars', 'dir', 'getattr', 'setattr', 'delattr',
                                  'input', 'raw_input']
             
-            code_lower = str(self.execution_logic).lower()
+            code_str = str(self.execution_logic)
             for keyword in dangerous_keywords:
-                if keyword in code_lower:
+                # Check for keyword as a standalone word or function call (not in strings)
+                # Pattern matches: keyword( or keyword. or keyword[ or keyword as a word boundary
+                pattern = r'\b' + re.escape(keyword) + r'(?:\s*[(.\[]|\s|$)'
+                if re.search(pattern, code_str, re.IGNORECASE):
                     raise ValueError(f"Dangerous operation '{keyword}' not allowed in code strings")
             
             namespace = {'inputs': copy.deepcopy(inputs), 'output': None}
