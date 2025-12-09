@@ -968,6 +968,8 @@ class MetaLearner:
         # Try to create a new instance with known constructor signatures
         try:
             # For EnhancedContinualLearner which has this signature
+            # Note: We use attribute detection instead of isinstance to avoid circular imports
+            # (continual_learning.py imports MetaLearner from this module)
             if hasattr(self.base_model, 'embedding_dim') and hasattr(self.base_model, 'config'):
                 cloned = model_class(
                     embedding_dim=self.base_model.embedding_dim,
@@ -987,11 +989,15 @@ class MetaLearner:
             
         except Exception as e:
             # If we can't instantiate a new model, log error and raise
-            logger.error(f"Failed to clone model of type {model_class.__name__}: {e}")
-            logger.error("Model cloning requires either a no-arg constructor or ")
-            logger.error("embedding_dim, config, use_hierarchical, use_progressive attributes")
-            raise RuntimeError(f"Cannot clone model of type {model_class.__name__}. "
-                             f"Consider using a simpler model or adding model construction logic.") from e
+            logger.error(
+                f"Failed to clone model of type {model_class.__name__}: {e}. "
+                f"Model cloning requires either a no-arg constructor or "
+                f"embedding_dim, config, use_hierarchical, use_progressive attributes."
+            )
+            raise RuntimeError(
+                f"Cannot clone model of type {model_class.__name__}. "
+                f"Consider using a simpler model or adding model construction logic."
+            ) from e
     
     def _compute_loss(self, model: nn.Module, 
                      data: Dict[str, torch.Tensor]) -> torch.Tensor:
