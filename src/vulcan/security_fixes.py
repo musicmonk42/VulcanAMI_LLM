@@ -83,6 +83,20 @@ class RestrictedUnpickler(pickle.Unpickler):
         Only allow safe classes to be unpickled.
         Raises pickle.UnpicklingError for unsafe classes.
         """
+        # Allow numpy array reconstruction functions (critical for array loading)
+        if module == 'numpy._core.multiarray' or module == 'numpy.core.multiarray':
+            if name == '_reconstruct':
+                try:
+                    import numpy._core.multiarray as nm
+                    return getattr(nm, name)
+                except (ImportError, AttributeError):
+                    # Fall back to numpy.core for older versions
+                    try:
+                        import numpy.core.multiarray as nm
+                        return getattr(nm, name)
+                    except (ImportError, AttributeError):
+                        pass
+        
         # Allow PyTorch tensor reconstruction functions (critical for model loading)
         if module == 'torch._utils':
             if name.startswith('_rebuild_'):

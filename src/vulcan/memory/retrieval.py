@@ -481,6 +481,10 @@ class TextSearchIndex:
             self.index = create_in(str(self.index_dir), self.schema)
         else:
             self.index = open_dir(str(self.index_dir))
+        
+        # Memory cache for Whoosh (since Whoosh doesn't store Memory objects)
+        self.memory_cache = {}
+        self.lock = threading.Lock()
     
     def _init_simple_index(self):
         """Initialize simple inverted index."""
@@ -506,6 +510,10 @@ class TextSearchIndex:
             importance=memory.importance
         )
         writer.commit()
+        
+        # Store memory in cache for retrieval
+        with self.lock:
+            self.memory_cache[memory.id] = memory
     
     def _add_simple(self, memory: Memory):
         """Add using simple inverted index."""
@@ -542,9 +550,11 @@ class TextSearchIndex:
             search_results = searcher.search(query_obj, limit=limit)
             
             for hit in search_results:
-                # Would need to retrieve memory object
-                # For now, return memory_id and score
-                results.append((hit['memory_id'], hit.score))
+                memory_id = hit['memory_id']
+                # Retrieve memory object from cache
+                with self.lock:
+                    if memory_id in self.memory_cache:
+                        results.append((self.memory_cache[memory_id], hit.score))
         
         return results
     
@@ -591,6 +601,9 @@ class TextSearchIndex:
             writer = AsyncWriter(self.index)
             writer.delete_by_term('memory_id', memory_id)
             writer.commit()
+            # Remove from memory cache
+            with self.lock:
+                self.memory_cache.pop(memory_id, None)
         else:
             with self.lock:
                 if memory_id in self.documents:
