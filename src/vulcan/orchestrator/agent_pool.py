@@ -28,7 +28,9 @@ try:
 except ImportError:
     psutil = None
     PSUTIL_AVAILABLE = False
-    logging.warning("psutil not available, system resource monitoring will be disabled")
+    # Note: Logger not yet configured at module level, so using logging directly here
+    import logging as _logging
+    _logging.getLogger(__name__).warning("psutil not available, system resource monitoring will be disabled")
 
 from .agent_lifecycle import (
     AgentState, 
@@ -47,6 +49,14 @@ from .task_queues import (
     create_task_queue,
     TaskStatus
 )
+
+# ============================================================
+# CONSTANTS
+# ============================================================
+
+# Fallback hardware specification values when psutil is not available
+DEFAULT_FALLBACK_MEMORY_GB = 4.0  # Conservative memory estimate
+DEFAULT_FALLBACK_STORAGE_GB = 100.0  # Conservative storage estimate
 
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
@@ -1076,13 +1086,12 @@ class AgentPoolManager:
                 }
             else:
                 # Fallback when psutil is not available
-                import multiprocessing
                 return {
                     "cpu_cores": multiprocessing.cpu_count(),
                     "cpu_cores_physical": multiprocessing.cpu_count(),
-                    "memory_gb": 4.0,  # Conservative estimate
+                    "memory_gb": DEFAULT_FALLBACK_MEMORY_GB,
                     "gpu_available": self._check_gpu_available(),
-                    "storage_gb": 100.0  # Conservative estimate
+                    "storage_gb": DEFAULT_FALLBACK_STORAGE_GB
                 }
         except Exception as e:
             logger.warning(f"Failed to get hardware spec: {e}")
