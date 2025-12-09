@@ -46,12 +46,27 @@ except ImportError:
 try:
     import spacy
     SPACY_AVAILABLE = True
-    # Try to load model
-    try:
-        nlp = spacy.load("en_core_web_sm")
-    except:
-        logger.warning("spaCy model not loaded for analogical reasoning")
-        nlp = None
+    # Try to load model - prefer larger models that may be installed
+    nlp = None
+    for model_name in ["en_core_web_lg", "en_core_web_md", "en_core_web_sm"]:
+        try:
+            nlp = spacy.load(model_name)
+            logger.info(f"Loaded spaCy model '{model_name}' for analogical reasoning")
+            break
+        except OSError:
+            # Model not installed, try next one
+            continue
+        except Exception as e:
+            logger.warning(f"Error loading spaCy model '{model_name}': {e}")
+            continue
+    
+    if nlp is None:
+        logger.warning(
+            "spaCy model not loaded for analogical reasoning. "
+            "Install a model with: python -m spacy download en_core_web_lg (recommended) "
+            "or: python -m spacy download en_core_web_md "
+            "or: python -m spacy download en_core_web_sm"
+        )
 except ImportError:
     SPACY_AVAILABLE = False
     nlp = None

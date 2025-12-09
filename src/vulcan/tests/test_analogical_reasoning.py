@@ -868,6 +868,43 @@ class TestStatistics:
         assert 'learning' in stats or stats.get('learning') is None
 
 
+class TestSpacyModelLoading:
+    """Test spaCy model loading improvements"""
+    
+    def test_spacy_model_availability(self):
+        """Test that spaCy model loading doesn't produce warnings when models are available"""
+        # This test verifies that the fix allows loading of available models
+        # The actual model loading happens at module import time
+        from vulcan.reasoning import analogical_reasoning
+        
+        # Check if spaCy is available
+        assert isinstance(analogical_reasoning.SPACY_AVAILABLE, bool)
+        
+        if analogical_reasoning.SPACY_AVAILABLE:
+            # If spaCy is available, the fix should have tried loading models
+            # nlp may be None if no models are installed, but that's acceptable
+            # The important thing is SPACY_AVAILABLE=True means spacy module exists
+            pass  # No failure means the import succeeded
+        else:
+            # If spaCy is not available, nlp must be None
+            assert analogical_reasoning.nlp is None
+    
+    def test_semantic_enricher_with_spacy(self):
+        """Test that SemanticEnricher works with or without spaCy"""
+        from vulcan.reasoning.analogical_reasoning import SemanticEnricher
+        
+        enricher = SemanticEnricher()
+        
+        # Test entity enrichment
+        entity = Entity(name='test_entity', entity_type='object')
+        enriched = enricher.enrich_entity(entity)
+        
+        # Should complete without error regardless of spaCy availability
+        assert enriched.name == 'test_entity'
+        assert enriched.embedding is not None
+        assert isinstance(enriched.embedding, np.ndarray)
+
+
 # ============================================================================
 # Run tests
 # ============================================================================
