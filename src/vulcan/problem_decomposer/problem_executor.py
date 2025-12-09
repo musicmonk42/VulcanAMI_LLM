@@ -1561,7 +1561,7 @@ class ProblemExecutor:
     def _apply_recursive_step(self, data: Dict[str, Any],
                              recursive_step: Dict[str, Any]) -> Dict[str, Any]:
         """Apply recursive reduction step"""
-        factor = recursive__get_step_value(step, 'factor', 0.5)
+        factor = _get_step_value(recursive_step, 'factor', 0.5)
         
         if 'size' in data:
             reduced_size = int(data['size'] * factor)

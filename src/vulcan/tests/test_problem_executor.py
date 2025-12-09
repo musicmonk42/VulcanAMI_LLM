@@ -1,15 +1,6 @@
 """
 test_problem_executor.py - Comprehensive tests for problem_executor module
 Tests execution of decomposition plans with safety validation
-
-FIXES APPLIED (corrected version):
-1. test_solve_recursive_with_protection: SKIPPED - SOURCE CODE BUG in problem_executor.py line 1564
-   Error: NameError: name 'recursive__get_step_value' is not defined
-   Should be: self._get_step_value(recursive_step, 'factor', 0.5)
-
-2. test_solve_recursive_max_depth: SKIPPED - Same source code bug
-
-3. test_recursion_depth_protection: SKIPPED - Same source code bug
 """
 
 import pytest
@@ -543,8 +534,6 @@ def test_solve_pipeline(basic_executor, simple_problem_graph):
     assert 'final_output' in result
 
 
-@pytest.mark.skip(reason="""SOURCE CODE BUG: problem_executor.py line 1564 has typo.
-    'recursive__get_step_value(step, ...)' should be 'self._get_step_value(recursive_step, ...)'""")
 def test_solve_recursive_with_protection(basic_executor, simple_problem_graph):
     """Test recursive solving with stack protection"""
     nodes = ['node1']
@@ -556,8 +545,6 @@ def test_solve_recursive_with_protection(basic_executor, simple_problem_graph):
     assert 'result' in result
 
 
-@pytest.mark.skip(reason="""SOURCE CODE BUG: problem_executor.py line 1564 has typo.
-    'recursive__get_step_value(step, ...)' should be 'self._get_step_value(recursive_step, ...)'""")
 def test_solve_recursive_max_depth(basic_executor, simple_problem_graph):
     """Test recursive solving respects max depth"""
     nodes = ['node1']
@@ -819,8 +806,6 @@ def test_thread_safety_cache_access(basic_executor, simple_problem_graph, simple
 
 # Test Recursion Protection
 
-@pytest.mark.skip(reason="""SOURCE CODE BUG: problem_executor.py line 1564 has typo.
-    'recursive__get_step_value(step, ...)' should be 'self._get_step_value(recursive_step, ...)'""")
 def test_recursion_depth_protection(basic_executor):
     """Test that recursion depth is protected"""
     basic_executor.max_recursion_depth = 10
