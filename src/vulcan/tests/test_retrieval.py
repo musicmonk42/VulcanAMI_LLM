@@ -315,7 +315,6 @@ class TestMemoryIndex:
         else:
             assert len(index.index.memory_ids) == len(sample_embeddings)
     
-    @pytest.mark.skip(reason="security_fixes.py blocks pickle loads of numpy arrays - 'Attempted to unpickle unsafe module: numpy._core.multiarray._reconstruct'")
     def test_save_and_load_index(self, temp_dir, sample_embeddings):
         """Test saving and loading index."""
         index = MemoryIndex(dimension=512)
@@ -773,7 +772,6 @@ class TestMemorySearch:
             assert memory.importance >= 0.6
             assert memory.metadata.get('category') == 'test'
     
-    @pytest.mark.skip(reason="Source code bug in retrieval.py: hybrid_search expects text_search to return (Memory, float) but _search_whoosh returns (memory_id, float)")
     def test_hybrid_search(self, temp_dir, sample_memories, memory_dict):
         """Test hybrid search combining multiple strategies."""
         search = MemorySearch(base_path=temp_dir)
@@ -1001,7 +999,6 @@ class TestEdgeCases:
 class TestIntegration:
     """Integration tests combining multiple components."""
     
-    @pytest.mark.skip(reason="Source code bug in retrieval.py: hybrid_search expects text_search to return (Memory, float) but _search_whoosh returns (memory_id, float)")
     def test_full_search_workflow(self, temp_dir, sample_memories):
         """Test complete search workflow."""
         search = MemorySearch(base_path=temp_dir)
