@@ -957,12 +957,41 @@ class MetaLearner:
         }
     
     def _clone_model(self) -> nn.Module:
-        """Create a functional copy of the model."""
-        cloned = copy.deepcopy(self.base_model)
-        cloned.load_state_dict(self.base_model.state_dict())
-        # FIXED: Ensure cloned model is on same device
-        cloned = cloned.to(self.device)
-        return cloned
+        """Create a functional copy of the model.
+        
+        Instead of using deepcopy (which fails on models with threading locks),
+        we create a new instance of the model and copy its state_dict.
+        This avoids the pickling issues with threading locks.
+        """
+        model_class = type(self.base_model)
+        
+        # Try to create a new instance with known constructor signatures
+        try:
+            # For EnhancedContinualLearner which has this signature
+            if hasattr(self.base_model, 'embedding_dim') and hasattr(self.base_model, 'config'):
+                cloned = model_class(
+                    embedding_dim=self.base_model.embedding_dim,
+                    config=self.base_model.config,
+                    use_hierarchical=getattr(self.base_model, 'use_hierarchical', False),
+                    use_progressive=getattr(self.base_model, 'use_progressive', False)
+                )
+            else:
+                # For simple models, try no-arg constructor
+                cloned = model_class()
+            
+            # Load the state dict to copy all parameters and buffers
+            cloned.load_state_dict(self.base_model.state_dict())
+            # Ensure cloned model is on same device
+            cloned = cloned.to(self.device)
+            return cloned
+            
+        except Exception as e:
+            # If we can't instantiate a new model, log error and raise
+            logger.error(f"Failed to clone model of type {model_class.__name__}: {e}")
+            logger.error("Model cloning requires either a no-arg constructor or ")
+            logger.error("embedding_dim, config, use_hierarchical, use_progressive attributes")
+            raise RuntimeError(f"Cannot clone model of type {model_class.__name__}. "
+                             f"Consider using a simpler model or adding model construction logic.") from e
     
     def _compute_loss(self, model: nn.Module, 
                      data: Dict[str, torch.Tensor]) -> torch.Tensor:
