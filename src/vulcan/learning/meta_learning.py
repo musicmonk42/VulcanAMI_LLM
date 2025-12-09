@@ -413,6 +413,9 @@ class MetaLearner:
         # FIXED: Get device from base model
         self.device = next(base_model.parameters()).device if hasattr(base_model, 'parameters') else torch.device('cpu')
         
+        # FIX: Get embedding dimension from base model, fallback to global constant
+        self.embedding_dim = getattr(base_model, 'embedding_dim', EMBEDDING_DIM)
+        
         # Different optimizers for different algorithms
         if algorithm == MetaLearningAlgorithm.REPTILE:
             self.meta_optimizer = optim.SGD(
@@ -447,7 +450,7 @@ class MetaLearner:
         
         # Prototypical network components (if using PROTO)
         if algorithm == MetaLearningAlgorithm.PROTO:
-            self.prototype_layer = nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM).to(self.device)
+            self.prototype_layer = nn.Linear(self.embedding_dim, self.embedding_dim).to(self.device)
         
         # Lock for thread safety
         self._lock = threading.RLock()
@@ -938,7 +941,7 @@ class MetaLearner:
         if len(indices) == 0:
             logger.warning("Empty indices in batch creation, returning dummy batch")
             return {
-                'x': torch.randn(1, EMBEDDING_DIM, device=self.device),
+                'x': torch.randn(1, self.embedding_dim, device=self.device),
                 'y': torch.zeros(1, device=self.device)
             }
         
@@ -963,12 +966,12 @@ class MetaLearner:
                     elif x.dim() > 1:
                         x = x.flatten()
                     
-                    # FIXED: Pad/truncate to EMBEDDING_DIM
-                    if x.shape[0] < EMBEDDING_DIM:
-                        padding = torch.zeros(EMBEDDING_DIM - x.shape[0])
+                    # FIXED: Pad/truncate to embedding_dim
+                    if x.shape[0] < self.embedding_dim:
+                        padding = torch.zeros(self.embedding_dim - x.shape[0])
                         x = torch.cat([x, padding])
-                    elif x.shape[0] > EMBEDDING_DIM:
-                        x = x[:EMBEDDING_DIM]
+                    elif x.shape[0] > self.embedding_dim:
+                        x = x[:self.embedding_dim]
                     
                     # FIXED: Move to correct device
                     x = x.to(self.device)
@@ -990,7 +993,7 @@ class MetaLearner:
         if not batch_x:
             logger.warning("All buffer items failed to process, returning dummy batch")
             return {
-                'x': torch.randn(1, EMBEDDING_DIM, device=self.device),
+                'x': torch.randn(1, self.embedding_dim, device=self.device),
                 'y': torch.zeros(1, device=self.device)
             }
         
@@ -1050,7 +1053,7 @@ class MetaLearner:
         
         if x is None or y is None:
             # Self-supervised loss - handle dimension mismatch properly
-            x = data.get('input', torch.randn(1, EMBEDDING_DIM, device=self.device))
+            x = data.get('input', torch.randn(1, self.embedding_dim, device=self.device))
             x = x.to(self.device)
             pred = model(x)
             
