@@ -1565,3 +1565,26 @@ __all__ = [
     'ModalityType',
     'ActionType'
 ]
+
+# ============================================================
+# MODULE VALIDATION
+# Ensure all exported names are properly defined to catch initialization errors early
+# ============================================================
+
+def _validate_module_exports():
+    """Validate that all exported names are properly defined."""
+    missing = []
+    for name in __all__:
+        if name not in globals():
+            missing.append(name)
+    
+    if missing:
+        raise ImportError(
+            f"Module vulcan.orchestrator.collective failed to initialize properly. "
+            f"Missing exports: {missing}. This may indicate a circular import or "
+            f"initialization error."
+        )
+
+# Run validation when module is loaded
+_validate_module_exports()
+
