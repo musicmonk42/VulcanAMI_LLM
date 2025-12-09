@@ -69,8 +69,8 @@ class TestPrinciple:
         # Use safe code that doesn't trigger security checks
         # The 'inputs' dict is provided in the namespace by execute()
         code = """
-x_val = data.get('x', 0)
-y_val = data.get('y', 0)
+x_val = inputs.get('x', 0)
+y_val = inputs.get('y', 0)
 output = {'result': x_val + y_val}
 """
         p = Principle(
@@ -81,10 +81,8 @@ output = {'result': x_val + y_val}
             execution_type="code_string"
         )
         
-        # Note: The execute() method renames 'inputs' to avoid the security check
-        # We need to modify how we pass this
-        # Actually, let's just skip this test since the security check is overly aggressive
-        pytest.skip("Security check for 'input' keyword is too aggressive")
+        result = p.execute({'x': 5, 'y': 3})
+        assert result == {'result': 8}
     
     def test_principle_execute_code_string_dangerous(self):
         """Test that dangerous code is blocked"""
