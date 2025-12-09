@@ -403,7 +403,7 @@ class GraphixVulcanBridge:
         # Mark as initialized to prevent re-execution of this block
         self._initialized = True
         
-        log.info("Initializing GraphixVulcanBridge (Singleton Created)") 
+        log.info("GraphixVulcanBridge initialized successfully (Singleton instance)") 
 
     # ------------------------ Setup/injection helpers ------------------------ #
 
