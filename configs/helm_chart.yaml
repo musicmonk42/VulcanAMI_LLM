@@ -19,7 +19,8 @@ metadata:
     app.kubernetes.io/name: graphix-arena
     app.kubernetes.io/instance: dev
 spec:
-  replicas: 1
+  # Note: HPA will manage replicas dynamically; this serves as the initial count
+  replicas: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: graphix-arena
@@ -130,10 +131,126 @@ spec:
     app.kubernetes.io/instance: dev
   # For easy access from your laptop on minikube/kind, use NodePort.
   # If you're on a cloud dev cluster with ingress, switch to ClusterIP.
-  type: NodePort
+  type: ClusterIP
   ports:
     - name: http
       protocol: TCP
       port: 8181
       targetPort: 8181
-      nodePort: 30181
+---
+# Secret for API credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: graphix-api-secret
+  namespace: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+type: Opaque
+stringData:
+  api-key: "REPLACE_WITH_ACTUAL_API_KEY"
+---
+# PodDisruptionBudget to ensure availability during cluster maintenance
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: graphix-arena-pdb
+  namespace: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graphix-arena
+      app.kubernetes.io/instance: dev
+---
+# HorizontalPodAutoscaler for automatic scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: graphix-arena-hpa
+  namespace: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: graphix-arena
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# ResourceQuota to prevent resource exhaustion
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: graphix-dev-quota
+  namespace: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: "8Gi"
+    limits.cpu: "8"
+    limits.memory: "16Gi"
+    pods: "10"
+---
+# NetworkPolicy to restrict pod-to-pod communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: graphix-arena-netpol
+  namespace: graphix-dev
+  labels:
+    app.kubernetes.io/name: graphix-arena
+    app.kubernetes.io/instance: dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: graphix-arena
+      app.kubernetes.io/instance: dev
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: graphix-arena
+      ports:
+        - protocol: TCP
+          port: 8181
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53  # DNS
+        - protocol: UDP
+          port: 53  # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+        - protocol: TCP
+          port: 80   # HTTP
