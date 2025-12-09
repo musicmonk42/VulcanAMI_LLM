@@ -655,7 +655,6 @@ class TestIntegratedLearningCoordinator:
 class TestUnifiedDecomposerLearner:
     """Test UnifiedDecomposerLearner"""
     
-    @pytest.mark.skip(reason="Requires full decomposer initialization")
     def test_unified_learner_initialization(self):
         """Test unified learner initialization"""
         learner = UnifiedDecomposerLearner(
