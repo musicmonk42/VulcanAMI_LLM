@@ -712,6 +712,9 @@ class MetaLearner:
                 support_loss.backward()
                 inner_optimizer.step()
             
+            # Zero gradients from adaptation before computing meta-gradients
+            self.base_model.zero_grad()
+            
             # Evaluate on query set with adapted model
             query_loss = self._compute_loss(self.base_model, query_set)
             
@@ -735,7 +738,7 @@ class MetaLearner:
             # This ensures each task starts from the same base model
             with torch.no_grad():
                 for name, param in self.base_model.named_parameters():
-                    param.data = original_state[name].clone()
+                    param.data = original_state[name]
             
             # Update task-specific learning rate
             if task_id:
