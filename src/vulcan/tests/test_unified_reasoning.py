@@ -927,19 +927,47 @@ class TestUnifiedReasoner:
         assert len(reasoner.result_cache) == 0
         assert len(reasoner.plan_cache) == 0
     
-    @pytest.mark.skip(reason="Creates real reasoner with transformer models, causes segfault with leaked threads")
     def test_state_persistence(self, reasoner, tmp_path):
-        """Test saving and loading state - SKIPPED: causes memory issues"""
-        # This test is skipped because:
-        # 1. It creates a NEW UnifiedReasoner without proper mocking
-        # 2. This loads real transformer models from HuggingFace
-        # 3. Combined with leaked threads from previous tests, causes access violation
-        # 
-        # To properly test state persistence, we would need:
-        # - Complete mocking of all components
-        # - Zero leaked threads from all previous tests
-        # - Or run this test in complete isolation
-        pytest.skip("Test creates real reasoner with transformers, causes segfault")
+        """Test saving and loading state using the shared reasoner fixture"""
+        # Set up initial state with some values
+        reasoner.confidence_threshold = 0.7
+        initial_threshold = reasoner.confidence_threshold
+        
+        # Add some test data to history
+        test_history_item = {
+            'type': 'test',
+            'data': 'test_data',
+            'timestamp': 1234567890.0  # Fixed timestamp for test reliability
+        }
+        reasoner.reasoning_history.append(test_history_item)
+        initial_history_len = len(reasoner.reasoning_history)
+        
+        # Temporarily override model_path to use tmp_path
+        original_model_path = reasoner.model_path
+        reasoner.model_path = tmp_path
+        
+        try:
+            # Save state
+            reasoner.save_state("test_state")
+            
+            # Verify state file was created
+            state_file = tmp_path / "test_state_unified_state.pkl"
+            assert state_file.exists(), "State file should be created"
+            
+            # Modify state
+            reasoner.confidence_threshold = 0.3
+            reasoner.reasoning_history.clear()
+            
+            # Load state back
+            reasoner.load_state("test_state")
+            
+            # Verify state was restored
+            assert reasoner.confidence_threshold == initial_threshold, "Confidence threshold should be restored"
+            assert len(reasoner.reasoning_history) == initial_history_len, "History should be restored"
+            
+        finally:
+            # Restore original model_path
+            reasoner.model_path = original_model_path
     
     def test_error_handling(self, reasoner):
         """Test error handling in reasoning"""
