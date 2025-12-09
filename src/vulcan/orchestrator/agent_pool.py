@@ -20,7 +20,15 @@ from typing import Any, Dict, Optional, List, Tuple
 from pathlib import Path
 from collections import defaultdict
 from dataclasses import asdict
-import psutil
+
+# Import psutil with fallback for missing or broken installations
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
+    logging.warning("psutil not available, system resource monitoring will be disabled")
 
 from .agent_lifecycle import (
     AgentState, 
@@ -805,10 +813,15 @@ class AgentPoolManager:
             # Update provenance
             if provenance:
                 provenance.complete("success", result=result)
-                provenance.update_resource_consumption({
-                    "cpu_seconds": duration,
-                    "memory_mb": psutil.Process().memory_info().rss / 1024 / 1024
-                })
+                resource_consumption = {
+                    "cpu_seconds": duration
+                }
+                if PSUTIL_AVAILABLE:
+                    try:
+                        resource_consumption["memory_mb"] = psutil.Process().memory_info().rss / 1024 / 1024
+                    except Exception:
+                        pass
+                provenance.update_resource_consumption(resource_consumption)
             
             # Update statistics
             with self.stats_lock:
@@ -1021,7 +1034,7 @@ class AgentPoolManager:
                                 agents_to_retire.append(agent_id)
                         
                         # Update resource usage for local agents
-                        if agent_id in self.agent_processes:
+                        if PSUTIL_AVAILABLE and agent_id in self.agent_processes:
                             process = self.agent_processes[agent_id]
                             if process.is_alive():
                                 try:
@@ -1033,6 +1046,8 @@ class AgentPoolManager:
                                     }
                                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                                     logger.debug(f"Cannot access process info for agent {agent_id}")
+                                except Exception as e:
+                                    logger.debug(f"Error accessing process info for agent {agent_id}: {e}")
                 
                 # Perform recovery and retirement outside the lock
                 for agent_id in agents_to_recover:
@@ -1051,13 +1066,24 @@ class AgentPoolManager:
     def _get_default_hardware_spec(self) -> Dict[str, Any]:
         """Get default hardware specification"""
         try:
-            return {
-                "cpu_cores": psutil.cpu_count(logical=True),
-                "cpu_cores_physical": psutil.cpu_count(logical=False),
-                "memory_gb": psutil.virtual_memory().total / (1024**3),
-                "gpu_available": self._check_gpu_available(),
-                "storage_gb": psutil.disk_usage('/').total / (1024**3)
-            }
+            if PSUTIL_AVAILABLE:
+                return {
+                    "cpu_cores": psutil.cpu_count(logical=True),
+                    "cpu_cores_physical": psutil.cpu_count(logical=False),
+                    "memory_gb": psutil.virtual_memory().total / (1024**3),
+                    "gpu_available": self._check_gpu_available(),
+                    "storage_gb": psutil.disk_usage('/').total / (1024**3)
+                }
+            else:
+                # Fallback when psutil is not available
+                import multiprocessing
+                return {
+                    "cpu_cores": multiprocessing.cpu_count(),
+                    "cpu_cores_physical": multiprocessing.cpu_count(),
+                    "memory_gb": 4.0,  # Conservative estimate
+                    "gpu_available": self._check_gpu_available(),
+                    "storage_gb": 100.0  # Conservative estimate
+                }
         except Exception as e:
             logger.warning(f"Failed to get hardware spec: {e}")
             return {
