@@ -104,7 +104,7 @@ RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.tx
 # This gives you an sbom.json artifact for compliance / scanning.
 # hadolint ignore=DL3013,SC2015
 RUN pip install --no-cache-dir cyclonedx-bom && \
-    cyclonedx-py -r requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
+    cyclonedx-py requirements -r requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
 
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
