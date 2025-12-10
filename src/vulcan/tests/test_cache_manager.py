@@ -14,6 +14,7 @@ Tests cover:
 """
 
 # Add parent directory to path for imports
+from semantic_bridge.cache_manager import CacheManager
 import sys
 import threading
 import time
@@ -24,8 +25,6 @@ from typing import Any, Dict
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from semantic_bridge.cache_manager import CacheManager
 
 
 class TestCacheManagerBasics:

@@ -5,6 +5,8 @@ Tests Gaussian Processes, uncertainty quantification, active learning,
 kernel selection, and numerical stability fixes.
 """
 
+from vulcan.reasoning.probabilistic_reasoning import (
+    TORCH_AVAILABLE, EnhancedProbabilisticReasoner, ProbabilisticReasoner)
 import logging
 import shutil
 import tempfile
@@ -19,9 +21,6 @@ import pytest
 # Filter warnings during tests
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
-
-from vulcan.reasoning.probabilistic_reasoning import (
-    TORCH_AVAILABLE, EnhancedProbabilisticReasoner, ProbabilisticReasoner)
 
 
 # Fixtures

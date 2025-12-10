@@ -2,6 +2,20 @@
 Test suite for continual learning module
 """
 
+from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
+                                            TaskInfo)
+from vulcan.learning.continual_learning import (ContinualLearner,
+                                                ContinualMetrics,
+                                                EnhancedContinualLearner,
+                                                ProgressiveNeuralNetwork)
+import torch.nn as nn
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+import time
+import threading
+import tempfile
+import shutil
 import pytest
 
 # Skip entire module if torch is not available
@@ -9,23 +23,8 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for continual_learning tests"
 )
 
-import shutil
-import tempfile
-import threading
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
 
 # Import the modules to test
-from vulcan.learning.continual_learning import (ContinualLearner,
-                                                ContinualMetrics,
-                                                EnhancedContinualLearner,
-                                                ProgressiveNeuralNetwork)
-from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
-                                            TaskInfo)
 
 # Test configuration
 TEST_EMBEDDING_DIM = 128

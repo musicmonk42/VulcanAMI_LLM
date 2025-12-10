@@ -1,5 +1,9 @@
 """Comprehensive test suite for cost_optimizer.py"""
 
+from cost_optimizer import (BudgetConfig, CostAnalyzer, CostBreakdown,
+                            CostOptimizer, OptimizationMetrics,
+                            OptimizationPhase, OptimizationReport,
+                            OptimizationStrategy)
 import sys
 import threading
 import time
@@ -9,10 +13,6 @@ import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from cost_optimizer import (BudgetConfig, CostAnalyzer, CostBreakdown,
-                            CostOptimizer, OptimizationMetrics,
-                            OptimizationPhase, OptimizationReport,
-                            OptimizationStrategy)
 
 # ============================================================
 # TEST DATA CLASSES

@@ -9,6 +9,7 @@ Tests cover:
 - Async operations
 """
 
+from unlearning import GradientSurgeryUnlearner, UnlearningEngine
 import asyncio
 import hashlib
 # Import the modules to test
@@ -21,8 +22,6 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from unlearning import GradientSurgeryUnlearner, UnlearningEngine
 
 
 class TestGradientSurgeryUnlearner:

@@ -2142,6 +2142,7 @@ class EnhancedNSOAligner:
     """Shim: present for compatibility; extend later if needed."""
 
     def __init__(self, *_, **__): ...
+
     def align(self, *_, **__):
         return {"aligned": True, "reason": "shim"}
 
@@ -2150,5 +2151,6 @@ class SymbolicSafetyChecker:
     """Shim: present for compatibility; extend later if needed."""
 
     def __init__(self, *_, **__): ...
+
     def check(self, *_, **__):
         return {"safe": True, "reason": "shim"}

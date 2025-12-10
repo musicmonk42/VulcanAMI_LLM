@@ -1,3 +1,29 @@
+import torch.optim as optim
+import torch.nn.utils
+import torch
+import astor
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from pathlib import Path
+from enum import Enum
+from datetime import datetime, timedelta
+from dataclasses import asdict, dataclass, field, is_dataclass
+from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
+from collections import Counter, OrderedDict, deque
+import uuid
+import unicodedata
+import traceback
+import time
+import threading
+import tempfile  # Added for __main__ block
+import sqlite3
+import re
+import json
+import importlib.util  # Added for lazy loading check
+import hashlib
+import difflib
+import copy
+import ast
 import logging
 import os
 
@@ -31,35 +57,6 @@ try:
 except Exception as e:
     _init_logger.debug(f"Could not limit torch threads: {e}")
 
-import ast
-import copy
-import difflib
-import hashlib
-import importlib.util  # Added for lazy loading check
-import json
-import logging
-import os
-import re
-import sqlite3
-import tempfile  # Added for __main__ block
-import threading
-import time
-import traceback
-import unicodedata
-import uuid
-from collections import Counter, OrderedDict, deque
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field, is_dataclass
-from datetime import datetime, timedelta
-from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
-
-import astor
-import torch
-import torch.nn.utils
-import torch.optim as optim
 
 # --- ML Model Integration for Bias Detection ---
 # Check if transformers is available without importing it at the top level
@@ -1219,10 +1216,12 @@ class NSOAligner:
         ]
         # Regex patterns for more complex detection
         suspicious_patterns = [
-            r"\b(ignore|disregard|forget)\s+(the\s+)?(above|previous|following)\s+(instructions|prompt|rules)\b",  # Instruction ignoring
+            # Instruction ignoring
+            r"\b(ignore|disregard|forget)\s+(the\s+)?(above|previous|following)\s+(instructions|prompt|rules)\b",
             r'output\s+only\s+the\s+text\s+["\']',  # Output filtering bypass
             r"(start|end)\s+(of)?\s+(your|the)\s+prompt",  # Prompt boundary manipulation
-            r"[\;\(\)\<\>\{\}\'\"].*(drop|delete|select|update|insert|exec|eval|import|script)",  # Code/SQL syntax with keywords
+            # Code/SQL syntax with keywords
+            r"[\;\(\)\<\>\{\}\'\"].*(drop|delete|select|update|insert|exec|eval|import|script)",
             r"(\.\./|%2e%2e%2f|%2e%e2%80%a4%2f|\/(\.\.|\%2e\%2e))",  # Directory traversal/LFI (expanded)
         ]
 
@@ -1395,7 +1394,7 @@ class NSOAligner:
         """Check proposal against real-world threat intelligence with bounded cache."""
         cache_key = hashlib.md5(
             json.dumps(proposal, sort_keys=True).encode()
-        , usedforsecurity=False).hexdigest()
+            , usedforsecurity=False).hexdigest()
 
         current_time = time.time()
 

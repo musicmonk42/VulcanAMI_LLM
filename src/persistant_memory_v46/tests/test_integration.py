@@ -8,6 +8,10 @@ Tests the interaction between all modules:
 - Complete end-to-end workflows
 """
 
+from zk import MerkleTree, ZKProver
+from unlearning import GradientSurgeryUnlearner, UnlearningEngine
+from store import PackfileStore
+from lsm import BloomFilter, MerkleLSM
 import asyncio
 import sys
 from typing import Any, Dict, List
@@ -25,11 +29,6 @@ try:
     INIT_AVAILABLE = True
 except ImportError:
     INIT_AVAILABLE = False
-
-from lsm import BloomFilter, MerkleLSM
-from store import PackfileStore
-from unlearning import GradientSurgeryUnlearner, UnlearningEngine
-from zk import MerkleTree, ZKProver
 
 
 class TestMemorySystemCreation:

@@ -11,6 +11,35 @@
 # ====================================================================
 # PATH + SAFETY SETUP - MUST BE FIRST
 # ====================================================================
+from vulcan.orchestrator import ProductionDeployment
+from vulcan.config import AgentConfig, ProfileType, get_config, load_profile
+import vulcan.world_model
+import vulcan.semantic_bridge
+import vulcan.safety
+import vulcan.memory
+from pydantic_settings import BaseSettings
+from pydantic import BaseModel, ConfigDict, Field
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
+import uvicorn
+import numpy as np
+import msgpack
+from unittest.mock import MagicMock
+from typing import Any, Dict, List, Optional
+from threading import Lock, Thread
+from contextlib import asynccontextmanager
+from collections import defaultdict
+import time
+import socket  # <-- ADDED
+import logging
+import json
+import hmac
+import hashlib
+import concurrent.futures
+import asyncio
+import argparse
 import sys
 from pathlib import Path
 
@@ -59,48 +88,17 @@ except Exception:
     pass
 # ====================================================================
 
-import argparse
-import asyncio
-import concurrent.futures
-import hashlib
-import hmac
-import json
-import logging
 # import os (already imported above)
-import socket  # <-- ADDED
-import time
-from collections import defaultdict
-from contextlib import asynccontextmanager
-from threading import Lock, Thread
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock
 
-import msgpack
-import numpy as np
-import uvicorn
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic_settings import BaseSettings
 
-import vulcan.memory
-import vulcan.safety
-import vulcan.semantic_bridge
 # Level 1: Pre-load core modules BEFORE orchestrator
 # This prevents circular import issues during orchestrator initialization
-import vulcan.world_model
 # Level 0: Config (no dependencies)
-from vulcan.config import AgentConfig, ProfileType, get_config, load_profile
 # Level 2: Now safe to import orchestrator (uses already-loaded modules)
-from vulcan.orchestrator import ProductionDeployment
 
 # ============================================================
 # IMPORTS - Ordered to prevent circular dependencies
 # ============================================================
-
-
 
 
 try:

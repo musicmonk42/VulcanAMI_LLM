@@ -12,6 +12,15 @@ Tests all components:
 Run with: pytest src/vulcan/tests/test_symbolic_parsing.py -v
 """
 
+from vulcan.reasoning.symbolic.parsing import (ASTConverter, ASTNode,
+                                               ClauseExtractor, CNFConverter,
+                                               FormulaBuilder, FormulaParser,
+                                               FormulaUtils, Lexer, NodeType,
+                                               Parser, PrenexConverter,
+                                               Skolemizer, Token, TokenType,
+                                               VariableRenamer)
+from vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
+                                            Literal, Variable)
 import sys
 from pathlib import Path
 
@@ -22,15 +31,6 @@ src_path = Path(__file__).parent.parent.parent
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-from vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
-                                            Literal, Variable)
-from vulcan.reasoning.symbolic.parsing import (ASTConverter, ASTNode,
-                                               ClauseExtractor, CNFConverter,
-                                               FormulaBuilder, FormulaParser,
-                                               FormulaUtils, Lexer, NodeType,
-                                               Parser, PrenexConverter,
-                                               Skolemizer, Token, TokenType,
-                                               VariableRenamer)
 
 # ============================================================================
 # LEXER TESTS

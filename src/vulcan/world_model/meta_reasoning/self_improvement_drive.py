@@ -36,6 +36,7 @@ ENCODING FIX (2025-10-19):
 - Robust UTF-8 config loading with BOM handling and fallback strategies for Windows compatibility
 """
 
+from typing import Any, Dict, List, Tuple
 import ast
 import difflib
 import json
@@ -57,9 +58,6 @@ logger = logging.getLogger(__name__)
 # NOTE: This patch assumes a class named SelfImprovementDrive exists.
 # Additions: policy loading, auto-apply gate, and robust get_status.
 
-import os
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
 
 try:
     from .auto_apply_policy import (Policy, check_files_against_policy,

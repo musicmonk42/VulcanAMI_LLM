@@ -754,7 +754,7 @@ class ObjectiveNegotiator:
 
             self.stats["dynamic_weightings"] += 1
             logger.debug(
-                f"Dynamic weighting complete. Final weights: { {k: round(v, 4) for k, v in final_weights.items()} }"
+                f"Dynamic weighting complete. Final weights: {{k: round(v, 4) for k, v in final_weights.items()} }"
             )
 
             return final_weights

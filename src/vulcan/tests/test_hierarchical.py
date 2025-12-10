@@ -12,6 +12,9 @@ Tests cover:
 - Edge cases and error handling
 """
 
+from vulcan.memory.hierarchical import (HierarchicalMemory, MemoryLevel,
+                                        ProblemPattern, ToolSelectionRecord)
+from vulcan.memory.base import Memory, MemoryConfig, MemoryQuery, MemoryType
 import shutil
 # Import the module under test
 import sys
@@ -25,9 +28,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.base import Memory, MemoryConfig, MemoryQuery, MemoryType
-from vulcan.memory.hierarchical import (HierarchicalMemory, MemoryLevel,
-                                        ProblemPattern, ToolSelectionRecord)
 
 # ============================================================
 # FIXTURES

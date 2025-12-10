@@ -587,7 +587,8 @@ class ValueEvolutionTracker:
 
         # Configuration
         self.ewma_alpha = 0.2  # EWMA smoothing parameter
-        self.cusum_slack = 0.5  # CUSUM slack parameter (relative to std dev?) Needs clarification/tuning. Let's assume relative to drift_threshold * baseline magnitude.
+        # CUSUM slack parameter (relative to std dev?) Needs clarification/tuning. Let's assume relative to drift_threshold * baseline magnitude.
+        self.cusum_slack = 0.5
         self.anomaly_z_threshold = 3.0  # Z-score threshold for anomalies
         self.min_history_for_drift = (
             10  # Minimum history points before running drift detection

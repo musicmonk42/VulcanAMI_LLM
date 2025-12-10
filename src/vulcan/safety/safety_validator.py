@@ -14,6 +14,10 @@ Revision / Fix Notes (Applied):
 """
 
 from __future__ import annotations
+from .safety_types import (ActionType, ComplianceStandard, ExplainabilityNode,
+                           GovernanceOrchestrator, NSOAligner, SafetyConfig,
+                           SafetyConstraint, SafetyException, SafetyMetrics,
+                           SafetyReport, SafetyValidator, SafetyViolationType)
 
 import asyncio
 import atexit
@@ -51,11 +55,6 @@ def safe_log(log_func, message):
     except (ValueError, AttributeError, OSError, RuntimeError):
         pass
 
-
-from .safety_types import (ActionType, ComplianceStandard, ExplainabilityNode,
-                           GovernanceOrchestrator, NSOAligner, SafetyConfig,
-                           SafetyConstraint, SafetyException, SafetyMetrics,
-                           SafetyReport, SafetyValidator, SafetyViolationType)
 
 try:
     from ..config import SafetyLevel

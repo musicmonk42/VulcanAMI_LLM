@@ -13,6 +13,10 @@ Tests cover:
 - Performance metrics
 """
 
+from safe_generation import (HallucinationValidator, PromptInjectionValidator,
+                             RiskAssessment, RiskLevel, SafeGeneration,
+                             SafetyEvent, SafetyMetrics, ToxicityValidator,
+                             ValidationCategory)
 import sys
 import unittest
 from collections import deque
@@ -20,11 +24,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from safe_generation import (HallucinationValidator, PromptInjectionValidator,
-                             RiskAssessment, RiskLevel, SafeGeneration,
-                             SafetyEvent, SafetyMetrics, ToxicityValidator,
-                             ValidationCategory)
 
 
 class TestSafeGenerationBasics(unittest.TestCase):

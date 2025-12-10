@@ -18,6 +18,14 @@ CRITICAL NOTES:
 - The force_shutdown_reasoner function makes ALL threads daemon immediately to prevent hangs
 """
 
+from vulcan.reasoning.unified_reasoning import (ReasoningPlan,
+                                                ReasoningStrategy,
+                                                ReasoningTask, UnifiedReasoner,
+                                                _load_optional_components,
+                                                _load_reasoning_components,
+                                                _load_selection_components)
+from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
+                                              ReasoningStep, ReasoningType)
 import gc
 import shutil
 # CRITICAL: Mock problematic components BEFORE any imports that might load them
@@ -47,15 +55,7 @@ sys.modules["src.unified_runtime.execution_metrics"] = mock_execution_metrics
 sys.modules["vulcan.processing"] = mock_processing
 sys.modules["vulcan.safety.rollback_audit"] = mock_rollback_audit
 
-from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
-                                              ReasoningStep, ReasoningType)
 # Now import the module to test
-from vulcan.reasoning.unified_reasoning import (ReasoningPlan,
-                                                ReasoningStrategy,
-                                                ReasoningTask, UnifiedReasoner,
-                                                _load_optional_components,
-                                                _load_reasoning_components,
-                                                _load_selection_components)
 
 # =============================================================================
 # MODULE-LEVEL SHARED REASONER (CRITICAL PERFORMANCE OPTIMIZATION)

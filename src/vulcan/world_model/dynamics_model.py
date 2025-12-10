@@ -280,7 +280,7 @@ class RobustOptimizer:
 
         # Numerical gradient if not provided
         if jac is None:
-            jac = lambda x: RobustOptimizer._numerical_gradient(fun, x)
+            def jac(x): return RobustOptimizer._numerical_gradient(fun, x)
 
         f_prev = fun(x)
         g_prev = jac(x)
@@ -452,7 +452,7 @@ class RobustOptimizer:
         x = x0.copy()
 
         if jac is None:
-            jac = lambda x: RobustOptimizer._numerical_gradient(fun, x)
+            def jac(x): return RobustOptimizer._numerical_gradient(fun, x)
 
         # Momentum parameters
         velocity = np.zeros_like(x)

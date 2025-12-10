@@ -1,5 +1,7 @@
 """Memory retrieval, search, and indexing"""
 
+from .base import Memory, MemoryQuery
+from ..security_fixes import safe_pickle_load
 import heapq
 import json
 import logging
@@ -55,8 +57,6 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-from ..security_fixes import safe_pickle_load
-from .base import Memory, MemoryQuery
 
 logger = logging.getLogger(__name__)
 

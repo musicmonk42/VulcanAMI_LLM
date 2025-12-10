@@ -11,6 +11,9 @@ Tests:
 - Cross-domain patterns
 """
 
+from problem_decomposer.decomposition_library import (
+    Context, DecompositionLibrary, DecompositionPrinciple, DomainCategory,
+    Pattern, PatternPerformance, PatternStatus, StratifiedDecompositionLibrary)
 import logging
 import sys
 import tempfile
@@ -24,9 +27,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
-from problem_decomposer.decomposition_library import (
-    Context, DecompositionLibrary, DecompositionPrinciple, DomainCategory,
-    Pattern, PatternPerformance, PatternStatus, StratifiedDecompositionLibrary)
 
 # Configure logging
 logging.basicConfig(

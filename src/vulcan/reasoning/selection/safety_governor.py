@@ -839,7 +839,7 @@ class SafetyGovernor:
                 "safety_level": context.safety_level.value,
                 "problem_hash": hashlib.md5(
                     str(context.problem)[:1000].encode()
-                , usedforsecurity=False).hexdigest()[:8],
+                    , usedforsecurity=False).hexdigest()[:8],
             }
 
             # Already bounded by deque maxlen

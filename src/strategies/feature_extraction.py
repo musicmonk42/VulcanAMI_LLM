@@ -5,6 +5,9 @@ Implements hierarchical feature extraction with increasing complexity and cost,
 from simple syntactic features to deep semantic and multimodal analysis.
 """
 
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.decomposition import PCA, TruncatedSVD
+import networkx as nx
 import hashlib
 import json
 import logging
@@ -60,9 +63,6 @@ except ImportError:
     HAS_NLTK = False
     nltk = None
 
-import networkx as nx
-from sklearn.decomposition import PCA, TruncatedSVD
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
 logger = logging.getLogger(__name__)
 

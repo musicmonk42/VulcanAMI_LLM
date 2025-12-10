@@ -4,6 +4,12 @@ Comprehensive test suite for adversarial validation and formal verification.
 Tests AdversarialValidator and FormalVerifier classes.
 """
 
+from vulcan.safety.safety_types import (ActionType, SafetyReport,
+                                        SafetyViolationType)
+from vulcan.safety.adversarial_formal import (AdversarialValidator,
+                                              AttackConfig, AttackType,
+                                              FormalProperty, FormalVerifier,
+                                              PropertyType, timeout)
 import copy
 import time
 from collections import defaultdict
@@ -17,12 +23,6 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for adversarial_formal tests"
 )
 
-from vulcan.safety.adversarial_formal import (AdversarialValidator,
-                                              AttackConfig, AttackType,
-                                              FormalProperty, FormalVerifier,
-                                              PropertyType, timeout)
-from vulcan.safety.safety_types import (ActionType, SafetyReport,
-                                        SafetyViolationType)
 
 # ============================================================
 # FIXTURES

@@ -723,7 +723,7 @@ class ProblemExecutor:
             except Exception as e:
                 logger.error("Failed to convert step %d to principle: %s", i, e)
                 # Create fallback principle
-                fallback_logic = lambda inputs: {"error": str(e), "fallback": True}
+                def fallback_logic(inputs): return {"error": str(e), "fallback": True}
                 principle = Principle(
                     id=f"step_{i}_fallback",
                     core_pattern=step,

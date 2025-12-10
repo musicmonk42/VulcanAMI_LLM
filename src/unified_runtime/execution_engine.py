@@ -1328,7 +1328,7 @@ class ExecutionEngine:
                 try:
                     input_repr = hashlib.md5(
                         json.dumps(input_val, sort_keys=True, default=str).encode()
-                    , usedforsecurity=False).hexdigest()[:8]
+                        , usedforsecurity=False).hexdigest()[:8]
                 except (TypeError, ValueError) as e:
                     # If value can't be hashed, use type representation
                     logger.debug(f"Could not hash input value: {e}")

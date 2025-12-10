@@ -13,6 +13,12 @@ Tests all major functionality including:
 - Error handling and recovery
 """
 
+from llm_executor import (NUMPY_AVAILABLE, TORCH_AVAILABLE,
+                          AttentionHeadResult, CacheStrategy, ExecutionCache,
+                          ExecutionMode, ExecutionResult, ExecutorConfig,
+                          LayerExecutionContext, LayerExecutor, LLMExecutor,
+                          SafetyLevel, SafetyValidationResult, SafetyValidator,
+                          create_default_executor, create_parallel_executor)
 import json
 import sys
 import tempfile
@@ -25,12 +31,6 @@ from unittest.mock import MagicMock, Mock, patch
 # Add the uploads directory to path
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from llm_executor import (NUMPY_AVAILABLE, TORCH_AVAILABLE,
-                          AttentionHeadResult, CacheStrategy, ExecutionCache,
-                          ExecutionMode, ExecutionResult, ExecutorConfig,
-                          LayerExecutionContext, LayerExecutor, LLMExecutor,
-                          SafetyLevel, SafetyValidationResult, SafetyValidator,
-                          create_default_executor, create_parallel_executor)
 
 # Try to import torch/numpy for tests
 if TORCH_AVAILABLE:

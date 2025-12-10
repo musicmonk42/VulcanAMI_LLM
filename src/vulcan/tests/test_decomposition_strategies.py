@@ -11,6 +11,12 @@ Tests:
 - Strategy-specific features
 """
 
+from problem_decomposer.problem_decomposer_core import ProblemGraph
+from problem_decomposer.decomposition_strategies import (
+    AnalogicalDecomposition, BruteForceSearch, DecompositionResult,
+    DecompositionStrategy, ExactDecomposition, PatternMatch,
+    SemanticDecomposition, StrategyType, StructuralDecomposition,
+    SyntheticBridging)
 import logging
 import sys
 from pathlib import Path
@@ -23,12 +29,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
-from problem_decomposer.decomposition_strategies import (
-    AnalogicalDecomposition, BruteForceSearch, DecompositionResult,
-    DecompositionStrategy, ExactDecomposition, PatternMatch,
-    SemanticDecomposition, StrategyType, StructuralDecomposition,
-    SyntheticBridging)
-from problem_decomposer.problem_decomposer_core import ProblemGraph
 
 # Configure logging
 logging.basicConfig(

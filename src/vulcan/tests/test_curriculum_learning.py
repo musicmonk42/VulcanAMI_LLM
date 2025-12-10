@@ -2,22 +2,7 @@
 Test suite for curriculum learning module
 """
 
-import pytest
-
-# Skip entire module if torch is not available (curriculum_learning imports learning modules that require torch)
-torch = pytest.importorskip(
-    "torch", reason="PyTorch required for curriculum_learning tests"
-)
-
-import json
-import shutil
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-
+from vulcan.learning.learning_types import LearningConfig
 from vulcan.learning.curriculum_learning import (CompositeDifficultyEstimator,
                                                  CurriculumLearner,
                                                  CurriculumMetrics,
@@ -25,7 +10,19 @@ from vulcan.learning.curriculum_learning import (CompositeDifficultyEstimator,
                                                  DifficultyMetric,
                                                  LearnedDifficultyEstimator,
                                                  PacingStrategy, StageInfo)
-from vulcan.learning.learning_types import LearningConfig
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+import time
+import tempfile
+import shutil
+import json
+import pytest
+
+# Skip entire module if torch is not available (curriculum_learning imports learning modules that require torch)
+torch = pytest.importorskip(
+    "torch", reason="PyTorch required for curriculum_learning tests"
+)
 
 
 class TestDifficultyEstimators:

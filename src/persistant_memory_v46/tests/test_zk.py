@@ -10,6 +10,7 @@ Tests cover:
 - Edge cases
 """
 
+from zk import GrothProof, MerkleTree, ZKCircuit, ZKProver
 import hashlib
 import sys
 from typing import Any, Dict, List
@@ -19,8 +20,6 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from zk import GrothProof, MerkleTree, ZKCircuit, ZKProver
 
 
 class TestMerkleTree:

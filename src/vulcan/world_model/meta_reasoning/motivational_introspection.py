@@ -10,6 +10,7 @@ Follows EXAMINE → SELECT → APPLY → REMEMBER pattern.
 """
 
 from __future__ import annotations  # Add this at the top
+import numpy  # For _calculate_validation_confidence
 
 import importlib  # ADDED as per fix steps
 # Existing imports remain (including from .validation_tracker)
@@ -2973,7 +2974,8 @@ class MotivationalIntrospection:
                     c.get("description", "Conflict detected")
                     for c in introspection.get("conflicts", [])
                 ]
-                base_reasoning = f"Proposal creates manageable conflicts between objectives: {'; '.join(conflict_reasons[:2])}"  # Show first 2 reasons
+                # Show first 2 reasons
+                base_reasoning = f"Proposal creates manageable conflicts between objectives: {'; '.join(conflict_reasons[:2])}"
         elif overall_status == ObjectiveStatus.DRIFT:
             base_reasoning = (
                 "Proposal shows signs of goal drift from design specification"
@@ -3092,4 +3094,3 @@ class MotivationalIntrospection:
 
 
 # Add any necessary imports if used only within methods
-import numpy  # For _calculate_validation_confidence

@@ -712,7 +712,7 @@ class RollbackManager:
         with self._lock:
             snapshot_id = hashlib.md5(
                 f"{time.time()}{len(self.snapshots)}".encode()
-            , usedforsecurity=False).hexdigest()[:16]
+                , usedforsecurity=False).hexdigest()[:16]
             snapshot = RollbackSnapshot(
                 snapshot_id=snapshot_id,
                 timestamp=time.time(),

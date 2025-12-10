@@ -42,6 +42,12 @@ Notes:
 """
 
 from __future__ import annotations
+from self_improving_training import SelfImprovingTraining
+from self_awareness import (awareness_summary, build_extended_awareness,
+                            calculate_adaptive_ece, calculate_distinct_n,
+                            calculate_ece, calculate_mce, summarize_entropies)
+from gpt_model import GPTConfig, GPTModel
+from data_loader import CorpusDataLoader
 
 import argparse
 import copy
@@ -62,12 +68,6 @@ HERE = os.path.dirname(__file__)
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from data_loader import CorpusDataLoader
-from gpt_model import GPTConfig, GPTModel
-from self_awareness import (awareness_summary, build_extended_awareness,
-                            calculate_adaptive_ece, calculate_distinct_n,
-                            calculate_ece, calculate_mce, summarize_entropies)
-from self_improving_training import SelfImprovingTraining
 
 # Prefer absolute import; fallback if run directly
 try:

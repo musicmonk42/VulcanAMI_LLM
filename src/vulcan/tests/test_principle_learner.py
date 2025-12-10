@@ -23,6 +23,16 @@ FIXES APPLIED (corrected version):
 2. Patched these mocks into the principle_learner module before tests run.
 """
 
+from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
+                                                        DecompositionStep,
+                                                        ExecutionOutcome,
+                                                        ProblemGraph)
+from problem_decomposer.principle_learner import (
+    DecompositionToTraceConverter, PrincipleLearner, PrinciplePromoter,
+    PromotionCandidate, integrate_principle_learning)
+from problem_decomposer.decomposition_library import \
+    StratifiedDecompositionLibrary
+import problem_decomposer.principle_learner as principle_learner_module
 import logging
 import shutil
 import sys
@@ -211,7 +221,6 @@ class MockExecutionTrace:
 
 
 # Patch the mocks into the principle_learner module
-import problem_decomposer.principle_learner as principle_learner_module
 
 # Only patch if the real implementations are None
 if principle_learner_module.MetricType is None:
@@ -232,16 +241,7 @@ if principle_learner_module.KnowledgePruner is None:
     principle_learner_module.KnowledgePruner = MockKnowledgePruner
 
 
-from problem_decomposer.decomposition_library import \
-    StratifiedDecompositionLibrary
 # Import components to test (after patching)
-from problem_decomposer.principle_learner import (
-    DecompositionToTraceConverter, PrincipleLearner, PrinciplePromoter,
-    PromotionCandidate, integrate_principle_learning)
-from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
-                                                        DecompositionStep,
-                                                        ExecutionOutcome,
-                                                        ProblemGraph)
 
 # Configure logging
 logging.basicConfig(

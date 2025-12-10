@@ -3,6 +3,14 @@ Comprehensive test suite for ComplianceMapper and BiasDetector.
 Tests regulatory compliance validation and multi-model bias detection.
 """
 
+from vulcan.safety.compliance_bias import (BiasDetector, ComplianceMapper,
+                                           LRUCache)
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+import time
+import threading
+import tempfile
 import pytest
 
 # Skip entire module if torch is not available
@@ -10,16 +18,6 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for compliance_bias tests"
 )
 
-import tempfile
-import threading
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-
-from vulcan.safety.compliance_bias import (BiasDetector, ComplianceMapper,
-                                           LRUCache)
 
 # Import from safety_types (with fallback)
 try:

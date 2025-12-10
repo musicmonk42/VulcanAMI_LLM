@@ -215,12 +215,14 @@ ProblemExecutor = MockProblemExecutor
 ExecutionPlan = DecompositionPlan
 
 # Strategy aliases
-ExactDecomposition = lambda: MockStrategy("exact")
-SemanticDecomposition = lambda: MockStrategy("semantic")
-StructuralDecomposition = lambda: MockStrategy("structural")
-SyntheticBridging = lambda: MockStrategy("synthetic")
-AnalogicalDecomposition = lambda: MockStrategy("analogical")
-BruteForceSearch = lambda: MockStrategy("brute_force")
+
+
+def ExactDecomposition(): return MockStrategy("exact")
+def SemanticDecomposition(): return MockStrategy("semantic")
+def StructuralDecomposition(): return MockStrategy("structural")
+def SyntheticBridging(): return MockStrategy("synthetic")
+def AnalogicalDecomposition(): return MockStrategy("analogical")
+def BruteForceSearch(): return MockStrategy("brute_force")
 
 
 # ============================================================================

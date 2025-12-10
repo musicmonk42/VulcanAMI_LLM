@@ -2,20 +2,17 @@
 Test suite for learning types module
 """
 
+from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
+                                            LearningMode, LearningTrajectory,
+                                            TaskInfo)
+import numpy as np
+from unittest.mock import MagicMock, patch
+from dataclasses import asdict, fields
+import time
 import pytest
 
 # Skip entire module if torch is not available (learning_types module requires torch)
 torch = pytest.importorskip("torch", reason="PyTorch required for learning_types tests")
-
-import time
-from dataclasses import asdict, fields
-from unittest.mock import MagicMock, patch
-
-import numpy as np
-
-from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
-                                            LearningMode, LearningTrajectory,
-                                            TaskInfo)
 
 
 class TestLearningMode:

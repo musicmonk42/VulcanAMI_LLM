@@ -7,6 +7,9 @@ FIXED: Consistent return format for _granger_causality_test method.
 """
 
 from __future__ import annotations
+from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
+                              ReasoningType)
+from .reasoning_explainer import ReasoningExplainer
 
 import json
 import logging
@@ -88,10 +91,6 @@ except ImportError:
         "lingam not available. LiNGAM algorithm will fall back to PC."
     )
 
-
-from .reasoning_explainer import ReasoningExplainer
-from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
-                              ReasoningType)
 
 logger = logging.getLogger(__name__)
 

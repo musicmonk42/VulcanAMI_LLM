@@ -5,21 +5,6 @@ Tests all bandit algorithms, exploration strategies, off-policy evaluation,
 and numerical stability fixes.
 """
 
-import pytest
-
-# Skip entire module if torch is not available
-torch = pytest.importorskip(
-    "torch", reason="PyTorch required for contextual_bandit tests"
-)
-
-import logging
-import shutil
-import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch
-
-import numpy as np
-
 from vulcan.reasoning.contextual_bandit import (AdaptiveBanditOrchestrator,
                                                 BanditAction, BanditContext,
                                                 BanditFeedback,
@@ -29,6 +14,18 @@ from vulcan.reasoning.contextual_bandit import (AdaptiveBanditOrchestrator,
                                                 NeuralContextualBandit,
                                                 OffPolicyEvaluator,
                                                 ToolSelectionBandit)
+import numpy as np
+from unittest.mock import Mock, patch
+from pathlib import Path
+import tempfile
+import shutil
+import logging
+import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip(
+    "torch", reason="PyTorch required for contextual_bandit tests"
+)
 
 
 # Fixtures

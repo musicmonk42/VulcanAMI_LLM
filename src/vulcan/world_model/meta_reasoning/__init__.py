@@ -39,6 +39,49 @@ Usage:
         improvement = si_drive.step(context)
 """
 
+from .value_evolution_tracker import (DriftAlert, DriftSeverity,
+                                      TrendDirection, ValueChangeType,
+                                      ValueEvolutionAnalysis,
+                                      ValueEvolutionTracker, ValueState,
+                                      ValueTrajectory)
+from .validation_tracker import (LearningInsight, ObjectiveBlocker,
+                                 PatternType, ValidationOutcome,
+                                 ValidationPattern, ValidationRecord,
+                                 ValidationTracker)
+from .transparency_interface import (SerializationFormat,
+                                     TransparencyInterface,
+                                     TransparencyMetadata)
+from .self_improvement_drive import (FailureType, ImprovementObjective,
+                                     SelfImprovementDrive,
+                                     SelfImprovementState, TriggerType)
+from .preference_learner import (BanditArm, Preference, PreferenceLearner,
+                                 PreferencePrediction, PreferenceSignal,
+                                 PreferenceSignalType, PreferenceStrength)
+from .objective_negotiator import (AgentProposal, ConflictResolution,
+                                   NegotiationOutcome, NegotiationResult,
+                                   NegotiationStrategy, ObjectiveNegotiator)
+from .objective_hierarchy import Objective, ObjectiveHierarchy, ObjectiveType
+from .objective_hierarchy import ConflictType as HierarchyConflictType
+from .motivational_introspection import (MotivationalIntrospection,
+                                         ObjectiveAnalysis, ObjectiveStatus,
+                                         ProposalValidation)
+from .internal_critic import (ComparisonResult, Critique, CritiqueLevel,
+                              Evaluation, EvaluationPerspective,
+                              InternalCritic, PerspectiveScore, Risk,
+                              RiskCategory, RiskSeverity)
+from .goal_conflict_detector import (Conflict, ConflictSeverity, ConflictType,
+                                     GoalConflictDetector,
+                                     MultiObjectiveTension)
+from .ethical_boundary_monitor import (BoundaryCategory, BoundaryType,
+                                       EnforcementAction, EnforcementLevel,
+                                       EthicalBoundary, EthicalBoundaryMonitor,
+                                       EthicalViolation, ViolationSeverity)
+from .curiosity_reward_shaper import (CuriosityMethod, CuriosityRewardShaper,
+                                      CuriosityStatistics, EpisodicMemory,
+                                      NoveltyEstimate, NoveltyLevel)
+from .counterfactual_objectives import (CounterfactualObjectiveReasoner,
+                                        CounterfactualOutcome,
+                                        ObjectiveComparison, ParetoPoint)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -46,51 +89,8 @@ logger = logging.getLogger(__name__)
 __version__ = "1.0.0"
 __author__ = "VULCAN-AMI Team"
 
-from .counterfactual_objectives import (CounterfactualObjectiveReasoner,
-                                        CounterfactualOutcome,
-                                        ObjectiveComparison, ParetoPoint)
-from .curiosity_reward_shaper import (CuriosityMethod, CuriosityRewardShaper,
-                                      CuriosityStatistics, EpisodicMemory,
-                                      NoveltyEstimate, NoveltyLevel)
-from .ethical_boundary_monitor import (BoundaryCategory, BoundaryType,
-                                       EnforcementAction, EnforcementLevel,
-                                       EthicalBoundary, EthicalBoundaryMonitor,
-                                       EthicalViolation, ViolationSeverity)
-from .goal_conflict_detector import (Conflict, ConflictSeverity, ConflictType,
-                                     GoalConflictDetector,
-                                     MultiObjectiveTension)
 # Added import for InternalCritic and related items
-from .internal_critic import (ComparisonResult, Critique, CritiqueLevel,
-                              Evaluation, EvaluationPerspective,
-                              InternalCritic, PerspectiveScore, Risk,
-                              RiskCategory, RiskSeverity)
 # Core components
-from .motivational_introspection import (MotivationalIntrospection,
-                                         ObjectiveAnalysis, ObjectiveStatus,
-                                         ProposalValidation)
-from .objective_hierarchy import ConflictType as HierarchyConflictType
-from .objective_hierarchy import Objective, ObjectiveHierarchy, ObjectiveType
-from .objective_negotiator import (AgentProposal, ConflictResolution,
-                                   NegotiationOutcome, NegotiationResult,
-                                   NegotiationStrategy, ObjectiveNegotiator)
-from .preference_learner import (BanditArm, Preference, PreferenceLearner,
-                                 PreferencePrediction, PreferenceSignal,
-                                 PreferenceSignalType, PreferenceStrength)
-from .self_improvement_drive import (FailureType, ImprovementObjective,
-                                     SelfImprovementDrive,
-                                     SelfImprovementState, TriggerType)
-from .transparency_interface import (SerializationFormat,
-                                     TransparencyInterface,
-                                     TransparencyMetadata)
-from .validation_tracker import (LearningInsight, ObjectiveBlocker,
-                                 PatternType, ValidationOutcome,
-                                 ValidationPattern, ValidationRecord,
-                                 ValidationTracker)
-from .value_evolution_tracker import (DriftAlert, DriftSeverity,
-                                      TrendDirection, ValueChangeType,
-                                      ValueEvolutionAnalysis,
-                                      ValueEvolutionTracker, ValueState,
-                                      ValueTrajectory)
 
 # Import auto_apply_policy with fallback
 try:

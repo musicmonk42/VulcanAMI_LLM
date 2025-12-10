@@ -14,6 +14,11 @@ Tests cover:
 - Performance benchmarks
 """
 
+from hierarchical_context import (ConsolidationStrategy, EpisodicItem,
+                                  HierarchicalContext, MemoryStatistics,
+                                  MemoryTier, ProceduralPattern,
+                                  PruningStrategy, RetrievalStrategy,
+                                  SemanticEntry, create_default_memory)
 import json
 import sys
 import threading
@@ -24,11 +29,6 @@ from unittest.mock import Mock, patch
 
 # Import the module to test
 sys.path.insert(0, "/home/claude")
-from hierarchical_context import (ConsolidationStrategy, EpisodicItem,
-                                  HierarchicalContext, MemoryStatistics,
-                                  MemoryTier, ProceduralPattern,
-                                  PruningStrategy, RetrievalStrategy,
-                                  SemanticEntry, create_default_memory)
 
 
 class TestHierarchicalContextBasics(unittest.TestCase):

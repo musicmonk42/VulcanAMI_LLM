@@ -13,6 +13,10 @@ Tests cover:
 - Edge cases and error handling
 """
 
+from vulcan.memory.persistence import (MemoryCompressor, MemoryPersistence,
+                                       MemoryVersionControl, NeuralCompressor,
+                                       SemanticCompressor)
+from vulcan.memory.base import CompressionType, Memory, MemoryType
 import os
 import pickle
 import shutil
@@ -29,10 +33,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from vulcan.memory.base import CompressionType, Memory, MemoryType
-from vulcan.memory.persistence import (MemoryCompressor, MemoryPersistence,
-                                       MemoryVersionControl, NeuralCompressor,
-                                       SemanticCompressor)
 
 # Check if optional dependencies are available
 try:

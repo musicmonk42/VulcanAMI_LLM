@@ -4,22 +4,8 @@ Comprehensive tests for neural_safety.py module.
 Tests neural network models, validators, and safety assessment functionality.
 """
 
-import pytest
-
-# Skip entire module if torch is not available
-torch = pytest.importorskip("torch", reason="PyTorch required for neural_safety tests")
-
-import asyncio
-import shutil
-import tempfile
-import time
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-
+from vulcan.safety.safety_types import (ActionType, SafetyReport,
+                                        SafetyViolationType)
 from vulcan.safety.neural_safety import (AnomalyDetector, BayesianSafetyNet,
                                          GraphSafetyNetwork,
                                          MemoryBoundedDeque, ModelConfig,
@@ -27,8 +13,20 @@ from vulcan.safety.neural_safety import (AnomalyDetector, BayesianSafetyNet,
                                          SafetyClassifier,
                                          TransformerSafetyModel,
                                          VariationalSafetyAutoencoder)
-from vulcan.safety.safety_types import (ActionType, SafetyReport,
-                                        SafetyViolationType)
+import torch.nn as nn
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from typing import Any, Dict, List
+from pathlib import Path
+import time
+import tempfile
+import shutil
+import asyncio
+import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for neural_safety tests")
+
 
 # ============================================================
 # FIXTURES

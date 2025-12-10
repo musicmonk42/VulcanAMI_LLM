@@ -634,11 +634,12 @@ class WarmStartPool:
                             )
                         else:
                             # Just name
-                            factory = lambda n=tool_name_arg, cls=tool_class: cls(n)
+                            def factory(n=tool_name_arg, cls=tool_class): return cls(n)
                     elif hasattr(tool_instance, "config"):
                         # Config-based tool without name attribute
                         config = getattr(tool_instance, "config", {})
-                        factory = lambda n=tool_name, c=config, cls=tool_class: cls(
+
+                        def factory(n=tool_name, c=config, cls=tool_class): return cls(
                             n, c
                         )
                     else:
@@ -646,13 +647,13 @@ class WarmStartPool:
                         try:
                             # Try creating with no args to test
                             test = tool_class()
-                            factory = lambda cls=tool_class: cls()
+                            def factory(cls=tool_class): return cls()
                         except Exception:
                             # Can't instantiate - use as singleton (not ideal but safe)
                             logger.warning(
                                 f"Using {tool_name} as singleton - factory creation failed"
                             )
-                            factory = lambda inst=tool_instance: inst
+                            def factory(inst=tool_instance): return inst
 
                 # Create pool
                 pool = ToolPool(

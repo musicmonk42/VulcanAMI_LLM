@@ -17,6 +17,9 @@ Tests cover:
 """
 
 # Add parent directory to path for imports
+from semantic_bridge.concept_mapper import (Concept, ConceptMapper, EffectType,
+                                            GroundingStatus, MeasurableEffect,
+                                            PatternOutcome)
 import sys
 import threading
 import time
@@ -29,10 +32,6 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from semantic_bridge.concept_mapper import (Concept, ConceptMapper, EffectType,
-                                            GroundingStatus, MeasurableEffect,
-                                            PatternOutcome)
 
 
 # Mock classes for testing

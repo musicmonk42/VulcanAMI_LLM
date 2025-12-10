@@ -13,6 +13,9 @@ Tests cover:
 - Performance metrics
 """
 
+from unified_generation import (CandidateMetadata, FusionStrategy,
+                                NormalizationMethod, UnifiedGenConfig,
+                                UnifiedGeneration)
 import math
 import os
 import sys
@@ -22,10 +25,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from unified_generation import (CandidateMetadata, FusionStrategy,
-                                NormalizationMethod, UnifiedGenConfig,
-                                UnifiedGeneration)
 
 
 class MockModule:

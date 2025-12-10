@@ -4,6 +4,12 @@
 # FIXED: Added concrete TestTaskQueue implementation for testing base interface
 # ============================================================
 
+from vulcan.orchestrator.task_queues import (CELERY_AVAILABLE, RAY_AVAILABLE,
+                                             ZMQ_AVAILABLE, CeleryTaskQueue,
+                                             CustomTaskQueue, QueueType,
+                                             RayTaskQueue, TaskMetadata,
+                                             TaskQueueInterface, TaskStatus,
+                                             create_task_queue)
 import sys
 import threading
 import time
@@ -18,12 +24,6 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.task_queues import (CELERY_AVAILABLE, RAY_AVAILABLE,
-                                             ZMQ_AVAILABLE, CeleryTaskQueue,
-                                             CustomTaskQueue, QueueType,
-                                             RayTaskQueue, TaskMetadata,
-                                             TaskQueueInterface, TaskStatus,
-                                             create_task_queue)
 
 # ============================================================
 # CONCRETE TEST IMPLEMENTATION

@@ -5,6 +5,12 @@ Tests Bayesian priors, similarity search, memory indexing, cache management,
 and all prior computation strategies.
 """
 
+from vulcan.reasoning.selection.memory_prior import (AdaptivePriorSelector,
+                                                     BayesianMemoryPrior,
+                                                     MemoryEntry, MemoryIndex,
+                                                     PriorDistribution,
+                                                     PriorType,
+                                                     SimilarityMetric)
 import shutil
 # Import the module to test
 import sys
@@ -19,13 +25,6 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from vulcan.reasoning.selection.memory_prior import (AdaptivePriorSelector,
-                                                     BayesianMemoryPrior,
-                                                     MemoryEntry, MemoryIndex,
-                                                     PriorDistribution,
-                                                     PriorType,
-                                                     SimilarityMetric)
 
 
 class TestEnums:

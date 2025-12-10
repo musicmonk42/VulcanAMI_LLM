@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import asdict, dataclass, field
 
 """
 Governed Trainer - Production Implementation (Revised)
@@ -46,7 +47,6 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
-from dataclasses import asdict, dataclass, field
 
 # ============================= CONSTANTS ============================= #
 

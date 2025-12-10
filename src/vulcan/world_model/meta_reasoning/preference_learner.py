@@ -1657,7 +1657,8 @@ class PreferenceLearner:
                     self.preferences[pref_key] = Preference(
                         feature=feature_name,
                         preferred_value=feature_value,  # Store original value
-                        context_conditions=signal.context,  # Associate with current context? Or make context handling more complex? Simple association for now.
+                        # Associate with current context? Or make context handling more complex? Simple association for now.
+                        context_conditions=signal.context,
                     )
                     self.preference_index[feature_name].append(pref_key)
                 else:

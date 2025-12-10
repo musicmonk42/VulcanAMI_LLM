@@ -6,6 +6,11 @@ and adaptive admission control with proper thread safety validation.
 """
 
 # Import the module to test
+from vulcan.reasoning.selection.admission_control import (
+    AdaptiveAdmissionController, AdmissionControlIntegration,
+    AdmissionDecision, AdmissionMetrics, CircuitBreaker, PriorityQueue,
+    Request, RequestPriority, ResourceMonitor, SlidingWindowRateLimiter,
+    SystemHealth, TokenBucketRateLimiter)
 import sys
 import threading
 import time
@@ -17,12 +22,6 @@ import psutil
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from vulcan.reasoning.selection.admission_control import (
-    AdaptiveAdmissionController, AdmissionControlIntegration,
-    AdmissionDecision, AdmissionMetrics, CircuitBreaker, PriorityQueue,
-    Request, RequestPriority, ResourceMonitor, SlidingWindowRateLimiter,
-    SystemHealth, TokenBucketRateLimiter)
 
 
 class TestEnums:

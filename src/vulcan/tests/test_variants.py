@@ -3,6 +3,14 @@
 # Comprehensive test suite for variants.py
 # ============================================================
 
+from vulcan.orchestrator.variants import (PYTHON_VERSION,
+                                          SUPPORTS_EXECUTOR_TIMEOUT,
+                                          AdaptiveOrchestrator, ExecutionError,
+                                          FaultTolerantOrchestrator,
+                                          ParallelOrchestrator,
+                                          PerceptionError, PerformanceMonitor,
+                                          ReasoningError, StrategySelector,
+                                          shutdown_executor_with_timeout)
 import asyncio
 import sys
 import threading
@@ -21,14 +29,6 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.variants import (PYTHON_VERSION,
-                                          SUPPORTS_EXECUTOR_TIMEOUT,
-                                          AdaptiveOrchestrator, ExecutionError,
-                                          FaultTolerantOrchestrator,
-                                          ParallelOrchestrator,
-                                          PerceptionError, PerformanceMonitor,
-                                          ReasoningError, StrategySelector,
-                                          shutdown_executor_with_timeout)
 
 # ============================================================
 # TEST HELPERS

@@ -2,29 +2,26 @@
 Test suite for parameter history management module
 """
 
+from vulcan.learning.parameter_history import ParameterHistoryManager
+from vulcan.learning.learning_types import LearningConfig, LearningTrajectory
+import torch.nn as nn
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+from collections import deque
+import time
+import threading
+import tempfile
+import shutil
+import queue
+import pickle
+import json
 import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip(
     "torch", reason="PyTorch required for parameter_history tests"
 )
-
-import json
-import pickle
-import queue
-import shutil
-import tempfile
-import threading
-import time
-from collections import deque
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-
-from vulcan.learning.learning_types import LearningConfig, LearningTrajectory
-from vulcan.learning.parameter_history import ParameterHistoryManager
 
 
 class SimpleModel(nn.Module):

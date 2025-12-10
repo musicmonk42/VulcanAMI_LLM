@@ -5,6 +5,11 @@
 # FIXED: test_shutdown - increased wait time for thread shutdown
 # ============================================================
 
+from vulcan.orchestrator.metrics import (AggregationType,
+                                         EnhancedMetricsCollector, MetricType,
+                                         compute_moving_average,
+                                         compute_percentile, compute_rate,
+                                         create_metrics_collector)
 import sys
 import threading
 import time
@@ -19,11 +24,6 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.metrics import (AggregationType,
-                                         EnhancedMetricsCollector, MetricType,
-                                         compute_moving_average,
-                                         compute_percentile, compute_rate,
-                                         create_metrics_collector)
 
 # ============================================================
 # TEST: ENUMS

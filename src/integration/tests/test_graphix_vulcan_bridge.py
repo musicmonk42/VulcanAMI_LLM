@@ -2,6 +2,9 @@
 Comprehensive tests for graphix_vulcan_bridge.py
 """
 
+from graphix_vulcan_bridge import (BridgeConfig, BridgeContext,
+                                   GraphixVulcanBridge, HierarchicalMemory,
+                                   UnifiedReasoning, WorldModelCore)
 import asyncio
 import sys
 from unittest.mock import AsyncMock, Mock, patch
@@ -10,10 +13,6 @@ import pytest
 import torch
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from graphix_vulcan_bridge import (BridgeConfig, BridgeContext,
-                                   GraphixVulcanBridge, HierarchicalMemory,
-                                   UnifiedReasoning, WorldModelCore)
 
 
 class TestBridgeConfig:

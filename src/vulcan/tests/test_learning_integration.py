@@ -12,6 +12,23 @@ Tests:
 - State persistence
 """
 
+from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
+                                                        DecompositionStep,
+                                                        ExecutionOutcome,
+                                                        ProblemGraph)
+from problem_decomposer.learning_integration import (
+    DecompositionDifficultyEstimator, IntegratedLearningCoordinator,
+    ProblemToExperienceConverter, RLHFFeedbackRouter, UnifiedDecomposerLearner,
+    create_unified_decomposer)
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from typing import Any, Dict, List
+from pathlib import Path
+import time
+import tempfile
+import sys
+import shutil
+import logging
 import pytest
 
 # Skip entire module if torch is not available
@@ -19,29 +36,11 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for learning_integration tests"
 )
 
-import logging
-import shutil
-import sys
-import tempfile
-import time
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
-from problem_decomposer.learning_integration import (
-    DecompositionDifficultyEstimator, IntegratedLearningCoordinator,
-    ProblemToExperienceConverter, RLHFFeedbackRouter, UnifiedDecomposerLearner,
-    create_unified_decomposer)
-from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
-                                                        DecompositionStep,
-                                                        ExecutionOutcome,
-                                                        ProblemGraph)
 
 # Configure logging
 logging.basicConfig(

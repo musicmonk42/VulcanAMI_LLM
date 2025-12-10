@@ -2,17 +2,16 @@
 Tests for cognitive_loop.py
 """
 
+from cognitive_loop import (CognitiveLoop, CognitiveLoopResult,
+                            LoopRuntimeConfig, LoopSamplingConfig, apply_top_k,
+                            apply_top_p, choose_token, penalize_repetition,
+                            softmax)
 import sys
 
 import pytest
 
 # Import from current directory instead of uploads
 sys.path.insert(0, "/mnt/user-data/outputs")
-
-from cognitive_loop import (CognitiveLoop, CognitiveLoopResult,
-                            LoopRuntimeConfig, LoopSamplingConfig, apply_top_k,
-                            apply_top_p, choose_token, penalize_repetition,
-                            softmax)
 
 
 class MockBridge:

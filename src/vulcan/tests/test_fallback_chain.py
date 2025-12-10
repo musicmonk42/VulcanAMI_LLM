@@ -11,6 +11,12 @@ Tests:
 - Statistics tracking
 """
 
+from problem_decomposer.problem_decomposer_core import ProblemGraph
+from problem_decomposer.fallback_chain import (ComponentType,
+                                               DecompositionComponent,
+                                               DecompositionFailure,
+                                               ExecutionPlan, FailureType,
+                                               FallbackChain, StrategyStatus)
 import logging
 import sys
 import time
@@ -25,12 +31,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
-from problem_decomposer.fallback_chain import (ComponentType,
-                                               DecompositionComponent,
-                                               DecompositionFailure,
-                                               ExecutionPlan, FailureType,
-                                               FallbackChain, StrategyStatus)
-from problem_decomposer.problem_decomposer_core import ProblemGraph
 
 # Configure logging
 logging.basicConfig(

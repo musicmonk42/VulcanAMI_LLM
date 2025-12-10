@@ -16,6 +16,13 @@ Complete fixed version with all edge cases and platform compatibility.
 FIXED: test_granger_causality now provides sufficient data points.
 """
 
+from vulcan.reasoning.reasoning_types import ReasoningType
+from vulcan.reasoning.causal_reasoning import (CausalEdge, CausalReasoner,
+                                               CausalReasoningEngine,
+                                               CounterfactualReasoner,
+                                               CounterfactualResult,
+                                               EnhancedCausalReasoning,
+                                               InterventionResult)
 import os
 import sys
 import threading
@@ -45,13 +52,6 @@ try:
 except ImportError:
     NETWORKX_AVAILABLE = False
 
-from vulcan.reasoning.causal_reasoning import (CausalEdge, CausalReasoner,
-                                               CausalReasoningEngine,
-                                               CounterfactualReasoner,
-                                               CounterfactualResult,
-                                               EnhancedCausalReasoning,
-                                               InterventionResult)
-from vulcan.reasoning.reasoning_types import ReasoningType
 
 # ============================================================================
 # Fixtures

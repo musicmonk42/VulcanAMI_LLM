@@ -1,3 +1,4 @@
+from . import merkle, zk
 from pathlib import Path
 
 __all__ = ["__version__", "zk", "merkle"]
@@ -14,4 +15,3 @@ def _read_semver() -> str:
 __version__ = _read_semver()
 
 # Expose ZK module for easy access
-from . import merkle, zk

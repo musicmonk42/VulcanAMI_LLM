@@ -22,6 +22,12 @@ FIXES APPLIED (corrected version):
 3. test_full_search_workflow: Added skip - Same source code bug as test_hybrid_search.
 """
 
+from vulcan.memory.retrieval import (FAISS_AVAILABLE, TORCH_AVAILABLE,
+                                     WHOOSH_AVAILABLE, AttentionMechanism,
+                                     LearnedAttention, MemoryIndex,
+                                     MemorySearch, NumpyIndex, RetrievalResult,
+                                     TemporalIndex, TextSearchIndex)
+from vulcan.memory.base import Memory, MemoryQuery, MemoryType
 import os
 import pickle
 import shutil
@@ -37,12 +43,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.base import Memory, MemoryQuery, MemoryType
-from vulcan.memory.retrieval import (FAISS_AVAILABLE, TORCH_AVAILABLE,
-                                     WHOOSH_AVAILABLE, AttentionMechanism,
-                                     LearnedAttention, MemoryIndex,
-                                     MemorySearch, NumpyIndex, RetrievalResult,
-                                     TemporalIndex, TextSearchIndex)
 
 # ============================================================
 # FIXTURES

@@ -419,7 +419,7 @@ class InternalCritic:
             f"  Strict mode: {strict_mode}, Adaptive weights: {self.adaptive_weights}"
         )
         logger.info(
-            f"  Perspective weights: { {p.value: w for p, w in self.perspective_weights.items()} }"
+            f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
         )
 
     def evaluate_proposal(
@@ -2061,7 +2061,7 @@ class InternalCritic:
                     }
 
                 logger.debug(
-                    f"New perspective weights: { {p.value: w for p, w in self.perspective_weights.items()} }"
+                    f"New perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
                 )
 
         # Optional: Slightly decrease weights of perspectives that gave high scores to a failed proposal? (More complex logic)

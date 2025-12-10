@@ -2,25 +2,22 @@
 Test suite for meta-learning module
 """
 
+from vulcan.learning.meta_learning import (MetaLearner, MetaLearningAlgorithm,
+                                           TaskDetector, TaskStatistics)
+from vulcan.learning.learning_types import LearningConfig
+from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, ModalityType
+import torch.nn as nn
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+import time
+import tempfile
+import shutil
+import pickle
 import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for meta_learning tests")
-
-import pickle
-import shutil
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-
-from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, ModalityType
-from vulcan.learning.learning_types import LearningConfig
-from vulcan.learning.meta_learning import (MetaLearner, MetaLearningAlgorithm,
-                                           TaskDetector, TaskStatistics)
 
 
 class SimpleModel(nn.Module):

@@ -10,6 +10,7 @@ Tests cover:
 - Async operations
 """
 
+from lsm import BloomFilter, MerkleLSM, MerkleLSMDAG, MerkleNode, Packfile
 import asyncio
 import pickle
 import sys
@@ -21,8 +22,6 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from lsm import BloomFilter, MerkleLSM, MerkleLSMDAG, MerkleNode, Packfile
 
 
 class TestBloomFilter:

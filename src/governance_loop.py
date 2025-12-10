@@ -709,7 +709,7 @@ class GovernanceLoop:
             entry_copy = copy.deepcopy(entry)
             entry_copy["id"] = hashlib.md5(
                 json.dumps(entry_copy, sort_keys=True).encode()
-            , usedforsecurity=False).hexdigest()[:8]
+                , usedforsecurity=False).hexdigest()[:8]
 
             with self.lock:
                 self.audit_log.append(entry_copy)

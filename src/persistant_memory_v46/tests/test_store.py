@@ -11,6 +11,7 @@ Tests cover:
 - Edge cases
 """
 
+from store import PackfileStore, S3Store
 import asyncio
 import hashlib
 import sys
@@ -21,8 +22,6 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from store import PackfileStore, S3Store
 
 
 class TestS3Store:

@@ -2,28 +2,25 @@
 Test suite for metacognition module
 """
 
-import pytest
-
-# Skip entire module if torch is not available
-torch = pytest.importorskip("torch", reason="PyTorch required for metacognition tests")
-
-import shutil
-import tempfile
-import time
-from collections import deque
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-import torch.optim as optim
-
-from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
 from vulcan.learning.metacognition import (CausalRelation,
                                            CompositionalUnderstanding,
                                            ConfidenceEstimator,
                                            MetaCognitiveMonitor,
                                            ReasoningPhase, ReasoningStep)
+from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
+import torch.optim as optim
+import torch.nn as nn
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from pathlib import Path
+from collections import deque
+import time
+import tempfile
+import shutil
+import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for metacognition tests")
 
 
 class SimpleModel(nn.Module):

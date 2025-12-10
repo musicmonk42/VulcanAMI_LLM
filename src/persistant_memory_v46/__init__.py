@@ -12,6 +12,7 @@ Author: Vulcan LLM
 Version: 46
 """
 
+import logging
 from .graph_rag import GraphNode, GraphRAG, RetrievalResult
 from .lsm import BloomFilter, MerkleLSM, MerkleLSMDAG, Packfile
 from .store import PackfileStore
@@ -176,7 +177,6 @@ def quick_start(s3_bucket: str, **kwargs):
 
 
 # Package initialization
-import logging
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

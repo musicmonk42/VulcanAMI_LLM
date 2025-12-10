@@ -13,6 +13,12 @@ Tests all major functionality including:
 - Error handling
 """
 
+from dynamic_architecture import (ArchChangeResult, ArchitectureStats,
+                                  ChangeType, Constraints, DynamicArchConfig,
+                                  DynamicArchitecture, SnapshotPolicy,
+                                  ValidationLevel, ValidationResult,
+                                  create_default_controller,
+                                  create_strict_controller)
 import json
 import sys
 import tempfile
@@ -24,13 +30,6 @@ from unittest.mock import MagicMock, Mock, patch
 
 # Add the uploads directory to path
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from dynamic_architecture import (ArchChangeResult, ArchitectureStats,
-                                  ChangeType, Constraints, DynamicArchConfig,
-                                  DynamicArchitecture, SnapshotPolicy,
-                                  ValidationLevel, ValidationResult,
-                                  create_default_controller,
-                                  create_strict_controller)
 
 
 class TestDynamicArchitectureBasics(unittest.TestCase):

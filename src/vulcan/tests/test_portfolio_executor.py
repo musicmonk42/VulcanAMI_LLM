@@ -6,6 +6,12 @@ and proper future cleanup.
 """
 
 # Import the module to test
+from vulcan.reasoning.selection.portfolio_executor import (ExecutionMonitor,
+                                                           ExecutionStatus,
+                                                           ExecutionStrategy,
+                                                           PortfolioExecutor,
+                                                           PortfolioResult,
+                                                           ToolExecution)
 import sys
 import threading
 import time
@@ -17,13 +23,6 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from vulcan.reasoning.selection.portfolio_executor import (ExecutionMonitor,
-                                                           ExecutionStatus,
-                                                           ExecutionStrategy,
-                                                           PortfolioExecutor,
-                                                           PortfolioResult,
-                                                           ToolExecution)
 
 
 # Mock tool classes for testing

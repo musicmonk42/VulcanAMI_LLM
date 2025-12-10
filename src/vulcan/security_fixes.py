@@ -26,6 +26,16 @@ Apply these fixes systematically across the codebase.
 # FIX 2: Safe Pickle Loading
 # ============================================================================
 
+import string
+import secrets
+from typing import Dict, List
+from typing import Callable, Optional, TypeVar
+from functools import wraps
+import traceback
+from pathlib import Path
+import subprocess
+import shlex
+import re
 import io
 import logging
 import os
@@ -234,11 +244,6 @@ def safe_pickle_load(file_or_path: Union[str, os.PathLike, BinaryIO]) -> Any:
 # FIX 3: Safe Subprocess Execution
 # ============================================================================
 
-import re
-import shlex
-import subprocess
-from pathlib import Path
-
 
 def validate_file_path(file_path: str, allowed_base: str = None) -> Path:
     """
@@ -343,9 +348,6 @@ def safe_git_commit(message: str, repo_root: str = ".") -> subprocess.CompletedP
 # FIX 4: Enhanced Error Handling Pattern
 # ============================================================================
 
-import traceback
-from functools import wraps
-from typing import Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -401,8 +403,6 @@ def safe_execute(
 # ============================================================================
 # FIX 5: Production Configuration Validation
 # ============================================================================
-
-from typing import Dict, List
 
 
 class ConfigurationError(Exception):
@@ -467,9 +467,6 @@ def validate_production_config() -> None:
 # ============================================================================
 # FIX 6: Secure Random Token Generation
 # ============================================================================
-
-import secrets
-import string
 
 
 def generate_secure_token(length: int = 32) -> str:

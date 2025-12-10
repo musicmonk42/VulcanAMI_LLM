@@ -681,7 +681,7 @@ class GraphCompiler:
             # Link to shared library
             with tempfile.NamedTemporaryFile(suffix=".so", delete=False) as so_f:
                 so_file = so_f.name
-            
+
             subprocess.run(
                 ["gcc", "-shared", "-fPIC", obj_file, "-o", so_file],
                 check=True,

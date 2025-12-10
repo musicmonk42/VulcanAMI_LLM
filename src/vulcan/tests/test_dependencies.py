@@ -4,6 +4,14 @@
 # FIXED: Corrected test_complex_dependency_setup to match actual shutdown behavior
 # ============================================================
 
+from vulcan.orchestrator.dependencies import (DependencyCategory,
+                                              EnhancedCollectiveDeps,
+                                              create_full_deps,
+                                              create_minimal_deps,
+                                              get_status_symbol,
+                                              print_dependency_report,
+                                              safe_print,
+                                              validate_dependencies)
 import io
 import logging
 import sys
@@ -17,14 +25,6 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.dependencies import (DependencyCategory,
-                                              EnhancedCollectiveDeps,
-                                              create_full_deps,
-                                              create_minimal_deps,
-                                              get_status_symbol,
-                                              print_dependency_report,
-                                              safe_print,
-                                              validate_dependencies)
 
 # ============================================================
 # MOCK COMPONENTS

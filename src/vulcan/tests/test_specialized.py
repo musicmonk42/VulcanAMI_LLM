@@ -10,6 +10,13 @@ Tests cover:
 - Edge cases and error handling
 """
 
+from vulcan.memory.specialized import (NETWORKX_AVAILABLE, Concept, Episode,
+                                       EpisodicMemory, ProceduralMemory,
+                                       SemanticMemory, Skill,
+                                       ToolPerformanceConcept, WorkingMemory,
+                                       WorkingMemoryBuffer)
+from vulcan.memory.base import (Memory, MemoryConfig, MemoryQuery, MemoryType,
+                                RetrievalResult)
 import os
 import shutil
 # Import the module under test
@@ -25,13 +32,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.base import (Memory, MemoryConfig, MemoryQuery, MemoryType,
-                                RetrievalResult)
-from vulcan.memory.specialized import (NETWORKX_AVAILABLE, Concept, Episode,
-                                       EpisodicMemory, ProceduralMemory,
-                                       SemanticMemory, Skill,
-                                       ToolPerformanceConcept, WorkingMemory,
-                                       WorkingMemoryBuffer)
 
 # ============================================================
 # FIXTURES

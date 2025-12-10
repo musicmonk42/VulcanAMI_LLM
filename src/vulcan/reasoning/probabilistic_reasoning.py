@@ -9,6 +9,8 @@ FULLY IMPLEMENTED VERSION with:
 - Automatic relevance determination (ARD)
 """
 
+from .reasoning_types import ReasoningResult, ReasoningStep, ReasoningType
+from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
 import hashlib
 import json
 import logging
@@ -61,9 +63,6 @@ try:
 except ImportError:
     SCIPY_AVAILABLE = False
     logger.warning("scipy not available, some features limited")
-
-from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
-from .reasoning_types import ReasoningResult, ReasoningStep, ReasoningType
 
 
 class FeatureExtractor:
@@ -266,7 +265,7 @@ class FeatureExtractor:
             # Hash of keys
             key_hash = hashlib.md5(
                 "".join(sorted(str(k) for k in data.keys())).encode()
-            , usedforsecurity=False)
+                , usedforsecurity=False)
             key_hash_int = int(key_hash.hexdigest()[:8], 16)
             features.append(key_hash_int / 1e10)
 

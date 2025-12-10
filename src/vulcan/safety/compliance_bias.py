@@ -1805,7 +1805,7 @@ class BiasDetector:
             json.dumps(
                 {"action": action, "context": context}, sort_keys=True, default=str
             ).encode()
-        , usedforsecurity=False).hexdigest()
+            , usedforsecurity=False).hexdigest()
 
         # Check cache
         cached_result = self.prediction_cache.get(cache_key)

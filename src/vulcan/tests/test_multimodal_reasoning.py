@@ -5,27 +5,7 @@ Tests all fusion strategies, cross-modal alignment, feature extraction,
 and numerical stability fixes.
 """
 
-import pytest
-
-# Skip entire module if torch is not available (multimodal_reasoning uses torch internally)
-torch = pytest.importorskip(
-    "torch", reason="PyTorch required for multimodal_reasoning tests"
-)
-
-import logging
-import shutil
-import tempfile
-import warnings
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-
-# Filter warnings during tests
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
-
+from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
 from vulcan.reasoning.multimodal_reasoning import (TORCH_AVAILABLE,
                                                    AttentionFusion,
                                                    CrossModalAlignment,
@@ -33,7 +13,25 @@ from vulcan.reasoning.multimodal_reasoning import (TORCH_AVAILABLE,
                                                    FusionStrategy, GatedFusion,
                                                    ModalityData, ModalityType,
                                                    MultiModalReasoningEngine)
-from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from typing import Any, Dict
+from pathlib import Path
+import warnings
+import tempfile
+import shutil
+import logging
+import pytest
+
+# Skip entire module if torch is not available (multimodal_reasoning uses torch internally)
+torch = pytest.importorskip(
+    "torch", reason="PyTorch required for multimodal_reasoning tests"
+)
+
+
+# Filter warnings during tests
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 # Fixtures

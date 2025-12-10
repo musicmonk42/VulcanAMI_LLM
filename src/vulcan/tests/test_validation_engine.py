@@ -2,6 +2,10 @@
 test_validation_engine.py - Tests for validation_engine.py
 """
 
+from validation_engine import (DomainCategory, DomainTestCase, DomainValidator,
+                               FailureAnalysis, KnowledgeValidator, Principle,
+                               TestResult, ValidationLevel, ValidationResult,
+                               ValidationResults)
 import sys
 import time
 from pathlib import Path
@@ -11,11 +15,6 @@ import pytest
 
 # Add the knowledge_crystallizer directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "knowledge_crystallizer"))
-
-from validation_engine import (DomainCategory, DomainTestCase, DomainValidator,
-                               FailureAnalysis, KnowledgeValidator, Principle,
-                               TestResult, ValidationLevel, ValidationResult,
-                               ValidationResults)
 
 
 class TestPrinciple:

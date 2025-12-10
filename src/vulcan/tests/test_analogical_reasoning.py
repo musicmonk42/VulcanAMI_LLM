@@ -12,6 +12,11 @@ Tests cover:
 FIXED VERSION - All platform compatibility issues resolved
 """
 
+from vulcan.reasoning.analogical_reasoning import (AnalogicalMapping,
+                                                   AnalogicalReasoner,
+                                                   AnalogicalReasoningEngine,
+                                                   Entity, MappingType,
+                                                   Relation)
 import os
 import sys
 import threading
@@ -25,11 +30,6 @@ import pytest
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from vulcan.reasoning.analogical_reasoning import (AnalogicalMapping,
-                                                   AnalogicalReasoner,
-                                                   AnalogicalReasoningEngine,
-                                                   Entity, MappingType,
-                                                   Relation)
 
 # ============================================================================
 # Fixtures

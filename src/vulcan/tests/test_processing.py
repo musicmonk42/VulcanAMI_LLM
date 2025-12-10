@@ -4,29 +4,6 @@
 # FIXED: All 15 test failures resolved
 # Run: pytest src/vulcan/tests/test_processing.py -v --tb=short --cov=src.vulcan.processing --cov-report=html
 
-import pytest
-
-# Skip entire module if torch is not available
-torch = pytest.importorskip("torch", reason="PyTorch required for processing tests")
-
-import asyncio
-import gc
-import json
-import shutil
-import tempfile
-import threading
-import time
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import PIL.Image
-
-# FIXED: Import from src.vulcan.config instead of config
-from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
-                               ModalityType)
-# Import processing module components
 from src.vulcan.processing import (AdaptiveMultimodalProcessor,
                                    CrossModalAttention, DynamicModelManager,
                                    EmbeddingCache, EnhancedEmbeddingCache,
@@ -35,6 +12,28 @@ from src.vulcan.processing import (AdaptiveMultimodalProcessor,
                                    ProcessingQuality, ProcessingResult,
                                    SLOConfig, StreamingProcessor,
                                    VersionedDataLogger, WorkloadManager)
+from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
+                               ModalityType)
+import PIL.Image
+import numpy as np
+from unittest.mock import MagicMock, Mock, patch
+from typing import Any, Dict, List
+from pathlib import Path
+import time
+import threading
+import tempfile
+import shutil
+import json
+import gc
+import asyncio
+import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for processing tests")
+
+
+# FIXED: Import from src.vulcan.config instead of config
+# Import processing module components
 
 # ============================================================
 # FIXTURES

@@ -2,6 +2,10 @@
 Tests for speculative_helpers.py
 """
 
+from speculative_helpers import (KL_THRESHOLD, LowRankDraftTransformer,
+                                 SpeculativeStats,
+                                 speculative_sampling_and_verify,
+                                 speculative_sampling_and_verify_async)
 import sys
 
 import pytest
@@ -9,11 +13,6 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from speculative_helpers import (KL_THRESHOLD, LowRankDraftTransformer,
-                                 SpeculativeStats,
-                                 speculative_sampling_and_verify,
-                                 speculative_sampling_and_verify_async)
 
 
 class MockTransformer(nn.Module):
