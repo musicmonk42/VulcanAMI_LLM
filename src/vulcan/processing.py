@@ -10,7 +10,6 @@
 import asyncio
 import gc
 import hashlib
-import heapq
 import json
 import logging
 import pickle
@@ -19,11 +18,9 @@ import shutil
 import threading
 import time
 import uuid
-import weakref
 from collections import OrderedDict, deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple,
@@ -34,7 +31,6 @@ import PIL.Image
 import psutil
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 # REMOVED: sentence_transformers import - will use internal LLM-based encoder
 from transformers import AutoImageProcessor, AutoModel, AutoTokenizer
 
@@ -530,7 +526,8 @@ class DynamicModelManager:
                 if torch.cuda.is_available():
                     for i in range(torch.cuda.device_count()):
                         mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3  # GB
-                        mem_total = torch.cuda.mem_get_info(i)[1] / 1024**3
+                        # mem_total could be used for future memory tracking
+                        # mem_total = torch.cuda.mem_get_info(i)[1] / 1024**3
 
                         if mem_free < 1.0:  # Less than 1GB free
                             now = time.time()
@@ -2317,7 +2314,8 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
     def process_ir_node(self, node_data: Dict[str, Any]) -> ProcessingResult:
         """Process Graphix IR node data."""
         if UnifiedRuntime:
-            runtime = UnifiedRuntime()
+            # UnifiedRuntime() initialization could be used in the future
+            # runtime = UnifiedRuntime()
             processed = node_data.get("params", node_data)
             return self.process_input(processed)
         else:

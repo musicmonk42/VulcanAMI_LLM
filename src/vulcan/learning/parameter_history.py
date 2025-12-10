@@ -802,5 +802,5 @@ class ParameterHistoryManager:
         if hasattr(self, "_running") and self._running:
             try:
                 self.shutdown()
-            except Exception as e:
+            except Exception:
                 pass  # Suppress errors in destructor

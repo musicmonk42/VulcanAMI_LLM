@@ -21,7 +21,6 @@ CSIU: Records routing outcomes for learning better tie-breaks over time
 """
 
 import inspect
-import json
 import logging
 import pickle
 import threading
@@ -30,7 +29,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 
@@ -47,7 +46,6 @@ _safety_imports_checked = False
 
 def _get_safety_validator():
     """Lazy import of EnhancedSafetyValidator to avoid circular imports."""
-    global _safety_validator_class, _safety_imports_checked
     if not _safety_imports_checked:
         _check_safety_imports()
     return _safety_validator_class
@@ -55,7 +53,6 @@ def _get_safety_validator():
 
 def _get_safety_config():
     """Lazy import of SafetyConfig to avoid circular imports."""
-    global _safety_config_class, _safety_imports_checked
     if not _safety_imports_checked:
         _check_safety_imports()
     return _safety_config_class
@@ -696,7 +693,10 @@ class WorldModelRouter:
                                 parallel_groups=[],
                                 estimated_time_ms=0,
                                 confidence=0.0,
-                                reasoning=f"Observation blocked by safety validator: {obs_safety.get('reason', 'unknown')}",
+                                reasoning=(
+                                    f"Observation blocked by safety validator: "
+                                    f"{obs_safety.get('reason', 'unknown')}"
+                                ),
                                 metadata={"safety_blocked": True},
                             )
                 except Exception as e:

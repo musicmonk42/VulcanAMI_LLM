@@ -10,13 +10,12 @@ import hashlib
 import json
 import logging
 import os
-import pickle
 import sqlite3
 import threading
 import time
-from collections import OrderedDict, defaultdict, deque
+from collections import OrderedDict
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -32,7 +31,6 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # Configure logging
 logging.basicConfig(
@@ -1258,8 +1256,6 @@ if __name__ == "__main__":
     print(
         f"✓ Stored in cache: {persistence.working_memory.recall('test_key') is not None}"
     )
-
-    import time
 
     time.sleep(1.1)
     print(
