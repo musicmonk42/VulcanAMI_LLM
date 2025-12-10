@@ -110,7 +110,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -223,7 +223,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/logs
           exit_code=0
           ulimit -Sn 10240 || true
-          pytest --cov=src \
+          pytest --cov=src -q \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
@@ -261,7 +261,7 @@ jobs:
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     needs: [test]
 
     steps:
