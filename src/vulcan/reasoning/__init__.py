@@ -24,18 +24,21 @@ try:
         PortfolioStrategy,
         UtilityContext,
     )
+
     TYPES_AVAILABLE = True
 except ImportError as e:
     logger.critical(f"Core types import failed: {e}")
     TYPES_AVAILABLE = False
     # Create minimal fallbacks
     from enum import Enum
+
     class ReasoningType(Enum):
         SYMBOLIC = "symbolic"
         CAUSAL = "causal"
         PROBABILISTIC = "probabilistic"
         ANALOGICAL = "analogical"
         MULTIMODAL = "multimodal"
+
 
 # ============================================================================
 # Strategy Enum - Import from unified_reasoning or provide fallback
@@ -45,9 +48,10 @@ try:
 except ImportError as e:
     logger.warning(f"Could not import ReasoningStrategy from unified_reasoning: {e}")
     from enum import Enum
-    
+
     class ReasoningStrategy(Enum):
         """Fallback ReasoningStrategy enum"""
+
         SINGLE = "single"
         SEQUENTIAL = "sequential"
         PARALLEL = "parallel"
@@ -58,11 +62,13 @@ except ImportError as e:
         PORTFOLIO = "portfolio"
         UTILITY_BASED = "utility_based"
 
+
 # ============================================================================
 # Probabilistic Reasoning - Core component
 # ============================================================================
 try:
     from .probabilistic_reasoning import ProbabilisticReasoner
+
     PROBABILISTIC_AVAILABLE = True
 except ImportError as e:
     logger.error(f"Probabilistic reasoning import failed: {e}")
@@ -73,11 +79,8 @@ except ImportError as e:
 # Causal Reasoning - Core component
 # ============================================================================
 try:
-    from .causal_reasoning import (
-        CausalReasoner,
-        EnhancedCausalReasoning,
-        CausalEdge
-    )
+    from .causal_reasoning import CausalReasoner, EnhancedCausalReasoning, CausalEdge
+
     CAUSAL_AVAILABLE = True
 except ImportError as e:
     logger.error(f"Causal reasoning import failed: {e}")
@@ -92,9 +95,10 @@ except ImportError as e:
 try:
     # Primary import from subdirectory - most critical
     from .symbolic.reasoner import SymbolicReasoner
+
     SYMBOLIC_AVAILABLE = True
     logger.info("Symbolic reasoning loaded successfully from symbolic.reasoner")
-    
+
     # Try to import core types - but don't fail if they're not there
     # Import each one individually with its own try/except
     try:
@@ -102,38 +106,38 @@ try:
     except (ImportError, AttributeError) as e:
         logger.debug(f"Could not import Clause: {e}")
         Clause = None
-    
+
     try:
         from .symbolic.core import Literal
     except (ImportError, AttributeError) as e:
         logger.debug(f"Could not import Literal: {e}")
         Literal = None
-    
+
     try:
         from .symbolic.core import Constant
     except (ImportError, AttributeError) as e:
         logger.debug(f"Could not import Constant: {e}")
         Constant = None
-    
+
     try:
         from .symbolic.core import Variable
     except (ImportError, AttributeError) as e:
         logger.debug(f"Could not import Variable: {e}")
         Variable = None
-    
+
     # Try extended symbolic reasoners - optional
     try:
         from .symbolic.reasoner import BayesianReasoner
     except (ImportError, AttributeError) as e:
         logger.debug(f"BayesianReasoner not available: {e}")
         BayesianReasoner = None
-    
+
     try:
         from .symbolic.reasoner import EnhancedSymbolicReasoner
     except (ImportError, AttributeError) as e:
         logger.debug(f"EnhancedSymbolicReasoner not available: {e}")
         EnhancedSymbolicReasoner = None
-    
+
 except ImportError as e:
     logger.error(f"Symbolic reasoning import failed: {e}")
     SymbolicReasoner = None
@@ -163,8 +167,9 @@ try:
         AnalogicalReasoningEngine,
         AnalogicalReasoner,
         Entity,
-        Relation
+        Relation,
     )
+
     ANALOGICAL_AVAILABLE = True
 except ImportError as e:
     logger.error(f"Analogical reasoning import failed: {e}")
@@ -178,10 +183,8 @@ except ImportError as e:
 # Multimodal Reasoning - Core component
 # ============================================================================
 try:
-    from .multimodal_reasoning import (
-        MultiModalReasoningEngine,
-        MultimodalReasoner
-    )
+    from .multimodal_reasoning import MultiModalReasoningEngine, MultimodalReasoner
+
     MULTIMODAL_AVAILABLE = True
 except ImportError as e:
     logger.error(f"Multimodal reasoning import failed: {e}")
@@ -194,6 +197,7 @@ except ImportError as e:
 # ============================================================================
 try:
     from .unified_reasoning import UnifiedReasoner
+
     UNIFIED_AVAILABLE = True
 except ImportError as e:
     logger.critical(f"UnifiedReasoner import failed: {e}")
@@ -204,10 +208,8 @@ except ImportError as e:
 # Explainability - Optional enhancement
 # ============================================================================
 try:
-    from .reasoning_explainer import (
-        ReasoningExplainer,
-        SafetyAwareReasoning
-    )
+    from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+
     EXPLAINER_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Reasoning explainer import failed: {e}")
@@ -219,15 +221,12 @@ except ImportError as e:
 # Tool Selection Components - Optional but recommended
 # ============================================================================
 try:
-    from .selection.tool_selector import (
-        ToolSelector,
-        SelectionRequest,
-        SelectionResult
-    )
+    from .selection.tool_selector import ToolSelector, SelectionRequest, SelectionResult
     from .selection.admission_control import (
         AdmissionControlIntegration,
-        RequestPriority
+        RequestPriority,
     )
+
     SELECTION_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Selection components import failed: {e}")
@@ -246,8 +245,9 @@ try:
         AdaptiveBanditOrchestrator,
         BanditContext,
         BanditFeedback,
-        BanditAction
+        BanditAction,
     )
+
     BANDIT_AVAILABLE = True
 except ImportError as e:
     logger.debug(f"Contextual bandit import failed: {e}")
@@ -262,72 +262,64 @@ except ImportError as e:
 # ============================================================================
 __all__ = [
     # ===== Core Types =====
-    'ReasoningType',
-    'ReasoningStep',
-    'ReasoningChain',
-    'ReasoningResult',
-    'ModalityType',
-    'SelectionMode',
-    'PortfolioStrategy',
-    'UtilityContext',
-    'ReasoningStrategy',
-    
+    "ReasoningType",
+    "ReasoningStep",
+    "ReasoningChain",
+    "ReasoningResult",
+    "ModalityType",
+    "SelectionMode",
+    "PortfolioStrategy",
+    "UtilityContext",
+    "ReasoningStrategy",
     # ===== Main Orchestrator =====
-    'UnifiedReasoner',
-    
+    "UnifiedReasoner",
     # ===== Individual Reasoners =====
-    'ProbabilisticReasoner',
-    'CausalReasoner',
-    'EnhancedCausalReasoning',
-    'SymbolicReasoner',
-    'BayesianReasoner',
-    'EnhancedSymbolicReasoner',
-    'AnalogicalReasoningEngine',
-    'AnalogicalReasoner',
-    'MultiModalReasoningEngine',
-    'MultimodalReasoner',
-    
+    "ProbabilisticReasoner",
+    "CausalReasoner",
+    "EnhancedCausalReasoning",
+    "SymbolicReasoner",
+    "BayesianReasoner",
+    "EnhancedSymbolicReasoner",
+    "AnalogicalReasoningEngine",
+    "AnalogicalReasoner",
+    "MultiModalReasoningEngine",
+    "MultimodalReasoner",
     # ===== Symbolic Types =====
-    'Clause',
-    'Literal',
-    'Constant',
-    'Variable',
-    
+    "Clause",
+    "Literal",
+    "Constant",
+    "Variable",
     # ===== Analogical Types =====
-    'Entity',
-    'Relation',
-    
+    "Entity",
+    "Relation",
     # ===== Causal Types =====
-    'CausalEdge',
-    
+    "CausalEdge",
     # ===== Explainability =====
-    'ReasoningExplainer',
-    'SafetyAwareReasoning',
-    
+    "ReasoningExplainer",
+    "SafetyAwareReasoning",
     # ===== Tool Selection (Optional) =====
-    'ToolSelector',
-    'SelectionRequest',
-    'SelectionResult',
-    'AdmissionControlIntegration',
-    'RequestPriority',
-    
+    "ToolSelector",
+    "SelectionRequest",
+    "SelectionResult",
+    "AdmissionControlIntegration",
+    "RequestPriority",
     # ===== Bandit Learning (Optional) =====
-    'AdaptiveBanditOrchestrator',
-    'BanditContext',
-    'BanditFeedback',
-    'BanditAction',
-    
+    "AdaptiveBanditOrchestrator",
+    "BanditContext",
+    "BanditFeedback",
+    "BanditAction",
     # ===== Availability Flags =====
-    'PROBABILISTIC_AVAILABLE',
-    'CAUSAL_AVAILABLE',
-    'SYMBOLIC_AVAILABLE',
-    'ANALOGICAL_AVAILABLE',
-    'MULTIMODAL_AVAILABLE',
-    'UNIFIED_AVAILABLE',
-    'EXPLAINER_AVAILABLE',
-    'SELECTION_AVAILABLE',
-    'BANDIT_AVAILABLE',
+    "PROBABILISTIC_AVAILABLE",
+    "CAUSAL_AVAILABLE",
+    "SYMBOLIC_AVAILABLE",
+    "ANALOGICAL_AVAILABLE",
+    "MULTIMODAL_AVAILABLE",
+    "UNIFIED_AVAILABLE",
+    "EXPLAINER_AVAILABLE",
+    "SELECTION_AVAILABLE",
+    "BANDIT_AVAILABLE",
 ]
+
 
 # ============================================================================
 # Module Status Report
@@ -335,66 +327,69 @@ __all__ = [
 def get_module_status() -> dict:
     """Get availability status of all reasoning components."""
     return {
-        'probabilistic': PROBABILISTIC_AVAILABLE,
-        'causal': CAUSAL_AVAILABLE,
-        'symbolic': SYMBOLIC_AVAILABLE,
-        'analogical': ANALOGICAL_AVAILABLE,
-        'multimodal': MULTIMODAL_AVAILABLE,
-        'unified': UNIFIED_AVAILABLE,
-        'explainer': EXPLAINER_AVAILABLE,
-        'selection': SELECTION_AVAILABLE,
-        'bandit': BANDIT_AVAILABLE,
+        "probabilistic": PROBABILISTIC_AVAILABLE,
+        "causal": CAUSAL_AVAILABLE,
+        "symbolic": SYMBOLIC_AVAILABLE,
+        "analogical": ANALOGICAL_AVAILABLE,
+        "multimodal": MULTIMODAL_AVAILABLE,
+        "unified": UNIFIED_AVAILABLE,
+        "explainer": EXPLAINER_AVAILABLE,
+        "selection": SELECTION_AVAILABLE,
+        "bandit": BANDIT_AVAILABLE,
     }
+
 
 def print_module_status():
     """Print a formatted status report of all components."""
     status = get_module_status()
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("VULCAN Reasoning Module Status")
-    print("="*60)
-    
+    print("=" * 60)
+
     for component, available in status.items():
         status_icon = "✓" if available else "✗"
         status_text = "Available" if available else "Not Available"
         print(f"{status_icon} {component.capitalize():15s}: {status_text}")
-    
-    print("="*60)
-    
+
+    print("=" * 60)
+
     available_count = sum(status.values())
     total_count = len(status)
     print(f"Total: {available_count}/{total_count} components available")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
-def create_unified_reasoner(config: Optional[dict] = None, 
-                           enable_learning: bool = True,
-                           enable_safety: bool = True) -> Optional['UnifiedReasoner']:
+
+def create_unified_reasoner(
+    config: Optional[dict] = None,
+    enable_learning: bool = True,
+    enable_safety: bool = True,
+) -> Optional["UnifiedReasoner"]:
     """
     Convenience function to create a UnifiedReasoner with error handling.
-    
+
     Args:
         config: Configuration dictionary
         enable_learning: Enable learning components
         enable_safety: Enable safety validation
-        
+
     Returns:
         UnifiedReasoner instance or None if unavailable
     """
     if not UNIFIED_AVAILABLE:
         logger.error("Cannot create UnifiedReasoner - component not available")
         return None
-    
+
     try:
         return UnifiedReasoner(
-            config=config,
-            enable_learning=enable_learning,
-            enable_safety=enable_safety
+            config=config, enable_learning=enable_learning, enable_safety=enable_safety
         )
     except Exception as e:
         logger.error(f"Failed to create UnifiedReasoner: {e}")
         return None
 
+
 # Export helpers
-__all__.extend(['get_module_status', 'print_module_status', 'create_unified_reasoner'])
+__all__.extend(["get_module_status", "print_module_status", "create_unified_reasoner"])
 
 # ============================================================================
 # Validation - Warn if critical components are missing
@@ -406,19 +401,25 @@ if not UNIFIED_AVAILABLE:
     )
 
 # Log successful initialization
-available_reasoners = sum([
-    PROBABILISTIC_AVAILABLE,
-    CAUSAL_AVAILABLE,
-    SYMBOLIC_AVAILABLE,
-    ANALOGICAL_AVAILABLE,
-    MULTIMODAL_AVAILABLE
-])
+available_reasoners = sum(
+    [
+        PROBABILISTIC_AVAILABLE,
+        CAUSAL_AVAILABLE,
+        SYMBOLIC_AVAILABLE,
+        ANALOGICAL_AVAILABLE,
+        MULTIMODAL_AVAILABLE,
+    ]
+)
 
-logger.info(f"Vulcan Reasoning Module initialized: {available_reasoners}/5 reasoners available")
+logger.info(
+    f"Vulcan Reasoning Module initialized: {available_reasoners}/5 reasoners available"
+)
 
 # ============================================================================
 # Version Info
 # ============================================================================
-__version__ = '1.0.0'
-__author__ = 'Vulcan AI Team'
-__description__ = 'Unified reasoning system with multiple paradigms and adaptive tool selection'
+__version__ = "1.0.0"
+__author__ = "Vulcan AI Team"
+__description__ = (
+    "Unified reasoning system with multiple paradigms and adaptive tool selection"
+)

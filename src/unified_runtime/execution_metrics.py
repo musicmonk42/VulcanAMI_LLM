@@ -21,6 +21,7 @@ from collections import deque, defaultdict
 # psutil is optional. We degrade gracefully if not installed.
 try:
     import psutil
+
     _PSUTIL_AVAILABLE = True
 except Exception:
     psutil = None
@@ -30,6 +31,7 @@ except Exception:
 # ============================================================================
 # LOW-LEVEL HELPERS
 # ============================================================================
+
 
 def _safe_div(numerator: float, denominator: float, default: float = 0.0) -> float:
     """Safe division that won't throw on denominator == 0."""
@@ -83,6 +85,7 @@ def _collect_resource_snapshot() -> Dict[str, Any]:
 # PER-NODE METRICS
 # ============================================================================
 
+
 @dataclass
 class NodeExecutionStats:
     """
@@ -97,6 +100,7 @@ class NodeExecutionStats:
     - cache_hit
     - error_message (if any)
     """
+
     node_id: str
     node_type: Optional[str] = None
     status: str = "unknown"
@@ -129,6 +133,7 @@ class NodeExecutionStats:
 # ============================================================================
 # PER-GRAPH EXECUTION METRICS (ONE RUN)
 # ============================================================================
+
 
 @dataclass
 class ExecutionMetrics:
@@ -182,10 +187,9 @@ class ExecutionMetrics:
     # MUTATION METHODS
     # ------------------------
 
-    def record_node_start(self,
-                          node_id: str,
-                          node_type: Optional[str] = None,
-                          cache_hit: bool = False) -> NodeExecutionStats:
+    def record_node_start(
+        self, node_id: str, node_type: Optional[str] = None, cache_hit: bool = False
+    ) -> NodeExecutionStats:
         """
         Create and register a NodeExecutionStats object for a node that
         is *beginning* execution. The caller will later finalize() it
@@ -208,10 +212,12 @@ class ExecutionMetrics:
         # We'll increment nodes_executed once we know it actually completed.
         return nes
 
-    def record_node_end(self,
-                        node_stats: NodeExecutionStats,
-                        status: str,
-                        error_message: Optional[str] = None):
+    def record_node_end(
+        self,
+        node_stats: NodeExecutionStats,
+        status: str,
+        error_message: Optional[str] = None,
+    ):
         """
         Finalize a node's execution record and update rollups.
         """
@@ -227,10 +233,12 @@ class ExecutionMetrics:
             # treat anything else as failure-ish
             self.nodes_failed += 1
 
-    def finalize_graph(self,
-                       execution_id: Optional[str] = None,
-                       mode: Optional[str] = None,
-                       extra_metadata: Optional[Dict[str, Any]] = None):
+    def finalize_graph(
+        self,
+        execution_id: Optional[str] = None,
+        mode: Optional[str] = None,
+        extra_metadata: Optional[Dict[str, Any]] = None,
+    ):
         """
         Mark the graph execution as complete:
         - stamps end timestamp
@@ -267,7 +275,9 @@ class ExecutionMetrics:
 
     @property
     def avg_latency_per_node_ms(self) -> float:
-        return _safe_div(self.total_latency_ms, float(max(1, self.nodes_executed)), default=0.0)
+        return _safe_div(
+            self.total_latency_ms, float(max(1, self.nodes_executed)), default=0.0
+        )
 
     @property
     def throughput_nodes_per_sec(self) -> float:
@@ -296,57 +306,46 @@ class ExecutionMetrics:
             "cache_hits": self.cache_hits,
             "cache_misses": self.cache_misses,
             "cache_hit_rate": self.cache_hit_rate,
-
             "nodes_executed": self.nodes_executed,
             "nodes_succeeded": self.nodes_succeeded,
             "nodes_failed": self.nodes_failed,
             "success_rate": self.success_rate,
-
             "total_latency_ms": self.total_latency_ms,
             "avg_latency_per_node_ms": self.avg_latency_per_node_ms,
             "throughput_nodes_per_sec": self.throughput_nodes_per_sec,
-
             "execution_count": self.execution_count,
-
             "graph_start_ms": self.graph_start_ms,
             "graph_end_ms": self.graph_end_ms,
-
             "resource_start": self.resource_start,
             "resource_end": self.resource_end,
-
             "metadata": dict(self.metadata),
-
             "node_details": [n.to_dict() for n in self.node_details],
         }
 
-    def to_prometheus_lines(self,
-                            prefix: str = "graphix") -> str:
+    def to_prometheus_lines(self, prefix: str = "graphix") -> str:
         """
         Export a Prometheus-style text payload.
         We intentionally keep this tiny and inline — no external exporter.
         """
         lines = [
-            f'{prefix}_cache_hits {self.cache_hits}',
-            f'{prefix}_cache_misses {self.cache_misses}',
-            f'{prefix}_cache_hit_rate {self.cache_hit_rate}',
-
-            f'{prefix}_nodes_executed {self.nodes_executed}',
-            f'{prefix}_nodes_succeeded {self.nodes_succeeded}',
-            f'{prefix}_nodes_failed {self.nodes_failed}',
-            f'{prefix}_success_rate {self.success_rate}',
-
-            f'{prefix}_total_latency_ms {self.total_latency_ms}',
-            f'{prefix}_avg_latency_per_node_ms {self.avg_latency_per_node_ms}',
-            f'{prefix}_throughput_nodes_per_sec {self.throughput_nodes_per_sec}',
-
-            f'{prefix}_execution_count {self.execution_count}',
+            f"{prefix}_cache_hits {self.cache_hits}",
+            f"{prefix}_cache_misses {self.cache_misses}",
+            f"{prefix}_cache_hit_rate {self.cache_hit_rate}",
+            f"{prefix}_nodes_executed {self.nodes_executed}",
+            f"{prefix}_nodes_succeeded {self.nodes_succeeded}",
+            f"{prefix}_nodes_failed {self.nodes_failed}",
+            f"{prefix}_success_rate {self.success_rate}",
+            f"{prefix}_total_latency_ms {self.total_latency_ms}",
+            f"{prefix}_avg_latency_per_node_ms {self.avg_latency_per_node_ms}",
+            f"{prefix}_throughput_nodes_per_sec {self.throughput_nodes_per_sec}",
+            f"{prefix}_execution_count {self.execution_count}",
         ]
 
         # Add memory/cpu if we have them
         if self.resource_end.get("rss_mb") is not None:
-            lines.append(f'{prefix}_rss_mb {self.resource_end["rss_mb"]}')
+            lines.append(f"{prefix}_rss_mb {self.resource_end['rss_mb']}")
         if self.resource_end.get("cpu_percent") is not None:
-            lines.append(f'{prefix}_cpu_percent {self.resource_end["cpu_percent"]}')
+            lines.append(f"{prefix}_cpu_percent {self.resource_end['cpu_percent']}")
 
         return "\n".join(lines)
 
@@ -354,6 +353,7 @@ class ExecutionMetrics:
 # ============================================================================
 # ROLLING AGGREGATOR / RUNTIME HEALTH
 # ============================================================================
+
 
 class MetricsAggregator:
     """
@@ -403,7 +403,9 @@ class MetricsAggregator:
                 # store most recent in totals for quick peek
                 self._totals["last_rss_mb"] = metrics.resource_end.get("rss_mb")
             if metrics.resource_end.get("cpu_percent") is not None:
-                self._totals["last_cpu_percent"] = metrics.resource_end.get("cpu_percent")
+                self._totals["last_cpu_percent"] = metrics.resource_end.get(
+                    "cpu_percent"
+                )
 
             self._total_runs += 1
 
@@ -464,17 +466,13 @@ class MetricsAggregator:
             "nodes_executed_total": total_nodes,
             "nodes_succeeded_total": total_succeeded,
             "nodes_failed_total": total_failed,
-
             "cache_hits_total": total_hits,
             "cache_misses_total": total_misses,
             "cache_hit_rate": cache_hit_rate,
-
             "success_rate": success_rate,
-
             "avg_latency_ms_per_execution": avg_latency_ms,
             "avg_latency_ms_per_node": avg_latency_per_node_ms,
             "throughput_nodes_per_sec": throughput_nodes_per_sec,
-
             "last_rss_mb": last_rss_mb,
             "last_cpu_percent": last_cpu_percent,
         }
@@ -517,8 +515,7 @@ class MetricsAggregator:
             recent = list(self.metrics_history)[-n:]
             return [m.to_dict() for m in recent]
 
-    def to_prometheus_lines(self,
-                            prefix: str = "graphix_agg") -> str:
+    def to_prometheus_lines(self, prefix: str = "graphix_agg") -> str:
         """
         Export a Prometheus-style flat metric dump of the rollup.
         Not meant to be scraped at nanosecond frequency — it's a snapshot.
@@ -536,26 +533,23 @@ class MetricsAggregator:
             )
 
         lines = [
-            f'{prefix}_total_runs_recorded {roll["total_runs_recorded"]}',
-            f'{prefix}_execution_count_total {roll["execution_count_total"]}',
-            f'{prefix}_nodes_executed_total {roll["nodes_executed_total"]}',
-            f'{prefix}_nodes_succeeded_total {roll["nodes_succeeded_total"]}',
-            f'{prefix}_nodes_failed_total {roll["nodes_failed_total"]}',
-
-            f'{prefix}_cache_hits_total {roll["cache_hits_total"]}',
-            f'{prefix}_cache_misses_total {roll["cache_misses_total"]}',
-            f'{prefix}_cache_hit_rate {roll["cache_hit_rate"]}',
-
-            f'{prefix}_success_rate {roll["success_rate"]}',
-
-            f'{prefix}_avg_latency_ms_per_execution {roll["avg_latency_ms_per_execution"]}',
-            f'{prefix}_avg_latency_ms_per_node {roll["avg_latency_ms_per_node"]}',
-            f'{prefix}_throughput_nodes_per_sec {roll["throughput_nodes_per_sec"]}',
+            f"{prefix}_total_runs_recorded {roll['total_runs_recorded']}",
+            f"{prefix}_execution_count_total {roll['execution_count_total']}",
+            f"{prefix}_nodes_executed_total {roll['nodes_executed_total']}",
+            f"{prefix}_nodes_succeeded_total {roll['nodes_succeeded_total']}",
+            f"{prefix}_nodes_failed_total {roll['nodes_failed_total']}",
+            f"{prefix}_cache_hits_total {roll['cache_hits_total']}",
+            f"{prefix}_cache_misses_total {roll['cache_misses_total']}",
+            f"{prefix}_cache_hit_rate {roll['cache_hit_rate']}",
+            f"{prefix}_success_rate {roll['success_rate']}",
+            f"{prefix}_avg_latency_ms_per_execution {roll['avg_latency_ms_per_execution']}",
+            f"{prefix}_avg_latency_ms_per_node {roll['avg_latency_ms_per_node']}",
+            f"{prefix}_throughput_nodes_per_sec {roll['throughput_nodes_per_sec']}",
         ]
 
         if roll.get("last_rss_mb") is not None:
-            lines.append(f'{prefix}_last_rss_mb {roll["last_rss_mb"]}')
+            lines.append(f"{prefix}_last_rss_mb {roll['last_rss_mb']}")
         if roll.get("last_cpu_percent") is not None:
-            lines.append(f'{prefix}_last_cpu_percent {roll["last_cpu_percent"]}')
+            lines.append(f"{prefix}_last_cpu_percent {roll['last_cpu_percent']}")
 
         return "\n".join(lines)

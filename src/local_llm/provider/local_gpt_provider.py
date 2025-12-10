@@ -11,7 +11,12 @@ import torch
 
 # Reuse your training model
 from src.training.gpt_model import GPTModel, GPTConfig
-from src.local_llm.tokenizer.simple_tokenizer import SimpleTokenizer, BOS_ID, EOS_ID, UNK_ID
+from src.local_llm.tokenizer.simple_tokenizer import (
+    SimpleTokenizer,
+    BOS_ID,
+    EOS_ID,
+    UNK_ID,
+)
 
 log = logging.getLogger("local_gpt_provider")
 
@@ -47,6 +52,7 @@ class OptionalCalibrator:
       - kind="temperature" with params {"T": float} for simple temperature scaling
       - kind="isotonic" (placeholder for future piecewise mapping)
     """
+
     def __init__(self, calib_path: Optional[str] = None):
         self.ready = False
         self.kind = None
@@ -124,7 +130,7 @@ class LocalGPTProvider:
             ff_mult=cfg.ff_mult,
             dropout=cfg.dropout,
             tied_embeddings=True,
-            device=cfg.device
+            device=cfg.device,
         )
         self.model = GPTModel(model_cfg).to(cfg.device).eval()
         if self.dtype != torch.float32:
@@ -147,7 +153,9 @@ class LocalGPTProvider:
         if self.eos_id is None and "<EOS>" in self.tokenizer.token_to_id:
             self.eos_id = self.tokenizer.token_to_id["<EOS>"]
 
-        log.info(f"LocalGPTProvider initialized (device={self.device}, dtype={self.dtype}, autocast={self.use_autocast})")
+        log.info(
+            f"LocalGPTProvider initialized (device={self.device}, dtype={self.dtype}, autocast={self.use_autocast})"
+        )
 
     # ----------------------
     # Helpers
@@ -192,7 +200,7 @@ class LocalGPTProvider:
             top_k=int(raw.get("top_k", 64)),
             top_p=float(raw.get("top_p", 0.95)),
             repetition_penalty=float(raw.get("repetition_penalty", 1.05)),
-            eos_token=raw.get("eos_token")
+            eos_token=raw.get("eos_token"),
         )
         return cls(cfg)
 
@@ -202,7 +210,9 @@ class LocalGPTProvider:
 
     def _guard_sampling(self, temperature: float, top_k: int, top_p: float):
         if temperature <= 0:
-            raise ValueError("temperature must be > 0 for sampling; set a tiny value for greedy fallback.")
+            raise ValueError(
+                "temperature must be > 0 for sampling; set a tiny value for greedy fallback."
+            )
         if top_k < 0:
             raise ValueError("top_k must be >= 0")
         if not (0.0 < top_p <= 1.0):
@@ -221,7 +231,7 @@ class LocalGPTProvider:
         top_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None,
         eos_token: Optional[str] = None,
-        seed: Optional[int] = None
+        seed: Optional[int] = None,
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Generate text from prompt. Returns (text, metadata).
@@ -232,7 +242,11 @@ class LocalGPTProvider:
         temperature = self.cfg.temperature if temperature is None else temperature
         top_k = self.cfg.top_k if top_k is None else top_k
         top_p = self.cfg.top_p if top_p is None else top_p
-        repetition_penalty = self.cfg.repetition_penalty if repetition_penalty is None else repetition_penalty
+        repetition_penalty = (
+            self.cfg.repetition_penalty
+            if repetition_penalty is None
+            else repetition_penalty
+        )
         eos_id = self.eos_id
         if eos_token and eos_token in self.tokenizer.token_to_id:
             eos_id = self.tokenizer.token_to_id[eos_token]
@@ -249,7 +263,7 @@ class LocalGPTProvider:
                     top_k=top_k,
                     top_p=top_p,
                     repetition_penalty=repetition_penalty,
-                    eos_id=eos_id
+                    eos_id=eos_id,
                 )
         else:
             gen_ids = self.model.generate(
@@ -259,7 +273,7 @@ class LocalGPTProvider:
                 top_k=top_k,
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
-                eos_id=eos_id
+                eos_id=eos_id,
             )
 
         text = self.tokenizer.decode(gen_ids, strip_special=True)
@@ -272,8 +286,8 @@ class LocalGPTProvider:
                 "temperature": temperature,
                 "top_k": top_k,
                 "top_p": top_p,
-                "repetition_penalty": repetition_penalty
-            }
+                "repetition_penalty": repetition_penalty,
+            },
         }
         return text, meta
 
@@ -286,7 +300,7 @@ class LocalGPTProvider:
         top_k: Optional[int] = None,
         top_p: Optional[float] = None,
         repetition_penalty: Optional[float] = None,
-        seed: Optional[int] = None
+        seed: Optional[int] = None,
     ) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
         Simple batch wrapper that calls generate() per prompt.
@@ -303,7 +317,7 @@ class LocalGPTProvider:
                 top_k=top_k,
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
-                seed=s
+                seed=s,
             )
             outs.append(text)
             metas.append(meta)
@@ -320,7 +334,7 @@ class LocalGPTProvider:
         repetition_penalty: Optional[float] = None,
         eos_token: Optional[str] = None,
         seed: Optional[int] = None,
-        chunk_size: int = 1
+        chunk_size: int = 1,
     ) -> Generator[Tuple[str, Dict[str, Any]], None, None]:
         """
         Streaming generator that yields (partial_text, meta) every chunk_size new tokens.
@@ -332,7 +346,11 @@ class LocalGPTProvider:
         temperature = self.cfg.temperature if temperature is None else temperature
         top_k = self.cfg.top_k if top_k is None else top_k
         top_p = self.cfg.top_p if top_p is None else top_p
-        repetition_penalty = self.cfg.repetition_penalty if repetition_penalty is None else repetition_penalty
+        repetition_penalty = (
+            self.cfg.repetition_penalty
+            if repetition_penalty is None
+            else repetition_penalty
+        )
         eos_id = self.eos_id
         if eos_token and eos_token in self.tokenizer.token_to_id:
             eos_id = self.tokenizer.token_to_id[eos_token]
@@ -351,20 +369,16 @@ class LocalGPTProvider:
                 top_k=top_k,
                 top_p=top_p,
                 repetition_penalty=repetition_penalty,
-                eos_id=eos_id
+                eos_id=eos_id,
             )
             # model.generate returns full sequence; slice new tail:
-            new_ids = step_ids[len(generated):]
+            new_ids = step_ids[len(generated) :]
             if not new_ids:
                 break
             generated = step_ids
             emitted += len(new_ids)
             text = self.tokenizer.decode(generated, strip_special=True)
-            meta = {
-                "new_ids": new_ids,
-                "total_len": len(generated),
-                "emitted": emitted
-            }
+            meta = {"new_ids": new_ids, "total_len": len(generated), "emitted": emitted}
             yield text, meta
             if eos_id is not None and eos_id in new_ids:
                 break
@@ -380,6 +394,7 @@ class LocalGPTProvider:
         if len(ids) < 2:
             return float("inf")
         import torch.nn.functional as F
+
         x = torch.tensor(ids[:-1], dtype=torch.long, device=self.device).unsqueeze(0)
         y = torch.tensor(ids[1:], dtype=torch.long, device=self.device).unsqueeze(0)
         logits = self.model.forward(x)

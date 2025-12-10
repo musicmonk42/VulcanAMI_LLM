@@ -47,16 +47,19 @@ from vulcan.world_model.meta_reasoning.internal_critic import (
 # Dependency stubs
 # ---------------------------
 
+
 class _StubViolationSeverity:
     # Provide .value to mimic Enum-like severity objects used in internal code
     def __init__(self, value: str):
         self.value = value
+
 
 class _StubViolation:
     def __init__(self, description: str, severity_value: str = "high"):
         self.description = description
         # Simulate object with nested severity Enum-like structure
         self.severity = _StubViolationSeverity(severity_value)
+
 
 class StubEthicalBoundaryMonitor:
     def __init__(self, violations=None):
@@ -66,6 +69,7 @@ class StubEthicalBoundaryMonitor:
     def detect_boundary_violations(self, proposal, context=None):
         return list(self._violations)
 
+
 class StubTransparencyInterface:
     def __init__(self):
         self.logged = []
@@ -73,6 +77,7 @@ class StubTransparencyInterface:
     def record_evaluation(self, evaluation_dict):
         # Keep last few for inspection
         self.logged.append(evaluation_dict)
+
 
 class StubValidationTracker:
     def __init__(self):
@@ -86,10 +91,13 @@ class StubValidationTracker:
 # Fixtures
 # ---------------------------
 
+
 @pytest.fixture
 def critic():
     # Non-strict critic by default with dependency stubs
-    ebm = StubEthicalBoundaryMonitor(violations=[_StubViolation("Test ethical violation", "high")])
+    ebm = StubEthicalBoundaryMonitor(
+        violations=[_StubViolation("Test ethical violation", "high")]
+    )
     ti = StubTransparencyInterface()
     vt = StubValidationTracker()
     return InternalCritic(
@@ -99,10 +107,12 @@ def critic():
         transparency_interface=ti,
     )
 
+
 @pytest.fixture
 def strict_critic():
     ebm = StubEthicalBoundaryMonitor(violations=[])
     return InternalCritic(strict_mode=True, ethical_boundary_monitor=ebm)
+
 
 @pytest.fixture
 def good_proposal():
@@ -127,6 +137,7 @@ def good_proposal():
         "causes_psychological_harm": False,
     }
 
+
 @pytest.fixture
 def risky_proposal():
     # Many flags to trigger critiques and risks across perspectives
@@ -146,16 +157,17 @@ def risky_proposal():
         "well_documented": False,
         "requires_network_access": True,
         "has_security_review": False,  # security risk
-        "has_rollback_plan": False,    # operational risk
+        "has_rollback_plan": False,  # operational risk
         "causes_physical_harm": True,  # safety critical
         "causes_psychological_harm": True,  # safety crit
     }
 
+
 @pytest.fixture
 def context():
     return {
-        "budget": 500,           # to trigger cost overrun in feasibility
-        "deadline": 10,          # to trigger timeline issue in feasibility
+        "budget": 500,  # to trigger cost overrun in feasibility
+        "deadline": 10,  # to trigger timeline issue in feasibility
         "system_goals": {"align", "safety", "maintainethics"},
     }
 
@@ -164,7 +176,10 @@ def context():
 # Core evaluation & coverage
 # ---------------------------
 
-def test_evaluate_proposal_full_paths_and_recommendation(critic, risky_proposal, context):
+
+def test_evaluate_proposal_full_paths_and_recommendation(
+    critic, risky_proposal, context
+):
     ev = critic.evaluate_proposal(risky_proposal, context)
     # Basic shape checks
     assert isinstance(ev, Evaluation)
@@ -183,6 +198,7 @@ def test_evaluate_proposal_full_paths_and_recommendation(critic, risky_proposal,
     # Transparency logging happened
     assert len(critic.transparency_interface.logged) >= 1
 
+
 def test_evaluate_proposal_good(critic, good_proposal, context):
     ev = critic.evaluate_proposal(good_proposal, context)
     assert isinstance(ev, Evaluation)
@@ -196,12 +212,16 @@ def test_evaluate_proposal_good(critic, good_proposal, context):
     pset = {ps.perspective for ps in ev.perspective_scores}
     assert set(critic.perspective_weights.keys()).issubset(pset)
 
-def test_strict_mode_penalty_and_overall_assessment(strict_critic, risky_proposal, context):
+
+def test_strict_mode_penalty_and_overall_assessment(
+    strict_critic, risky_proposal, context
+):
     ev = strict_critic.evaluate_proposal(risky_proposal, context)
     # strict mode can penalize overall score based on critical issues count
     assert 0.0 <= ev.overall_score <= 1.0
     # Ensure overall assessment has expected fragments
     assert isinstance(ev.overall_assessment, str) and len(ev.overall_assessment) > 0
+
 
 def test_generate_critique_and_suggest_improvements(critic):
     # Generate generic aspect critique
@@ -210,6 +230,7 @@ def test_generate_critique_and_suggest_improvements(critic):
     # Suggest improvements using an on-the-fly evaluation
     suggestions = critic.suggest_improvements({"type": "plan", "description": "brief"})
     assert isinstance(suggestions, list)
+
 
 def test_identify_risks_individual_helpers(critic, risky_proposal, context):
     # Ensure each risk helper contributes entries where applicable
@@ -223,7 +244,10 @@ def test_identify_risks_individual_helpers(critic, risky_proposal, context):
     # ETHICAL added by stub monitor (violations configured in fixture)
     assert any(r.category == RiskCategory.ETHICAL for r in risks)
 
-def test_compare_alternatives_ranking_matrix_and_rationale(critic, good_proposal, risky_proposal, context):
+
+def test_compare_alternatives_ranking_matrix_and_rationale(
+    critic, good_proposal, risky_proposal, context
+):
     # Compare two proposals
     res = critic.compare_alternatives([good_proposal, risky_proposal], context)
     assert isinstance(res, ComparisonResult)
@@ -238,7 +262,10 @@ def test_compare_alternatives_ranking_matrix_and_rationale(critic, good_proposal
     res_d = res.to_dict()
     assert "ranking" in res_d and isinstance(res_d["ranking"], list)
 
-def test_learn_from_outcome_and_adaptive_weights_and_validation_record(critic, good_proposal, context):
+
+def test_learn_from_outcome_and_adaptive_weights_and_validation_record(
+    critic, good_proposal, context
+):
     # Evaluate once to populate history and critiques
     ev = critic.evaluate_proposal(good_proposal, context)
     # Snapshot a weight for a perspective likely to get critiques in less ideal cases
@@ -254,7 +281,10 @@ def test_learn_from_outcome_and_adaptive_weights_and_validation_record(critic, g
     # Validation tracker should log a record
     assert len(critic.validation_tracker.records) >= 0  # at least no exception
 
-def test_get_evaluation_history_filters_and_ordering(critic, good_proposal, risky_proposal, context):
+
+def test_get_evaluation_history_filters_and_ordering(
+    critic, good_proposal, risky_proposal, context
+):
     # Generate multiple evaluations
     ev1 = critic.evaluate_proposal(good_proposal, context)
     ev2 = critic.evaluate_proposal(risky_proposal, context)
@@ -268,6 +298,7 @@ def test_get_evaluation_history_filters_and_ordering(critic, good_proposal, risk
     # min_score filter (extreme threshold may zero-out)
     high = critic.get_evaluation_history(min_score=0.99)
     assert isinstance(high, list)
+
 
 def test_get_statistics_contains_expected_fields(critic, good_proposal, context):
     critic.evaluate_proposal(good_proposal, context)
@@ -289,15 +320,20 @@ def test_get_statistics_contains_expected_fields(critic, good_proposal, context)
     }
     assert required.issubset(stats.keys())
 
+
 def test_export_import_reset_roundtrip(critic, good_proposal, context):
     critic.evaluate_proposal(good_proposal, context)
     state = critic.export_state()
     # New critic imports state
-    new = InternalCritic(strict_mode=True)  # different config to prove import takes effect
+    new = InternalCritic(
+        strict_mode=True
+    )  # different config to prove import takes effect
     new.import_state(state)
     # Validate weights mapping (string keys -> EvaluationPerspective)
     assert isinstance(new.perspective_weights, dict)
-    assert all(isinstance(k, EvaluationPerspective) for k in new.perspective_weights.keys())
+    assert all(
+        isinstance(k, EvaluationPerspective) for k in new.perspective_weights.keys()
+    )
     # Reset clears history and stats (except initialized_at reset)
     new.evaluate_proposal(good_proposal, context)
     assert len(new.get_evaluation_history()) >= 1
@@ -307,6 +343,7 @@ def test_export_import_reset_roundtrip(critic, good_proposal, context):
     assert st["evaluation_history_size"] == 0
     # Ensure reinitialized stats exist
     assert "initialized_at" in st
+
 
 def test_import_state_string_keys_mapping_explicit():
     # Construct a minimal exported-like state with string perspective keys
@@ -327,13 +364,19 @@ def test_import_state_string_keys_mapping_explicit():
     }
     assert ic.critique_effectiveness.get("clarity:description") == 0.7
 
+
 def test_generate_recommendation_thresholds(strict_critic):
     # Minimal, likely weak proposal: no description; strict mode applied
     proposal = {"type": "plan"}
     ev = strict_critic.evaluate_proposal(proposal, {})
-    assert ev.recommendation in {"modify", "reject", "approve"}  # any allowed, but path covered
+    assert ev.recommendation in {
+        "modify",
+        "reject",
+        "approve",
+    }  # any allowed, but path covered
     # Confidence within [0,1]
     assert 0.0 <= ev.evaluation_confidence <= 1.0
+
 
 def test_concurrency_multiple_evaluations(critic, good_proposal, context):
     # Run a few parallel evaluations to exercise lock paths (no race expected)
@@ -343,11 +386,14 @@ def test_concurrency_multiple_evaluations(critic, good_proposal, context):
         critic.evaluate_proposal(p, context)
 
     threads = [threading.Thread(target=_worker, args=(i,)) for i in range(4)]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
     hist = critic.get_evaluation_history()
     assert len(hist) >= 4
+
 
 def test_generate_comparison_no_proposals(critic):
     res = critic.compare_alternatives([])

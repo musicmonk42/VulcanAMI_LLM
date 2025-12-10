@@ -101,6 +101,7 @@ import torch.nn.functional as F
 # GPT Configuration Dataclass
 # ======================================
 
+
 @dataclass
 class GPTConfig:
     vocab_size: int
@@ -115,16 +116,19 @@ class GPTConfig:
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Patch additions:
-    loss_reduction: str = "mean"          # 'mean' or 'sum'
-    label_smoothing: float = 0.0          # 0.0 disables smoothing
-    return_loss_dict: bool = False        # If True, model.loss returns dict instead of scalar
-    enforce_safe_softmax: bool = True     # Guard against NaNs in generation softmax
-    generation_pad_token_id: Optional[int] = None  # Optional pad token id for future use
+    loss_reduction: str = "mean"  # 'mean' or 'sum'
+    label_smoothing: float = 0.0  # 0.0 disables smoothing
+    return_loss_dict: bool = False  # If True, model.loss returns dict instead of scalar
+    enforce_safe_softmax: bool = True  # Guard against NaNs in generation softmax
+    generation_pad_token_id: Optional[int] = (
+        None  # Optional pad token id for future use
+    )
 
 
 # ======================================
 # Multi-Head Self-Attention
 # ======================================
+
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, dim: int, n_heads: int, dropout: float):
@@ -170,7 +174,9 @@ class MultiHeadAttention(nn.Module):
         k = k.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
         v = v.view(B, T, self.n_heads, self.head_dim).transpose(1, 2)
 
-        attn_scores = (q @ k.transpose(-2, -1)) / math.sqrt(self.head_dim)  # (B, h, T, T)
+        attn_scores = (q @ k.transpose(-2, -1)) / math.sqrt(
+            self.head_dim
+        )  # (B, h, T, T)
         causal = self._get_causal_mask(T, x.device)
         attn_scores = attn_scores.masked_fill(~causal, float("-inf"))  # causal masking
 
@@ -187,6 +193,7 @@ class MultiHeadAttention(nn.Module):
 # ======================================
 # FeedForward Block
 # ======================================
+
 
 class FeedForward(nn.Module):
     def __init__(self, dim: int, ff_mult: int, dropout: float):
@@ -214,8 +221,11 @@ class FeedForward(nn.Module):
 # Transformer Block (Pre-LN)
 # ======================================
 
+
 class TransformerBlock(nn.Module):
-    def __init__(self, dim: int, n_heads: int, ff_mult: int, dropout: float, ln_eps: float):
+    def __init__(
+        self, dim: int, n_heads: int, ff_mult: int, dropout: float, ln_eps: float
+    ):
         super().__init__()
         self.ln1 = nn.LayerNorm(dim, eps=ln_eps)
         self.attn = MultiHeadAttention(dim, n_heads, dropout)
@@ -235,6 +245,7 @@ class TransformerBlock(nn.Module):
 # GPT Model
 # ======================================
 
+
 class GPTModel(nn.Module):
     def __init__(self, config: GPTConfig):
         super().__init__()
@@ -242,15 +253,18 @@ class GPTModel(nn.Module):
         self.token_emb = nn.Embedding(config.vocab_size, config.dim)
         self.pos_emb = nn.Embedding(config.seq_len, config.dim)
         self.drop = nn.Dropout(config.dropout)
-        self.blocks = nn.ModuleList([
-            TransformerBlock(
-                dim=config.dim,
-                n_heads=config.n_heads,
-                ff_mult=config.ff_mult,
-                dropout=config.dropout,
-                ln_eps=config.layer_norm_eps
-            ) for _ in range(config.n_layers)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                TransformerBlock(
+                    dim=config.dim,
+                    n_heads=config.n_heads,
+                    ff_mult=config.ff_mult,
+                    dropout=config.dropout,
+                    ln_eps=config.layer_norm_eps,
+                )
+                for _ in range(config.n_layers)
+            ]
+        )
         self.ln_f = nn.LayerNorm(config.dim, eps=config.layer_norm_eps)
 
         if config.tied_embeddings:
@@ -323,9 +337,7 @@ class GPTModel(nn.Module):
     # Loss Function
     # ---------------------------
     def loss(
-        self,
-        batch: torch.Tensor,
-        return_dict: Optional[bool] = None
+        self, batch: torch.Tensor, return_dict: Optional[bool] = None
     ) -> Union[torch.Tensor, Dict[str, Any]]:
         """
         Compute next-token prediction loss.
@@ -355,8 +367,8 @@ class GPTModel(nn.Module):
         if return_dict is None:
             return_dict = self.config.return_loss_dict
 
-        inputs = batch[:, :-1]      # (B, T)
-        targets = batch[:, 1:]      # (B, T)
+        inputs = batch[:, :-1]  # (B, T)
+        targets = batch[:, 1:]  # (B, T)
         logits = self.forward(inputs)  # (B, T, vocab)
         B, T, V = logits.size()
         total_tokens = B * T
@@ -374,7 +386,9 @@ class GPTModel(nn.Module):
                 true_dist.fill_(eps / (V - 1))
                 true_dist.scatter_(1, targets_flat.unsqueeze(1), 1.0 - eps)
             if self.config.loss_reduction == "mean":
-                ce = -(true_dist * F.log_softmax(logits_flat, dim=-1)).sum(dim=-1).mean()
+                ce = (
+                    -(true_dist * F.log_softmax(logits_flat, dim=-1)).sum(dim=-1).mean()
+                )
             elif self.config.loss_reduction == "sum":
                 ce = -(true_dist * F.log_softmax(logits_flat, dim=-1)).sum(dim=-1).sum()
             else:
@@ -404,7 +418,7 @@ class GPTModel(nn.Module):
             "avg_loss_per_token": avg_loss_per_token,
             "perplexity": perplexity,
             "total_tokens": total_tokens,
-            "reduction": self.config.loss_reduction
+            "reduction": self.config.loss_reduction,
         }
 
     @staticmethod
@@ -427,7 +441,7 @@ class GPTModel(nn.Module):
         top_p: float = 0.95,
         repetition_penalty: float = 1.1,
         eos_id: Optional[int] = None,
-        greedy_threshold: float = 1e-8
+        greedy_threshold: float = 1e-8,
     ) -> List[int]:
         """
         Autoregressive token generation.
@@ -450,7 +464,7 @@ class GPTModel(nn.Module):
         generated = list(start_ids)
 
         for _ in range(max_new_tokens):
-            ctx = generated[-self.config.seq_len:]
+            ctx = generated[-self.config.seq_len :]
             idx = torch.tensor(ctx, dtype=torch.long, device=device).unsqueeze(0)
             logits = self.forward(idx)[:, -1, :]  # (1, vocab)
 
@@ -499,7 +513,7 @@ class GPTModel(nn.Module):
                 cutoff_mask = cumulative > top_p
                 if torch.any(cutoff_mask):
                     first_exceed = torch.where(cutoff_mask)[1].min()
-                    sorted_logits[:, first_exceed + 1:] = float("-inf")
+                    sorted_logits[:, first_exceed + 1 :] = float("-inf")
                 # Scatter back
                 new_logits = torch.full_like(logits, float("-inf"))
                 new_logits.scatter_(1, sorted_indices, sorted_logits)
@@ -528,7 +542,9 @@ class GPTModel(nn.Module):
     # Utility for manual perplexity on arbitrary logits & targets
     # ---------------------------
     @staticmethod
-    def compute_token_level_nll(logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    def compute_token_level_nll(
+        logits: torch.Tensor, targets: torch.Tensor
+    ) -> torch.Tensor:
         """
         Compute per-token negative log-likelihood given logits and target IDs (no reduction).
         logits: (B, T, V)
@@ -544,7 +560,9 @@ class GPTModel(nn.Module):
         return nll_flat.view(B, T)
 
     @staticmethod
-    def compute_perplexity_from_logits(logits: torch.Tensor, targets: torch.Tensor, reduction: str = "mean") -> float:
+    def compute_perplexity_from_logits(
+        logits: torch.Tensor, targets: torch.Tensor, reduction: str = "mean"
+    ) -> float:
         """
         Convenience: compute perplexity directly from logits and targets.
         reduction: 'mean' averages over all tokens; 'sum' sums then divides by total tokens.

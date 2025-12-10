@@ -114,7 +114,9 @@ class CausalLossComputer:
 
         # Validate inputs
         if not logits or not targets:
-            return 0.0, {"error": "Missing required fields: logits or targets not provided in batch"}
+            return 0.0, {
+                "error": "Missing required fields: logits or targets not provided in batch"
+            }
 
         seq_len = len(logits)
         if seq_len == 0:
@@ -153,12 +155,12 @@ class CausalLossComputer:
 
         # Combine losses
         total_loss = (
-            ce_loss +
-            self.entropy_weight * entropy_loss +
-            self.surprise_weight * surprise_loss +
-            self.consistency_weight * consistency_loss +
-            self.memory_weight * memory_loss +
-            self.temporal_weight * temporal_loss
+            ce_loss
+            + self.entropy_weight * entropy_loss
+            + self.surprise_weight * surprise_loss
+            + self.consistency_weight * consistency_loss
+            + self.memory_weight * memory_loss
+            + self.temporal_weight * temporal_loss
         )
 
         # Compute gradients (pseudo-gradients for models without autograd)
@@ -175,7 +177,9 @@ class CausalLossComputer:
         )
 
         # Update statistics
-        self._update_statistics(total_loss, surprise_loss, consistency_loss, confidences)
+        self._update_statistics(
+            total_loss, surprise_loss, consistency_loss, confidences
+        )
 
         # Store current state for temporal comparisons
         self.previous_hidden_states = hidden_states
@@ -195,15 +199,16 @@ class CausalLossComputer:
         gradients["metrics"] = {
             "perplexity": math.exp(min(ce_loss, MAX_PERPLEXITY_EXP)),
             "avg_confidence": sum(confidences) / max(len(confidences), 1),
-            "prediction_accuracy": sum(1 for p, t in zip(predictions, targets) if p == t) / max(len(targets), 1),
+            "prediction_accuracy": sum(
+                1 for p, t in zip(predictions, targets) if p == t
+            )
+            / max(len(targets), 1),
         }
 
         return total_loss, gradients
 
     def _compute_cross_entropy(
-        self,
-        logits: List[List[float]],
-        targets: List[int]
+        self, logits: List[List[float]], targets: List[int]
     ) -> Tuple[float, List[int], List[float]]:
         """
         Compute cross-entropy loss with optional label smoothing and focal loss.
@@ -239,7 +244,9 @@ class CausalLossComputer:
             # Apply label smoothing
             if self.label_smoothing > 0:
                 smooth_target = self._smooth_labels(target, len(logit_vec))
-                loss = -sum(st * math.log(p + 1e-10) for st, p in zip(smooth_target, probs))
+                loss = -sum(
+                    st * math.log(p + 1e-10) for st, p in zip(smooth_target, probs)
+                )
             else:
                 # Standard cross-entropy
                 loss = -math.log(probs[target] + 1e-10)
@@ -274,10 +281,7 @@ class CausalLossComputer:
         return -avg_entropy
 
     def _compute_surprise(
-        self,
-        logits: List[List[float]],
-        targets: List[int],
-        confidences: List[float]
+        self, logits: List[List[float]], targets: List[int], confidences: List[float]
     ) -> float:
         """
         Compute surprise signal: magnitude of prediction error.
@@ -302,9 +306,7 @@ class CausalLossComputer:
         return avg_surprise
 
     def _compute_causal_consistency(
-        self,
-        logits: List[List[float]],
-        predictions: List[int]
+        self, logits: List[List[float]], predictions: List[int]
     ) -> float:
         """
         Penalize inconsistent predictions across timesteps.
@@ -336,9 +338,7 @@ class CausalLossComputer:
         return avg_inconsistency * 0.1  # Scale down
 
     def _compute_memory_loss(
-        self,
-        hidden_states: Optional[List[List[float]]],
-        memory_keys: List[Any]
+        self, hidden_states: Optional[List[List[float]]], memory_keys: List[Any]
     ) -> float:
         """
         Compute memory-related loss for memory-augmented models.
@@ -371,10 +371,7 @@ class CausalLossComputer:
         avg_memory_loss = total_memory_loss / max(len(hidden_states), 1)
         return avg_memory_loss
 
-    def _compute_temporal_coherence(
-        self,
-        hidden_states: List[List[float]]
-    ) -> float:
+    def _compute_temporal_coherence(self, hidden_states: List[List[float]]) -> float:
         """
         Encourage smooth transitions in hidden states across time.
         Prevents sudden, discontinuous jumps.
@@ -443,9 +440,9 @@ class CausalLossComputer:
             layer_weight = (layer_idx + 1) / num_layers
 
             grad_w = (
-                base_grad +
-                consistency_loss * layer_weight * 0.05 +
-                surprise_loss * (1 - layer_weight) * 0.03
+                base_grad
+                + consistency_loss * layer_weight * 0.05
+                + surprise_loss * (1 - layer_weight) * 0.03
             )
 
             grad_b = grad_w * 0.5  # Bias gradients typically smaller
@@ -474,7 +471,7 @@ class CausalLossComputer:
                 "layer_norm": {
                     "weight": grad_w * 0.1,
                     "bias": grad_b * 0.1,
-                }
+                },
             }
 
         # Output layer gradients
@@ -538,7 +535,9 @@ class CausalLossComputer:
         """
         memory_writes = []
 
-        for i, (hidden, pred, target) in enumerate(zip(hidden_states, predictions, targets)):
+        for i, (hidden, pred, target) in enumerate(
+            zip(hidden_states, predictions, targets)
+        ):
             if not hidden:
                 continue
 
@@ -550,7 +549,7 @@ class CausalLossComputer:
                 memory_write = {
                     "position": i,
                     "importance": importance,
-                    "key": hidden[:min(64, len(hidden))],
+                    "key": hidden[: min(64, len(hidden))],
                     "value": {
                         "target": target,
                         "prediction": pred,
@@ -616,10 +615,14 @@ class CausalLossComputer:
             self.prediction_confidence_history.append(avg_conf)
 
         max_history = DEFAULT_MAX_HISTORY
-        for hist in [self.loss_history, self.surprise_history,
-                     self.consistency_history, self.prediction_confidence_history]:
+        for hist in [
+            self.loss_history,
+            self.surprise_history,
+            self.consistency_history,
+            self.prediction_confidence_history,
+        ]:
             if len(hist) > max_history:
-                del hist[:len(hist) - max_history]
+                del hist[: len(hist) - max_history]
 
     def get_adaptive_weights(self) -> Dict[str, float]:
         """
@@ -753,9 +756,7 @@ class ReinforcementCausalLoss(CausalLossComputer):
         return base_loss, gradients
 
     def _compute_reward_loss(
-        self,
-        rewards: List[float],
-        gradients: Dict[str, Any]
+        self, rewards: List[float], gradients: Dict[str, Any]
     ) -> float:
         """
         Compute policy gradient style loss from rewards.

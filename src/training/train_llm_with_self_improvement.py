@@ -98,6 +98,7 @@ TRAINER_VERSION = "v2-normalized-2025-11-18"
 
 # ============================= Optional Drift Detection Helper ============================= #
 
+
 def _detect_drift(window: List[Dict[str, Any]]) -> Dict[str, Any]:
     if len(window) < 4:
         return {"drift_detected": False, "reason": "insufficient_window"}
@@ -106,25 +107,33 @@ def _detect_drift(window: List[Dict[str, Any]]) -> Dict[str, Any]:
     ent = [w["awareness"].get("avg_entropy_bits", 0.0) for w in window]
 
     def trend(vals: List[float]) -> float:
-        return 0.0 if not vals else (vals[-1] - vals[0]) / max(1e-6, abs(vals[0]) + 1e-6)
+        return (
+            0.0 if not vals else (vals[-1] - vals[0]) / max(1e-6, abs(vals[0]) + 1e-6)
+        )
 
     flags = []
     t_acc = trend(acc)
     t_ece = trend(ece)
     t_ent = trend(ent)
-    if t_acc < -0.15: flags.append("accuracy_down")
-    if t_ece > 0.20: flags.append("ece_up")
-    if t_ent < -0.30: flags.append("entropy_collapse")
-    if t_ent > 0.50: flags.append("entropy_explosion")
+    if t_acc < -0.15:
+        flags.append("accuracy_down")
+    if t_ece > 0.20:
+        flags.append("ece_up")
+    if t_ent < -0.30:
+        flags.append("entropy_collapse")
+    if t_ent > 0.50:
+        flags.append("entropy_explosion")
     return {
         "drift_detected": bool(flags),
         "flags": flags,
         "acc_trend": t_acc,
         "ece_trend": t_ece,
-        "entropy_trend": t_ent
+        "entropy_trend": t_ent,
     }
 
+
 # ============================= Governance Wrapper (Consensus Gate) ============================= #
+
 
 class ConsensusGate:
     def __init__(self, approve_fn=None):
@@ -136,32 +145,44 @@ class ConsensusGate:
         except Exception:
             return True  # fail-open
 
+
 # ============================= Utilities ============================= #
+
 
 def _set_seed(seed: int):
     random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
+
 def _device_auto(device: str) -> str:
     if device == "auto":
         return "cuda" if torch.cuda.is_available() else "cpu"
     return device
 
+
 def _prepare_batch(sequences: List[List[int]], device: str) -> torch.Tensor:
     return torch.tensor(sequences, dtype=torch.long, device=device)
 
-def _cosine_with_warmup(step: int, warmup_steps: int, total_steps: int, base_lr: float, min_lr: float) -> float:
+
+def _cosine_with_warmup(
+    step: int, warmup_steps: int, total_steps: int, base_lr: float, min_lr: float
+) -> float:
     if warmup_steps > 0 and step < warmup_steps:
         return base_lr * (step / max(1, warmup_steps))
     progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
     progress = min(max(progress, 0.0), 1.0)
     return min_lr + 0.5 * (base_lr - min_lr) * (1.0 + math.cos(math.pi * progress))
 
-def _safe_lr_change(old_lr: float, new_lr: float, min_ratio: float = 0.25, max_ratio: float = 4.0) -> bool:
-    if old_lr <= 0 or new_lr <= 0: return False
+
+def _safe_lr_change(
+    old_lr: float, new_lr: float, min_ratio: float = 0.25, max_ratio: float = 4.0
+) -> bool:
+    if old_lr <= 0 or new_lr <= 0:
+        return False
     r = new_lr / old_lr
     return min_ratio <= r <= max_ratio
+
 
 @torch.no_grad()
 def _calc_val_loss(
@@ -169,7 +190,7 @@ def _calc_val_loss(
     loader: CorpusDataLoader,
     batch_size: int,
     batches: int,
-    device: str
+    device: str,
 ) -> float:
     """
     Compute validation loss as average cross-entropy PER VALID TOKEN (nats),
@@ -188,12 +209,13 @@ def _calc_val_loss(
         m: LossMetrics = compute_loss_metrics_eval(
             logits=logits,
             targets=targets,
-            ignore_index=None  # all positions should be valid in fixed-length windows
+            ignore_index=None,  # all positions should be valid in fixed-length windows
         )
         total_loss_sum += m.loss_sum_valid
         total_valid += m.valid_tokens
     model.train()
-    return (total_loss_sum / max(total_valid, 1))
+    return total_loss_sum / max(total_valid, 1)
+
 
 def _compute_awareness(
     model: GPTModel,
@@ -207,7 +229,7 @@ def _compute_awareness(
     temp: float,
     top_k: int,
     top_p: float,
-    rep_penalty: float
+    rep_penalty: float,
 ) -> Dict[str, Any]:
     model.eval()
     entropy_inputs: List[List[float]] = []
@@ -250,7 +272,9 @@ def _compute_awareness(
         ent_summary = summarize_entropies(entropy_inputs)
         ece = calculate_ece(predictions, confidences, targets_all, n_bins=fixed_bins)
         mce = calculate_mce(predictions, confidences, targets_all, n_bins=fixed_bins)
-        adaptive = calculate_adaptive_ece(predictions, confidences, targets_all, n_bins=adaptive_bins)
+        adaptive = calculate_adaptive_ece(
+            predictions, confidences, targets_all, n_bins=adaptive_bins
+        )
 
         gen_ids = model.generate(
             start_ids=[loader.bos_id],
@@ -259,7 +283,7 @@ def _compute_awareness(
             top_k=top_k,
             top_p=top_p,
             repetition_penalty=rep_penalty,
-            eos_id=loader.eos_id
+            eos_id=loader.eos_id,
         )
         distinct_1 = calculate_distinct_n([gen_ids], 1)
         distinct_2 = calculate_distinct_n([gen_ids], 2)
@@ -279,10 +303,11 @@ def _compute_awareness(
             "token_count": len(targets_all),
             "distinct_1": distinct_1,
             "distinct_2": distinct_2,
-            "distinct_3": distinct_3
+            "distinct_3": distinct_3,
         }
     model.train()
     return awareness
+
 
 # ============================= Demo Corpus Helpers ============================= #
 
@@ -295,8 +320,9 @@ Backoff smoothing blends higher-order statistics with more robust lower-order di
     "poetry_bits.txt": """In the quiet code the tokens sleep;
 Gradients whisper secrets deep.
 Metrics rise and losses fall,
-Awareness watches over all."""
+Awareness watches over all.""",
 }
+
 
 def _auto_create_corpus_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
@@ -306,7 +332,10 @@ def _auto_create_corpus_dir(path: str) -> None:
             with open(fpath, "w", encoding="utf-8") as f:
                 f.write(content.strip() + "\n")
 
-def _prepare_corpus_from_single_file(data_file: str, target_dir: str, shard_size: int = 8000) -> str:
+
+def _prepare_corpus_from_single_file(
+    data_file: str, target_dir: str, shard_size: int = 8000
+) -> str:
     if not os.path.exists(data_file):
         raise FileNotFoundError(f"--data-file does not exist: {data_file}")
     os.makedirs(target_dir, exist_ok=True)
@@ -332,7 +361,9 @@ def _prepare_corpus_from_single_file(data_file: str, target_dir: str, shard_size
             f.write(chunk.strip() + "\n")
     return target_dir
 
+
 # ============================= Proposal Application ============================= #
+
 
 def apply_proposals(
     optimizer: optim.Optimizer,
@@ -344,11 +375,15 @@ def apply_proposals(
     warmup_guard: bool,
     force_high_confidence: bool,
     enforce_risk: bool,
-    current_clip: float
+    current_clip: float,
 ) -> Tuple[List[Dict[str, Any]], float, Dict[str, Any]]:
     actions_applied: List[Dict[str, Any]] = []
     new_clip = current_clip
-    recent_props = [p for p in orchestrator.proposals if p.experiment_id in cycle_info.get("proposals_generated", [])]
+    recent_props = [
+        p
+        for p in orchestrator.proposals
+        if p.experiment_id in cycle_info.get("proposals_generated", [])
+    ]
 
     for prop in recent_props:
         if prop.proposal_type != "hyperparam_adjust":
@@ -369,8 +404,17 @@ def apply_proposals(
                 for pg in optimizer.param_groups:
                     pg["lr"] = new_lr
                 scheduler_state["base_lr"] = new_lr
-                actions_applied.append({"type": "lr_change", "old": old_lr, "new": new_lr, "proposal": prop.experiment_id})
-                print(f"[META-ACTION] LR {old_lr:.4e} -> {new_lr:.4e} (proposal {prop.experiment_id})")
+                actions_applied.append(
+                    {
+                        "type": "lr_change",
+                        "old": old_lr,
+                        "new": new_lr,
+                        "proposal": prop.experiment_id,
+                    }
+                )
+                print(
+                    f"[META-ACTION] LR {old_lr:.4e} -> {new_lr:.4e} (proposal {prop.experiment_id})"
+                )
             else:
                 print(f"[META-SKIP] Unsafe LR ratio: {old_lr:.4e} -> {new_lr:.4e}")
 
@@ -379,8 +423,17 @@ def apply_proposals(
             if 0.1 <= maxg <= 10.0:
                 old = new_clip
                 new_clip = maxg
-                actions_applied.append({"type": "grad_clip_change", "old": old, "new": new_clip, "proposal": prop.experiment_id})
-                print(f"[META-ACTION] Grad clip {old:.3f} -> {new_clip:.3f} (proposal {prop.experiment_id})")
+                actions_applied.append(
+                    {
+                        "type": "grad_clip_change",
+                        "old": old,
+                        "new": new_clip,
+                        "proposal": prop.experiment_id,
+                    }
+                )
+                print(
+                    f"[META-ACTION] Grad clip {old:.3f} -> {new_clip:.3f} (proposal {prop.experiment_id})"
+                )
             else:
                 print(f"[META-SKIP] Invalid grad clip {maxg}")
 
@@ -389,14 +442,25 @@ def apply_proposals(
             if 10 <= w <= int(scheduler_state.get("total_steps", 1_000_000)):
                 old = scheduler_state["warmup_steps"]
                 scheduler_state["warmup_steps"] = w
-                actions_applied.append({"type": "warmup_change", "old": old, "new": w, "proposal": prop.experiment_id})
-                print(f"[META-ACTION] Warmup {old} -> {w} (proposal {prop.experiment_id})")
+                actions_applied.append(
+                    {
+                        "type": "warmup_change",
+                        "old": old,
+                        "new": w,
+                        "proposal": prop.experiment_id,
+                    }
+                )
+                print(
+                    f"[META-ACTION] Warmup {old} -> {w} (proposal {prop.experiment_id})"
+                )
             else:
                 print(f"[META-SKIP] Invalid warmup {w}")
 
     return actions_applied, new_clip, scheduler_state
 
+
 # ============================= Main Training Function ============================= #
+
 
 def run(args: argparse.Namespace) -> None:
     print(f"[TRAINER] version={TRAINER_VERSION}")
@@ -413,22 +477,34 @@ def run(args: argparse.Namespace) -> None:
         corpus_dir = args.data_path
         if not os.path.exists(corpus_dir):
             if args.auto_create_corpus:
-                print(f"[AUTO-CORPUS] --data-path '{corpus_dir}' does not exist. Creating demo corpus...")
+                print(
+                    f"[AUTO-CORPUS] --data-path '{corpus_dir}' does not exist. Creating demo corpus..."
+                )
                 _auto_create_corpus_dir(corpus_dir)
             else:
-                raise FileNotFoundError(f"--data-path missing and auto-create disabled: {corpus_dir}")
+                raise FileNotFoundError(
+                    f"--data-path missing and auto-create disabled: {corpus_dir}"
+                )
         if not os.path.isdir(corpus_dir):
-            raise FileNotFoundError(f"--data-path exists but is not a directory: {corpus_dir}")
+            raise FileNotFoundError(
+                f"--data-path exists but is not a directory: {corpus_dir}"
+            )
         if not any(os.scandir(corpus_dir)):
             if args.auto_create_corpus:
-                print(f"[AUTO-CORPUS] Directory '{corpus_dir}' empty. Populating demo corpus...")
+                print(
+                    f"[AUTO-CORPUS] Directory '{corpus_dir}' empty. Populating demo corpus..."
+                )
                 _auto_create_corpus_dir(corpus_dir)
             else:
-                raise FileNotFoundError(f"--data-path empty and auto-create disabled: {corpus_dir}")
+                raise FileNotFoundError(
+                    f"--data-path empty and auto-create disabled: {corpus_dir}"
+                )
 
     log_corpus_dir = corpus_dir.replace("\\", "/")
     file_list = [f.name for f in os.scandir(corpus_dir) if f.is_file()]
-    print(f"[DATA] Resolved corpus directory: {log_corpus_dir} | files={len(file_list)}")
+    print(
+        f"[DATA] Resolved corpus directory: {log_corpus_dir} | files={len(file_list)}"
+    )
     if len(file_list) == 0:
         raise RuntimeError(f"Corpus directory '{corpus_dir}' has no readable files.")
 
@@ -439,7 +515,7 @@ def run(args: argparse.Namespace) -> None:
         min_freq=args.min_freq,
         seq_len=args.seq_len,
         val_ratio=args.val_ratio,
-        seed=args.seed
+        seed=args.seed,
     )
 
     # Auto adjust sequence length if corpus length is too small
@@ -449,7 +525,9 @@ def run(args: argparse.Namespace) -> None:
         if train_size > 0 and train_size < (args.seq_len + 1):
             new_seq_len = max(8, train_size - 1)
             if new_seq_len < args.seq_len:
-                print(f"[SEQ-LEN-ADJUST] Requested seq_len={args.seq_len} > available tokens={train_size}. Clamping to {new_seq_len}.")
+                print(
+                    f"[SEQ-LEN-ADJUST] Requested seq_len={args.seq_len} > available tokens={train_size}. Clamping to {new_seq_len}."
+                )
                 args.seq_len = new_seq_len
                 loader = CorpusDataLoader(
                     corpus_dir=corpus_dir,
@@ -457,19 +535,25 @@ def run(args: argparse.Namespace) -> None:
                     min_freq=args.min_freq,
                     seq_len=args.seq_len,
                     val_ratio=args.val_ratio,
-                    seed=args.seed
+                    seed=args.seed,
                 )
         else:
             if train_size == 0:
-                raise RuntimeError("Corpus appears to have zero tokens after processing.")
+                raise RuntimeError(
+                    "Corpus appears to have zero tokens after processing."
+                )
     else:
         train_len = getattr(loader, "train_tokens", [])
         train_size = len(train_len)
         if train_size > 0 and train_size < (args.seq_len + 1):
-            raise RuntimeError(f"Token stream too short ({train_size}) for requested sequence length {args.seq_len + 1}. "
-                               f"Re-run with --auto-adjust-seq-len or lower --seq-len.")
+            raise RuntimeError(
+                f"Token stream too short ({train_size}) for requested sequence length {args.seq_len + 1}. "
+                f"Re-run with --auto-adjust-seq-len or lower --seq-len."
+            )
 
-    print(f"[DATA] vocab={loader.vocab_size} BOS={loader.bos_id} EOS={loader.eos_id} effective_seq_len={args.seq_len}")
+    print(
+        f"[DATA] vocab={loader.vocab_size} BOS={loader.bos_id} EOS={loader.eos_id} effective_seq_len={args.seq_len}"
+    )
 
     # Model
     config = GPTConfig(
@@ -481,7 +565,7 @@ def run(args: argparse.Namespace) -> None:
         ff_mult=args.ff_mult,
         dropout=args.dropout,
         tied_embeddings=True,
-        device=device
+        device=device,
     )
     model = GPTModel(config).train()
 
@@ -490,13 +574,13 @@ def run(args: argparse.Namespace) -> None:
         model.parameters(),
         lr=args.learning_rate,
         betas=(0.9, 0.95),
-        weight_decay=args.weight_decay
+        weight_decay=args.weight_decay,
     )
     sched_state = {
         "base_lr": args.learning_rate,
         "min_lr": max(args.learning_rate / 50, 1e-7),
         "warmup_steps": args.warmup_steps,
-        "total_steps": max(args.steps, args.val_interval * 2)
+        "total_steps": max(args.steps, args.val_interval * 2),
     }
 
     gate = ConsensusGate()
@@ -506,11 +590,13 @@ def run(args: argparse.Namespace) -> None:
         random_seed=args.seed,
         experiment_selection_strategy=args.meta_strategy,
         enable_memory_decay=args.meta_enable_decay,
-        eval_is_accuracy=False
+        eval_is_accuracy=False,
     )
 
     os.makedirs(args.out_dir, exist_ok=True)
-    meta_state_path = args.meta_state_path or os.path.join(args.out_dir, "llm_meta_state.json")
+    meta_state_path = args.meta_state_path or os.path.join(
+        args.out_dir, "llm_meta_state.json"
+    )
     meta_log_path = os.path.join(args.out_dir, args.meta_log_file)
     training_log_path = os.path.join(args.out_dir, args.train_log_file)
     awareness_log_path = os.path.join(args.out_dir, "awareness_metrics.jsonl")
@@ -525,10 +611,18 @@ def run(args: argparse.Namespace) -> None:
     best_model_sd = copy.deepcopy(model.state_dict())
     best_optim_sd = copy.deepcopy(optimizer.state_dict())
 
-    print(f"[TRAIN] steps={args.steps} device={device} seq_len={args.seq_len} batch={args.batch_size} lr={args.learning_rate}")
+    print(
+        f"[TRAIN] steps={args.steps} device={device} seq_len={args.seq_len} batch={args.batch_size} lr={args.learning_rate}"
+    )
 
     for step in range(1, args.steps + 1):
-        lr_now = _cosine_with_warmup(step, sched_state["warmup_steps"], sched_state["total_steps"], sched_state["base_lr"], sched_state["min_lr"])
+        lr_now = _cosine_with_warmup(
+            step,
+            sched_state["warmup_steps"],
+            sched_state["total_steps"],
+            sched_state["base_lr"],
+            sched_state["min_lr"],
+        )
         for pg in optimizer.param_groups:
             pg["lr"] = lr_now
 
@@ -538,19 +632,21 @@ def run(args: argparse.Namespace) -> None:
         # Next-token setup: inputs are [:, :-1], targets are [:, 1:]
         inputs = batch[:, :-1]
         targets = batch[:, 1:]
-        tokens_per_batch = int(inputs.numel())  # batch_size * (seq_len - 1) if loader returns seq_len+1
+        tokens_per_batch = int(
+            inputs.numel()
+        )  # batch_size * (seq_len - 1) if loader returns seq_len+1
 
         if step == 1:
-            print(f"[SANITY] inputs.shape={tuple(inputs.shape)} targets.shape={tuple(targets.shape)} tokens_per_batch={tokens_per_batch}")
+            print(
+                f"[SANITY] inputs.shape={tuple(inputs.shape)} targets.shape={tuple(targets.shape)} tokens_per_batch={tokens_per_batch}"
+            )
 
         optimizer.zero_grad(set_to_none=True)
 
         # Forward -> normalized loss and metrics (divide ONCE by valid tokens)
         logits = model.forward(inputs)
         loss_scalar, m = compute_loss_metrics_train(
-            logits=logits,
-            targets=targets,
-            ignore_index=None
+            logits=logits, targets=targets, ignore_index=None
         )
 
         # Debug diagnostics on step 1 to catch pathological logits
@@ -558,10 +654,14 @@ def run(args: argparse.Namespace) -> None:
             with torch.no_grad():
                 ls = torch.log_softmax(logits, dim=-1)
                 true_logp = ls.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
-                print(f"[DEBUG] logits_stats mean={logits.mean().item():.4f} std={logits.std().item():.4f} "
-                      f"min={logits.min().item():.2f} max={logits.max().item():.2f}")
-                print(f"[DEBUG] true_logp_stats mean={true_logp.mean().item():.4f} std={true_logp.std().item():.4f} "
-                      f"min={true_logp.min().item():.2f} max={true_logp.max().item():.2f}")
+                print(
+                    f"[DEBUG] logits_stats mean={logits.mean().item():.4f} std={logits.std().item():.4f} "
+                    f"min={logits.min().item():.2f} max={logits.max().item():.2f}"
+                )
+                print(
+                    f"[DEBUG] true_logp_stats mean={true_logp.mean().item():.4f} std={true_logp.std().item():.4f} "
+                    f"min={true_logp.min().item():.2f} max={true_logp.max().item():.2f}"
+                )
 
         # Backprop
         loss_scalar.backward()
@@ -609,7 +709,9 @@ def run(args: argparse.Namespace) -> None:
 
         # Validation + awareness
         if step % args.val_interval == 0:
-            val_loss = _calc_val_loss(model, loader, args.batch_size, args.val_batches, device)
+            val_loss = _calc_val_loss(
+                model, loader, args.batch_size, args.val_batches, device
+            )
             ppl_val = math.exp(min(val_loss, 100.0))
             print(f"[VAL] step={step} val_loss={val_loss:.4f} ppl~{ppl_val:.2f}")
 
@@ -625,7 +727,7 @@ def run(args: argparse.Namespace) -> None:
                 temp=args.temperature,
                 top_k=args.top_k,
                 top_p=args.top_p,
-                rep_penalty=args.rep_penalty
+                rep_penalty=args.rep_penalty,
             )
             summary = awareness_summary(awareness)
             drift_window.append({"awareness": awareness, "step": step})
@@ -644,7 +746,7 @@ def run(args: argparse.Namespace) -> None:
                 "grad_norm_clipped": grad_norm_val,
                 "tokens_per_batch": tokens_per_batch,
                 "elapsed_sec": time.time() - start_time,
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
             try:
                 with open(training_log_path, "a", encoding="utf-8") as f:
@@ -654,16 +756,23 @@ def run(args: argparse.Namespace) -> None:
 
     elapsed = time.time() - start_time
     sps = (applied_updates) / elapsed if elapsed > 0 else 0.0
-    print(f"[DONE] steps={applied_updates} best_val={best_val:.4f} best_step={best_step} elapsed={elapsed:.1f}s steps/s={sps:.2f}")
+    print(
+        f"[DONE] steps={applied_updates} best_val={best_val:.4f} best_step={best_step} elapsed={elapsed:.1f}s steps/s={sps:.2f}"
+    )
 
     last_model_path = os.path.join(args.out_dir, "llm_last_model.pt")
     last_optim_path = os.path.join(args.out_dir, "llm_last_optim.pt")
-    torch.save({"model": model.state_dict(), "step": args.steps, "sched_state": sched_state}, last_model_path)
+    torch.save(
+        {"model": model.state_dict(), "step": args.steps, "sched_state": sched_state},
+        last_model_path,
+    )
     torch.save({"optimizer": optimizer.state_dict()}, last_optim_path)
     print(f"[SAVE] last model -> {last_model_path}")
     print(f"[SAVE] last optim -> {last_optim_path}")
 
+
 # ============================= CLI ============================= #
+
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -678,12 +787,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--warmup-steps", type=int, default=1000)
     p.add_argument("--val-interval", type=int, default=500)
     p.add_argument("--val-batches", type=int, default=50)
-    p.add_argument("--aw-val-batches", type=int, default=8, help="Batches for awareness estimation")
+    p.add_argument(
+        "--aw-val-batches", type=int, default=8, help="Batches for awareness estimation"
+    )
     p.add_argument("--patience", type=int, default=0)
     p.add_argument("--log-interval", type=int, default=20)
     p.add_argument("--train-log-interval", type=int, default=50)
     p.add_argument("--max-grad-norm", type=float, default=1.0)
-    p.add_argument("--device", type=str, default="auto", choices=["auto", "cpu", "cuda"])
+    p.add_argument(
+        "--device", type=str, default="auto", choices=["auto", "cpu", "cuda"]
+    )
     p.add_argument("--seed", type=int, default=123)
 
     # Model size
@@ -718,17 +831,27 @@ def build_parser() -> argparse.ArgumentParser:
     # Orchestrator (meta) controls
     p.add_argument("--meta-interval", type=int, default=400)
     p.add_argument("--meta-apply", action="store_true", default=False)
-    p.add_argument("--meta-safe-types", type=str, default="lr_adjustment,lr_sweep,grad_clip_adjust,warmup_schedule_adjust")
+    p.add_argument(
+        "--meta-safe-types",
+        type=str,
+        default="lr_adjustment,lr_sweep,grad_clip_adjust,warmup_schedule_adjust",
+    )
     p.add_argument("--meta-state-path", type=str, default="")
     p.add_argument("--meta-enable-decay", action="store_true", default=False)
     p.add_argument("--meta-max-select", type=int, default=3)
-    p.add_argument("--meta-strategy", type=str, default="multi_objective",
-                   choices=["multi_objective", "greedy", "thompson_sampling"])
+    p.add_argument(
+        "--meta-strategy",
+        type=str,
+        default="multi_objective",
+        choices=["multi_objective", "greedy", "thompson_sampling"],
+    )
     p.add_argument("--meta-require-high-confidence", action="store_true", default=False)
     p.add_argument("--meta-require-low-risk", action="store_true", default=False)
 
     # Logging/output
-    p.add_argument("--out-dir", type=str, default=os.path.join(os.path.dirname(HERE), "logs"))
+    p.add_argument(
+        "--out-dir", type=str, default=os.path.join(os.path.dirname(HERE), "logs")
+    )
     p.add_argument("--meta-log-file", type=str, default="meta_cycles.jsonl")
     p.add_argument("--train-log-file", type=str, default="training_log.jsonl")
     p.add_argument("--best-model-name", type=str, default="llm_best_model.pt")
@@ -741,6 +864,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--override-lr", action="store_true", default=False)
 
     return p
+
 
 if __name__ == "__main__":
     args = build_parser().parse_args()

@@ -47,13 +47,21 @@ import importlib
 # Optional dependencies with graceful degradation
 try:
     import httpx
+
     HTTPX_AVAILABLE = True
 except ImportError:
     HTTPX_AVAILABLE = False
     print("⚠️  httpx not available - health checks will be limited")
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import (
+        Counter,
+        Histogram,
+        Gauge,
+        generate_latest,
+        CONTENT_TYPE_LATEST,
+    )
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -62,6 +70,7 @@ except ImportError:
 
 try:
     from jose import jwt, JWTError
+
     JWT_AVAILABLE = True
 except ImportError:
     JWT_AVAILABLE = False
@@ -80,12 +89,13 @@ except ImportError:
 # SECRETS MANAGEMENT
 # =============================================================================
 
+
 class SecretsManager:
     """
     Unified secrets management supporting multiple backends.
     Supports: environment variables, .env files, AWS Secrets Manager, etc.
     """
-    
+
     @staticmethod
     def get_secret(key: str, default: Optional[str] = None) -> Optional[str]:
         """Get secret from environment with fallback support."""
@@ -93,25 +103,26 @@ class SecretsManager:
         value = os.environ.get(key)
         if value:
             return value
-        
+
         # Try with UNIFIED_ prefix
         value = os.environ.get(f"UNIFIED_{key}")
         if value:
             return value
-        
+
         # Try AWS Secrets Manager (if boto3 available)
         try:
             import boto3
             import json
-            
-            secrets_client = boto3.client('secretsmanager')
+
+            secrets_client = boto3.client("secretsmanager")
             secret_value = secrets_client.get_secret_value(SecretId=key)
-            
-            if 'SecretString' in secret_value:
-                return secret_value['SecretString']
+
+            if "SecretString" in secret_value:
+                return secret_value["SecretString"]
         except Exception:
-            pass        
+            pass
         return default
+
 
 secrets = SecretsManager()
 
@@ -119,34 +130,34 @@ secrets = SecretsManager()
 # CONFIGURATION
 # =============================================================================
 
+
 class AuthMethod(str, Enum):
     """Supported authentication methods."""
+
     NONE = "none"
     API_KEY = "api_key"
     JWT = "jwt"
     OAUTH2 = "oauth2"
 
+
 class UnifiedPlatformSettings(BaseSettings):
     """Centralized configuration with secrets support."""
-    
+
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_prefix="UNIFIED_",
-        case_sensitive=False,
-        extra='ignore'
+        env_file=".env", env_prefix="UNIFIED_", case_sensitive=False, extra="ignore"
     )
-    
+
     # Server configuration
     host: str = "0.0.0.0"
     port: int = 8080
     workers: int = 1  # Default to 1 for safety
     reload: bool = False
-    
+
     # Service mount paths (configurable!)
     vulcan_mount: str = "/vulcan"
     arena_mount: str = "/arena"
     registry_mount: str = "/registry"
-    
+
     # Service import paths (support absolute imports like src.vulcan.main)
     vulcan_module: str = "src.vulcan.main"
     vulcan_attr: str = "app"
@@ -154,10 +165,10 @@ class UnifiedPlatformSettings(BaseSettings):
     arena_attr: str = "app"
     registry_module: str = "app"
     registry_attr: str = "app"
-    
+
     # Auto-detect src structure
     auto_detect_src: bool = True
-    
+
     # Authentication
     # Default will be auto-selected based on configured secrets in __init__
     auth_method: AuthMethod = AuthMethod.NONE
@@ -167,27 +178,27 @@ class UnifiedPlatformSettings(BaseSettings):
     jwt_expire_minutes: int = 30
     oauth2_client_id: Optional[str] = None
     oauth2_client_secret: Optional[str] = None
-    
+
     # CORS
     cors_enabled: bool = True
     # Tightened default origins; wildcard is no longer the default for security
     cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
-    
+
     # Health checks
     enable_health_checks: bool = True
     health_check_timeout: float = 5.0
-    
+
     # Monitoring
     enable_metrics: bool = True
     metrics_path: str = "/metrics"
-    
+
     # Logging
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
+
     # Flash messaging
     flash_message_max: int = 10  # Max recent messages to show
-    
+
     # Multi-worker awareness
     warn_on_multi_worker: bool = True
 
@@ -204,7 +215,9 @@ class UnifiedPlatformSettings(BaseSettings):
 
         # Sanitize CORS origins: drop empty strings and whitespace-only entries
         if isinstance(self.cors_origins, list):
-            self.cors_origins = [o.strip() for o in self.cors_origins if isinstance(o, str) and o.strip()]
+            self.cors_origins = [
+                o.strip() for o in self.cors_origins if isinstance(o, str) and o.strip()
+            ]
             # Remove '*' from defaults to enforce explicit allowlist unless user sets it intentionally
             self.cors_origins = [o for o in self.cors_origins if o != "*"]
 
@@ -217,48 +230,56 @@ class UnifiedPlatformSettings(BaseSettings):
             else:
                 self.auth_method = AuthMethod.NONE
 
+
 settings = UnifiedPlatformSettings()
 
 # =============================================================================
 # FLASH MESSAGING SYSTEM
 # =============================================================================
 
+
 class FlashMessage:
     """Flash message for displaying errors/warnings."""
+
     def __init__(self, level: str, message: str, details: Optional[str] = None):
         self.level = level  # error, warning, info, success
         self.message = message
         self.details = details
         self.timestamp = datetime.utcnow()
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "level": self.level,
             "message": self.message,
             "details": self.details,
-            "timestamp": self.timestamp.isoformat()
+            "timestamp": self.timestamp.isoformat(),
         }
+
 
 class FlashMessageManager:
     """Thread-safe flash message manager."""
+
     def __init__(self, max_messages: int = 10):
         self.messages = deque(maxlen=max_messages)
         self._lock = asyncio.Lock()
-    
-    async def add_message(self, level: str, message: str, details: Optional[str] = None):
+
+    async def add_message(
+        self, level: str, message: str, details: Optional[str] = None
+    ):
         """Add a new flash message."""
         async with self._lock:
             self.messages.append(FlashMessage(level, message, details))
-    
+
     async def get_recent_messages(self, limit: int = 5) -> List[Dict[str, Any]]:
         """Get recent flash messages."""
         async with self._lock:
             return [msg.to_dict() for msg in list(self.messages)[-limit:]]
-    
+
     async def clear_messages(self):
         """Clear all messages."""
         async with self._lock:
             self.messages.clear()
+
 
 flash_manager = FlashMessageManager(max_messages=settings.flash_message_max)
 
@@ -266,39 +287,41 @@ flash_manager = FlashMessageManager(max_messages=settings.flash_message_max)
 # LOGGING SETUP
 # =============================================================================
 
+
 def setup_unified_logging():
     """Configure unified logging for all services with UTF-8 support."""
     # Clear existing handlers to avoid duplicates from the watcher process
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
-    
+
     # Create handlers with explicit UTF-8 encoding
     stdout_handler = logging.StreamHandler(sys.stdout)
-    
+
     # Ensure stdout is UTF-8 on Windows
-    if sys.platform == "win32" and hasattr(sys.stdout, 'reconfigure'):
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
         try:
-            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stdout.reconfigure(encoding="utf-8")
         except Exception:
             pass
-    
+
     # File handler with explicit UTF-8 encoding
-    file_handler = logging.FileHandler("unified_platform.log", encoding='utf-8')
-    
+    file_handler = logging.FileHandler("unified_platform.log", encoding="utf-8")
+
     # Configure logging with UTF-8 handlers
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper()),
         format=settings.log_format,
         handlers=[stdout_handler, file_handler],
-        force=True  # Force re-configuration
+        force=True,  # Force re-configuration
     )
-    
+
     # Set log levels for sub-apps
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("fastapi").setLevel(logging.INFO)
     logging.getLogger("vulcan").setLevel(logging.INFO)
     logging.getLogger("arena").setLevel(logging.INFO)
     logging.getLogger("registry").setLevel(logging.INFO)
+
 
 # NOTE: setup_unified_logging() is NO LONGER called here.
 # It is now called inside the lifespan() function.
@@ -312,7 +335,7 @@ if settings.workers > 1 and settings.warn_on_multi_worker:
         level=getattr(logging, settings.log_level.upper()),
         format=settings.log_format,
         handlers=[logging.StreamHandler(sys.stdout)],
-        force=True
+        force=True,
     )
     logger.warning("=" * 70)
     logger.warning("⚠️  MULTI-WORKER MODE DETECTED")
@@ -344,25 +367,24 @@ if PROMETHEUS_AVAILABLE:
         # Try to create metrics - if they already exist, prometheus will raise an error
         # which we'll catch and skip creation
         request_counter = Counter(
-            'unified_platform_requests_total',
-            'Total requests to unified platform',
-            ['service', 'method', 'endpoint']
+            "unified_platform_requests_total",
+            "Total requests to unified platform",
+            ["service", "method", "endpoint"],
         )
         request_duration = Histogram(
-            'unified_platform_request_duration_seconds',
-            'Request duration',
-            ['service', 'endpoint']
+            "unified_platform_request_duration_seconds",
+            "Request duration",
+            ["service", "endpoint"],
         )
         service_health = Gauge(
-            'unified_platform_service_health',
-            'Service health status (1=healthy, 0=unhealthy)',
-            ['service']
+            "unified_platform_service_health",
+            "Service health status (1=healthy, 0=unhealthy)",
+            ["service"],
         )
         active_workers = Gauge(
-            'unified_platform_active_workers',
-            'Number of active workers'
+            "unified_platform_active_workers", "Number of active workers"
         )
-        
+
         # Set worker count
         active_workers.set(settings.workers)
     except (ValueError, Exception) as e:
@@ -384,30 +406,32 @@ if PROMETHEUS_AVAILABLE:
 # PATH SETUP WITH ABSOLUTE IMPORT SUPPORT
 # =============================================================================
 
+
 def setup_python_path():
     """
     Ensure proper Python path for imports.
     Supports both flat and src/ directory structures.
     """
     script_dir = Path(__file__).resolve().parent
-    
+
     # Add current directory
     if str(script_dir) not in sys.path:
         sys.path.insert(0, str(script_dir))
-    
+
     # Add src directory if it exists
     src_dir = script_dir / "src"
     if src_dir.exists() and str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
         # Use print here as logger isn't configured yet
         print(f"✓ Added src directory to path: {src_dir}")
-    
+
     # Add parent directory
     parent_dir = script_dir.parent
     if str(parent_dir) not in sys.path:
         sys.path.insert(0, str(parent_dir))
-    
+
     print(f"Debug: Python path configured: {sys.path[:3]}...")
+
 
 setup_python_path()
 
@@ -415,14 +439,17 @@ setup_python_path()
 # ENHANCED AUTHENTICATION SYSTEM
 # =============================================================================
 
+
 class AuthenticationError(HTTPException):
     """Custom authentication error."""
+
     def __init__(self, detail: str = "Could not validate credentials"):
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
+
 
 def _safe_compare(a: Optional[str], b: Optional[str]) -> bool:
     """Constant-time string comparison that handles None safely."""
@@ -438,49 +465,48 @@ def _safe_compare(a: Optional[str], b: Optional[str]) -> bool:
     except Exception:
         return False
 
+
 class JWTAuth:
     """JWT authentication handler."""
-    
+
     @staticmethod
     def create_access_token(data: dict) -> str:
         """Create JWT access token."""
         if not JWT_AVAILABLE or not settings.jwt_secret:
             raise ValueError("JWT not available or secret not configured")
-        
+
         to_encode = data.copy()
         expire = datetime.utcnow() + timedelta(minutes=settings.jwt_expire_minutes)
         to_encode.update({"exp": expire})
-        
+
         encoded_jwt = jwt.encode(
-            to_encode,
-            settings.jwt_secret,
-            algorithm=settings.jwt_algorithm
+            to_encode, settings.jwt_secret, algorithm=settings.jwt_algorithm
         )
         return encoded_jwt
-    
+
     @staticmethod
     def verify_token(token: str) -> Dict[str, Any]:
         """Verify JWT token and return payload."""
         if not JWT_AVAILABLE or not settings.jwt_secret:
             raise AuthenticationError("JWT not configured")
-        
+
         try:
             payload = jwt.decode(
-                token,
-                settings.jwt_secret,
-                algorithms=[settings.jwt_algorithm]
+                token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
             )
             return payload
         except JWTError as e:
             raise AuthenticationError(f"Invalid token: {e}")
 
+
 # Security schemes
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 bearer_scheme = HTTPBearer(auto_error=False)
 
+
 async def verify_authentication(
     api_key: Optional[str] = Security(api_key_header),
-    bearer: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme)
+    bearer: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
 ) -> Dict[str, Any]:
     """
     Unified authentication verification.
@@ -491,7 +517,7 @@ async def verify_authentication(
     """
     if settings.auth_method == AuthMethod.NONE:
         return {"authenticated": True, "method": "none"}
-    
+
     # API Key authentication (strict)
     if settings.auth_method == AuthMethod.API_KEY:
         configured_key = settings.api_key or ""
@@ -500,7 +526,7 @@ async def verify_authentication(
         if _safe_compare(presented_key, configured_key):
             return {"authenticated": True, "method": "api_key"}
         raise AuthenticationError("Invalid API key")
-    
+
     # JWT authentication
     if settings.auth_method == AuthMethod.JWT:
         if not bearer or not bearer.credentials:
@@ -510,23 +536,26 @@ async def verify_authentication(
             "authenticated": True,
             "method": "jwt",
             "user": payload.get("sub"),
-            "payload": payload
+            "payload": payload,
         }
-    
+
     # OAuth2 (placeholder - extend as needed)
     if settings.auth_method == AuthMethod.OAUTH2:
         # Implement OAuth2 flow here
         raise AuthenticationError("OAuth2 not yet implemented")
-    
+
     raise AuthenticationError("Unknown authentication method")
+
 
 # =============================================================================
 # ROBUST IMPORT SYSTEM WITH ABSOLUTE PATH SUPPORT
 # =============================================================================
 
+
 @dataclass
 class ServiceImportResult:
     """Result of attempting to import a service."""
+
     name: str
     success: bool
     app: Any = None
@@ -534,70 +563,74 @@ class ServiceImportResult:
     error_type: Optional[str] = None
     import_path: Optional[str] = None
     timestamp: str = ""
-    
+
     def __post_init__(self):
         if not self.timestamp:
             self.timestamp = datetime.utcnow().isoformat()
 
-async def import_service_async(name: str, module_path: str, attr_name: str, 
-                                expected_type: Optional[str] = None) -> ServiceImportResult:
+
+async def import_service_async(
+    name: str, module_path: str, attr_name: str, expected_type: Optional[str] = None
+) -> ServiceImportResult:
     """
     Asynchronously and robustly import a service with detailed error reporting.
     Supports both relative and absolute imports (e.g., 'main' or 'src.vulcan.main').
     """
     # Logger might not be fully configured yet, use print for critical path
     print(f"Attempting to import {name} from {module_path}.{attr_name}")
-    
+
     # Try multiple import strategies
     import_strategies = [module_path]
-    
+
     # If auto-detect is enabled, try src.* variants
-    if settings.auto_detect_src and '.' not in module_path:
-        import_strategies.extend([
-            f"src.{module_path}",
-            f"src.vulcan.{module_path}" if name == "VULCAN" else None,
-            f"src.arena.{module_path}" if name == "Arena" else None,
-            f"src.registry.{module_path}" if name == "Registry" else None,
-        ])
-    
+    if settings.auto_detect_src and "." not in module_path:
+        import_strategies.extend(
+            [
+                f"src.{module_path}",
+                f"src.vulcan.{module_path}" if name == "VULCAN" else None,
+                f"src.arena.{module_path}" if name == "Arena" else None,
+                f"src.registry.{module_path}" if name == "Registry" else None,
+            ]
+        )
+
     # Remove None entries
     import_strategies = [s for s in import_strategies if s]
-    
+
     for strategy in import_strategies:
         try:
             # Try to import the module
             module = __import__(strategy, fromlist=[attr_name])
             print(f"  ✓ Module '{strategy}' imported successfully")
-            
+
             # Check if attribute exists
             if not hasattr(module, attr_name):
                 error = f"Module '{strategy}' has no attribute '{attr_name}'"
                 print(f"  ✗ {error}")
                 continue
-            
+
             # Get the app object
             app_obj = getattr(module, attr_name)
             actual_type = type(app_obj).__name__
             print(f"  ✓ Found '{attr_name}' with type '{actual_type}'")
-            
+
             # Validate type if expected
             if expected_type and actual_type != expected_type:
                 print(f"  ⚠ Expected type '{expected_type}' but got '{actual_type}'")
-            
+
             print(f"  ✅ Successfully imported {name} from {strategy}")
             await flash_manager.add_message(
                 "success",
                 f"Successfully imported {name}",
-                f"Import path: {strategy}.{attr_name}"
+                f"Import path: {strategy}.{attr_name}",
             )
-            
+
             return ServiceImportResult(
                 name=name,
                 success=True,
                 app=app_obj,
-                import_path=f"{strategy}.{attr_name}"
+                import_path=f"{strategy}.{attr_name}",
             )
-            
+
         except ImportError as e:
             print(f"  ✗ ImportError for '{strategy}': {e}")
             continue
@@ -607,56 +640,51 @@ async def import_service_async(name: str, module_path: str, attr_name: str,
             if isinstance(e, (SyntaxError, NameError, TypeError)):
                 raise e
             continue
-    
+
     # All strategies failed
     error = f"Cannot import {name} from any of: {import_strategies}"
     print(f"  ✗ {error}")
-    
+
     await flash_manager.add_message(
-        "error",
-        f"Failed to import {name}",
-        f"Tried: {', '.join(import_strategies)}"
+        "error", f"Failed to import {name}", f"Tried: {', '.join(import_strategies)}"
     )
-    
+
     return ServiceImportResult(
-        name=name,
-        success=False,
-        error=error,
-        error_type="ImportError"
+        name=name, success=False, error=error, error_type="ImportError"
     )
+
 
 # =============================================================================
 # ASYNC SERVICE HEALTH CHECKS
 # =============================================================================
 
-async def check_service_health_async(service_name: str, base_url: str, 
-                                      path: str) -> Dict[str, Any]:
+
+async def check_service_health_async(
+    service_name: str, base_url: str, path: str
+) -> Dict[str, Any]:
     """
     Perform actual HTTP health check on a service asynchronously.
     """
     if not HTTPX_AVAILABLE:
-        return {
-            "status": "unknown",
-            "message": "httpx not available for health checks"
-        }
-    
+        return {"status": "unknown", "message": "httpx not available for health checks"}
+
     try:
         async with httpx.AsyncClient(timeout=settings.health_check_timeout) as client:
             start_time = datetime.utcnow()
             response = await client.get(f"{base_url}{path}")
             latency = (datetime.utcnow() - start_time).total_seconds() * 1000
-            
+
             is_healthy = response.status_code == 200
-            
+
             # Update Prometheus metrics
             if PROMETHEUS_AVAILABLE and service_health:
                 service_health.labels(service=service_name).set(1 if is_healthy else 0)
-            
+
             return {
                 "status": "healthy" if is_healthy else "unhealthy",
                 "status_code": response.status_code,
                 "response": response.json() if is_healthy else None,
-                "latency_ms": latency
+                "latency_ms": latency,
             }
     except httpx.TimeoutException:
         if PROMETHEUS_AVAILABLE and service_health:
@@ -667,24 +695,31 @@ async def check_service_health_async(service_name: str, base_url: str,
             service_health.labels(service=service_name).set(0)
         return {"status": "error", "message": str(e)}
 
+
 # =============================================================================
 # ASYNC SERVICE MANAGER
 # =============================================================================
 
+
 class AsyncServiceManager:
     """Fully async service lifecycle manager."""
-    
+
     def __init__(self):
         self.services: Dict[str, Dict[str, Any]] = {}
         self.import_results: List[ServiceImportResult] = []
         self._lock = asyncio.Lock()
-    
-    async def register_service(self, name: str, import_result: ServiceImportResult,
-                                mount_path: str, health_path: str):
+
+    async def register_service(
+        self,
+        name: str,
+        import_result: ServiceImportResult,
+        mount_path: str,
+        health_path: str,
+    ):
         """Register a service asynchronously."""
         async with self._lock:
             self.import_results.append(import_result)
-            
+
             if import_result.success:
                 self.services[name] = {
                     "name": name,
@@ -694,7 +729,7 @@ class AsyncServiceManager:
                     "app": import_result.app,
                     "import_success": True,
                     "import_path": import_result.import_path,
-                    "docs_url": f"{mount_path}/docs"
+                    "docs_url": f"{mount_path}/docs",
                 }
             else:
                 self.services[name] = {
@@ -702,45 +737,43 @@ class AsyncServiceManager:
                     "mounted": False,
                     "import_success": False,
                     "error": import_result.error,
-                    "error_type": import_result.error_type
+                    "error_type": import_result.error_type,
                 }
-    
+
     async def mount_service(self, app: FastAPI, name: str, use_wsgi: bool = False):
         """Mount a service to the main app asynchronously."""
         async with self._lock:
             service = self.services.get(name)
             if not service or not service["import_success"]:
                 return False
-            
+
             try:
                 if use_wsgi:
                     app.mount(service["mount_path"], WSGIMiddleware(service["app"]))
                 else:
                     app.mount(service["mount_path"], service["app"])
-                
+
                 service["mounted"] = True
                 # Use logger here, as it's guaranteed to be configured
                 logger.info(f"✓ Mounted {name} at {service['mount_path']}")
-                
+
                 await flash_manager.add_message(
                     "success",
                     f"Mounted {name}",
-                    f"Available at {service['mount_path']}"
+                    f"Available at {service['mount_path']}",
                 )
-                
+
                 return True
             except Exception as e:
                 logger.error(f"✗ Failed to mount {name}: {e}")
                 service["mount_error"] = str(e)
-                
+
                 await flash_manager.add_message(
-                    "error",
-                    f"Failed to mount {name}",
-                    str(e)
+                    "error", f"Failed to mount {name}", str(e)
                 )
-                
+
                 return False
-    
+
     async def get_service_status(self) -> Dict[str, Any]:
         """Get status of all services asynchronously."""
         async with self._lock:
@@ -750,32 +783,39 @@ class AsyncServiceManager:
                     "mount_path": service.get("mount_path"),
                     "health_path": service.get("health_path"),
                     "import_path": service.get("import_path"),
-                    "docs_url": service.get("docs_url") if service.get("mounted") else None,
-                    "error": service.get("error")
+                    "docs_url": service.get("docs_url")
+                    if service.get("mounted")
+                    else None,
+                    "error": service.get("error"),
                 }
                 for name, service in self.services.items()
             }
-    
+
     async def check_all_health(self, base_url: str) -> Dict[str, Any]:
         """Check health of all mounted services asynchronously."""
         health_results = {}
-        
+
         async with self._lock:
             services = dict(self.services)  # Copy to avoid holding lock
-        
+
         # Check health in parallel
         tasks = []
         service_names = []
-        
+
         for name, service in services.items():
             if service.get("mounted") and service.get("health_path"):
-                tasks.append(check_service_health_async(name, base_url, service["health_path"]))
+                tasks.append(
+                    check_service_health_async(name, base_url, service["health_path"])
+                )
                 service_names.append(name)
             elif service.get("mounted"):
-                health_results[name] = {"status": "mounted", "message": "No health endpoint"}
+                health_results[name] = {
+                    "status": "mounted",
+                    "message": "No health endpoint",
+                }
             else:
                 health_results[name] = {"status": "not_mounted"}
-        
+
         # Execute all health checks in parallel
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -784,8 +824,9 @@ class AsyncServiceManager:
                     health_results[name] = {"status": "error", "message": str(result)}
                 else:
                     health_results[name] = result
-        
+
         return health_results
+
 
 # Global async service manager
 service_manager = AsyncServiceManager()
@@ -793,6 +834,7 @@ service_manager = AsyncServiceManager()
 # =============================================================================
 # LIFESPAN MANAGEMENT
 # =============================================================================
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -802,7 +844,7 @@ async def lifespan(app: FastAPI):
     """
     startup_complete = False
     worker_id = os.getpid()
-    
+
     # ====================================================================
     # [!!!] MOVED BLOCKS HERE TO RUN IN WORKER PROCESS [!!!]
     # ====================================================================
@@ -811,30 +853,28 @@ async def lifespan(app: FastAPI):
     if sys.platform == "win32":
         try:
             # Fix stdout/stderr streams
-            sys.stdout.reconfigure(encoding='utf-8')
-            sys.stderr.reconfigure(encoding='utf-8')
-            
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")
+
             # CRITICAL FIX: Reconfigure ALL existing logging handlers
             # This prevents UnicodeEncodeError when logging Unicode characters
             for handler in logging.root.handlers[:]:
                 if isinstance(handler, logging.StreamHandler):
                     try:
                         # Try to reconfigure the handler's stream
-                        if hasattr(handler.stream, 'reconfigure'):
-                            handler.stream.reconfigure(encoding='utf-8')
-                        elif hasattr(handler.stream, 'name'):
+                        if hasattr(handler.stream, "reconfigure"):
+                            handler.stream.reconfigure(encoding="utf-8")
+                        elif hasattr(handler.stream, "name"):
                             # For file handlers, recreate stream with UTF-8
                             old_stream = handler.stream
                             handler.stream = open(
-                                old_stream.name, 
-                                'w', 
-                                encoding='utf-8'
+                                old_stream.name, "w", encoding="utf-8"
                             )
                     except (AttributeError, OSError):
                         # Some streams can't be reconfigured (e.g., StringIO)
                         # Skip them gracefully
                         pass
-            
+
             print("✅ Reconfigured stdout/stderr and logging handlers to UTF-8")
         except Exception as e:
             print(f"⚠️  Could not reconfigure encoding: {e}")
@@ -842,23 +882,23 @@ async def lifespan(app: FastAPI):
     # LOAD ENVIRONMENT VARIABLES
     try:
         from dotenv import load_dotenv
-        
+
         # Load .env file from project root (go up from src/ to Graphix/)
         # Assumes this file is in a 'src' directory
         env_path = Path(__file__).parent.parent / ".env"
         if env_path.exists():
             load_dotenv(dotenv_path=env_path)
             print(f"✅ Loaded environment variables from: {env_path}")
-            
+
             # Verify critical keys
             if os.getenv("OPENAI_API_KEY"):
                 print("✅ OPENAI_API_KEY loaded successfully")
             else:
                 print("⚠️ OPENAI_API_KEY not found in .env")
-                
+
             if os.getenv("ANTHROPIC_API_KEY"):
                 print("✅ ANTHROPIC_API_KEY loaded successfully")
-                
+
             if os.getenv("GRAPHIX_API_KEY"):
                 print("✅ GRAPHIX_API_KEY loaded successfully")
         else:
@@ -870,7 +910,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Error loading .env: {e}")
     # ====================================================================
-    
+
     # [!!!] MOVED LOGGING SETUP HERE [!!!]
     # This ensures logging is configured *after* encoding is set
     # and *inside* the worker process.
@@ -881,84 +921,83 @@ async def lifespan(app: FastAPI):
         logger.info("=" * 70)
         logger.info(f"Starting Unified Platform (Worker {worker_id})")
         logger.info("=" * 70)
-    
+
         # Log configuration
         logger.info(f"Host: {settings.host}:{settings.port}")
         logger.info(f"Workers: {settings.workers}")
         logger.info(f"Auth: {settings.auth_method.value}")
         logger.info(f"Metrics: {'Enabled' if settings.enable_metrics else 'Disabled'}")
-        logger.info(f"Health Checks: {'Enabled' if settings.enable_health_checks else 'Disabled'}")
+        logger.info(
+            f"Health Checks: {'Enabled' if settings.enable_health_checks else 'Disabled'}"
+        )
 
         # Enforce security-critical configuration
         if settings.auth_method == AuthMethod.JWT and not settings.jwt_secret:
-            logger.error("JWT auth is enabled but jwt_secret is not configured. Failing startup.")
+            logger.error(
+                "JWT auth is enabled but jwt_secret is not configured. Failing startup."
+            )
             raise RuntimeError("JWT secret is required when AuthMethod is JWT")
         if settings.cors_enabled and any(o == "*" for o in settings.cors_origins):
-            logger.warning("Wildcard '*' detected in CORS origins; this is discouraged in production. Consider restricting to specific origins.")
+            logger.warning(
+                "Wildcard '*' detected in CORS origins; this is discouraged in production. Consider restricting to specific origins."
+            )
 
         # Import and mount services
         logger.info("=" * 70)
         logger.info("Importing services...")
         logger.info("=" * 70)
-        
+
         # Import VULCAN
         vulcan_result = await import_service_async(
-            "VULCAN",
-            settings.vulcan_module,
-            settings.vulcan_attr,
-            "FastAPI"
+            "VULCAN", settings.vulcan_module, settings.vulcan_attr, "FastAPI"
         )
         await service_manager.register_service(
             "vulcan",
             vulcan_result,
             settings.vulcan_mount,
-            f"{settings.vulcan_mount}/health"
+            f"{settings.vulcan_mount}/health",
         )
-        
+
         # Import Arena
         arena_result = await import_service_async(
-            "Arena",
-            settings.arena_module,
-            settings.arena_attr,
-            "FastAPI"
+            "Arena", settings.arena_module, settings.arena_attr, "FastAPI"
         )
         await service_manager.register_service(
             "arena",
             arena_result,
             settings.arena_mount,
-            f"{settings.arena_mount}/health"
+            f"{settings.arena_mount}/health",
         )
-        
+
         # Import Registry
         registry_result = await import_service_async(
-            "Registry",
-            settings.registry_module,
-            settings.registry_attr,
-            "Flask"
+            "Registry", settings.registry_module, settings.registry_attr, "Flask"
         )
         await service_manager.register_service(
             "registry",
             registry_result,
             settings.registry_mount,
-            f"{settings.registry_mount}/health"
+            f"{settings.registry_mount}/health",
         )
-        
+
         # Mount services
         logger.info("=" * 70)
         logger.info("Mounting services...")
         logger.info("=" * 70)
-        
+
         # Explicit VULCAN mount per user request
         try:
             vulcan_module = importlib.import_module("src.vulcan.main")
-            if not hasattr(vulcan_module, "app") or not isinstance(vulcan_module.app, FastAPI):
+            if not hasattr(vulcan_module, "app") or not isinstance(
+                vulcan_module.app, FastAPI
+            ):
                 raise RuntimeError("src.vulcan.main does not expose a FastAPI 'app'")
             app.mount("/vulcan", vulcan_module.app)
             logger.info("✓ Mounted vulcan at /vulcan")
             # Manually update service manager state if it was registered
             if "vulcan" in service_manager.services:
-                 service_manager.services["vulcan"]["mounted"] = True
-            
+                service_manager.services["vulcan"]["mounted"] = True
+
             # ================================================================
             # VULCAN DEPLOYMENT INITIALIZATION
             # Since VULCAN is mounted as a sub-app, its lifespan doesn't run.
@@ -968,50 +1007,62 @@ async def lifespan(app: FastAPI):
                 logger.info("Initializing VULCAN deployment...")
                 from vulcan.config import get_config, AgentConfig
                 from vulcan.orchestrator import ProductionDeployment
-                
+
                 # Load configuration profile
                 vulcan_config = get_config("development")
                 if not isinstance(vulcan_config, AgentConfig):
-                    logger.warning("get_config returned invalid type, creating default AgentConfig")
+                    logger.warning(
+                        "get_config returned invalid type, creating default AgentConfig"
+                    )
                     vulcan_config = AgentConfig()
-                
+
                 # Create the deployment
                 vulcan_deployment = ProductionDeployment(vulcan_config)
-                
+
                 # Attach to VULCAN's app.state so health checks pass
                 vulcan_module.app.state.deployment = vulcan_deployment
-                vulcan_module.app.state.startup_time = __import__('time').time()
+                vulcan_module.app.state.startup_time = __import__("time").time()
                 vulcan_module.app.state.worker_id = worker_id
-                
+
                 # Initialize LLM component if available
                 try:
                     from graphix_vulcan_llm import GraphixVulcanLLM
-                    llm_instance = GraphixVulcanLLM(config_path="configs/llm_config.yaml")
+
+                    llm_instance = GraphixVulcanLLM(
+                        config_path="configs/llm_config.yaml"
+                    )
                     vulcan_module.app.state.llm = llm_instance
                     logger.info("✓ VULCAN LLM initialized")
                 except ImportError:
                     logger.info("GraphixVulcanLLM not available, using mock")
                     from unittest.mock import MagicMock
+
                     vulcan_module.app.state.llm = MagicMock()
                 except Exception as llm_err:
                     logger.warning(f"LLM initialization failed: {llm_err}, using mock")
                     from unittest.mock import MagicMock
+
                     vulcan_module.app.state.llm = MagicMock()
-                
+
                 logger.info("✓ VULCAN deployment initialized successfully")
-                
+
             except Exception as init_err:
-                logger.error(f"⚠️ VULCAN deployment initialization failed: {init_err}", exc_info=True)
-                logger.warning("VULCAN health checks will report unhealthy until manually initialized")
+                logger.error(
+                    f"⚠️ VULCAN deployment initialization failed: {init_err}",
+                    exc_info=True,
+                )
+                logger.warning(
+                    "VULCAN health checks will report unhealthy until manually initialized"
+                )
             # ================================================================
-                 
+
         except Exception as e:
             logger.error(f"❌ Failed to mount vulcan at /vulcan: {e}", exc_info=True)
             logger.info("vulcan: ❌ FAILED")
 
         await service_manager.mount_service(app, "arena")
         await service_manager.mount_service(app, "registry", use_wsgi=True)
-        
+
         # Summary
         logger.info("=" * 70)
         logger.info("Service Status Summary")
@@ -1023,32 +1074,35 @@ async def lifespan(app: FastAPI):
             if service.get("mounted"):
                 logger.info(f"  → {service['mount_path']}")
                 logger.info(f"  → Import: {service.get('import_path', 'N/A')}")
-        
+
         logger.info("=" * 70)
         logger.info(f"Platform Ready! (Worker {worker_id})")
         logger.info("=" * 70)
-    
+
     except asyncio.CancelledError:
         logger.warning(f"Unified Platform (Worker {worker_id}) startup cancelled")
         raise
     except Exception as e:
         logger.error(f"Failed to start Unified Platform: {e}", exc_info=True)
         raise
-    
+
     startup_complete = True
-    
+
     try:
         yield
     except asyncio.CancelledError:
-        logger.info(f"Unified Platform (Worker {worker_id}) received cancellation signal")
+        logger.info(
+            f"Unified Platform (Worker {worker_id}) received cancellation signal"
+        )
     finally:
         # SHUTDOWN
         logger.info("=" * 70)
         logger.info(f"Shutting down Unified Platform (Worker {worker_id})...")
         logger.info("=" * 70)
-        
+
         # Cleanup tasks
         logger.info("Shutdown complete")
+
 
 # =============================================================================
 # FASTAPI APP CREATION
@@ -1060,8 +1114,9 @@ app = FastAPI(
     version="2.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
+
 
 # Request size limiting middleware (header-based)
 @app.middleware("http")
@@ -1074,34 +1129,47 @@ async def request_size_limit_middleware(request: Request, call_next):
                 if cl > settings.max_request_size_bytes:
                     return JSONResponse(
                         status_code=413,
-                        content={"error": "Request too large", "max_bytes": settings.max_request_size_bytes}
+                        content={
+                            "error": "Request too large",
+                            "max_bytes": settings.max_request_size_bytes,
+                        },
                     )
             except ValueError:
                 # Invalid header; deny to be safe
-                return JSONResponse(status_code=400, content={"error": "Invalid Content-Length"})
+                return JSONResponse(
+                    status_code=400, content={"error": "Invalid Content-Length"}
+                )
         # For chunked requests, rely on upstream reverse proxy limits
     except Exception:
         # Fail-safe: allow request to proceed if checking fails
         pass
     return await call_next(request)
 
+
 # Security headers middleware (applied globally)
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
     # Security headers
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Referrer-Policy'] = 'no-referrer'
-    response.headers['Content-Security-Policy'] = "default-src 'none'"
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
-    response.headers['Cache-Control'] = 'no-store'
-    response.headers['Vary'] = 'Origin'
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "default-src 'none'"
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains; preload"
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Vary"] = "Origin"
     return response
+
 
 # CORS middleware (tightened)
 if settings.cors_enabled:
-    allowed_origins = [o for o in settings.cors_origins if isinstance(o, str) and o.strip() and o != "*"]
+    allowed_origins = [
+        o
+        for o in settings.cors_origins
+        if isinstance(o, str) and o.strip() and o != "*"
+    ]
     if not allowed_origins:
         allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
     app.add_middleware(
@@ -1112,6 +1180,7 @@ if settings.cors_enabled:
         allow_headers=["Authorization", "Content-Type", "X-API-Key"],
     )
 
+
 # Request logging and metrics middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -1119,12 +1188,11 @@ async def log_requests(request: Request, call_next):
     start_time = datetime.utcnow()
     response = await call_next(request)
     duration = (datetime.utcnow() - start_time).total_seconds()
-    
+
     logger.info(
-        f"{request.method} {request.url.path} "
-        f"[{response.status_code}] {duration:.3f}s"
+        f"{request.method} {request.url.path} [{response.status_code}] {duration:.3f}s"
     )
-    
+
     if PROMETHEUS_AVAILABLE and request_counter and request_duration:
         service = "platform"
         service_status = await service_manager.get_service_status()
@@ -1132,23 +1200,22 @@ async def log_requests(request: Request, call_next):
             if svc.get("mount_path") and request.url.path.startswith(svc["mount_path"]):
                 service = name
                 break
-        
+
         request_counter.labels(
-            service=service,
-            method=request.method,
-            endpoint=request.url.path
+            service=service, method=request.method, endpoint=request.url.path
         ).inc()
-        
-        request_duration.labels(
-            service=service,
-            endpoint=request.url.path
-        ).observe(duration)
-    
+
+        request_duration.labels(service=service, endpoint=request.url.path).observe(
+            duration
+        )
+
     return response
+
 
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
@@ -1156,14 +1223,14 @@ async def root(request: Request):
     Enhanced root endpoint with flash messaging, live service health, and API explorer.
     """
     base_url = f"http://{request.url.hostname}:{request.url.port or settings.port}"
-    
+
     service_status = await service_manager.get_service_status()
     recent_messages = await flash_manager.get_recent_messages(limit=5)
-    
+
     health_checks = {}
     if settings.enable_health_checks:
         health_checks = await service_manager.check_all_health(base_url)
-    
+
     flash_html = ""
     if recent_messages:
         flash_html = '<div class="flash-section">'
@@ -1172,18 +1239,18 @@ async def root(request: Request):
                 "error": "#dc3545",
                 "warning": "#ffc107",
                 "info": "#17a2b8",
-                "success": "#28a745"
+                "success": "#28a745",
             }
             color = level_colors.get(msg["level"], "#6c757d")
-            flash_html += f'''
+            flash_html += f"""
             <div class="flash-message" style="border-left: 4px solid {color};">
                 <strong style="color: {color};">{msg["level"].upper()}</strong>: {msg["message"]}
-                {f'<div class="flash-details">{msg["details"]}</div>' if msg.get("details") else ''}
+                {f'<div class="flash-details">{msg["details"]}</div>' if msg.get("details") else ""}
                 <div class="flash-timestamp">{msg["timestamp"]}</div>
             </div>
-            '''
-        flash_html += '</div>'
-    
+            """
+        flash_html += "</div>"
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -1263,12 +1330,12 @@ async def root(request: Request):
             <h1>🚀 Graphix Vulcan Unified Platform</h1>
             <p>Production-Hardened Enterprise Platform (v2.1)</p>
             <p><strong>Worker PID:</strong> {os.getpid()} | <strong>Workers:</strong> {settings.workers}</p>
-            <p><strong>Auth:</strong> {settings.auth_method.value.upper()} | 
-               <strong>Metrics:</strong> {'✅ Enabled' if settings.enable_metrics and PROMETHEUS_AVAILABLE else '❌ Disabled'}</p>
+            <p><strong>Auth:</strong> {settings.auth_method.value.upper()} |
+               <strong>Metrics:</strong> {"✅ Enabled" if settings.enable_metrics and PROMETHEUS_AVAILABLE else "❌ Disabled"}</p>
         </div>
-        
+
         {flash_html}
-        
+
         <div class="service-card">
             <h2>📊 Platform Status</h2>
             <p><strong>Status:</strong> <span class="badge badge-success">ACTIVE</span></p>
@@ -1276,72 +1343,75 @@ async def root(request: Request):
                 <a href="/docs">📚 API Documentation</a>
                 <a href="/health">🏥 Health Check</a>
                 <a href="/api/status">📋 JSON Status</a>
-                {f'<a href="{settings.metrics_path}">📈 Metrics</a>' if settings.enable_metrics and PROMETHEUS_AVAILABLE else ''}
+                {f'<a href="{settings.metrics_path}">📈 Metrics</a>' if settings.enable_metrics and PROMETHEUS_AVAILABLE else ""}
                 <a href="/auth/token">🔑 Get Token</a>
             </div>
         </div>
     """
-    
+
     for name, status in service_status.items():
         mounted = status.get("mounted", False)
         health = health_checks.get(name, {})
-        
+
         status_class = "status-mounted" if mounted else "status-failed"
         status_text = "✅ MOUNTED" if mounted else "❌ FAILED"
-        
+
         health_status = ""
         if mounted and health:
             health_class = f"status-{health.get('status', 'unknown')}"
             health_status = f'<p class="{health_class}"><strong>Health:</strong> {health.get("status", "unknown").upper()}</p>'
             if health.get("latency_ms"):
-                health_status += f'<p><strong>Latency:</strong> {health["latency_ms"]:.2f}ms</p>'
-        
+                health_status += (
+                    f"<p><strong>Latency:</strong> {health['latency_ms']:.2f}ms</p>"
+                )
+
         html_content += f"""
         <div class="service-card">
             <h2 class="{status_class}">{name.upper()}</h2>
             <p><strong>Status:</strong> <span class="{status_class}">{status_text}</span></p>
         """
-        
+
         if mounted:
             html_content += f"""
             <p><strong>Mount Path:</strong> <code>{status.get("mount_path")}</code></p>
             <p><strong>Import Path:</strong> <code>{status.get("import_path", "N/A")}</code></p>
             {health_status}
             <div classs="links">
-                <a href="{status.get('mount_path')}">🔗 Service Root</a>
-                {f'<a href="{status.get("docs_url")}">📚 API Docs</a>' if status.get("docs_url") else ''}
-                {f'<a href="{status.get("health_path")}">🏥 Health</a>' if status.get("health_path") else ''}
+                <a href="{status.get("mount_path")}">🔗 Service Root</a>
+                {f'<a href="{status.get("docs_url")}">📚 API Docs</a>' if status.get("docs_url") else ""}
+                {f'<a href="{status.get("health_path")}">🏥 Health</a>' if status.get("health_path") else ""}
             </div>
             """
         elif status.get("error"):
             html_content += f'<p class="error">Error: {status["error"]}</p>'
-        
+
         html_content += "</div>"
-    
+
     html_content += """
     </body>
     </html>
     """
-    
+
     return HTMLResponse(content=html_content)
+
 
 @app.get("/health")
 async def health_check(request: Request):
     """Comprehensive health check for all services."""
     base_url = f"http://{request.url.hostname}:{request.url.port or settings.port}"
-    
+
     service_status = await service_manager.get_service_status()
-    
+
     health_checks = {}
     if settings.enable_health_checks:
         health_checks = await service_manager.check_all_health(base_url)
-    
+
     all_healthy = all(
         h.get("status") == "healthy"
         for h in health_checks.values()
         if isinstance(h, dict) and "status" in h
     )
-    
+
     return {
         "status": "healthy" if all_healthy else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
@@ -1349,11 +1419,12 @@ async def health_check(request: Request):
         "services": {
             name: {
                 "mounted": status.get("mounted", False),
-                "health": health_checks.get(name, {"status": "unknown"})
+                "health": health_checks.get(name, {"status": "unknown"}),
             }
             for name, status in service_status.items()
-        }
+        },
     }
+
 
 @app.get("/api/status")
 async def api_status():
@@ -1364,16 +1435,17 @@ async def api_status():
             "version": "2.1.0",
             "timestamp": datetime.utcnow().isoformat(),
             "worker_pid": os.getpid(),
-            "workers": settings.workers
+            "workers": settings.workers,
         },
         "services": await service_manager.get_service_status(),
         "configuration": {
             "auth_method": settings.auth_method.value,
             "metrics_enabled": settings.enable_metrics,
             "health_checks_enabled": settings.enable_health_checks,
-            "auto_detect_src": settings.auto_detect_src
-        }
+            "auto_detect_src": settings.auto_detect_src,
+        },
     }
+
 
 @app.post("/auth/token")
 async def get_token(request: Request, sub: Optional[str] = None):
@@ -1387,7 +1459,10 @@ async def get_token(request: Request, sub: Optional[str] = None):
         raise HTTPException(status_code=501, detail="JWT not available")
 
     if settings.auth_method != AuthMethod.JWT:
-        raise HTTPException(status_code=400, detail="Token issuance available only when AuthMethod is JWT")
+        raise HTTPException(
+            status_code=400,
+            detail="Token issuance available only when AuthMethod is JWT",
+        )
 
     if not settings.jwt_secret:
         raise HTTPException(status_code=500, detail="JWT secret not configured")
@@ -1402,24 +1477,25 @@ async def get_token(request: Request, sub: Optional[str] = None):
         subject = "api_key"
 
     token = JWTAuth.create_access_token({"sub": subject})
-    return {"access_token": token, "token_type": "bearer", "expires_in": settings.jwt_expire_minutes * 60}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": settings.jwt_expire_minutes * 60,
+    }
+
 
 @app.get("/api/protected")
 async def protected_endpoint(auth: Dict = Depends(verify_authentication)):
     """Example protected endpoint."""
-    return {
-        "message": "Access granted!",
-        "auth": auth
-    }
+    return {"message": "Access granted!", "auth": auth}
+
 
 if PROMETHEUS_AVAILABLE:
+
     @app.get(settings.metrics_path)
     async def metrics():
         """Aggregated Prometheus metrics."""
-        return Response(
-            generate_latest(),
-            media_type=CONTENT_TYPE_LATEST
-        )
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 # =============================================================================
 # ARENA API ENDPOINTS (INTEGRATED)
@@ -1428,40 +1504,41 @@ if PROMETHEUS_AVAILABLE:
 _arena_instance_cache = None
 _arena_instance_initialized = False
 
+
 def get_arena_instance():
     """
     Get or create Arena instance for proxy endpoints.
     """
     global _arena_instance_cache, _arena_instance_initialized
-    
+
     if _arena_instance_cache is not None:
         return _arena_instance_cache
-    
+
     if _arena_instance_initialized:
         return None
-    
+
     _arena_instance_initialized = True
-    
+
     try:
         from src.graphix_arena import GraphixArena, _ARENA_INSTANCE, register_routes
-        
+
         if _ARENA_INSTANCE is not None:
             logger.info("✅ Using existing Arena instance from src.graphix_arena")
             _arena_instance_cache = _ARENA_INSTANCE
             return _arena_instance_cache
-        
+
         logger.info("🔧 Creating new Arena instance for platform proxy endpoints")
         arena = GraphixArena()
-        
+
         try:
             register_routes(arena)
         except Exception as e:
             logger.warning(f"Could not register Arena routes: {e}")
-        
+
         _arena_instance_cache = arena
         logger.info("✅ Arena instance initialized successfully")
         return _arena_instance_cache
-        
+
     except ImportError as e:
         logger.error(f"❌ Could not import Arena components: {e}")
         logger.error("   Arena API endpoints will return 503 Service Unavailable")
@@ -1470,17 +1547,16 @@ def get_arena_instance():
         logger.error(f"❌ Could not initialize Arena instance: {e}")
         return None
 
+
 @app.post("/api/arena/run/{agent_id}")
 async def arena_run_agent(
-    agent_id: str,
-    request: Request,
-    auth: Dict = Depends(verify_authentication)
+    agent_id: str, request: Request, auth: Dict = Depends(verify_authentication)
 ):
     """Run agent task via Arena API."""
     arena = get_arena_instance()
     if arena is None:
         raise HTTPException(status_code=503, detail="Arena not available")
-    
+
     try:
         result = await arena.run_agent_task(request)
         return result
@@ -1488,16 +1564,14 @@ async def arena_run_agent(
         logger.error(f"Arena agent task failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/arena/feedback")
-async def arena_feedback(
-    request: Request,
-    auth: Dict = Depends(verify_authentication)
-):
+async def arena_feedback(request: Request, auth: Dict = Depends(verify_authentication)):
     """Submit feedback via Arena API."""
     arena = get_arena_instance()
     if arena is None:
         raise HTTPException(status_code=503, detail="Arena not available")
-    
+
     try:
         result = await arena.feedback_ingestion(request)
         return result
@@ -1505,16 +1579,16 @@ async def arena_feedback(
         logger.error(f"Arena feedback failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/arena/tournament")
 async def arena_tournament(
-    request: Request,
-    auth: Dict = Depends(verify_authentication)
+    request: Request, auth: Dict = Depends(verify_authentication)
 ):
     """Run tournament via Arena API."""
     arena = get_arena_instance()
     if arena is None:
         raise HTTPException(status_code=503, detail="Arena not available")
-    
+
     try:
         result = await arena.run_tournament_task(request)
         return result
@@ -1522,27 +1596,28 @@ async def arena_tournament(
         logger.error(f"Arena tournament failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/api/arena/feedback_dispatch")
 async def arena_feedback_dispatch(
-    request: Request,
-    auth: Dict = Depends(verify_authentication)
+    request: Request, auth: Dict = Depends(verify_authentication)
 ):
     """Dispatch feedback protocol via Arena API."""
     arena = get_arena_instance()
     if arena is None:
         raise HTTPException(status_code=503, detail="Arena not available")
-    
+
     try:
         from src.graphix_arena import dispatch_feedback_protocol, MAX_PAYLOAD_SIZE
+
         data = await request.json()
-        
+
         payload_size = len(json.dumps(data))
         if payload_size > MAX_PAYLOAD_SIZE:
             raise HTTPException(
                 status_code=413,
-                detail=f"Payload too large: {payload_size} > {MAX_PAYLOAD_SIZE}"
+                detail=f"Payload too large: {payload_size} > {MAX_PAYLOAD_SIZE}",
             )
-        
+
         context = {"audit_log": []}
         result = dispatch_feedback_protocol(data, context)
         return result
@@ -1550,52 +1625,70 @@ async def arena_feedback_dispatch(
         logger.error(f"Arena feedback dispatch failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # =============================================================================
 # CLI & MAIN
 # =============================================================================
 
+
 def parse_args():
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Graphix Vulcan Unified Platform v2.1"
-    )
-    
+    parser = argparse.ArgumentParser(description="Graphix Vulcan Unified Platform v2.1")
+
     parser.add_argument("--host", default=settings.host, help="Host to bind")
     parser.add_argument("--port", type=int, default=settings.port, help="Port to bind")
-    parser.add_argument("--workers", type=int, default=settings.workers, help="Number of workers")
+    parser.add_argument(
+        "--workers", type=int, default=settings.workers, help="Number of workers"
+    )
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
-    
+
     parser.add_argument("--mount-vulcan", default=settings.vulcan_mount)
     parser.add_argument("--mount-arena", default=settings.arena_mount)
     parser.add_argument("--mount-registry", default=settings.registry_mount)
-    
-    parser.add_argument("--vulcan-module", default=settings.vulcan_module,
-                       help="VULCAN import module (e.g., 'main' or 'src.vulcan.main')")
-    parser.add_argument("--arena-module", default=settings.arena_module,
-                       help="Arena import module")
-    parser.add_argument("--registry-module", default=settings.registry_module,
-                       help="Registry import module")
-    
-    parser.add_argument("--auth-method", 
-                       choices=["none", "api_key", "jwt", "oauth2"],
-                       default=settings.auth_method.value,
-                       help="Authentication method")
+
+    parser.add_argument(
+        "--vulcan-module",
+        default=settings.vulcan_module,
+        help="VULCAN import module (e.g., 'main' or 'src.vulcan.main')",
+    )
+    parser.add_argument(
+        "--arena-module", default=settings.arena_module, help="Arena import module"
+    )
+    parser.add_argument(
+        "--registry-module",
+        default=settings.registry_module,
+        help="Registry import module",
+    )
+
+    parser.add_argument(
+        "--auth-method",
+        choices=["none", "api_key", "jwt", "oauth2"],
+        default=settings.auth_method.value,
+        help="Authentication method",
+    )
     parser.add_argument("--api-key", help="API key for authentication")
     parser.add_argument("--jwt-secret", help="JWT secret key")
-    
+
     parser.add_argument("--disable-metrics", action="store_true")
     parser.add_argument("--disable-health-checks", action="store_true")
-    parser.add_argument("--no-auto-detect-src", action="store_true",
-                       help="Disable automatic src/ directory detection")
-    
-    parser.add_argument("--log-level", default=settings.log_level,
-                       choices=["DEBUG", "INFO", "WARNING", "ERROR"])
-    
+    parser.add_argument(
+        "--no-auto-detect-src",
+        action="store_true",
+        help="Disable automatic src/ directory detection",
+    )
+
+    parser.add_argument(
+        "--log-level",
+        default=settings.log_level,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+    )
+
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()
-    
+
     settings.host = args.host
     settings.port = args.port
     settings.workers = args.workers
@@ -1609,7 +1702,7 @@ if __name__ == "__main__":
     settings.auth_method = AuthMethod(args.auth_method)
     settings.log_level = args.log_level
     settings.auto_detect_src = not args.no_auto_detect_src
-    
+
     if args.api_key:
         settings.api_key = args.api_key
     if args.jwt_secret:
@@ -1618,11 +1711,11 @@ if __name__ == "__main__":
         settings.enable_metrics = False
     if args.disable_health_checks:
         settings.enable_health_checks = False
-    
+
     setup_unified_logging()
-    
-    import uvicorn 
-    
+
+    import uvicorn
+
     logger.info("=" * 70)
     logger.info("Launching Unified Platform Server v2.1")
     logger.info("=" * 70)
@@ -1631,12 +1724,12 @@ if __name__ == "__main__":
     logger.info(f"Workers: {settings.workers}")
     logger.info(f"Auth: {settings.auth_method.value}")
     logger.info("=" * 70)
-    
+
     uvicorn.run(
         "full_platform:app",
         host=settings.host,
         port=settings.port,
         workers=1 if settings.reload else settings.workers,
         reload=settings.reload,
-        log_level=settings.log_level.lower()
+        log_level=settings.log_level.lower(),
     )

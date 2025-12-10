@@ -9,39 +9,23 @@ from .base import (
     MemoryQuery,
     MemoryConfig,
     MemoryStats,
-    MemoryException
+    MemoryException,
 )
 
-from .hierarchical import (
-    HierarchicalMemory,
-    MemoryLevel
-)
+from .hierarchical import HierarchicalMemory, MemoryLevel
 
 from .distributed import (
     DistributedMemory,
     MemoryFederation,
     MemoryNode,
-    ConsistencyLevel
+    ConsistencyLevel,
 )
 
-from .persistence import (
-    MemoryPersistence,
-    MemoryVersionControl,
-    CompressionType
-)
+from .persistence import MemoryPersistence, MemoryVersionControl, CompressionType
 
-from .retrieval import (
-    MemoryIndex,
-    MemorySearch,
-    AttentionMechanism,
-    RetrievalResult
-)
+from .retrieval import MemoryIndex, MemorySearch, AttentionMechanism, RetrievalResult
 
-from .consolidation import (
-    MemoryConsolidator,
-    ConsolidationStrategy,
-    MemoryOptimizer
-)
+from .consolidation import MemoryConsolidator, ConsolidationStrategy, MemoryOptimizer
 
 from .specialized import (
     EpisodicMemory,
@@ -51,35 +35,48 @@ from .specialized import (
     Episode,
     Concept,
     Skill,
-    WorkingMemoryBuffer
+    WorkingMemoryBuffer,
 )
 
 __all__ = [
     # Base
-    'MemoryType', 'Memory', 'MemoryQuery', 'MemoryConfig',
-    'MemoryStats', 'MemoryException',
-    
+    "MemoryType",
+    "Memory",
+    "MemoryQuery",
+    "MemoryConfig",
+    "MemoryStats",
+    "MemoryException",
     # Hierarchical
-    'HierarchicalMemory', 'MemoryLevel',
-    
+    "HierarchicalMemory",
+    "MemoryLevel",
     # Distributed
-    'DistributedMemory', 'MemoryFederation', 'MemoryNode',
-    'ConsistencyLevel',
-    
+    "DistributedMemory",
+    "MemoryFederation",
+    "MemoryNode",
+    "ConsistencyLevel",
     # Persistence
-    'MemoryPersistence', 'MemoryVersionControl', 'CompressionType',
-    
+    "MemoryPersistence",
+    "MemoryVersionControl",
+    "CompressionType",
     # Retrieval
-    'MemoryIndex', 'MemorySearch', 'AttentionMechanism',
-    'RetrievalResult',
-    
+    "MemoryIndex",
+    "MemorySearch",
+    "AttentionMechanism",
+    "RetrievalResult",
     # Consolidation
-    'MemoryConsolidator', 'ConsolidationStrategy', 'MemoryOptimizer',
-    
+    "MemoryConsolidator",
+    "ConsolidationStrategy",
+    "MemoryOptimizer",
     # Specialized
-    'EpisodicMemory', 'SemanticMemory', 'ProceduralMemory',
-    'WorkingMemory', 'Episode', 'Concept', 'Skill', 'WorkingMemoryBuffer'
+    "EpisodicMemory",
+    "SemanticMemory",
+    "ProceduralMemory",
+    "WorkingMemory",
+    "Episode",
+    "Concept",
+    "Skill",
+    "WorkingMemoryBuffer",
 ]
 
 # Version info
-__version__ = '1.0.0'
+__version__ = "1.0.0"

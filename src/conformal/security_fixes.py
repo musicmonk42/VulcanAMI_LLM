@@ -8,4 +8,4 @@ from src.vulcan.security_fixes import (
     RestrictedUnpickler,
 )
 
-__all__ = ['safe_pickle_load', 'RestrictedUnpickler']
+__all__ = ["safe_pickle_load", "RestrictedUnpickler"]

@@ -93,6 +93,7 @@ from self_improving_training import SelfImprovingTraining  # noqa: E402
 
 # ============================= Tokenizer & Dataset ============================= #
 
+
 class TinyTokenizer:
     PAD = "<PAD>"
     UNK = "<UNK>"
@@ -134,7 +135,10 @@ class TinyTokenizer:
         return [self.token_to_id.get(tok, unk) for tok in tokens]
 
     def decode(self, ids: List[int]) -> List[str]:
-        return [self.id_to_token[i] if 0 <= i < len(self.id_to_token) else self.UNK for i in ids]
+        return [
+            self.id_to_token[i] if 0 <= i < len(self.id_to_token) else self.UNK
+            for i in ids
+        ]
 
     def vocab_size(self) -> int:
         return len(self.id_to_token)
@@ -152,7 +156,9 @@ def insert_eos(tokens: List[str]) -> List[str]:
 
 
 class TinyTextDataset:
-    def __init__(self, path: str, seq_len: int = 16, min_freq: int = 1, use_eos: bool = True):
+    def __init__(
+        self, path: str, seq_len: int = 16, min_freq: int = 1, use_eos: bool = True
+    ):
         if not os.path.exists(path):
             raise FileNotFoundError(f"Dataset file not found: {path}")
         self.seq_len = seq_len
@@ -179,7 +185,7 @@ class TinyTextDataset:
         self.val_idx = indices[split:]
 
     def _window(self, start: int) -> List[int]:
-        seq = self.encoded[start:start + self.seq_len + 1]
+        seq = self.encoded[start : start + self.seq_len + 1]
         if len(seq) < self.seq_len + 1:
             seq += [self.pad_id] * (self.seq_len + 1 - len(seq))
         return seq
@@ -192,7 +198,11 @@ class TinyTextDataset:
         return {"sequence": seq, "tokens": seq[:-1]}
 
     def sample_val_batch(self) -> Dict[str, Any]:
-        pool = self.val_idx if self.val_idx else (self.train_idx if self.train_idx else [0])
+        pool = (
+            self.val_idx
+            if self.val_idx
+            else (self.train_idx if self.train_idx else [0])
+        )
         start = random.choice(pool)
         seq = self._window(start)
         return {"sequence": seq, "tokens": seq[:-1]}
@@ -205,6 +215,7 @@ class TinyTextDataset:
 
 
 # ============================= Models ============================= #
+
 
 class LearnableBigramModel:
     order = 2
@@ -223,13 +234,17 @@ class LearnableBigramModel:
 
     def get_parameters(self) -> Dict[str, Any]:
         import copy
+
         return copy.deepcopy(self.params)
 
     def set_parameters(self, params: Dict[str, Any]) -> None:
         import copy
+
         self.params = copy.deepcopy(params)
 
-    def apply_update(self, gradients: Dict[str, Any], learning_rate: float = 0.001) -> None:
+    def apply_update(
+        self, gradients: Dict[str, Any], learning_rate: float = 0.001
+    ) -> None:
         # Apply scaled updates (GovernedTrainer supplies raw directions)
         root = gradients.get("transformer_layers", gradients)
         upd = root.get("bigram", {})
@@ -273,7 +288,13 @@ class LearnableBigramModel:
 class LearnableTrigramModel:
     order = 3
 
-    def __init__(self, vocab_size: int, bos_id: int, init_scale: float = 0.0, separate_bigram: bool = False):
+    def __init__(
+        self,
+        vocab_size: int,
+        bos_id: int,
+        init_scale: float = 0.0,
+        separate_bigram: bool = False,
+    ):
         self.vocab_size = vocab_size
         self.bos_id = bos_id
         tri = {
@@ -286,19 +307,24 @@ class LearnableTrigramModel:
         data = {"trigram": tri}
         if separate_bigram:
             data["bigram_backoff"] = {
-                p1: {nxt: float(init_scale) for nxt in range(vocab_size)} for p1 in range(vocab_size)
+                p1: {nxt: float(init_scale) for nxt in range(vocab_size)}
+                for p1 in range(vocab_size)
             }
         self.params = {"transformer_layers": data}
 
     def get_parameters(self) -> Dict[str, Any]:
         import copy
+
         return copy.deepcopy(self.params)
 
     def set_parameters(self, params: Dict[str, Any]) -> None:
         import copy
+
         self.params = copy.deepcopy(params)
 
-    def apply_update(self, gradients: Dict[str, Any], learning_rate: float = 0.001) -> None:
+    def apply_update(
+        self, gradients: Dict[str, Any], learning_rate: float = 0.001
+    ) -> None:
         root = gradients.get("transformer_layers", gradients)
         tri_upd = root.get("trigram", {})
         tri = self.params["transformer_layers"]["trigram"]
@@ -361,6 +387,7 @@ class LearnableTrigramModel:
 
 # ============================= Gradient Functions (Label Smoothing) ============================= #
 
+
 def make_bigram_gradient_fn(model: LearnableBigramModel, label_smoothing: float):
     eps = max(0.0, min(label_smoothing, 0.49))
 
@@ -400,14 +427,19 @@ def make_bigram_gradient_fn(model: LearnableBigramModel, label_smoothing: float)
                     row[nx] /= count
         return total_nll / max(count, 1), {
             "transformer_layers": {
-                "bigram": {prev: {nx: float(v) for nx, v in row.items()} for prev, row in grads.items()}
+                "bigram": {
+                    prev: {nx: float(v) for nx, v in row.items()}
+                    for prev, row in grads.items()
+                }
             }
         }
 
     return gradient_fn
 
 
-def make_trigram_gradient_fn(model: LearnableTrigramModel, label_smoothing: float, separate_bigram: bool):
+def make_trigram_gradient_fn(
+    model: LearnableTrigramModel, label_smoothing: float, separate_bigram: bool
+):
     eps = max(0.0, min(label_smoothing, 0.49))
 
     def gradient_fn(batch: Dict[str, Any]) -> Tuple[float, Dict[str, Any]]:
@@ -421,7 +453,11 @@ def make_trigram_gradient_fn(model: LearnableTrigramModel, label_smoothing: floa
         targets = seq[1:]
         V = model.vocab_size
         tri = model.params["transformer_layers"]["trigram"]
-        bb = model.params["transformer_layers"].get("bigram_backoff", {}) if separate_bigram else None
+        bb = (
+            model.params["transformer_layers"].get("bigram_backoff", {})
+            if separate_bigram
+            else None
+        )
         total_nll = 0.0
         count = 0
         tri_grads: Dict[int, Dict[int, Dict[int, float]]] = {}
@@ -485,7 +521,8 @@ def make_trigram_gradient_fn(model: LearnableTrigramModel, label_smoothing: floa
         }
         if separate_bigram:
             payload["transformer_layers"]["bigram_backoff"] = {
-                p1: {nx: float(v) for nx, v in row.items()} for p1, row in bb_grads.items()
+                p1: {nx: float(v) for nx, v in row.items()}
+                for p1, row in bb_grads.items()
             }
         return total_nll / max(count, 1), payload
 
@@ -494,11 +531,14 @@ def make_trigram_gradient_fn(model: LearnableTrigramModel, label_smoothing: floa
 
 # ============================= Count Accumulation & Smoothing ============================= #
 
+
 class NGramCounts:
     def __init__(self):
         self.unigram = Counter()
-        self.bigram = defaultdict(Counter)          # prev1 -> next
-        self.trigram = defaultdict(lambda: defaultdict(Counter))  # prev2 -> prev1 -> next
+        self.bigram = defaultdict(Counter)  # prev1 -> next
+        self.trigram = defaultdict(
+            lambda: defaultdict(Counter)
+        )  # prev2 -> prev1 -> next
         self.total = 0
 
     def update_sequence(self, seq: List[int], bos_id: int):
@@ -512,10 +552,12 @@ class NGramCounts:
             prev2 = seq[i - 2] if i > 1 else bos_id
             self.trigram[prev2][prev1][tok] += 1
 
-    def smooth_log_probs(self, V: int, alpha: float, discount_d: float) -> Tuple[
+    def smooth_log_probs(
+        self, V: int, alpha: float, discount_d: float
+    ) -> Tuple[
         Dict[Tuple[int, int, int], float],
         Dict[Tuple[int, int], float],
-        Dict[int, float]
+        Dict[int, float],
     ]:
         # Unigram
         log_uni = {}
@@ -558,12 +600,15 @@ class NGramCounts:
 
 # ============================= Utility Helpers ============================= #
 
+
 def vocab_hash(id_to_token: List[str]) -> str:
     data = "\n".join(id_to_token).encode("utf-8")
     return hashlib.sha256(data).hexdigest()
 
 
-def attempt_vocab_remap(ckpt_vocab: Dict[str, Any], dataset: TinyTextDataset, model: Any):
+def attempt_vocab_remap(
+    ckpt_vocab: Dict[str, Any], dataset: TinyTextDataset, model: Any
+):
     ckpt_id_to_token = ckpt_vocab.get("id_to_token", [])
     ckpt_token_to_id = ckpt_vocab.get("token_to_id", {})
     if not ckpt_id_to_token or not ckpt_token_to_id:
@@ -575,7 +620,9 @@ def attempt_vocab_remap(ckpt_vocab: Dict[str, Any], dataset: TinyTextDataset, mo
     if set(ckpt_id_to_token) != set(current_tokens):
         print("[WARN] Token sets differ; cannot safely remap indices.")
         return
-    old_to_new = {ckpt_token_to_id[t]: dataset.tok.token_to_id[t] for t in ckpt_id_to_token}
+    old_to_new = {
+        ckpt_token_to_id[t]: dataset.tok.token_to_id[t] for t in ckpt_id_to_token
+    }
     print("[INFO] Remapping parameter indices to current vocab order.")
     layers = model.params["transformer_layers"]
     if getattr(model, "order", 2) == 3:
@@ -637,11 +684,16 @@ def load_params_json(path: str) -> Dict[str, Any]:
 
 # ============================= Generation Helpers ============================= #
 
-def _apply_repetition_penalty(logits: List[float], generated: List[int], rep_penalty: float) -> List[float]:
+
+def _apply_repetition_penalty(
+    logits: List[float], generated: List[int], rep_penalty: float
+) -> List[float]:
     if rep_penalty is None or rep_penalty <= 1.0 or not generated:
         return logits
     seen = Counter(generated)
-    return [logit / rep_penalty if i in seen else logit for i, logit in enumerate(logits)]
+    return [
+        logit / rep_penalty if i in seen else logit for i, logit in enumerate(logits)
+    ]
 
 
 def _softmax(logits: List[float], temperature: float) -> List[float]:
@@ -678,6 +730,7 @@ def _sample_from_probs(probs: List[float], top_k: int, top_p: float) -> int:
 
 # ============================= Learned + Counts Combination (Fixed) ============================= #
 
+
 def combine_learned_and_counts(
     order: int,
     tri_logits: Optional[List[float]],
@@ -692,7 +745,7 @@ def combine_learned_and_counts(
     bigram_weight: float,
     backoff_weights: Tuple[float, float, float],
     backoff_lambda: float,
-    eps: float = 1e-12
+    eps: float = 1e-12,
 ) -> List[float]:
     """
     Probability-space interpolation:
@@ -724,12 +777,16 @@ def combine_learned_and_counts(
             if v3 is not None:
                 count_log_mix[i] += w3 * v3
             bi_key = (prev1, i)
-            count_log_mix[i] += w2 * count_bi_log.get(bi_key, count_uni_log.get(i, -math.log(V)))
+            count_log_mix[i] += w2 * count_bi_log.get(
+                bi_key, count_uni_log.get(i, -math.log(V))
+            )
             count_log_mix[i] += w1 * count_uni_log.get(i, -math.log(V))
     else:
         for i in range(V):
             bi_key = (prev1, i)
-            count_log_mix[i] += w2 * count_bi_log.get(bi_key, count_uni_log.get(i, -math.log(V)))
+            count_log_mix[i] += w2 * count_bi_log.get(
+                bi_key, count_uni_log.get(i, -math.log(V))
+            )
             count_log_mix[i] += w1 * count_uni_log.get(i, -math.log(V))
 
     # Convert to probs
@@ -751,6 +808,7 @@ def combine_learned_and_counts(
 
 # ============================= Auxiliary (Trigram Integrity) ============================= #
 
+
 def ensure_trigram_rows(model: Any, vocab_size: int, bos_id: int) -> None:
     if getattr(model, "order", 2) != 3:
         return
@@ -764,6 +822,7 @@ def ensure_trigram_rows(model: Any, vocab_size: int, bos_id: int) -> None:
 
 
 # ============================= Generation ============================= #
+
 
 def generate_tokens(
     model: Any,
@@ -814,11 +873,19 @@ def generate_tokens(
 
         if backoff_enabled:
             logits = combine_learned_and_counts(
-                order, tri_logits, big_logits,
-                count_tri_log, count_bi_log, count_uni_log,
-                prev2, prev1, V,
-                trigram_weight, bigram_weight,
-                backoff_weights, backoff_lambda
+                order,
+                tri_logits,
+                big_logits,
+                count_tri_log,
+                count_bi_log,
+                count_uni_log,
+                prev2,
+                prev1,
+                V,
+                trigram_weight,
+                bigram_weight,
+                backoff_weights,
+                backoff_lambda,
             )
         else:
             logits = tri_logits if tri_logits is not None else big_logits
@@ -857,7 +924,10 @@ def generate_tokens(
 
 # ============================= Validation Loss ============================= #
 
-def validation_loss(model: Any, dataset: TinyTextDataset, batches: int, full: bool) -> float:
+
+def validation_loss(
+    model: Any, dataset: TinyTextDataset, batches: int, full: bool
+) -> float:
     losses = []
     if full:
         for vb in dataset.iter_all_val_batches():
@@ -881,7 +951,7 @@ def blended_validation_loss(
     counts: Optional[NGramCounts],
     alpha: float,
     discount_d: float,
-    use_count_loss: bool
+    use_count_loss: bool,
 ) -> float:
     if not use_count_loss or counts is None:
         return validation_loss(model, dataset, batches, full)
@@ -890,7 +960,11 @@ def blended_validation_loss(
     layers = model.params["transformer_layers"]
     order = getattr(model, "order", 2)
     losses = []
-    iterator = dataset.iter_all_val_batches() if full else (dataset.sample_val_batch() for _ in range(batches))
+    iterator = (
+        dataset.iter_all_val_batches()
+        if full
+        else (dataset.sample_val_batch() for _ in range(batches))
+    )
     for vb in iterator:
         seq = vb["sequence"]
         if len(seq) < 2:
@@ -917,11 +991,19 @@ def blended_validation_loss(
                 big_logits = [big_row.get(i, 0.0) for i in range(V)]
             if backoff_enabled:
                 log_mix = combine_learned_and_counts(
-                    order, tri_logits, big_logits,
-                    tri_log, bi_log, uni_log,
-                    prev2, prev1, V,
-                    trigram_weight, bigram_weight,
-                    backoff_weights, backoff_lambda
+                    order,
+                    tri_logits,
+                    big_logits,
+                    tri_log,
+                    bi_log,
+                    uni_log,
+                    prev2,
+                    prev1,
+                    V,
+                    trigram_weight,
+                    bigram_weight,
+                    backoff_weights,
+                    backoff_lambda,
                 )
                 m = max(log_mix)
                 exps = [math.exp(x - m) for x in log_mix]
@@ -941,6 +1023,7 @@ def blended_validation_loss(
 
 # ============================= Checkpoint Saving ============================= #
 
+
 def save_best_params(
     model: Any,
     dataset: TinyTextDataset,
@@ -950,7 +1033,7 @@ def save_best_params(
     filename: str,
     counts: Optional[NGramCounts],
     save_optimizer_state: bool,
-    optimizer_state: Dict[str, Any]
+    optimizer_state: Dict[str, Any],
 ) -> None:
     os.makedirs(out_dir, exist_ok=True)
     vocab_meta = {
@@ -974,7 +1057,7 @@ def save_best_params(
                 str(p2): {str(p1): dict(row) for p1, row in row_p1.items()}
                 for p2, row_p1 in counts.trigram.items()
             },
-            "total": counts.total
+            "total": counts.total,
         }
     if save_optimizer_state:
         payload["optimizer_state"] = optimizer_state
@@ -986,7 +1069,10 @@ def save_best_params(
 
 # ============================= Cyclic LR ============================= #
 
-def compute_cyclic_lr(update_idx: int, base_lr: float, max_lr: float, period: int) -> float:
+
+def compute_cyclic_lr(
+    update_idx: int, base_lr: float, max_lr: float, period: int
+) -> float:
     if period <= 0:
         return base_lr
     cycle_pos = update_idx % period
@@ -1000,15 +1086,22 @@ def compute_cyclic_lr(update_idx: int, base_lr: float, max_lr: float, period: in
 
 # ============================= Training Orchestration ============================= #
 
+
 def run_training(args: argparse.Namespace) -> None:
     print(f"Loading dataset from: {args.data_path}")
     random.seed(args.seed)
-    dataset = TinyTextDataset(path=args.data_path,
-                              seq_len=args.seq_len,
-                              min_freq=args.min_freq,
-                              use_eos=args.use_eos)
-    print(f"Vocab size: {dataset.vocab_size} (PAD={dataset.pad_id}, UNK={dataset.unk_id}, BOS={dataset.bos_id}, EOS={dataset.eos_id})")
-    print(f"Train windows: {len(dataset.train_idx)} | Val windows: {len(dataset.val_idx)}")
+    dataset = TinyTextDataset(
+        path=args.data_path,
+        seq_len=args.seq_len,
+        min_freq=args.min_freq,
+        use_eos=args.use_eos,
+    )
+    print(
+        f"Vocab size: {dataset.vocab_size} (PAD={dataset.pad_id}, UNK={dataset.unk_id}, BOS={dataset.bos_id}, EOS={dataset.eos_id})"
+    )
+    print(
+        f"Train windows: {len(dataset.train_idx)} | Val windows: {len(dataset.val_idx)}"
+    )
 
     trainer = GovernedTrainer(
         learning_rate=args.learning_rate,
@@ -1025,19 +1118,18 @@ def run_training(args: argparse.Namespace) -> None:
         divergence_threshold=args.divergence_threshold,
     )
 
-    separate_bigram = (args.order == 3 and args.enable_backoff)
+    separate_bigram = args.order == 3 and args.enable_backoff
     if args.order == 3:
         model = LearnableTrigramModel(
             vocab_size=dataset.vocab_size,
             bos_id=dataset.bos_id,
-            separate_bigram=separate_bigram
+            separate_bigram=separate_bigram,
         )
         grad_fn = make_trigram_gradient_fn(model, args.label_smoothing, separate_bigram)
         best_name = "learnable_trigram_best.json"
     else:
         model = LearnableBigramModel(
-            vocab_size=dataset.vocab_size,
-            bos_id=dataset.bos_id
+            vocab_size=dataset.vocab_size, bos_id=dataset.bos_id
         )
         grad_fn = make_bigram_gradient_fn(model, args.label_smoothing)
         best_name = "learnable_bigram_best.json"
@@ -1046,14 +1138,18 @@ def run_training(args: argparse.Namespace) -> None:
 
     # Meta orchestrator
     safe_types = [s.strip() for s in args.meta_safe_types.split(",") if s.strip()]
-    meta_state_path = args.meta_state_path or os.path.join(args.best_out_dir, "meta_state.json")
+    meta_state_path = args.meta_state_path or os.path.join(
+        args.best_out_dir, "meta_state.json"
+    )
     orchestrator = SelfImprovingTraining(
         random_seed=args.seed,
         experiment_selection_strategy="multi_objective",
         eval_is_accuracy=False,
-        enable_memory_decay=args.meta_enable_decay
+        enable_memory_decay=args.meta_enable_decay,
     )
-    print(f"[META] Initialized (interval={args.meta_interval}, apply={args.meta_apply}, safe_types={safe_types}, state={meta_state_path})")
+    print(
+        f"[META] Initialized (interval={args.meta_interval}, apply={args.meta_apply}, safe_types={safe_types}, state={meta_state_path})"
+    )
 
     applied_updates_restored = 0
     if args.resume_from:
@@ -1061,7 +1157,9 @@ def run_training(args: argparse.Namespace) -> None:
             ckpt = load_params_json(args.resume_from)
             ck_order = ckpt.get("order")
             if ck_order != args.order:
-                print(f"[WARN] Resume checkpoint order {ck_order} != requested --order {args.order}.")
+                print(
+                    f"[WARN] Resume checkpoint order {ck_order} != requested --order {args.order}."
+                )
             model.set_parameters(ckpt["params"])
             if counts and "counts" in ckpt:
                 cdata = ckpt["counts"]
@@ -1078,11 +1176,15 @@ def run_training(args: argparse.Namespace) -> None:
             if "optimizer_state" in ckpt and args.save_optimizer_state:
                 opt_state = ckpt["optimizer_state"]
                 if not args.override_lr:
-                    restored_lr = opt_state.get("learning_rate", trainer.optimizer.get_lr())
+                    restored_lr = opt_state.get(
+                        "learning_rate", trainer.optimizer.get_lr()
+                    )
                     trainer.optimizer.set_lr(restored_lr)
                     trainer.lr_scheduler.initial_lr = restored_lr
                 applied_updates_restored = opt_state.get("applied_updates", 0)
-                print(f"[RESUME] Optimizer state (updates={applied_updates_restored}, lr={trainer.optimizer.get_lr():.4e}).")
+                print(
+                    f"[RESUME] Optimizer state (updates={applied_updates_restored}, lr={trainer.optimizer.get_lr():.4e})."
+                )
             ck_vocab = ckpt.get("vocab", {})
             if ck_vocab.get("hash") == vocab_hash(dataset.tok.id_to_token):
                 print("[RESUME] Vocab hash matches.")
@@ -1119,13 +1221,17 @@ def run_training(args: argparse.Namespace) -> None:
                 return False
             ratio = new_lr / old_lr
             if ratio < min_ratio or ratio > max_ratio:
-                print(f"[SAFETY] Proposed LR change {old_lr:.4e} -> {new_lr:.4e} rejected (ratio={ratio:.2f})")
+                print(
+                    f"[SAFETY] Proposed LR change {old_lr:.4e} -> {new_lr:.4e} rejected (ratio={ratio:.2f})"
+                )
                 return False
             # Apply to trainer if available
             try:
                 trainer.optimizer.set_lr(new_lr)
                 # If scheduler tracks an initial_lr, update it too
-                if hasattr(trainer, "lr_scheduler") and hasattr(trainer.lr_scheduler, "initial_lr"):
+                if hasattr(trainer, "lr_scheduler") and hasattr(
+                    trainer.lr_scheduler, "initial_lr"
+                ):
                     trainer.lr_scheduler.initial_lr = new_lr
                 print(f"[SAFETY] Learning rate changed {old_lr:.4e} -> {new_lr:.4e}")
                 return True
@@ -1140,25 +1246,29 @@ def run_training(args: argparse.Namespace) -> None:
     for step in range(args.steps):
         if step >= args.steps:
             break
-        
+
         try:
             batch = dataset.sample_train_batch()
         except Exception:
             break
-        
+
         loss, grads = trainer.gradient_fn(batch)
-        
+
         # Update model
         if hasattr(trainer, "step"):
             trainer.step(grads)
         elif hasattr(trainer, "apply_gradients"):
             trainer.apply_gradients(grads)
         elif hasattr(model, "apply_update"):
-            current_lr = trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate
+            current_lr = (
+                trainer.optimizer.get_lr()
+                if hasattr(trainer, "optimizer")
+                else args.learning_rate
+            )
             model.apply_update(grads, learning_rate=current_lr)
-        
+
         applied_updates += 1
-        
+
         # Accumulate counts if enabled
         if counts is not None:
             seq = batch["sequence"]
@@ -1168,51 +1278,79 @@ def run_training(args: argparse.Namespace) -> None:
                 counts.unigram[tok] += 1
                 counts.total += 1
                 if j > 0:
-                    prev1 = seq[j-1]
+                    prev1 = seq[j - 1]
                     counts.bigram[prev1][tok] += 1
                     if order == 3 and j > 1:
-                        prev2 = seq[j-2]
+                        prev2 = seq[j - 2]
                         counts.trigram[prev2][prev1][tok] += 1
-        
+
         # Validation and checkpointing
         if applied_updates % max(1, args.val_interval) == 0:
             val_loss = blended_validation_loss(
-                model, dataset, batches=args.val_batches, full=args.val_full,
-                backoff_enabled=args.enable_backoff, backoff_lambda=args.backoff_lambda,
-                backoff_weights=tuple(map(float, args.backoff_weights.split(","))) if isinstance(args.backoff_weights, str) else args.backoff_weights,
-                trigram_weight=args.trigram_weight, bigram_weight=args.bigram_weight,
-                counts=counts, alpha=args.count_smoothing_alpha, discount_d=args.discount_d, use_count_loss=args.use_count_loss
+                model,
+                dataset,
+                batches=args.val_batches,
+                full=args.val_full,
+                backoff_enabled=args.enable_backoff,
+                backoff_lambda=args.backoff_lambda,
+                backoff_weights=tuple(map(float, args.backoff_weights.split(",")))
+                if isinstance(args.backoff_weights, str)
+                else args.backoff_weights,
+                trigram_weight=args.trigram_weight,
+                bigram_weight=args.bigram_weight,
+                counts=counts,
+                alpha=args.count_smoothing_alpha,
+                discount_d=args.discount_d,
+                use_count_loss=args.use_count_loss,
             )
             print(f"[VAL] Step {applied_updates}: val_loss={val_loss:.4f}")
-            
+
             if val_loss + args.early_stop_tol < best_val:
                 best_val = val_loss
                 best_update = applied_updates
                 patience_counter = 0
                 optimizer_state = {
-                    "learning_rate": trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate,
-                    "applied_updates": applied_updates
+                    "learning_rate": trainer.optimizer.get_lr()
+                    if hasattr(trainer, "optimizer")
+                    else args.learning_rate,
+                    "applied_updates": applied_updates,
                 }
-                save_best_params(model, dataset, args.best_out_dir, applied_updates, val_loss, best_name, counts, args.save_optimizer_state, optimizer_state)
+                save_best_params(
+                    model,
+                    dataset,
+                    args.best_out_dir,
+                    applied_updates,
+                    val_loss,
+                    best_name,
+                    counts,
+                    args.save_optimizer_state,
+                    optimizer_state,
+                )
             else:
                 patience_counter += 1
                 if patience_counter >= args.patience:
                     print("[TRAIN] Early stopping triggered.")
                     break
-        
+
         # Meta self-improvement (if enabled)
         if args.meta_interval > 0 and applied_updates % args.meta_interval == 0:
-            current_lr = trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate
+            current_lr = (
+                trainer.optimizer.get_lr()
+                if hasattr(trainer, "optimizer")
+                else args.learning_rate
+            )
             issue_report = {
                 "current_val_loss": best_val,
                 "patience_counter": patience_counter,
                 "learning_rate": current_lr,
-                "step": applied_updates
+                "step": applied_updates,
             }
             orchestrator.record_metrics(applied_updates, {"val_loss": best_val})
-            
+
             if args.meta_apply:
-                safe_types = [s.strip() for s in args.meta_safe_types.split(",") if s.strip()]
+                safe_types = [
+                    s.strip() for s in args.meta_safe_types.split(",") if s.strip()
+                ]
                 proposals = orchestrator.propose_experiments(issue_report)
                 for proposal in proposals:
                     exp_type = proposal.get("type", "")
@@ -1220,42 +1358,74 @@ def run_training(args: argparse.Namespace) -> None:
                         print(f"[META] Applying safe experiment: {exp_type}")
                         if exp_type == "lr_adjustment" and "new_lr" in proposal:
                             safe_lr_change(current_lr, proposal["new_lr"])
-    
+
     # Final save
-    print(f"[TRAIN] Training complete. Best val loss: {best_val:.4f} at step {best_update}")
+    print(
+        f"[TRAIN] Training complete. Best val loss: {best_val:.4f} at step {best_update}"
+    )
     optimizer_state = {
-        "learning_rate": trainer.optimizer.get_lr() if hasattr(trainer, "optimizer") else args.learning_rate,
-        "applied_updates": applied_updates
+        "learning_rate": trainer.optimizer.get_lr()
+        if hasattr(trainer, "optimizer")
+        else args.learning_rate,
+        "applied_updates": applied_updates,
     }
-    save_best_params(model, dataset, args.best_out_dir, applied_updates, best_val, f"final_{best_name}", counts, args.save_optimizer_state, optimizer_state)
-    
+    save_best_params(
+        model,
+        dataset,
+        args.best_out_dir,
+        applied_updates,
+        best_val,
+        f"final_{best_name}",
+        counts,
+        args.save_optimizer_state,
+        optimizer_state,
+    )
+
     # Save meta state
     if args.meta_interval > 0:
         try:
-            meta_state_path = args.meta_state_path or os.path.join(args.best_out_dir, "meta_state.json")
+            meta_state_path = args.meta_state_path or os.path.join(
+                args.best_out_dir, "meta_state.json"
+            )
             with open(meta_state_path, "w", encoding="utf-8") as f:
                 json.dump(orchestrator.export_state(), f)
             print(f"[META] Saved orchestrator state to {meta_state_path}")
         except Exception as e:
             print(f"[META] Failed to save meta state: {e}")
-    
+
     # Generate if requested
     if args.generate_length > 0:
         print(f"\n[GEN] Generating {args.generate_length} tokens...")
         if counts is not None:
             V = dataset.vocab_size
-            tri_log, bi_log, uni_log = counts.smooth_log_probs(V, args.count_smoothing_alpha, args.discount_d)
+            tri_log, bi_log, uni_log = counts.smooth_log_probs(
+                V, args.count_smoothing_alpha, args.discount_d
+            )
         else:
             tri_log, bi_log, uni_log = {}, {}, {}
-        
+
         tokens = generate_tokens(
-            model, dataset, args.generate_length, args.temperature,
-            args.top_k, args.top_p, args.repetition_penalty,
-            args.start_token, args.stop_on_eos, args.mask_bos,
-            args.enable_backoff, args.backoff_lambda,
-            tuple(map(float, args.backoff_weights.split(","))) if isinstance(args.backoff_weights, str) else args.backoff_weights,
-            args.trigram_weight, args.bigram_weight,
-            tri_log, bi_log, uni_log, args.interp_lambda
+            model,
+            dataset,
+            args.generate_length,
+            args.temperature,
+            args.top_k,
+            args.top_p,
+            args.repetition_penalty,
+            args.start_token,
+            args.stop_on_eos,
+            args.mask_bos,
+            args.enable_backoff,
+            args.backoff_lambda,
+            tuple(map(float, args.backoff_weights.split(",")))
+            if isinstance(args.backoff_weights, str)
+            else args.backoff_weights,
+            args.trigram_weight,
+            args.bigram_weight,
+            tri_log,
+            bi_log,
+            uni_log,
+            args.interp_lambda,
         )
         text = dataset.tok.decode(tokens)
         print(f"[GEN] {text}")
@@ -1264,73 +1434,296 @@ def run_training(args: argparse.Namespace) -> None:
 # ============================= Main Entry Point ============================= #
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Learnable bigram/trigram trainer with governance and meta self-improvement")
-    
+    parser = argparse.ArgumentParser(
+        description="Learnable bigram/trigram trainer with governance and meta self-improvement"
+    )
+
     # Data and model
-    parser.add_argument("--data-path", "--data_path", required=True, help="Path to training corpus")
-    parser.add_argument("--order", type=int, default=2, choices=[2, 3], help="N-gram order (2=bigram, 3=trigram)")
-    parser.add_argument("--seq-len", "--seq_len", type=int, default=16, help="Sequence length for training windows")
-    parser.add_argument("--min-freq", "--min_freq", type=int, default=1, help="Minimum token frequency")
-    parser.add_argument("--use-eos", "--use_eos", action="store_true", default=True, help="Append EOS to sequences")
-    
+    parser.add_argument(
+        "--data-path", "--data_path", required=True, help="Path to training corpus"
+    )
+    parser.add_argument(
+        "--order",
+        type=int,
+        default=2,
+        choices=[2, 3],
+        help="N-gram order (2=bigram, 3=trigram)",
+    )
+    parser.add_argument(
+        "--seq-len",
+        "--seq_len",
+        type=int,
+        default=16,
+        help="Sequence length for training windows",
+    )
+    parser.add_argument(
+        "--min-freq", "--min_freq", type=int, default=1, help="Minimum token frequency"
+    )
+    parser.add_argument(
+        "--use-eos",
+        "--use_eos",
+        action="store_true",
+        default=True,
+        help="Append EOS to sequences",
+    )
+
     # Training
     parser.add_argument("--steps", type=int, default=200, help="Training steps")
-    parser.add_argument("--learning-rate", "--learning_rate", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument("--batch-size", "--batch_size", type=int, default=1, help="Gradient accumulation steps")
-    parser.add_argument("--label-smoothing", "--label_smoothing", type=float, default=0.0, help="Label smoothing")
-    parser.add_argument("--lr-schedule", "--lr_schedule", default="constant", choices=["constant", "cosine"], help="LR schedule")
-    parser.add_argument("--divergence-threshold", "--divergence_threshold", type=float, default=100.0, help="Divergence threshold")
-    
+    parser.add_argument(
+        "--learning-rate",
+        "--learning_rate",
+        type=float,
+        default=1e-3,
+        help="Learning rate",
+    )
+    parser.add_argument(
+        "--batch-size",
+        "--batch_size",
+        type=int,
+        default=1,
+        help="Gradient accumulation steps",
+    )
+    parser.add_argument(
+        "--label-smoothing",
+        "--label_smoothing",
+        type=float,
+        default=0.0,
+        help="Label smoothing",
+    )
+    parser.add_argument(
+        "--lr-schedule",
+        "--lr_schedule",
+        default="constant",
+        choices=["constant", "cosine"],
+        help="LR schedule",
+    )
+    parser.add_argument(
+        "--divergence-threshold",
+        "--divergence_threshold",
+        type=float,
+        default=100.0,
+        help="Divergence threshold",
+    )
+
     # Validation and checkpointing
-    parser.add_argument("--val-interval", "--val_interval", type=int, default=100, help="Validation interval")
-    parser.add_argument("--val-batches", "--val_batches", type=int, default=5, help="Validation batches")
-    parser.add_argument("--val-full", "--val_full", action="store_true", default=False, help="Use full validation set")
-    parser.add_argument("--patience", type=int, default=5, help="Early stopping patience")
-    parser.add_argument("--early-stop-tol", "--early_stop_tol", type=float, default=1e-6, help="Early stopping tolerance")
-    parser.add_argument("--best-out-dir", "--best_out_dir", default=".", help="Output directory for checkpoints")
-    parser.add_argument("--save-optimizer-state", "--save_optimizer_state", action="store_true", default=False, help="Save optimizer state")
-    
+    parser.add_argument(
+        "--val-interval",
+        "--val_interval",
+        type=int,
+        default=100,
+        help="Validation interval",
+    )
+    parser.add_argument(
+        "--val-batches", "--val_batches", type=int, default=5, help="Validation batches"
+    )
+    parser.add_argument(
+        "--val-full",
+        "--val_full",
+        action="store_true",
+        default=False,
+        help="Use full validation set",
+    )
+    parser.add_argument(
+        "--patience", type=int, default=5, help="Early stopping patience"
+    )
+    parser.add_argument(
+        "--early-stop-tol",
+        "--early_stop_tol",
+        type=float,
+        default=1e-6,
+        help="Early stopping tolerance",
+    )
+    parser.add_argument(
+        "--best-out-dir",
+        "--best_out_dir",
+        default=".",
+        help="Output directory for checkpoints",
+    )
+    parser.add_argument(
+        "--save-optimizer-state",
+        "--save_optimizer_state",
+        action="store_true",
+        default=False,
+        help="Save optimizer state",
+    )
+
     # Backoff and counts
-    parser.add_argument("--enable-backoff", "--enable_backoff", action="store_true", default=False, help="Enable learned backoff")
-    parser.add_argument("--store-counts", "--store_counts", action="store_true", default=False, help="Store n-gram counts")
-    parser.add_argument("--backoff-lambda", "--backoff_lambda", type=float, default=0.5, help="Backoff interpolation lambda")
-    parser.add_argument("--backoff-weights", "--backoff_weights", default="0.6,0.3,0.1", help="Backoff weights (tri,bi,uni)")
-    parser.add_argument("--trigram-weight", "--trigram_weight", type=float, default=1.0, help="Trigram weight")
-    parser.add_argument("--bigram-weight", "--bigram_weight", type=float, default=0.0, help="Bigram weight")
-    parser.add_argument("--count-smoothing-alpha", "--count_smoothing_alpha", type=float, default=0.1, help="Count smoothing alpha")
-    parser.add_argument("--discount-d", "--discount_d", type=float, default=0.0, help="Count discount factor")
-    parser.add_argument("--use-count-loss", "--use_count_loss", action="store_true", default=False, help="Use count-based validation loss")
-    
+    parser.add_argument(
+        "--enable-backoff",
+        "--enable_backoff",
+        action="store_true",
+        default=False,
+        help="Enable learned backoff",
+    )
+    parser.add_argument(
+        "--store-counts",
+        "--store_counts",
+        action="store_true",
+        default=False,
+        help="Store n-gram counts",
+    )
+    parser.add_argument(
+        "--backoff-lambda",
+        "--backoff_lambda",
+        type=float,
+        default=0.5,
+        help="Backoff interpolation lambda",
+    )
+    parser.add_argument(
+        "--backoff-weights",
+        "--backoff_weights",
+        default="0.6,0.3,0.1",
+        help="Backoff weights (tri,bi,uni)",
+    )
+    parser.add_argument(
+        "--trigram-weight",
+        "--trigram_weight",
+        type=float,
+        default=1.0,
+        help="Trigram weight",
+    )
+    parser.add_argument(
+        "--bigram-weight",
+        "--bigram_weight",
+        type=float,
+        default=0.0,
+        help="Bigram weight",
+    )
+    parser.add_argument(
+        "--count-smoothing-alpha",
+        "--count_smoothing_alpha",
+        type=float,
+        default=0.1,
+        help="Count smoothing alpha",
+    )
+    parser.add_argument(
+        "--discount-d",
+        "--discount_d",
+        type=float,
+        default=0.0,
+        help="Count discount factor",
+    )
+    parser.add_argument(
+        "--use-count-loss",
+        "--use_count_loss",
+        action="store_true",
+        default=False,
+        help="Use count-based validation loss",
+    )
+
     # Meta self-improvement
-    parser.add_argument("--meta-interval", "--meta_interval", type=int, default=0, help="Meta self-improvement interval (0=disabled)")
-    parser.add_argument("--meta-apply", "--meta_apply", action="store_true", default=False, help="Apply meta experiments")
-    parser.add_argument("--meta-safe-types", "--meta_safe_types", default="lr_adjustment", help="Safe experiment types (comma-separated)")
-    parser.add_argument("--meta-state-path", "--meta_state_path", default=None, help="Meta state file path")
-    parser.add_argument("--meta-enable-decay", "--meta_enable_decay", action="store_true", default=False, help="Enable meta memory decay")
-    
+    parser.add_argument(
+        "--meta-interval",
+        "--meta_interval",
+        type=int,
+        default=0,
+        help="Meta self-improvement interval (0=disabled)",
+    )
+    parser.add_argument(
+        "--meta-apply",
+        "--meta_apply",
+        action="store_true",
+        default=False,
+        help="Apply meta experiments",
+    )
+    parser.add_argument(
+        "--meta-safe-types",
+        "--meta_safe_types",
+        default="lr_adjustment",
+        help="Safe experiment types (comma-separated)",
+    )
+    parser.add_argument(
+        "--meta-state-path",
+        "--meta_state_path",
+        default=None,
+        help="Meta state file path",
+    )
+    parser.add_argument(
+        "--meta-enable-decay",
+        "--meta_enable_decay",
+        action="store_true",
+        default=False,
+        help="Enable meta memory decay",
+    )
+
     # Resume and generation
-    parser.add_argument("--resume-from", "--resume_from", default=None, help="Resume from checkpoint")
-    parser.add_argument("--load-best", "--load_best", default=None, help="Load best checkpoint for generation")
-    parser.add_argument("--override-lr", "--override_lr", action="store_true", default=False, help="Override loaded LR")
-    parser.add_argument("--generate-length", "--generate_length", type=int, default=0, help="Generate N tokens")
-    parser.add_argument("--temperature", type=float, default=1.0, help="Sampling temperature")
-    parser.add_argument("--top-k", "--top_k", type=int, default=0, help="Top-k sampling")
-    parser.add_argument("--top-p", "--top_p", type=float, default=1.0, help="Top-p (nucleus) sampling")
-    parser.add_argument("--repetition-penalty", "--repetition_penalty", type=float, default=1.0, help="Repetition penalty")
-    parser.add_argument("--start-token", "--start_token", default=None, help="Start token for generation")
-    parser.add_argument("--stop-on-eos", "--stop_on_eos", action="store_true", default=False, help="Stop generation on EOS")
-    parser.add_argument("--mask-bos", "--mask_bos", action="store_true", default=False, help="Mask BOS during generation")
-    parser.add_argument("--interp-lambda", "--interp_lambda", type=float, default=0.0, help="Legacy interpolation lambda")
-    
+    parser.add_argument(
+        "--resume-from", "--resume_from", default=None, help="Resume from checkpoint"
+    )
+    parser.add_argument(
+        "--load-best",
+        "--load_best",
+        default=None,
+        help="Load best checkpoint for generation",
+    )
+    parser.add_argument(
+        "--override-lr",
+        "--override_lr",
+        action="store_true",
+        default=False,
+        help="Override loaded LR",
+    )
+    parser.add_argument(
+        "--generate-length",
+        "--generate_length",
+        type=int,
+        default=0,
+        help="Generate N tokens",
+    )
+    parser.add_argument(
+        "--temperature", type=float, default=1.0, help="Sampling temperature"
+    )
+    parser.add_argument(
+        "--top-k", "--top_k", type=int, default=0, help="Top-k sampling"
+    )
+    parser.add_argument(
+        "--top-p", "--top_p", type=float, default=1.0, help="Top-p (nucleus) sampling"
+    )
+    parser.add_argument(
+        "--repetition-penalty",
+        "--repetition_penalty",
+        type=float,
+        default=1.0,
+        help="Repetition penalty",
+    )
+    parser.add_argument(
+        "--start-token",
+        "--start_token",
+        default=None,
+        help="Start token for generation",
+    )
+    parser.add_argument(
+        "--stop-on-eos",
+        "--stop_on_eos",
+        action="store_true",
+        default=False,
+        help="Stop generation on EOS",
+    )
+    parser.add_argument(
+        "--mask-bos",
+        "--mask_bos",
+        action="store_true",
+        default=False,
+        help="Mask BOS during generation",
+    )
+    parser.add_argument(
+        "--interp-lambda",
+        "--interp_lambda",
+        type=float,
+        default=0.0,
+        help="Legacy interpolation lambda",
+    )
+
     # Other
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    
+
     args = parser.parse_args()
-    
+
     try:
         run_training(args)
     except Exception as e:
         print(f"[ERROR] run_training failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

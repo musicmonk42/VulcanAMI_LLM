@@ -37,6 +37,7 @@ from pathlib import Path
 # Load .env file if it exists and dotenv is available
 try:
     from dotenv import load_dotenv
+
     # Try multiple paths for .env file
     env_paths = [
         Path(__file__).parent.parent / ".env",  # project_root/.env
@@ -52,11 +53,17 @@ except ImportError:
 
 # Try to import tenacity for retry logic, handle gracefully if not available
 try:
-    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+    from tenacity import (
+        retry,
+        stop_after_attempt,
+        wait_exponential,
+        retry_if_exception_type,
+    )
+
     TENACITY_AVAILABLE = True
 except ImportError:
     TENACITY_AVAILABLE = False
-    
+
     # Create a no-op decorator as fallback when tenacity is not installed.
     # This enables the @retry(...) decorator syntax to work without tenacity.
     #
@@ -65,39 +72,45 @@ except ImportError:
     # 2. @retry(...) - decorator with arguments (returns a decorator)
     def retry(*args, **kwargs):
         """No-op retry decorator when tenacity is not installed."""
+
         def decorator(func):
             return func
+
         # Pattern 1: @retry - first arg is the decorated function itself
         if len(args) == 1 and callable(args[0]):
             return args[0]
         # Pattern 2: @retry(...) - return a decorator that will receive the function
         return decorator
-    
+
     # No-op functions for tenacity configuration parameters.
     # These are passed as arguments to retry() and their return values
     # are ignored by the no-op retry decorator above.
     def stop_after_attempt(attempts):
         """No-op stop condition."""
         return None
-    
+
     def wait_exponential(**kwargs):
         """No-op wait strategy."""
         return None
-    
+
     def retry_if_exception_type(exception_types):
         """No-op retry condition."""
         return None
 
+
 # Try to import OpenAI, handle gracefully if not available
 try:
     from openai import OpenAI, OpenAIError
+
     OPENAI_AVAILABLE = True
 except ImportError:
     OpenAI = None
     OpenAIError = Exception  # Fallback for retry decorator
     OPENAI_AVAILABLE = False
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 # Constants
 MOCK_RESPONSE_TRUNCATION_LENGTH = 100
@@ -107,15 +120,22 @@ class GraphixLLMClient:
     """
     Enhanced client for Graphix IR LLM interactions using OpenAI API.
     Designed for GraphixArena integration with generator, evolver, and visualizer agents.
-    
+
     Supports graceful degradation: when OPENAI_API_KEY is not configured or OpenAI
     package is not installed, the client operates in mock mode and returns placeholder
     responses.
     """
-    def __init__(self, agent_id: str = "agent-default", model: str = "gpt-4o", temperature: float = 0.01, max_tokens: int = 4096):
+
+    def __init__(
+        self,
+        agent_id: str = "agent-default",
+        model: str = "gpt-4o",
+        temperature: float = 0.01,
+        max_tokens: int = 4096,
+    ):
         """
         Initialize the LLM client with OpenAI API and Graphix-specific settings.
-        
+
         Args:
             agent_id (str): Identifier for the agent (e.g., 'generator', 'evolver').
             model (str): LLM model to use (default from crew_config.yaml: gpt-4o).
@@ -129,25 +149,33 @@ class GraphixLLMClient:
         self.logger = logging.getLogger("GraphixLLMClient")
         self.client = None
         self.mock_mode = False
-        
+
         api_key = os.getenv("OPENAI_API_KEY")
-        
+
         if not OPENAI_AVAILABLE:
             self.logger.warning("OpenAI package not installed. Running in mock mode.")
             self.logger.warning("To enable real LLM features: pip install openai")
             self.mock_mode = True
         elif not api_key:
-            self.logger.warning("OPENAI_API_KEY not set in environment variables. Running in mock mode.")
-            self.logger.warning("To enable real LLM features: set OPENAI_API_KEY in your .env file")
+            self.logger.warning(
+                "OPENAI_API_KEY not set in environment variables. Running in mock mode."
+            )
+            self.logger.warning(
+                "To enable real LLM features: set OPENAI_API_KEY in your .env file"
+            )
             self.mock_mode = True
         else:
             try:
                 self.client = OpenAI(api_key=api_key)
-                self.logger.info(f"Client initialized for agent: {agent_id} with model: {model}, temperature: {temperature}")
+                self.logger.info(
+                    f"Client initialized for agent: {agent_id} with model: {model}, temperature: {temperature}"
+                )
             except Exception as e:
-                self.logger.error(f"Failed to initialize OpenAI client: {e}. Running in mock mode.")
+                self.logger.error(
+                    f"Failed to initialize OpenAI client: {e}. Running in mock mode."
+                )
                 self.mock_mode = True
-    
+
     @property
     def is_available(self) -> bool:
         """Check if the LLM client is available for real API calls."""
@@ -159,9 +187,15 @@ class GraphixLLMClient:
         retry=retry_if_exception_type((OpenAIError, ConnectionError)),
         before_sleep=lambda retry_state: logging.getLogger("GraphixLLMClient").warning(
             f"Retrying due to {retry_state.outcome.exception()}. Attempt {retry_state.attempt_number}..."
-        )
+        ),
     )
-    def chat(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: Optional[float] = None, max_tokens: Optional[int] = None) -> Dict[str, Any]:
+    def chat(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """
         Perform a chat interaction using OpenAI API, returning a Graphix IR graph.
 
@@ -183,9 +217,11 @@ class GraphixLLMClient:
         max_tokens = max_tokens or self.max_tokens
 
         # Validate messages
-        if not messages or not all('role' in m and 'content' in m for m in messages):
+        if not messages or not all("role" in m and "content" in m for m in messages):
             self.logger.error("Invalid messages format")
-            raise ValueError("Messages must be a list of dicts with 'role' and 'content'")
+            raise ValueError(
+                "Messages must be a list of dicts with 'role' and 'content'"
+            )
 
         last_content = messages[-1].get("content", "") if messages else ""
         proposal_id = hashlib.sha256(last_content.encode()).hexdigest()[:8]
@@ -201,7 +237,7 @@ class GraphixLLMClient:
                     model=model,
                     messages=messages,
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
                 response = completion.choices[0].message.content
             except Exception as e:
@@ -214,35 +250,50 @@ class GraphixLLMClient:
             "type": "Graph",
             "nodes": [
                 {"id": "prompt", "type": "PromptNode", "value": last_content},
-                {"id": "generate", "type": "GenerativeNode", "params": {"model": model, "temperature": temperature}},
-                {"id": "output", "type": "OutputNode", "value": response}
+                {
+                    "id": "generate",
+                    "type": "GenerativeNode",
+                    "params": {"model": model, "temperature": temperature},
+                },
+                {"id": "output", "type": "OutputNode", "value": response},
             ],
             "edges": [
-                {"from": "prompt", "to": {"node": "generate", "port": "input"}, "type": "data"},
-                {"from": "generate", "to": {"node": "output", "port": "input"}, "type": "data"}
+                {
+                    "from": "prompt",
+                    "to": {"node": "generate", "port": "input"},
+                    "type": "data",
+                },
+                {
+                    "from": "generate",
+                    "to": {"node": "output", "port": "input"},
+                    "type": "data",
+                },
             ],
             "metadata": {
                 "agent_id": self.agent_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "model": model,
-                "mock_mode": self.mock_mode
-            }
+                "mock_mode": self.mock_mode,
+            },
         }
 
         # Log interaction for ObservabilityManager
-        self.logger.info(f"Chat response for agent {self.agent_id}: {response[:50]}... (ID: {proposal_id})")
+        self.logger.info(
+            f"Chat response for agent {self.agent_id}: {response[:50]}... (ID: {proposal_id})"
+        )
 
-        return {
-            "response": response,
-            "ir": ir_graph,
-            "proposal_id": proposal_id
-        }
+        return {"response": response, "ir": ir_graph, "proposal_id": proposal_id}
 
 
 if __name__ == "__main__":
     # Demo usage
     client = GraphixLLMClient(agent_id="agent-grok")
-    messages = [{"role": "user", "content": "Generate a Python function for matrix multiplication"}]
+    messages = [
+        {
+            "role": "user",
+            "content": "Generate a Python function for matrix multiplication",
+        }
+    ]
 
     print("\n--- Demo: OpenAI LLM Interaction ---")
     print(f"Mock mode: {client.mock_mode}")

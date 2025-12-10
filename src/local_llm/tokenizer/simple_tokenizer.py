@@ -45,15 +45,24 @@ class SimpleTokenizer:
         for k, v in data["token_to_id"].items():
             self.token_to_id[k] = int(v) if isinstance(v, str) else v
         # id_to_token is string keys in file; coerce to int
-        self.id_to_token: Dict[int, str] = {int(k): v for k, v in data["id_to_token"].items()}
+        self.id_to_token: Dict[int, str] = {
+            int(k): v for k, v in data["id_to_token"].items()
+        }
         self.lowercase: bool = bool(data.get("lowercase", True))
 
         # Validate special tokens ordering and ids
         for i, st in enumerate(SPECIAL_TOKENS):
             if i >= len(self.vocab) or self.vocab[i] != st:
-                raise ValueError(f"Vocab special token mismatch at index {i}: expected {st}, got {self.vocab[i] if i < len(self.vocab) else '<out of range>'}")
-            if self.token_to_id.get(st, None) != i or self.id_to_token.get(i, None) != st:
-                raise ValueError(f"Special token mapping mismatch for {st}: token_to_id={self.token_to_id.get(st)} id_to_token[{i}]={self.id_to_token.get(i)}")
+                raise ValueError(
+                    f"Vocab special token mismatch at index {i}: expected {st}, got {self.vocab[i] if i < len(self.vocab) else '<out of range>'}"
+                )
+            if (
+                self.token_to_id.get(st, None) != i
+                or self.id_to_token.get(i, None) != st
+            ):
+                raise ValueError(
+                    f"Special token mapping mismatch for {st}: token_to_id={self.token_to_id.get(st)} id_to_token[{i}]={self.id_to_token.get(i)}"
+                )
 
     def tokenize(self, text: str) -> List[str]:
         if self.lowercase:
@@ -69,7 +78,9 @@ class SimpleTokenizer:
     def encode_with_bos_eos(self, text: str) -> List[int]:
         return [BOS_ID] + self.encode(text) + [EOS_ID]
 
-    def batch_encode(self, texts: Iterable[str], add_bos: bool = True, add_eos: bool = False) -> List[List[int]]:
+    def batch_encode(
+        self, texts: Iterable[str], add_bos: bool = True, add_eos: bool = False
+    ) -> List[List[int]]:
         out: List[List[int]] = []
         for t in texts:
             if add_bos and add_eos:
@@ -100,7 +111,9 @@ class SimpleTokenizer:
         text = re.sub(r"\s{2,}", " ", text).strip()
         return text
 
-    def batch_decode(self, batch_ids: Iterable[List[int]], strip_special: bool = True) -> List[str]:
+    def batch_decode(
+        self, batch_ids: Iterable[List[int]], strip_special: bool = True
+    ) -> List[str]:
         return [self.decode(ids, strip_special=strip_special) for ids in batch_ids]
 
 
@@ -108,7 +121,9 @@ def _cli():
     ap = argparse.ArgumentParser(description="SimpleTokenizer smoke test")
     ap.add_argument("--vocab", required=True, help="Path to vocab.json")
     ap.add_argument("--text", default="Hello, world!", help="Text to encode/decode")
-    ap.add_argument("--bos-eos", action="store_true", default=False, help="Add BOS/EOS in encoding")
+    ap.add_argument(
+        "--bos-eos", action="store_true", default=False, help="Add BOS/EOS in encoding"
+    )
     args = ap.parse_args()
 
     tok = SimpleTokenizer(args.vocab)

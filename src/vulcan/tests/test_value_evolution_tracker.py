@@ -33,6 +33,7 @@ from vulcan.world_model.meta_reasoning.value_evolution_tracker import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 class AlertCatcher:
     def __init__(self):
         self.alerts = []
@@ -56,6 +57,7 @@ def feed_series(tracker: ValueEvolutionTracker, series, sleep=False):
 # ---------------------------------------------------------------------------
 # Basic recording, stats, and baseline behavior
 # ---------------------------------------------------------------------------
+
 
 def test_recording_and_stats_basic():
     catcher = AlertCatcher()
@@ -88,6 +90,7 @@ def test_recording_and_stats_basic():
 # Drift detection: CUSUM + change-point + trend
 # ---------------------------------------------------------------------------
 
+
 def test_drift_detection_cusum_change_trend_and_alerts():
     catcher = AlertCatcher()
     tr = ValueEvolutionTracker(drift_threshold=0.08, alert_callback=catcher)
@@ -95,11 +98,15 @@ def test_drift_detection_cusum_change_trend_and_alerts():
 
     # Warm-up: ~baseline
     low_phase = [{"A": 0.50, "B": 0.10} for _ in range(6)]  # >=5 triggers baseline
-    feed_series(tr, low_phase, sleep=True) # Add sleep to ensure baseline timestamps differ
+    feed_series(
+        tr, low_phase, sleep=True
+    )  # Add sleep to ensure baseline timestamps differ
 
     # Shift: both should drift
     high_phase = [{"A": 0.90, "B": 0.90} for _ in range(6)]
-    feed_series(tr, high_phase, sleep=True) # Add sleep to ensure drift timestamps differ
+    feed_series(
+        tr, high_phase, sleep=True
+    )  # Add sleep to ensure drift timestamps differ
 
     # detect_drift(None) checks all values
     dd = tr.detect_drift()
@@ -129,6 +136,7 @@ def test_drift_detection_cusum_change_trend_and_alerts():
 # Analysis, caching paths, correlation matrix, and trends
 # ---------------------------------------------------------------------------
 
+
 def test_analyze_evolution_caching_and_correlation_and_trends():
     tr = ValueEvolutionTracker(drift_threshold=0.12)
     tr.cusum_slack = 0.0
@@ -137,7 +145,7 @@ def test_analyze_evolution_caching_and_correlation_and_trends():
     series = []
     for i in range(12):
         series.append({"X": 0.2 + 0.05 * i, "Y": 0.3 + 0.05 * i})
-    
+
     # **************************************************************************
     # FIXED: The bug was here. sleep=True is required to ensure timestamps
     # are unique, which is necessary for the correlation matrix calculation.
@@ -153,7 +161,9 @@ def test_analyze_evolution_caching_and_correlation_and_trends():
     # The tracker may classify monotonic increase as INCREASING, VOLATILE, or STABLE,
     # depending on slope/volatility thresholds. Accept any of these directions.
     assert analysis1.value_trends["X"] in {
-        TrendDirection.INCREASING, TrendDirection.VOLATILE, TrendDirection.STABLE
+        TrendDirection.INCREASING,
+        TrendDirection.VOLATILE,
+        TrendDirection.STABLE,
     }
 
     # Correlation matrix populated because same-length trajectories exist
@@ -176,11 +186,12 @@ def test_analyze_evolution_caching_and_correlation_and_trends():
 # Trajectory retrieval and future prediction
 # ---------------------------------------------------------------------------
 
+
 def test_trajectory_and_prediction_paths():
     tr = ValueEvolutionTracker(drift_threshold=0.2)
 
     # Need at least two points for predictions to use slope
-    feed_series(tr, [{"S": 0.10}, {"S": 0.20}, {"S": 0.30}], sleep=True) # Use sleep
+    feed_series(tr, [{"S": 0.10}, {"S": 0.20}, {"S": 0.30}], sleep=True)  # Use sleep
 
     traj_all = tr.get_value_trajectory("S")
     assert len(traj_all) == 3
@@ -203,12 +214,15 @@ def test_trajectory_and_prediction_paths():
 # Baseline management, export/import, reset
 # ---------------------------------------------------------------------------
 
+
 def test_set_baseline_export_import_and_reset_roundtrip():
     tr = ValueEvolutionTracker(drift_threshold=0.15)
     tr.cusum_slack = 0.0
 
     # Build history and set a manual baseline
-    feed_series(tr, [{"A": 0.4}, {"A": 0.5}, {"A": 0.6}, {"A": 0.7}, {"A": 0.8}], sleep=True) # Use sleep
+    feed_series(
+        tr, [{"A": 0.4}, {"A": 0.5}, {"A": 0.6}, {"A": 0.7}, {"A": 0.8}], sleep=True
+    )  # Use sleep
     tr.set_baseline({"A": 0.55})
     stats = tr.get_stats()
     assert stats["baseline_set"] is True
@@ -241,6 +255,7 @@ def test_set_baseline_export_import_and_reset_roundtrip():
 # Severity classification boundaries
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "score, expected",
     [
@@ -262,6 +277,7 @@ def test_classify_drift_severity_thresholds(score, expected):
 # Detect drift on specific value path and empty-history guard
 # ---------------------------------------------------------------------------
 
+
 def test_detect_specific_value_and_insufficient_history_guard():
     tr = ValueEvolutionTracker(drift_threshold=0.1)
     # With no history -> guard path
@@ -271,7 +287,7 @@ def test_detect_specific_value_and_insufficient_history_guard():
 
     # Once we have enough history, specific value path returns detail
     series = [{"X": 0.2} for _ in range(12)]
-    feed_series(tr, series, sleep=True) # Use sleep
+    feed_series(tr, series, sleep=True)  # Use sleep
     dd1 = tr.detect_drift(value_name="X")
     assert "drift_details" in dd1
     assert "X" in dd1["drift_details"]
@@ -281,33 +297,42 @@ def test_detect_specific_value_and_insufficient_history_guard():
 # Additional coverage: VOLATILE classification and time-window slicing
 # ---------------------------------------------------------------------------
 
+
 def test_volatile_classification_and_time_window_slice():
-    tr = ValueEvolutionTracker(drift_threshold=0.5)  # make drift detection harder; we want volatility
+    tr = ValueEvolutionTracker(
+        drift_threshold=0.5
+    )  # make drift detection harder; we want volatility
     tr.cusum_slack = 0.2
 
     # Oscillating series around 0.5 to induce volatility classification
     series = [{"V": 0.5 + (0.2 if i % 2 == 0 else -0.2)} for i in range(20)]
     # Mix in a tiny ramp to avoid degenerate slope=0
     for i in range(20):
-        series[i]["V"] += (i * 0.002)
-    feed_series(tr, series, sleep=True) # Use sleep
+        series[i]["V"] += i * 0.002
+    feed_series(tr, series, sleep=True)  # Use sleep
 
     analysis = tr.analyze_evolution(use_cache=False)
     assert analysis is not None
     # Depending on thresholds, VOLATILE is likely; but STABLE/INCREASING are okay too.
     assert analysis.value_trends["V"] in {
-        TrendDirection.VOLATILE, TrendDirection.STABLE, TrendDirection.INCREASING, TrendDirection.DECREASING
+        TrendDirection.VOLATILE,
+        TrendDirection.STABLE,
+        TrendDirection.INCREASING,
+        TrendDirection.DECREASING,
     }
 
     # Small time window slice to hit windowed trajectory path
     # Use a tiny window to include only latest points
-    recent = tr.get_value_trajectory("V", time_window=1e-9)  # may be 0/1/2 depending on timestamps
+    recent = tr.get_value_trajectory(
+        "V", time_window=1e-9
+    )  # may be 0/1/2 depending on timestamps
     assert isinstance(recent, list)
 
 
 # ---------------------------------------------------------------------------
 # Additional coverage: anomaly-like spike to exercise z-score branches
 # ---------------------------------------------------------------------------
+
 
 def test_anomaly_spike_path_and_alert_limit_and_filter():
     catcher = AlertCatcher()
@@ -316,11 +341,11 @@ def test_anomaly_spike_path_and_alert_limit_and_filter():
 
     # Build a mostly calm series
     calm = [{"Z": 0.50 + np.random.uniform(-0.01, 0.01)} for _ in range(15)]
-    feed_series(tr, calm, sleep=True) # Use sleep
+    feed_series(tr, calm, sleep=True)  # Use sleep
 
     # Inject a spike that should look anomalous and also push drift methods
     spike = [{"Z": 0.95} for _ in range(6)]
-    feed_series(tr, spike, sleep=True) # Use sleep
+    feed_series(tr, spike, sleep=True)  # Use sleep
 
     # Trigger detection for Z (specific value)
     dd = tr.detect_drift(value_name="Z")

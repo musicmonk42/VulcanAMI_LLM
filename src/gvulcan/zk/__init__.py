@@ -11,19 +11,19 @@ Main components:
 
 Example:
     from src.gvulcan.zk import FieldElement, Groth16Prover, Circuit, R1CSConstraint
-    
+
     # Define circuit
     constraints = [R1CSConstraint(A=[...], B=[...], C=[...])]
     circuit = Circuit(constraints, num_variables=3, num_public_inputs=1)
-    
+
     # Create prover and setup
     prover = Groth16Prover(circuit)
     pk, vk = prover.setup()
-    
+
     # Generate proof
     witness = [1, 9, 3]  # [constant, public, private]
     proof = prover.prove(witness)
-    
+
     # Verify
     is_valid = prover.verify(proof, public_inputs=[9], vk=vk)
 """
@@ -45,29 +45,25 @@ from .snark import (
 
 __all__ = [
     # Field arithmetic
-    'FieldElement',
-    'CURVE_ORDER',
-    
+    "FieldElement",
+    "CURVE_ORDER",
     # Polynomials
-    'Polynomial',
-    
+    "Polynomial",
     # QAP
-    'QAP',
-    'r1cs_to_qap',
-    'compute_h_polynomial',
-    
+    "QAP",
+    "r1cs_to_qap",
+    "compute_h_polynomial",
     # Groth16
-    'Circuit',
-    'R1CSConstraint',
-    'Groth16Prover',
-    'Groth16Proof',
-    'ProvingKey',
-    'VerificationKey',
-    
+    "Circuit",
+    "R1CSConstraint",
+    "Groth16Prover",
+    "Groth16Proof",
+    "ProvingKey",
+    "VerificationKey",
     # Unlearning integration
-    'create_unlearning_circuit',
-    'generate_proof_for_unlearning',
-    'verify_unlearning_proof',
+    "create_unlearning_circuit",
+    "generate_proof_for_unlearning",
+    "verify_unlearning_proof",
 ]
 
-__version__ = '1.0.0'
+__version__ = "1.0.0"
