@@ -1926,7 +1926,8 @@ class AdversarialTester:
             {
                 "id": f"file_writer_{uuid.uuid4().hex[:8]}",
                 "type": "FileNode",
-                "params": {"path": "/tmp/test", "mode": "w"},
+                # Security: Use tempfile.gettempdir() instead of hardcoded /tmp
+                "params": {"path": os.path.join(tempfile.gettempdir(), "test"), "mode": "w"},
             },
             {
                 "id": f"network_scanner_{uuid.uuid4().hex[:8]}",

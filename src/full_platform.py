@@ -148,7 +148,9 @@ class UnifiedPlatformSettings(BaseSettings):
     )
 
     # Server configuration
-    host: str = "0.0.0.0"
+    # Security: Default to localhost binding for safety
+    # Set UNIFIED_HOST=0.0.0.0 in environment to bind to all interfaces
+    host: str = "127.0.0.1"
     port: int = 8080
     workers: int = 1  # Default to 1 for safety
     reload: bool = False
