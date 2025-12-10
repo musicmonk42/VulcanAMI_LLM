@@ -112,6 +112,9 @@ async def test_safe_call_async_uses_config_default_timeout():
     """Test that config default timeout is used when no custom timeout provided."""
     from src.integration.graphix_vulcan_bridge import GraphixVulcanBridge, BridgeConfig
     
+    # Reset singleton to ensure fresh instance
+    GraphixVulcanBridge._instance = None
+    
     # Create bridge with very short default timeout
     config = BridgeConfig(async_timeout=0.1)
     bridge = GraphixVulcanBridge(config=config)
