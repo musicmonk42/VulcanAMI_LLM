@@ -11,15 +11,14 @@ import torch.nn.functional as F
 @dataclass
 class LossMetrics:
     # All losses are in natural-log units (nats)
-    loss_sum_valid: float           # Sum of cross-entropy over valid targets
-    valid_tokens: int               # Count of targets that contributed
-    loss_per_token: float           # Average cross-entropy over valid targets
-    ppl: float                      # Perplexity = exp(loss_per_token)
+    loss_sum_valid: float  # Sum of cross-entropy over valid targets
+    valid_tokens: int  # Count of targets that contributed
+    loss_per_token: float  # Average cross-entropy over valid targets
+    ppl: float  # Perplexity = exp(loss_per_token)
 
 
 def _flatten_logits_targets(
-    logits: torch.Tensor,
-    targets: torch.Tensor
+    logits: torch.Tensor, targets: torch.Tensor
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Flatten (B, T, V) logits and (B, T) targets to (N, V) and (N,),
@@ -41,16 +40,16 @@ def _flatten_logits_targets(
         raise ValueError(f"targets must be (B,T) or (N,), got {tuple(targets.shape)}")
 
     if logits_flat.size(0) != targets_flat.size(0):
-        raise ValueError(f"Flattened logits and targets must have same N. "
-                         f"Got logits N={logits_flat.size(0)} vs targets N={targets_flat.size(0)}")
+        raise ValueError(
+            f"Flattened logits and targets must have same N. "
+            f"Got logits N={logits_flat.size(0)} vs targets N={targets_flat.size(0)}"
+        )
     return logits_flat, targets_flat
 
 
 @torch.no_grad()
 def compute_loss_metrics_eval(
-    logits: torch.Tensor,
-    targets: torch.Tensor,
-    ignore_index: Optional[int] = None
+    logits: torch.Tensor, targets: torch.Tensor, ignore_index: Optional[int] = None
 ) -> LossMetrics:
     """
     Compute evaluation CE loss metrics in nats:
@@ -67,7 +66,9 @@ def compute_loss_metrics_eval(
         logits_flat,
         targets_flat,
         reduction="none",
-        ignore_index=ignore_index if ignore_index is not None else -100  # default HF ignore_index
+        ignore_index=ignore_index
+        if ignore_index is not None
+        else -100,  # default HF ignore_index
     )
 
     # Build valid mask
@@ -89,14 +90,12 @@ def compute_loss_metrics_eval(
         loss_sum_valid=loss_sum_valid,
         valid_tokens=valid_tokens,
         loss_per_token=loss_per_token,
-        ppl=ppl
+        ppl=ppl,
     )
 
 
 def compute_loss_metrics_train(
-    logits: torch.Tensor,
-    targets: torch.Tensor,
-    ignore_index: Optional[int] = None
+    logits: torch.Tensor, targets: torch.Tensor, ignore_index: Optional[int] = None
 ) -> Tuple[torch.Tensor, LossMetrics]:
     """
     Compute training CE loss and metrics:
@@ -110,7 +109,7 @@ def compute_loss_metrics_train(
         logits_flat,
         targets_flat,
         reduction="none",
-        ignore_index=ignore_index if ignore_index is not None else -100
+        ignore_index=ignore_index if ignore_index is not None else -100,
     )
 
     if ignore_index is None:
@@ -130,7 +129,7 @@ def compute_loss_metrics_train(
         loss_sum_valid=float(loss_sum_valid.detach().item()),
         valid_tokens=valid_tokens,
         loss_per_token=float(loss_per_token.detach().item()),
-        ppl=float(math.exp(loss_per_token.detach().item()))
+        ppl=float(math.exp(loss_per_token.detach().item())),
     )
 
     return loss_per_token, metrics
@@ -141,7 +140,7 @@ def random_label_sanity(
     vocab_size: int,
     targets: torch.Tensor,
     device: Optional[torch.device] = None,
-    ignore_index: Optional[int] = None
+    ignore_index: Optional[int] = None,
 ) -> Dict[str, float]:
     """
     Sanity test: replace targets by random labels in [0, vocab_size).
@@ -155,9 +154,13 @@ def random_label_sanity(
 
     # Create random labels, keeping ignore positions as-is if ignore_index is set
     if ignore_index is None:
-        rand_tgts = torch.randint(low=0, high=vocab_size, size=targets.shape, device=device)
+        rand_tgts = torch.randint(
+            low=0, high=vocab_size, size=targets.shape, device=device
+        )
     else:
-        rand_tgts = torch.randint(low=0, high=vocab_size, size=targets.shape, device=device)
+        rand_tgts = torch.randint(
+            low=0, high=vocab_size, size=targets.shape, device=device
+        )
         rand_tgts = torch.where(targets == ignore_index, targets, rand_tgts)
 
     # Uniform logits = zeros
@@ -177,7 +180,7 @@ def random_label_sanity(
         "ppl": metrics.ppl,
         "expected_ln_vocab": math.log(vocab_size),
         "expected_vocab": float(vocab_size),
-        "valid_tokens": float(metrics.valid_tokens)
+        "valid_tokens": float(metrics.valid_tokens),
     }
 
 
@@ -187,7 +190,7 @@ def uniform_logits_sanity(
     targets: torch.Tensor,
     logits_shape_like: Tuple[int, ...],
     device: Optional[torch.device] = None,
-    ignore_index: Optional[int] = None
+    ignore_index: Optional[int] = None,
 ) -> Dict[str, float]:
     """
     Sanity test: given real targets but force logits to be uniform (zeros).
@@ -203,5 +206,5 @@ def uniform_logits_sanity(
         "ppl": metrics.ppl,
         "expected_ln_vocab": math.log(vocab_size),
         "expected_vocab": float(vocab_size),
-        "valid_tokens": float(metrics.valid_tokens)
+        "valid_tokens": float(metrics.valid_tokens),
     }

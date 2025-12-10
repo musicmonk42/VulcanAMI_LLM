@@ -59,6 +59,7 @@ At the top of `src/__init__.py`:
 
 License: MIT (or your project's license)
 """
+
 from __future__ import annotations
 
 import os
@@ -80,6 +81,7 @@ import builtins as _builtins
 
 # ---------- Configuration & State ----------
 
+
 @dataclass
 class StdIOConfig:
     # Behavior toggles
@@ -95,20 +97,21 @@ class StdIOConfig:
 
     # Coloring / ANSI
     enable_color: Optional[bool] = None  # None=auto by env; True/False forces
-    strip_color_on_windows: bool = False # keep ANSI but avoid Colorama wrapping
+    strip_color_on_windows: bool = False  # keep ANSI but avoid Colorama wrapping
 
     # Structured logging / audit
-    jsonl_path: Optional[str] = None     # e.g., "governance_artifacts/io_events.jsonl"
+    jsonl_path: Optional[str] = None  # e.g., "governance_artifacts/io_events.jsonl"
     include_pid_tid: bool = True
     include_ts: bool = True
     effect_label: str = "Effect.IO.Stdout"
 
     # Safety
-    max_len: int = 1_000_000             # prevent giant writes
-    lock_print: bool = True              # serialize concurrent prints
+    max_len: int = 1_000_000  # prevent giant writes
+    lock_print: bool = True  # serialize concurrent prints
 
     # Diagnostics
     verbose: bool = False
+
 
 @dataclass
 class _StdIOState:
@@ -121,13 +124,16 @@ class _StdIOState:
     patched_tqdm: bool = False
     lock: threading.RLock = field(default_factory=threading.RLock)
 
+
 _STATE = _StdIOState()
 
 
 # ---------- Utilities ----------
 
+
 def _is_windows() -> bool:
     return os.name == "nt"
+
 
 def _should_disable_color(env: Dict[str, str], cfg: StdIOConfig) -> bool:
     if cfg.enable_color is not None:
@@ -144,6 +150,7 @@ def _should_disable_color(env: Dict[str, str], cfg: StdIOConfig) -> bool:
         return True
     return False
 
+
 def _normalize_text(text: str, cfg: StdIOConfig) -> str:
     if cfg.normalize_newlines:
         # Replace CRLF/CR with LF for determinism; the console renders LF fine
@@ -154,10 +161,11 @@ def _normalize_text(text: str, cfg: StdIOConfig) -> str:
         text = text[: cfg.max_len] + "...[truncated]"
     return text
 
+
 def _write(stream: TextIO, text: str, cfg: StdIOConfig) -> None:
     """
     Write text to stream with fallback error handling.
-    
+
     FIXED: Proper error handling instead of silent swallowing.
     """
     try:
@@ -178,21 +186,27 @@ def _write(stream: TextIO, text: str, cfg: StdIOConfig) -> None:
 
 # ---------- Safe Printers ----------
 
-def _plain_print(*args: Any, sep: str = " ", end: str = "\n",
-                 file: Optional[TextIO] = None, cfg: Optional[StdIOConfig] = None) -> None:
+
+def _plain_print(
+    *args: Any,
+    sep: str = " ",
+    end: str = "\n",
+    file: Optional[TextIO] = None,
+    cfg: Optional[StdIOConfig] = None,
+) -> None:
     """
     A recursion-proof, cross-platform print that bypasses layered wrappers.
     Writes to sys.__stdout__ by default and never calls Colorama's wrapped streams.
-    
+
     FIXED: Consistent locking for all writes.
     """
     if cfg is None:
         cfg = StdIOConfig(replace_builtins=False)
-    
+
     s = sep.join("" if a is None else str(a) for a in args) + end
     s = _normalize_text(s, cfg)
     target = file if file is not None else sys.__stdout__
-    
+
     # FIXED: Always use lock for consistency
     if cfg.lock_print:
         with _STATE.lock:
@@ -200,11 +214,16 @@ def _plain_print(*args: Any, sep: str = " ", end: str = "\n",
     else:
         _write(target, s, cfg)
 
-def safe_print(*args: Any, sep: str = " ", end: str = "\n",
-               file: Optional[TextIO] = None,
-               effect: Optional[str] = None,
-               cfg: Optional[StdIOConfig] = None,
-               **kv: Any) -> None:
+
+def safe_print(
+    *args: Any,
+    sep: str = " ",
+    end: str = "\n",
+    file: Optional[TextIO] = None,
+    effect: Optional[str] = None,
+    cfg: Optional[StdIOConfig] = None,
+    **kv: Any,
+) -> None:
     """
     Public, effect-aware print for Graphix.
 
@@ -233,22 +252,29 @@ def safe_print(*args: Any, sep: str = " ", end: str = "\n",
         if cfg.include_ts:
             payload["ts"] = time.time()
         payload.update(kv or {})
-        
+
         try:
             with _STATE.lock:
                 # FIXED: Handle empty dirname case
                 dir_path = os.path.dirname(cfg.jsonl_path)
                 if dir_path:  # Only create directory if dirname is not empty
                     os.makedirs(dir_path, exist_ok=True)
-                
+
                 with open(cfg.jsonl_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(payload, ensure_ascii=False) + "\n")
         except Exception as e:
             # FIXED: Log error instead of silent ignore
             _logger.warning(f"Failed to write audit log to {cfg.jsonl_path}: {e}")
 
-def json_print(*, data: Any = None, effect: Optional[str] = None,
-               file: Optional[TextIO] = None, cfg: Optional[StdIOConfig] = None, **extra: Any) -> None:
+
+def json_print(
+    *,
+    data: Any = None,
+    effect: Optional[str] = None,
+    file: Optional[TextIO] = None,
+    cfg: Optional[StdIOConfig] = None,
+    **extra: Any,
+) -> None:
     """
     Structured print for audit / ML ops. Always emits a single JSON object per line.
     """
@@ -271,11 +297,12 @@ def json_print(*, data: Any = None, effect: Optional[str] = None,
 
 # ---------- Integration Patches ----------
 
+
 def _patch_colorama(cfg: StdIOConfig) -> bool:
     """
     Prevent recursive wrapping by making Colorama **non-wrapping**.
     Keep ANSI intact unless disable-color is requested.
-    
+
     FIXED: Proper error logging.
     """
     try:
@@ -303,28 +330,32 @@ def _patch_colorama(cfg: StdIOConfig) -> bool:
         _logger.warning(f"Colorama init failed: {e}")
         return False
 
+
 def _patch_ray(cfg: StdIOConfig) -> bool:
     """
     Replace Ray's tqdm_ray.safe_print with our recursion-proof printer.
-    
+
     FIXED: Proper error logging.
     """
     try:
         from ray.experimental import tqdm_ray  # type: ignore
+
         tqdm_ray.safe_print = lambda *a, **k: _plain_print(*a, cfg=cfg, **k)
         return True
     except Exception as e:
         _logger.debug(f"Ray patching not available: {e}")
         return False
 
+
 def _patch_tqdm(cfg: StdIOConfig) -> bool:
     """
     Tame tqdm notebooks auto-detection to avoid weird streams under pytest/Windows.
-    
+
     FIXED: Proper error logging.
     """
     try:
         import tqdm  # type: ignore
+
         # Prefer plain tqdm by default; force disable notebook auto-mode.
         os.environ.setdefault("TQDM_DISABLE", "0")
         os.environ.setdefault("TQDM_NOTEBOOK", "0")
@@ -336,13 +367,15 @@ def _patch_tqdm(cfg: StdIOConfig) -> bool:
 
 # ---------- Installation / Uninstall ----------
 
+
 @dataclass
 class StdIOHandle:
     """
     Handle for stdio policy installation.
-    
+
     FIXED: Added context manager support and __del__ for guaranteed cleanup.
     """
+
     cfg: StdIOConfig
     restored: bool = False
 
@@ -350,7 +383,7 @@ class StdIOHandle:
         """Revert all patches safely."""
         if self.restored:
             return
-        
+
         with _STATE.lock:
             try:
                 if _STATE.original_stdout is not None:
@@ -359,10 +392,10 @@ class StdIOHandle:
                     sys.stderr = _STATE.original_stderr
                 if _STATE.original_print is not None:
                     _builtins.print = _STATE.original_print  # type: ignore
-                
+
                 self.restored = True
                 _STATE.installed = False
-                
+
                 if self.cfg.verbose:
                     sys.__stderr__.write("[stdio_policy] restored\n")
                     try:
@@ -371,16 +404,16 @@ class StdIOHandle:
                         pass
             except Exception as e:
                 _logger.error(f"Error during restore: {e}")
-    
+
     def __enter__(self):
         """Context manager entry."""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit with cleanup."""
         self.restore()
         return False
-    
+
     def __del__(self):
         """Cleanup on deletion."""
         try:
@@ -388,6 +421,7 @@ class StdIOHandle:
                 self.restore()
         except Exception:
             pass
+
 
 def install(
     *,
@@ -433,7 +467,9 @@ def install(
 
     if _STATE.installed:
         if verbose:
-            sys.__stderr__.write("[stdio_policy] already installed, returning existing handle\n")
+            sys.__stderr__.write(
+                "[stdio_policy] already installed, returning existing handle\n"
+            )
             try:
                 sys.__stderr__.flush()
             except Exception:
@@ -458,13 +494,16 @@ def install(
 
         # Replace builtins.print with safe_print (bound to our cfg)
         if replace_builtins:
+
             def _bound_print(*a: Any, **k: Any) -> None:
                 # Map builtins.print(...) to safe_print(..., cfg=cfg)
                 file = k.pop("file", None)
                 sep = k.pop("sep", " ")
                 end = k.pop("end", "\n")
                 effect = k.pop("effect", None)
-                return safe_print(*a, sep=sep, end=end, file=file, cfg=cfg, effect=effect, **k)
+                return safe_print(
+                    *a, sep=sep, end=end, file=file, cfg=cfg, effect=effect, **k
+                )
 
             _builtins.print = _bound_print  # type: ignore
 
@@ -494,6 +533,7 @@ def install(
 
 # ---------- Self-Test ----------
 
+
 def self_test() -> Dict[str, Any]:
     """
     Run a tiny battery of checks to confirm deterministic, recursion-free behavior.
@@ -504,7 +544,9 @@ def self_test() -> Dict[str, Any]:
     diag: Dict[str, Any] = {
         "os": os.name,
         "isatty": getattr(sys.stdout, "isatty", lambda: False)(),
-        "color_disabled": _should_disable_color(os.environ, StdIOConfig(replace_builtins=False)),
+        "color_disabled": _should_disable_color(
+            os.environ, StdIOConfig(replace_builtins=False)
+        ),
         "ray_patched": _STATE.patched_ray,
         "colorama_patched": _STATE.patched_colorama,
         "tqdm_patched": _STATE.patched_tqdm,
@@ -532,16 +574,18 @@ def self_test() -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # Manual smoke run: python -m src.stdio_policy
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("StdIO Policy Self-Test")
-    print("="*70 + "\n")
-    
+    print("=" * 70 + "\n")
+
     # Test with context manager
-    with install(replace_builtins=True, patch_ray=True, patch_colorama=True, verbose=True) as handle:
+    with install(
+        replace_builtins=True, patch_ray=True, patch_colorama=True, verbose=True
+    ) as handle:
         print("Hello from stdio_policy (builtins routed via safe_print).")
         print("\nDiagnostics:")
         print(json.dumps(self_test(), indent=2))
-    
-    print("\n" + "="*70)
+
+    print("\n" + "=" * 70)
     print("Self-Test Complete")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")

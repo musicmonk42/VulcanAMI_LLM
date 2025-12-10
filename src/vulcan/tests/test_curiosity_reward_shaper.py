@@ -37,40 +37,48 @@ from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
 # Lightweight stubs for integrations
 # ---------------------------
 
+
 class StubTransparency:
     def __init__(self):
         self.records = []
 
     def record_curiosity_bonus(self, state_hash, novelty, bonus, method):
         # Store a tiny dict so we can assert integration happened
-        self.records.append({
-            "state_hash": state_hash,
-            "novelty": novelty,
-            "bonus": bonus,
-            "method": method
-        })
+        self.records.append(
+            {
+                "state_hash": state_hash,
+                "novelty": novelty,
+                "bonus": bonus,
+                "method": method,
+            }
+        )
+
 
 class StubValidationTracker:
     def __init__(self):
         self.records = []
 
     def record_validation(self, proposal, validation_result, actual_outcome):
-        self.records.append({
-            "proposal": proposal,
-            "validation_result": validation_result,
-            "actual_outcome": actual_outcome
-        })
+        self.records.append(
+            {
+                "proposal": proposal,
+                "validation_result": validation_result,
+                "actual_outcome": actual_outcome,
+            }
+        )
 
 
 # ---------------------------
 # Helpers
 # ---------------------------
 
+
 def mk_state(**kwargs):
     # Keep features numeric/boolean/string to exercise vectorization paths
     base = {"x": 0.1, "y": 0.2, "flag": True, "tag": "alpha"}
     base.update(kwargs)
     return base
+
 
 def approx_between(x, lo=0.0, hi=1.0):
     assert lo <= x <= hi
@@ -79,6 +87,7 @@ def approx_between(x, lo=0.0, hi=1.0):
 # ---------------------------
 # COUNT_BASED
 # ---------------------------
+
 
 def test_count_based_curiosity_basic_and_novelty_levels():
     sh = CuriosityRewardShaper(
@@ -115,6 +124,7 @@ def test_count_based_curiosity_basic_and_novelty_levels():
 # ICM
 # ---------------------------
 
+
 def test_icm_curiosity_with_and_without_prediction_history():
     vt = StubValidationTracker()
     tr = StubTransparency()
@@ -147,6 +157,7 @@ def test_icm_curiosity_with_and_without_prediction_history():
 # RND
 # ---------------------------
 
+
 def test_rnd_curiosity_prediction_error_range_and_feature_dim_cap():
     sh = CuriosityRewardShaper(
         curiosity_weight=0.3,
@@ -168,12 +179,13 @@ def test_rnd_curiosity_prediction_error_range_and_feature_dim_cap():
 # INFORMATION_GAIN
 # ---------------------------
 
+
 def test_information_gain_first_visit_high_then_entropy_normalized():
     vt = StubValidationTracker()
     sh = CuriosityRewardShaper(
         curiosity_weight=0.4,
         method=CuriosityMethod.INFORMATION_GAIN,
-        validation_tracker=vt
+        validation_tracker=vt,
     )
 
     s = mk_state(tag="ig")
@@ -192,6 +204,7 @@ def test_information_gain_first_visit_high_then_entropy_normalized():
 # ---------------------------
 # EPISODIC
 # ---------------------------
+
 
 def test_episodic_novelty_similarity_inverse_and_memory_growth():
     sh = CuriosityRewardShaper(
@@ -217,12 +230,11 @@ def test_episodic_novelty_similarity_inverse_and_memory_growth():
 # HYBRID
 # ---------------------------
 
+
 def test_hybrid_combination_weights_and_estimate_fields():
     tr = StubTransparency()
     sh = CuriosityRewardShaper(
-        curiosity_weight=0.6,
-        method=CuriosityMethod.HYBRID,
-        transparency_interface=tr
+        curiosity_weight=0.6, method=CuriosityMethod.HYBRID, transparency_interface=tr
     )
     # Shrink the scale interval to trigger adaptive scaling later
     sh.scale_update_interval = 5
@@ -250,14 +262,14 @@ def test_hybrid_combination_weights_and_estimate_fields():
 # shape_reward + get_novelty + recommendation + extractor
 # ---------------------------
 
+
 def test_shape_reward_get_novelty_recommendation_and_custom_extractor():
-    sh = CuriosityRewardShaper(
-        curiosity_weight=0.5,
-        method=CuriosityMethod.COUNT_BASED
-    )
+    sh = CuriosityRewardShaper(curiosity_weight=0.5, method=CuriosityMethod.COUNT_BASED)
+
     # Register a custom extractor (adds a new numeric feature)
     def extra_features(state, context):
         return {"fx": 0.42, "ctx_flag": 1 if context.get("z") else 0}
+
     sh.register_feature_extractor(extra_features)
 
     # shape_reward uses compute underneath
@@ -283,6 +295,7 @@ def test_shape_reward_get_novelty_recommendation_and_custom_extractor():
 # Statistics + export/import + reset
 # ---------------------------
 
+
 def test_statistics_export_import_reset_roundtrip():
     tr = StubTransparency()
     sh = CuriosityRewardShaper(
@@ -298,8 +311,12 @@ def test_statistics_export_import_reset_roundtrip():
     stats = sh.get_statistics()
     # Expected top-level keys present
     for k in [
-        "method", "curiosity_weight", "bonus_scale", "unique_states_seen",
-        "episodic_memory_size", "novelty_estimates"
+        "method",
+        "curiosity_weight",
+        "bonus_scale",
+        "unique_states_seen",
+        "episodic_memory_size",
+        "novelty_estimates",
     ]:
         assert k in stats
 
@@ -336,6 +353,7 @@ def test_statistics_export_import_reset_roundtrip():
 # Adaptive scaling explicit tests
 # ---------------------------
 
+
 def test_adaptive_scaling_low_novelty_increases_scale_and_high_decreases():
     sh = CuriosityRewardShaper(method=CuriosityMethod.HYBRID)
     # Force novelty history to low values -> scale should increase up to 2.0 cap
@@ -357,6 +375,7 @@ def test_adaptive_scaling_low_novelty_increases_scale_and_high_decreases():
 # Concurrency smoke (lock path)
 # ---------------------------
 
+
 def test_concurrent_bonus_computation_lock_paths():
     sh = CuriosityRewardShaper(method=CuriosityMethod.HYBRID)
     s = mk_state(tag="concurrent")
@@ -367,7 +386,9 @@ def test_concurrent_bonus_computation_lock_paths():
             sh.compute_curiosity_bonus(s)
 
     threads = [threading.Thread(target=worker) for _ in range(4)]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     st = sh.get_statistics()
     assert st["total_bonuses_computed"] >= 20

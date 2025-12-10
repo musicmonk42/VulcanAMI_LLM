@@ -5,7 +5,7 @@ from .cpu_capabilities import (
     detect_cpu_capabilities,
     get_cpu_capabilities,
     format_capability_warning,
-    get_capability_summary
+    get_capability_summary,
 )
 
 from .performance_metrics import (
@@ -15,23 +15,22 @@ from .performance_metrics import (
     log_performance_summary,
     track_zk_proof_generation,
     track_analogical_reasoning,
-    track_faiss_search
+    track_faiss_search,
 )
 
 __all__ = [
     # CPU Capabilities
-    'CPUCapabilities',
-    'detect_cpu_capabilities',
-    'get_cpu_capabilities',
-    'format_capability_warning',
-    'get_capability_summary',
+    "CPUCapabilities",
+    "detect_cpu_capabilities",
+    "get_cpu_capabilities",
+    "format_capability_warning",
+    "get_capability_summary",
     # Performance Metrics
-    'PerformanceTracker',
-    'PerformanceTimer',
-    'get_performance_tracker',
-    'log_performance_summary',
-    'track_zk_proof_generation',
-    'track_analogical_reasoning',
-    'track_faiss_search',
+    "PerformanceTracker",
+    "PerformanceTimer",
+    "get_performance_tracker",
+    "log_performance_summary",
+    "track_zk_proof_generation",
+    "track_analogical_reasoning",
+    "track_faiss_search",
 ]
-

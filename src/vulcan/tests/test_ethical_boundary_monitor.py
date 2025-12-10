@@ -34,6 +34,7 @@ from src.vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
 # Helpers
 # ---------------------------
 
+
 def mk_monitor(strict: bool = False) -> EthicalBoundaryMonitor:
     """
     Create a fresh EthicalBoundaryMonitor.
@@ -63,11 +64,17 @@ def list_names(bounds: Dict[str, EthicalBoundary]) -> List[str]:
 # Tests
 # ---------------------------
 
+
 def test_defaults_allow_benign_action_and_stats_increase():
     mon = mk_monitor(strict=False)
 
     # A benign action that should pass under defaults:
-    action = {"type": "benign", "is_explainable": True, "estimated_compute_cost": 1.0, "has_user_consent": True}
+    action = {
+        "type": "benign",
+        "is_explainable": True,
+        "estimated_compute_cost": 1.0,
+        "has_user_consent": True,
+    }
 
     allowed, violation = mon.check_action(action)
 
@@ -91,10 +98,16 @@ def test_block_on_physical_harm_records_violation():
         description="Block any action indicating physical harm intent",
         enforcement_level=EnforcementLevel.BLOCK,
         severity=ViolationSeverity.HIGH,
-        constraint_function=lambda action: not action.get('causes_physical_harm', False)
+        constraint_function=lambda action: not action.get(
+            "causes_physical_harm", False
+        ),
     )
 
-    bad = {"causes_physical_harm": True, "is_explainable": True, "estimated_compute_cost": 1.0}
+    bad = {
+        "causes_physical_harm": True,
+        "is_explainable": True,
+        "estimated_compute_cost": 1.0,
+    }
     allowed, violation = mon.check_action(bad)
 
     assert allowed is False
@@ -123,7 +136,7 @@ def test_warn_soft_guideline_transparency_and_counts():
         description="Ensure actions are explainable",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.LOW,
-        constraint_function=lambda action: action.get('is_explainable', True)
+        constraint_function=lambda action: action.get("is_explainable", True),
     )
 
     opaque = {"task": "do_thing", "is_explainable": False}
@@ -159,8 +172,8 @@ def test_modify_enforcement_applies_modification_and_allows():
         description="Cap 'load' to 5 via modification",
         enforcement_level=EnforcementLevel.MODIFY,
         severity=ViolationSeverity.MEDIUM,
-        constraint_function=lambda action: action.get('load', 0) <= 5,
-        modification_function=cap_load_modifier
+        constraint_function=lambda action: action.get("load", 0) <= 5,
+        modification_function=cap_load_modifier,
     )
 
     heavy = {"load": 9, "is_explainable": True}
@@ -194,7 +207,7 @@ def test_shutdown_enforcement_triggers_shutdown_state_and_callback():
         description="Always trigger shutdown when 'nuclear' flag is set",
         enforcement_level=EnforcementLevel.SHUTDOWN,
         severity=ViolationSeverity.CRITICAL,
-        constraint_function=lambda action: not action.get('nuclear', False)
+        constraint_function=lambda action: not action.get("nuclear", False),
     )
 
     act = {"nuclear": True, "anything": True}
@@ -238,7 +251,7 @@ def test_detect_violations_no_enforcement_and_filters():
         description="Warn on missing rationale",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.LOW,
-        constraint_function=lambda action: 'rationale' in action
+        constraint_function=lambda action: "rationale" in action,
     )
     mon.add_boundary(
         name="warn_debug_mark",
@@ -247,7 +260,7 @@ def test_detect_violations_no_enforcement_and_filters():
         description="Warn if debug flag is set in prod",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.MEDIUM,
-        constraint_function=lambda action: not action.get('debug', False)
+        constraint_function=lambda action: not action.get("debug", False),
     )
 
     action = {"debug": True}  # missing 'rationale' too
@@ -261,7 +274,9 @@ def test_detect_violations_no_enforcement_and_filters():
     assert limited[0].boundary_violated == "warn_debug_mark"
 
     # Manual filter by category
-    only_transparency = [v for v in all_found if v.category == BoundaryCategory.TRANSPARENCY]
+    only_transparency = [
+        v for v in all_found if v.category == BoundaryCategory.TRANSPARENCY
+    ]
     assert all(v.category == BoundaryCategory.TRANSPARENCY for v in only_transparency)
 
 
@@ -281,19 +296,19 @@ def test_rule_based_constraints_combined_and_matches_pattern():
         severity=ViolationSeverity.MEDIUM,
         constraint_rules=[
             {
-                'type': 'field_check',
-                'field': 'token',
-                'condition': 'matches_pattern',
-                'pattern': r"^[A-Z]{2}\-\d{3}$"
+                "type": "field_check",
+                "field": "token",
+                "condition": "matches_pattern",
+                "pattern": r"^[A-Z]{2}\-\d{3}$",
             },
             {
-                'type': 'field_check',
-                'field': 'count',
-                'condition': 'in_range',
-                'min': 2,
-                'max': 5
-            }
-        ]
+                "type": "field_check",
+                "field": "count",
+                "condition": "in_range",
+                "min": 2,
+                "max": 5,
+            },
+        ],
     )
 
     good = {"token": "AB-123", "count": 3}
@@ -319,14 +334,16 @@ def test_add_remove_get_boundaries_filters():
         description="Stay within computational resource limits",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.MEDIUM,
-        constraint_rules=[{
-            'type': 'field_check',
-            'field': 'estimated_compute_cost',
-            'condition': 'less_than',
-            'value': 1000.0
-        }]
+        constraint_rules=[
+            {
+                "type": "field_check",
+                "field": "estimated_compute_cost",
+                "condition": "less_than",
+                "value": 1000.0,
+            }
+        ],
     )
-    
+
     # Remove default computational boundary so that later check doesn't warn
     ensure_removed(mon, "respect_computational_limits")
 
@@ -338,12 +355,12 @@ def test_add_remove_get_boundaries_filters():
         description="Debug allowed only in dev",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.LOW,
-        constraint_function=lambda action: not action.get('debug', False)
+        constraint_function=lambda action: not action.get("debug", False),
     )
-    
+
     # Define constraint function explicitly to ensure re is in scope
     def token_format_constraint(action: Dict[str, Any]) -> bool:
-        return bool(re.match(r"^[a-z]{3}\d{2}$", action.get('token', '')))
+        return bool(re.match(r"^[a-z]{3}\d{2}$", action.get("token", "")))
 
     mon.add_boundary(
         name="token_format",
@@ -352,7 +369,7 @@ def test_add_remove_get_boundaries_filters():
         description="Token must match pattern",
         enforcement_level=EnforcementLevel.BLOCK,
         severity=ViolationSeverity.MEDIUM,
-        constraint_function=token_format_constraint
+        constraint_function=token_format_constraint,
     )
 
     all_bounds = mon.get_boundaries()
@@ -384,15 +401,15 @@ def test_summary_export_import_reset_roundtrip(tmp_path):
         description="warn if 'note' missing",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.LOW,
-        constraint_function=lambda action: 'note' in action
+        constraint_function=lambda action: "note" in action,
     )
 
     mon.check_action({"x": 1})  # missing 'note' => WARN
 
     # Export
     summary = mon.export_state()
-    assert 'boundaries' in summary and 'violations' in summary and 'stats' in summary
-    assert summary['stats']['checks_performed'] == 1 # Check stat is exported
+    assert "boundaries" in summary and "violations" in summary and "stats" in summary
+    assert summary["stats"]["checks_performed"] == 1  # Check stat is exported
 
     # Save to disk, read back
     p = tmp_path / "ebm_summary.json"
@@ -406,9 +423,9 @@ def test_summary_export_import_reset_roundtrip(tmp_path):
 
     # Check that violations and stats were imported
     s2_before = mon2.get_stats()
-    assert s2_before.get("checks_performed", 0) == 1 # Stats are imported
+    assert s2_before.get("checks_performed", 0) == 1  # Stats are imported
     v2 = mon2.get_violations()
-    assert len(v2) == len(summary['violations'])
+    assert len(v2) == len(summary["violations"])
 
     # *** START FIX ***
     # The original test asserted before the reset.
@@ -416,11 +433,11 @@ def test_summary_export_import_reset_roundtrip(tmp_path):
 
     # Reset stats/violations
     mon2.reset()
-    
+
     # Check stats *after* reset
     s2_after = mon2.get_stats()
     assert s2_after.get("checks_performed", 0) == 0  # Stats should be 0 after reset
-    assert len(mon2.get_violations()) == 0 # Violations should be 0 after reset
+    assert len(mon2.get_violations()) == 0  # Violations should be 0 after reset
     # *** END FIX ***
 
 
@@ -438,7 +455,7 @@ def test_strict_mode_blocks_warn_boundaries():
         description="Would normally WARN when 'gentle' flag missing",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.LOW,
-        constraint_function=lambda action: 'gentle' in action
+        constraint_function=lambda action: "gentle" in action,
     )
 
     # Missing "gentle" => in strict mode, expect BLOCK
@@ -446,11 +463,13 @@ def test_strict_mode_blocks_warn_boundaries():
     assert allowed is False
     assert isinstance(violation, EthicalViolation)
     assert violation.boundary_violated == "gentle_warn"
-    
+
     # *** START FIX ***
     # The test was checking for WARN, but the code correctly escalates
     # the *enforcement_action* attribute in the violation object to BLOCK.
-    assert violation.enforcement_action == EnforcementLevel.BLOCK  # Recorded as BLOCK due to strict mode
+    assert (
+        violation.enforcement_action == EnforcementLevel.BLOCK
+    )  # Recorded as BLOCK due to strict mode
     # *** END FIX ***
 
 
@@ -467,7 +486,7 @@ def test_get_violations_sorted_and_limited():
         description="missing 'a' warn",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.LOW,
-        constraint_function=lambda action: 'a' in action
+        constraint_function=lambda action: "a" in action,
     )
     mon.add_boundary(
         name="warn_missing_b",
@@ -476,14 +495,14 @@ def test_get_violations_sorted_and_limited():
         description="missing 'b' warn",
         enforcement_level=EnforcementLevel.WARN,
         severity=ViolationSeverity.LOW,
-        constraint_function=lambda action: 'b' in action
+        constraint_function=lambda action: "b" in action,
     )
 
     mon.check_action({"b": 1})  # missing a
     time.sleep(0.01)
     mon.check_action({"a": 1})  # missing b
     time.sleep(0.01)
-    mon.check_action({})        # missing both; order will depend on monitor logic
+    mon.check_action({})  # missing both; order will depend on monitor logic
 
     # Retrieve sorted (most recent first) and limited
     recent = mon.get_violations(limit=2)

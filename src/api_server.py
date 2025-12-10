@@ -57,32 +57,35 @@ import random
 # Optional dependencies
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
 
 try:
     import redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
 
 try:
     from argon2 import PasswordHasher as Argon2Hasher
+
     ARGON2_AVAILABLE = True
 except ImportError:
     ARGON2_AVAILABLE = False
 
 # Configure logging EARLY
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("GraphAPIServer")
 
 # JWT support
 try:
     import jwt
+
     JWT_AVAILABLE = True
 except ImportError:
     JWT_AVAILABLE = False
@@ -91,9 +94,14 @@ except ImportError:
 # GraphQL support (placeholder)
 try:
     from graphql import (
-        GraphQLSchema, GraphQLObjectType, GraphQLField,
-        GraphQLString, GraphQLList, GraphQLFloat
+        GraphQLSchema,
+        GraphQLObjectType,
+        GraphQLField,
+        GraphQLString,
+        GraphQLList,
+        GraphQLFloat,
     )
+
     GRAPHQL_AVAILABLE = True
 except ImportError:
     GRAPHQL_AVAILABLE = False
@@ -104,12 +112,16 @@ except ImportError:
 RECOMMENDED_PBKDF2_ITERATIONS = 200_000
 JWT_SECRET = os.environ.get("GRAPHIX_JWT_SECRET")
 
-ALLOW_EPHEMERAL_SECRET = os.environ.get("ALLOW_EPHEMERAL_SECRET", "false").lower() == "true"
+ALLOW_EPHEMERAL_SECRET = (
+    os.environ.get("ALLOW_EPHEMERAL_SECRET", "false").lower() == "true"
+)
 
 if not JWT_SECRET:
     if ALLOW_EPHEMERAL_SECRET:
         JWT_SECRET = secrets.token_urlsafe(48)
-        logger.warning("GRAPHIX_JWT_SECRET missing. Using ephemeral secret (DEVELOPMENT ONLY).")
+        logger.warning(
+            "GRAPHIX_JWT_SECRET missing. Using ephemeral secret (DEVELOPMENT ONLY)."
+        )
     else:
         raise RuntimeError(
             "GRAPHIX_JWT_SECRET is required for production. Set ALLOW_EPHEMERAL_SECRET=true to bypass (NOT RECOMMENDED)."
@@ -123,14 +135,18 @@ JWT_AUD = os.environ.get("GRAPHIX_JWT_AUD", "graphix-clients")
 JWT_ALGORITHM = os.environ.get("GRAPHIX_JWT_ALGO", "HS256").upper().strip()
 if GRAPHIX_JWT_PRIVATE_KEY and GRAPHIX_JWT_PUBLIC_KEY:
     if JWT_ALGORITHM not in {"RS256", "EdDSA"}:
-        logger.warning("Asymmetric keys provided but JWT_ALGO not RS256/EdDSA; falling back to HS256.")
+        logger.warning(
+            "Asymmetric keys provided but JWT_ALGO not RS256/EdDSA; falling back to HS256."
+        )
         JWT_ALGORITHM = "HS256"
 
 TOKEN_EXPIRY_HOURS = int(os.environ.get("GRAPHIX_JWT_EXPIRY_HOURS", "24"))
 TOKEN_NOT_BEFORE_SECONDS = int(os.environ.get("GRAPHIX_JWT_NBF_OFFSET", "0"))
 
 PBKDF2_ALGO = "sha256"
-PBKDF2_ITERATIONS = int(os.environ.get("PBKDF2_ITERATIONS", str(RECOMMENDED_PBKDF2_ITERATIONS)))
+PBKDF2_ITERATIONS = int(
+    os.environ.get("PBKDF2_ITERATIONS", str(RECOMMENDED_PBKDF2_ITERATIONS))
+)
 PBKDF2_SALT_BYTES = 16
 PROOF_ALLOWED_DRIFT_SECONDS = 120  # time-based replay protection window
 
@@ -157,7 +173,9 @@ CALLBACK_DOMAIN_ALLOWLIST = [
 # ======================================================================
 DEFAULT_PORT = int(os.environ.get("GRAPHIX_API_PORT", "8080"))
 DEFAULT_HOST = os.environ.get("GRAPHIX_API_HOST", "127.0.0.1")
-MAX_REQUEST_SIZE = int(os.environ.get("GRAPHIX_MAX_REQUEST_SIZE", str(10 * 1024 * 1024)))
+MAX_REQUEST_SIZE = int(
+    os.environ.get("GRAPHIX_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))
+)
 RATE_LIMIT_WINDOW = int(os.environ.get("GRAPHIX_RATE_WINDOW", "60"))
 RATE_LIMIT_MAX_REQUESTS = int(os.environ.get("GRAPHIX_RATE_MAX", "100"))
 DATABASE_PATH = os.environ.get("GRAPHIX_DB_PATH", "graphix_api.db")
@@ -171,14 +189,18 @@ CLEANUP_INTERVAL = int(os.environ.get("GRAPHIX_CLEANUP_INTERVAL", "300"))
 
 # RBAC roles
 REQUIRED_ROLE_GRAPH_SUBMIT = os.environ.get("REQUIRED_ROLE_GRAPH_SUBMIT", "user")
-REQUIRED_ROLE_PROPOSAL_CREATE = os.environ.get("REQUIRED_ROLE_PROPOSAL_CREATE", "govern")
+REQUIRED_ROLE_PROPOSAL_CREATE = os.environ.get(
+    "REQUIRED_ROLE_PROPOSAL_CREATE", "govern"
+)
 
 # Optional Redis for JWT revocation
 REDIS_URL = os.environ.get("GRAPHIX_REDIS_URL")
 redis_client = None
 if REDIS_AVAILABLE and REDIS_URL:
     try:
-        redis_client = redis.Redis.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2, decode_responses=True)
+        redis_client = redis.Redis.from_url(
+            REDIS_URL, socket_connect_timeout=2, socket_timeout=2, decode_responses=True
+        )
         redis_client.ping()
         logger.info("Connected to Redis for token revocation.")
     except Exception as e:
@@ -186,6 +208,7 @@ if REDIS_AVAILABLE and REDIS_URL:
         redis_client = None
 
 REVOCATION_PREFIX = os.environ.get("GRAPHIX_REVOCATION_PREFIX", "graphix:jwt:revoked:")
+
 
 # ======================================================================
 # Data Classes
@@ -266,6 +289,7 @@ class Agent:
     password_salt: Optional[str] = None
     password_algo: Optional[str] = None  # e.g. 'argon2', 'pbkdf2_sha256$200000'
 
+
 # ======================================================================
 # Security Utilities
 # ======================================================================
@@ -275,8 +299,12 @@ class SecurityUtils:
         return base64.b64encode(os.urandom(n_bytes)).decode("ascii")
 
     @staticmethod
-    def hash_password(password: str, salt_b64: str, iterations: int = PBKDF2_ITERATIONS,
-                      algo: str = PBKDF2_ALGO) -> str:
+    def hash_password(
+        password: str,
+        salt_b64: str,
+        iterations: int = PBKDF2_ITERATIONS,
+        algo: str = PBKDF2_ALGO,
+    ) -> str:
         if not isinstance(password, str) or not password:
             raise ValueError("Password must be a non-empty string")
         salt = base64.b64decode(salt_b64.encode("ascii"))
@@ -291,8 +319,12 @@ class SecurityUtils:
         return ph.hash(password)
 
     @staticmethod
-    def verify_password(password: str, salt_b64: Optional[str], stored_hash: str,
-                        algo_spec: Optional[str]) -> bool:
+    def verify_password(
+        password: str,
+        salt_b64: Optional[str],
+        stored_hash: str,
+        algo_spec: Optional[str],
+    ) -> bool:
         try:
             if algo_spec and algo_spec.startswith("argon2"):
                 if not ARGON2_AVAILABLE:
@@ -308,7 +340,9 @@ class SecurityUtils:
                     iterations = int(parts[1])
             if not salt_b64:
                 return False
-            actual = SecurityUtils.hash_password(password, salt_b64, iterations, PBKDF2_ALGO)
+            actual = SecurityUtils.hash_password(
+                password, salt_b64, iterations, PBKDF2_ALGO
+            )
             return hmac.compare_digest(actual, stored_hash)
         except Exception:
             return False
@@ -332,8 +366,10 @@ class DatabaseConnectionPool:
         self.lock = threading.RLock()
         for _ in range(pool_size):
             conn = sqlite3.connect(
-                db_path, check_same_thread=False, timeout=10.0,
-                detect_types=sqlite3.PARSE_DECLTYPES
+                db_path,
+                check_same_thread=False,
+                timeout=10.0,
+                detect_types=sqlite3.PARSE_DECLTYPES,
             )
             conn.row_factory = sqlite3.Row
             self.connections.append(conn)
@@ -364,7 +400,11 @@ class DatabaseConnectionPool:
 # Rate Limiter (simple window) + Backoff
 # ======================================================================
 class RateLimiter:
-    def __init__(self, window: int = RATE_LIMIT_WINDOW, max_requests: int = RATE_LIMIT_MAX_REQUESTS):
+    def __init__(
+        self,
+        window: int = RATE_LIMIT_WINDOW,
+        max_requests: int = RATE_LIMIT_MAX_REQUESTS,
+    ):
         self.window = window
         self.max_requests = max_requests
         self.requests = defaultdict(deque)
@@ -375,7 +415,10 @@ class RateLimiter:
     def is_allowed(self, identifier: str) -> bool:
         with self.lock:
             now = time.time()
-            while self.requests[identifier] and self.requests[identifier][0] < now - self.window:
+            while (
+                self.requests[identifier]
+                and self.requests[identifier][0] < now - self.window
+            ):
                 self.requests[identifier].popleft()
             if len(self.requests[identifier]) >= self.max_requests:
                 return False
@@ -397,6 +440,7 @@ class RateLimiter:
                 time.sleep(CLEANUP_INTERVAL)
                 if not self.shutdown_flag:
                     self._cleanup()
+
         t = threading.Thread(target=loop, daemon=True, name="RateLimitCleanup")
         t.start()
 
@@ -448,14 +492,14 @@ class InputValidator:
     def sanitize_string(s: str, max_length: int = 1000) -> str:
         if not isinstance(s, str):
             return ""
-        s = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', s)
+        s = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", s)
         return s[:max_length]
 
     @staticmethod
     def validate_api_key(api_key: str) -> bool:
         if not isinstance(api_key, str):
             return False
-        return bool(re.match(r'^[a-f0-9]{32,128}$', api_key))
+        return bool(re.match(r"^[a-f0-9]{32,128}$", api_key))
 
     @staticmethod
     def validate_url(url: str) -> bool:
@@ -491,7 +535,9 @@ class DatabaseManager:
         self._init_database()
         self.pool = DatabaseConnectionPool(db_path)
 
-    def _add_column_if_missing(self, conn: sqlite3.Connection, table: str, column: str, col_type: str):
+    def _add_column_if_missing(
+        self, conn: sqlite3.Connection, table: str, column: str, col_type: str
+    ):
         cur = conn.cursor()
         cur.execute(f"PRAGMA table_info({table})")
         cols = [row[1] for row in cur.fetchall()]
@@ -501,7 +547,7 @@ class DatabaseManager:
     def _init_database(self):
         conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         cursor = conn.cursor()
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS graphs (
                 id TEXT PRIMARY KEY,
                 agent_id TEXT NOT NULL,
@@ -514,11 +560,15 @@ class DatabaseManager:
                 error TEXT,
                 metadata TEXT
             )
-        ''')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_graphs_agent ON graphs(agent_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_graphs_status ON graphs(status)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_graphs_submitted ON graphs(submitted_at DESC)')
-        cursor.execute('''
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_graphs_agent ON graphs(agent_id)"
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_graphs_status ON graphs(status)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_graphs_submitted ON graphs(submitted_at DESC)"
+        )
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS proposals (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
@@ -532,10 +582,14 @@ class DatabaseManager:
                 closes_at TIMESTAMP,
                 metadata TEXT
             )
-        ''')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_proposals_created ON proposals(created_at DESC)')
-        cursor.execute('''
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_proposals_created ON proposals(created_at DESC)"
+        )
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS agents (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -549,9 +603,11 @@ class DatabaseManager:
                 password_salt TEXT,
                 password_algo TEXT
             )
-        ''')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_agents_api_key ON agents(api_key)')
-        cursor.execute('''
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_agents_api_key ON agents(api_key)"
+        )
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TIMESTAMP NOT NULL,
@@ -559,10 +615,14 @@ class DatabaseManager:
                 value REAL NOT NULL,
                 metadata TEXT
             )
-        ''')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp DESC)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_metrics_type ON metrics(metric_type)')
-        cursor.execute('''
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp DESC)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_metrics_type ON metrics(metric_type)"
+        )
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS audit_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TIMESTAMP NOT NULL,
@@ -571,9 +631,13 @@ class DatabaseManager:
                 resource TEXT NOT NULL,
                 details TEXT
             )
-        ''')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp DESC)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_log(agent_id)')
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp DESC)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_log(agent_id)"
+        )
         conn.commit()
         conn.close()
         logger.info("Database initialized")
@@ -582,34 +646,41 @@ class DatabaseManager:
         with self.pool.get_connection() as conn:
             cursor = conn.cursor()
             graph_json = json.dumps(submission.graph)
-            graph_b64 = base64.b64encode(gzip.compress(graph_json.encode("utf-8"))).decode("ascii")
+            graph_b64 = base64.b64encode(
+                gzip.compress(graph_json.encode("utf-8"))
+            ).decode("ascii")
             result_b64 = None
             if submission.result:
                 result_json = json.dumps(submission.result)
-                result_b64 = base64.b64encode(gzip.compress(result_json.encode("utf-8"))).decode("ascii")
-            cursor.execute('''
+                result_b64 = base64.b64encode(
+                    gzip.compress(result_json.encode("utf-8"))
+                ).decode("ascii")
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO graphs
                 (id, agent_id, graph_data, status, submitted_at, started_at,
                  completed_at, result, error, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                submission.id,
-                submission.agent_id,
-                graph_b64,
-                submission.status.value,
-                submission.submitted_at,
-                submission.started_at,
-                submission.completed_at,
-                result_b64,
-                submission.error,
-                json.dumps(submission.metadata)
-            ))
+            """,
+                (
+                    submission.id,
+                    submission.agent_id,
+                    graph_b64,
+                    submission.status.value,
+                    submission.submitted_at,
+                    submission.started_at,
+                    submission.completed_at,
+                    result_b64,
+                    submission.error,
+                    json.dumps(submission.metadata),
+                ),
+            )
             conn.commit()
 
     def get_graph(self, graph_id: str) -> Optional[GraphSubmission]:
         with self.pool.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('SELECT * FROM graphs WHERE id = ?', (graph_id,))
+            cursor.execute("SELECT * FROM graphs WHERE id = ?", (graph_id,))
             row = cursor.fetchone()
         if not row:
             return None
@@ -630,7 +701,7 @@ class DatabaseManager:
                 completed_at=row[6],
                 result=result,
                 error=row[8],
-                metadata=json.loads(row[9]) if row[9] else {}
+                metadata=json.loads(row[9]) if row[9] else {},
             )
         except Exception as e:
             logger.error(f"Error deserializing graph: {e}")
@@ -639,17 +710,27 @@ class DatabaseManager:
     def save_agent(self, agent: Agent):
         with self.pool.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO agents
                 (id, name, api_key, roles, trust_level, created_at, last_seen,
                  metadata, password_hash, password_salt, password_algo)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                agent.id, agent.name, agent.api_key, json.dumps(agent.roles),
-                agent.trust_level, agent.created_at, agent.last_seen,
-                json.dumps(agent.metadata), agent.password_hash,
-                agent.password_salt, agent.password_algo
-            ))
+            """,
+                (
+                    agent.id,
+                    agent.name,
+                    agent.api_key,
+                    json.dumps(agent.roles),
+                    agent.trust_level,
+                    agent.created_at,
+                    agent.last_seen,
+                    json.dumps(agent.metadata),
+                    agent.password_hash,
+                    agent.password_salt,
+                    agent.password_algo,
+                ),
+            )
             conn.commit()
 
     def get_agent_by_api_key(self, api_key: str) -> Optional[Agent]:
@@ -657,20 +738,30 @@ class DatabaseManager:
             return None
         with self.pool.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            cursor.execute(
+                """
                 SELECT id, name, api_key, roles, trust_level, created_at, last_seen,
                        metadata, password_hash, password_salt, password_algo
                 FROM agents WHERE api_key = ?
-            ''', (api_key,))
+            """,
+                (api_key,),
+            )
             row = cursor.fetchone()
         if not row:
             return None
         try:
             return Agent(
-                id=row[0], name=row[1], api_key=row[2],
-                roles=json.loads(row[3]), trust_level=row[4], created_at=row[5],
-                last_seen=row[6], metadata=json.loads(row[7]) if row[7] else {},
-                password_hash=row[8], password_salt=row[9], password_algo=row[10]
+                id=row[0],
+                name=row[1],
+                api_key=row[2],
+                roles=json.loads(row[3]),
+                trust_level=row[4],
+                created_at=row[5],
+                last_seen=row[6],
+                metadata=json.loads(row[7]) if row[7] else {},
+                password_hash=row[8],
+                password_salt=row[9],
+                password_algo=row[10],
             )
         except Exception as e:
             logger.error(f"Error deserializing agent: {e}")
@@ -679,12 +770,13 @@ class DatabaseManager:
     def log_audit(self, agent_id: str, action: str, resource: str, details: Dict):
         with self.pool.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO audit_log (timestamp, agent_id, action, resource, details)
                 VALUES (?, ?, ?, ?, ?)
-            ''', (
-                datetime.utcnow(), agent_id, action, resource, json.dumps(details)
-            ))
+            """,
+                (datetime.utcnow(), agent_id, action, resource, json.dumps(details)),
+            )
             conn.commit()
 
     def cleanup(self):
@@ -696,12 +788,16 @@ class DatabaseManager:
 # ======================================================================
 class ExecutionEngine:
     def __init__(self, max_workers: int = 4):
-        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="GraphExecutor")
+        self.executor = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="GraphExecutor"
+        )
         self.executing: Dict[str, GraphSubmission] = {}
         self.futures: Dict[str, Future] = {}
         self.lock = threading.RLock()
 
-    def execute_graph(self, submission: GraphSubmission, callback: Optional[Callable] = None) -> Future:
+    def execute_graph(
+        self, submission: GraphSubmission, callback: Optional[Callable] = None
+    ) -> Future:
         def _execute():
             try:
                 submission.status = ExecutionStatus.EXECUTING
@@ -715,10 +811,7 @@ class ExecutionEngine:
                     "nodes_processed": len(submission.graph.get("nodes", [])),
                     "edges_processed": len(submission.graph.get("edges", [])),
                     "output": f"Processed graph {submission.id}",
-                    "metrics": {
-                        "execution_time_ms": 2000,
-                        "memory_used_mb": 50
-                    }
+                    "metrics": {"execution_time_ms": 2000, "memory_used_mb": 50},
                 }
                 submission.status = ExecutionStatus.COMPLETED
                 submission.result = result
@@ -816,6 +909,7 @@ class CacheManager:
                 time.sleep(CLEANUP_INTERVAL)
                 if not self.shutdown_flag:
                     self._cleanup()
+
         t = threading.Thread(target=loop, daemon=True, name="CacheCleanup")
         t.start()
 
@@ -833,6 +927,7 @@ class CacheManager:
 # ======================================================================
 revoked_jti_set = set()
 
+
 def revoke_token(jti: str, exp: Optional[int] = None):
     if redis_client:
         try:
@@ -846,6 +941,7 @@ def revoke_token(jti: str, exp: Optional[int] = None):
             logger.error(f"Redis revocation failed: {e}")
     revoked_jti_set.add(jti)
 
+
 def is_revoked(jti: str) -> bool:
     if redis_client:
         try:
@@ -854,12 +950,14 @@ def is_revoked(jti: str) -> bool:
             pass
     return jti in revoked_jti_set
 
+
 # ======================================================================
 # Login Failure Backoff
 # ======================================================================
 login_fail_lock = threading.RLock()
 login_fail_counts: Dict[str, int] = {}
 login_backoff_expiry: Dict[str, float] = {}
+
 
 def record_login_failure(ip: str) -> int:
     with login_fail_lock:
@@ -870,10 +968,12 @@ def record_login_failure(ip: str) -> int:
         login_backoff_expiry[ip] = expiry
         return backoff
 
+
 def clear_login_failures(ip: str):
     with login_fail_lock:
         login_fail_counts.pop(ip, None)
         login_backoff_expiry.pop(ip, None)
+
 
 def get_login_backoff_remaining(ip: str) -> float:
     with login_fail_lock:
@@ -881,6 +981,7 @@ def get_login_backoff_remaining(ip: str) -> float:
         if not expiry:
             return 0.0
         return max(0.0, expiry - time.time())
+
 
 # ======================================================================
 # HTTP Request Handler
@@ -895,20 +996,22 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         logger.info(f"{self.address_string()} ({self._request_id}) - {format % args}")
 
     def _apply_security_headers(self):
-        self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('X-Frame-Options', 'DENY')
-        self.send_header('Content-Security-Policy', "default-src 'none'")
-        self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
-        allowed_origin = os.environ.get('ALLOWED_ORIGIN', 'http://localhost:3000')
-        self.send_header('Access-Control-Allow-Origin', allowed_origin)
-        self.send_header('Vary', 'Origin')
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Content-Security-Policy", "default-src 'none'")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload"
+        )
+        allowed_origin = os.environ.get("ALLOWED_ORIGIN", "http://localhost:3000")
+        self.send_header("Access-Control-Allow-Origin", allowed_origin)
+        self.send_header("Vary", "Origin")
         if self._request_id:
-            self.send_header('X-Request-ID', self._request_id)
+            self.send_header("X-Request-ID", self._request_id)
 
     def _init_request_id(self):
-        incoming = self.headers.get('X-Request-ID')
-        if incoming and re.match(r'^[A-Za-z0-9_\-\.]{1,128}$', incoming):
+        incoming = self.headers.get("X-Request-ID")
+        if incoming and re.match(r"^[A-Za-z0-9_\-\.]{1,128}$", incoming):
             self._request_id = incoming
         else:
             self._request_id = uuid.uuid4().hex
@@ -937,9 +1040,11 @@ class APIRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         self._init_request_id()
         try:
-            content_length_raw = self.headers.get('Content-Length')
+            content_length_raw = self.headers.get("Content-Length")
             try:
-                content_length = int(content_length_raw) if content_length_raw is not None else 0
+                content_length = (
+                    int(content_length_raw) if content_length_raw is not None else 0
+                )
             except ValueError:
                 self._send_error(400, "Invalid Content-Length")
                 return
@@ -951,7 +1056,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 return
             body = self.rfile.read(content_length)
             try:
-                data = json.loads(body.decode('utf-8'))
+                data = json.loads(body.decode("utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError):
                 self._send_error(400, "Invalid JSON")
                 return
@@ -962,7 +1067,10 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 ip = self.client_address[0] if self.client_address else "unknown"
                 backoff_remaining = get_login_backoff_remaining(ip)
                 if backoff_remaining > 0:
-                    self._send_error(429, f"Login temporarily blocked. Try in {int(backoff_remaining)}s")
+                    self._send_error(
+                        429,
+                        f"Login temporarily blocked. Try in {int(backoff_remaining)}s",
+                    )
                     return
                 self._handle_login(data, ip)
             elif path == f"{APIEndpoint.AUTH.value}/logout":
@@ -973,7 +1081,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             elif path == f"{APIEndpoint.PROPOSALS.value}/create":
                 agent = self._authenticate()
                 self._handle_create_proposal(data, agent)
-            elif path.startswith(f"{APIEndpoint.PROPOSALS.value}/") and path.endswith("/vote"):
+            elif path.startswith(f"{APIEndpoint.PROPOSALS.value}/") and path.endswith(
+                "/vote"
+            ):
                 agent = self._authenticate()
                 self._handle_vote(path, data, agent)
             elif path == APIEndpoint.GRAPHQL.value and GRAPHQL_AVAILABLE:
@@ -989,36 +1099,43 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         self._init_request_id()
         self.send_response(200)
         self._apply_security_headers()
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Request-ID')
-        self.send_header('Access-Control-Max-Age', '86400')
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Authorization, X-API-Key, X-Request-ID",
+        )
+        self.send_header("Access-Control-Max-Age", "86400")
         self.end_headers()
 
     def _authenticate(self) -> Optional[Agent]:
-        auth_header = self.headers.get('Authorization', '')
-        if auth_header.startswith('Bearer ') and JWT_AVAILABLE:
+        auth_header = self.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer ") and JWT_AVAILABLE:
             token = auth_header[7:]
             try:
                 # Decode without verifying revocation first
                 payload = jwt.decode(
                     token,
-                    GRAPHIX_JWT_PUBLIC_KEY if GRAPHIX_JWT_PRIVATE_KEY and GRAPHIX_JWT_PUBLIC_KEY and JWT_ALGORITHM != "HS256" else JWT_SECRET,
+                    GRAPHIX_JWT_PUBLIC_KEY
+                    if GRAPHIX_JWT_PRIVATE_KEY
+                    and GRAPHIX_JWT_PUBLIC_KEY
+                    and JWT_ALGORITHM != "HS256"
+                    else JWT_SECRET,
                     algorithms=[JWT_ALGORITHM],
                     audience=JWT_AUD,
-                    issuer=JWT_ISS
+                    issuer=JWT_ISS,
                 )
                 jti = payload.get("jti")
                 if jti and is_revoked(jti):
                     logger.warning("Revoked JWT token used")
                     return None
-                agent_id = payload.get('agent_id')
+                agent_id = payload.get("agent_id")
                 if agent_id and self.server_instance:
                     return self.server_instance.get_agent_by_id(agent_id)
             except jwt.ExpiredSignatureError:
                 logger.warning("Expired JWT token")
             except jwt.InvalidTokenError:
                 logger.warning("Invalid JWT token")
-        api_key = self.headers.get('X-API-Key')
+        api_key = self.headers.get("X-API-Key")
         if api_key and self.server_instance:
             agent = self.server_instance.db.get_agent_by_api_key(api_key)
             if agent:
@@ -1034,17 +1151,19 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 p = psutil.Process(os.getpid())
                 mem_info = {
                     "rss_mb": round(p.memory_info().rss / (1024 * 1024), 2),
-                    "threads": p.num_threads()
+                    "threads": p.num_threads(),
                 }
             except Exception:
                 mem_info = {}
-        self._send_json({
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "version": "2.2.0",
-            "revoked_tokens": len(revoked_jti_set),
-            "memory": mem_info
-        })
+        self._send_json(
+            {
+                "status": "healthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "version": "2.2.0",
+                "revoked_tokens": len(revoked_jti_set),
+                "memory": mem_info,
+            }
+        )
 
     def _handle_status(self):
         if self.server_instance:
@@ -1054,7 +1173,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             self._send_error(500, "Server not initialized")
 
     def _handle_get_graph(self, path: str):
-        parts = path.split('/')
+        parts = path.split("/")
         if len(parts) >= 3 and parts[2]:
             graph_id = InputValidator.sanitize_string(parts[2], 64)
             if self.server_instance:
@@ -1075,8 +1194,12 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not agent:
             self._send_error(401, "Unauthorized")
             return
-        if REQUIRED_ROLE_GRAPH_SUBMIT and not self._require_role(agent, REQUIRED_ROLE_GRAPH_SUBMIT):
-            self._send_error(403, f"Missing required role: {REQUIRED_ROLE_GRAPH_SUBMIT}")
+        if REQUIRED_ROLE_GRAPH_SUBMIT and not self._require_role(
+            agent, REQUIRED_ROLE_GRAPH_SUBMIT
+        ):
+            self._send_error(
+                403, f"Missing required role: {REQUIRED_ROLE_GRAPH_SUBMIT}"
+            )
             return
         if not self.server_instance:
             self._send_error(500, "Server not initialized")
@@ -1084,10 +1207,10 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not self.server_instance.rate_limiter.is_allowed(agent.id):
             self._send_error(429, "Rate limit exceeded")
             return
-        graph = data.get('graph')
-        priority = data.get('priority', 0)
-        timeout = data.get('timeout', REQUEST_TIMEOUT)
-        callback = data.get('callback')
+        graph = data.get("graph")
+        priority = data.get("priority", 0)
+        timeout = data.get("timeout", REQUEST_TIMEOUT)
+        callback = data.get("callback")
         if not graph:
             self._send_error(400, "Missing graph")
             return
@@ -1117,15 +1240,19 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not agent:
             self._send_error(401, "Unauthorized")
             return
-        if REQUIRED_ROLE_PROPOSAL_CREATE and not self._require_role(agent, REQUIRED_ROLE_PROPOSAL_CREATE):
-            self._send_error(403, f"Missing required role: {REQUIRED_ROLE_PROPOSAL_CREATE}")
+        if REQUIRED_ROLE_PROPOSAL_CREATE and not self._require_role(
+            agent, REQUIRED_ROLE_PROPOSAL_CREATE
+        ):
+            self._send_error(
+                403, f"Missing required role: {REQUIRED_ROLE_PROPOSAL_CREATE}"
+            )
             return
         if not self.server_instance:
             self._send_error(500, "Server not initialized")
             return
-        title = InputValidator.sanitize_string(data.get('title', ''), 200)
-        description = InputValidator.sanitize_string(data.get('description', ''), 2000)
-        graph = data.get('graph')
+        title = InputValidator.sanitize_string(data.get("title", ""), 200)
+        description = InputValidator.sanitize_string(data.get("description", ""), 2000)
+        graph = data.get("graph")
         if not title or not graph:
             self._send_error(400, "Missing title or graph")
             return
@@ -1133,7 +1260,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not valid:
             self._send_error(400, f"Invalid graph: {error}")
             return
-        proposal = self.server_instance.create_proposal(title, description, graph, agent.id)
+        proposal = self.server_instance.create_proposal(
+            title, description, graph, agent.id
+        )
         if proposal:
             self._send_json({"id": proposal.id, "status": "created"})
         else:
@@ -1146,11 +1275,11 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not self.server_instance:
             self._send_error(500, "Server not initialized")
             return
-        parts = path.split('/')
+        parts = path.split("/")
         if len(parts) >= 4:
             proposal_id = InputValidator.sanitize_string(parts[2], 64)
-            vote = data.get('vote')
-            if vote not in ['for', 'against']:
+            vote = data.get("vote")
+            if vote not in ["for", "against"]:
                 self._send_error(400, "Invalid vote (must be 'for' or 'against')")
                 return
             success = self.server_instance.vote_on_proposal(proposal_id, agent.id, vote)
@@ -1165,11 +1294,11 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not self.server_instance:
             self._send_error(500, "Server not initialized")
             return
-        api_key = data.get('api_key')
-        password = data.get('password')
-        nonce = data.get('nonce')
-        timestamp = data.get('timestamp')
-        proof = data.get('proof')
+        api_key = data.get("api_key")
+        password = data.get("password")
+        nonce = data.get("nonce")
+        timestamp = data.get("timestamp")
+        proof = data.get("proof")
         if not api_key:
             self._send_error(400, "Missing api_key")
             return
@@ -1180,7 +1309,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         agent = self.server_instance.db.get_agent_by_api_key(api_key)
         audit_details = {
             "remote_ip": ip,
-            "auth_method": "password" if password else ("mutual_proof" if all([nonce, timestamp, proof]) else "api_key_only"),
+            "auth_method": "password"
+            if password
+            else ("mutual_proof" if all([nonce, timestamp, proof]) else "api_key_only"),
         }
         # Require password or mutual proof
         if password is None and not (nonce and timestamp and proof):
@@ -1188,7 +1319,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 agent.id if agent else "unknown",
                 "login_failed",
                 "auth/login",
-                {**audit_details, "reason": "missing password or proof"}
+                {**audit_details, "reason": "missing password or proof"},
             )
             # Timing jitter
             time.sleep(random.uniform(0.02, 0.05))
@@ -1200,7 +1331,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 "unknown",
                 "login_failed",
                 "auth/login",
-                {**audit_details, "reason": "unknown_api_key"}
+                {**audit_details, "reason": "unknown_api_key"},
             )
             time.sleep(random.uniform(0.02, 0.05))
             self._send_error(401, "Invalid credentials")
@@ -1216,7 +1347,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 password,
                 agent.password_salt,
                 agent.password_hash or "",
-                agent.password_algo
+                agent.password_algo,
             )
             verify_reason = "password_ok" if verified else "password_mismatch"
 
@@ -1228,13 +1359,17 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 elif isinstance(timestamp, str) and timestamp.isdigit():
                     ts = float(timestamp)
                 elif isinstance(timestamp, str):
-                    ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
+                    ts = datetime.fromisoformat(
+                        timestamp.replace("Z", "+00:00")
+                    ).timestamp()
                 else:
                     raise ValueError("Invalid timestamp format")
             except Exception:
                 self.server_instance.db.log_audit(
-                    agent.id, "login_failed", "auth/login",
-                    {**audit_details, "reason": "invalid_timestamp"}
+                    agent.id,
+                    "login_failed",
+                    "auth/login",
+                    {**audit_details, "reason": "invalid_timestamp"},
                 )
                 time.sleep(random.uniform(0.02, 0.05))
                 self._send_error(401, "Invalid credentials")
@@ -1243,8 +1378,10 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             now_ts = time.time()
             if abs(now_ts - ts) > PROOF_ALLOWED_DRIFT_SECONDS:
                 self.server_instance.db.log_audit(
-                    agent.id, "login_failed", "auth/login",
-                    {**audit_details, "reason": "stale_or_future_timestamp"}
+                    agent.id,
+                    "login_failed",
+                    "auth/login",
+                    {**audit_details, "reason": "stale_or_future_timestamp"},
                 )
                 time.sleep(random.uniform(0.02, 0.05))
                 self._send_error(401, "Invalid credentials")
@@ -1254,8 +1391,10 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             nonce_cache_key = f"login_nonce:{nonce}"
             if self.server_instance.cache.get(nonce_cache_key) is not None:
                 self.server_instance.db.log_audit(
-                    agent.id, "login_failed", "auth/login",
-                    {**audit_details, "reason": "nonce_reuse"}
+                    agent.id,
+                    "login_failed",
+                    "auth/login",
+                    {**audit_details, "reason": "nonce_reuse"},
                 )
                 time.sleep(random.uniform(0.02, 0.05))
                 self._send_error(401, "Invalid credentials")
@@ -1277,8 +1416,14 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not verified:
             backoff = record_login_failure(ip)
             self.server_instance.db.log_audit(
-                agent.id, "login_failed", "auth/login",
-                {**audit_details, "reason": verify_reason or "verification_failed", "backoff": backoff}
+                agent.id,
+                "login_failed",
+                "auth/login",
+                {
+                    **audit_details,
+                    "reason": verify_reason or "verification_failed",
+                    "backoff": backoff,
+                },
             )
             self.server_instance.metrics_lock.acquire()
             self.server_instance.metrics["auth_failures"] += 1
@@ -1297,58 +1442,78 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         jti = uuid.uuid4().hex
         now = datetime.utcnow()
         payload = {
-            'agent_id': agent.id,
-            'iss': JWT_ISS,
-            'aud': JWT_AUD,
-            'iat': now,
-            'nbf': now + timedelta(seconds=TOKEN_NOT_BEFORE_SECONDS),
-            'exp': now + timedelta(hours=TOKEN_EXPIRY_HOURS),
-            'jti': jti
+            "agent_id": agent.id,
+            "iss": JWT_ISS,
+            "aud": JWT_AUD,
+            "iat": now,
+            "nbf": now + timedelta(seconds=TOKEN_NOT_BEFORE_SECONDS),
+            "exp": now + timedelta(hours=TOKEN_EXPIRY_HOURS),
+            "jti": jti,
         }
         # kid derived from secret hash or public key fingerprint
-        if GRAPHIX_JWT_PRIVATE_KEY and GRAPHIX_JWT_PUBLIC_KEY and JWT_ALGORITHM != "HS256":
+        if (
+            GRAPHIX_JWT_PRIVATE_KEY
+            and GRAPHIX_JWT_PUBLIC_KEY
+            and JWT_ALGORITHM != "HS256"
+        ):
             kid_source = GRAPHIX_JWT_PUBLIC_KEY
         else:
             kid_source = JWT_SECRET
-        kid = hashlib.sha256(kid_source.encode('utf-8')).hexdigest()[:16]
-        headers = {'kid': kid}
+        kid = hashlib.sha256(kid_source.encode("utf-8")).hexdigest()[:16]
+        headers = {"kid": kid}
 
-        signing_key = GRAPHIX_JWT_PRIVATE_KEY if GRAPHIX_JWT_PRIVATE_KEY and GRAPHIX_JWT_PUBLIC_KEY and JWT_ALGORITHM != "HS256" else JWT_SECRET
-        token = jwt.encode(payload, signing_key, algorithm=JWT_ALGORITHM, headers=headers)
+        signing_key = (
+            GRAPHIX_JWT_PRIVATE_KEY
+            if GRAPHIX_JWT_PRIVATE_KEY
+            and GRAPHIX_JWT_PUBLIC_KEY
+            and JWT_ALGORITHM != "HS256"
+            else JWT_SECRET
+        )
+        token = jwt.encode(
+            payload, signing_key, algorithm=JWT_ALGORITHM, headers=headers
+        )
 
         self.server_instance.db.log_audit(
-            agent.id, "login_success", "auth/login",
-            {**audit_details, "verification": verify_reason, "jti": jti}
+            agent.id,
+            "login_success",
+            "auth/login",
+            {**audit_details, "verification": verify_reason, "jti": jti},
         )
         with self.server_instance.metrics_lock:
             self.server_instance.metrics["auth_success"] += 1
 
-        self._send_json({
-            "token": token,
-            "agent_id": agent.id,
-            "expires_in": TOKEN_EXPIRY_HOURS * 3600,
-            "issuer": JWT_ISS,
-            "audience": JWT_AUD,
-            "kid": kid
-        })
+        self._send_json(
+            {
+                "token": token,
+                "agent_id": agent.id,
+                "expires_in": TOKEN_EXPIRY_HOURS * 3600,
+                "issuer": JWT_ISS,
+                "audience": JWT_AUD,
+                "kid": kid,
+            }
+        )
 
     def _handle_logout(self):
         agent = self._authenticate()
         if not agent:
             self._send_error(401, "Unauthorized")
             return
-        auth_header = self.headers.get('Authorization', '')
-        token = auth_header[7:] if auth_header.startswith('Bearer ') else None
+        auth_header = self.headers.get("Authorization", "")
+        token = auth_header[7:] if auth_header.startswith("Bearer ") else None
         if not token:
             self._send_error(400, "Missing token")
             return
         try:
             payload = jwt.decode(
                 token,
-                GRAPHIX_JWT_PUBLIC_KEY if GRAPHIX_JWT_PRIVATE_KEY and GRAPHIX_JWT_PUBLIC_KEY and JWT_ALGORITHM != "HS256" else JWT_SECRET,
+                GRAPHIX_JWT_PUBLIC_KEY
+                if GRAPHIX_JWT_PRIVATE_KEY
+                and GRAPHIX_JWT_PUBLIC_KEY
+                and JWT_ALGORITHM != "HS256"
+                else JWT_SECRET,
                 algorithms=[JWT_ALGORITHM],
                 audience=JWT_AUD,
-                issuer=JWT_ISS
+                issuer=JWT_ISS,
             )
             jti = payload.get("jti")
             exp_dt = payload.get("exp")
@@ -1359,7 +1524,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 exp_ts = int(exp_dt.timestamp())
             if jti:
                 revoke_token(jti, exp_ts)
-                self.server_instance.db.log_audit(agent.id, "logout", "auth/logout", {"jti": jti})
+                self.server_instance.db.log_audit(
+                    agent.id, "logout", "auth/logout", {"jti": jti}
+                )
                 self._send_json({"status": "revoked", "jti": jti})
             else:
                 self._send_error(400, "Token missing jti")
@@ -1386,10 +1553,12 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if len(query) > 10_000:
             self._send_error(400, "Query too large")
             return
-        self._send_json({
-            "message": "GraphQL endpoint (integration pending)",
-            "query_preview": query[:100]
-        })
+        self._send_json(
+            {
+                "message": "GraphQL endpoint (integration pending)",
+                "query_preview": query[:100],
+            }
+        )
 
     def _handle_vulcan_insights(self):
         agent = self._authenticate()
@@ -1401,20 +1570,28 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             return
         try:
             from unified_runtime_core import get_runtime
+
             runtime = get_runtime()
-            if not hasattr(runtime, 'vulcan_bridge') or not runtime.vulcan_bridge:
-                self._send_json({"vulcan_enabled": False, "message": "VULCAN integration not active"})
+            if not hasattr(runtime, "vulcan_bridge") or not runtime.vulcan_bridge:
+                self._send_json(
+                    {
+                        "vulcan_enabled": False,
+                        "message": "VULCAN integration not active",
+                    }
+                )
                 return
             insights = {
                 "vulcan_enabled": True,
                 "world_model_active": runtime.vulcan_bridge.world_model is not None,
-                "reasoning_enabled": getattr(runtime.config, "enable_vulcan_integration", False),
+                "reasoning_enabled": getattr(
+                    runtime.config, "enable_vulcan_integration", False
+                ),
                 "capabilities": [
                     "temporal_reasoning",
                     "safety_validation",
                     "goal_alignment",
-                    "proposal_evaluation"
-                ]
+                    "proposal_evaluation",
+                ],
             }
             self._send_json(insights)
         except Exception as e:
@@ -1422,27 +1599,30 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             self._send_error(500, f"Failed to get VULCAN insights: {e}")
 
     def _send_json(self, data: Dict[str, Any]):
-        response = json.dumps(data, indent=2).encode('utf-8')
+        response = json.dumps(data, indent=2).encode("utf-8")
         self.send_response(200)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Content-Length', str(len(response)))
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(response)))
         self._apply_security_headers()
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(response)
 
     def _send_error(self, code: int, message: str):
-        response = json.dumps({
-            "error": message,
-            "code": code,
-            "timestamp": datetime.utcnow().isoformat(),
-            "request_id": self._request_id
-        }, indent=2).encode('utf-8')
+        response = json.dumps(
+            {
+                "error": message,
+                "code": code,
+                "timestamp": datetime.utcnow().isoformat(),
+                "request_id": self._request_id,
+            },
+            indent=2,
+        ).encode("utf-8")
         self.send_response(code)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Content-Length', str(len(response)))
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(response)))
         self._apply_security_headers()
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(response)
 
@@ -1461,8 +1641,7 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
     def finish_request(self, request, client_address):
         self.RequestHandlerClass(
-            request, client_address, self,
-            server_instance=self.server_instance
+            request, client_address, self, server_instance=self.server_instance
         )
 
 
@@ -1482,9 +1661,9 @@ class GraphAPIServer:
         self.proposals: Dict[str, Proposal] = {}
         self.agents: Dict[str, Agent] = {}
         self.locks = {
-            'submissions': threading.RLock(),
-            'proposals': threading.RLock(),
-            'agents': threading.RLock()
+            "submissions": threading.RLock(),
+            "proposals": threading.RLock(),
+            "agents": threading.RLock(),
         }
         self.running = False
         self.start_time = datetime.utcnow()
@@ -1499,9 +1678,7 @@ class GraphAPIServer:
         self.running = True
         try:
             self.http_server = ThreadedHTTPServer(
-                (self.host, self.port),
-                APIRequestHandler,
-                server_instance=self
+                (self.host, self.port), APIRequestHandler, server_instance=self
             )
             # Optional SSL wrapping (mTLS)
             cert_path = os.environ.get("CERT_PATH")
@@ -1514,17 +1691,17 @@ class GraphAPIServer:
                 if ca_path:
                     context.load_verify_locations(cafile=ca_path)
                     context.verify_mode = ssl.CERT_REQUIRED
-                self.http_server.socket = context.wrap_socket(self.http_server.socket, server_side=True)
+                self.http_server.socket = context.wrap_socket(
+                    self.http_server.socket, server_side=True
+                )
         except OSError as e:
-            if getattr(e, 'errno', None) == 48:
+            if getattr(e, "errno", None) == 48:
                 self.logger.error(f"Port {self.port} already in use")
                 raise
             raise
 
         thread = threading.Thread(
-            target=self.http_server.serve_forever,
-            daemon=True,
-            name="HTTPServer"
+            target=self.http_server.serve_forever, daemon=True, name="HTTPServer"
         )
         thread.start()
         self.logger.info(f"Server started on http://{self.host}:{self.port}")
@@ -1550,8 +1727,14 @@ class GraphAPIServer:
         self.stop()
         sys.exit(0)
 
-    def submit_graph(self, graph: Dict, agent_id: str, priority: int = 0,
-                     timeout: int = REQUEST_TIMEOUT, callback: Optional[str] = None) -> Dict:
+    def submit_graph(
+        self,
+        graph: Dict,
+        agent_id: str,
+        priority: int = 0,
+        timeout: int = REQUEST_TIMEOUT,
+        callback: Optional[str] = None,
+    ) -> Dict:
         graph_id = uuid.uuid4().hex
         submission = GraphSubmission(
             id=graph_id,
@@ -1561,46 +1744,50 @@ class GraphAPIServer:
                 "version": graph.get("grammar_version", "1.0.0"),
                 "priority": priority,
                 "timeout": timeout,
-                "callback_url": callback
-            }
+                "callback_url": callback,
+            },
         )
-        with self.locks['submissions']:
+        with self.locks["submissions"]:
             self.submissions[graph_id] = submission
             self.db.save_graph(submission)
             self.execution_engine.execute_graph(
-                submission,
-                callback=lambda s: self._on_graph_complete(s)
+                submission, callback=lambda s: self._on_graph_complete(s)
             )
             with self.metrics_lock:
                 self.metrics["graphs_submitted"] += 1
             with self.count_lock:
                 self.request_count += 1
             self.db.log_audit(
-                agent_id, "submit_graph", graph_id,
-                {"nodes": len(graph.get("nodes", []))}
+                agent_id,
+                "submit_graph",
+                graph_id,
+                {"nodes": len(graph.get("nodes", []))},
             )
         self.logger.info(f"Graph {graph_id} submitted by {agent_id}")
         return {
             "status": "submitted",
             "graph_id": graph_id,
-            "queue_position": len(self.execution_engine.executing)
+            "queue_position": len(self.execution_engine.executing),
         }
 
     def _send_callback(self, url: str, data: Dict):
         try:
             import urllib.request
+
             req = urllib.request.Request(
                 url,
-                data=json.dumps(data).encode('utf-8'),
+                data=json.dumps(data).encode("utf-8"),
                 headers={
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'GraphixAPIServer/2.2.0'
+                    "Content-Type": "application/json",
+                    "User-Agent": "GraphixAPIServer/2.2.0",
                 },
-                method='POST'
+                method="POST",
             )
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status >= 300:
-                    self.logger.error(f"Callback to {url} failed with status {response.status}")
+                    self.logger.error(
+                        f"Callback to {url} failed with status {response.status}"
+                    )
         except Exception as e:
             self.logger.error(f"Failed to send callback to {url}: {e}")
 
@@ -1620,13 +1807,16 @@ class GraphAPIServer:
             callback_thread = threading.Thread(
                 target=self._send_callback,
                 args=(callback_url, submission.to_dict()),
-                daemon=True
+                daemon=True,
             )
             callback_thread.start()
-        self.logger.info(f"Graph {submission.id} completed with status {submission.status.value}")
+        self.logger.info(
+            f"Graph {submission.id} completed with status {submission.status.value}"
+        )
 
-    def create_proposal(self, title: str, description: str,
-                        graph: Dict, proposer_id: str) -> Optional[Proposal]:
+    def create_proposal(
+        self, title: str, description: str, graph: Dict, proposer_id: str
+    ) -> Optional[Proposal]:
         if not all([title, description, graph, proposer_id]):
             return None
         proposal_id = uuid.uuid4().hex[:16]
@@ -1636,25 +1826,25 @@ class GraphAPIServer:
             description=description,
             graph=graph,
             proposer_id=proposer_id,
-            closes_at=datetime.utcnow() + timedelta(days=7)
+            closes_at=datetime.utcnow() + timedelta(days=7),
         )
-        with self.locks['proposals']:
+        with self.locks["proposals"]:
             self.proposals[proposal_id] = proposal
         self.logger.info(f"Proposal {proposal_id} created by {proposer_id}")
         return proposal
 
     def vote_on_proposal(self, proposal_id: str, agent_id: str, vote: str) -> bool:
-        with self.locks['proposals']:
+        with self.locks["proposals"]:
             if proposal_id not in self.proposals:
                 return False
             proposal = self.proposals[proposal_id]
             if proposal.closes_at and datetime.utcnow() > proposal.closes_at:
                 return False
-            if 'voters' not in proposal.metadata:
-                proposal.metadata['voters'] = []
-            if agent_id in proposal.metadata['voters']:
+            if "voters" not in proposal.metadata:
+                proposal.metadata["voters"] = []
+            if agent_id in proposal.metadata["voters"]:
                 return False
-            proposal.metadata['voters'].append(agent_id)
+            proposal.metadata["voters"].append(agent_id)
             if vote == "for":
                 proposal.votes_for += 1
             else:
@@ -1672,9 +1862,13 @@ class GraphAPIServer:
         self.logger.info(f"Applying approved proposal {proposal.id}")
         # Future implementation placeholder
 
-    def register_agent(self, name: str, roles: Optional[List[str]] = None,
-                       password: Optional[str] = None) -> Agent:
-        with self.locks['agents']:
+    def register_agent(
+        self,
+        name: str,
+        roles: Optional[List[str]] = None,
+        password: Optional[str] = None,
+    ) -> Agent:
+        with self.locks["agents"]:
             # Prevent duplicate names
             for a in self.agents.values():
                 if a.name.lower() == name.lower():
@@ -1690,7 +1884,9 @@ class GraphAPIServer:
                     password_algo = "argon2"
                 else:
                     password_salt = SecurityUtils.generate_salt()
-                    password_hash = SecurityUtils.hash_password(password, password_salt, PBKDF2_ITERATIONS, PBKDF2_ALGO)
+                    password_hash = SecurityUtils.hash_password(
+                        password, password_salt, PBKDF2_ITERATIONS, PBKDF2_ALGO
+                    )
                     password_algo = f"pbkdf2_sha256${PBKDF2_ITERATIONS}"
             agent = Agent(
                 id=agent_id,
@@ -1699,7 +1895,7 @@ class GraphAPIServer:
                 roles=roles or ["user"],
                 password_hash=password_hash,
                 password_salt=password_salt,
-                password_algo=password_algo
+                password_algo=password_algo,
             )
             self.agents[agent_id] = agent
             self.db.save_agent(agent)
@@ -1707,7 +1903,7 @@ class GraphAPIServer:
         return agent
 
     def get_agent_by_id(self, agent_id: str) -> Optional[Agent]:
-        with self.locks['agents']:
+        with self.locks["agents"]:
             if agent_id in self.agents:
                 return self.agents[agent_id]
         cached = self.cache.get(f"agent:{agent_id}")
@@ -1727,11 +1923,15 @@ class GraphAPIServer:
         with self.count_lock:
             total_requests = self.request_count
             total_errors = self.error_count
-        with self.locks['proposals']:
+        with self.locks["proposals"]:
             total_proposals = len(self.proposals)
-            open_proposals = len([p for p in self.proposals.values() if p.status == "open"])
-            approved_proposals = len([p for p in self.proposals.values() if p.status == "approved"])
-        with self.locks['agents']:
+            open_proposals = len(
+                [p for p in self.proposals.values() if p.status == "open"]
+            )
+            approved_proposals = len(
+                [p for p in self.proposals.values() if p.status == "approved"]
+            )
+        with self.locks["agents"]:
             total_agents = len(self.agents)
         return {
             "status": "active" if self.running else "stopped",
@@ -1742,25 +1942,20 @@ class GraphAPIServer:
                 "submitted": graphs_submitted,
                 "completed": graphs_completed,
                 "failed": graphs_failed,
-                "executing": len(self.execution_engine.executing)
+                "executing": len(self.execution_engine.executing),
             },
             "proposals": {
                 "total": total_proposals,
                 "open": open_proposals,
-                "approved": approved_proposals
+                "approved": approved_proposals,
             },
-            "agents": {
-                "registered": total_agents
-            },
+            "agents": {"registered": total_agents},
             "auth": {
                 "failures": auth_failures,
                 "success": auth_success,
-                "revoked_tokens": len(revoked_jti_set)
+                "revoked_tokens": len(revoked_jti_set),
             },
-            "requests": {
-                "total": total_requests,
-                "errors": total_errors
-            }
+            "requests": {"total": total_requests, "errors": total_errors},
         }
 
     def get_metrics(self) -> Dict[str, Any]:
@@ -1775,8 +1970,8 @@ class GraphAPIServer:
             "metrics": metrics_copy,
             "performance": {
                 "requests_per_second": total_requests / max(uptime, 1),
-                "error_rate": total_errors / max(total_requests, 1)
-            }
+                "error_rate": total_errors / max(total_requests, 1),
+            },
         }
 
 
@@ -1785,10 +1980,13 @@ class GraphAPIServer:
 # ======================================================================
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="Graphix API Server")
-    parser.add_argument('--host', default=DEFAULT_HOST, help='Host to bind to')
-    parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Port to bind to')
-    parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument("--host", default=DEFAULT_HOST, help="Host to bind to")
+    parser.add_argument(
+        "--port", type=int, default=DEFAULT_PORT, help="Port to bind to"
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
     args = parser.parse_args()
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -1803,7 +2001,9 @@ def main():
     bob_password = secrets.token_urlsafe(16)
     admin_password = secrets.token_urlsafe(20)
 
-    alice = server.register_agent("Alice", ["user", "developer"], password=alice_password)
+    alice = server.register_agent(
+        "Alice", ["user", "developer"], password=alice_password
+    )
     bob = server.register_agent("Bob", ["user"], password=bob_password)
     admin = server.register_agent("Admin", ["admin", "govern"], password=admin_password)
 
@@ -1823,15 +2023,20 @@ def main():
     print(f"  JWT Issuer: {JWT_ISS}")
     print(f"  JWT Audience: {JWT_AUD}")
     print(f"  Revocation Backend: {'Redis' if redis_client else 'In-Memory'}")
-    print(f"  HTTPS/TLS: {'Enabled' if os.environ.get('CERT_PATH') and os.environ.get('KEY_PATH') else 'Not enabled (use reverse proxy in production)'}")
+    print(
+        f"  HTTPS/TLS: {'Enabled' if os.environ.get('CERT_PATH') and os.environ.get('KEY_PATH') else 'Not enabled (use reverse proxy in production)'}"
+    )
     print("\nPress Ctrl+C to stop\n")
 
     test_graph = {
         "grammar_version": "1.0.0",
         "id": "test_graph",
         "type": "Graph",
-        "nodes": [{"id": "n1", "type": "InputNode"}, {"id": "n2", "type": "OutputNode"}],
-        "edges": [{"from": "n1", "to": "n2"}]
+        "nodes": [
+            {"id": "n1", "type": "InputNode"},
+            {"id": "n2", "type": "OutputNode"},
+        ],
+        "edges": [{"from": "n1", "to": "n2"}],
     }
     result = server.submit_graph(test_graph, alice.id)
     print(f"Test submission: {result}\n")

@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 # Lazy import placeholders to prevent circular dependencies
 EnhancedSafetyValidator = None
 SafetyConfig = None
-WorldModel = None # Placeholder for the lazy-loaded class
+WorldModel = None  # Placeholder for the lazy-loaded class
+
 
 def _lazy_import_safety_validator():
     """Lazy loads the safety validator to prevent circular imports."""
@@ -43,9 +44,11 @@ def _lazy_import_safety_validator():
         try:
             from ..safety.safety_validator import EnhancedSafetyValidator
             from ..safety.safety_types import SafetyConfig
+
             logger.info("Safety validator lazy loaded successfully")
         except ImportError as e:
             logging.warning(f"Safety validator not available: {e}")
+
 
 def _lazy_import_world_model():
     """
@@ -56,17 +59,20 @@ def _lazy_import_world_model():
         try:
             # Import the class from the module in the same directory
             from .world_model_core import WorldModel
+
             logger.info("Lazy-loaded WorldModel in CorrelationTracker")
         except ImportError as e:
             # Allow standalone usage without WorldModel
             logger.debug(f"WorldModel not available (standalone mode): {e}")
             WorldModel = None  # Mark as attempted but unavailable
 
+
 # Protected imports with fallbacks
 try:
     from scipy import stats
     from scipy.stats import pearsonr, spearmanr, kendalltau, t as t_dist
     from scipy.special import betainc
+
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
@@ -74,6 +80,7 @@ except ImportError:
 
 try:
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -81,6 +88,7 @@ except ImportError:
 
 
 # ===== COMPLETE CORRELATION IMPLEMENTATIONS =====
+
 
 class RobustPearsonCorrelation:
     """
@@ -108,7 +116,9 @@ class RobustPearsonCorrelation:
 
         # Validate inputs
         if x.shape != y.shape:
-            raise ValueError(f"x and y must have the same shape, got {x.shape} and {y.shape}")
+            raise ValueError(
+                f"x and y must have the same shape, got {x.shape} and {y.shape}"
+            )
 
         if x.ndim != 1:
             raise ValueError(f"x and y must be 1-dimensional, got {x.ndim}-dimensional")
@@ -139,7 +149,9 @@ class RobustPearsonCorrelation:
         y_centered = y - np.mean(y)
 
         numerator = np.dot(x_centered, y_centered)
-        denominator = np.sqrt(np.dot(x_centered, x_centered) * np.dot(y_centered, y_centered))
+        denominator = np.sqrt(
+            np.dot(x_centered, x_centered) * np.dot(y_centered, y_centered)
+        )
 
         if denominator == 0:
             return 0.0, 1.0
@@ -166,11 +178,11 @@ class RobustPearsonCorrelation:
 
         # Calculate t-statistic
         df = n - 2
-        
+
         # Add check for division by zero if r is exactly 1.0
         if 1.0 - r * r == 0:
-            return 0.0 # Perfect correlation
-            
+            return 0.0  # Perfect correlation
+
         t_stat = r * sqrt(df / (1.0 - r * r))
 
         # Calculate p-value from t-distribution
@@ -251,15 +263,17 @@ class RobustPearsonCorrelation:
     @staticmethod
     def _log_beta(a, b):
         """Logarithm of beta function"""
-        return RobustPearsonCorrelation._log_gamma(a) + \
-               RobustPearsonCorrelation._log_gamma(b) - \
-               RobustPearsonCorrelation._log_gamma(a + b)
+        return (
+            RobustPearsonCorrelation._log_gamma(a)
+            + RobustPearsonCorrelation._log_gamma(b)
+            - RobustPearsonCorrelation._log_gamma(a + b)
+        )
 
     @staticmethod
     def _log_gamma(x):
         """Stirling's approximation for log gamma function"""
         if x <= 0:
-            return float('inf')
+            return float("inf")
 
         # Stirling's approximation
         return (x - 0.5) * log(x) - x + 0.5 * log(2 * np.pi)
@@ -291,7 +305,9 @@ class RobustSpearmanCorrelation:
 
         # Validate inputs
         if x.shape != y.shape:
-            raise ValueError(f"x and y must have the same shape, got {x.shape} and {y.shape}")
+            raise ValueError(
+                f"x and y must have the same shape, got {x.shape} and {y.shape}"
+            )
 
         if x.ndim != 1:
             raise ValueError(f"x and y must be 1-dimensional, got {x.ndim}-dimensional")
@@ -324,7 +340,9 @@ class RobustSpearmanCorrelation:
         # Calculate p-value with tie correction
         if len(ties_x) > 0 or len(ties_y) > 0:
             # Use t-distribution approximation with tie correction
-            p_value = RobustSpearmanCorrelation._p_value_with_ties(rho, n, ties_x, ties_y)
+            p_value = RobustSpearmanCorrelation._p_value_with_ties(
+                rho, n, ties_x, ties_y
+            )
         else:
             # Use exact p-value without ties
             p_value = RobustSpearmanCorrelation._p_value_no_ties(rho, n)
@@ -385,10 +403,10 @@ class RobustSpearmanCorrelation:
 
         # Use t-distribution
         df = n - 2
-        
+
         # Add check for division by zero if rho is exactly 1.0
         if 1.0 - rho * rho == 0:
-            return 0.0 # Perfect correlation
+            return 0.0  # Perfect correlation
 
         t_stat = rho * sqrt(df / (1.0 - rho * rho))
 
@@ -412,11 +430,11 @@ class RobustSpearmanCorrelation:
 
         # Adjusted variance
         n3_n = n * n * n - n
-        
+
         # Avoid division by zero if n3_n is zero (e.g., n=1)
         if n3_n == 0:
             return 1.0
-            
+
         var_rho = (n3_n - tx) * (n3_n - ty) / (n3_n * n3_n)
 
         if var_rho <= 0:
@@ -444,7 +462,7 @@ class RobustKendallCorrelation:
     """
 
     @staticmethod
-    def calculate(x, y, variant='b'):
+    def calculate(x, y, variant="b"):
         """
         Calculate Kendall's tau correlation coefficient and p-value.
 
@@ -463,7 +481,9 @@ class RobustKendallCorrelation:
 
         # Validate inputs
         if x.shape != y.shape:
-            raise ValueError(f"x and y must have the same shape, got {x.shape} and {y.shape}")
+            raise ValueError(
+                f"x and y must have the same shape, got {x.shape} and {y.shape}"
+            )
 
         if x.ndim != 1:
             raise ValueError(f"x and y must be 1-dimensional, got {x.ndim}-dimensional")
@@ -488,16 +508,18 @@ class RobustKendallCorrelation:
         # Calculate concordant, discordant pairs, and ties
         counts = RobustKendallCorrelation._count_pairs(x, y)
 
-        concordant = counts['concordant']
-        discordant = counts['discordant']
-        ties_x = counts['ties_x']
-        ties_y = counts['ties_y']
-        ties_xy = counts['ties_xy']
+        concordant = counts["concordant"]
+        discordant = counts["discordant"]
+        ties_x = counts["ties_x"]
+        ties_y = counts["ties_y"]
+        ties_xy = counts["ties_xy"]
 
         # Calculate tau based on variant
-        if variant == 'b':
-            tau = RobustKendallCorrelation._tau_b(concordant, discordant, ties_x, ties_y, n)
-        elif variant == 'c':
+        if variant == "b":
+            tau = RobustKendallCorrelation._tau_b(
+                concordant, discordant, ties_x, ties_y, n
+            )
+        elif variant == "c":
             tau = RobustKendallCorrelation._tau_c(concordant, discordant, n)
         else:
             # tau-a (no tie correction)
@@ -554,11 +576,11 @@ class RobustKendallCorrelation:
                     discordant += 1
 
         return {
-            'concordant': concordant,
-            'discordant': discordant,
-            'ties_x': ties_x,
-            'ties_y': ties_y,
-            'ties_xy': ties_xy
+            "concordant": concordant,
+            "discordant": discordant,
+            "ties_x": ties_x,
+            "ties_y": ties_y,
+            "ties_xy": ties_xy,
         }
 
     @staticmethod
@@ -652,6 +674,7 @@ class RobustKendallCorrelation:
 
 # ===== FALLBACK IMPLEMENTATIONS =====
 
+
 def robust_pearsonr(x, y):
     """Robust Pearson correlation with comprehensive error handling"""
     try:
@@ -673,7 +696,7 @@ def robust_spearmanr(x, y):
 def robust_kendalltau(x, y):
     """Robust Kendall tau with tie correction"""
     try:
-        return RobustKendallCorrelation.calculate(x, y, variant='b')
+        return RobustKendallCorrelation.calculate(x, y, variant="b")
     except Exception as e:
         logger.error(f"Kendall tau failed: {e}")
         return 0.0, 1.0
@@ -777,8 +800,10 @@ else:
 
 # ===== SUPPORTING CLASSES =====
 
+
 class SimpleLinearRegression:
     """Simple linear regression for partial correlation"""
+
     def __init__(self):
         self.coef_ = None
         self.intercept_ = None
@@ -815,7 +840,7 @@ class SimpleLinearRegression:
         X = np.asarray(X)
         if X.ndim == 1:
             X = X.reshape(-1, 1)
-        
+
         if self.coef_ is None:
             self.coef_ = np.zeros(X.shape[1])
         if self.intercept_ is None:
@@ -826,6 +851,7 @@ class SimpleLinearRegression:
 
 class SimpleDataFrame:
     """Simple DataFrame replacement"""
+
     def __init__(self, data, index=None, columns=None):
         if isinstance(data, np.ndarray):
             self.data = data
@@ -833,7 +859,11 @@ class SimpleDataFrame:
             self.data = np.array(data)
 
         self.index = index if index is not None else list(range(len(self.data)))
-        self.columns = columns if columns is not None else list(range(self.data.shape[1] if self.data.ndim > 1 else 1))
+        self.columns = (
+            columns
+            if columns is not None
+            else list(range(self.data.shape[1] if self.data.ndim > 1 else 1))
+        )
 
     def __repr__(self):
         return f"SimpleDataFrame(shape={self.data.shape})"
@@ -841,11 +871,12 @@ class SimpleDataFrame:
 
 # Use fallback if pandas not available
 if not PANDAS_AVAILABLE:
-    pd = type('pd', (), {'DataFrame': SimpleDataFrame})()
+    pd = type("pd", (), {"DataFrame": SimpleDataFrame})()
 
 
 class CorrelationMethod(Enum):
     """Methods for calculating correlation"""
+
     PEARSON = "pearson"
     SPEARMAN = "spearman"
     KENDALL = "kendall"
@@ -855,6 +886,7 @@ class CorrelationMethod(Enum):
 @dataclass
 class CorrelationEntry:
     """Single correlation entry"""
+
     var_a: str
     var_b: str
     correlation: float
@@ -874,13 +906,15 @@ class CorrelationCalculator:
         self.methods = {
             CorrelationMethod.PEARSON: pearsonr,
             CorrelationMethod.SPEARMAN: spearmanr,
-            CorrelationMethod.KENDALL: kendalltau
+            CorrelationMethod.KENDALL: kendalltau,
         }
 
-    def calculate(self,
-                 data_a: np.ndarray,
-                 data_b: np.ndarray,
-                 method: CorrelationMethod = CorrelationMethod.PEARSON) -> Tuple[float, float]:
+    def calculate(
+        self,
+        data_a: np.ndarray,
+        data_b: np.ndarray,
+        method: CorrelationMethod = CorrelationMethod.PEARSON,
+    ) -> Tuple[float, float]:
         """Calculate correlation between two arrays"""
 
         # Validate inputs
@@ -906,10 +940,9 @@ class CorrelationCalculator:
             logger.debug(f"Correlation calculation failed: {e}")
             return 0.0, 1.0
 
-    def calculate_partial(self,
-                         x: np.ndarray,
-                         y: np.ndarray,
-                         z: np.ndarray) -> Tuple[float, float]:
+    def calculate_partial(
+        self, x: np.ndarray, y: np.ndarray, z: np.ndarray
+    ) -> Tuple[float, float]:
         """Calculate partial correlation controlling for z"""
 
         if len(x) < self.min_samples:
@@ -917,6 +950,7 @@ class CorrelationCalculator:
 
         try:
             from sklearn.linear_model import LinearRegression
+
             model_class = LinearRegression
         except ImportError:
             model_class = SimpleLinearRegression
@@ -953,16 +987,16 @@ class StatisticsTracker:
         with self.lock:
             if variable not in self.stats:
                 self.stats[variable] = {
-                    'mean': value,
-                    'variance': 0,
-                    'count': 1,
-                    'm2': 0
+                    "mean": value,
+                    "variance": 0,
+                    "count": 1,
+                    "m2": 0,
                 }
             else:
                 stats = self.stats[variable]
-                count = stats['count']
-                mean = stats['mean']
-                m2 = stats['m2']
+                count = stats["count"]
+                mean = stats["mean"]
+                m2 = stats["m2"]
 
                 # Welford's online algorithm
                 count += 1
@@ -971,10 +1005,10 @@ class StatisticsTracker:
                 delta2 = value - mean
                 m2 += delta * delta2
 
-                stats['count'] = count
-                stats['mean'] = mean
-                stats['m2'] = m2
-                stats['variance'] = m2 / (count - 1) if count > 1 else 0
+                stats["count"] = count
+                stats["mean"] = mean
+                stats["m2"] = m2
+                stats["variance"] = m2 / (count - 1) if count > 1 else 0
 
     def get_stats(self, variable: str) -> Optional[Dict[str, float]]:
         """Get statistics for a variable"""
@@ -986,13 +1020,13 @@ class StatisticsTracker:
         """Get mean for a variable"""
 
         stats = self.get_stats(variable)
-        return stats.get('mean') if stats else None
+        return stats.get("mean") if stats else None
 
     def get_variance(self, variable: str) -> Optional[float]:
         """Get variance for a variable"""
 
         stats = self.get_stats(variable)
-        return stats.get('variance') if stats else None
+        return stats.get("variance") if stats else None
 
 
 class DataBuffer:
@@ -1016,7 +1050,7 @@ class DataBuffer:
 
     def add_batch(self, data: Dict[str, float]):
         """Add multiple values at once (more efficient)"""
-        
+
         with self.lock:
             for variable, value in data.items():
                 self.buffers[variable].append(value)
@@ -1028,7 +1062,7 @@ class DataBuffer:
         with self.lock:
             if self._cache_valid.get(variable, False):
                 return self._array_cache[variable]
-            
+
             arr = np.array(self.buffers[variable])
             self._array_cache[variable] = arr
             self._cache_valid[variable] = True
@@ -1036,7 +1070,7 @@ class DataBuffer:
 
     def get_length(self, variable: str) -> int:
         """Get buffer length without creating array"""
-        
+
         with self.lock:
             return len(self.buffers[variable])
 
@@ -1047,7 +1081,7 @@ class DataBuffer:
             len_a = len(self.buffers[var_a])
             len_b = len(self.buffers[var_b])
             min_len = min(len_a, len_b)
-            
+
             if min_len == 0:
                 return np.array([]), np.array([])
 
@@ -1056,7 +1090,7 @@ class DataBuffer:
                 data_a = self._array_cache[var_a][-min_len:]
             else:
                 data_a = np.array(list(self.buffers[var_a])[-min_len:])
-            
+
             if self._cache_valid.get(var_b, False):
                 data_b = self._array_cache[var_b][-min_len:]
             else:
@@ -1066,38 +1100,38 @@ class DataBuffer:
 
     def get_all_as_matrix(self, variables: List[str]) -> Tuple[np.ndarray, int]:
         """Get all variable data as a matrix for batch processing.
-        
+
         Returns:
             Tuple of (matrix of shape [min_len, n_vars], min_len)
         """
         with self.lock:
             if not variables:
                 return np.array([[]]), 0
-            
+
             # Find minimum length
             min_len = min(len(self.buffers[var]) for var in variables)
-            
+
             if min_len == 0:
                 return np.array([[]]), 0
-            
+
             # Build matrix efficiently
             matrix = np.empty((min_len, len(variables)))
             for i, var in enumerate(variables):
                 buf = self.buffers[var]
                 # Get last min_len elements
                 matrix[:, i] = list(buf)[-min_len:]
-            
+
             return matrix, min_len
 
     def get_multiple(self, variables: List[str]) -> Dict[str, np.ndarray]:
         """Get aligned data for multiple variables"""
 
         with self.lock:
-            min_len = float('inf')
+            min_len = float("inf")
             for var in variables:
                 min_len = min(min_len, len(self.buffers[var]))
 
-            if min_len == 0 or min_len == float('inf'):
+            if min_len == 0 or min_len == float("inf"):
                 return {var: np.array([]) for var in variables}
 
             result = {}
@@ -1119,13 +1153,24 @@ class CorrelationStorage:
         self.timestamps = {}
         self.lock = threading.Lock()
 
-    def store(self, var_a: str, var_b: str, correlation: float, p_value: float, sample_count: int):
+    def store(
+        self,
+        var_a: str,
+        var_b: str,
+        correlation: float,
+        p_value: float,
+        sample_count: int,
+    ):
         """Store correlation data"""
 
         key = self._get_key(var_a, var_b)
 
         with self.lock:
-            if key not in self.matrix and len(self.matrix) >= self.max_variables * (self.max_variables - 1) // 2:
+            if (
+                key not in self.matrix
+                and len(self.matrix)
+                >= self.max_variables * (self.max_variables - 1) // 2
+            ):
                 oldest_key = min(self.timestamps.items(), key=lambda x: x[1])[0]
                 self._remove_key(oldest_key)
 
@@ -1141,11 +1186,7 @@ class CorrelationStorage:
 
         with self.lock:
             if key in self.matrix:
-                return (
-                    self.matrix[key],
-                    self.p_values[key],
-                    self.sample_counts[key]
-                )
+                return (self.matrix[key], self.p_values[key], self.sample_counts[key])
 
         return None
 
@@ -1170,7 +1211,7 @@ class CorrelationStorage:
             sorted_corrs = sorted(
                 [(k[0], k[1], v) for k, v in self.matrix.items()],
                 key=lambda x: abs(x[2]),
-                reverse=True
+                reverse=True,
             )
 
         return sorted_corrs[:n]
@@ -1211,12 +1252,9 @@ class ChangeDetector:
         """Get detected changes"""
 
         with self.lock:
-            filtered = [
-                c for c in self.change_points
-                if abs(c['change']) >= min_change
-            ]
+            filtered = [c for c in self.change_points if abs(c["change"]) >= min_change]
 
-            filtered.sort(key=lambda x: x['timestamp'], reverse=True)
+            filtered.sort(key=lambda x: x["timestamp"], reverse=True)
 
             return filtered
 
@@ -1234,19 +1272,20 @@ class ChangeDetector:
         t_stat, p_value = stats.ttest_ind(older, recent)
 
         if p_value < 0.05:
-            self.change_points.append({
-                'variables': key,
-                'timestamp': time.time(),
-                'p_value': p_value,
-                'old_mean': np.mean(older),
-                'new_mean': np.mean(recent),
-                'change': np.mean(recent) - np.mean(older)
-            })
+            self.change_points.append(
+                {
+                    "variables": key,
+                    "timestamp": time.time(),
+                    "p_value": p_value,
+                    "old_mean": np.mean(older),
+                    "new_mean": np.mean(recent),
+                    "change": np.mean(recent) - np.mean(older),
+                }
+            )
 
             cutoff_time = time.time() - 3600
             self.change_points = [
-                c for c in self.change_points
-                if c['timestamp'] > cutoff_time
+                c for c in self.change_points if c["timestamp"] > cutoff_time
             ]
 
 
@@ -1314,16 +1353,14 @@ class BaselineTracker:
                 self.baselines[variable] = value
                 self.noise_levels[variable] = 0.0
             else:
-                self.baselines[variable] = (
-                    (1 - self.alpha) * self.baselines[variable] +
-                    self.alpha * value
-                )
+                self.baselines[variable] = (1 - self.alpha) * self.baselines[
+                    variable
+                ] + self.alpha * value
 
                 deviation = abs(value - self.baselines[variable])
-                self.noise_levels[variable] = (
-                    (1 - self.alpha) * self.noise_levels[variable] +
-                    self.alpha * deviation
-                )
+                self.noise_levels[variable] = (1 - self.alpha) * self.noise_levels[
+                    variable
+                ] + self.alpha * deviation
 
     def get_baseline(self, variable: str) -> Optional[float]:
         """Get baseline value"""
@@ -1343,7 +1380,7 @@ class CorrelationMatrix:
 
     def __init__(self, max_variables: int = 1000, update_interval: int = 1):
         """Initialize correlation matrix
-        
+
         Args:
             max_variables: Maximum number of variables to track
             update_interval: Number of updates before recalculating correlations
@@ -1377,14 +1414,16 @@ class CorrelationMatrix:
                     self.variables.add(var)
 
             # Use batch add for efficiency
-            filtered_data = {var: value for var, value in new_data.items() if var in self.variables}
+            filtered_data = {
+                var: value for var, value in new_data.items() if var in self.variables
+            }
             self.data_buffer.add_batch(filtered_data)
-            
+
             for var, value in filtered_data.items():
                 self.stats_tracker.update(var, value)
 
             self._update_counter += 1
-            
+
             # Only recalculate correlations periodically based on update_interval
             if self._update_counter >= self.update_interval:
                 self._update_correlations_batch(filtered_data)
@@ -1457,37 +1496,37 @@ class CorrelationMatrix:
 
     def _update_correlations_batch(self, new_data: Dict[str, float]):
         """Update correlations using batch processing for efficiency"""
-        
+
         variables = list(new_data.keys())
         n_vars = len(variables)
-        
+
         if n_vars < 2:
             return
-        
+
         # Get all data as a matrix for efficient processing
         matrix, min_len = self.data_buffer.get_all_as_matrix(variables)
-        
+
         if min_len < 3:
             return
-        
+
         # Calculate correlations using numpy's corrcoef for efficiency
         # This is O(n²) but highly optimized
         try:
             # corrcoef returns correlation matrix
             corr_matrix = np.corrcoef(matrix, rowvar=False)
-            
+
             # Extract pairwise correlations
             for i in range(n_vars):
                 for j in range(i + 1, n_vars):
                     corr = corr_matrix[i, j]
-                    
+
                     if not np.isnan(corr):
                         var_a = variables[i]
                         var_b = variables[j]
-                        
+
                         # Calculate p-value using the sample size
                         p_value = self._calculate_p_value(corr, min_len)
-                        
+
                         self.storage.store(var_a, var_b, float(corr), p_value, min_len)
                         self.change_detector.update(var_a, var_b, float(corr))
         except (np.linalg.LinAlgError, ValueError) as e:
@@ -1497,31 +1536,31 @@ class CorrelationMatrix:
 
     def _calculate_p_value(self, r: float, n: int) -> float:
         """Calculate p-value for Pearson correlation"""
-        
+
         if n <= 2:
             return 1.0
-        
+
         if abs(r) >= 1.0:
             return 0.0
-        
+
         # t-statistic
         df = n - 2
         t_stat = r * sqrt(df / (1.0 - r * r))
-        
+
         # Use scipy if available, otherwise approximate
         if SCIPY_AVAILABLE:
             try:
                 p_value = 2.0 * (1.0 - t_dist.cdf(abs(t_stat), df))
                 return float(p_value)
-            except:
+            except Exception:
                 pass
-        
+
         # Approximate using normal distribution for large df
         if df > 30:
             # For large df, t-distribution approximates normal
             p_value = 2.0 * (1.0 - 0.5 * (1.0 + erf(abs(t_stat) / sqrt(2.0))))
             return max(0.0, min(1.0, p_value))
-        
+
         # Use robust implementation for small df
         return 2.0 * RobustPearsonCorrelation._t_cdf_complement(abs(t_stat), df)
 
@@ -1531,7 +1570,7 @@ class CorrelationMatrix:
         variables = list(new_data.keys())
 
         for i, var_a in enumerate(variables):
-            for var_b in variables[i+1:]:
+            for var_b in variables[i + 1 :]:
                 data_a, data_b = self.data_buffer.get_pair(var_a, var_b)
 
                 if len(data_a) >= 3:
@@ -1545,13 +1584,15 @@ class CorrelationMatrix:
 class CorrelationTracker:
     """Tracks correlations between variables - Complete implementation"""
 
-    def __init__(self,
-                 method: str = "pearson",
-                 min_samples: int = 10,
-                 significance_level: float = 0.05,
-                 safety_config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        method: str = "pearson",
+        min_samples: int = 10,
+        significance_level: float = 0.05,
+        safety_config: Optional[Dict[str, Any]] = None,
+    ):
         """Initialize correlation tracker"""
-        _lazy_import_world_model() # <--- FIXED
+        _lazy_import_world_model()  # <--- FIXED
         _lazy_import_safety_validator()
 
         self.method = CorrelationMethod(method)
@@ -1567,7 +1608,9 @@ class CorrelationTracker:
                 self.safety_validator = EnhancedSafetyValidator(config=safety_config)
                 logger.info("CorrelationTracker: Safety validator initialized")
             except Exception as e:
-                logger.error(f"CorrelationTracker: Failed to initialize EnhancedSafetyValidator: {e}")
+                logger.error(
+                    f"CorrelationTracker: Failed to initialize EnhancedSafetyValidator: {e}"
+                )
                 self.safety_validator = None
         # --- END FIX ---
         else:
@@ -1601,32 +1644,36 @@ class CorrelationTracker:
         if observation is None:
             logger.debug("CorrelationTracker.update() called without observation")
             return {
-                'status': 'success',
-                'message': 'No observation provided',
-                'observation_count': self.observation_count,
-                'tracked_variables': len(self.correlation_matrix.variables)
+                "status": "success",
+                "message": "No observation provided",
+                "observation_count": self.observation_count,
+                "tracked_variables": len(self.correlation_matrix.variables),
             }
 
         with self.lock:
             # SAFETY: Validate observation
             if self.safety_validator:
                 try:
-                    if hasattr(self.safety_validator, 'analyze_observation_safety'):
-                        obs_check = self.safety_validator.analyze_observation_safety(observation)
-                        if not obs_check.get('safe', True):
-                            logger.warning(f"Rejected unsafe observation: {obs_check.get('reason', 'unknown')}")
-                            self.safety_blocks['observation'] += 1
+                    if hasattr(self.safety_validator, "analyze_observation_safety"):
+                        obs_check = self.safety_validator.analyze_observation_safety(
+                            observation
+                        )
+                        if not obs_check.get("safe", True):
+                            logger.warning(
+                                f"Rejected unsafe observation: {obs_check.get('reason', 'unknown')}"
+                            )
+                            self.safety_blocks["observation"] += 1
                             return {
-                                'status': 'blocked',
-                                'reason': obs_check.get('reason', 'unknown'),
-                                'safety_blocked': True
+                                "status": "blocked",
+                                "reason": obs_check.get("reason", "unknown"),
+                                "safety_blocked": True,
                             }
                 except Exception as e:
                     logger.error(f"Safety validator error: {e}")
                     return {
-                        'status': 'blocked',
-                        'reason': f'Safety validator error: {str(e)}',
-                        'safety_blocked': True
+                        "status": "blocked",
+                        "reason": f"Safety validator error: {str(e)}",
+                        "safety_blocked": True,
                     }
 
             # Extract variables
@@ -1634,9 +1681,9 @@ class CorrelationTracker:
 
             if not numeric_vars:
                 return {
-                    'status': 'success',
-                    'message': 'No numeric variables extracted',
-                    'observation_count': self.observation_count
+                    "status": "success",
+                    "message": "No numeric variables extracted",
+                    "observation_count": self.observation_count,
                 }
 
             # SAFETY: Validate extracted variables
@@ -1644,12 +1691,12 @@ class CorrelationTracker:
                 for var, value in list(numeric_vars.items()):
                     if not np.isfinite(value):
                         logger.warning(f"Non-finite value for variable {var}: {value}")
-                        self.safety_corrections['non_finite'] += 1
+                        self.safety_corrections["non_finite"] += 1
                         numeric_vars[var] = 0.0
 
                     if abs(value) > 1e6:
                         logger.warning(f"Extreme value for variable {var}: {value}")
-                        self.safety_corrections['extreme_value'] += 1
+                        self.safety_corrections["extreme_value"] += 1
                         numeric_vars[var] = np.clip(value, -1e6, 1e6)
 
             # Update components
@@ -1667,10 +1714,10 @@ class CorrelationTracker:
                 self.partial_corr_cache.clear()
 
             return {
-                'status': 'success',
-                'variables_processed': len(numeric_vars),
-                'observation_count': self.observation_count,
-                'tracked_variables': len(self.correlation_matrix.variables)
+                "status": "success",
+                "variables_processed": len(numeric_vars),
+                "observation_count": self.observation_count,
+                "tracked_variables": len(self.correlation_matrix.variables),
             }
 
     def get_correlation(self, var_a: str, var_b: str) -> Optional[float]:
@@ -1709,8 +1756,11 @@ class CorrelationTracker:
                         correlation=corr,
                         p_value=p_value,
                         method=self.method,
-                        sample_size=self.correlation_matrix.get_sample_count(var_a, var_b),
-                        is_causal=self.causality_tracker.is_causal(var_a, var_b) is not None
+                        sample_size=self.correlation_matrix.get_sample_count(
+                            var_a, var_b
+                        ),
+                        is_causal=self.causality_tracker.is_causal(var_a, var_b)
+                        is not None,
                     )
                     correlations.append(entry)
 
@@ -1726,10 +1776,9 @@ class CorrelationTracker:
 
         self.causality_tracker.mark_causal(var_a, var_b, strength)
 
-    def calculate_partial_correlation(self,
-                                     x: str,
-                                     y: str,
-                                     conditioning_vars: List[str]) -> Tuple[float, float]:
+    def calculate_partial_correlation(
+        self, x: str, y: str, conditioning_vars: List[str]
+    ) -> Tuple[float, float]:
         """Calculate partial correlation"""
 
         cache_key = (x, y, tuple(sorted(conditioning_vars)))
@@ -1743,9 +1792,7 @@ class CorrelationTracker:
             if not all(len(d) >= self.min_samples for d in data.values()):
                 result = (0.0, 1.0)
             elif not conditioning_vars:
-                result = self.correlation_matrix.calculator.calculate(
-                    data[x], data[y]
-                )
+                result = self.correlation_matrix.calculator.calculate(data[x], data[y])
             else:
                 z = np.column_stack([data[var] for var in conditioning_vars])
                 result = self.correlation_matrix.calculator.calculate_partial(
@@ -1791,7 +1838,7 @@ class CorrelationTracker:
 
         if isinstance(observation, dict):
             variables = observation
-        elif hasattr(observation, 'variables'):
+        elif hasattr(observation, "variables"):
             variables = observation.variables
         else:
             logger.warning("Cannot extract variables from observation")
@@ -1808,24 +1855,26 @@ class CorrelationTracker:
         """Get correlation tracker statistics"""
 
         stats = {
-            'observation_count': self.observation_count,
-            'tracked_variables': len(self.correlation_matrix.variables),
-            'stored_correlations': len(self.correlation_matrix.storage.matrix),
-            'causal_relationships': len(self.causality_tracker.causal_pairs),
-            'non_causal_relationships': len(self.causality_tracker.non_causal_pairs),
-            'correlation_changes_detected': len(self.correlation_matrix.change_detector.change_points)
+            "observation_count": self.observation_count,
+            "tracked_variables": len(self.correlation_matrix.variables),
+            "stored_correlations": len(self.correlation_matrix.storage.matrix),
+            "causal_relationships": len(self.causality_tracker.causal_pairs),
+            "non_causal_relationships": len(self.causality_tracker.non_causal_pairs),
+            "correlation_changes_detected": len(
+                self.correlation_matrix.change_detector.change_points
+            ),
         }
 
         if self.safety_validator:
-            stats['safety'] = {
-                'enabled': True,
-                'blocks': dict(self.safety_blocks),
-                'corrections': dict(self.safety_corrections),
-                'total_blocks': sum(self.safety_blocks.values()),
-                'total_corrections': sum(self.safety_corrections.values())
+            stats["safety"] = {
+                "enabled": True,
+                "blocks": dict(self.safety_blocks),
+                "corrections": dict(self.safety_corrections),
+                "total_blocks": sum(self.safety_blocks.values()),
+                "total_corrections": sum(self.safety_corrections.values()),
             }
         else:
-            stats['safety'] = {'enabled': False}
+            stats["safety"] = {"enabled": False}
 
         return stats
 
@@ -1836,31 +1885,29 @@ class CorrelationTracker:
         save_path.mkdir(parents=True, exist_ok=True)
 
         state = {
-            'observation_count': self.observation_count,
-            'baselines': self.baseline_tracker.baselines,
-            'noise_levels': self.baseline_tracker.noise_levels,
-            'non_causal_pairs': list(self.causality_tracker.non_causal_pairs),
-            'causal_pairs': {
+            "observation_count": self.observation_count,
+            "baselines": self.baseline_tracker.baselines,
+            "noise_levels": self.baseline_tracker.noise_levels,
+            "non_causal_pairs": list(self.causality_tracker.non_causal_pairs),
+            "causal_pairs": {
                 f"{k[0]}_{k[1]}": v
                 for k, v in self.causality_tracker.causal_pairs.items()
             },
-            'top_correlations': [
-                {
-                    'var_a': var_a,
-                    'var_b': var_b,
-                    'correlation': corr
-                }
-                for var_a, var_b, corr in self.correlation_matrix.get_top_correlations(100)
-            ]
+            "top_correlations": [
+                {"var_a": var_a, "var_b": var_b, "correlation": corr}
+                for var_a, var_b, corr in self.correlation_matrix.get_top_correlations(
+                    100
+                )
+            ],
         }
 
         if self.safety_validator:
-            state['safety_statistics'] = {
-                'blocks': dict(self.safety_blocks),
-                'corrections': dict(self.safety_corrections)
+            state["safety_statistics"] = {
+                "blocks": dict(self.safety_blocks),
+                "corrections": dict(self.safety_corrections),
             }
 
-        with open(save_path / 'correlation_state.json', 'w') as f:
+        with open(save_path / "correlation_state.json", "w") as f:
             json.dump(state, f, indent=2)
 
         logger.info(f"Correlation tracker state saved to {save_path}")
@@ -1868,21 +1915,21 @@ class CorrelationTracker:
 
 # Export main classes and functions
 __all__ = [
-    'CorrelationTracker',
-    'CorrelationMatrix',
-    'CorrelationCalculator',
-    'CorrelationEntry',
-    'CorrelationMethod',
-    'RobustPearsonCorrelation',
-    'RobustSpearmanCorrelation',
-    'RobustKendallCorrelation',
-    'pearsonr',
-    'spearmanr',
-    'kendalltau',
-    'StatisticsTracker',
-    'DataBuffer',
-    'CorrelationStorage',
-    'ChangeDetector',
-    'CausalityTracker',
-    'BaselineTracker'
+    "CorrelationTracker",
+    "CorrelationMatrix",
+    "CorrelationCalculator",
+    "CorrelationEntry",
+    "CorrelationMethod",
+    "RobustPearsonCorrelation",
+    "RobustSpearmanCorrelation",
+    "RobustKendallCorrelation",
+    "pearsonr",
+    "spearmanr",
+    "kendalltau",
+    "StatisticsTracker",
+    "DataBuffer",
+    "CorrelationStorage",
+    "ChangeDetector",
+    "CausalityTracker",
+    "BaselineTracker",
 ]

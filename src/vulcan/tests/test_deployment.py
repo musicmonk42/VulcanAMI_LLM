@@ -1,6 +1,6 @@
 # ============================================================
-# VULCAN-AGI Orchestrator - Deployment Tests 
-# 
+# VULCAN-AGI Orchestrator - Deployment Tests
+#
 # This version does NOT import ProductionDeployment to avoid thread spawning.
 # Instead, it tests the deployment patterns using a MockDeployment class.
 # ============================================================
@@ -22,8 +22,10 @@ from datetime import datetime
 # MOCK OBJECTS
 # ============================================================
 
+
 class MockConfig:
     """Mock configuration object"""
+
     def __init__(self, checkpoint_dir=None):
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_interval = 100
@@ -37,7 +39,7 @@ class MockConfig:
         self.max_agents = 10
         self.min_agents = 2
         self.task_queue_type = "custom"
-        self.safety_policies = {'names_to_versions': {'default': '1.0'}}
+        self.safety_policies = {"names_to_versions": {"default": "1.0"}}
         self.max_working_memory = 20
         self.short_term_capacity = 1000
         self.long_term_capacity = 100000
@@ -48,6 +50,7 @@ class MockConfig:
 
 class MockHealth:
     """Mock health object"""
+
     def __init__(self):
         self.energy_budget_left_nJ = 1000000
         self.memory_usage_mb = 100
@@ -57,6 +60,7 @@ class MockHealth:
 
 class MockSA:
     """Mock self-awareness object"""
+
     def __init__(self):
         self.learning_efficiency = 0.8
         self.uncertainty = 0.3
@@ -65,10 +69,11 @@ class MockSA:
 
 class MockSystemState:
     """Mock system state"""
+
     def __init__(self):
         self.CID = "test_cid_12345"
         self.step = 0
-        self.policies = {'default': '1.0'}
+        self.policies = {"default": "1.0"}
         self.health = MockHealth()
         self.SA = MockSA()
         self.active_modalities = set()
@@ -80,16 +85,17 @@ class MockSystemState:
 
 class MockAgentPool:
     """Mock agent pool"""
+
     def __init__(self):
         self.min_agents = 2
         self.max_agents = 10
 
     def get_pool_status(self):
         return {
-            'total_agents': 5,
-            'state_distribution': {'idle': 3, 'working': 2},
-            'pending_tasks': 0,
-            'average_health_score': 0.9
+            "total_agents": 5,
+            "state_distribution": {"idle": 3, "working": 2},
+            "pending_tasks": 0,
+            "average_health_score": 0.9,
         }
 
     def shutdown(self):
@@ -98,6 +104,7 @@ class MockAgentPool:
 
 class MockMetricsCollector:
     """Mock metrics collector"""
+
     def __init__(self):
         self.counters = {}
         self.gauges = {}
@@ -109,14 +116,18 @@ class MockMetricsCollector:
         self.gauges[name] = value
 
     def get_summary(self):
-        return {'counters': self.counters, 'gauges': self.gauges}
+        return {"counters": self.counters, "gauges": self.gauges}
 
     def export_metrics(self):
-        return {'counters': self.counters, 'gauges': self.gauges, 'timestamp': time.time()}
+        return {
+            "counters": self.counters,
+            "gauges": self.gauges,
+            "timestamp": time.time(),
+        }
 
     def import_metrics(self, data):
-        self.counters = data.get('counters', {})
-        self.gauges = data.get('gauges', {})
+        self.counters = data.get("counters", {})
+        self.gauges = data.get("gauges", {})
 
     def shutdown(self):
         pass
@@ -124,14 +135,15 @@ class MockMetricsCollector:
 
 class MockDependencies:
     """Mock dependencies"""
+
     def __init__(self):
         self.goal_system = Mock()
         self.goal_system.generate_plan = Mock(return_value={})
-        self.goal_system.get_goal_status = Mock(return_value={'goals': []})
+        self.goal_system.get_goal_status = Mock(return_value={"goals": []})
         self.governance = Mock()
         self.governance.enforce_policies = Mock(side_effect=lambda x: x)
         self.safety_validator = Mock()
-        self.safety_validator.get_safety_report = Mock(return_value={'violations': []})
+        self.safety_validator.get_safety_report = Mock(return_value={"violations": []})
         self.metrics = MockMetricsCollector()
 
     def validate(self):
@@ -143,6 +155,7 @@ class MockDependencies:
 
 class MockCollective:
     """Mock collective orchestrator"""
+
     def __init__(self):
         self.sys = MockSystemState()
         self.deps = MockDependencies()
@@ -154,10 +167,10 @@ class MockCollective:
         self.sys.step += 1
         self.cycle_count += 1
         return {
-            'action': {'type': 'test_action'},
-            'success': True,
-            'observation': 'test_observation',
-            'reward': 0.5
+            "action": {"type": "test_action"},
+            "success": True,
+            "observation": "test_observation",
+            "reward": 0.5,
         }
 
     def shutdown(self):
@@ -169,203 +182,208 @@ class MockCollective:
 # This mirrors ProductionDeployment's interface without spawning threads
 # ============================================================
 
+
 class MockDeployment:
     """
     Mock deployment that mirrors ProductionDeployment interface.
     This is what we test instead of the real class.
     """
-    
+
     def __init__(self, config, orchestrator_type="parallel"):
         self.config = config
         self.orchestrator_type = orchestrator_type
-        self.checkpoint_dir = Path(config.checkpoint_dir) if config.checkpoint_dir else None
-        
+        self.checkpoint_dir = (
+            Path(config.checkpoint_dir) if config.checkpoint_dir else None
+        )
+
         # Create checkpoint directory
         if self.checkpoint_dir:
             self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Initialize components
         self.collective = MockCollective()
         self.metrics_collector = MockMetricsCollector()
         self.collective.deps.metrics = self.metrics_collector
-        
+
         # State
         self._shutdown_requested = False
         self._last_checkpointed_step = 0
         self.start_time = time.time()
-    
+
     def _health_check(self):
         """Check system health."""
         health = self.collective.sys.health
-        
+
         if health.energy_budget_left_nJ < self.config.min_energy_budget_nJ:
             return False
         if health.memory_usage_mb > self.config.max_memory_usage_mb:
             return False
         if health.error_rate > self.config.slo_max_error_rate:
             return False
-        
+
         return True
-    
+
     def step_with_monitoring(self, history, context):
         """Execute step with monitoring."""
         if self._shutdown_requested:
             return {
-                'error': 'System shutdown requested',
-                'action': {'type': 'SYSTEM_SHUTDOWN'},
-                'success': False
+                "error": "System shutdown requested",
+                "action": {"type": "SYSTEM_SHUTDOWN"},
+                "success": False,
             }
-        
+
         if not self._health_check():
             return {
-                'error': 'Health check failed',
-                'action': {'type': 'SYSTEM_UNHEALTHY'},
-                'success': False
+                "error": "Health check failed",
+                "action": {"type": "SYSTEM_UNHEALTHY"},
+                "success": False,
             }
-        
+
         result = self.collective.step(history, context)
         self._update_monitoring(result)
         return result
-    
+
     def _update_monitoring(self, result):
         """Update monitoring metrics."""
-        if result.get('success'):
-            self.metrics_collector.increment_counter('successful_steps')
+        if result.get("success"):
+            self.metrics_collector.increment_counter("successful_steps")
         else:
-            self.metrics_collector.increment_counter('failed_steps')
-        
+            self.metrics_collector.increment_counter("failed_steps")
+
         # Update gauges
         self.metrics_collector.update_gauge(
-            'energy_remaining_nJ',
-            self.collective.sys.health.energy_budget_left_nJ
+            "energy_remaining_nJ", self.collective.sys.health.energy_budget_left_nJ
         )
         self.metrics_collector.update_gauge(
-            'identity_drift',
-            self.collective.sys.SA.identity_drift
+            "identity_drift", self.collective.sys.SA.identity_drift
         )
         self.metrics_collector.update_gauge(
-            'uncertainty',
-            self.collective.sys.SA.uncertainty
+            "uncertainty", self.collective.sys.SA.uncertainty
         )
         self.metrics_collector.update_gauge(
-            'learning_efficiency',
-            self.collective.sys.SA.learning_efficiency
+            "learning_efficiency", self.collective.sys.SA.learning_efficiency
         )
         self.metrics_collector.update_gauge(
-            'agent_pool_size',
-            self.collective.agent_pool.get_pool_status()['total_agents']
+            "agent_pool_size",
+            self.collective.agent_pool.get_pool_status()["total_agents"],
         )
-    
+
     def get_status(self):
         """Get deployment status."""
         return {
-            'cid': self.collective.sys.CID,
-            'step': self.collective.sys.step,
-            'uptime_seconds': time.time() - self.start_time,
-            'orchestrator_type': self.orchestrator_type,
-            'health': {
-                'energy_budget_left_nJ': self.collective.sys.health.energy_budget_left_nJ,
-                'memory_usage_mb': self.collective.sys.health.memory_usage_mb,
-                'latency_ms': self.collective.sys.health.latency_ms,
-                'error_rate': self.collective.sys.health.error_rate,
+            "cid": self.collective.sys.CID,
+            "step": self.collective.sys.step,
+            "uptime_seconds": time.time() - self.start_time,
+            "orchestrator_type": self.orchestrator_type,
+            "health": {
+                "energy_budget_left_nJ": self.collective.sys.health.energy_budget_left_nJ,
+                "memory_usage_mb": self.collective.sys.health.memory_usage_mb,
+                "latency_ms": self.collective.sys.health.latency_ms,
+                "error_rate": self.collective.sys.health.error_rate,
             },
-            'self_awareness': {
-                'learning_efficiency': self.collective.sys.SA.learning_efficiency,
-                'uncertainty': self.collective.sys.SA.uncertainty,
-                'identity_drift': self.collective.sys.SA.identity_drift,
+            "self_awareness": {
+                "learning_efficiency": self.collective.sys.SA.learning_efficiency,
+                "uncertainty": self.collective.sys.SA.uncertainty,
+                "identity_drift": self.collective.sys.SA.identity_drift,
             },
-            'metrics': self.metrics_collector.get_summary(),
-            'agent_pool': self.collective.agent_pool.get_pool_status(),
-            'config': {},
-            'shutdown_requested': self._shutdown_requested,
-            'goal_status': self.collective.deps.goal_system.get_goal_status(),
-            'safety_report': self.collective.deps.safety_validator.get_safety_report(),
+            "metrics": self.metrics_collector.get_summary(),
+            "agent_pool": self.collective.agent_pool.get_pool_status(),
+            "config": {},
+            "shutdown_requested": self._shutdown_requested,
+            "goal_status": self.collective.deps.goal_system.get_goal_status(),
+            "safety_report": self.collective.deps.safety_validator.get_safety_report(),
         }
-    
+
     def save_checkpoint(self, path=None):
         """Save checkpoint."""
         if path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             step = self.collective.sys.step
             path = str(self.checkpoint_dir / f"checkpoint_{timestamp}_step{step}.pkl")
-        
+
         checkpoint_path = Path(path)
-        
+
         # Create checkpoint data
         checkpoint_data = {
-            'step': self.collective.sys.step,
-            'cid': self.collective.sys.CID,
-            'metrics': self.metrics_collector.export_metrics(),
-            'timestamp': time.time(),
+            "step": self.collective.sys.step,
+            "cid": self.collective.sys.CID,
+            "metrics": self.metrics_collector.export_metrics(),
+            "timestamp": time.time(),
         }
-        
+
         # Save checkpoint
-        with open(checkpoint_path, 'wb') as f:
+        with open(checkpoint_path, "wb") as f:
             pickle.dump(checkpoint_data, f)
-        
+
         # Save metadata
         metadata_path = checkpoint_path.with_name(
-            checkpoint_path.stem + '_metadata.json'
+            checkpoint_path.stem + "_metadata.json"
         )
         metadata = {
-            'timestamp': datetime.now().isoformat(),
-            'step': self.collective.sys.step,
-            'cid': self.collective.sys.CID,
+            "timestamp": datetime.now().isoformat(),
+            "step": self.collective.sys.step,
+            "cid": self.collective.sys.CID,
         }
-        with open(metadata_path, 'w') as f:
+        with open(metadata_path, "w") as f:
             json.dump(metadata, f)
-        
+
         self._last_checkpointed_step = self.collective.sys.step
         return True
-    
+
     def _load_checkpoint(self, path):
         """Load checkpoint."""
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             checkpoint_data = pickle.load(f)
-        
-        self.collective.sys.step = checkpoint_data['step']
-        self._last_checkpointed_step = checkpoint_data['step']
-        
-        if 'metrics' in checkpoint_data:
-            self.metrics_collector.import_metrics(checkpoint_data['metrics'])
-    
+
+        self.collective.sys.step = checkpoint_data["step"]
+        self._last_checkpointed_step = checkpoint_data["step"]
+
+        if "metrics" in checkpoint_data:
+            self.metrics_collector.import_metrics(checkpoint_data["metrics"])
+
     def list_checkpoints(self):
         """List available checkpoints."""
         if not self.checkpoint_dir:
             return []
-        
+
         checkpoints = []
-        for pkl_file in sorted(self.checkpoint_dir.glob("checkpoint_*.pkl"), 
-                               key=lambda p: p.stat().st_mtime, reverse=True):
-            metadata_file = pkl_file.with_name(pkl_file.stem + '_metadata.json')
-            
+        for pkl_file in sorted(
+            self.checkpoint_dir.glob("checkpoint_*.pkl"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        ):
+            metadata_file = pkl_file.with_name(pkl_file.stem + "_metadata.json")
+
             checkpoint_info = {
-                'path': str(pkl_file),
-                'size_mb': pkl_file.stat().st_size / (1024 * 1024),
-                'created': datetime.fromtimestamp(pkl_file.stat().st_mtime).isoformat(),
+                "path": str(pkl_file),
+                "size_mb": pkl_file.stat().st_size / (1024 * 1024),
+                "created": datetime.fromtimestamp(pkl_file.stat().st_mtime).isoformat(),
             }
-            
+
             if metadata_file.exists():
-                with open(metadata_file, 'r') as f:
+                with open(metadata_file, "r") as f:
                     metadata = json.load(f)
                 checkpoint_info.update(metadata)
-            
+
             checkpoints.append(checkpoint_info)
-        
+
         return checkpoints
-    
+
     def request_shutdown(self):
         """Request shutdown."""
         self._shutdown_requested = True
-    
+
     def shutdown(self):
         """Shutdown deployment."""
         if not self._shutdown_requested:
             # Save final checkpoint
             if self.checkpoint_dir:
-                final_path = self.checkpoint_dir / f"checkpoint_final_{self.collective.sys.step}.pkl"
+                final_path = (
+                    self.checkpoint_dir
+                    / f"checkpoint_final_{self.collective.sys.step}.pkl"
+                )
                 self.save_checkpoint(str(final_path))
-        
+
         self._shutdown_requested = True
         self.collective.shutdown()
         self.metrics_collector.shutdown()
@@ -375,9 +393,10 @@ class MockDeployment:
 # TEST BASE CLASS
 # ============================================================
 
+
 class DeploymentTestBase(unittest.TestCase):
     """Base class for deployment tests"""
-    
+
     def setUp(self):
         """Set up test fixtures"""
         self.temp_dir = Path(tempfile.mkdtemp())
@@ -398,6 +417,7 @@ class DeploymentTestBase(unittest.TestCase):
 # ============================================================
 # TEST: INITIALIZATION
 # ============================================================
+
 
 class TestDeploymentInitialization(DeploymentTestBase):
     """Test deployment initialization"""
@@ -428,6 +448,7 @@ class TestDeploymentInitialization(DeploymentTestBase):
 # ============================================================
 # TEST: HEALTH CHECKS
 # ============================================================
+
 
 class TestHealthChecks(DeploymentTestBase):
     """Test health check functionality"""
@@ -464,14 +485,15 @@ class TestHealthChecks(DeploymentTestBase):
 # TEST: STEP EXECUTION
 # ============================================================
 
+
 class TestStepExecution(DeploymentTestBase):
     """Test step execution with monitoring"""
 
     def test_step_executes(self):
         """Test basic step execution"""
         self.deployment = self.create_deployment()
-        result = self.deployment.step_with_monitoring(["test"], {'goal': 'test'})
-        self.assertTrue(result.get('success', False))
+        result = self.deployment.step_with_monitoring(["test"], {"goal": "test"})
+        self.assertTrue(result.get("success", False))
 
     def test_step_increments_counter(self):
         """Test that step increments step counter"""
@@ -485,27 +507,28 @@ class TestStepExecution(DeploymentTestBase):
         self.deployment = self.create_deployment()
         self.deployment._shutdown_requested = True
         result = self.deployment.step_with_monitoring(["test"], {})
-        self.assertIn('error', result)
-        self.assertEqual(result['error'], 'System shutdown requested')
+        self.assertIn("error", result)
+        self.assertEqual(result["error"], "System shutdown requested")
 
     def test_step_unhealthy_returns_error(self):
         """Test step when unhealthy returns error"""
         self.deployment = self.create_deployment()
         self.deployment.collective.sys.health.energy_budget_left_nJ = 0
         result = self.deployment.step_with_monitoring(["test"], {})
-        self.assertIn('error', result)
-        self.assertEqual(result['error'], 'Health check failed')
+        self.assertIn("error", result)
+        self.assertEqual(result["error"], "Health check failed")
 
     def test_step_updates_metrics(self):
         """Test that step updates metrics"""
         self.deployment = self.create_deployment()
         self.deployment.step_with_monitoring(["test"], {})
-        self.assertIn('successful_steps', self.deployment.metrics_collector.counters)
+        self.assertIn("successful_steps", self.deployment.metrics_collector.counters)
 
 
 # ============================================================
 # TEST: STATUS
 # ============================================================
+
 
 class TestStatus(DeploymentTestBase):
     """Test status reporting"""
@@ -520,47 +543,48 @@ class TestStatus(DeploymentTestBase):
         """Test status includes CID"""
         self.deployment = self.create_deployment()
         status = self.deployment.get_status()
-        self.assertEqual(status['cid'], self.deployment.collective.sys.CID)
+        self.assertEqual(status["cid"], self.deployment.collective.sys.CID)
 
     def test_status_includes_step(self):
         """Test status includes step"""
         self.deployment = self.create_deployment()
         status = self.deployment.get_status()
-        self.assertEqual(status['step'], self.deployment.collective.sys.step)
+        self.assertEqual(status["step"], self.deployment.collective.sys.step)
 
     def test_status_includes_health(self):
         """Test status includes health"""
         self.deployment = self.create_deployment()
         status = self.deployment.get_status()
-        self.assertIn('health', status)
-        self.assertIn('energy_budget_left_nJ', status['health'])
+        self.assertIn("health", status)
+        self.assertIn("energy_budget_left_nJ", status["health"])
 
     def test_status_includes_metrics(self):
         """Test status includes metrics"""
         self.deployment = self.create_deployment()
         self.deployment.metrics_collector.increment_counter("test_counter")
         status = self.deployment.get_status()
-        self.assertIn('metrics', status)
-        self.assertIn('test_counter', status['metrics']['counters'])
+        self.assertIn("metrics", status)
+        self.assertIn("test_counter", status["metrics"]["counters"])
 
     def test_status_includes_self_awareness(self):
         """Test status includes self awareness"""
         self.deployment = self.create_deployment()
         status = self.deployment.get_status()
-        self.assertIn('self_awareness', status)
-        self.assertIn('learning_efficiency', status['self_awareness'])
+        self.assertIn("self_awareness", status)
+        self.assertIn("learning_efficiency", status["self_awareness"])
 
     def test_status_includes_agent_pool(self):
         """Test status includes agent pool"""
         self.deployment = self.create_deployment()
         status = self.deployment.get_status()
-        self.assertIn('agent_pool', status)
-        self.assertIn('total_agents', status['agent_pool'])
+        self.assertIn("agent_pool", status)
+        self.assertIn("total_agents", status["agent_pool"])
 
 
 # ============================================================
 # TEST: CHECKPOINTING
 # ============================================================
+
 
 class TestCheckpointing(DeploymentTestBase):
     """Test checkpoint save/load functionality"""
@@ -595,7 +619,7 @@ class TestCheckpointing(DeploymentTestBase):
         self.deployment.collective.sys.step = 42
         checkpoint_path = self.temp_dir / "test_load.pkl"
         self.deployment.save_checkpoint(str(checkpoint_path))
-        
+
         # Create new deployment and load
         new_deployment = self.create_deployment()
         self.assertEqual(new_deployment.collective.sys.step, 0)
@@ -605,13 +629,15 @@ class TestCheckpointing(DeploymentTestBase):
     def test_load_checkpoint_restores_metrics(self):
         """Test loading checkpoint restores metrics"""
         self.deployment = self.create_deployment()
-        self.deployment.metrics_collector.increment_counter('test_metric', 5)
+        self.deployment.metrics_collector.increment_counter("test_metric", 5)
         checkpoint_path = self.temp_dir / "test_load_metrics.pkl"
         self.deployment.save_checkpoint(str(checkpoint_path))
-        
+
         new_deployment = self.create_deployment()
         new_deployment._load_checkpoint(str(checkpoint_path))
-        self.assertEqual(new_deployment.metrics_collector.counters.get('test_metric'), 5)
+        self.assertEqual(
+            new_deployment.metrics_collector.counters.get("test_metric"), 5
+        )
 
     def test_list_checkpoints(self):
         """Test listing checkpoints"""
@@ -620,7 +646,7 @@ class TestCheckpointing(DeploymentTestBase):
         time.sleep(0.02)
         self.deployment.collective.sys.step = 1
         self.deployment.save_checkpoint()
-        
+
         checkpoints = self.deployment.list_checkpoints()
         self.assertEqual(len(checkpoints), 2)
 
@@ -632,15 +658,16 @@ class TestCheckpointing(DeploymentTestBase):
         time.sleep(0.02)
         self.deployment.collective.sys.step = 2
         self.deployment.save_checkpoint()
-        
+
         checkpoints = self.deployment.list_checkpoints()
-        self.assertEqual(checkpoints[0]['step'], 2)
-        self.assertEqual(checkpoints[1]['step'], 1)
+        self.assertEqual(checkpoints[0]["step"], 2)
+        self.assertEqual(checkpoints[1]["step"], 1)
 
 
 # ============================================================
 # TEST: MONITORING
 # ============================================================
+
 
 class TestMonitoring(DeploymentTestBase):
     """Test monitoring functionality"""
@@ -648,32 +675,35 @@ class TestMonitoring(DeploymentTestBase):
     def test_update_monitoring_success(self):
         """Test monitoring updates on success"""
         self.deployment = self.create_deployment()
-        result = {'success': True}
+        result = {"success": True}
         self.deployment._update_monitoring(result)
-        self.assertIn('successful_steps', self.deployment.metrics_collector.counters)
-        self.assertEqual(self.deployment.metrics_collector.counters['successful_steps'], 1)
+        self.assertIn("successful_steps", self.deployment.metrics_collector.counters)
+        self.assertEqual(
+            self.deployment.metrics_collector.counters["successful_steps"], 1
+        )
 
     def test_update_monitoring_failure(self):
         """Test monitoring updates on failure"""
         self.deployment = self.create_deployment()
-        result = {'success': False}
+        result = {"success": False}
         self.deployment._update_monitoring(result)
-        self.assertIn('failed_steps', self.deployment.metrics_collector.counters)
-        self.assertEqual(self.deployment.metrics_collector.counters['failed_steps'], 1)
+        self.assertIn("failed_steps", self.deployment.metrics_collector.counters)
+        self.assertEqual(self.deployment.metrics_collector.counters["failed_steps"], 1)
 
     def test_update_monitoring_updates_gauges(self):
         """Test monitoring updates gauges"""
         self.deployment = self.create_deployment()
-        result = {'success': True}
+        result = {"success": True}
         self.deployment._update_monitoring(result)
-        self.assertIn('energy_remaining_nJ', self.deployment.metrics_collector.gauges)
-        self.assertIn('identity_drift', self.deployment.metrics_collector.gauges)
-        self.assertIn('uncertainty', self.deployment.metrics_collector.gauges)
+        self.assertIn("energy_remaining_nJ", self.deployment.metrics_collector.gauges)
+        self.assertIn("identity_drift", self.deployment.metrics_collector.gauges)
+        self.assertIn("uncertainty", self.deployment.metrics_collector.gauges)
 
 
 # ============================================================
 # TEST: SHUTDOWN
 # ============================================================
+
 
 class TestShutdown(DeploymentTestBase):
     """Test shutdown functionality"""
@@ -714,33 +744,34 @@ class TestShutdown(DeploymentTestBase):
 # TEST: INTEGRATION
 # ============================================================
 
+
 class TestIntegration(DeploymentTestBase):
     """Integration tests"""
 
     def test_full_lifecycle(self):
         """Test full deployment lifecycle"""
         self.deployment = self.create_deployment()
-        
+
         # Execute steps
         for i in range(5):
-            result = self.deployment.step_with_monitoring(["test"], {'goal': 'test'})
-            self.assertTrue(result.get('success', False))
-        
+            result = self.deployment.step_with_monitoring(["test"], {"goal": "test"})
+            self.assertTrue(result.get("success", False))
+
         self.assertEqual(self.deployment.collective.sys.step, 5)
-        
+
         # Get status
         status = self.deployment.get_status()
-        self.assertEqual(status['step'], 5)
-        self.assertEqual(status['metrics']['counters']['successful_steps'], 5)
-        
+        self.assertEqual(status["step"], 5)
+        self.assertEqual(status["metrics"]["counters"]["successful_steps"], 5)
+
         # Save checkpoint
         success = self.deployment.save_checkpoint()
         self.assertTrue(success)
-        
+
         # List checkpoints
         checkpoints = self.deployment.list_checkpoints()
         self.assertGreaterEqual(len(checkpoints), 1)
-        
+
         # Shutdown
         self.deployment.shutdown()
         self.assertTrue(self.deployment._shutdown_requested)
@@ -751,21 +782,21 @@ class TestIntegration(DeploymentTestBase):
         deployment1 = self.create_deployment()
         for i in range(10):
             deployment1.step_with_monitoring(["test"], {})
-        deployment1.metrics_collector.increment_counter('before_save', 1)
-        
+        deployment1.metrics_collector.increment_counter("before_save", 1)
+
         checkpoint_path = self.temp_dir / "restore_test.pkl"
         deployment1.save_checkpoint(str(checkpoint_path))
         deployment1._shutdown_requested = True
-        
+
         # Create new deployment and restore
         deployment2 = self.create_deployment()
         self.assertEqual(deployment2.collective.sys.step, 0)
         deployment2._load_checkpoint(str(checkpoint_path))
-        
+
         # Verify restoration
         self.assertEqual(deployment2.collective.sys.step, 10)
-        self.assertEqual(deployment2.metrics_collector.counters.get('before_save'), 1)
-        
+        self.assertEqual(deployment2.metrics_collector.counters.get("before_save"), 1)
+
         # Continue execution
         deployment2.step_with_monitoring(["test"], {})
         self.assertEqual(deployment2.collective.sys.step, 11)
@@ -773,31 +804,32 @@ class TestIntegration(DeploymentTestBase):
     def test_error_recovery(self):
         """Test recovery from errors"""
         self.deployment = self.create_deployment()
-        
+
         # Execute some steps
         for i in range(3):
             self.deployment.step_with_monitoring(["test"], {})
-        
+
         # Simulate unhealthy state
         self.deployment.collective.sys.health.energy_budget_left_nJ = 0
         result = self.deployment.step_with_monitoring(["test"], {})
-        self.assertIn('error', result)
-        
+        self.assertIn("error", result)
+
         # Restore health
         self.deployment.collective.sys.health.energy_budget_left_nJ = 1000000
         result = self.deployment.step_with_monitoring(["test"], {})
-        self.assertTrue(result.get('success', False))
+        self.assertTrue(result.get("success", False))
 
 
 # ============================================================
 # TEST SUITE RUNNER
 # ============================================================
 
+
 def suite():
     """Create test suite"""
     loader = unittest.TestLoader()
     test_suite = unittest.TestSuite()
-    
+
     test_suite.addTests(loader.loadTestsFromTestCase(TestDeploymentInitialization))
     test_suite.addTests(loader.loadTestsFromTestCase(TestHealthChecks))
     test_suite.addTests(loader.loadTestsFromTestCase(TestStepExecution))
@@ -806,10 +838,10 @@ def suite():
     test_suite.addTests(loader.loadTestsFromTestCase(TestMonitoring))
     test_suite.addTests(loader.loadTestsFromTestCase(TestShutdown))
     test_suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
-    
+
     return test_suite
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite())

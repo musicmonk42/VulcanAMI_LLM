@@ -14,8 +14,10 @@ from ..config import ModalityType, EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM
 # LEARNING TYPES AND CONFIGS
 # ============================================================
 
+
 class LearningMode(Enum):
     """Learning modes supported by the system."""
+
     SUPERVISED = "supervised"
     UNSUPERVISED = "unsupervised"
     REINFORCEMENT = "reinforcement"
@@ -27,9 +29,11 @@ class LearningMode(Enum):
     RLHF = "rlhf"  # Reinforcement Learning from Human Feedback
     ONLINE = "online"  # Online/streaming learning
 
+
 @dataclass
 class LearningConfig:
     """Configuration for learning systems."""
+
     learning_rate: float = 0.001
     batch_size: int = 32
     ewc_lambda: float = 100.0
@@ -54,9 +58,11 @@ class LearningConfig:
     max_checkpoints: int = 100
     audit_trail_enabled: bool = True
 
+
 @dataclass
 class TaskInfo:
     """Information about a learning task."""
+
     task_id: str
     task_type: str
     difficulty: float = 0.5
@@ -66,9 +72,11 @@ class TaskInfo:
     signature: Optional[np.ndarray] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-@dataclass 
+
+@dataclass
 class FeedbackData:
     """Human feedback data structure"""
+
     feedback_id: str
     timestamp: float
     feedback_type: str  # 'rating', 'comparison', 'correction', 'preference'
@@ -79,9 +87,11 @@ class FeedbackData:
     reward_signal: float
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass
 class LearningTrajectory:
     """Complete learning trajectory for auditing"""
+
     trajectory_id: str
     start_time: float
     end_time: Optional[float]

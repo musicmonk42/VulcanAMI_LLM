@@ -79,14 +79,21 @@ DIVERGENCE_THRESHOLD = 2.0
 try:
     from src.consensus_engine import ConsensusEngine
 except ImportError:
+
     class ConsensusEngine:
-        def propose_weight_update(self, gradient_update: Dict[str, Any], agent_id: str) -> Any:
-            return type("Proposal", (), {
-                "status": "approved",
-                "metadata": {},
-                "gradient_update": gradient_update,
-                "confidence": 0.8
-            })()
+        def propose_weight_update(
+            self, gradient_update: Dict[str, Any], agent_id: str
+        ) -> Any:
+            return type(
+                "Proposal",
+                (),
+                {
+                    "status": "approved",
+                    "metadata": {},
+                    "gradient_update": gradient_update,
+                    "confidence": 0.8,
+                },
+            )()
 
         def approve(self, proposal: Any) -> bool:
             return getattr(proposal, "status", "") == "approved"
@@ -94,8 +101,12 @@ except ImportError:
 
 # ============================= FALLBACK MODEL ============================= #
 try:
-    from src.llm_core.graphix_transformer import GraphixTransformer, GraphixTransformerConfig
+    from src.llm_core.graphix_transformer import (
+        GraphixTransformer,
+        GraphixTransformerConfig,
+    )
 except ImportError:
+
     class GraphixTransformerConfig:
         hidden_size = 256
         num_layers = 12
@@ -114,7 +125,7 @@ except ImportError:
                 params[f"layer_{layer}"] = {
                     "attention": {"weight": 1.0, "bias": 0.0},
                     "mlp": {"weight": 1.0, "bias": 0.0},
-                    "layer_norm": {"weight": 1.0, "bias": 0.0}
+                    "layer_norm": {"weight": 1.0, "bias": 0.0},
                 }
             params["embedding"] = {"weight": 1.0}
             params["output"] = {"weight": 1.0, "bias": 0.0}
@@ -127,7 +138,9 @@ except ImportError:
             variation = random.uniform(-0.005, 0.005)
             return base_loss + variation
 
-        def apply_update(self, gradients: Dict[str, Any], learning_rate: float = 0.001) -> None:
+        def apply_update(
+            self, gradients: Dict[str, Any], learning_rate: float = 0.001
+        ) -> None:
             """
             Apply parameter updates.
             Expects gradients (update directions) WITHOUT learning rate scaling.
@@ -135,9 +148,7 @@ except ImportError:
             for param_key, grad_info in gradients.items():
                 if param_key in self._parameters and isinstance(grad_info, dict):
                     self._apply_recursive_update(
-                        self._parameters[param_key],
-                        grad_info,
-                        learning_rate
+                        self._parameters[param_key], grad_info, learning_rate
                     )
 
         def _apply_recursive_update(self, params: Any, grads: Any, lr: float) -> None:
@@ -160,9 +171,11 @@ except ImportError:
 
 # ============================= DATA CLASSES ============================= #
 
+
 @dataclass
 class OptimizerState:
     """State for Adam optimizer."""
+
     m: Dict[str, Any] = field(default_factory=dict)  # First moment
     v: Dict[str, Any] = field(default_factory=dict)  # Second moment
     step: int = 0
@@ -171,6 +184,7 @@ class OptimizerState:
 @dataclass
 class TrainingMetrics:
     """Metrics tracked during training."""
+
     step: int
     loss: float
     grad_norm: float
@@ -186,6 +200,7 @@ class TrainingMetrics:
 @dataclass
 class SafetyReport:
     """Safety validation report."""
+
     passed: bool
     checks_run: List[str]
     failures: List[str]
@@ -195,6 +210,7 @@ class SafetyReport:
 
 
 # ============================= OPTIMIZER ============================= #
+
 
 class AdamOptimizer:
     """
@@ -229,8 +245,8 @@ class AdamOptimizer:
         t = self.state.step
 
         # Bias correction terms
-        bias_correction1 = 1 - self.beta1 ** t
-        bias_correction2 = 1 - self.beta2 ** t
+        bias_correction1 = 1 - self.beta1**t
+        bias_correction2 = 1 - self.beta2**t
 
         # Initialize state if needed
         if not self.state.m:
@@ -271,7 +287,7 @@ class AdamOptimizer:
             # Update biased first moment estimate
             new_m = self.beta1 * float(m) + (1 - self.beta1) * grads
             # Update biased second raw moment estimate
-            new_v = self.beta2 * float(v) + (1 - self.beta2) * (grads ** 2)
+            new_v = self.beta2 * float(v) + (1 - self.beta2) * (grads**2)
             # Bias corrections
             m_hat = new_m / bc1
             v_hat = new_v / bc2
@@ -304,6 +320,7 @@ class AdamOptimizer:
 
 # ============================= SCHEDULER ============================= #
 
+
 class LearningRateScheduler:
     """Learning rate scheduling strategies."""
 
@@ -326,11 +343,15 @@ class LearningRateScheduler:
         if step < self.warmup_steps:
             return self.initial_lr * (step / max(1, self.warmup_steps))
 
-        progress = (step - self.warmup_steps) / max(1, (self.total_steps - self.warmup_steps))
+        progress = (step - self.warmup_steps) / max(
+            1, (self.total_steps - self.warmup_steps)
+        )
         progress = max(0.0, min(1.0, progress))
 
         if self.schedule_type == "cosine":
-            lr = self.min_lr + (self.initial_lr - self.min_lr) * 0.5 * (1 + math.cos(math.pi * progress))
+            lr = self.min_lr + (self.initial_lr - self.min_lr) * 0.5 * (
+                1 + math.cos(math.pi * progress)
+            )
         elif self.schedule_type == "linear":
             lr = self.initial_lr - (self.initial_lr - self.min_lr) * progress
         elif self.schedule_type == "exponential":
@@ -346,6 +367,7 @@ class LearningRateScheduler:
 
 # ============================= TRAINER ============================= #
 
+
 class GovernedTrainer:
     """
     Production-grade training loop with governance, safety, and optimization.
@@ -355,7 +377,9 @@ class GovernedTrainer:
         self,
         agent_id: str = "trainer-0",
         model_config: Optional[GraphixTransformerConfig] = None,
-        gradient_fn: Optional[Callable[[Dict[str, Any]], Tuple[float, Dict[str, Any]]]] = None,
+        gradient_fn: Optional[
+            Callable[[Dict[str, Any]], Tuple[float, Dict[str, Any]]]
+        ] = None,
         consensus_engine: Optional[ConsensusEngine] = None,
         world_model: Optional[Any] = None,
         safety_validator: Optional[Any] = None,
@@ -492,6 +516,7 @@ class GovernedTrainer:
             # Default gradient estimation via causal_loss (stateless fallback)
             try:
                 from causal_loss import compute_loss
+
                 grad_loss, gradients = compute_loss(batch)
             except Exception:
                 gradients = self._compute_fallback_gradients(loss, batch)
@@ -504,7 +529,9 @@ class GovernedTrainer:
 
         # Anomaly detection
         if self.detect_anomalies:
-            anomaly_detected, anomaly_type = self._detect_gradient_anomalies(layer_grads, grad_norm)
+            anomaly_detected, anomaly_type = self._detect_gradient_anomalies(
+                layer_grads, grad_norm
+            )
             if anomaly_detected:
                 return self._handle_anomaly(anomaly_type, loss, layer_grads)
 
@@ -603,11 +630,13 @@ class GovernedTrainer:
                 # RLHF integration
                 if self.rlhf_manager and hasattr(self.rlhf_manager, "step"):
                     try:
-                        rlhf_feedback = self.rlhf_manager.step({
-                            "loss": loss,
-                            "gradients": optimizer_updates,
-                            "step": self.step_counter,
-                        })
+                        rlhf_feedback = self.rlhf_manager.step(
+                            {
+                                "loss": loss,
+                                "gradients": optimizer_updates,
+                                "step": self.step_counter,
+                            }
+                        )
                         if rlhf_feedback:
                             self._apply_rlhf_feedback(rlhf_feedback)
                     except Exception as e:
@@ -616,11 +645,13 @@ class GovernedTrainer:
                 # World model integration
                 if self.world_model and hasattr(self.world_model, "update"):
                     try:
-                        self.world_model.update({
-                            "loss": loss,
-                            "step": self.step_counter,
-                            "tokens": batch.get("tokens", []),
-                        })
+                        self.world_model.update(
+                            {
+                                "loss": loss,
+                                "step": self.step_counter,
+                                "tokens": batch.get("tokens", []),
+                            }
+                        )
                     except Exception as e:
                         logger.warning(f"World model update failed: {e}")
 
@@ -660,7 +691,9 @@ class GovernedTrainer:
 
     # ======================= GRADIENT UTILITIES ======================= #
 
-    def _compute_fallback_gradients(self, loss: float, batch: Dict[str, Any]) -> Dict[str, Any]:
+    def _compute_fallback_gradients(
+        self, loss: float, batch: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Compute pseudo-gradients when no gradient_fn is provided."""
         num_layers = getattr(self.model.config, "num_layers", 12)
         gradients = {"transformer_layers": {}}
@@ -683,7 +716,7 @@ class GovernedTrainer:
                 "layer_norm": {
                     "weight": base_grad * 0.1,
                     "bias": base_grad * 0.05,
-                }
+                },
             }
         return gradients
 
@@ -754,7 +787,9 @@ class GovernedTrainer:
 
     # ======================= ANOMALY DETECTION ======================= #
 
-    def _detect_gradient_anomalies(self, gradients: Dict[str, Any], grad_norm: float) -> Tuple[bool, str]:
+    def _detect_gradient_anomalies(
+        self, gradients: Dict[str, Any], grad_norm: float
+    ) -> Tuple[bool, str]:
         values: List[float] = []
         self._collect_gradient_values(gradients, values)
         for val in values:
@@ -776,11 +811,15 @@ class GovernedTrainer:
 
         return False, ""
 
-    def _handle_anomaly(self, anomaly_type: str, loss: float, gradients: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_anomaly(
+        self, anomaly_type: str, loss: float, gradients: Dict[str, Any]
+    ) -> Dict[str, Any]:
         if anomaly_type in ["nan_gradient", "inf_gradient"]:
             if self.last_good_state:
                 self._rollback_model()
-            return self._record_error(f"anomaly_{anomaly_type}", "Detected NaN/Inf gradients, rolled back")
+            return self._record_error(
+                f"anomaly_{anomaly_type}", "Detected NaN/Inf gradients, rolled back"
+            )
 
         elif anomaly_type == "exploding_gradient":
             self.optimizer.set_lr(self.optimizer.get_lr() * 0.5)
@@ -813,7 +852,9 @@ class GovernedTrainer:
 
     # ======================= SAFETY CHECKS ======================= #
 
-    def _comprehensive_safety_check(self, gradients: Dict[str, Any], loss: float) -> SafetyReport:
+    def _comprehensive_safety_check(
+        self, gradients: Dict[str, Any], loss: float
+    ) -> SafetyReport:
         checks_run: List[str] = []
         failures: List[str] = []
         warnings: List[str] = []
@@ -900,8 +941,10 @@ class GovernedTrainer:
         if self.rollback_count >= self.max_rollback_attempts:
             return False
 
-        recent = list(self.loss_history)[-self.rollback_window:]
-        previous = list(self.loss_history)[-(self.rollback_window * 2):-self.rollback_window]
+        recent = list(self.loss_history)[-self.rollback_window :]
+        previous = list(self.loss_history)[
+            -(self.rollback_window * 2) : -self.rollback_window
+        ]
 
         if not previous:
             return False
@@ -931,7 +974,9 @@ class GovernedTrainer:
             return
         try:
             self.model.set_parameters(self.last_good_state["parameters"])
-            self.optimizer.state = copy.deepcopy(self.last_good_state["optimizer_state"])
+            self.optimizer.state = copy.deepcopy(
+                self.last_good_state["optimizer_state"]
+            )
             current_lr = self.optimizer.get_lr()
             self.optimizer.set_lr(current_lr * 0.8)
         except Exception as e:
@@ -970,13 +1015,17 @@ class GovernedTrainer:
 
     # ======================= PROPOSAL SYSTEM ======================= #
 
-    def _make_proposal(self, gradients: Dict[str, Any], loss: float, grad_norm: float) -> Any:
+    def _make_proposal(
+        self, gradients: Dict[str, Any], loss: float, grad_norm: float
+    ) -> Any:
         proposal = None
         try:
             proposal = self.consensus.propose_weight_update(gradients, self.agent_id)
         except TypeError:
             try:
-                proposal = self.consensus.propose_weight_update(gradients, self.agent_id, "global", loss)
+                proposal = self.consensus.propose_weight_update(
+                    gradients, self.agent_id, "global", loss
+                )
             except TypeError:
                 try:
                     proposal = self.consensus.propose_weight_update(
@@ -1018,15 +1067,17 @@ class GovernedTrainer:
                 )
 
         try:
-            proposal.metadata.update({
-                "loss": loss,
-                "grad_norm": grad_norm,
-                "step": self.step_counter,
-                "timestamp": time.time(),
-                "agent_id": self.agent_id,
-                "learning_rate": self.optimizer.get_lr(),
-                "best_loss": self.best_loss,
-            })
+            proposal.metadata.update(
+                {
+                    "loss": loss,
+                    "grad_norm": grad_norm,
+                    "step": self.step_counter,
+                    "timestamp": time.time(),
+                    "agent_id": self.agent_id,
+                    "learning_rate": self.optimizer.get_lr(),
+                    "best_loss": self.best_loss,
+                }
+            )
         except Exception:
             proposal.metadata = {
                 "loss": loss,
@@ -1095,7 +1146,7 @@ class GovernedTrainer:
 
         self.audit_log.append(metrics)
         if len(self.audit_log) > self.max_audit_log_size:
-            del self.audit_log[:len(self.audit_log) - self.max_audit_log_size]
+            del self.audit_log[: len(self.audit_log) - self.max_audit_log_size]
 
         return asdict(metrics)
 
@@ -1111,7 +1162,7 @@ class GovernedTrainer:
     def _log_progress(self) -> None:
         if not self.loss_history:
             return
-        recent_losses = list(self.loss_history)[-self.log_interval:]
+        recent_losses = list(self.loss_history)[-self.log_interval :]
         avg_loss = sum(recent_losses) / max(len(recent_losses), 1)
         elapsed = time.time() - self.training_start_time
         tokens_per_sec = self.tokens_processed / elapsed if elapsed > 0 else 0
@@ -1130,7 +1181,9 @@ class GovernedTrainer:
     def summary(self) -> Dict[str, Any]:
         if self.loss_history:
             recent_loss = self.loss_history[-1]
-            avg_recent_loss = sum(list(self.loss_history)[-100:]) / min(100, len(self.loss_history))
+            avg_recent_loss = sum(list(self.loss_history)[-100:]) / min(
+                100, len(self.loss_history)
+            )
         else:
             recent_loss = None
             avg_recent_loss = None
@@ -1158,8 +1211,12 @@ class GovernedTrainer:
     def get_detailed_report(self) -> Dict[str, Any]:
         summary = self.summary()
         if len(self.audit_log) > 0:
-            approval_rate = sum(1 for m in self.audit_log if m.approved) / len(self.audit_log)
-            avg_grad_norm = sum(m.grad_norm for m in self.audit_log) / len(self.audit_log)
+            approval_rate = sum(1 for m in self.audit_log if m.approved) / len(
+                self.audit_log
+            )
+            avg_grad_norm = sum(m.grad_norm for m in self.audit_log) / len(
+                self.audit_log
+            )
         else:
             approval_rate = 0.0
             avg_grad_norm = 0.0
@@ -1176,7 +1233,9 @@ class GovernedTrainer:
             "loss_statistics": {
                 "min": min(self.loss_history) if self.loss_history else None,
                 "max": max(self.loss_history) if self.loss_history else None,
-                "mean": sum(self.loss_history) / len(self.loss_history) if self.loss_history else None,
+                "mean": sum(self.loss_history) / len(self.loss_history)
+                if self.loss_history
+                else None,
             },
         }
 
@@ -1191,13 +1250,16 @@ if __name__ == "__main__":
 
     class _ModelShim:
         """Wrap model to ensure get_parameters/set_parameters/apply_update exist for demo run."""
+
         def __init__(self, impl):
             self.impl = impl
+
         def __call__(self, batch):
             try:
                 return self.impl(batch)
             except Exception:
                 return 0.1
+
         def apply_update(self, gradients, learning_rate=0.001):
             if hasattr(self.impl, "apply_update"):
                 try:
@@ -1205,6 +1267,7 @@ if __name__ == "__main__":
                 except Exception:
                     return None
             return None
+
         def get_parameters(self):
             if hasattr(self.impl, "get_parameters"):
                 try:
@@ -1212,6 +1275,7 @@ if __name__ == "__main__":
                 except Exception:
                     return {}
             return {}
+
         def set_parameters(self, params):
             if hasattr(self.impl, "set_parameters"):
                 try:
@@ -1220,7 +1284,9 @@ if __name__ == "__main__":
                     return None
             return None
 
-    def _make_batch(seq_len: int = 12, vocab: int = 256, hidden_dim: int = 64) -> Dict[str, Any]:
+    def _make_batch(
+        seq_len: int = 12, vocab: int = 256, hidden_dim: int = 64
+    ) -> Dict[str, Any]:
         tokens = [_random.randint(1, vocab - 1) for _ in range(seq_len)]
         logits, targets = [], []
         for _ in range(seq_len):
@@ -1229,7 +1295,10 @@ if __name__ == "__main__":
             row = [_random.uniform(-1.0, 1.0) for _ in range(vocab)]
             row[t] += 2.0  # make target token likelier so loss is meaningful
             logits.append(row)
-        hidden_states = [[_random.uniform(-0.5, 0.5) for _ in range(hidden_dim)] for _ in range(seq_len)]
+        hidden_states = [
+            [_random.uniform(-0.5, 0.5) for _ in range(hidden_dim)]
+            for _ in range(seq_len)
+        ]
         return {
             "tokens": tokens,
             "logits": logits,
@@ -1258,13 +1327,17 @@ if __name__ == "__main__":
         _rec = _trainer.training_step(_make_batch())
         _status = _rec.get("status")
         if _status == "error":
-            print(f"step={_rec.get('step')} status=error type={_rec.get('error_type')} msg={_rec.get('message')}")
+            print(
+                f"step={_rec.get('step')} status=error type={_rec.get('error_type')} msg={_rec.get('message')}"
+            )
         else:
             _lr = _rec.get("learning_rate")
             _lr_str = f"{_lr:.2e}" if isinstance(_lr, (int, float)) else "n/a"
             _loss = _rec.get("loss")
             _loss_str = f"{_loss:.4f}" if isinstance(_loss, (int, float)) else "n/a"
-            print(f"step={_rec.get('step')} status={_status} loss={_loss_str} lr={_lr_str}")
+            print(
+                f"step={_rec.get('step')} status={_status} loss={_loss_str} lr={_lr_str}"
+            )
         _time.sleep(0.02)
 
     print("Summary:", _trainer.summary())
@@ -1272,26 +1345,32 @@ if __name__ == "__main__":
 
     # === PATCH: Save trained model as JSON for downstream evaluation ===
     import os
-    model_save_path = 'exp_probe_1p34m/llm_best_model.json'
+
+    model_save_path = "exp_probe_1p34m/llm_best_model.json"
     os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
 
-    if hasattr(_trainer.model, 'impl'):
+    if hasattr(_trainer.model, "impl"):
         model_to_save = _trainer.model.impl
     else:
         model_to_save = _trainer.model
 
     try:
         # Prefer .save() if using native GraphixTransformer
-        if hasattr(model_to_save, 'save'):
+        if hasattr(model_to_save, "save"):
             model_to_save.save(model_save_path)
-            print(f'Model saved for evaluation: {model_save_path}')
+            print(f"Model saved for evaluation: {model_save_path}")
         else:
             # Fallback: save parameters dict as JSON
-            params = model_to_save.get_parameters() if hasattr(model_to_save, 'get_parameters') else {}
-            with open(model_save_path, 'w', encoding='utf-8') as f:
+            params = (
+                model_to_save.get_parameters()
+                if hasattr(model_to_save, "get_parameters")
+                else {}
+            )
+            with open(model_save_path, "w", encoding="utf-8") as f:
                 import json
-                json.dump({'parameters': params}, f, indent=2)
-            print(f'Shim model state saved for evaluation: {model_save_path}')
+
+                json.dump({"parameters": params}, f, indent=2)
+            print(f"Shim model state saved for evaluation: {model_save_path}")
 
     except Exception as e:
-        print(f'[ERROR] Could not save model for evaluation: {e}')
+        print(f"[ERROR] Could not save model for evaluation: {e}")

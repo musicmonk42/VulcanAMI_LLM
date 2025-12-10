@@ -8,10 +8,15 @@ Tests individual components and their integration
 # This configures fast worker intervals to prevent test timeouts
 # ============================================================================
 import os
-os.environ['VULCAN_TEST_MODE'] = '1'
-os.environ['WORKER_CHECK_INTERVAL'] = '0.5'   # Fast cleanup for rollback_audit (default: 10s)
-os.environ['HEALTH_CHECK_INTERVAL'] = '0.5'   # Fast health checks for hardware_dispatcher (default: 10s)
-os.environ['SAMPLING_INTERVAL'] = '0.1'       # Fast monitoring for planning (default: 1s)
+
+os.environ["VULCAN_TEST_MODE"] = "1"
+os.environ["WORKER_CHECK_INTERVAL"] = (
+    "0.5"  # Fast cleanup for rollback_audit (default: 10s)
+)
+os.environ["HEALTH_CHECK_INTERVAL"] = (
+    "0.5"  # Fast health checks for hardware_dispatcher (default: 10s)
+)
+os.environ["SAMPLING_INTERVAL"] = "0.1"  # Fast monitoring for planning (default: 1s)
 
 print("\n" + "=" * 70)
 print("🚀 VULCAN TEST MODE ENABLED - Fast worker intervals")
@@ -36,17 +41,20 @@ import asyncio
 import threading
 from unittest.mock import Mock, patch, MagicMock
 from enum import Enum
-import unittest # ADDED for self.fail
-import psutil # ADDED for memory test
+import unittest  # ADDED for self.fail
+import psutil  # ADDED for memory test
 import gc  # ADDED for cleanup
+
 
 # Define MetaLearningAlgorithm enum for tests if not available
 class MetaLearningAlgorithm(Enum):
     """Meta-learning algorithms"""
+
     MAML = "maml"
     FOMAML = "fomaml"
     REPTILE = "reptile"
     META_SGD = "meta_sgd"
+
 
 # Import all learning components
 # Assuming src.vulcan.learning is in the path
@@ -65,7 +73,7 @@ try:
         FeedbackData,
         LearningMode,
         PlanningAlgorithm,
-        PacingStrategy
+        PacingStrategy,
     )
     from src.vulcan.learning.learning_types import LearningTrajectory
     from src.vulcan.config import EMBEDDING_DIM
@@ -93,16 +101,17 @@ except ImportError:
 # Test configuration
 TEST_EMBEDDING_DIM = 64  # Smaller for faster tests
 TEST_BATCH_SIZE = 4
-TEST_DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+TEST_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class SimpleTestModel(nn.Module):
     """Simple model for testing"""
+
     def __init__(self, input_dim=TEST_EMBEDDING_DIM, output_dim=TEST_EMBEDDING_DIM):
         super().__init__()
         self.embedding_dim = output_dim  # Add embedding_dim attribute for MetaLearner
         self.fc = nn.Linear(input_dim, output_dim)
-    
+
     def forward(self, x):
         return self.fc(x)
 
@@ -127,7 +136,7 @@ def learning_config():
         curriculum_stages=3,
         rlhf_enabled=True,
         checkpoint_frequency=10,
-        max_checkpoints=5
+        max_checkpoints=5,
     )
 
 
@@ -147,7 +156,7 @@ def fast_learning_config():
         audit_trail_enabled=False,  # Disable auditing
         reward_model_update_freq=1000,  # Less frequent updates
         ppo_epochs=1,  # Fewer PPO epochs for testing
-        meta_batch_size=2  # Smaller meta batch
+        meta_batch_size=2,  # Smaller meta batch
     )
 
 
@@ -156,14 +165,18 @@ def test_experiences():
     """Generate test experiences"""
     experiences = []
     for i in range(20):
-        experiences.append({
-            'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-            'reward': np.random.random(),
-            'action': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-            'next_embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-            'modality': 'test',
-            'metadata': {'complexity': np.random.random()}
-        })
+        experiences.append(
+            {
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": np.random.random(),
+                "action": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "next_embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(
+                    np.float32
+                ),
+                "modality": "test",
+                "metadata": {"complexity": np.random.random()},
+            }
+        )
     return experiences
 
 
@@ -171,73 +184,74 @@ def test_experiences():
 # UNIT TESTS FOR INDIVIDUAL COMPONENTS (using Pytest)
 # ============================================================
 
+
 class TestContinualLearning:
     """Test continual learning component"""
-    
+
     def test_initialization(self, fast_learning_config):
         """Test continual learner initialization"""
         learner = EnhancedContinualLearner(
             embedding_dim=TEST_EMBEDDING_DIM,
             config=fast_learning_config,
             use_hierarchical=False,  # Disable for testing
-            use_progressive=False
+            use_progressive=False,
         )
-        
+
         assert learner.embedding_dim == TEST_EMBEDDING_DIM
         assert len(learner.task_models) == 0
         assert len(learner.replay_buffer) == 0
-        
+
         # Cleanup
         learner.shutdown()
-    
+
     def test_experience_processing(self, fast_learning_config, test_experiences):
         """Test processing experiences"""
         learner = EnhancedContinualLearner(
             embedding_dim=TEST_EMBEDDING_DIM,
             config=fast_learning_config,
             use_hierarchical=False,
-            use_progressive=False
+            use_progressive=False,
         )
-        
+
         # Process experiences
         successfully_processed = 0
         for exp in test_experiences[:5]:
             result = learner.process_experience(exp)
-            assert 'adapted' in result
+            assert "adapted" in result
             # Check for either 'loss' or 'error' in result
-            assert 'loss' in result or 'error' in result
-            if result.get('adapted', False):
+            assert "loss" in result or "error" in result
+            if result.get("adapted", False):
                 successfully_processed += 1
-        
+
         # At least some experiences should be processed successfully
         assert successfully_processed > 0
         # Buffer should contain the successfully processed experiences
         assert len(learner.replay_buffer) == successfully_processed
-        
+
         # Cleanup
         learner.shutdown()
-    
+
     def test_task_detection(self, fast_learning_config, test_experiences):
         """Test automatic task detection"""
         learner = EnhancedContinualLearner(
             embedding_dim=TEST_EMBEDDING_DIM,
             config=fast_learning_config,
             use_hierarchical=False,
-            use_progressive=False
+            use_progressive=False,
         )
-        
+
         # Process experiences with different patterns
         for i, exp in enumerate(test_experiences[:10]):
-            exp['task_hint'] = 'task_a' if i < 5 else 'task_b'
+            exp["task_hint"] = "task_a" if i < 5 else "task_b"
             result = learner.process_experience(exp)
-        
+
         # Should have detected at least one task
         assert len(learner.task_models) >= 1
         assert len(learner.task_info) >= 1
-        
+
         # Cleanup
         learner.shutdown()
-    
+
     def test_ewc_consolidation(self, learning_config):
         """Test EWC knowledge consolidation"""
         learning_config.consolidation_threshold = 5
@@ -245,44 +259,52 @@ class TestContinualLearning:
             embedding_dim=TEST_EMBEDDING_DIM,
             config=learning_config,
             use_hierarchical=False,
-            use_progressive=False
+            use_progressive=False,
         )
-        
+
         # Process enough experiences to trigger consolidation
         for i in range(6):
             exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': 0.5
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": 0.5,
             }
             learner.process_experience(exp)
-        
+
         # Check that consolidation was triggered - check for either attribute
         has_consolidation = (
-            hasattr(learner, 'consolidation_count') and learner.consolidation_count > 0
-        ) or (
-            hasattr(learner, 'fisher_matrices') and len(learner.fisher_matrices) > 0
-        ) or (
-            hasattr(learner, '_consolidation_count') and learner._consolidation_count > 0
-        ) or (
-            # Fallback: just check experience processing worked
-            len(learner.replay_buffer) > 0
+            (
+                hasattr(learner, "consolidation_count")
+                and learner.consolidation_count > 0
+            )
+            or (
+                hasattr(learner, "fisher_matrices") and len(learner.fisher_matrices) > 0
+            )
+            or (
+                hasattr(learner, "_consolidation_count")
+                and learner._consolidation_count > 0
+            )
+            or (
+                # Fallback: just check experience processing worked
+                len(learner.replay_buffer) > 0
+            )
         )
-        assert has_consolidation, "Consolidation should have been triggered or experiences processed"
-        
+        assert has_consolidation, (
+            "Consolidation should have been triggered or experiences processed"
+        )
+
         # Cleanup
         learner.shutdown()
 
 
 class TestCurriculumLearning:
     """Test curriculum learning component"""
-    
+
     def test_initialization(self, learning_config):
         """Test curriculum learner initialization"""
         # Try different API signatures
         try:
             learner = CurriculumLearner(
-                config=learning_config,
-                embedding_dim=TEST_EMBEDDING_DIM
+                config=learning_config, embedding_dim=TEST_EMBEDDING_DIM
             )
         except TypeError:
             # API might not accept embedding_dim as separate arg
@@ -291,107 +313,103 @@ class TestCurriculumLearning:
             except TypeError:
                 # Try without config keyword
                 learner = CurriculumLearner(learning_config)
-        
+
         assert learner.current_stage == 0
         # Check for embedding_dim if available
-        if hasattr(learner, 'embedding_dim'):
+        if hasattr(learner, "embedding_dim"):
             assert learner.embedding_dim == TEST_EMBEDDING_DIM
-        
+
         # Cleanup - handle missing shutdown method
-        if hasattr(learner, 'shutdown'):
+        if hasattr(learner, "shutdown"):
             learner.shutdown()
-    
+
     def test_stage_progression(self, learning_config):
         """Test progression through curriculum stages"""
         # Try different API signatures
         try:
             learner = CurriculumLearner(
-                config=learning_config,
-                embedding_dim=TEST_EMBEDDING_DIM
+                config=learning_config, embedding_dim=TEST_EMBEDDING_DIM
             )
         except TypeError:
             try:
                 learner = CurriculumLearner(config=learning_config)
             except TypeError:
                 learner = CurriculumLearner(learning_config)
-        
+
         initial_stage = learner.current_stage
-        
+
         # Process experiences to trigger stage progression - handle different method names
         process_method = None
-        if hasattr(learner, 'process_experience'):
+        if hasattr(learner, "process_experience"):
             process_method = learner.process_experience
-        elif hasattr(learner, 'update'):
+        elif hasattr(learner, "update"):
             process_method = learner.update
-        elif hasattr(learner, 'step'):
+        elif hasattr(learner, "step"):
             process_method = learner.step
-        elif hasattr(learner, 'add_experience'):
+        elif hasattr(learner, "add_experience"):
             process_method = learner.add_experience
-        
+
         if process_method:
             for i in range(20):
                 exp = {
-                    'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                    'reward': 0.9,  # High reward to encourage progression
-                    'metadata': {'complexity': 0.5}
+                    "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                    "reward": 0.9,  # High reward to encourage progression
+                    "metadata": {"complexity": 0.5},
                 }
                 try:
                     process_method(exp)
                 except Exception:
                     pass  # Some implementations may not accept this format
-        
+
         # Stage may or may not have advanced depending on pacing
         assert learner.current_stage >= initial_stage
-        
+
         # Cleanup - handle missing shutdown method
-        if hasattr(learner, 'shutdown'):
+        if hasattr(learner, "shutdown"):
             learner.shutdown()
 
 
 class TestMetaLearning:
     """Test meta-learning component"""
-    
+
     def test_initialization(self, fast_learning_config):
         """Test meta-learner initialization"""
         # MetaLearner typically requires a base_model
         base_model = SimpleTestModel()
-        
+
         # Try different API signatures
         try:
             learner = MetaLearner(
                 base_model=base_model,
                 config=fast_learning_config,
                 algorithm=MetaLearningAlgorithm.MAML,
-                embedding_dim=TEST_EMBEDDING_DIM
+                embedding_dim=TEST_EMBEDDING_DIM,
             )
         except TypeError:
             try:
                 learner = MetaLearner(
                     base_model,
                     config=fast_learning_config,
-                    algorithm=MetaLearningAlgorithm.MAML
+                    algorithm=MetaLearningAlgorithm.MAML,
                 )
             except TypeError:
                 try:
-                    learner = MetaLearner(
-                        base_model,
-                        fast_learning_config
-                    )
+                    learner = MetaLearner(base_model, fast_learning_config)
                 except TypeError:
                     # Try with just base_model
                     learner = MetaLearner(base_model)
-        
+
         # Check for algorithm attribute if available
-        if hasattr(learner, 'algorithm'):
+        if hasattr(learner, "algorithm"):
             # Algorithm might be stored differently
             pass
-        if hasattr(learner, 'embedding_dim'):
+        if hasattr(learner, "embedding_dim"):
             assert learner.embedding_dim == TEST_EMBEDDING_DIM
-        
+
         # Cleanup
-        if hasattr(learner, 'shutdown'):
+        if hasattr(learner, "shutdown"):
             learner.shutdown()
-    
+
     def test_maml_adaptation(self, fast_learning_config):
         """Test MAML few-shot adaptation"""
         # Create base learner (which is a nn.Module)
@@ -399,34 +417,36 @@ class TestMetaLearning:
             config=fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             use_hierarchical=False,
-            use_progressive=False
+            use_progressive=False,
         )
-        
+
         # Create meta-learner with base learner
         meta_learner = MetaLearner(
             base_model=base_learner,
             config=fast_learning_config,
-            algorithm=MetaLearningAlgorithm.MAML
+            algorithm=MetaLearningAlgorithm.MAML,
         )
-        
+
         # Create few-shot task - adapt() expects Dict[str, torch.Tensor]
         # Create synthetic input (x) and target (y) tensors
         batch_size = 5
         support_set = {
-            'x': torch.randn(batch_size, TEST_EMBEDDING_DIM),
-            'y': torch.randn(batch_size, TEST_EMBEDDING_DIM)
+            "x": torch.randn(batch_size, TEST_EMBEDDING_DIM),
+            "y": torch.randn(batch_size, TEST_EMBEDDING_DIM),
         }
-        
+
         # Adapt to task - method is 'adapt', not 'adapt_to_task'
-        adapted_model, stats = meta_learner.adapt(support_set, num_steps=3, task_id='test_task')
-        
+        adapted_model, stats = meta_learner.adapt(
+            support_set, num_steps=3, task_id="test_task"
+        )
+
         assert adapted_model is not None
         assert isinstance(stats, dict)
-        
+
         # Cleanup
         meta_learner.shutdown()
         base_learner.shutdown()
-    
+
     def test_meta_update(self, fast_learning_config):
         """Test meta-update across tasks"""
         # Create base learner (which is a nn.Module)
@@ -434,46 +454,48 @@ class TestMetaLearning:
             config=fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             use_hierarchical=False,
-            use_progressive=False
+            use_progressive=False,
         )
-        
+
         # Create meta-learner with base learner
         meta_learner = MetaLearner(
             base_model=base_learner,
             config=fast_learning_config,
-            algorithm=MetaLearningAlgorithm.MAML
+            algorithm=MetaLearningAlgorithm.MAML,
         )
-        
+
         # Create multiple tasks - meta_update expects list of dicts with 'support' and 'query' keys
         batch_size = 5
         tasks = []
         for i in range(3):
             task = {
-                'task_id': f'task_{i}',
-                'support': {
-                    'x': torch.randn(batch_size, TEST_EMBEDDING_DIM),
-                    'y': torch.randn(batch_size, TEST_EMBEDDING_DIM)
+                "task_id": f"task_{i}",
+                "support": {
+                    "x": torch.randn(batch_size, TEST_EMBEDDING_DIM),
+                    "y": torch.randn(batch_size, TEST_EMBEDDING_DIM),
                 },
-                'query': {
-                    'x': torch.randn(batch_size, TEST_EMBEDDING_DIM),
-                    'y': torch.randn(batch_size, TEST_EMBEDDING_DIM)
-                }
+                "query": {
+                    "x": torch.randn(batch_size, TEST_EMBEDDING_DIM),
+                    "y": torch.randn(batch_size, TEST_EMBEDDING_DIM),
+                },
             }
             tasks.append(task)
-        
+
         # Perform meta-update - note: meta_learner.base_model is base_learner
-        initial_params = {k: v.clone() for k, v in meta_learner.base_model.state_dict().items()}
+        initial_params = {
+            k: v.clone() for k, v in meta_learner.base_model.state_dict().items()
+        }
         meta_learner.meta_update(tasks)
-        
+
         # Parameters should have changed (meta_update operates on meta_learner.base_model)
         params_changed = False
         for k, v in meta_learner.base_model.state_dict().items():
             if not torch.allclose(v, initial_params[k], atol=1e-6):
                 params_changed = True
                 break
-        
+
         assert params_changed, "Meta-update should change model parameters"
-        
+
         # Cleanup
         meta_learner.shutdown()
         base_learner.shutdown()
@@ -481,30 +503,30 @@ class TestMetaLearning:
 
 class TestRLHF:
     """Test RLHF component"""
-    
+
     def test_initialization(self, fast_learning_config):
         """Test RLHF manager initialization"""
         base_model = SimpleTestModel()
         rlhf = RLHFManager(base_model, fast_learning_config)
-        
+
         assert rlhf.base_model is not None
         assert rlhf.reward_model is not None
-        
+
         # Cleanup
         rlhf.shutdown()
-    
+
     def test_feedback_reception(self, fast_learning_config):
         """Test receiving human feedback"""
         base_model = SimpleTestModel()
         rlhf = RLHFManager(base_model, fast_learning_config)
-        
+
         # Simulate feedback - try different API signatures
         try:
             feedback = FeedbackData(
                 prompt="test prompt",
                 response="test response",
                 rating=0.8,
-                feedback_text="Good response"
+                feedback_text="Good response",
             )
         except TypeError:
             # Try alternative API with input/output instead of prompt/response
@@ -513,47 +535,48 @@ class TestRLHF:
                     input="test prompt",
                     output="test response",
                     rating=0.8,
-                    feedback_text="Good response"
+                    feedback_text="Good response",
                 )
             except TypeError:
                 # Try minimal API
                 try:
-                    feedback = FeedbackData(
-                        rating=0.8,
-                        feedback_text="Good response"
-                    )
+                    feedback = FeedbackData(rating=0.8, feedback_text="Good response")
                 except TypeError:
                     # Create a simple mock feedback with all possible attributes
-                    feedback = type('FeedbackData', (), {
-                        'rating': 0.8, 
-                        'feedback_text': 'Good response',
-                        'input': 'test prompt',
-                        'output': 'test response',
-                        'reward_signal': 0.8,
-                        'prompt': 'test prompt',
-                        'response': 'test response',
-                        'feedback_type': 'rating'  # Add feedback_type
-                    })()
-        
+                    feedback = type(
+                        "FeedbackData",
+                        (),
+                        {
+                            "rating": 0.8,
+                            "feedback_text": "Good response",
+                            "input": "test prompt",
+                            "output": "test response",
+                            "reward_signal": 0.8,
+                            "prompt": "test prompt",
+                            "response": "test response",
+                            "feedback_type": "rating",  # Add feedback_type
+                        },
+                    )()
+
         # Ensure feedback has required attributes
-        if not hasattr(feedback, 'reward_signal'):
-            feedback.reward_signal = getattr(feedback, 'rating', 0.8)
-        if not hasattr(feedback, 'feedback_type'):
-            feedback.feedback_type = 'rating'
-        
+        if not hasattr(feedback, "reward_signal"):
+            feedback.reward_signal = getattr(feedback, "rating", 0.8)
+        if not hasattr(feedback, "feedback_type"):
+            feedback.feedback_type = "rating"
+
         rlhf.receive_feedback(feedback)
-        
+
         # Feedback should be stored
         assert len(rlhf.feedback_buffer) > 0
-        
+
         # Cleanup
         rlhf.shutdown()
-    
+
     def test_ppo_update(self, fast_learning_config):
         """Test PPO policy update"""
         base_model = SimpleTestModel()
         rlhf = RLHFManager(base_model, fast_learning_config)
-        
+
         # Add some feedback
         for i in range(10):
             # Try different API signatures for FeedbackData
@@ -562,7 +585,7 @@ class TestRLHF:
                     prompt=f"prompt {i}",
                     response=f"response {i}",
                     rating=np.random.random(),
-                    feedback_text="test"
+                    feedback_text="test",
                 )
             except TypeError:
                 try:
@@ -570,36 +593,39 @@ class TestRLHF:
                         input=f"prompt {i}",
                         output=f"response {i}",
                         rating=np.random.random(),
-                        feedback_text="test"
+                        feedback_text="test",
                     )
                 except TypeError:
                     try:
                         feedback = FeedbackData(
-                            rating=np.random.random(),
-                            feedback_text="test"
+                            rating=np.random.random(), feedback_text="test"
                         )
                     except TypeError:
                         # Create a simple mock feedback with all possible attributes
                         rating = np.random.random()
-                        feedback = type('FeedbackData', (), {
-                            'rating': rating,
-                            'feedback_text': 'test',
-                            'input': f'prompt {i}',
-                            'output': f'response {i}',
-                            'reward_signal': rating,
-                            'prompt': f'prompt {i}',
-                            'response': f'response {i}',
-                            'feedback_type': 'rating'  # Add feedback_type
-                        })()
-            
+                        feedback = type(
+                            "FeedbackData",
+                            (),
+                            {
+                                "rating": rating,
+                                "feedback_text": "test",
+                                "input": f"prompt {i}",
+                                "output": f"response {i}",
+                                "reward_signal": rating,
+                                "prompt": f"prompt {i}",
+                                "response": f"response {i}",
+                                "feedback_type": "rating",  # Add feedback_type
+                            },
+                        )()
+
             # Ensure feedback has required attributes
-            if not hasattr(feedback, 'reward_signal'):
-                feedback.reward_signal = getattr(feedback, 'rating', 0.5)
-            if not hasattr(feedback, 'feedback_type'):
-                feedback.feedback_type = 'rating'
-            
+            if not hasattr(feedback, "reward_signal"):
+                feedback.reward_signal = getattr(feedback, "rating", 0.5)
+            if not hasattr(feedback, "feedback_type"):
+                feedback.feedback_type = "rating"
+
             rlhf.receive_feedback(feedback)
-        
+
         # Perform PPO update
         try:
             loss = rlhf.ppo_update()
@@ -607,14 +633,14 @@ class TestRLHF:
         except Exception as e:
             # PPO update might fail if not enough data, that's ok for this test
             pass
-        
+
         # Cleanup
         rlhf.shutdown()
 
 
 class TestMetacognition:
     """Test metacognitive monitoring"""
-    
+
     def test_initialization(self, learning_config):
         """Test metacognitive monitor initialization"""
         # Try different API signatures
@@ -626,17 +652,17 @@ class TestMetacognition:
             except TypeError:
                 # Try without any arguments
                 monitor = MetaCognitiveMonitor()
-        
+
         # Check for attributes that might exist
-        if hasattr(monitor, 'confidence_history'):
+        if hasattr(monitor, "confidence_history"):
             assert monitor.confidence_history is not None
-        if hasattr(monitor, 'performance_history'):
+        if hasattr(monitor, "performance_history"):
             assert monitor.performance_history is not None
-        
+
         # Cleanup - handle missing shutdown method
-        if hasattr(monitor, 'shutdown'):
+        if hasattr(monitor, "shutdown"):
             monitor.shutdown()
-    
+
     def test_confidence_assessment(self, learning_config):
         """Test confidence assessment"""
         # Try different API signatures
@@ -647,83 +673,77 @@ class TestMetacognition:
                 monitor = MetaCognitiveMonitor(learning_config)
             except TypeError:
                 monitor = MetaCognitiveMonitor()
-        
+
         # Simulate a prediction
         embedding = torch.randn(TEST_EMBEDDING_DIM)
-        
+
         # Try different method names for confidence assessment
         confidence = None
-        if hasattr(monitor, 'assess_confidence'):
+        if hasattr(monitor, "assess_confidence"):
             confidence = monitor.assess_confidence(embedding)
-        elif hasattr(monitor, 'get_confidence'):
+        elif hasattr(monitor, "get_confidence"):
             confidence = monitor.get_confidence(embedding)
-        elif hasattr(monitor, 'estimate_confidence'):
+        elif hasattr(monitor, "estimate_confidence"):
             confidence = monitor.estimate_confidence(embedding)
-        elif hasattr(monitor, 'compute_confidence'):
+        elif hasattr(monitor, "compute_confidence"):
             confidence = monitor.compute_confidence(embedding)
         else:
             # If no confidence method exists, use a default
             confidence = 0.5
-        
+
         assert 0.0 <= confidence <= 1.0
-        
+
         # Cleanup - handle missing shutdown method
-        if hasattr(monitor, 'shutdown'):
+        if hasattr(monitor, "shutdown"):
             monitor.shutdown()
 
 
 class TestWorldModel:
     """Test world model component"""
-    
+
     def test_initialization(self, fast_learning_config):
         """Test world model initialization"""
         # Try different API signatures
         try:
             model = UnifiedWorldModel(
-                config=fast_learning_config,
-                embedding_dim=TEST_EMBEDDING_DIM
+                config=fast_learning_config, embedding_dim=TEST_EMBEDDING_DIM
             )
         except TypeError:
             try:
-                model = UnifiedWorldModel(
-                    embedding_dim=TEST_EMBEDDING_DIM
-                )
+                model = UnifiedWorldModel(embedding_dim=TEST_EMBEDDING_DIM)
             except TypeError:
                 try:
                     model = UnifiedWorldModel(fast_learning_config)
                 except TypeError:
                     model = UnifiedWorldModel()
-        
+
         # Check for embedding_dim if available
-        if hasattr(model, 'embedding_dim'):
+        if hasattr(model, "embedding_dim"):
             assert model.embedding_dim == TEST_EMBEDDING_DIM
-        
+
         # Cleanup
         model.shutdown()
-    
+
     def test_prediction(self, fast_learning_config):
         """Test state prediction"""
         # Try different API signatures
         try:
             model = UnifiedWorldModel(
-                config=fast_learning_config,
-                embedding_dim=TEST_EMBEDDING_DIM
+                config=fast_learning_config, embedding_dim=TEST_EMBEDDING_DIM
             )
         except TypeError:
             try:
-                model = UnifiedWorldModel(
-                    embedding_dim=TEST_EMBEDDING_DIM
-                )
+                model = UnifiedWorldModel(embedding_dim=TEST_EMBEDDING_DIM)
             except TypeError:
                 try:
                     model = UnifiedWorldModel(fast_learning_config)
                 except TypeError:
                     model = UnifiedWorldModel()
-        
+
         # Make prediction
         state = torch.randn(TEST_EMBEDDING_DIM)
         action = torch.randn(TEST_EMBEDDING_DIM)
-        
+
         try:
             next_state, reward = model.predict(state, action)
             assert next_state.shape == (TEST_EMBEDDING_DIM,)
@@ -731,64 +751,62 @@ class TestWorldModel:
         except Exception as e:
             # Model might not be trained yet, that's ok
             pass
-        
+
         # Cleanup
         model.shutdown()
 
 
 class TestParameterHistory:
     """Test parameter history management"""
-    
+
     def test_checkpoint_saving(self, temp_dir, fast_learning_config):
         """Test saving checkpoints"""
         model = SimpleTestModel()
-        manager = ParameterHistoryManager(
-            config=fast_learning_config
-        )
-        
+        manager = ParameterHistoryManager(config=fast_learning_config)
+
         # Save checkpoint
-        checkpoint_path = manager.save_checkpoint(model, Path(temp_dir) / "checkpoint.pt")
-        
+        checkpoint_path = manager.save_checkpoint(
+            model, Path(temp_dir) / "checkpoint.pt"
+        )
+
         # Handle both string and Path return types
         if isinstance(checkpoint_path, str):
             assert Path(checkpoint_path).exists()
         else:
             assert checkpoint_path.exists()
-        
+
         # Cleanup
         manager.shutdown()
-    
+
     def test_trajectory_recording(self, temp_dir, fast_learning_config):
         """Test recording parameter trajectory"""
         model = SimpleTestModel()
-        manager = ParameterHistoryManager(
-            config=fast_learning_config
-        )
-        
+        manager = ParameterHistoryManager(config=fast_learning_config)
+
         # Record multiple states - try different method names
         for i in range(5):
-            if hasattr(manager, 'record_state'):
+            if hasattr(manager, "record_state"):
                 manager.record_state(model, f"step_{i}")
-            elif hasattr(manager, 'record'):
+            elif hasattr(manager, "record"):
                 manager.record(model, f"step_{i}")
-            elif hasattr(manager, 'record_checkpoint'):
+            elif hasattr(manager, "record_checkpoint"):
                 manager.record_checkpoint(model, f"step_{i}")
-            elif hasattr(manager, 'save_checkpoint'):
+            elif hasattr(manager, "save_checkpoint"):
                 # Use save_checkpoint as fallback
                 manager.save_checkpoint(model, Path(temp_dir) / f"checkpoint_{i}.pt")
             else:
                 # Skip if no suitable method exists
                 pytest.skip("No record_state or equivalent method found")
-        
+
         # Should have recorded states - check various possible attribute names
         has_trajectory = (
-            (hasattr(manager, 'trajectory') and len(manager.trajectory) > 0) or
-            (hasattr(manager, 'history') and len(manager.history) > 0) or
-            (hasattr(manager, 'checkpoints') and len(manager.checkpoints) > 0) or
-            (hasattr(manager, '_trajectory') and len(manager._trajectory) > 0)
+            (hasattr(manager, "trajectory") and len(manager.trajectory) > 0)
+            or (hasattr(manager, "history") and len(manager.history) > 0)
+            or (hasattr(manager, "checkpoints") and len(manager.checkpoints) > 0)
+            or (hasattr(manager, "_trajectory") and len(manager._trajectory) > 0)
         )
         assert has_trajectory or True  # Pass if we got this far without error
-        
+
         # Cleanup
         manager.shutdown()
 
@@ -797,9 +815,10 @@ class TestParameterHistory:
 # INTEGRATION TESTS (using Unittest as they need setUp/tearDown)
 # ============================================================
 
+
 class TestUnifiedSystem(unittest.TestCase):
     """Integration tests for the unified learning system"""
-    
+
     def setUp(self):
         """Set up test fixtures"""
         self.fast_learning_config = LearningConfig(
@@ -815,15 +834,15 @@ class TestUnifiedSystem(unittest.TestCase):
             audit_trail_enabled=False,
             reward_model_update_freq=1000,
             ppo_epochs=1,
-            meta_batch_size=2
+            meta_batch_size=2,
         )
         # Track system instance for cleanup
         self._system = None
-    
+
     def tearDown(self):
         """Clean up test fixtures - ensure system is shut down even on test failure"""
         # Shutdown any system created in the test to prevent thread leaks
-        if hasattr(self, '_system') and self._system is not None:
+        if hasattr(self, "_system") and self._system is not None:
             try:
                 self._system.shutdown()
             except Exception:
@@ -834,7 +853,7 @@ class TestUnifiedSystem(unittest.TestCase):
         time.sleep(0.1)
         # Force garbage collection to help clean up resources
         gc.collect()
-    
+
     def test_full_integration(self):
         """Test full system integration"""
         self._system = UnifiedLearningSystem(
@@ -842,209 +861,210 @@ class TestUnifiedSystem(unittest.TestCase):
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=True,
             enable_curriculum=True,
-            enable_metacognition=True
+            enable_metacognition=True,
         )
-        
+
         # Process multiple experiences
         for i in range(10):
             exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': np.random.random(),
-                'action': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'next_embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32)
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": np.random.random(),
+                "action": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "next_embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(
+                    np.float32
+                ),
             }
             result = self._system.process_experience(exp)
-            
+
             # Result should contain key fields
-            self.assertIn('adapted', result)
+            self.assertIn("adapted", result)
             # Should have either loss or error
-            self.assertTrue('loss' in result or 'error' in result)
-        
+            self.assertTrue("loss" in result or "error" in result)
+
         # Get stats
         stats = self._system.get_unified_stats()
-        self.assertIn('continual', stats)
+        self.assertIn("continual", stats)
         # curriculum and metacognition may be optional depending on implementation
         # self.assertIn('curriculum', stats)  # May not be present in all implementations
         # self.assertIn('metacognition', stats)  # May not be present in all implementations
-        
+
         # Check that at least the essential stats exist
-        self.assertIn('timestamp', stats)
-        
+        self.assertIn("timestamp", stats)
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
-    
+
     def test_component_coordination(self):
         """Test coordination between components"""
         self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_curriculum=True,
-            enable_metacognition=True
+            enable_metacognition=True,
         )
-        
+
         # Process experiences with varying difficulty
         for i in range(15):
             difficulty = i / 15.0
             exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': 1.0 - difficulty,  # Harder tasks get lower reward
-                'metadata': {'complexity': difficulty}
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": 1.0 - difficulty,  # Harder tasks get lower reward
+                "metadata": {"complexity": difficulty},
             }
             result = self._system.process_experience(exp)
-        
+
         # Check components are coordinating
         stats = self._system.get_unified_stats()
-        self.assertGreater(stats['continual']['total_experiences'], 0)
-        
+        self.assertGreater(stats["continual"]["total_experiences"], 0)
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
-    
+
     def test_error_handling(self):
         """Test system handles errors gracefully"""
         self._system = UnifiedLearningSystem(
-            config=self.fast_learning_config,
-            embedding_dim=TEST_EMBEDDING_DIM
+            config=self.fast_learning_config, embedding_dim=TEST_EMBEDDING_DIM
         )
-        
+
         # Send invalid experience
-        invalid_exp = {'invalid': 'data'}
+        invalid_exp = {"invalid": "data"}
         result = self._system.process_experience(invalid_exp)
-        
+
         # Should handle gracefully
-        self.assertIn('error', result)
-        
+        self.assertIn("error", result)
+
         # System should still work after error
         valid_exp = {
-            'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-            'reward': 0.5
+            "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+            "reward": 0.5,
         }
         result = self._system.process_experience(valid_exp)
-        self.assertTrue('adapted' in result or 'error' in result)
-        
+        self.assertTrue("adapted" in result or "error" in result)
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
-    
+
     def test_save_and_load(self):
         """Test saving and loading complete state"""
         self._system = UnifiedLearningSystem(
-            config=self.fast_learning_config,
-            embedding_dim=TEST_EMBEDDING_DIM
+            config=self.fast_learning_config, embedding_dim=TEST_EMBEDDING_DIM
         )
-        
+
         # Process some experiences to create state
         for i in range(5):
             exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': 0.5
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": 0.5,
             }
             self._system.process_experience(exp)
-        
+
         # Save state using save_complete_state method
         with tempfile.TemporaryDirectory() as tmpdir:
             save_path = Path(tmpdir) / "system_state"
-            
+
             # Use the actual save_complete_state method
             saved_dir = self._system.save_complete_state(str(save_path))
-            
+
             # Check that the saved directory exists
             self.assertTrue(Path(saved_dir).exists())
-            
+
             # Verify key files were created
             saved_path = Path(saved_dir)
             self.assertTrue((saved_path / "continual_state.pkl").exists())
             self.assertTrue((saved_path / "unified_stats.json").exists())
-        
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
-    
+
     def test_concurrent_experiences(self):
         """Test processing experiences from multiple threads"""
         self._system = UnifiedLearningSystem(
-            config=self.fast_learning_config,
-            embedding_dim=TEST_EMBEDDING_DIM
+            config=self.fast_learning_config, embedding_dim=TEST_EMBEDDING_DIM
         )
-        
+
         results = []
         errors = []
         system_ref = self._system  # Capture reference for threads
-        
+
         def process_batch(batch_id):
             try:
                 for i in range(5):
                     exp = {
-                        'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                        'reward': 0.5,
-                        'batch_id': batch_id
+                        "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(
+                            np.float32
+                        ),
+                        "reward": 0.5,
+                        "batch_id": batch_id,
                     }
                     result = system_ref.process_experience(exp)
                     results.append(result)
             except Exception as e:
                 errors.append(e)
-        
+
         # Create multiple threads
         threads = []
         for i in range(3):
             t = threading.Thread(target=process_batch, args=(i,))
             threads.append(t)
             t.start()
-        
+
         # Wait for completion
         for t in threads:
             t.join(timeout=10)
-        
+
         # Check results
         self.assertEqual(len(errors), 0, f"Thread errors: {errors}")
         self.assertEqual(len(results), 15)  # 3 threads * 5 experiences
-        
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
-    
+
     def test_memory_management(self):
         """Test memory doesn't grow unbounded"""
-        
+
         process = psutil.Process(os.getpid())
-        
+
         self.fast_learning_config.replay_buffer_size = 50
         self.fast_learning_config.max_checkpoints = 3
-        
+
         self._system = UnifiedLearningSystem(
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=False,  # Disable for speed
-            enable_metacognition=False  # Disable for speed
+            enable_metacognition=False,  # Disable for speed
         )
-        
+
         # Get initial memory
         gc.collect()
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-        
+
         # Process many experiences
         for i in range(100):
             exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': np.random.random()
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": np.random.random(),
             }
             self._system.process_experience(exp)
-            
+
             if i % 20 == 0:
                 gc.collect()
-        
+
         # Get final memory
         gc.collect()
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_growth = final_memory - initial_memory
-        
+
         # Memory growth should be reasonable (< 100MB for this test)
         self.assertLess(memory_growth, 100, f"Memory grew by {memory_growth:.1f}MB")
-        
+
         # Check buffers are bounded
         self.assertLessEqual(len(self._system.continual_learner.replay_buffer), 50)
-        
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
@@ -1054,7 +1074,8 @@ class TestUnifiedSystem(unittest.TestCase):
 # STRESS TESTS (using Unittest)
 # ============================================================
 
-class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
+
+class TestStress(unittest.TestCase):  # CHANGED to use unittest.TestCase
     """Stress tests for robustness"""
 
     def setUp(self):
@@ -1072,15 +1093,15 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
             audit_trail_enabled=False,
             reward_model_update_freq=1000,
             ppo_epochs=1,
-            meta_batch_size=2
+            meta_batch_size=2,
         )
         # Track system instance for cleanup
         self._system = None
-    
+
     def tearDown(self):
         """Clean up test fixtures - ensure system is shut down even on test failure"""
         # Shutdown any system created in the test to prevent thread leaks
-        if hasattr(self, '_system') and self._system is not None:
+        if hasattr(self, "_system") and self._system is not None:
             try:
                 self._system.shutdown()
             except Exception:
@@ -1098,28 +1119,29 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=False,  # Disable for speed
-            enable_metacognition=False  # Disable for speed
+            enable_metacognition=False,  # Disable for speed
         )
-        
+
         # Rapidly switch between different task patterns
         for i in range(50):
             task_id = i % 5  # 5 different tasks
             exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32) * (task_id + 1),
-                'reward': task_id / 5.0,
-                'task_hint': f'task_{task_id}'
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32)
+                * (task_id + 1),
+                "reward": task_id / 5.0,
+                "task_hint": f"task_{task_id}",
             }
             result = self._system.process_experience(exp)
             # Check for either adapted=True or error in result
-            self.assertTrue(result.get('adapted', False) or 'error' in result)
-        
+            self.assertTrue(result.get("adapted", False) or "error" in result)
+
         # System should have detected multiple tasks
         self.assertGreaterEqual(len(self._system.continual_learner.task_models), 1)
-        
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
-    
+
     def test_error_recovery(self):
         """Test system recovers from errors"""
         # Create a fresh system for this test
@@ -1127,42 +1149,44 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
             config=self.fast_learning_config,
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=False,  # Disable for speed
-            enable_metacognition=False  # Disable for speed
+            enable_metacognition=False,  # Disable for speed
         )
-        
+
         # Send invalid experiences
         invalid_exps = [
             {},  # Empty
-            {'embedding': None},  # None embedding
-            {'embedding': 'invalid'},  # Invalid type
-            {'embedding': np.array([])},  # Empty array
+            {"embedding": None},  # None embedding
+            {"embedding": "invalid"},  # Invalid type
+            {"embedding": np.array([])},  # Empty array
         ]
-        
+
         for exp in invalid_exps:
             result = self._system.process_experience(exp)
             # System should handle gracefully
-            self.assertTrue('error' in result or 'adapted' in result)
-        
+            self.assertTrue("error" in result or "adapted" in result)
+
         # Try multiple valid experiences to ensure recovery
         recovery_attempts = 0
         max_attempts = 5
         recovered = False
-        
+
         while recovery_attempts < max_attempts and not recovered:
             valid_exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': 0.5
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": 0.5,
             }
             result = self._system.process_experience(valid_exp)
             # Check if system recovered (either adapted successfully or at least no error)
-            if result.get('adapted', False) and 'loss' in result:
+            if result.get("adapted", False) and "loss" in result:
                 recovered = True
             recovery_attempts += 1
-        
+
         # System should eventually recover and process valid experiences
-        self.assertTrue(recovered or recovery_attempts == max_attempts,
-            f"System failed to recover after {recovery_attempts} attempts")
-        
+        self.assertTrue(
+            recovered or recovery_attempts == max_attempts,
+            f"System failed to recover after {recovery_attempts} attempts",
+        )
+
         # Cleanup (tearDown will also call shutdown as backup)
         self._system.shutdown()
         self._system = None
@@ -1172,10 +1196,11 @@ class TestStress(unittest.TestCase): # CHANGED to use unittest.TestCase
 # PERFORMANCE TESTS (Optional - marked slow)
 # ============================================================
 
+
 @pytest.mark.slow
 class TestPerformance:
     """Performance tests - run with pytest -m slow"""
-    
+
     def test_large_scale_processing(self, learning_config):
         """Test processing large number of experiences"""
         system = UnifiedLearningSystem(
@@ -1183,21 +1208,21 @@ class TestPerformance:
             embedding_dim=TEST_EMBEDDING_DIM,
             enable_world_model=True,
             enable_curriculum=True,
-            enable_metacognition=True
+            enable_metacognition=True,
         )
-        
+
         # Process many experiences
         for i in range(100):
             exp = {
-                'embedding': np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
-                'reward': np.random.random()
+                "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
+                "reward": np.random.random(),
             }
             result = system.process_experience(exp)
-            
+
             if i % 20 == 0:
                 stats = system.get_unified_stats()
-                assert stats['continual']['total_experiences'] > 0
-        
+                assert stats["continual"]["total_experiences"] > 0
+
         # Cleanup
         system.shutdown()
 
@@ -1209,38 +1234,38 @@ class TestPerformance:
 if __name__ == "__main__":
     # Run tests with pytest
     pytest.main([__file__, "-v", "--tb=short", "-m", "not slow"])
-    
+
     # Or run basic smoke test
     print("Running basic smoke test...")
-    
+
     config = LearningConfig(
-        rlhf_enabled=False,
-        checkpoint_frequency=0,
-        consolidation_threshold=100
+        rlhf_enabled=False, checkpoint_frequency=0, consolidation_threshold=100
     )
     system = UnifiedLearningSystem(
         config=config,
         embedding_dim=64,
         enable_world_model=False,
         enable_curriculum=True,
-        enable_metacognition=False
+        enable_metacognition=False,
     )
-    
+
     # Process some experiences
     for i in range(10):
         exp = {
-            'embedding': np.random.randn(64).astype(np.float32),
-            'reward': np.random.random()
+            "embedding": np.random.randn(64).astype(np.float32),
+            "reward": np.random.random(),
         }
         result = system.process_experience(exp)
-        print(f"Experience {i}: adapted={result.get('adapted', False)}, "
-              f"loss={result.get('loss', 'N/A')}")
-    
+        print(
+            f"Experience {i}: adapted={result.get('adapted', False)}, "
+            f"loss={result.get('loss', 'N/A')}"
+        )
+
     # Get stats
     stats = system.get_unified_stats()
     print(f"\nSystem stats:")
     print(f"  Total experiences: {stats['continual']['total_experiences']}")
     print(f"  Active components: {stats['integration']['components_active']}")
-    
+
     # Cleanup
     system.shutdown()

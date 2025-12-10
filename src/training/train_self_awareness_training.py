@@ -71,7 +71,7 @@ from src.training.self_awareness import (
     summarize_entropies,
     calculate_ece,
     calculate_mce,
-    calculate_adaptive_ece
+    calculate_adaptive_ece,
 )
 from src.training.awareness_thresholds import AwarenessThresholds
 from src.training.drift_detection import detect_drift
@@ -160,7 +160,9 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
     drift_window = int(config.get("drift_window", 10))
     report_out = config.get("report_out", "logs/final_self_awareness_report.txt")
     save_final_model = config.get("save_final_model", "logs/final_gpt_model.pt")
-    max_prob_vectors_for_extended = int(config.get("max_prob_vectors_for_extended", 500))
+    max_prob_vectors_for_extended = int(
+        config.get("max_prob_vectors_for_extended", 500)
+    )
 
     random.seed(seed)
     torch.manual_seed(seed)
@@ -182,7 +184,7 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
         min_freq=min_freq,
         seq_len=seq_len,
         val_ratio=0.01,
-        seed=seed
+        seed=seed,
     )
 
     print(f"[INIT] Vocab size: {loader.vocab_size}")
@@ -196,12 +198,16 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
         ff_mult=ff_mult,
         dropout=dropout,
         tied_embeddings=True,
-        device=device
+        device=device,
     )
     model = GPTModel(model_config)
-    optimizer = optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.95), weight_decay=0.01)
+    optimizer = optim.AdamW(
+        model.parameters(), lr=lr, betas=(0.9, 0.95), weight_decay=0.01
+    )
     # Scheduler only after warmup to avoid overriding manual linear warmup.
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(1, steps - warmup_steps), eta_min=lr / 50)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=max(1, steps - warmup_steps), eta_min=lr / 50
+    )
 
     thresholds = AwarenessThresholds()
     drift_buffer: List[Dict[str, Any]] = []
@@ -292,9 +298,18 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
                 avg_conf = sum(val_confidences) / max(1, len(val_confidences))
                 entropy_summary = summarize_entropies(entropy_inputs)
 
-                ece = calculate_ece(val_predictions, val_confidences, val_targets, n_bins=fixed_ece_bins)
-                mce = calculate_mce(val_predictions, val_confidences, val_targets, n_bins=fixed_ece_bins)
-                adaptive_ece = calculate_adaptive_ece(val_predictions, val_confidences, val_targets, n_bins=adaptive_ece_bins)
+                ece = calculate_ece(
+                    val_predictions, val_confidences, val_targets, n_bins=fixed_ece_bins
+                )
+                mce = calculate_mce(
+                    val_predictions, val_confidences, val_targets, n_bins=fixed_ece_bins
+                )
+                adaptive_ece = calculate_adaptive_ece(
+                    val_predictions,
+                    val_confidences,
+                    val_targets,
+                    n_bins=adaptive_ece_bins,
+                )
 
                 awareness = {
                     "avg_entropy_bits": entropy_summary["mean"],
@@ -317,7 +332,7 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
                     top_k=top_k,
                     top_p=top_p,
                     repetition_penalty=rep_penalty,
-                    eos_id=loader.eos_id
+                    eos_id=loader.eos_id,
                 )
                 awareness["distinct_1"] = calculate_distinct_n([gen_ids], 1)
                 awareness["distinct_2"] = calculate_distinct_n([gen_ids], 2)
@@ -326,7 +341,7 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
                 if extended_awareness:
                     # Align probability vectors and labels to max_prob_vectors_for_extended
                     pv_slice = entropy_inputs[:max_prob_vectors_for_extended]
-                    lbl_slice = val_targets[:len(pv_slice)]
+                    lbl_slice = val_targets[: len(pv_slice)]
                     awareness = build_extended_awareness(
                         base_awareness=awareness,
                         sequences=[gen_ids],
@@ -334,7 +349,7 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
                         multi_class_labels=lbl_slice,
                         distinct_ns=(1, 2, 3),
                         include_macro_distinct=True,
-                        multi_class_bins=multi_class_bins
+                        multi_class_bins=multi_class_bins,
                     )
 
                 summary = awareness_summary(awareness)
@@ -353,14 +368,16 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
                     "flags": flags,
                     "drift": drift_status,
                     "grad_norm": last_grad_norm,
-                    "time_elapsed_s": time.time() - start_time
+                    "time_elapsed_s": time.time() - start_time,
                 }
                 metrics_file.write(json.dumps(payload) + "\n")
                 metrics_file.flush()
 
-                print(f"[VAL step={step}] loss={loss.item():.4f} acc={accuracy:.3f} ppl={perplexity:.2f} "
-                      f"ece={ece:.4f} entropy={entropy_summary['mean']:.3f} distinct3={awareness.get('distinct_3', 0.0):.3f} "
-                      f"grad_norm={last_grad_norm:.3f}")
+                print(
+                    f"[VAL step={step}] loss={loss.item():.4f} acc={accuracy:.3f} ppl={perplexity:.2f} "
+                    f"ece={ece:.4f} entropy={entropy_summary['mean']:.3f} distinct3={awareness.get('distinct_3', 0.0):.3f} "
+                    f"grad_norm={last_grad_norm:.3f}"
+                )
 
                 if perplexity < best_perplexity:
                     best_perplexity = perplexity
@@ -372,7 +389,12 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
                 last_drift_status = drift_status
 
         # Simple LR adaptation post-warmup
-        if warmup_steps > 0 and step > warmup_steps and step % val_interval == 0 and last_awareness is not None:
+        if (
+            warmup_steps > 0
+            and step > warmup_steps
+            and step % val_interval == 0
+            and last_awareness is not None
+        ):
             if last_awareness.get("ece", 0.0) > 0.2:
                 for pg in optimizer.param_groups:
                     old_lr = pg["lr"]
@@ -397,7 +419,11 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         print(f"[READ-ERROR] Failed reading metrics log for report: {e}")
         records = []
-    report_text = generate_report(records) if records else "No records available for report generation."
+    report_text = (
+        generate_report(records)
+        if records
+        else "No records available for report generation."
+    )
     try:
         with open(report_out, "w", encoding="utf-8") as rf:
             rf.write(report_text)
@@ -414,7 +440,7 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
         "model_path": model_path,
         "steps_completed": steps,
         "grad_norm": last_grad_norm,
-        "best_perplexity": best_perplexity
+        "best_perplexity": best_perplexity,
     }
 
 
@@ -433,14 +459,18 @@ def _cli_main():
     parser.add_argument("--max_vocab_size", type=int, default=30000)
     parser.add_argument("--min_freq", type=int, default=2)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument(
+        "--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu"
+    )
     parser.add_argument("--n_layers", type=int, default=6)
     parser.add_argument("--n_heads", type=int, default=8)
     parser.add_argument("--dim", type=int, default=512)
     parser.add_argument("--ff_mult", type=int, default=4)
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--clip_grad", type=float, default=1.0)
-    parser.add_argument("--log_path", type=str, default="logs/self_awareness_transformer.jsonl")
+    parser.add_argument(
+        "--log_path", type=str, default="logs/self_awareness_transformer.jsonl"
+    )
     parser.add_argument("--diversity_sample_length", type=int, default=256)
     parser.add_argument("--temperature", type=float, default=0.9)
     parser.add_argument("--top_k", type=int, default=64)
@@ -451,23 +481,32 @@ def _cli_main():
     parser.add_argument("--extended_awareness", action="store_true")
     parser.add_argument("--multi_class_bins", type=int, default=10)
     parser.add_argument("--drift_window", type=int, default=10)
-    parser.add_argument("--report_out", type=str, default="logs/final_self_awareness_report.txt")
-    parser.add_argument("--save_final_model", type=str, default="logs/final_gpt_model.pt")
+    parser.add_argument(
+        "--report_out", type=str, default="logs/final_self_awareness_report.txt"
+    )
+    parser.add_argument(
+        "--save_final_model", type=str, default="logs/final_gpt_model.pt"
+    )
     parser.add_argument("--max_prob_vectors_for_extended", type=int, default=500)
     args = parser.parse_args()
 
     result = train_self_awareness_transformer(vars(args))
     print("[FINAL RESULT]")
-    print(json.dumps({
-        "final_awareness": result["final_awareness"],
-        "final_summary": result["final_summary"],
-        "final_drift_status": result["final_drift_status"],
-        "metrics_log_path": result["metrics_log_path"],
-        "model_path": result["model_path"],
-        "steps_completed": result["steps_completed"],
-        "best_perplexity": result["best_perplexity"],
-        "grad_norm": result["grad_norm"]
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "final_awareness": result["final_awareness"],
+                "final_summary": result["final_summary"],
+                "final_drift_status": result["final_drift_status"],
+                "metrics_log_path": result["metrics_log_path"],
+                "model_path": result["model_path"],
+                "steps_completed": result["steps_completed"],
+                "best_perplexity": result["best_perplexity"],
+                "grad_norm": result["grad_norm"],
+            },
+            indent=2,
+        )
+    )
 
 
 # NOTE: No automatic execution guard; platform decides whether to call _cli_main().

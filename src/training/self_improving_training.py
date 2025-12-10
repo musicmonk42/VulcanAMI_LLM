@@ -77,13 +77,17 @@ DEFAULT_EXPLORATION_FACTOR = 0.2
 MIN_CONFIDENCE_FOR_ACTION = 0.3
 
 # Decay configuration
-MEMORY_DECAY_FACTOR = 0.98  # per update decay for historical priors (optional, can be disabled)
+MEMORY_DECAY_FACTOR = (
+    0.98  # per update decay for historical priors (optional, can be disabled)
+)
 
 
 # ============================= ENUMS ============================= #
 
+
 class IssueType(Enum):
     """Types of training issues that can be detected."""
+
     LOSS_PLATEAU = "loss_plateau"
     SAFETY_DRIFT = "safety_drift"
     CAUSAL_INSTABILITY = "causal_instability"
@@ -96,6 +100,7 @@ class IssueType(Enum):
 
 class SubProblemCategory(Enum):
     """Categories for decomposed subproblems."""
+
     DATA_QUALITY = "data_quality"
     ARCHITECTURE_LIMIT = "architecture_limit"
     OPTIMIZATION = "optimization"
@@ -107,6 +112,7 @@ class SubProblemCategory(Enum):
 
 class ExperimentType(Enum):
     """Types of experiments that can be run."""
+
     HYPERPARAMETER_SWEEP = "hyperparam_sweep"
     LEARNING_RATE_ADJUSTMENT = "lr_adjustment"
     OPTIMIZER_CHANGE = "optimizer_change"
@@ -129,9 +135,11 @@ class ExperimentType(Enum):
 
 # ============================= DATA CLASSES ============================= #
 
+
 @dataclass
 class TelemetrySnapshot:
     """Comprehensive telemetry data point."""
+
     step: int
     loss: float
     eval_score: Optional[float] = None
@@ -147,6 +155,7 @@ class TelemetrySnapshot:
 @dataclass
 class IssueReport:
     """Detected training issue with diagnostics."""
+
     issue_type: str
     severity: float  # 0.0 to 1.0
     confidence: float  # 0.0 to 1.0
@@ -155,12 +164,15 @@ class IssueReport:
     potential_causes: List[str] = field(default_factory=list)
     recommended_actions: List[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
-    id: str = field(default_factory=lambda: hashlib.md5(str(time.time()).encode()).hexdigest()[:8])
+    id: str = field(
+        default_factory=lambda: hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8]
+    )
 
 
 @dataclass
 class SubProblem:
     """Decomposed subproblem from an issue."""
+
     id: str
     parent_issue_id: str
     parent_issue_type: str
@@ -177,6 +189,7 @@ class SubProblem:
 @dataclass
 class ExperimentSpec:
     """Specification for a training experiment."""
+
     id: str
     subproblem_id: str
     experiment_type: str
@@ -194,6 +207,7 @@ class ExperimentSpec:
 @dataclass
 class ExperimentOutcome:
     """Result of running an experiment."""
+
     experiment_id: str
     success: bool
     metrics: Dict[str, float]
@@ -208,6 +222,7 @@ class ExperimentOutcome:
 @dataclass
 class Proposal:
     """Governance proposal for system change."""
+
     proposal_type: str
     payload: Dict[str, Any]
     experiment_id: Optional[str] = None
@@ -220,6 +235,7 @@ class Proposal:
 
 
 # ============================= MAIN ORCHESTRATOR ============================= #
+
 
 class SelfImprovingTraining:
     """

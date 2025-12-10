@@ -116,48 +116,69 @@ __all__ = [
     # ========================================================================
     # MAIN INTERFACES
     # ========================================================================
-    'SymbolicReasoner',
-    'ProbabilisticReasoner',
-    'HybridReasoner',
-
+    "SymbolicReasoner",
+    "ProbabilisticReasoner",
+    "HybridReasoner",
     # ========================================================================
     # CORE COMPONENTS
     # ========================================================================
-    'Term', 'Variable', 'Constant', 'Function',
-    'Literal', 'Clause', 'Unifier', 'ProofNode',
-
+    "Term",
+    "Variable",
+    "Constant",
+    "Function",
+    "Literal",
+    "Clause",
+    "Unifier",
+    "ProofNode",
     # ========================================================================
     # PARSING & AST
     # ========================================================================
-    'TokenType', 'Token', 'Lexer', 'Parser', 'ASTConverter',
-    'NodeType', 'ASTNode', 'FormulaUtils', 'VariableRenamer',
-    'PrenexConverter', 'SkolemFunction', 'Skolemizer', 
-    'CNFConverter', 'ClauseExtractor',
-    'FormulaParser', 'FormulaBuilder',
-
+    "TokenType",
+    "Token",
+    "Lexer",
+    "Parser",
+    "ASTConverter",
+    "NodeType",
+    "ASTNode",
+    "FormulaUtils",
+    "VariableRenamer",
+    "PrenexConverter",
+    "SkolemFunction",
+    "Skolemizer",
+    "CNFConverter",
+    "ClauseExtractor",
+    "FormulaParser",
+    "FormulaBuilder",
     # ========================================================================
     # THEOREM PROVERS
     # ========================================================================
-    'BaseProver', 'TableauProver', 'ResolutionProver', 'ModelEliminationProver',
-    'ConnectionMethodProver', 'NaturalDeductionProver', 'ParallelProver',
-
+    "BaseProver",
+    "TableauProver",
+    "ResolutionProver",
+    "ModelEliminationProver",
+    "ConnectionMethodProver",
+    "NaturalDeductionProver",
+    "ParallelProver",
     # ========================================================================
     # SOLVERS
     # ========================================================================
-    'CSPSolver', 'BayesianNetworkReasoner', 'VariableType',
-
+    "CSPSolver",
+    "BayesianNetworkReasoner",
+    "VariableType",
     # ========================================================================
     # ADVANCED REASONING
     # ========================================================================
-    'FuzzyLogicReasoner', 'TemporalReasoner', 'MetaReasoner', 'ProofLearner',
-    
+    "FuzzyLogicReasoner",
+    "TemporalReasoner",
+    "MetaReasoner",
+    "ProofLearner",
     # ========================================================================
     # METADATA & CONVENIENCE
     # ========================================================================
-    '__version__',
-    'create_reasoner',
-    'quick_prove',
-    'check_consistency',
+    "__version__",
+    "create_reasoner",
+    "quick_prove",
+    "check_consistency",
 ]
 
 
@@ -165,65 +186,67 @@ __all__ = [
 # CONVENIENCE FUNCTIONS
 # ============================================================================
 
-def create_reasoner(prover_type: str = 'parallel') -> SymbolicReasoner:
+
+def create_reasoner(prover_type: str = "parallel") -> SymbolicReasoner:
     """
     Create a symbolic reasoner with default settings.
-    
+
     Convenience function for quick setup.
-    
+
     Args:
         prover_type: Proving method to use ('parallel', 'resolution', etc.)
-        
+
     Returns:
         Configured SymbolicReasoner instance
     """
     return SymbolicReasoner(prover_type=prover_type)
 
 
-def quick_prove(goal: str, facts: List[str], 
-               method: str = 'parallel', timeout: float = 5.0) -> bool:
+def quick_prove(
+    goal: str, facts: List[str], method: str = "parallel", timeout: float = 5.0
+) -> bool:
     """
     Quick theorem proving without creating a persistent reasoner.
-    
+
     Convenience function for one-off proofs.
-    
+
     Args:
         goal: Goal formula to prove
         facts: List of fact and rule formulas
         method: Proving method
         timeout: Timeout in seconds
-        
+
     Returns:
         True if proven, False otherwise
     """
     reasoner = SymbolicReasoner(prover_type=method)
     for fact in facts:
         reasoner.add_rule(fact)
-    
+
     result = reasoner.query(goal, timeout=timeout)
-    return result.get('proven', False)
+    return result.get("proven", False)
 
 
 def check_consistency(formulas: List[str], timeout: float = 5.0) -> bool:
     """
     Check if a set of formulas is consistent (satisfiable).
-    
+
     Args:
         formulas: List of formula strings
         timeout: Timeout in seconds
-        
+
     Returns:
         True if consistent, False if contradictory
     """
     # To check consistency, we try to prove a contradiction (False).
     # A common way to represent False is an empty goal.
-    reasoner = SymbolicReasoner(prover_type='resolution')  # Resolution is good for this
-    
+    reasoner = SymbolicReasoner(prover_type="resolution")  # Resolution is good for this
+
     for formula in formulas:
         reasoner.add_rule(formula)
-    
+
     # If we can prove an empty goal, it means the KB is inconsistent.
     result = reasoner.query("", timeout=timeout)
-    
+
     # The set is consistent if a contradiction is NOT proven.
-    return not result.get('proven', False)
+    return not result.get("proven", False)

@@ -46,8 +46,10 @@ try:
 except ImportError:
     prometheus_client = None
 
+
 class RotationType(str, Enum):
     """Valid rotation types for TimedRotatingFileHandler."""
+
     SIZE = "size"
     SECOND = "s"
     MINUTE = "m"
@@ -56,10 +58,13 @@ class RotationType(str, Enum):
     MIDNIGHT = "midnight"
     WEEKDAY = "w0-w6"
 
+
 class CompressionType(str, Enum):
     """Supported compression types for rotated files."""
+
     NONE = "none"
     GZIP = "gzip"
+
 
 @dataclass
 class AuditLoggerConfig:
@@ -67,49 +72,103 @@ class AuditLoggerConfig:
     Configuration for the Tamper-Evident Audit Logger.
     Supports advanced options for encryption, batching, and custom validation.
     """
-    log_path: Path = field(default_factory=lambda: Path(os.environ.get("AUDIT_LOG_PATH", "./logs/audit_log.jsonl")))
-    rotation_type: str = field(default_factory=lambda: os.environ.get("AUDIT_LOG_ROTATION", RotationType.MIDNIGHT))
-    rotation_interval: int = field(default_factory=lambda: int(os.environ.get("AUDIT_LOG_INTERVAL", 1)))
-    max_file_size: int = field(default_factory=lambda: int(os.environ.get("AUDIT_LOG_MAX_SIZE", 10 * 1024 * 1024)))
-    retention_count: int = field(default_factory=lambda: int(os.environ.get("AUDIT_LOG_RETENTION", 30)))
-    compression_type: str = field(default_factory=lambda: os.environ.get("AUDIT_LOG_COMPRESSION", CompressionType.GZIP))
+
+    log_path: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("AUDIT_LOG_PATH", "./logs/audit_log.jsonl")
+        )
+    )
+    rotation_type: str = field(
+        default_factory=lambda: os.environ.get(
+            "AUDIT_LOG_ROTATION", RotationType.MIDNIGHT
+        )
+    )
+    rotation_interval: int = field(
+        default_factory=lambda: int(os.environ.get("AUDIT_LOG_INTERVAL", 1))
+    )
+    max_file_size: int = field(
+        default_factory=lambda: int(
+            os.environ.get("AUDIT_LOG_MAX_SIZE", 10 * 1024 * 1024)
+        )
+    )
+    retention_count: int = field(
+        default_factory=lambda: int(os.environ.get("AUDIT_LOG_RETENTION", 30))
+    )
+    compression_type: str = field(
+        default_factory=lambda: os.environ.get(
+            "AUDIT_LOG_COMPRESSION", CompressionType.GZIP
+        )
+    )
     compress_type: str = field(init=False)
-    encrypt_logs: bool = field(default_factory=lambda: os.environ.get("AUDIT_LOG_ENCRYPT", "false").lower() == "true")
-    encryption_key: Optional[str] = field(default_factory=lambda: os.environ.get("AUDIT_LOG_ENCRYPTION_KEY", None))
-    batch_size: int = field(default_factory=lambda: int(os.environ.get("AUDIT_LOG_BATCH_SIZE", 100)))
-    batch_timeout: float = field(default_factory=lambda: float(os.environ.get("AUDIT_LOG_BATCH_TIMEOUT", 1.0)))
+    encrypt_logs: bool = field(
+        default_factory=lambda: os.environ.get("AUDIT_LOG_ENCRYPT", "false").lower()
+        == "true"
+    )
+    encryption_key: Optional[str] = field(
+        default_factory=lambda: os.environ.get("AUDIT_LOG_ENCRYPTION_KEY", None)
+    )
+    batch_size: int = field(
+        default_factory=lambda: int(os.environ.get("AUDIT_LOG_BATCH_SIZE", 100))
+    )
+    batch_timeout: float = field(
+        default_factory=lambda: float(os.environ.get("AUDIT_LOG_BATCH_TIMEOUT", 1.0))
+    )
     dlt_enabled: bool = field(default_factory=lambda: AuditLedgerClient is not None)
-    dlt_anchor_critical: bool = field(default_factory=lambda: os.environ.get("DLT_ANCHOR_CRITICAL", "true").lower() == "true")
-    dlt_retry_count: int = field(default_factory=lambda: int(os.environ.get("DLT_RETRY_COUNT", 3)))
-    dlt_batch_size: int = field(default_factory=lambda: int(os.environ.get("DLT_BATCH_SIZE", 10)))
+    dlt_anchor_critical: bool = field(
+        default_factory=lambda: os.environ.get("DLT_ANCHOR_CRITICAL", "true").lower()
+        == "true"
+    )
+    dlt_retry_count: int = field(
+        default_factory=lambda: int(os.environ.get("DLT_RETRY_COUNT", 3))
+    )
+    dlt_batch_size: int = field(
+        default_factory=lambda: int(os.environ.get("DLT_BATCH_SIZE", 10))
+    )
     syslog_enabled: bool = field(default_factory=lambda: syslog is not None)
-    syslog_facility: int = field(default_factory=lambda: int(os.environ.get("SYSLOG_FACILITY", syslog.LOG_LOCAL0 if syslog else 0)))
-    async_logging: bool = field(default_factory=lambda: os.environ.get("ASYNC_LOGGING", "true").lower() == "true")
+    syslog_facility: int = field(
+        default_factory=lambda: int(
+            os.environ.get("SYSLOG_FACILITY", syslog.LOG_LOCAL0 if syslog else 0)
+        )
+    )
+    async_logging: bool = field(
+        default_factory=lambda: os.environ.get("ASYNC_LOGGING", "true").lower()
+        == "true"
+    )
     metrics_enabled: bool = field(default_factory=lambda: prometheus_client is not None)
-    valid_event_types: List[str] = field(default_factory=lambda: [
-        e.strip() for e in os.environ.get("VALID_EVENT_TYPES", "").split(",") if e.strip()
-    ])
-    max_details_size: int = field(default_factory=lambda: int(os.environ.get("MAX_DETAILS_SIZE", 1024 * 1024)))
+    valid_event_types: List[str] = field(
+        default_factory=lambda: [
+            e.strip()
+            for e in os.environ.get("VALID_EVENT_TYPES", "").split(",")
+            if e.strip()
+        ]
+    )
+    max_details_size: int = field(
+        default_factory=lambda: int(os.environ.get("MAX_DETAILS_SIZE", 1024 * 1024))
+    )
     alert_callback: Optional[Callable[[str], None]] = None
-    
+
     def __post_init__(self):
         """Validate configuration parameters."""
         self.compress_type = self.compression_type
-        
+
         rotation_map = {
-            's': RotationType.SECOND,
-            'm': RotationType.MINUTE,
-            'h': RotationType.HOUR,
-            'd': RotationType.DAY,
+            "s": RotationType.SECOND,
+            "m": RotationType.MINUTE,
+            "h": RotationType.HOUR,
+            "d": RotationType.DAY,
         }
         if isinstance(self.rotation_type, str) and len(self.rotation_type) == 1:
             if self.rotation_type in rotation_map:
                 self.rotation_type = rotation_map[self.rotation_type].value
-        
+
         if self.rotation_type not in [e.value for e in RotationType]:
-            raise ValueError(f"Invalid rotation_type: {self.rotation_type}. Must be one of {[e.value for e in RotationType]}")
+            raise ValueError(
+                f"Invalid rotation_type: {self.rotation_type}. Must be one of {[e.value for e in RotationType]}"
+            )
         if self.compression_type not in [e.value for e in CompressionType]:
-            raise ValueError(f"Invalid compression_type: {self.compression_type}. Must be one of {[e.value for e in CompressionType]}")
+            raise ValueError(
+                f"Invalid compression_type: {self.compression_type}. Must be one of {[e.value for e in CompressionType]}"
+            )
         if self.retention_count < 0:
             raise ValueError("retention_count must be non-negative")
         if self.max_file_size <= 0 and self.rotation_type == RotationType.SIZE:
@@ -123,13 +182,31 @@ class AuditLoggerConfig:
         if self.encrypt_logs and not Fernet:
             raise ValueError("cryptography module required for log encryption")
         if self.encrypt_logs and not self.encryption_key:
-            self.encryption_key = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode("utf-8")
+            self.encryption_key = base64.urlsafe_b64encode(
+                secrets.token_bytes(32)
+            ).decode("utf-8")
         self.log_path = Path(self.log_path)
+
 
 class SizedTimedRotatingFileHandler(TimedRotatingFileHandler):
     """Custom handler supporting size-based rotation and compression."""
-    def __init__(self, filename: str, when: str, interval: int, backupCount: int, maxBytes: int, compression_type: str):
-        super().__init__(filename, when=when, interval=interval, backupCount=backupCount, encoding="utf-8")
+
+    def __init__(
+        self,
+        filename: str,
+        when: str,
+        interval: int,
+        backupCount: int,
+        maxBytes: int,
+        compression_type: str,
+    ):
+        super().__init__(
+            filename,
+            when=when,
+            interval=interval,
+            backupCount=backupCount,
+            encoding="utf-8",
+        )
         self.maxBytes = maxBytes
         self.compression_type = compression_type
 
@@ -162,14 +239,18 @@ class SizedTimedRotatingFileHandler(TimedRotatingFileHandler):
                         f_out.writelines(f_in)
                 os.remove(rotated_file_path)
             except OSError as e:
-                logging.error(f"Failed to compress rotated file {rotated_file_path}: {e}")
+                logging.error(
+                    f"Failed to compress rotated file {rotated_file_path}: {e}"
+                )
+
 
 class TamperEvidentLogger:
     """
     A tamper-evident audit logger with hash chaining, async support, encryption, batching, and integrations.
     Uses a singleton pattern for consistent state across the application.
     """
-    _instance: Optional['TamperEvidentLogger'] = None
+
+    _instance: Optional["TamperEvidentLogger"] = None
 
     def __new__(cls, config: Optional[AuditLoggerConfig] = None):
         if cls._instance is None:
@@ -180,7 +261,7 @@ class TamperEvidentLogger:
     def __init__(self, config: Optional[AuditLoggerConfig] = None):
         if self._initialized:
             return
-        
+
         self.config = config or AuditLoggerConfig()
         self.config.log_path.parent.mkdir(parents=True, exist_ok=True)
         self._last_hash: Optional[str] = None
@@ -206,13 +287,15 @@ class TamperEvidentLogger:
         if not logger.handlers:
             handler = SizedTimedRotatingFileHandler(
                 filename=str(self.config.log_path),
-                when="midnight" if self.config.rotation_type == RotationType.SIZE else self.config.rotation_type,
+                when="midnight"
+                if self.config.rotation_type == RotationType.SIZE
+                else self.config.rotation_type,
                 interval=self.config.rotation_interval,
                 backupCount=self.config.retention_count,
                 maxBytes=self.config.max_file_size,
-                compression_type=self.config.compression_type
+                compression_type=self.config.compression_type,
             )
-            formatter = logging.Formatter('%(message)s')
+            formatter = logging.Formatter("%(message)s")
             handler.setFormatter(formatter)
             logger.addHandler(handler)
         return logger
@@ -233,16 +316,21 @@ class TamperEvidentLogger:
             return {}
         return {
             "log_events_total": prometheus_client.Counter(
-                "audit_log_events_total", "Total number of audit log events", ["event_type"]
+                "audit_log_events_total",
+                "Total number of audit log events",
+                ["event_type"],
             ),
             "dlt_failures_total": prometheus_client.Counter(
                 "audit_dlt_failures_total", "Total number of DLT anchoring failures"
             ),
             "integrity_checks_failed": prometheus_client.Counter(
-                "audit_integrity_checks_failed_total", "Total number of failed integrity checks"
+                "audit_integrity_checks_failed_total",
+                "Total number of failed integrity checks",
             ),
             "log_latency_seconds": prometheus_client.Histogram(
-                "audit_log_latency_seconds", "Latency of log operations", buckets=[0.001, 0.01, 0.1, 0.5, 1, 5]
+                "audit_log_latency_seconds",
+                "Latency of log operations",
+                buckets=[0.001, 0.01, 0.1, 0.5, 1, 5],
             ),
             "batch_size": prometheus_client.Gauge(
                 "audit_log_batch_size", "Current size of the batch queue"
@@ -260,7 +348,9 @@ class TamperEvidentLogger:
                 salt=b"audit_logger_salt",
                 iterations=100000,
             )
-            key = base64.urlsafe_b64encode(kdf.derive(self.config.encryption_key.encode("utf-8")))
+            key = base64.urlsafe_b64encode(
+                kdf.derive(self.config.encryption_key.encode("utf-8"))
+            )
             return Fernet(key)
         except Exception as e:
             self._logger.error(f"Failed to initialize encryption: {e}")
@@ -301,12 +391,17 @@ class TamperEvidentLogger:
         """Calculate a SHA256 hash of a log entry, chained with the previous hash."""
         h = hashlib.sha256()
         h.update((prev_hash or "").encode("utf-8"))
-        h.update(json.dumps(entry_dict, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        h.update(
+            json.dumps(entry_dict, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            )
+        )
         return h.hexdigest()
 
     @staticmethod
     def _sanitize_dict(d: Dict[str, Any], max_size: int) -> Dict[str, Any]:
         """Sanitize dictionary and enforce size limits."""
+
         def sanitize_value(v: Any) -> Any:
             if isinstance(v, dict):
                 return TamperEvidentLogger._sanitize_dict(v, max_size)
@@ -315,12 +410,15 @@ class TamperEvidentLogger:
             if isinstance(v, str):
                 v = v.encode("utf-8", errors="replace").decode("utf-8")
                 if len(v.encode("utf-8")) > max_size:
-                    return v[:max_size//4] + "...[truncated]"
+                    return v[: max_size // 4] + "...[truncated]"
             return v
+
         result = {k: sanitize_value(v) for k, v in d.items()}
         serialized = json.dumps(result, ensure_ascii=False)
         if len(serialized.encode("utf-8")) > max_size:
-            raise ValueError(f"Dictionary size {len(serialized.encode('utf-8'))} exceeds size limit {max_size} bytes")
+            raise ValueError(
+                f"Dictionary size {len(serialized.encode('utf-8'))} exceeds size limit {max_size} bytes"
+            )
         return result
 
     def _encrypt_entry(self, entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -330,9 +428,13 @@ class TamperEvidentLogger:
         sensitive_fields = ["details", "extra"]
         encrypted_entry = entry.copy()
         for field_name in sensitive_fields:
-            if field_name in encrypted_entry and isinstance(encrypted_entry[field_name], dict):
+            if field_name in encrypted_entry and isinstance(
+                encrypted_entry[field_name], dict
+            ):
                 serialized = json.dumps(encrypted_entry[field_name], ensure_ascii=False)
-                encrypted_entry[field_name] = self._fernet.encrypt(serialized.encode("utf-8")).decode("utf-8")
+                encrypted_entry[field_name] = self._fernet.encrypt(
+                    serialized.encode("utf-8")
+                ).decode("utf-8")
         return encrypted_entry
 
     def _decrypt_entry(self, entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -342,9 +444,13 @@ class TamperEvidentLogger:
         sensitive_fields = ["details", "extra"]
         decrypted_entry = entry.copy()
         for field_name in sensitive_fields:
-            if field_name in decrypted_entry and isinstance(decrypted_entry[field_name], str):
+            if field_name in decrypted_entry and isinstance(
+                decrypted_entry[field_name], str
+            ):
                 try:
-                    decrypted = self._fernet.decrypt(decrypted_entry[field_name].encode("utf-8")).decode("utf-8")
+                    decrypted = self._fernet.decrypt(
+                        decrypted_entry[field_name].encode("utf-8")
+                    ).decode("utf-8")
                     decrypted_entry[field_name] = json.loads(decrypted)
                 except Exception as e:
                     decrypted_entry[field_name] = {"error": f"Decryption failed: {e}"}
@@ -353,24 +459,26 @@ class TamperEvidentLogger:
     def _get_actual_log_path(self) -> Path:
         """Get the actual file path where logs are written."""
         for handler in self._logger.handlers:
-            if hasattr(handler, 'baseFilename'):
+            if hasattr(handler, "baseFilename"):
                 return Path(handler.baseFilename)
         return self.config.log_path
 
     async def _log_to_file_async(self, entries: List[Dict[str, Any]]):
         """Write a batch of log entries asynchronously."""
         loop = asyncio.get_event_loop()
+
         def write_batch():
             actual_path = self._get_actual_log_path()
             if not actual_path.exists():
                 actual_path.parent.mkdir(parents=True, exist_ok=True)
                 actual_path.touch()
-            
+
             for entry in entries:
                 serialized = json.dumps(self._encrypt_entry(entry), ensure_ascii=False)
                 self._logger.info(serialized)
             for handler in self._logger.handlers:
                 handler.flush()
+
         await loop.run_in_executor(self._executor, write_batch)
 
     def _log_to_file_sync(self, entries: List[Dict[str, Any]]):
@@ -379,7 +487,7 @@ class TamperEvidentLogger:
         if not actual_path.exists():
             actual_path.parent.mkdir(parents=True, exist_ok=True)
             actual_path.touch()
-        
+
         for entry in entries:
             serialized = json.dumps(self._encrypt_entry(entry), ensure_ascii=False)
             self._logger.info(serialized)
@@ -390,12 +498,14 @@ class TamperEvidentLogger:
         """Periodically check and process the batch queue."""
         while not self._shutdown_event.is_set():
             try:
-                await asyncio.wait_for(self._shutdown_event.wait(), timeout=self.config.batch_timeout)
+                await asyncio.wait_for(
+                    self._shutdown_event.wait(), timeout=self.config.batch_timeout
+                )
                 break  # Shutdown requested
             except asyncio.TimeoutError:
                 # Normal timeout, process batch
                 pass
-            
+
             try:
                 async with self._lock:
                     if self._batch_queue:
@@ -403,7 +513,7 @@ class TamperEvidentLogger:
                         self._batch_queue = []
                         if self._metrics:
                             self._metrics["batch_size"].set(0)
-                        
+
                         try:
                             if self.config.async_logging:
                                 await self._log_to_file_async(batch)
@@ -418,7 +528,10 @@ class TamperEvidentLogger:
                         if critical_entries and self.config.dlt_enabled:
                             dlt_results = await self._anchor_to_dlt(critical_entries)
                             for entry, dlt_result in zip(critical_entries, dlt_results):
-                                if isinstance(dlt_result, str) and "Failed" in dlt_result:
+                                if (
+                                    isinstance(dlt_result, str)
+                                    and "Failed" in dlt_result
+                                ):
                                     entry["dlt_error"] = dlt_result
                                     if self.config.dlt_anchor_critical:
                                         self._logger.critical(dlt_result)
@@ -430,8 +543,15 @@ class TamperEvidentLogger:
                         if self.config.syslog_enabled:
                             for syslog_entry in batch:
                                 try:
-                                    syslog_data = {k: v for k, v in syslog_entry.items() if k not in ["dlt_error"]}
-                                    syslog.syslog(self.config.syslog_facility | syslog.LOG_INFO, json.dumps(syslog_data, ensure_ascii=False))
+                                    syslog_data = {
+                                        k: v
+                                        for k, v in syslog_entry.items()
+                                        if k not in ["dlt_error"]
+                                    }
+                                    syslog.syslog(
+                                        self.config.syslog_facility | syslog.LOG_INFO,
+                                        json.dumps(syslog_data, ensure_ascii=False),
+                                    )
                                 except Exception:
                                     pass
             except asyncio.CancelledError:
@@ -439,14 +559,16 @@ class TamperEvidentLogger:
             except Exception as e:
                 self._logger.error(f"Error in batch processing loop: {e}")
 
-    async def _anchor_to_dlt(self, entries: List[Dict[str, Any]]) -> List[Optional[str]]:
+    async def _anchor_to_dlt(
+        self, entries: List[Dict[str, Any]]
+    ) -> List[Optional[str]]:
         """Attempt to anchor a batch of events to the DLT with retries."""
         if not self._dlt_client:
             return [None] * len(entries)
-        
+
         results = []
         for i in range(0, len(entries), self.config.dlt_batch_size):
-            sub_batch = entries[i:i + self.config.dlt_batch_size]
+            sub_batch = entries[i : i + self.config.dlt_batch_size]
             dlt_batch_payload = [
                 {
                     "event_type": entry.get("event_type") or entry.get("event"),
@@ -456,12 +578,15 @@ class TamperEvidentLogger:
                     "agent": entry.get("agent", self._agent_info),
                     "user_id": entry.get("user_id"),
                     "extra": entry.get("extra"),
-                } for entry in sub_batch
+                }
+                for entry in sub_batch
             ]
-            
+
             for attempt in range(self.config.dlt_retry_count + 1):
                 try:
-                    dlt_results = await asyncio.to_thread(self._dlt_client.log_event_batch, dlt_batch_payload)
+                    dlt_results = await asyncio.to_thread(
+                        self._dlt_client.log_event_batch, dlt_batch_payload
+                    )
                     results.extend(dlt_results)
                     break
                 except Exception as e:
@@ -472,34 +597,63 @@ class TamperEvidentLogger:
                         results.extend([error_msg] * len(sub_batch))
                         if self.config.alert_callback:
                             self.config.alert_callback(error_msg)
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
         return results
 
-    async def log_event(self, event_type: str, details: Dict[str, Any], user_id: Optional[str] = None, critical: bool = False, omnicore_url: Optional[str] = None):
+    async def log_event(
+        self,
+        event_type: str,
+        details: Dict[str, Any],
+        user_id: Optional[str] = None,
+        critical: bool = False,
+        omnicore_url: Optional[str] = None,
+    ):
         """
         Public-facing method to log an audit event, now with OmniCore integration.
         """
-        await self.emit_audit_event(event_type, details, user_id, critical, omnicore_url or "https://api.example.com")
-    
+        await self.emit_audit_event(
+            event_type,
+            details,
+            user_id,
+            critical,
+            omnicore_url or "https://api.example.com",
+        )
+
     def _sanitize_details(self, details: Dict[str, Any]) -> Dict[str, Any]:
         """A helper to sanitize details before logging."""
-        return TamperEvidentLogger._sanitize_dict(details or {}, self.config.max_details_size)
-        
+        return TamperEvidentLogger._sanitize_dict(
+            details or {}, self.config.max_details_size
+        )
+
     def _compute_hmac(self, event_id, event_type, details, user_id):
         """Placeholder for HMAC computation."""
         return "mock_hmac"
 
-    async def emit_audit_event(self, event_type: str, details: Dict[str, Any], user_id: Optional[str] = None, critical: bool = False, omnicore_url: Optional[str] = None):
+    async def emit_audit_event(
+        self,
+        event_type: str,
+        details: Dict[str, Any],
+        user_id: Optional[str] = None,
+        critical: bool = False,
+        omnicore_url: Optional[str] = None,
+    ):
         start_time = time.time()
-        
-        if self.config.valid_event_types and event_type not in self.config.valid_event_types:
-            raise ValueError(f"Invalid event_type: {event_type}. Must be one of {self.config.valid_event_types}")
+
+        if (
+            self.config.valid_event_types
+            and event_type not in self.config.valid_event_types
+        ):
+            raise ValueError(
+                f"Invalid event_type: {event_type}. Must be one of {self.config.valid_event_types}"
+            )
 
         now = datetime.utcnow().isoformat() + "Z"
         trace_id, span_id = self._get_trace_ids()
 
         try:
-            sanitized_details = self._sanitize_dict(details or {}, self.config.max_details_size)
+            sanitized_details = self._sanitize_dict(
+                details or {}, self.config.max_details_size
+            )
         except ValueError as e:
             if self.config.alert_callback:
                 self.config.alert_callback(f"Log event dropped due to size limit: {e}")
@@ -515,11 +669,13 @@ class TamperEvidentLogger:
             "user_id": user_id or "anonymous",
             "app_instance_id": self.app_instance_id,
             "agent": self._agent_info,
-            "critical": critical
+            "critical": critical,
         }
         if self._hmac_key:
-            log_entry["hmac"] = self._compute_hmac(event_id, event_type, details, user_id)
-        
+            log_entry["hmac"] = self._compute_hmac(
+                event_id, event_type, details, user_id
+            )
+
         self._log_queue.put_nowait(log_entry)
 
         async with self._lock:
@@ -531,14 +687,14 @@ class TamperEvidentLogger:
             if self._metrics:
                 self._metrics["batch_size"].set(len(self._batch_queue))
                 self._metrics["log_events_total"].labels(event_type=event_type).inc()
-            
+
             if not self._batch_task or self._batch_task.done():
                 self._batch_task = asyncio.create_task(self._process_batch_loop())
-            
+
             if len(self._batch_queue) >= self.config.batch_size or critical:
                 batch_to_flush = self._batch_queue
                 self._batch_queue = []
-                
+
                 try:
                     if self.config.async_logging:
                         await self._log_to_file_async(batch_to_flush)
@@ -548,7 +704,11 @@ class TamperEvidentLogger:
                     self._logger.error(f"Failed to write batch to file: {e}")
                     if self.config.alert_callback:
                         self.config.alert_callback(f"Batch write failed: {e}")
-                    if "Permission denied" in str(e) or "Read-only" in str(e) or "PermissionError" in str(type(e).__name__):
+                    if (
+                        "Permission denied" in str(e)
+                        or "Read-only" in str(e)
+                        or "PermissionError" in str(type(e).__name__)
+                    ):
                         raise
 
                 if critical and self.config.dlt_enabled:
@@ -566,35 +726,50 @@ class TamperEvidentLogger:
                 if self.config.syslog_enabled:
                     for syslog_entry in batch_to_flush:
                         try:
-                            syslog_data = {k: v for k, v in syslog_entry.items() if k not in ["dlt_error"]}
-                            syslog.syslog(self.config.syslog_facility | syslog.LOG_INFO, json.dumps(syslog_data, ensure_ascii=False))
+                            syslog_data = {
+                                k: v
+                                for k, v in syslog_entry.items()
+                                if k not in ["dlt_error"]
+                            }
+                            syslog.syslog(
+                                self.config.syslog_facility | syslog.LOG_INFO,
+                                json.dumps(syslog_data, ensure_ascii=False),
+                            )
                         except Exception:
                             pass
-                
+
                 if self._metrics:
                     self._metrics["batch_size"].set(len(self._batch_queue))
-                    self._metrics["log_latency_seconds"].observe(time.time() - start_time)
+                    self._metrics["log_latency_seconds"].observe(
+                        time.time() - start_time
+                    )
 
         if omnicore_url:
             async with aiohttp.ClientSession() as session:
                 try:
                     await session.post(f"{omnicore_url}/audit", json=log_entry)
-                    logging.getLogger(__name__).info(f"Audit event sent to omnicore_engine: {event_type}")
+                    logging.getLogger(__name__).info(
+                        f"Audit event sent to omnicore_engine: {event_type}"
+                    )
                 except Exception as e:
-                    logging.getLogger(__name__).error(f"Failed to send audit event to omnicore_engine: {e}")
+                    logging.getLogger(__name__).error(
+                        f"Failed to send audit event to omnicore_engine: {e}"
+                    )
 
         return log_entry["current_hash"]
 
-    async def verify_log_integrity(self, log_path: Optional[Path] = None) -> Tuple[bool, Optional[int], Optional[str]]:
+    async def verify_log_integrity(
+        self, log_path: Optional[Path] = None
+    ) -> Tuple[bool, Optional[int], Optional[str]]:
         """
         Verify the hash chain integrity of the audit log, including rotated files.
         """
         start_time = time.time()
         target_path = log_path or self._get_actual_log_path()
-        
+
         if not target_path.exists():
             return True, None, None
-        
+
         log_files = self._get_log_files(target_path)
         prev_hash: Optional[str] = None
         file_line_num = 0
@@ -608,41 +783,51 @@ class TamperEvidentLogger:
                 else:
                     open_func = Path.open
                     mode = "r"
-                
+
                 with open_func(file_path, mode, encoding="utf-8") as f:
                     for line in f:
                         file_line_num += 1
-                        
+
                         if not line.strip():
                             continue
-                        
+
                         try:
                             entry = json.loads(line)
                             current_hash = entry.get("current_hash")
                             decrypted_entry = self._decrypt_entry(entry)
-                            temp_entry = {k: v for k, v in decrypted_entry.items() if k not in ["current_hash", "previous_hash"]}
+                            temp_entry = {
+                                k: v
+                                for k, v in decrypted_entry.items()
+                                if k not in ["current_hash", "previous_hash"]
+                            }
                             temp_entry["previous_hash"] = prev_hash
                             expected_hash = self._hash_entry(prev_hash, temp_entry)
                         except (json.JSONDecodeError, ValueError) as e:
                             if self._metrics:
                                 self._metrics["integrity_checks_failed"].inc()
                             if self.config.alert_callback:
-                                self.config.alert_callback(f"Integrity check failed (JSON/decryption error) at {file_path}:{file_line_num}: {e}")
+                                self.config.alert_callback(
+                                    f"Integrity check failed (JSON/decryption error) at {file_path}:{file_line_num}: {e}"
+                                )
                             return False, file_line_num, str(file_path)
 
                         if current_hash != expected_hash:
                             if self._metrics:
                                 self._metrics["integrity_checks_failed"].inc()
                             if self.config.alert_callback:
-                                self.config.alert_callback(f"Integrity check failed at {file_path}:{file_line_num}")
+                                self.config.alert_callback(
+                                    f"Integrity check failed at {file_path}:{file_line_num}"
+                                )
                             return False, file_line_num, str(file_path)
-                        
+
                         prev_hash = current_hash
             except (IOError, gzip.BadGzipFile) as e:
                 if self._metrics:
                     self._metrics["integrity_checks_failed"].inc()
                 if self.config.alert_callback:
-                    self.config.alert_callback(f"Integrity check error at {file_path}: {e}")
+                    self.config.alert_callback(
+                        f"Integrity check error at {file_path}: {e}"
+                    )
                 return False, file_line_num, str(file_path)
 
         if self._metrics:
@@ -657,23 +842,30 @@ class TamperEvidentLogger:
         for f in log_path.parent.glob(f"{log_path.name}.*"):
             if f.is_file() and not f.name.endswith(".gz.gz"):
                 files.append(f)
-        return sorted(files, key=lambda x: (x.name != log_path.name, x.name), reverse=False)
+        return sorted(
+            files, key=lambda x: (x.name != log_path.name, x.name), reverse=False
+        )
 
-    def load_audit_trail(self, log_path: Optional[Path] = None, event_type: Optional[str] = None,
-                         start_time: Optional[datetime] = None, end_time: Optional[datetime] = None,
-                         user_id: Optional[str] = None) -> Iterator[Dict[str, Any]]:
+    def load_audit_trail(
+        self,
+        log_path: Optional[Path] = None,
+        event_type: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        user_id: Optional[str] = None,
+    ) -> Iterator[Dict[str, Any]]:
         """
         A generator that yields each valid log entry from the audit log file, with optional filtering.
         """
         start_time_read = time.time()
         target_path = log_path or self._get_actual_log_path()
-        
+
         if not target_path.exists():
             return
-        
+
         for handler in self._logger.handlers:
             handler.flush()
-        
+
         log_files = self._get_log_files(target_path)
 
         for file_path in log_files:
@@ -686,18 +878,28 @@ class TamperEvidentLogger:
                     mode = "r"
 
                 with open_func(file_path, mode, encoding="utf-8") as f:
-                    yield from self._filter_log_entries(f, event_type, start_time, end_time, user_id)
+                    yield from self._filter_log_entries(
+                        f, event_type, start_time, end_time, user_id
+                    )
             except (IOError, gzip.BadGzipFile) as e:
                 self._logger.error(f"Error reading audit log file {file_path}: {e}")
                 if self.config.alert_callback:
-                    self.config.alert_callback(f"Audit trail read error at {file_path}: {e}")
+                    self.config.alert_callback(
+                        f"Audit trail read error at {file_path}: {e}"
+                    )
                 continue
-        
+
         if self._metrics:
             self._metrics["log_latency_seconds"].observe(time.time() - start_time_read)
 
-    def _filter_log_entries(self, file_handle, event_type: Optional[str], start_time: Optional[datetime],
-                             end_time: Optional[datetime], user_id: Optional[str]) -> Iterator[Dict[str, Any]]:
+    def _filter_log_entries(
+        self,
+        file_handle,
+        event_type: Optional[str],
+        start_time: Optional[datetime],
+        end_time: Optional[datetime],
+        user_id: Optional[str],
+    ) -> Iterator[Dict[str, Any]]:
         """Yields log entries that match the given filters."""
         for line in file_handle:
             line = line.strip()
@@ -706,17 +908,30 @@ class TamperEvidentLogger:
             try:
                 encrypted_entry = json.loads(line)
                 entry = self._decrypt_entry(encrypted_entry)
-                if self._filter_entry_logic(entry, event_type, start_time, end_time, user_id):
+                if self._filter_entry_logic(
+                    entry, event_type, start_time, end_time, user_id
+                ):
                     yield entry
             except (json.JSONDecodeError, ValueError) as e:
-                self._logger.warning(f"Skipping malformed or undecryptable log entry: {e}")
+                self._logger.warning(
+                    f"Skipping malformed or undecryptable log entry: {e}"
+                )
                 continue
 
     @staticmethod
-    def _filter_entry_logic(entry: Dict[str, Any], event_type: Optional[str], start_time: Optional[datetime],
-                             end_time: Optional[datetime], user_id: Optional[str]) -> bool:
+    def _filter_entry_logic(
+        entry: Dict[str, Any],
+        event_type: Optional[str],
+        start_time: Optional[datetime],
+        end_time: Optional[datetime],
+        user_id: Optional[str],
+    ) -> bool:
         """Apply filtering conditions to a log entry."""
-        if event_type and entry.get("event_type") != event_type and entry.get("event") != event_type:
+        if (
+            event_type
+            and entry.get("event_type") != event_type
+            and entry.get("event") != event_type
+        ):
             return False
         if user_id and entry.get("user_id") != user_id:
             return False
@@ -736,7 +951,7 @@ class TamperEvidentLogger:
         """Gracefully shutdown the logger and cleanup resources."""
         # Signal shutdown to batch processing loop
         self._shutdown_event.set()
-        
+
         # Cancel batch processing task
         if self._batch_task and not self._batch_task.done():
             self._batch_task.cancel()
@@ -744,7 +959,7 @@ class TamperEvidentLogger:
                 await self._batch_task
             except asyncio.CancelledError:
                 pass
-        
+
         # Flush any remaining batched entries
         async with self._lock:
             if self._batch_queue:
@@ -756,11 +971,11 @@ class TamperEvidentLogger:
                 except Exception as e:
                     self._logger.error(f"Error flushing final batch: {e}")
                 self._batch_queue = []
-        
+
         # Shutdown thread pool
         if self._executor:
             self._executor.shutdown(wait=True)
-        
+
         # Close file handlers
         for handler in self._logger.handlers[:]:
             try:
@@ -769,22 +984,41 @@ class TamperEvidentLogger:
                 pass
             self._logger.removeHandler(handler)
 
+
 audit_logger = TamperEvidentLogger()
 
-async def log_event(event_type: str, details: Dict[str, Any], critical: bool = False,
-                    user_id: Optional[str] = None, extra: Optional[Dict[str, Any]] = None) -> str:
+
+async def log_event(
+    event_type: str,
+    details: Dict[str, Any],
+    critical: bool = False,
+    user_id: Optional[str] = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> str:
     return await audit_logger.log_event(event_type, details, user_id, critical, extra)
 
-async def verify_log_integrity(log_path: Optional[Path] = None) -> Tuple[bool, Optional[int], Optional[str]]:
+
+async def verify_log_integrity(
+    log_path: Optional[Path] = None,
+) -> Tuple[bool, Optional[int], Optional[str]]:
     return await audit_logger.verify_log_integrity(log_path)
 
-async def load_audit_trail(log_path: Optional[Path] = None, event_type: Optional[str] = None,
-                           start_time: Optional[datetime] = None, end_time: Optional[datetime] = None,
-                           user_id: Optional[str] = None) -> Iterator[Dict[str, Any]]:
-    for entry in audit_logger.load_audit_trail(log_path, event_type, start_time, end_time, user_id):
+
+async def load_audit_trail(
+    log_path: Optional[Path] = None,
+    event_type: Optional[str] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    user_id: Optional[str] = None,
+) -> Iterator[Dict[str, Any]]:
+    for entry in audit_logger.load_audit_trail(
+        log_path, event_type, start_time, end_time, user_id
+    ):
         yield entry
 
+
 if __name__ == "__main__":
+
     async def main():
         def alert_callback(message: str):
             """A simple callback function for alerts."""
@@ -806,22 +1040,34 @@ if __name__ == "__main__":
         logger_instance = TamperEvidentLogger(config)
 
         details = {"action": "user_login", "ip": "192.168.1.1"}
-        hash_val = await logger_instance.log_event("user_action", details, user_id="user123")
+        hash_val = await logger_instance.log_event(
+            "user_action", details, user_id="user123"
+        )
         print(f"Logged event with hash: {hash_val}")
 
-        details_critical = {"file_op": "deletion", "filename": "sensitive_data.txt", "data": "This is sensitive info." * 100}
-        hash_val_critical = await logger_instance.log_event("policy_violation", details_critical, user_id="user456", critical=True)
+        details_critical = {
+            "file_op": "deletion",
+            "filename": "sensitive_data.txt",
+            "data": "This is sensitive info." * 100,
+        }
+        hash_val_critical = await logger_instance.log_event(
+            "policy_violation", details_critical, user_id="user456", critical=True
+        )
         print(f"Logged critical event with hash: {hash_val_critical}")
 
         await asyncio.sleep(config.batch_timeout * 2)
 
         is_valid, line, file = await logger_instance.verify_log_integrity()
-        print(f"Log integrity: {'Valid' if is_valid else f'Invalid at line {line} in {file}'}")
+        print(
+            f"Log integrity: {'Valid' if is_valid else f'Invalid at line {line} in {file}'}"
+        )
 
         print("\nLoading filtered audit trail:")
-        for entry in logger_instance.load_audit_trail(event_type="policy_violation", user_id="user456"):
+        for entry in logger_instance.load_audit_trail(
+            event_type="policy_violation", user_id="user456"
+        ):
             print(json.dumps(entry, indent=2))
-        
+
         await logger_instance.shutdown()
 
     try:

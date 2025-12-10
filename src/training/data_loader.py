@@ -211,7 +211,9 @@ class CorpusDataLoader:
     # ------------------------------------------------------------------ #
     # Vocabulary Construction
     # ------------------------------------------------------------------ #
-    def _build_vocab(self, tokens: List[str]) -> Tuple[List[str], Dict[str, int], Dict[int, str]]:
+    def _build_vocab(
+        self, tokens: List[str]
+    ) -> Tuple[List[str], Dict[str, int], Dict[int, str]]:
         freq = Counter(tokens)
         # Remove special tokens if they appear naturally to avoid duplication
         for st in SPECIAL_TOKENS:
@@ -224,7 +226,7 @@ class CorpusDataLoader:
         filtered.sort(key=lambda x: (-x[1], x[0]))
         # Truncate to remaining slots
         remaining_slots = self.max_vocab_size - len(SPECIAL_TOKENS)
-        trimmed = filtered[:max(0, remaining_slots)]
+        trimmed = filtered[: max(0, remaining_slots)]
 
         vocab = SPECIAL_TOKENS + [t for t, _ in trimmed]
         token_to_id = {t: i for i, t in enumerate(vocab)}
@@ -276,7 +278,7 @@ class CorpusDataLoader:
             token_stream=self.train_tokens,
             length=self._train_len,
             batch_size=batch_size,
-            split_name="train"
+            split_name="train",
         )
 
     def sample_val_batch(self, batch_size: int) -> Dict[str, Any]:
@@ -284,15 +286,11 @@ class CorpusDataLoader:
             token_stream=self.val_tokens,
             length=self._val_len,
             batch_size=batch_size,
-            split_name="val"
+            split_name="val",
         )
 
     def _sample_batch(
-        self,
-        token_stream: List[int],
-        length: int,
-        batch_size: int,
-        split_name: str
+        self, token_stream: List[int], length: int, batch_size: int, split_name: str
     ) -> Dict[str, Any]:
         """
         Robust batch sampling:
@@ -310,7 +308,7 @@ class CorpusDataLoader:
                 "sequences": [],
                 "seq_len": 0,
                 "split": split_name,
-                "warning": f"{split_name} stream too short (length={length}) for any sequence sampling."
+                "warning": f"{split_name} stream too short (length={length}) for any sequence sampling.",
             }
 
         # We will extract windows of size (eff_seq_len + 1) from token_stream
@@ -326,7 +324,7 @@ class CorpusDataLoader:
                     "sequences": [],
                     "seq_len": 0,
                     "split": split_name,
-                    "warning": f"{split_name} stream cannot provide even minimal sequence."
+                    "warning": f"{split_name} stream cannot provide even minimal sequence.",
                 }
             window_size = eff_seq_len + 1
             max_start = max(0, length - window_size)
@@ -340,14 +338,10 @@ class CorpusDataLoader:
         else:
             for _ in range(batch_size):
                 start = self.rng.randint(0, max_start)
-                seq = token_stream[start: start + window_size]
+                seq = token_stream[start : start + window_size]
                 sequences.append(seq)
 
-        return {
-            "sequences": sequences,
-            "seq_len": eff_seq_len,
-            "split": split_name
-        }
+        return {"sequences": sequences, "seq_len": eff_seq_len, "split": split_name}
 
     # ------------------------------------------------------------------ #
     # Diagnostics
@@ -356,7 +350,7 @@ class CorpusDataLoader:
         return {
             "vocab_size": self.vocab_size,
             "special_tokens": SPECIAL_TOKENS,
-            "sample_vocab": self.vocab[:50]
+            "sample_vocab": self.vocab[:50],
         }
 
     def tokens_info(self) -> Dict[str, Any]:
@@ -407,7 +401,7 @@ class CorpusDataLoader:
             return
         step = eff_seq_len + 1
         for start in range(0, self._train_len - step + 1, step):
-            yield self.train_tokens[start:start + step]
+            yield self.train_tokens[start : start + step]
 
     def iter_val_stream(self) -> Iterable[List[int]]:
         """
@@ -418,4 +412,4 @@ class CorpusDataLoader:
             return
         step = eff_seq_len + 1
         for start in range(0, self._val_len - step + 1, step):
-            yield self.val_tokens[start:start + step]
+            yield self.val_tokens[start : start + step]

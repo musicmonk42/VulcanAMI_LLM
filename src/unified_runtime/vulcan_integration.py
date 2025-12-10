@@ -25,8 +25,8 @@ from collections import deque, defaultdict
 from functools import wraps
 import sys
 import os
-import threading # Added for new __init__
-import inspect # Added for shutdown checks
+import threading  # Added for new __init__
+import inspect  # Added for shutdown checks
 
 # Define logger early
 logger = logging.getLogger(__name__)
@@ -34,8 +34,11 @@ logger = logging.getLogger(__name__)
 # Import VULCAN components
 try:
     # WorldModel is now lazy-loaded to prevent circular imports
-    from vulcan.world_model.meta_reasoning.motivational_introspection import MotivationalIntrospection
+    from vulcan.world_model.meta_reasoning.motivational_introspection import (
+        MotivationalIntrospection,
+    )
     from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+
     VULCAN_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"VULCAN components not available: {e}. Using MagicMock stubs.")
@@ -50,10 +53,12 @@ WorldModel = None
 try:
     from .execution_engine import ExecutionContext, ExecutionMode, GraphExecutionResult
     from .graph_validator import ValidationResult
-    from .execution_metrics import ExecutionMetrics # Needed for on_run_complete
+    from .execution_metrics import ExecutionMetrics  # Needed for on_run_complete
 except ImportError as e:
     # Fallback for potential direct script execution or testing issues
-    logger.warning(f"Could not perform relative import for Graphix components: {e}. Using MagicMock stubs.")
+    logger.warning(
+        f"Could not perform relative import for Graphix components: {e}. Using MagicMock stubs."
+    )
     ExecutionContext = MagicMock()
     ExecutionMode = MagicMock()
     ValidationResult = MagicMock()
@@ -65,14 +70,17 @@ def _lazy_import_world_model():
     """Lazy imports WorldModel to avoid circular dependencies."""
     try:
         from vulcan.world_model.world_model_core import WorldModel
+
         return WorldModel
     except ImportError as e:
         logger.warning(f"Failed to import WorldModel: {e}. Using MagicMock stub.")
         return MagicMock()
 
+
 @dataclass
 class VulcanIntegrationConfig:
     """Configuration for VULCAN-Graphix integration"""
+
     enable_validation: bool = True
     enable_consensus: bool = True
     enable_semantic_transfer: bool = True
@@ -87,7 +95,8 @@ class VulcanIntegrationConfig:
     execution_timeout_seconds: float = 300.0
     enable_parallel_validation: bool = True
     enable_self_improvement: bool = field(
-        default_factory=lambda: os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "1").lower() in ("1", "true", "yes", "on")
+        default_factory=lambda: os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "1").lower()
+        in ("1", "true", "yes", "on")
     )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -97,6 +106,7 @@ class VulcanIntegrationConfig:
 @dataclass
 class ValidationResponse:
     """Standardized validation response"""
+
     success: bool
     reason: str
     details: Dict[str, Any] = field(default_factory=dict)
@@ -105,17 +115,18 @@ class ValidationResponse:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'success': self.success,
-            'reason': self.reason,
-            'details': self.details,
-            'confidence': self.confidence,
-            'conflicts': self.conflicts
+            "success": self.success,
+            "reason": self.reason,
+            "details": self.details,
+            "confidence": self.confidence,
+            "conflicts": self.conflicts,
         }
 
 
 @dataclass
 class ConceptTransferFailure:
     """Track failed concept transfers"""
+
     concept: str
     error: str
     timestamp: float
@@ -124,6 +135,7 @@ class ConceptTransferFailure:
 
 def async_timeout(seconds: float):
     """Decorator to add timeout to async functions"""
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -132,35 +144,41 @@ def async_timeout(seconds: float):
             except asyncio.TimeoutError:
                 logger.error(f"Timeout after {seconds}s in {func.__name__}")
                 raise
+
         return wrapper
+
     return decorator
 
 
 class VulcanGraphixBridge:
     """Bridge between VULCAN World Model and Graphix runtime"""
-    
+
     def __init__(self, runtime: Any, config: Optional[VulcanIntegrationConfig] = None):
         self.runtime = runtime
         self.config = config or VulcanIntegrationConfig()
         self.vulcan_available = VULCAN_AVAILABLE
         self.world_model = None
         self.semantic_bridge = SemanticBridge() if SemanticBridge else None
-        
+
         # --- START REPLACEMENT ---
-        if MotivationalIntrospection and not isinstance(MotivationalIntrospection, MagicMock):
-            self.motivational_driver = MotivationalIntrospection(world_model=self.world_model)
+        if MotivationalIntrospection and not isinstance(
+            MotivationalIntrospection, MagicMock
+        ):
+            self.motivational_driver = MotivationalIntrospection(
+                world_model=self.world_model
+            )
         else:
             self.motivational_driver = MagicMock()
         # --- END REPLACEMENT ---
-        
+
         self._cache = {}
-        self.cache_timestamps = {} # Initialize cache timestamps
+        self.cache_timestamps = {}  # Initialize cache timestamps
         self._lock = threading.Lock()
         self._history = deque(maxlen=self.config.max_history_size)
         self._stats = defaultdict(int)
-        self.transfer_failures = deque(maxlen=100) # Track failures
-        self._pending_tasks: Set[asyncio.Task] = set() # Track background tasks
-                
+        self.transfer_failures = deque(maxlen=100)  # Track failures
+        self._pending_tasks: Set[asyncio.Task] = set()  # Track background tasks
+
         if self.vulcan_available:
             try:
                 global WorldModel
@@ -169,35 +187,45 @@ class VulcanGraphixBridge:
                     # FIX: Pass explicit config including enable_self_improvement
                     world_model_config = {
                         # Honor environment and integration config toggle
-                        'enable_self_improvement': bool(self.config.enable_self_improvement),
+                        "enable_self_improvement": bool(
+                            self.config.enable_self_improvement
+                        ),
                         # Sensible defaults that match your profile_development.json
-                        'enable_meta_reasoning': True,
-                        'simulation_mode': True,
-                        'bootstrap_mode': True,
+                        "enable_meta_reasoning": True,
+                        "simulation_mode": True,
+                        "bootstrap_mode": True,
                         # Also pass the file paths used elsewhere for consistency
-                        'self_improvement_config': "configs/intrinsic_drives.json",
-                        'self_improvement_state': "data/agent_state.json",
-                        'meta_reasoning_config': "configs/intrinsic_drives.json",
+                        "self_improvement_config": "configs/intrinsic_drives.json",
+                        "self_improvement_state": "data/agent_state.json",
+                        "meta_reasoning_config": "configs/intrinsic_drives.json",
                     }
                     self.world_model = WorldModel(config=world_model_config)
                     logger.info("Initializing VULCAN World Model...")
-                    if hasattr(self.world_model, 'initialize'):
+                    if hasattr(self.world_model, "initialize"):
                         if asyncio.iscoroutinefunction(self.world_model.initialize):
                             asyncio.run(self.world_model.initialize())
                         else:
                             self.world_model.initialize()
                     logger.info("✓ VULCAN World Model initialized")
-                    
+
                     # --- PATCH: Re-initialize motivational_driver *after* world_model is created ---
-                    if MotivationalIntrospection and not isinstance(MotivationalIntrospection, MagicMock):
-                        self.motivational_driver = MotivationalIntrospection(world_model=self.world_model)
-                        logger.info("✓ VULCAN MotivationalIntrospection re-initialized with WorldModel")
+                    if MotivationalIntrospection and not isinstance(
+                        MotivationalIntrospection, MagicMock
+                    ):
+                        self.motivational_driver = MotivationalIntrospection(
+                            world_model=self.world_model
+                        )
+                        logger.info(
+                            "✓ VULCAN MotivationalIntrospection re-initialized with WorldModel"
+                        )
                     else:
                         self.motivational_driver = MagicMock()
                     # --- END PATCH ---
 
                 else:
-                    logger.error("❌ Failed to initialize VULCAN World Model: WorldModel is None or Mock")
+                    logger.error(
+                        "❌ Failed to initialize VULCAN World Model: WorldModel is None or Mock"
+                    )
                     self.vulcan_available = False
             except Exception as e:
                 logger.error(f"❌ Failed to initialize VULCAN World Model: {e}")
@@ -207,15 +235,18 @@ class VulcanGraphixBridge:
         """
         Lazy loader for WorldModel to fix circular dependencies
         """
-        global WorldModel # Use global to cache the import
+        global WorldModel  # Use global to cache the import
         if WorldModel is None:
             try:
                 from vulcan.world_model.world_model_core import WorldModel as WM
-                WorldModel = WM # Assign to global
+
+                WorldModel = WM  # Assign to global
                 logger.info("WorldModel lazy loaded successfully")
             except ImportError as e:
-                logger.error(f"Failed to import VULCAN World Model: {e}. Using MagicMock stub.")
-                WorldModel = MagicMock() # Ensure it's a mock on failure
+                logger.error(
+                    f"Failed to import VULCAN World Model: {e}. Using MagicMock stub."
+                )
+                WorldModel = MagicMock()  # Ensure it's a mock on failure
         return WorldModel
 
     def _validate_graph_structure(self, graph: Dict[str, Any]) -> bool:
@@ -232,13 +263,13 @@ class VulcanGraphixBridge:
             logger.error(f"Graph must be a dictionary, got {type(graph)}")
             return False
 
-        required_fields = ['nodes']
+        required_fields = ["nodes"]
         for field in required_fields:
             if field not in graph:
                 logger.error(f"Graph missing required field: {field}")
                 return False
 
-        nodes = graph.get('nodes', [])
+        nodes = graph.get("nodes", [])
         if not isinstance(nodes, list):
             logger.error(f"Graph 'nodes' must be a list, got {type(nodes)}")
             return False
@@ -246,10 +277,12 @@ class VulcanGraphixBridge:
         # Validate each node is a dictionary
         for i, node in enumerate(nodes):
             if not isinstance(node, dict):
-                logger.error(f"Node at index {i} must be a dictionary, got {type(node)}")
+                logger.error(
+                    f"Node at index {i} must be a dictionary, got {type(node)}"
+                )
                 return False
 
-            if 'id' not in node:
+            if "id" not in node:
                 logger.error(f"Node at index {i} missing required 'id' field")
                 return False
 
@@ -287,10 +320,10 @@ class VulcanGraphixBridge:
         if key in self._cache:
             timestamp = self.cache_timestamps.get(key, 0)
             if time.time() - timestamp <= self.config.cache_ttl_seconds:
-                self._stats['cache_hits'] += 1
+                self._stats["cache_hits"] += 1
                 return self._cache[key]
 
-        self._stats['cache_misses'] += 1
+        self._stats["cache_misses"] += 1
         return None
 
     def _put_in_cache(self, key: str, value: Any):
@@ -304,17 +337,18 @@ class VulcanGraphixBridge:
         # Enforce max cache size
         if len(self._cache) >= self.config.max_cache_size:
             # Remove oldest entry
-            oldest_key = min(self.cache_timestamps.keys(),
-                           key=lambda k: self.cache_timestamps[k])
+            oldest_key = min(
+                self.cache_timestamps.keys(), key=lambda k: self.cache_timestamps[k]
+            )
             self._cache.pop(oldest_key, None)
             self.cache_timestamps.pop(oldest_key, None)
 
         self._cache[key] = value
         self.cache_timestamps[key] = time.time()
 
-    async def execute_graph_with_vulcan(self,
-                                        graph: Dict[str, Any],
-                                        context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def execute_graph_with_vulcan(
+        self, graph: Dict[str, Any], context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Execute graph with full VULCAN validation pipeline (DEPRECATED - use runtime.execute_graph)
 
@@ -335,34 +369,45 @@ class VulcanGraphixBridge:
         Returns:
             Execution result with VULCAN metadata
         """
-        logger.warning("execute_graph_with_vulcan is deprecated. Use runtime.execute_graph instead.")
-        return await self.runtime.execute_graph(graph) # Delegate to runtime's method
+        logger.warning(
+            "execute_graph_with_vulcan is deprecated. Use runtime.execute_graph instead."
+        )
+        return await self.runtime.execute_graph(graph)  # Delegate to runtime's method
 
-
-    async def _execute_graph_internal(self,
-                                     graph: Dict[str, Any],
-                                     context: Optional[Dict[str, Any]],
-                                     start_time: float) -> Dict[str, Any]:
+    async def _execute_graph_internal(
+        self,
+        graph: Dict[str, Any],
+        context: Optional[Dict[str, Any]],
+        start_time: float,
+    ) -> Dict[str, Any]:
         """Internal graph execution with full pipeline (Kept for potential internal use)"""
 
         # Stage 1: Basic validation
         logger.info("🔍 Stage 1: Validating graph structure...")
         # Assume validator exists based on UnifiedRuntime logic
-        if not self.runtime or not hasattr(self.runtime, 'validator') or not self.runtime.validator:
-             return {'status': 'error', 'errors': ['Validator not available'], 'stage': 'structure_validation'}
-
-        validation_result_obj = self.runtime.validator.validate_graph(graph)
-        validation_dict = validation_result_obj.to_dict() # Convert to dict
-
-        if not validation_dict.get('valid', False):
+        if (
+            not self.runtime
+            or not hasattr(self.runtime, "validator")
+            or not self.runtime.validator
+        ):
             return {
-                'status': 'validation_failed',
-                'errors': validation_dict.get('errors', []),
-                'warnings': validation_dict.get('warnings', []),
-                'stage': 'structure_validation'
+                "status": "error",
+                "errors": ["Validator not available"],
+                "stage": "structure_validation",
             }
 
-        self._stats['graphs_validated'] += 1
+        validation_result_obj = self.runtime.validator.validate_graph(graph)
+        validation_dict = validation_result_obj.to_dict()  # Convert to dict
+
+        if not validation_dict.get("valid", False):
+            return {
+                "status": "validation_failed",
+                "errors": validation_dict.get("errors", []),
+                "warnings": validation_dict.get("warnings", []),
+                "stage": "structure_validation",
+            }
+
+        self._stats["graphs_validated"] += 1
 
         # Stage 2: Extract agent proposals
         logger.info("🔍 Stage 2: Extracting agent proposals...")
@@ -376,21 +421,24 @@ class VulcanGraphixBridge:
             try:
                 if self.config.enable_parallel_validation and len(proposals) > 1:
                     # Parallel validation
-                    self._stats['parallel_validations'] += 1
+                    self._stats["parallel_validations"] += 1
                     validation_tasks = [
-                        self._validate_with_vulcan(proposal)
-                        for proposal in proposals
+                        self._validate_with_vulcan(proposal) for proposal in proposals
                     ]
-                    vulcan_validations = await asyncio.gather(*validation_tasks, return_exceptions=True)
+                    vulcan_validations = await asyncio.gather(
+                        *validation_tasks, return_exceptions=True
+                    )
 
                     # Handle any exceptions from parallel execution
                     for i, result in enumerate(vulcan_validations):
                         if isinstance(result, Exception):
-                            logger.error(f"Validation failed for proposal {i}: {result}")
+                            logger.error(
+                                f"Validation failed for proposal {i}: {result}"
+                            )
                             vulcan_validations[i] = ValidationResponse(
                                 success=False,
                                 reason=f"Validation error: {str(result)}",
-                                details={'exception': str(result)}
+                                details={"exception": str(result)},
                             )
                 else:
                     # Sequential validation
@@ -398,46 +446,52 @@ class VulcanGraphixBridge:
                         validation_result = await self._validate_with_vulcan(proposal)
                         vulcan_validations.append(validation_result)
 
-                self._stats['proposals_checked'] += len(proposals)
+                self._stats["proposals_checked"] += len(proposals)
 
                 # Block if critical proposal rejected
-                for i, (proposal, validation) in enumerate(zip(proposals, vulcan_validations)):
+                for i, (proposal, validation) in enumerate(
+                    zip(proposals, vulcan_validations)
+                ):
                     if isinstance(validation, ValidationResponse):
                         validation_success = validation.success
                         validation_reason = validation.reason
                         validation_conflicts = validation.conflicts
                     else:
                         # Handle dict format for backward compatibility
-                        validation_success = validation.get('success', validation.get('valid', True))
-                        validation_reason = validation.get('reason', validation.get('reasoning', ''))
-                        validation_conflicts = validation.get('conflicts', [])
+                        validation_success = validation.get(
+                            "success", validation.get("valid", True)
+                        )
+                        validation_reason = validation.get(
+                            "reason", validation.get("reasoning", "")
+                        )
+                        validation_conflicts = validation.get("conflicts", [])
 
-                    if not validation_success and proposal.get('critical', False):
-                        self._stats['safety_blocks'] += 1
+                    if not validation_success and proposal.get("critical", False):
+                        self._stats["safety_blocks"] += 1
                         return {
-                            'status': 'proposal_rejected',
-                            'proposal_id': proposal.get('id'),
-                            'reason': validation_reason,
-                            'conflicts': validation_conflicts,
-                            'stage': 'vulcan_validation'
+                            "status": "proposal_rejected",
+                            "proposal_id": proposal.get("id"),
+                            "reason": validation_reason,
+                            "conflicts": validation_conflicts,
+                            "stage": "vulcan_validation",
                         }
 
             except asyncio.TimeoutError:
-                self._stats['validation_timeouts'] += 1
+                self._stats["validation_timeouts"] += 1
                 logger.error("Validation timed out")
                 return {
-                    'status': 'validation_timeout',
-                    'reason': f'Validation timed out after {self.config.validation_timeout_seconds}s',
-                    'stage': 'vulcan_validation'
+                    "status": "validation_timeout",
+                    "reason": f"Validation timed out after {self.config.validation_timeout_seconds}s",
+                    "stage": "vulcan_validation",
                 }
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception as e:
                 logger.error(f"Validation stage failed: {e}", exc_info=True)
                 return {
-                    'status': 'validation_error',
-                    'reason': f'Validation error: {str(e)}',
-                    'stage': 'vulcan_validation'
+                    "status": "validation_error",
+                    "reason": f"Validation error: {str(e)}",
+                    "stage": "vulcan_validation",
                 }
 
         # Stage 4: Consensus voting (if multiple agents)
@@ -445,32 +499,34 @@ class VulcanGraphixBridge:
         if self.config.enable_consensus and len(proposals) > 1:
             logger.info("🔍 Stage 4: Running consensus voting...")
             try:
-                consensus_result = await self._run_consensus(proposals, vulcan_validations)
-                self._stats['consensus_votes'] += 1
+                consensus_result = await self._run_consensus(
+                    proposals, vulcan_validations
+                )
+                self._stats["consensus_votes"] += 1
 
-                if not consensus_result['consensus_reached']:
+                if not consensus_result["consensus_reached"]:
                     return {
-                        'status': 'consensus_failed',
-                        'reason': 'Agents could not reach consensus',
-                        'voting_results': consensus_result,
-                        'stage': 'consensus'
+                        "status": "consensus_failed",
+                        "reason": "Agents could not reach consensus",
+                        "voting_results": consensus_result,
+                        "stage": "consensus",
                     }
             except asyncio.TimeoutError:
-                self._stats['consensus_timeouts'] += 1
+                self._stats["consensus_timeouts"] += 1
                 logger.error("Consensus voting timed out")
                 return {
-                    'status': 'consensus_timeout',
-                    'reason': f'Consensus timed out after {self.config.consensus_timeout_seconds}s',
-                    'stage': 'consensus'
+                    "status": "consensus_timeout",
+                    "reason": f"Consensus timed out after {self.config.consensus_timeout_seconds}s",
+                    "stage": "consensus",
                 }
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception as e:
                 logger.error(f"Consensus stage failed: {e}", exc_info=True)
                 return {
-                    'status': 'consensus_error',
-                    'reason': f'Consensus error: {str(e)}',
-                    'stage': 'consensus'
+                    "status": "consensus_error",
+                    "reason": f"Consensus error: {str(e)}",
+                    "stage": "consensus",
                 }
 
         # Stage 5: Safety validation
@@ -479,13 +535,13 @@ class VulcanGraphixBridge:
             try:
                 safety_check = self._safety_validate_graph(graph)
 
-                if not safety_check['safe']:
-                    self._stats['safety_blocks'] += 1
+                if not safety_check["safe"]:
+                    self._stats["safety_blocks"] += 1
                     return {
-                        'status': 'safety_failed',
-                        'reason': safety_check.get('reason'),
-                        'violations': safety_check.get('violations', []),
-                        'stage': 'safety_validation'
+                        "status": "safety_failed",
+                        "reason": safety_check.get("reason"),
+                        "violations": safety_check.get("violations", []),
+                        "stage": "safety_validation",
                     }
             except (KeyboardInterrupt, SystemExit):
                 raise
@@ -499,13 +555,17 @@ class VulcanGraphixBridge:
         if self.vulcan_available and self.config.enable_semantic_transfer:
             logger.info("🔍 Stage 6: Semantic concept transfer...")
             try:
-                graph, transfer_failures = await self._apply_semantic_transfer(graph, context or {})
+                graph, transfer_failures = await self._apply_semantic_transfer(
+                    graph, context or {}
+                )
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception as e:
                 logger.error(f"Semantic transfer failed: {e}", exc_info=True)
                 # Continue with original graph
-                logger.warning("Continuing with original graph after semantic transfer failure")
+                logger.warning(
+                    "Continuing with original graph after semantic transfer failure"
+                )
 
         # Stage 7: Execute graph with Graphix runtime
         logger.info("🚀 Stage 7: Executing graph...")
@@ -518,12 +578,10 @@ class VulcanGraphixBridge:
         except Exception as e:
             logger.error(f"Graph execution failed: {e}", exc_info=True)
             return {
-                'status': 'execution_failed',
-                'errors': [str(e)],
-                'stage': 'graph_execution',
-                'metadata': {
-                    'execution_time_s': time.time() - start_time
-                }
+                "status": "execution_failed",
+                "errors": [str(e)],
+                "stage": "graph_execution",
+                "metadata": {"execution_time_s": time.time() - start_time},
             }
 
         # Stage 8: Post-execution analysis
@@ -531,24 +589,23 @@ class VulcanGraphixBridge:
 
         # Compile comprehensive result
         result = {
-            'status': exec_result.get('status', 'unknown'),
-            'output': exec_result.get('output'),
-            'errors': exec_result.get('errors'),
-            'metadata': {
-                'execution_time_s': execution_time,
-                'vulcan_enabled': self.vulcan_available,
-                'stages_completed': 8,
-                'vulcan_validations': [
+            "status": exec_result.get("status", "unknown"),
+            "output": exec_result.get("output"),
+            "errors": exec_result.get("errors"),
+            "metadata": {
+                "execution_time_s": execution_time,
+                "vulcan_enabled": self.vulcan_available,
+                "stages_completed": 8,
+                "vulcan_validations": [
                     v.to_dict() if isinstance(v, ValidationResponse) else v
                     for v in vulcan_validations
                 ],
-                'consensus_result': consensus_result,
-                'transfer_failures': [
-                    {'concept': f.concept, 'error': f.error}
-                    for f in transfer_failures
+                "consensus_result": consensus_result,
+                "transfer_failures": [
+                    {"concept": f.concept, "error": f.error} for f in transfer_failures
                 ],
-                'graphix_metadata': exec_result.get('metadata', {}),
-            }
+                "graphix_metadata": exec_result.get("metadata", {}),
+            },
         }
 
         logger.info(f"✅ Graph execution complete in {execution_time:.2f}s")
@@ -571,40 +628,48 @@ class VulcanGraphixBridge:
         """
         proposals = []
 
-        for node in graph.get('nodes', []):
+        for node in graph.get("nodes", []):
             # Validate node is a dictionary
             if not isinstance(node, dict):
                 logger.warning(f"Skipping non-dict node: {type(node)}")
                 continue
 
-            node_type = node.get('type', '')
+            node_type = node.get("type", "")
 
-            if node_type in ['AgentNode', 'ProposalNode', 'DecisionNode']:
-                params = node.get('params', {})
+            if node_type in ["AgentNode", "ProposalNode", "DecisionNode"]:
+                params = node.get("params", {})
 
                 if not isinstance(params, dict):
-                    logger.warning(f"Node {node.get('id', 'unknown')} has non-dict params: {type(params)}. Skipping.")
+                    logger.warning(
+                        f"Node {node.get('id', 'unknown')} has non-dict params: {type(params)}. Skipping."
+                    )
                     continue
 
-                if 'proposal' in params:
-                    proposal = params['proposal']
+                if "proposal" in params:
+                    proposal = params["proposal"]
 
                     # Validate proposal is a dictionary
                     if not isinstance(proposal, dict):
-                        logger.warning(f"Node {node['id']} has non-dict proposal: {type(proposal)}. Skipping.")
+                        logger.warning(
+                            f"Node {node['id']} has non-dict proposal: {type(proposal)}. Skipping."
+                        )
                         continue
 
                     # Create a copy to avoid modifying original
                     proposal_copy = proposal.copy()
-                    proposal_copy['node_id'] = node['id']
-                    proposal_copy['id'] = proposal_copy.get('id', f"proposal_{node['id']}")
-                    proposal_copy['critical'] = node.get('critical', False)
+                    proposal_copy["node_id"] = node["id"]
+                    proposal_copy["id"] = proposal_copy.get(
+                        "id", f"proposal_{node['id']}"
+                    )
+                    proposal_copy["critical"] = node.get("critical", False)
                     proposals.append(proposal_copy)
 
         return proposals
 
     @async_timeout(30.0)
-    async def _validate_with_vulcan(self, proposal: Dict[str, Any]) -> ValidationResponse:
+    async def _validate_with_vulcan(
+        self, proposal: Dict[str, Any]
+    ) -> ValidationResponse:
         """
         Validate proposal using VULCAN meta-reasoning
 
@@ -619,8 +684,8 @@ class VulcanGraphixBridge:
         if not self.world_model:
             return ValidationResponse(
                 success=True,
-                reason='VULCAN not available',
-                details={'vulcan_available': False}
+                reason="VULCAN not available",
+                details={"vulcan_available": False},
             )
 
         # Check cache first
@@ -631,12 +696,12 @@ class VulcanGraphixBridge:
             return cached
 
         # Check if method exists before calling
-        if not hasattr(self.world_model, 'evaluate_agent_proposal'):
+        if not hasattr(self.world_model, "evaluate_agent_proposal"):
             logger.warning("world_model.evaluate_agent_proposal not available")
             return ValidationResponse(
                 success=True,
-                reason='Method not available, skipping validation',
-                details={'method_available': False}
+                reason="Method not available, skipping validation",
+                details={"method_available": False},
             )
 
         try:
@@ -648,17 +713,17 @@ class VulcanGraphixBridge:
                 result = validation
             elif isinstance(validation, dict):
                 result = ValidationResponse(
-                    success=validation.get('valid', validation.get('success', True)),
-                    reason=validation.get('reasoning', validation.get('reason', '')),
-                    details=validation.get('details', {}),
-                    confidence=validation.get('confidence', 0.0),
-                    conflicts=validation.get('conflicts', [])
+                    success=validation.get("valid", validation.get("success", True)),
+                    reason=validation.get("reasoning", validation.get("reason", "")),
+                    details=validation.get("details", {}),
+                    confidence=validation.get("confidence", 0.0),
+                    conflicts=validation.get("conflicts", []),
                 )
             else:
                 result = ValidationResponse(
                     success=True,
-                    reason='Unknown validation format',
-                    details={'raw_validation': str(validation)}
+                    reason="Unknown validation format",
+                    details={"raw_validation": str(validation)},
                 )
 
             # Cache the result
@@ -672,14 +737,14 @@ class VulcanGraphixBridge:
             logger.error(f"VULCAN validation failed: {e}", exc_info=True)
             return ValidationResponse(
                 success=False,
-                reason=f'Validation error: {str(e)}',
-                details={'exception': str(e)}
+                reason=f"Validation error: {str(e)}",
+                details={"exception": str(e)},
             )
 
     @async_timeout(60.0)
-    async def _run_consensus(self,
-                            proposals: List[Dict[str, Any]],
-                            validations: List[Any]) -> Dict[str, Any]:
+    async def _run_consensus(
+        self, proposals: List[Dict[str, Any]], validations: List[Any]
+    ) -> Dict[str, Any]:
         """
         Run consensus voting using VULCAN's transparency interface
 
@@ -692,43 +757,45 @@ class VulcanGraphixBridge:
         """
         if not self.world_model:
             return {
-                'consensus_reached': True,
-                'reason': 'VULCAN not available',
-                'votes': []
+                "consensus_reached": True,
+                "reason": "VULCAN not available",
+                "votes": [],
             }
 
         # Validate list lengths match
         if len(proposals) != len(validations):
-            error_msg = f'Proposal and validation counts do not match: {len(proposals)} vs {len(validations)}'
+            error_msg = f"Proposal and validation counts do not match: {len(proposals)} vs {len(validations)}"
             logger.error(error_msg)
-            return {
-                'consensus_reached': False,
-                'error': error_msg,
-                'votes': []
-            }
+            return {"consensus_reached": False, "error": error_msg, "votes": []}
 
         try:
             # Get consensus context from VULCAN
             consensus_context = {}
 
             # Check if motivational_introspection exists
-            if hasattr(self.world_model, 'motivational_introspection'):
+            if hasattr(self.world_model, "motivational_introspection"):
                 mi = self.world_model.motivational_introspection
 
                 # Check if transparency_interface and method exist
-                if hasattr(mi, 'transparency_interface'):
+                if hasattr(mi, "transparency_interface"):
                     transparency_interface = mi.transparency_interface
-                    if hasattr(transparency_interface, 'export_for_consensus'):
+                    if hasattr(transparency_interface, "export_for_consensus"):
                         try:
-                            consensus_context = transparency_interface.export_for_consensus()
+                            consensus_context = (
+                                transparency_interface.export_for_consensus()
+                            )
                         except (KeyboardInterrupt, SystemExit):
                             raise
                         except Exception as e:
                             logger.debug(f"Failed to export consensus context: {e}")
                     else:
-                        logger.debug("transparency_interface.export_for_consensus not available")
+                        logger.debug(
+                            "transparency_interface.export_for_consensus not available"
+                        )
                 else:
-                    logger.debug("motivational_introspection.transparency_interface not available")
+                    logger.debug(
+                        "motivational_introspection.transparency_interface not available"
+                    )
             else:
                 logger.debug("world_model.motivational_introspection not available")
 
@@ -741,34 +808,38 @@ class VulcanGraphixBridge:
                     confidence = validation.confidence
                     reasoning = validation.reason
                 elif isinstance(validation, dict):
-                    approved = validation.get('valid', validation.get('success', False))
-                    confidence = validation.get('confidence', 0.0)
-                    reasoning = validation.get('reasoning', validation.get('reason', ''))
+                    approved = validation.get("valid", validation.get("success", False))
+                    confidence = validation.get("confidence", 0.0)
+                    reasoning = validation.get(
+                        "reasoning", validation.get("reason", "")
+                    )
                 else:
                     approved = False
                     confidence = 0.0
-                    reasoning = 'Unknown validation format'
+                    reasoning = "Unknown validation format"
 
-                votes.append({
-                    'proposal_id': proposal.get('id', 'unknown'),
-                    'approved': approved,
-                    'confidence': confidence,
-                    'reasoning': reasoning
-                })
+                votes.append(
+                    {
+                        "proposal_id": proposal.get("id", "unknown"),
+                        "approved": approved,
+                        "confidence": confidence,
+                        "reasoning": reasoning,
+                    }
+                )
 
             # Check for consensus
-            approved_count = sum(1 for v in votes if v['approved'])
+            approved_count = sum(1 for v in votes if v["approved"])
             approval_rate = approved_count / len(votes) if votes else 0
 
             consensus_reached = approval_rate >= self.config.consensus_threshold
 
             result = {
-                'consensus_reached': consensus_reached,
-                'votes': votes,
-                'approval_rate': approval_rate,
-                'threshold': self.config.consensus_threshold,
-                'context': consensus_context,
-                'timestamp': time.time()
+                "consensus_reached": consensus_reached,
+                "votes": votes,
+                "approval_rate": approval_rate,
+                "threshold": self.config.consensus_threshold,
+                "context": consensus_context,
+                "timestamp": time.time(),
             }
 
             self._history.append(result)
@@ -778,11 +849,7 @@ class VulcanGraphixBridge:
             raise
         except Exception as e:
             logger.error(f"Consensus voting failed: {e}", exc_info=True)
-            return {
-                'consensus_reached': False,
-                'error': str(e),
-                'votes': []
-            }
+            return {"consensus_reached": False, "error": str(e), "votes": []}
 
     def _safety_validate_graph(self, graph: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -797,59 +864,55 @@ class VulcanGraphixBridge:
             Dictionary with safety validation results
         """
         if not self.world_model:
-            return {
-                'safe': True,
-                'reason': 'VULCAN not available',
-                'violations': []
-            }
+            return {"safe": True, "reason": "VULCAN not available", "violations": []}
 
         try:
             # Use VULCAN's safety validator
-            if hasattr(self.world_model, 'safety_validator'):
+            if hasattr(self.world_model, "safety_validator"):
                 try:
                     safety_result = self.world_model.safety_validator.validate(graph)
 
                     # Handle different result formats
-                    if hasattr(safety_result, 'safe'):
+                    if hasattr(safety_result, "safe"):
                         safe = safety_result.safe
                     elif isinstance(safety_result, dict):
-                        safe = safety_result.get('safe', True)
+                        safe = safety_result.get("safe", True)
                     else:
                         safe = True
 
-                    if hasattr(safety_result, 'violations'):
+                    if hasattr(safety_result, "violations"):
                         violations = safety_result.violations
                     elif isinstance(safety_result, dict):
-                        violations = safety_result.get('violations', [])
+                        violations = safety_result.get("violations", [])
                     else:
                         violations = []
 
-                    if hasattr(safety_result, 'reasoning'):
+                    if hasattr(safety_result, "reasoning"):
                         reason = safety_result.reasoning
                     elif isinstance(safety_result, dict):
-                        reason = safety_result.get('reasoning', safety_result.get('reason', ''))
+                        reason = safety_result.get(
+                            "reasoning", safety_result.get("reason", "")
+                        )
                     else:
-                        reason = ''
+                        reason = ""
 
-                    return {
-                        'safe': safe,
-                        'violations': violations,
-                        'reason': reason
-                    }
+                    return {"safe": safe, "violations": violations, "reason": reason}
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except Exception as e:
-                    logger.error(f"Safety validator threw exception: {e}", exc_info=True)
+                    logger.error(
+                        f"Safety validator threw exception: {e}", exc_info=True
+                    )
                     return {
-                        'safe': False,
-                        'reason': f'Safety check error: {str(e)}',
-                        'violations': []
+                        "safe": False,
+                        "reason": f"Safety check error: {str(e)}",
+                        "violations": [],
                     }
 
             return {
-                'safe': True,
-                'reason': 'Safety validator not available',
-                'violations': []
+                "safe": True,
+                "reason": "Safety validator not available",
+                "violations": [],
             }
 
         except (KeyboardInterrupt, SystemExit):
@@ -857,14 +920,14 @@ class VulcanGraphixBridge:
         except Exception as e:
             logger.error(f"Safety validation failed: {e}", exc_info=True)
             return {
-                'safe': False,
-                'reason': f'Safety check error: {str(e)}',
-                'violations': []
+                "safe": False,
+                "reason": f"Safety check error: {str(e)}",
+                "violations": [],
             }
 
-    async def _apply_semantic_transfer(self,
-                                       graph: Dict[str, Any],
-                                       context: Dict[str, Any]) -> tuple[Dict[str, Any], List[ConceptTransferFailure]]:
+    async def _apply_semantic_transfer(
+        self, graph: Dict[str, Any], context: Dict[str, Any]
+    ) -> tuple[Dict[str, Any], List[ConceptTransferFailure]]:
         """
         Apply semantic concept transfer using VULCAN semantic bridge
 
@@ -877,7 +940,7 @@ class VulcanGraphixBridge:
         Returns:
             Tuple of (modified graph, list of transfer failures)
         """
-        if not self.world_model or not hasattr(self.world_model, 'semantic_bridge'):
+        if not self.world_model or not hasattr(self.world_model, "semantic_bridge"):
             return graph, []
 
         failures = []
@@ -886,7 +949,7 @@ class VulcanGraphixBridge:
             semantic_bridge = self.world_model.semantic_bridge
 
             # Check if transfer_concept method exists
-            if not hasattr(semantic_bridge, 'transfer_concept'):
+            if not hasattr(semantic_bridge, "transfer_concept"):
                 logger.warning("semantic_bridge.transfer_concept not available")
                 return graph, []
 
@@ -898,9 +961,9 @@ class VulcanGraphixBridge:
                 try:
                     transferred = semantic_bridge.transfer_concept(
                         concept=concept,
-                        source_domain='agent_planning',
-                        target_domain='execution',
-                        context=context
+                        source_domain="agent_planning",
+                        target_domain="execution",
+                        context=context,
                     )
 
                     if transferred:
@@ -909,14 +972,19 @@ class VulcanGraphixBridge:
                 except (KeyboardInterrupt, SystemExit):
                     raise
                 except Exception as concept_error:
-                    logger.warning(f"Failed to transfer concept '{concept}': {concept_error}")
+                    logger.warning(
+                        f"Failed to transfer concept '{concept}': {concept_error}"
+                    )
 
                     # Track the failure
                     failure = ConceptTransferFailure(
                         concept=concept,
                         error=str(concept_error),
                         timestamp=time.time(),
-                        context={'source_domain': 'agent_planning', 'target_domain': 'execution'}
+                        context={
+                            "source_domain": "agent_planning",
+                            "target_domain": "execution",
+                        },
                     )
                     failures.append(failure)
                     self.transfer_failures.append(failure)
@@ -944,20 +1012,20 @@ class VulcanGraphixBridge:
         """
         concepts = set()
 
-        nodes = graph.get('nodes', [])
+        nodes = graph.get("nodes", [])
         for node in nodes:
             if not isinstance(node, dict):
                 continue
 
-            node_type = node.get('type', '')
+            node_type = node.get("type", "")
             if node_type:
                 concepts.add(node_type)
 
             # Extract concepts from node parameters
-            params = node.get('params', {})
+            params = node.get("params", {})
             if isinstance(params, dict):
                 # Look for concept-related keys
-                for key in ['concept', 'semantic_type', 'domain']:
+                for key in ["concept", "semantic_type", "domain"]:
                     if key in params:
                         value = params[key]
                         if isinstance(value, str):
@@ -965,9 +1033,9 @@ class VulcanGraphixBridge:
 
         return list(concepts)
 
-    def _apply_transferred_concept(self,
-                                   graph: Dict[str, Any],
-                                   transferred: Any) -> Dict[str, Any]:
+    def _apply_transferred_concept(
+        self, graph: Dict[str, Any], transferred: Any
+    ) -> Dict[str, Any]:
         """
         Apply transferred semantic concept to graph
 
@@ -983,11 +1051,11 @@ class VulcanGraphixBridge:
 
         # For now, just add metadata if it doesn't break the graph structure
         if isinstance(transferred, dict):
-            if 'metadata' not in graph:
-                 graph['metadata'] = {}
-            if '_semantic_transfers' not in graph['metadata']:
-                graph['metadata']['_semantic_transfers'] = []
-            graph['metadata']['_semantic_transfers'].append(transferred)
+            if "metadata" not in graph:
+                graph["metadata"] = {}
+            if "_semantic_transfers" not in graph["metadata"]:
+                graph["metadata"]["_semantic_transfers"] = []
+            graph["metadata"]["_semantic_transfers"].append(transferred)
 
         return graph
 
@@ -1001,33 +1069,30 @@ class VulcanGraphixBridge:
             Dictionary with VULCAN state information
         """
         if not self.world_model:
-            return {
-                'available': False,
-                'reason': 'VULCAN world model not initialized'
-            }
+            return {"available": False, "reason": "VULCAN world model not initialized"}
 
         # Check if motivational_introspection exists
-        if not hasattr(self.world_model, 'motivational_introspection'):
+        if not hasattr(self.world_model, "motivational_introspection"):
             return {
-                'available': False,
-                'error': 'MotivationalIntrospection not available'
+                "available": False,
+                "error": "MotivationalIntrospection not available",
             }
 
         try:
             mi = self.world_model.motivational_introspection
 
             # Check if method exists
-            if not hasattr(mi, 'explain_motivation_structure'):
+            if not hasattr(mi, "explain_motivation_structure"):
                 return {
-                    'available': False,
-                    'error': 'explain_motivation_structure not available'
+                    "available": False,
+                    "error": "explain_motivation_structure not available",
                 }
 
             state = mi.explain_motivation_structure()
 
             # Add timestamp
             if isinstance(state, dict):
-                state['timestamp'] = time.time()
+                state["timestamp"] = time.time()
 
             return state
 
@@ -1035,10 +1100,7 @@ class VulcanGraphixBridge:
             raise
         except Exception as e:
             logger.error(f"Failed to get VULCAN state: {e}", exc_info=True)
-            return {
-                'available': False,
-                'error': str(e)
-            }
+            return {"available": False, "error": str(e)}
 
     def get_integration_statistics(self) -> Dict[str, Any]:
         """
@@ -1048,25 +1110,27 @@ class VulcanGraphixBridge:
             Dictionary with comprehensive statistics
         """
         stats = self._stats.copy()
-        stats['vulcan_available'] = self.vulcan_available
-        stats['config'] = self.config.to_dict()
-        stats['cache_size'] = len(self._cache)
-        stats['consensus_history_size'] = len(self._history)
-        stats['transfer_failures_size'] = len(self.transfer_failures)
-        stats['pending_tasks'] = len(self._pending_tasks)
+        stats["vulcan_available"] = self.vulcan_available
+        stats["config"] = self.config.to_dict()
+        stats["cache_size"] = len(self._cache)
+        stats["consensus_history_size"] = len(self._history)
+        stats["transfer_failures_size"] = len(self.transfer_failures)
+        stats["pending_tasks"] = len(self._pending_tasks)
 
         if self.world_model:
             try:
                 # Check if method exists before calling
-                if hasattr(self.world_model, 'get_system_metrics'):
-                    stats['vulcan_metrics'] = self.world_model.get_system_metrics()
+                if hasattr(self.world_model, "get_system_metrics"):
+                    stats["vulcan_metrics"] = self.world_model.get_system_metrics()
                 else:
-                    stats['vulcan_metrics'] = {'note': 'get_system_metrics not available'}
+                    stats["vulcan_metrics"] = {
+                        "note": "get_system_metrics not available"
+                    }
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception as e:
                 logger.debug(f"Could not get VULCAN metrics: {e}")
-                stats['vulcan_metrics'] = {'error': str(e)}
+                stats["vulcan_metrics"] = {"error": str(e)}
 
         return stats
 
@@ -1099,10 +1163,10 @@ class VulcanGraphixBridge:
 
         return [
             {
-                'concept': f.concept,
-                'error': f.error,
-                'timestamp': f.timestamp,
-                'context': f.context
+                "concept": f.concept,
+                "error": f.error,
+                "timestamp": f.timestamp,
+                "context": f.context,
             }
             for f in recent
         ]
@@ -1129,19 +1193,22 @@ class VulcanGraphixBridge:
                 success=False,
                 reason="Invalid graph structure",
                 confidence=1.0,
-                details={"stage": "structure"}
+                details={"stage": "structure"},
             )
 
         # Integrate with VULCAN safety validation if available
-        if self.world_model and hasattr(self.world_model, 'safety_validator'):
+        if self.world_model and hasattr(self.world_model, "safety_validator"):
             try:
                 safety_result = self._safety_validate_graph(graph)
-                if not safety_result.get('safe', True):
+                if not safety_result.get("safe", True):
                     return ValidationResponse(
                         success=False,
-                        reason=safety_result.get('reason', 'Safety check failed'),
-                        confidence=0.9, # High confidence for safety block
-                        details={"stage": "safety", "violations": safety_result.get('violations', [])}
+                        reason=safety_result.get("reason", "Safety check failed"),
+                        confidence=0.9,  # High confidence for safety block
+                        details={
+                            "stage": "safety",
+                            "violations": safety_result.get("violations", []),
+                        },
                     )
             except Exception as e:
                 logger.error(f"Error during safety validation in pre-check: {e}")
@@ -1150,39 +1217,45 @@ class VulcanGraphixBridge:
                     success=False,
                     reason=f"Safety check error: {e}",
                     confidence=0.5,
-                    details={"stage": "safety_error"}
+                    details={"stage": "safety_error"},
                 )
 
         # Add richer policy checks here using self.world_model, self.motivational_driver, etc.
         # Example using motivational driver (if available)
-        if self.motivational_driver and hasattr(self.motivational_driver, 'validate_proposal_alignment'):
+        if self.motivational_driver and hasattr(
+            self.motivational_driver, "validate_proposal_alignment"
+        ):
             # Extract a pseudo-proposal from the graph intent
-            pseudo_proposal = {'description': f'Execute graph {graph.get("id", "unnamed")}', 'graph': graph}
+            pseudo_proposal = {
+                "description": f"Execute graph {graph.get('id', 'unnamed')}",
+                "graph": graph,
+            }
             try:
-                alignment = self.motivational_driver.validate_proposal_alignment(pseudo_proposal)
-                if isinstance(alignment, dict) and not alignment.get('aligned', True):
+                alignment = self.motivational_driver.validate_proposal_alignment(
+                    pseudo_proposal
+                )
+                if isinstance(alignment, dict) and not alignment.get("aligned", True):
                     return ValidationResponse(
                         success=False,
-                        reason=alignment.get('reasoning', 'Motivational misalignment'),
-                        confidence=alignment.get('confidence', 0.7),
-                        details={"stage": "motivation"}
+                        reason=alignment.get("reasoning", "Motivational misalignment"),
+                        confidence=alignment.get("confidence", 0.7),
+                        details={"stage": "motivation"},
                     )
             except Exception as e:
-                 logger.warning(f"Motivational alignment check failed: {e}")
+                logger.warning(f"Motivational alignment check failed: {e}")
 
         # If all checks pass
         return ValidationResponse(
-            success=True,
-            reason="Approved",
-            confidence=0.8,
-            details={"stage": "policy"}
+            success=True, reason="Approved", confidence=0.8, details={"stage": "policy"}
         )
 
-    async def on_run_complete(self,
-                              graph: Dict[str, Any],
-                              result: GraphExecutionResult, # Use the correct type hint
-                              metrics: Optional[ExecutionMetrics], # Use the correct type hint
-                              extension_meta: Dict[str, Any]):
+    async def on_run_complete(
+        self,
+        graph: Dict[str, Any],
+        result: GraphExecutionResult,  # Use the correct type hint
+        metrics: Optional[ExecutionMetrics],  # Use the correct type hint
+        extension_meta: Dict[str, Any],
+    ):
         """
         Called by UnifiedRuntime after every run.
         Use this to update motivation/introspection, semantic memory, etc.
@@ -1190,41 +1263,52 @@ class VulcanGraphixBridge:
         try:
             # Record basic run outcome in _history
             status_value = None
-            if hasattr(result, 'status') and hasattr(result.status, 'value'):
+            if hasattr(result, "status") and hasattr(result.status, "value"):
                 status_value = result.status.value
-            elif hasattr(result, 'status'):
+            elif hasattr(result, "status"):
                 status_value = result.status
 
-            metrics_summary = metrics.to_dict() if metrics and hasattr(metrics, 'to_dict') else {}
+            metrics_summary = (
+                metrics.to_dict() if metrics and hasattr(metrics, "to_dict") else {}
+            )
 
-            self._history.append({
-                "ts": time.time(),
-                "status": status_value,
-                "nodes_executed": getattr(result, "nodes_executed", metrics_summary.get("nodes_executed")),
-                "total_latency_ms": metrics_summary.get("total_latency_ms"),
-                "extension_meta": extension_meta,
-            })
+            self._history.append(
+                {
+                    "ts": time.time(),
+                    "status": status_value,
+                    "nodes_executed": getattr(
+                        result, "nodes_executed", metrics_summary.get("nodes_executed")
+                    ),
+                    "total_latency_ms": metrics_summary.get("total_latency_ms"),
+                    "extension_meta": extension_meta,
+                }
+            )
             self._stats["runs_observed"] += 1
 
             # Optionally call world_model or motivational_driver with run summary
             if self.world_model:
-                if hasattr(self.world_model, 'observe_execution_outcome'):
+                if hasattr(self.world_model, "observe_execution_outcome"):
                     # Create a summary payload
                     outcome_summary = {
-                        'graph_id': graph.get('id'),
-                        'status': status_value,
-                        'metrics': metrics_summary,
-                        'output_summary': str(getattr(result, 'output', None))[:200], # Summary of output
-                        'errors': getattr(result, 'errors', [])
+                        "graph_id": graph.get("id"),
+                        "status": status_value,
+                        "metrics": metrics_summary,
+                        "output_summary": str(getattr(result, "output", None))[
+                            :200
+                        ],  # Summary of output
+                        "errors": getattr(result, "errors", []),
                     }
-                    if asyncio.iscoroutinefunction(self.world_model.observe_execution_outcome):
-                        await self.world_model.observe_execution_outcome(outcome_summary)
+                    if asyncio.iscoroutinefunction(
+                        self.world_model.observe_execution_outcome
+                    ):
+                        await self.world_model.observe_execution_outcome(
+                            outcome_summary
+                        )
                     else:
                         self.world_model.observe_execution_outcome(outcome_summary)
 
         except Exception as e:
             logger.error(f"Error in VULCAN on_run_complete hook: {e}")
-
 
     async def shutdown(self):
         """
@@ -1261,7 +1345,9 @@ class VulcanGraphixBridge:
                         shutdown_method()
                     logger.debug(f"VULCAN world model {method_name}() called")
                 else:
-                    logger.debug("No standard cleanup method found on VULCAN world model")
+                    logger.debug(
+                        "No standard cleanup method found on VULCAN world model"
+                    )
 
             except Exception as e:
                 logger.error(f"Error shutting down VULCAN world model: {e}")
@@ -1280,8 +1366,10 @@ class VulcanGraphixBridge:
 # EXPORT HELPER
 # ============================================================================
 
-def enable_vulcan_integration(runtime: Any,
-                              config: Optional[VulcanIntegrationConfig] = None) -> Optional[VulcanGraphixBridge]:
+
+def enable_vulcan_integration(
+    runtime: Any, config: Optional[VulcanIntegrationConfig] = None
+) -> Optional[VulcanGraphixBridge]:
     """
     Enable VULCAN integration for a Graphix runtime
 
@@ -1305,19 +1393,21 @@ def enable_vulcan_integration(runtime: Any,
     """
     try:
         bridge = VulcanGraphixBridge(runtime=runtime, config=config)
-        
-        status = 'enabled' if bridge.vulcan_available else 'disabled'
+
+        status = "enabled" if bridge.vulcan_available else "disabled"
         logger.info(f"VULCAN integration {status}")
 
         if not bridge.vulcan_available:
-            logger.warning("⚠️  VULCAN integration disabled - VULCAN components not available")
+            logger.warning(
+                "⚠️  VULCAN integration disabled - VULCAN components not available"
+            )
             logger.warning("   Graph execution will proceed without VULCAN validation")
             # Return None or the bridge? Returning bridge allows partial functionality if desired.
             # Let's return the bridge instance even if VULCAN isn't fully available,
             # as the methods internally check `self.vulcan_available`.
-            
+
         return bridge
-        
+
     except Exception as e:
         logger.error(f"Failed to enable VULCAN integration: {e}")
         return None

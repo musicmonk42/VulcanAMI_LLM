@@ -47,6 +47,7 @@ from governed_trainer import GovernedTrainer  # noqa: E402
 
 # ---------------------------- Tokenizer and Dataset ---------------------------- #
 
+
 class TinyTokenizer:
     """
     Very simple whitespace tokenizer with a tiny special token set.
@@ -54,6 +55,7 @@ class TinyTokenizer:
     - Splits on whitespace
     - Keeps tokens with frequency >= min_freq (others -> <UNK>)
     """
+
     PAD = "<PAD>"
     UNK = "<UNK>"
     BOS = "<BOS>"
@@ -78,7 +80,10 @@ class TinyTokenizer:
         return [tid(tok, unk) for tok in tokens]
 
     def decode(self, ids: List[int]) -> List[str]:
-        return [self.id_to_token[i] if 0 <= i < len(self.id_to_token) else self.UNK for i in ids]
+        return [
+            self.id_to_token[i] if 0 <= i < len(self.id_to_token) else self.UNK
+            for i in ids
+        ]
 
     def vocab_size(self) -> int:
         return len(self.id_to_token)
@@ -103,7 +108,14 @@ class TinyTextDataset:
         }
     """
 
-    def __init__(self, path: str, seq_len: int = 16, min_freq: int = 1, alpha: float = 1.0, hidden_dim: int = 32):
+    def __init__(
+        self,
+        path: str,
+        seq_len: int = 16,
+        min_freq: int = 1,
+        alpha: float = 1.0,
+        hidden_dim: int = 32,
+    ):
         if not os.path.exists(path):
             raise FileNotFoundError(f"Dataset file not found: {path}")
 
@@ -134,7 +146,9 @@ class TinyTextDataset:
                 self.unigram[t] += 1
 
         # Bigram counts c[prev][next]
-        self.bigram = [[0 for _ in range(self.vocab_size)] for _ in range(self.vocab_size)]
+        self.bigram = [
+            [0 for _ in range(self.vocab_size)] for _ in range(self.vocab_size)
+        ]
         prev = self.bos_id
         for t in self.encoded:
             if 0 <= prev < self.vocab_size and 0 <= t < self.vocab_size:
@@ -165,9 +179,12 @@ class TinyTextDataset:
             row = self.bigram[prev]
             row_sum = sum(row) + alpha * self.vocab_size
             # Each entry: log( (count + alpha) / (row_sum) )
-            bigram_logp.append([
-                math.log((row[next_id] + alpha) / row_sum) for next_id in range(self.vocab_size)
-            ])
+            bigram_logp.append(
+                [
+                    math.log((row[next_id] + alpha) / row_sum)
+                    for next_id in range(self.vocab_size)
+                ]
+            )
         return bigram_logp
 
     def _token_embedding(self, token_id: int) -> List[float]:
@@ -176,12 +193,15 @@ class TinyTextDataset:
         """
         d = self.hidden_dim
         return [
-            math.sin((token_id + 1) * (i + 1) * 0.13) * 0.5 + math.cos((token_id + 2) * (i + 3) * 0.07) * 0.5
+            math.sin((token_id + 1) * (i + 1) * 0.13) * 0.5
+            + math.cos((token_id + 2) * (i + 3) * 0.07) * 0.5
             for i in range(d)
         ]
 
     def _sequence_to_batch(self, seq: List[int]) -> Dict[str, Any]:
-        assert len(seq) == self.seq_len + 1, "Internal: sequence length must be seq_len+1"
+        assert len(seq) == self.seq_len + 1, (
+            "Internal: sequence length must be seq_len+1"
+        )
         inputs = seq[:-1]
         targets = seq[1:]
 
@@ -204,18 +224,22 @@ class TinyTextDataset:
         if not self.train_idx:
             raise RuntimeError("No train indices available; dataset too small.")
         start = random.choice(self.train_idx)
-        seq = self.encoded[start:start + self.seq_len + 1]
+        seq = self.encoded[start : start + self.seq_len + 1]
         if len(seq) < self.seq_len + 1:
             seq = seq + [self.pad_id] * (self.seq_len + 1 - len(seq))
         return self._sequence_to_batch(seq)
 
     def sample_val_batch(self) -> Dict[str, Any]:
         if not self.val_idx:
-            idx_pool = self.train_idx if self.train_idx else list(range(max(1, len(self.encoded) - self.seq_len - 1)))
+            idx_pool = (
+                self.train_idx
+                if self.train_idx
+                else list(range(max(1, len(self.encoded) - self.seq_len - 1)))
+            )
         else:
             idx_pool = self.val_idx
         start = random.choice(idx_pool)
-        seq = self.encoded[start:start + self.seq_len + 1]
+        seq = self.encoded[start : start + self.seq_len + 1]
         if len(seq) < self.seq_len + 1:
             seq = seq + [self.pad_id] * (self.seq_len + 1 - len(seq))
         return self._sequence_to_batch(seq)
@@ -223,14 +247,17 @@ class TinyTextDataset:
 
 # ---------------------------- Training and Validation ---------------------------- #
 
+
 def run_training(
-    data_path: str = os.path.join(os.path.dirname(os.path.dirname(HERE)), "data", "tiny_corpus.txt"),
+    data_path: str = os.path.join(
+        os.path.dirname(os.path.dirname(HERE)), "data", "tiny_corpus.txt"
+    ),
     steps: int = 200,
     val_interval: int = 50,
     seq_len: int = 16,
     min_freq: int = 1,
     alpha: float = 1.0,
-    seed: int = 123
+    seed: int = 123,
 ) -> None:
     """
     Run a short governed training session over a tiny real dataset.
@@ -247,10 +274,16 @@ def run_training(
     random.seed(seed)
 
     print(f"Loading dataset from: {data_path}")
-    dataset = TinyTextDataset(path=data_path, seq_len=seq_len, min_freq=min_freq, alpha=alpha, hidden_dim=32)
-    print(f"Vocab size: {dataset.vocab_size} (PAD={dataset.pad_id}, UNK={dataset.unk_id}, BOS={dataset.bos_id})")
+    dataset = TinyTextDataset(
+        path=data_path, seq_len=seq_len, min_freq=min_freq, alpha=alpha, hidden_dim=32
+    )
+    print(
+        f"Vocab size: {dataset.vocab_size} (PAD={dataset.pad_id}, UNK={dataset.unk_id}, BOS={dataset.bos_id})"
+    )
     print(f"First 10 vocab tokens: {dataset.tok.id_to_token[:10]}")
-    print(f"Train indices: {len(dataset.train_idx)} | Val indices: {len(dataset.val_idx)}")
+    print(
+        f"Train indices: {len(dataset.train_idx)} | Val indices: {len(dataset.val_idx)}"
+    )
 
     trainer = GovernedTrainer(
         learning_rate=0.001,
@@ -271,14 +304,18 @@ def run_training(
         record = trainer.training_step(batch)
 
         if record.get("status") == "error":
-            print(f"[ERR] step={record.get('step')} type={record.get('error_type')} msg={record.get('message')}")
+            print(
+                f"[ERR] step={record.get('step')} type={record.get('error_type')} msg={record.get('message')}"
+            )
         else:
             if step % trainer.log_interval != 0:
                 lr = record.get("learning_rate")
                 lr_str = f"{lr:.2e}" if isinstance(lr, (int, float)) else "n/a"
                 loss = record.get("loss")
                 loss_str = f"{loss:.4f}" if isinstance(loss, (int, float)) else "n/a"
-                print(f"step={record.get('step')} status={record.get('status')} loss={loss_str} lr={lr_str}")
+                print(
+                    f"step={record.get('step')} status={record.get('status')} loss={loss_str} lr={lr_str}"
+                )
 
         if step % val_interval == 0:
             val_losses: List[float] = []
@@ -296,7 +333,9 @@ def run_training(
             if val_losses:
                 avg_vloss = sum(val_losses) / len(val_losses)
                 ppl = math.exp(min(avg_vloss, 100.0))
-                print(f"[VAL] step={step} avg_val_loss={avg_vloss:.4f} perplexity~{ppl:.2f}")
+                print(
+                    f"[VAL] step={step} avg_val_loss={avg_vloss:.4f} perplexity~{ppl:.2f}"
+                )
             else:
                 print(f"[VAL] step={step} (no validation performed)")
 

@@ -159,6 +159,7 @@ __all__ = [
 # 1. Basic Probability Utilities
 # ============================================================
 
+
 def _softmax(logits: Sequence[float]) -> List[float]:
     if not logits:
         return []
@@ -178,7 +179,9 @@ def _normalize(probabilities: Sequence[float], eps: float = 1e-12) -> List[float
     return [p / s for p in probabilities]
 
 
-def _entropy_bits(probabilities: Sequence[float], assume_normalized: bool = True) -> float:
+def _entropy_bits(
+    probabilities: Sequence[float], assume_normalized: bool = True
+) -> float:
     """
     Shannon entropy in bits.
     If assume_normalized=False, will normalize first.
@@ -191,9 +194,11 @@ def _entropy_bits(probabilities: Sequence[float], assume_normalized: bool = True
             h -= p * math.log2(p)
     return h
 
+
 # ============================================================
 # 2. Core Metrics: Confidence, NLL, Perplexity, Entropy Summary
 # ============================================================
+
 
 def calculate_confidence(probabilities: Sequence[float]) -> float:
     return max(probabilities) if probabilities else 0.0
@@ -229,14 +234,13 @@ def calculate_perplexity(
     if log_base == math.e:
         return math.exp(nll)
     elif log_base == 2.0:
-        return 2.0 ** nll
+        return 2.0**nll
     else:
-        return log_base ** nll
+        return log_base**nll
 
 
 def summarize_entropies(
-    prob_distributions: Sequence[Sequence[float]],
-    assume_normalized: bool = True
+    prob_distributions: Sequence[Sequence[float]], assume_normalized: bool = True
 ) -> Dict[str, float]:
     entropies: List[float] = []
     for probs in prob_distributions:
@@ -254,9 +258,11 @@ def summarize_entropies(
         "count": len(entropies),
     }
 
+
 # ============================================================
 # 3. Calibration Metrics (ECE, MCE, Adaptive ECE, Brier + Multi-class)
 # ============================================================
+
 
 def _init_bins(n_bins: int) -> Dict[int, Tuple[float, float, int]]:
     return {i: (0.0, 0.0, 0) for i in range(n_bins)}
@@ -282,7 +288,7 @@ def compute_calibration_bins(
         total_conf, total_acc, count = bins[idx]
         count += 1
         total_conf += conf
-        total_acc += (1.0 if pred == label else 0.0)
+        total_acc += 1.0 if pred == label else 0.0
         bins[idx] = (total_conf, total_acc, count)
 
     out: List[Dict[str, float]] = []
@@ -390,10 +396,11 @@ def calculate_brier_score(
 
 # ---------- Multi-class Calibration (Optional) ----------
 
+
 def compute_multi_class_calibration(
     all_class_probs: Sequence[Sequence[float]],
     true_labels: Sequence[int],
-    n_bins: int = 10
+    n_bins: int = 10,
 ) -> Dict[str, Any]:
     """
     Computes per-bin calibration using top-class confidence for multi-class predictions,
@@ -428,7 +435,9 @@ def compute_multi_class_calibration(
         predictions.append(pred)
         confidences.append(conf)
 
-    bins = compute_calibration_bins(predictions, confidences, true_labels, n_bins=n_bins)
+    bins = compute_calibration_bins(
+        predictions, confidences, true_labels, n_bins=n_bins
+    )
     ece = calculate_ece(predictions, confidences, true_labels, n_bins=n_bins)
     mce = calculate_mce(predictions, confidences, true_labels, n_bins=n_bins)
 
@@ -443,8 +452,14 @@ def compute_multi_class_calibration(
     class_accuracy: Dict[int, float] = {
         c: (class_correct.get(c, 0) / class_total[c]) for c in class_total
     }
-    macro_accuracy = (sum(class_accuracy.values()) / len(class_accuracy)) if class_accuracy else 0.0
-    micro_accuracy = (sum(1 for p, t in zip(predictions, true_labels) if p == t) / len(true_labels)) if true_labels else 0.0
+    macro_accuracy = (
+        (sum(class_accuracy.values()) / len(class_accuracy)) if class_accuracy else 0.0
+    )
+    micro_accuracy = (
+        (sum(1 for p, t in zip(predictions, true_labels) if p == t) / len(true_labels))
+        if true_labels
+        else 0.0
+    )
 
     return {
         "ece": ece,
@@ -452,14 +467,14 @@ def compute_multi_class_calibration(
         "bins": bins,
         "class_accuracy": class_accuracy,
         "macro_accuracy": macro_accuracy,
-        "micro_accuracy": micro_accuracy
+        "micro_accuracy": micro_accuracy,
     }
 
 
 def multi_class_ece(
     all_class_probs: Sequence[Sequence[float]],
     true_labels: Sequence[int],
-    n_bins: int = 10
+    n_bins: int = 10,
 ) -> float:
     """
     Convenience function returning only ECE for multi-class.
@@ -467,9 +482,11 @@ def multi_class_ece(
     cal = compute_multi_class_calibration(all_class_probs, true_labels, n_bins=n_bins)
     return cal["ece"]
 
+
 # ============================================================
 # 4. Diversity / Distinct-n (Micro & Macro)
 # ============================================================
+
 
 def _get_ngrams(tokens: Sequence[Any], n: int) -> Iterable[Tuple[Any, ...]]:
     length = len(tokens)
@@ -499,8 +516,7 @@ def calculate_distinct_n(
 
 
 def calculate_distinct_n_per_sequence(
-    sequences: Sequence[Sequence[Any]],
-    n: int
+    sequences: Sequence[Sequence[Any]], n: int
 ) -> List[float]:
     if n <= 0:
         raise ValueError("n must be > 0.")
@@ -515,10 +531,7 @@ def calculate_distinct_n_per_sequence(
     return scores
 
 
-def calculate_macro_distinct_n(
-    sequences: Sequence[Sequence[Any]],
-    n: int
-) -> float:
+def calculate_macro_distinct_n(sequences: Sequence[Sequence[Any]], n: int) -> float:
     per = calculate_distinct_n_per_sequence(sequences, n)
     return statistics.mean(per) if per else 0.0
 
@@ -526,7 +539,7 @@ def calculate_macro_distinct_n(
 def calculate_distinct_all(
     sequences: Sequence[Sequence[Any]],
     ns: Sequence[int] = (1, 2, 3),
-    macro: bool = False
+    macro: bool = False,
 ) -> Dict[str, float]:
     result: Dict[str, float] = {}
     for n in ns:
@@ -536,9 +549,11 @@ def calculate_distinct_all(
             result[f"macro_distinct_{n}"] = calculate_macro_distinct_n(sequences, n)
     return result
 
+
 # ============================================================
 # 5. Probability Extraction for N-Gram + Backoff Model
 # ============================================================
+
 
 def _combine_learned_and_counts(
     order: int,
@@ -554,7 +569,7 @@ def _combine_learned_and_counts(
     bigram_weight: float,
     backoff_weights: Tuple[float, float, float],
     backoff_lambda: float,
-    eps: float = 1e-12
+    eps: float = 1e-12,
 ) -> List[float]:
     """
     Properly combine learned logits and count-based log probabilities.
@@ -591,12 +606,16 @@ def _combine_learned_and_counts(
             if v3 is not None:
                 count_log_values[i] += w3 * v3
             bi_key = (prev1, i)
-            count_log_values[i] += w2 * count_bi_log.get(bi_key, count_uni_log.get(i, -math.log(V)))
+            count_log_values[i] += w2 * count_bi_log.get(
+                bi_key, count_uni_log.get(i, -math.log(V))
+            )
             count_log_values[i] += w1 * count_uni_log.get(i, -math.log(V))
     else:
         for i in range(V):
             bi_key = (prev1, i)
-            count_log_values[i] += w2 * count_bi_log.get(bi_key, count_uni_log.get(i, -math.log(V)))
+            count_log_values[i] += w2 * count_bi_log.get(
+                bi_key, count_uni_log.get(i, -math.log(V))
+            )
             count_log_values[i] += w1 * count_uni_log.get(i, -math.log(V))
 
     # Convert log probabilities to probabilities
@@ -628,7 +647,7 @@ def extract_batch_probabilities(
     trigram_weight: float,
     bigram_weight: float,
     alpha: float,
-    discount_d: float
+    discount_d: float,
 ) -> Tuple[List[List[float]], List[int]]:
     """
     Returns per-position probability vectors and ground-truth targets for one validation batch.
@@ -667,13 +686,23 @@ def extract_batch_probabilities(
 
         if backoff_enabled:
             log_mix = _combine_learned_and_counts(
-                order, tri_logits, big_logits,
-                tri_log, bi_log, uni_log,
-                prev2, prev1, V,
-                trigram_weight, bigram_weight,
-                backoff_weights, backoff_lambda
+                order,
+                tri_logits,
+                big_logits,
+                tri_log,
+                bi_log,
+                uni_log,
+                prev2,
+                prev1,
+                V,
+                trigram_weight,
+                bigram_weight,
+                backoff_weights,
+                backoff_lambda,
             )
-            probs = _softmax(log_mix)  # converts log probabilities back to probabilities
+            probs = _softmax(
+                log_mix
+            )  # converts log probabilities back to probabilities
         else:
             raw_logits = tri_logits if tri_logits is not None else big_logits
             probs = _softmax(raw_logits) if raw_logits else [1.0 / V] * V
@@ -682,9 +711,11 @@ def extract_batch_probabilities(
 
     return probs_list, list(targets)
 
+
 # ============================================================
 # 6. Self-Awareness Aggregation
 # ============================================================
+
 
 def compute_validation_self_awareness(
     model: Any,
@@ -702,7 +733,7 @@ def compute_validation_self_awareness(
     discount_d: float,
     fixed_ece_bins: int = 15,
     adaptive_ece_bins: int = 15,
-    brier_positive_label: Optional[int] = None
+    brier_positive_label: Optional[int] = None,
 ) -> Dict[str, float]:
     """
     Computes a suite of self-awareness metrics over several sampled validation batches.
@@ -730,14 +761,17 @@ def compute_validation_self_awareness(
     for _ in range(batches):
         vb = dataset.sample_val_batch()
         probs_list, targets = extract_batch_probabilities(
-            model, dataset, vb, counts,
+            model,
+            dataset,
+            vb,
+            counts,
             backoff_enabled=backoff_enabled,
             backoff_lambda=backoff_lambda,
             backoff_weights=backoff_weights,
             trigram_weight=trigram_weight,
             bigram_weight=bigram_weight,
             alpha=alpha,
-            discount_d=discount_d
+            discount_d=discount_d,
         )
         if not probs_list:
             continue
@@ -774,7 +808,7 @@ def compute_validation_self_awareness(
             "mce": 0.0,
             "adaptive_ece": 0.0,
             "brier_score": 0.0,
-            "token_count": 0
+            "token_count": 0,
         }
 
     entropy_summary = summarize_entropies(all_probs)
@@ -782,12 +816,20 @@ def compute_validation_self_awareness(
     nll_nats = calculate_token_nll(true_token_probs, log_base=math.e)
     ppl = calculate_perplexity(true_token_probs, log_base=math.e)
 
-    ece = calculate_ece(predictions, all_confidences, all_targets, n_bins=fixed_ece_bins)
-    mce = calculate_mce(predictions, all_confidences, all_targets, n_bins=fixed_ece_bins)
-    adaptive = calculate_adaptive_ece(predictions, all_confidences, all_targets, n_bins=adaptive_ece_bins)
+    ece = calculate_ece(
+        predictions, all_confidences, all_targets, n_bins=fixed_ece_bins
+    )
+    mce = calculate_mce(
+        predictions, all_confidences, all_targets, n_bins=fixed_ece_bins
+    )
+    adaptive = calculate_adaptive_ece(
+        predictions, all_confidences, all_targets, n_bins=adaptive_ece_bins
+    )
 
     if brier_positive_label is not None:
-        brier = calculate_brier_score(all_confidences, all_targets, positive_label=brier_positive_label)
+        brier = calculate_brier_score(
+            all_confidences, all_targets, positive_label=brier_positive_label
+        )
     else:
         brier = 0.0
 
@@ -802,12 +844,14 @@ def compute_validation_self_awareness(
         "mce": mce,
         "adaptive_ece": adaptive,
         "brier_score": brier,
-        "token_count": token_count
+        "token_count": token_count,
     }
+
 
 # ============================================================
 # 7. Generation Helper for Diversity Sampling
 # ============================================================
+
 
 def generate_sample_for_diversity(
     model: Any,
@@ -827,7 +871,7 @@ def generate_sample_for_diversity(
     trigram_weight: float,
     bigram_weight: float,
     alpha: float = 0.5,
-    discount_d: float = 0.2
+    discount_d: float = 0.2,
 ) -> List[int]:
     """
     Lightweight token generation for diversity metrics.
@@ -839,16 +883,28 @@ def generate_sample_for_diversity(
     if "generate_tokens" in globals():
         tri_log, bi_log, uni_log = ({}, {}, {})
         if counts is not None:
-            tri_log, bi_log, uni_log = counts.smooth_log_probs(dataset.vocab_size, alpha, discount_d)
+            tri_log, bi_log, uni_log = counts.smooth_log_probs(
+                dataset.vocab_size, alpha, discount_d
+            )
         return globals()["generate_tokens"](
-            model=model, dataset=dataset, length=length,
-            temperature=temperature, top_k=top_k, top_p=top_p,
-            rep_penalty=rep_penalty, start_token=start_token,
-            stop_on_eos=True, mask_bos=mask_bos,
-            backoff_enabled=backoff_enabled, backoff_lambda=backoff_lambda,
+            model=model,
+            dataset=dataset,
+            length=length,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            rep_penalty=rep_penalty,
+            start_token=start_token,
+            stop_on_eos=True,
+            mask_bos=mask_bos,
+            backoff_enabled=backoff_enabled,
+            backoff_lambda=backoff_lambda,
             backoff_weights=backoff_weights,
-            trigram_weight=trigram_weight, bigram_weight=bigram_weight,
-            count_tri_log=tri_log, count_bi_log=bi_log, count_uni_log=uni_log
+            trigram_weight=trigram_weight,
+            bigram_weight=bigram_weight,
+            count_tri_log=tri_log,
+            count_bi_log=bi_log,
+            count_uni_log=uni_log,
         )
 
     generated: List[int] = []
@@ -857,7 +913,9 @@ def generate_sample_for_diversity(
 
     tri_log, bi_log, uni_log = {}, {}, {}
     if counts is not None:
-        tri_log, bi_log, uni_log = counts.smooth_log_probs(dataset.vocab_size, alpha, discount_d)
+        tri_log, bi_log, uni_log = counts.smooth_log_probs(
+            dataset.vocab_size, alpha, discount_d
+        )
 
     order = getattr(model, "order", 2)
     layers = model.params["transformer_layers"]
@@ -876,11 +934,19 @@ def generate_sample_for_diversity(
 
         if backoff_enabled:
             log_mix = _combine_learned_and_counts(
-                order, tri_logits, big_logits,
-                tri_log, bi_log, uni_log,
-                current_prev2, current_prev1, V,
-                trigram_weight, bigram_weight,
-                backoff_weights, backoff_lambda
+                order,
+                tri_logits,
+                big_logits,
+                tri_log,
+                bi_log,
+                uni_log,
+                current_prev2,
+                current_prev1,
+                V,
+                trigram_weight,
+                bigram_weight,
+                backoff_weights,
+                backoff_lambda,
             )
             probs = _softmax(log_mix)
         else:
@@ -895,9 +961,11 @@ def generate_sample_for_diversity(
 
     return generated
 
+
 # ============================================================
 # 8. Composite Awareness Summary / Thresholding
 # ============================================================
+
 
 def awareness_summary(awareness: Dict[str, float]) -> Dict[str, Any]:
     """
@@ -906,11 +974,13 @@ def awareness_summary(awareness: Dict[str, float]) -> Dict[str, Any]:
     out = dict(awareness)
 
     if awareness.get("perplexity", 0.0) > 0.0 and awareness.get("nll_nats", 0.0) > 0.0:
-        out["ppl_nll_ratio"] = awareness["perplexity"] / max(awareness["nll_nats"], 1e-12)
+        out["ppl_nll_ratio"] = awareness["perplexity"] / max(
+            awareness["nll_nats"], 1e-12
+        )
     else:
         out["ppl_nll_ratio"] = 0.0
 
-    gap = (awareness.get("avg_confidence", 0.0) - awareness.get("accuracy", 0.0))
+    gap = awareness.get("avg_confidence", 0.0) - awareness.get("accuracy", 0.0)
     out["confidence_accuracy_gap"] = gap
 
     ece = awareness.get("ece", 0.0)
@@ -923,21 +993,22 @@ def awareness_summary(awareness: Dict[str, float]) -> Dict[str, Any]:
     else:
         out["entropy_flag"] = "ok"
 
-    out["is_calibration_degrading"] = (ece > 0.15 and gap > 0.1)
-    out["is_overconfident"] = (gap > 0.2 and ece > 0.05)
-    out["is_uncertain"] = (awareness.get("avg_confidence", 0.0) < 0.3 and entropy_mean > 2.0)
+    out["is_calibration_degrading"] = ece > 0.15 and gap > 0.1
+    out["is_overconfident"] = gap > 0.2 and ece > 0.05
+    out["is_uncertain"] = (
+        awareness.get("avg_confidence", 0.0) < 0.3 and entropy_mean > 2.0
+    )
 
     return out
+
 
 # ============================================================
 # 9. OPTIONAL: Threshold-based Trainer Reaction (Example API)
 # ============================================================
 
+
 def trainer_reaction(
-    awareness: Dict[str, float],
-    lr: float,
-    min_lr: float = 1e-5,
-    max_lr: float = 1e-1
+    awareness: Dict[str, float], lr: float, min_lr: float = 1e-5, max_lr: float = 1e-1
 ) -> Dict[str, Any]:
     """
     Example heuristic adaptation logic.
@@ -963,9 +1034,11 @@ def trainer_reaction(
     adjustments["recommended_lr"] = min(max_lr, max(min_lr, new_lr))
     return adjustments
 
+
 # ============================================================
 # 10. Multi-Class + Diversity Integrated Awareness (Aggregator)
 # ============================================================
+
 
 def build_extended_awareness(
     base_awareness: Dict[str, float],
@@ -974,7 +1047,7 @@ def build_extended_awareness(
     multi_class_labels: Optional[Sequence[int]] = None,
     distinct_ns: Sequence[int] = (1, 2, 3),
     include_macro_distinct: bool = True,
-    multi_class_bins: int = 10
+    multi_class_bins: int = 10,
 ) -> Dict[str, Any]:
     """
     Extend a base awareness dictionary with:
@@ -985,21 +1058,21 @@ def build_extended_awareness(
 
     if sequences:
         diversity = calculate_distinct_all(
-            sequences,
-            ns=distinct_ns,
-            macro=include_macro_distinct
+            sequences, ns=distinct_ns, macro=include_macro_distinct
         )
         extended.update(diversity)
         for n in distinct_ns:
             per_scores = calculate_distinct_n_per_sequence(sequences, n)
-            extended[f"distinct_{n}_per_sequence_mean"] = statistics.mean(per_scores) if per_scores else 0.0
-            extended[f"distinct_{n}_per_sequence_std"] = statistics.pstdev(per_scores) if len(per_scores) > 1 else 0.0
+            extended[f"distinct_{n}_per_sequence_mean"] = (
+                statistics.mean(per_scores) if per_scores else 0.0
+            )
+            extended[f"distinct_{n}_per_sequence_std"] = (
+                statistics.pstdev(per_scores) if len(per_scores) > 1 else 0.0
+            )
 
     if multi_class_probs and multi_class_labels is not None:
         mc_cal = compute_multi_class_calibration(
-            multi_class_probs,
-            multi_class_labels,
-            n_bins=multi_class_bins
+            multi_class_probs, multi_class_labels, n_bins=multi_class_bins
         )
         extended["multi_class_ece"] = mc_cal["ece"]
         extended["multi_class_mce"] = mc_cal["mce"]
@@ -1010,6 +1083,7 @@ def build_extended_awareness(
     extended.update({f"summary_{k}": v for k, v in extended_summary.items()})
 
     return extended
+
 
 # ============================================================
 # END OF MODULE

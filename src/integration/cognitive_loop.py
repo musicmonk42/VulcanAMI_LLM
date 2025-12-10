@@ -9,16 +9,26 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import (
-    Any, Dict, List, Optional, Callable, Sequence, Union, Tuple,
-    Iterable, AsyncGenerator
+    Any,
+    Dict,
+    List,
+    Optional,
+    Callable,
+    Sequence,
+    Union,
+    Tuple,
+    Iterable,
+    AsyncGenerator,
 )
 
 Token = Union[int, str]
 Tokens = List[Token]
-SpeculativeFunction = Callable[[Any, Any, Tokens, float, int],
-                               Tuple[Tokens, Optional[Token], Dict[str, Any]]]
+SpeculativeFunction = Callable[
+    [Any, Any, Tokens, float, int], Tuple[Tokens, Optional[Token], Dict[str, Any]]
+]
 
 # =========================== CONFIG STRUCTS =========================== #
+
 
 @dataclass
 class LoopSamplingConfig:
@@ -44,6 +54,7 @@ class LoopSamplingConfig:
     speculative_enabled: bool = False
     speculative_draft_steps: int = 4
     speculative_max_rejects: int = 10
+
 
 @dataclass
 class LoopRuntimeConfig:
@@ -71,6 +82,7 @@ class LoopRuntimeConfig:
     score_window: int = 10
     attach_token_rationale: bool = True
 
+
 @dataclass
 class CognitiveLoopResult:
     tokens: Tokens
@@ -85,7 +97,9 @@ class CognitiveLoopResult:
     stopped_reason: str
     duration_seconds: float
 
+
 # =========================== UTILS =========================== #
+
 
 def softmax(xs: Sequence[float]) -> List[float]:
     if not xs:
@@ -97,12 +111,14 @@ def softmax(xs: Sequence[float]) -> List[float]:
         return [1.0 / len(xs)] * len(xs)
     return [e / s for e in exps]
 
+
 def apply_top_k(logits: List[float], k: int) -> List[float]:
     if k <= 0 or k >= len(logits):
         return logits
     indexed_logits = [(logits[i], i) for i in range(len(logits))]
     kth_value = sorted(indexed_logits, key=lambda x: x[0], reverse=True)[k - 1][0]
-    return [l if l >= kth_value else float('-inf') for l in logits]
+    return [l if l >= kth_value else float("-inf") for l in logits]
+
 
 def apply_top_p(logits: List[float], p: float) -> List[float]:
     if p >= 1.0:
@@ -115,12 +131,15 @@ def apply_top_p(logits: List[float], p: float) -> List[float]:
         keep.append(idx)
         if cumulative >= p:
             break
-    out = [float('-inf')] * len(logits)
+    out = [float("-inf")] * len(logits)
     for idx in keep:
         out[idx] = logits[idx]
     return out
 
-def penalize_repetition(logits: List[float], generated: Tokens, penalty: float, window: int) -> List[float]:
+
+def penalize_repetition(
+    logits: List[float], generated: Tokens, penalty: float, window: int
+) -> List[float]:
     if penalty <= 1.0 or not generated:
         return logits
     rec = generated[-window:] if window > 0 else generated
@@ -138,6 +157,7 @@ def penalize_repetition(logits: List[float], generated: Tokens, penalty: float, 
                 out[idx] = out[idx] * penalty
     return out
 
+
 def choose_token(logits: List[float], temperature: float) -> int:
     if not logits:
         return 0
@@ -153,6 +173,7 @@ def choose_token(logits: List[float], temperature: float) -> int:
             return i
     return max(range(len(probs)), key=lambda i: probs[i])
 
+
 def _sequence_entropy(probs: List[float]) -> float:
     entropy = 0.0
     for p in probs:
@@ -160,7 +181,9 @@ def _sequence_entropy(probs: List[float]) -> float:
             entropy += -p * math.log(p, 2)
     return entropy
 
+
 # =========================== MAIN CLASS =========================== #
+
 
 class CognitiveLoop:
     def __init__(
@@ -177,7 +200,9 @@ class CognitiveLoop:
         consensus_engine: Optional[Any] = None,
         draft_transformer: Optional[Any] = None,
         speculative_function: Optional[SpeculativeFunction] = None,
-        reranker: Optional[Callable[[List[Dict[str, Any]]], List[Dict[str, Any]]]] = None,
+        reranker: Optional[
+            Callable[[List[Dict[str, Any]]], List[Dict[str, Any]]]
+        ] = None,
         candidate_scorer: Optional[Callable[[Any, Any, Any], float]] = None,
     ) -> None:
         self.bridge = bridge
@@ -207,7 +232,9 @@ class CognitiveLoop:
 
     def _get_executor(self) -> ThreadPoolExecutor:
         if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=self.runtime.max_parallel_workers)
+            self._executor = ThreadPoolExecutor(
+                max_workers=self.runtime.max_parallel_workers
+            )
         return self._executor
 
     # ---------------------- PUBLIC ENTRY ---------------------- #
@@ -249,27 +276,54 @@ class CognitiveLoop:
         top_k = self.sampling.top_k
 
         if self.sampling.use_beam_search:
-            self._beam_state = [{
-                "tokens": init_tokens,
-                "log_prob": 0.0,
-                "score": 0.0,
-                "is_finished": False
-            }]
+            self._beam_state = [
+                {
+                    "tokens": init_tokens,
+                    "log_prob": 0.0,
+                    "score": 0.0,
+                    "is_finished": False,
+                }
+            ]
 
         async def _generator() -> AsyncGenerator[Dict[str, Any], None]:
             # ADD generated TO nonlocal (critical fix)
-            nonlocal temperature, top_k, errors, beam_metadata, speculative_stats, safety_interventions, generated
+            nonlocal \
+                temperature, \
+                top_k, \
+                errors, \
+                beam_metadata, \
+                speculative_stats, \
+                safety_interventions, \
+                generated
 
             last_reasoning_meta: Dict[str, Any] = {}
 
             for step in range(max_steps):
-                if self.sampling.use_beam_search and all(b["is_finished"] for b in self._beam_state):
+                if self.sampling.use_beam_search and all(
+                    b["is_finished"] for b in self._beam_state
+                ):
                     break
 
-                if self.runtime.time_budget_seconds and (time.time() - start) >= self.runtime.time_budget_seconds:
-                    yield await self._finalize(prompt, init_tokens, generated, reasoning_trace, safety_events,
-                                               audit_records, beam_metadata, speculative_stats, start,
-                                               True, "time_budget_exceeded", perplex_nll, entropy_scores, safety_interventions)
+                if (
+                    self.runtime.time_budget_seconds
+                    and (time.time() - start) >= self.runtime.time_budget_seconds
+                ):
+                    yield await self._finalize(
+                        prompt,
+                        init_tokens,
+                        generated,
+                        reasoning_trace,
+                        safety_events,
+                        audit_records,
+                        beam_metadata,
+                        speculative_stats,
+                        start,
+                        True,
+                        "time_budget_exceeded",
+                        perplex_nll,
+                        entropy_scores,
+                        safety_interventions,
+                    )
                     return
 
                 try:
@@ -279,17 +333,29 @@ class CognitiveLoop:
                         top_k=top_k,
                         stop_tokens=stop_tok_set,
                         stop_strings=stop_str_patterns,
-                        step=step
+                        step=step,
                     )
                     errors = 0
                 except Exception as e:
                     print(f"Error during cognitive step: {e}\n{traceback.format_exc()}")
                     errors += 1
                     if errors > self.runtime.max_errors:
-                        yield await self._finalize(prompt, init_tokens, generated, reasoning_trace,
-                                                   safety_events, audit_records, beam_metadata,
-                                                   speculative_stats, start, False,
-                                                   f"error_exceeded:{e.__class__.__name__}", perplex_nll, entropy_scores, safety_interventions)
+                        yield await self._finalize(
+                            prompt,
+                            init_tokens,
+                            generated,
+                            reasoning_trace,
+                            safety_events,
+                            audit_records,
+                            beam_metadata,
+                            speculative_stats,
+                            start,
+                            False,
+                            f"error_exceeded:{e.__class__.__name__}",
+                            perplex_nll,
+                            entropy_scores,
+                            safety_interventions,
+                        )
                         return
                     await asyncio.sleep(self.runtime.error_backoff_seconds)
                     continue
@@ -302,20 +368,31 @@ class CognitiveLoop:
 
                 if token_info.get("safety_event"):
                     safety_events.append(token_info["safety_event"])
-                    if token_info["safety_event"].get("reason") in ["token_validation_replacement", "world_model_intervention",
-                                                                   "sequence_replaced", "consensus_rejection"]:
+                    if token_info["safety_event"].get("reason") in [
+                        "token_validation_replacement",
+                        "world_model_intervention",
+                        "sequence_replaced",
+                        "consensus_rejection",
+                    ]:
                         safety_interventions += 1
                 if token_info.get("audit_record"):
                     audit_records.append(token_info["audit_record"])
                 if token_info.get("beam"):
                     beam_metadata = token_info["beam"]
-                    generated = token_info["beam"].get("best_sequence_tokens", generated)
+                    generated = token_info["beam"].get(
+                        "best_sequence_tokens", generated
+                    )
                 if token_info.get("speculative"):
                     speculative_stats = token_info["speculative"]
-                    generated.extend(token_info["speculative"].get("accepted_tokens", []))
+                    generated.extend(
+                        token_info["speculative"].get("accepted_tokens", [])
+                    )
                     token = token_info["speculative"].get("next_token", None)
 
-                if token_info.get("logits") and token_info.get("chosen_index") is not None:
+                if (
+                    token_info.get("logits")
+                    and token_info.get("chosen_index") is not None
+                ):
                     logits = token_info["logits"]
                     chosen_idx = token_info["chosen_index"]
                     probs = softmax(logits)
@@ -330,26 +407,55 @@ class CognitiveLoop:
 
                 if len(self._perplex_nll) >= self.runtime.score_window:
                     if self.runtime.early_stop_score_delta is not None:
-                        ppl_improvement = self._improvement(self._perplex_nll[-self.runtime.score_window:])
+                        ppl_improvement = self._improvement(
+                            self._perplex_nll[-self.runtime.score_window :]
+                        )
                         if ppl_improvement < self.runtime.early_stop_score_delta:
                             yield await self._finalize(
-                                prompt, init_tokens, generated, reasoning_trace, safety_events,
-                                audit_records, beam_metadata, speculative_stats, start,
-                                True, "early_stop_ppl", perplex_nll, entropy_scores, safety_interventions
+                                prompt,
+                                init_tokens,
+                                generated,
+                                reasoning_trace,
+                                safety_events,
+                                audit_records,
+                                beam_metadata,
+                                speculative_stats,
+                                start,
+                                True,
+                                "early_stop_ppl",
+                                perplex_nll,
+                                entropy_scores,
+                                safety_interventions,
                             )
                             return
                     if self.runtime.early_stop_entropy_delta is not None:
-                        entropy_improvement = self._improvement(self._entropy_scores[-self.runtime.score_window:])
+                        entropy_improvement = self._improvement(
+                            self._entropy_scores[-self.runtime.score_window :]
+                        )
                         if entropy_improvement < self.runtime.early_stop_entropy_delta:
                             yield await self._finalize(
-                                prompt, init_tokens, generated, reasoning_trace, safety_events,
-                                audit_records, beam_metadata, speculative_stats, start,
-                                True, "early_stop_entropy", perplex_nll, entropy_scores, safety_interventions
+                                prompt,
+                                init_tokens,
+                                generated,
+                                reasoning_trace,
+                                safety_events,
+                                audit_records,
+                                beam_metadata,
+                                speculative_stats,
+                                start,
+                                True,
+                                "early_stop_entropy",
+                                perplex_nll,
+                                entropy_scores,
+                                safety_interventions,
                             )
                             return
 
                 if token is not None:
-                    if not self.sampling.use_beam_search and not self.sampling.speculative_enabled:
+                    if (
+                        not self.sampling.use_beam_search
+                        and not self.sampling.speculative_enabled
+                    ):
                         generated.append(token)
 
                     current_text = await self._decode(generated)
@@ -357,7 +463,7 @@ class CognitiveLoop:
                     stream_chunk = {
                         "token": token,
                         "text": current_text,
-                        "token_info": token_info
+                        "token_info": token_info,
                     }
                     if self.runtime.enable_stream:
                         yield stream_chunk
@@ -366,10 +472,22 @@ class CognitiveLoop:
                         stream_callback(token, current_text, token_info)
 
                     if token in stop_tok_set:
-                        yield await self._finalize(prompt, init_tokens, generated, reasoning_trace,
-                                                   safety_events, audit_records, beam_metadata,
-                                                   speculative_stats, start, True,
-                                                   f"stop_token:{token}", perplex_nll, entropy_scores, safety_interventions)
+                        yield await self._finalize(
+                            prompt,
+                            init_tokens,
+                            generated,
+                            reasoning_trace,
+                            safety_events,
+                            audit_records,
+                            beam_metadata,
+                            speculative_stats,
+                            start,
+                            True,
+                            f"stop_token:{token}",
+                            perplex_nll,
+                            entropy_scores,
+                            safety_interventions,
+                        )
                         return
 
                     for pattern in stop_str_patterns:
@@ -379,17 +497,32 @@ class CognitiveLoop:
                                 split_text = full_text.split(pattern, 1)
                                 final_text_segment = split_text[0] + pattern
                                 final_tokens = await self._tokenize(final_text_segment)
-                                generated = final_tokens[len(init_tokens):]
+                                generated = final_tokens[len(init_tokens) :]
                             except Exception:
                                 pass
-                            yield await self._finalize(prompt, init_tokens, generated, reasoning_trace,
-                                                       safety_events, audit_records, beam_metadata,
-                                                       speculative_stats, start, True,
-                                                       f"stop_string:{pattern}", perplex_nll, entropy_scores, safety_interventions)
+                            yield await self._finalize(
+                                prompt,
+                                init_tokens,
+                                generated,
+                                reasoning_trace,
+                                safety_events,
+                                audit_records,
+                                beam_metadata,
+                                speculative_stats,
+                                start,
+                                True,
+                                f"stop_string:{pattern}",
+                                perplex_nll,
+                                entropy_scores,
+                                safety_interventions,
+                            )
                             return
 
                 if self.sampling.adaptive_temperature:
-                    temperature = max(self.sampling.temperature_floor, temperature * self.sampling.temperature_decay)
+                    temperature = max(
+                        self.sampling.temperature_floor,
+                        temperature * self.sampling.temperature_decay,
+                    )
                 if self.sampling.dynamic_top_k:
                     top_k = max(self.sampling.min_top_k, int(top_k * 0.99))
 
@@ -397,10 +530,22 @@ class CognitiveLoop:
                     break
 
             # Removed redundant bandit feedback block (was referencing undefined reasoning_meta)
-            yield await self._finalize(prompt, init_tokens, generated, reasoning_trace,
-                                       safety_events, audit_records, beam_metadata,
-                                       speculative_stats, start, True, "max_tokens_reached",
-                                       perplex_nll, entropy_scores, safety_interventions)
+            yield await self._finalize(
+                prompt,
+                init_tokens,
+                generated,
+                reasoning_trace,
+                safety_events,
+                audit_records,
+                beam_metadata,
+                speculative_stats,
+                start,
+                True,
+                "max_tokens_reached",
+                perplex_nll,
+                entropy_scores,
+                safety_interventions,
+            )
             return
 
         if self.runtime.enable_stream:
@@ -418,10 +563,10 @@ class CognitiveLoop:
         top_k: int,
         stop_tokens: set,
         stop_strings: Tuple[str, ...],
-        step: int
+        step: int,
     ) -> Dict[str, Any]:
         t0 = time.time()
-        sub_times = {} # Timing dictionary
+        sub_times = {}  # Timing dictionary
         token_info: Dict[str, Any] = {}
         reasoning_meta: Dict[str, Any] = {}
         token = None
@@ -433,7 +578,11 @@ class CognitiveLoop:
 
         if self.sampling.use_beam_search:
             t_beam = time.time()
-            token, beam_meta, prompt_tokens = await self._multi_step_beam_search_expansion(
+            (
+                token,
+                beam_meta,
+                prompt_tokens,
+            ) = await self._multi_step_beam_search_expansion(
                 prompt_tokens, temperature, top_k, stop_tokens
             )
             sub_times["beam_search_ms"] = (time.time() - t_beam) * 1000
@@ -442,26 +591,36 @@ class CognitiveLoop:
             reasoning_meta["strategy"] = "beam_search"
         else:
             t_ctx = time.time()
-            retrieved_context = await self._async_safe(self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {})
+            retrieved_context = await self._async_safe(
+                self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
+            )
             sub_times["context_retrieval_ms"] = (time.time() - t_ctx) * 1000
             token_info["retrieved_context"] = retrieved_context
 
-            if self.runtime.attach_world_model_hooks and hasattr(self.bridge, "world_model"):
+            if self.runtime.attach_world_model_hooks and hasattr(
+                self.bridge, "world_model"
+            ):
                 try:
                     t_wm_up = time.time()
-                    await self._async_safe(self.bridge.world_model.update, {"tokens": prompt_tokens}, None)
+                    await self._async_safe(
+                        self.bridge.world_model.update, {"tokens": prompt_tokens}, None
+                    )
                     sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
                 except Exception:
                     pass
 
             t_enc = time.time()
-            hidden_state = await self._async_safe(self.transformer.encode, prompt_tokens, None)
+            hidden_state = await self._async_safe(
+                self.transformer.encode, prompt_tokens, None
+            )
             sub_times["encode_ms"] = (time.time() - t_enc) * 1000
             reasoning_meta["hidden_state_shape"] = getattr(hidden_state, "shape", None)
 
             available_strategies = list(self.strategy_weights.keys())
             strategy_weights = [self.strategy_weights[s] for s in available_strategies]
-            reasoning_meta["strategy"] = random.choices(available_strategies, weights=strategy_weights)[0]
+            reasoning_meta["strategy"] = random.choices(
+                available_strategies, weights=strategy_weights
+            )[0]
 
             t_cand = time.time()
             candidates = await self._select_candidates(hidden_state, retrieved_context)
@@ -471,7 +630,9 @@ class CognitiveLoop:
             candidate_scores = None
             if self.runtime.parallel_score_candidates and self.candidate_scorer:
                 t_score = time.time()
-                candidate_scores = await self._parallel_score(hidden_state, candidates, retrieved_context)
+                candidate_scores = await self._parallel_score(
+                    hidden_state, candidates, retrieved_context
+                )
                 sub_times["parallel_score_ms"] = (time.time() - t_score) * 1000
                 reasoning_meta["candidate_scores"] = candidate_scores
 
@@ -516,7 +677,11 @@ class CognitiveLoop:
         reasoning_meta["selected_token"] = token
 
         safety_event = None
-        if self.runtime.require_consensus_per_token and token is not None and self.consensus:
+        if (
+            self.runtime.require_consensus_per_token
+            and token is not None
+            and self.consensus
+        ):
             t_cons = time.time()
             approved = await self._per_token_consensus(
                 token,
@@ -525,7 +690,7 @@ class CognitiveLoop:
                 extra_context={
                     "strategy": reasoning_meta.get("strategy"),
                     "candidate_count": reasoning_meta.get("candidate_count"),
-                }
+                },
             )
             sub_times["consensus_ms"] = (time.time() - t_cons) * 1000
             if not approved:
@@ -539,7 +704,9 @@ class CognitiveLoop:
         if token is not None:
             if self.runtime.safety_per_token:
                 t_val_tok = time.time()
-                safe_token, intervention_notes = await self._validate_token(token, retrieved_context, hidden_state)
+                safe_token, intervention_notes = await self._validate_token(
+                    token, retrieved_context, hidden_state
+                )
                 sub_times["validate_token_ms"] = (time.time() - t_val_tok) * 1000
                 if safe_token != token:
                     safety_event = safety_event or {
@@ -554,21 +721,28 @@ class CognitiveLoop:
             if self.runtime.safety_per_sequence:
                 hypot_seq = prompt_tokens + [token]
                 t_val_seq = time.time()
-                seq_ok = await self._async_safe(getattr(self.safety, "validate_sequence", None),
-                                                (hypot_seq, retrieved_context, getattr(self.bridge, "world_model", None)), True)
+                seq_ok = await self._async_safe(
+                    getattr(self.safety, "validate_sequence", None),
+                    (
+                        hypot_seq,
+                        retrieved_context,
+                        getattr(self.bridge, "world_model", None),
+                    ),
+                    True,
+                )
                 sub_times["validate_sequence_ms"] = (time.time() - t_val_seq) * 1000
                 if isinstance(seq_ok, list) and seq_ok[-1] != token:
                     safety_event = safety_event or {
                         "reason": "sequence_replaced",
                         "timestamp": time.time(),
-                        "original_tail": hypot_seq[-5:]
+                        "original_tail": hypot_seq[-5:],
                     }
                     token = seq_ok[-1]
                 elif seq_ok is False:
                     safety_event = safety_event or {
                         "reason": "sequence_block",
                         "blocked_token": token,
-                        "timestamp": time.time()
+                        "timestamp": time.time(),
                     }
                     token = None
 
@@ -598,27 +772,45 @@ class CognitiveLoop:
                 await self._async_safe(self._log_audit_record, audit_record, None)
 
         if self.runtime.enable_observability:
-            self._obs_sync("cognitive_step", {
-                "token": token,
-                "duration_ms": (time.time() - t0) * 1000,
-                "strategy": reasoning_meta.get("strategy"),
-                "candidates": reasoning_meta.get("candidate_count"),
-                "beam": bool(self.sampling.use_beam_search),
-                "speculative": bool(self.sampling.speculative_enabled),
-            })
+            self._obs_sync(
+                "cognitive_step",
+                {
+                    "token": token,
+                    "duration_ms": (time.time() - t0) * 1000,
+                    "strategy": reasoning_meta.get("strategy"),
+                    "candidates": reasoning_meta.get("candidate_count"),
+                    "beam": bool(self.sampling.use_beam_search),
+                    "speculative": bool(self.sampling.speculative_enabled),
+                },
+            )
 
-        if self.runtime.enable_strategy_bandit_feedback and step > self.runtime.score_window and reasoning_meta.get("strategy"):
-            window = self._perplex_nll[-self.runtime.score_window:]
+        if (
+            self.runtime.enable_strategy_bandit_feedback
+            and step > self.runtime.score_window
+            and reasoning_meta.get("strategy")
+        ):
+            window = self._perplex_nll[-self.runtime.score_window :]
             if window:
                 ppl_improvement = self._improvement(window)
                 strategy = reasoning_meta["strategy"]
                 reward = min(1.0, max(-1.0, -ppl_improvement))
-                self.strategy_weights[strategy] = self.strategy_weights.get(strategy, 1.0) + reward
-                self._obs_sync("bandit.strategy_feedback", {"strategy": strategy, "reward": reward, "new_weight": self.strategy_weights[strategy]})
+                self.strategy_weights[strategy] = (
+                    self.strategy_weights.get(strategy, 1.0) + reward
+                )
+                self._obs_sync(
+                    "bandit.strategy_feedback",
+                    {
+                        "strategy": strategy,
+                        "reward": reward,
+                        "new_weight": self.strategy_weights[strategy],
+                    },
+                )
 
         if self.runtime.attach_token_rationale and token is not None:
             t_rationale = time.time()
-            token_rationale = await self._build_token_rationale(token, hidden_state, candidates, retrieved_context)
+            token_rationale = await self._build_token_rationale(
+                token, hidden_state, candidates, retrieved_context
+            )
             sub_times["rationale_ms"] = (time.time() - t_rationale) * 1000
             reasoning_meta["rationale"] = token_rationale
 
@@ -632,12 +824,12 @@ class CognitiveLoop:
                     "top_k": top_k,
                     "top_p": self.sampling.top_p,
                     "beam": self.sampling.use_beam_search,
-                    "speculative": self.sampling.speculative_enabled
+                    "speculative": self.sampling.speculative_enabled,
                 },
                 "candidate_preview": candidates[:10],
                 "rationale": reasoning_meta.get("rationale"),
                 "intervention": reasoning_meta.get("intervention"),
-                "timings": sub_times, # Add timing info
+                "timings": sub_times,  # Add timing info
             }
 
         if safety_event:
@@ -653,16 +845,22 @@ class CognitiveLoop:
             return []
         reasoning = getattr(self.bridge, "reasoning", None)
         if reasoning and hasattr(reasoning, "select_next_token"):
-            cands = await self._async_safe(reasoning.select_next_token, (hidden_state, context), [hidden_state])
+            cands = await self._async_safe(
+                reasoning.select_next_token, (hidden_state, context), [hidden_state]
+            )
             if isinstance(cands, (list, tuple)):
                 return list(cands)
             return [cands]
         return [hidden_state]
 
-    async def _obtain_logits(self, hidden_state: Any, prompt_tokens: Tokens, candidates: List[Any]) -> List[float]:
+    async def _obtain_logits(
+        self, hidden_state: Any, prompt_tokens: Tokens, candidates: List[Any]
+    ) -> List[float]:
         if hasattr(self.transformer, "get_logits"):
             try:
-                logits = await self._async_safe(self.transformer.get_logits, (hidden_state, prompt_tokens), None)
+                logits = await self._async_safe(
+                    self.transformer.get_logits, (hidden_state, prompt_tokens), None
+                )
                 if isinstance(logits, list):
                     return logits
                 if hasattr(logits, "tolist"):
@@ -676,16 +874,25 @@ class CognitiveLoop:
             vocab_size = 200
         return [0.0] * vocab_size
 
-    def _sample(self, logits: List[float], generated_tokens: Tokens,
-                temperature: float, top_k: int, top_p: float) -> Tuple[int, List[float]]:
+    def _sample(
+        self,
+        logits: List[float],
+        generated_tokens: Tokens,
+        temperature: float,
+        top_k: int,
+        top_p: float,
+    ) -> Tuple[int, List[float]]:
         if not logits:
             return 0, logits
         filtered = apply_top_k(logits, top_k)
         filtered = apply_top_p(filtered, top_p)
         if not self.sampling.allow_repetition:
-            filtered = penalize_repetition(filtered, generated_tokens,
-                                           self.sampling.repetition_penalty,
-                                           self.sampling.repetition_window)
+            filtered = penalize_repetition(
+                filtered,
+                generated_tokens,
+                self.sampling.repetition_penalty,
+                self.sampling.repetition_window,
+            )
         chosen = choose_token(filtered, temperature)
         return chosen, filtered
 
@@ -698,14 +905,17 @@ class CognitiveLoop:
         return idx
 
     async def _multi_step_beam_search_expansion(
-        self,
-        init_tokens: Tokens,
-        temperature: float,
-        top_k: int,
-        stop_tokens: set
+        self, init_tokens: Tokens, temperature: float, top_k: int, stop_tokens: set
     ) -> Tuple[Token, Dict[str, Any], Tokens]:
         if not self._beam_state:
-            self._beam_state = [{"tokens": init_tokens, "log_prob": 0.0, "score": 0.0, "is_finished": False}]
+            self._beam_state = [
+                {
+                    "tokens": init_tokens,
+                    "log_prob": 0.0,
+                    "score": 0.0,
+                    "is_finished": False,
+                }
+            ]
         new_beams: List[Dict[str, Any]] = []
         for exp in range(self.sampling.beam_max_expansions):
             beams_to_expand = [b for b in self._beam_state if not b["is_finished"]]
@@ -714,70 +924,76 @@ class CognitiveLoop:
             temp_new_beams: List[Dict[str, Any]] = []
             for beam in beams_to_expand:
                 current_tokens = beam["tokens"]
-                hidden_state = await self._async_safe(self.transformer.encode, current_tokens, None)
+                hidden_state = await self._async_safe(
+                    self.transformer.encode, current_tokens, None
+                )
                 logits = await self._obtain_logits(hidden_state, current_tokens, [])
                 filtered_logits = apply_top_k(logits, self.sampling.beam_width)
                 probs = softmax(filtered_logits)
                 top_indices_with_probs = sorted(
                     [(p, idx) for idx, p in enumerate(probs) if p > 0],
                     key=lambda x: x[0],
-                    reverse=True
-                )[:self.sampling.beam_width]
+                    reverse=True,
+                )[: self.sampling.beam_width]
                 for p, idx in top_indices_with_probs:
                     log_prob = math.log(p)
                     new_log_prob = beam["log_prob"] + log_prob
                     token_id = await self._index_to_token(idx)
                     new_tokens = current_tokens + [token_id]
-                    length_norm = (len(new_tokens) ** self.sampling.beam_length_penalty)
+                    length_norm = len(new_tokens) ** self.sampling.beam_length_penalty
                     score = new_log_prob / length_norm
                     is_finished = token_id in stop_tokens
                     new_beam = {
                         "tokens": new_tokens,
                         "log_prob": new_log_prob,
                         "score": score,
-                        "is_finished": is_finished
+                        "is_finished": is_finished,
                     }
                     temp_new_beams.append(new_beam)
-            self._beam_state = [b for b in self._beam_state if b["is_finished"]] + temp_new_beams
-            self._beam_state = sorted(self._beam_state, key=lambda b: b["score"], reverse=True)[:self.sampling.beam_width]
+            self._beam_state = [
+                b for b in self._beam_state if b["is_finished"]
+            ] + temp_new_beams
+            self._beam_state = sorted(
+                self._beam_state, key=lambda b: b["score"], reverse=True
+            )[: self.sampling.beam_width]
         best_overall_beam = max(self._beam_state, key=lambda b: b["score"])
         final_token = best_overall_beam["tokens"][-1]
         meta = {
             "beam_candidates": self._beam_state,
             "chosen_score": best_overall_beam["score"],
-            "best_sequence_tokens": best_overall_beam["tokens"][len(init_tokens):],
-            "beam_width": self.sampling.beam_width
+            "best_sequence_tokens": best_overall_beam["tokens"][len(init_tokens) :],
+            "beam_width": self.sampling.beam_width,
         }
         return final_token, meta, best_overall_beam["tokens"]
 
-    async def _speculative_decoding(self, prompt_tokens: Tokens, temperature: float, top_k: int) -> Tuple[Tokens, Optional[Token], Dict[str, Any]]:
+    async def _speculative_decoding(
+        self, prompt_tokens: Tokens, temperature: float, top_k: int
+    ) -> Tuple[Tokens, Optional[Token], Dict[str, Any]]:
         if not self._speculative_fn or not self.draft_transformer:
-            raise RuntimeError("Speculative decoding requested but no speculative function / draft_transformer attached")
+            raise RuntimeError(
+                "Speculative decoding requested but no speculative function / draft_transformer attached"
+            )
         main_model = getattr(self.transformer, "backend", self.transformer)
         accepted_tokens, token, spec_meta = await self._async_safe(
             self._speculative_fn,
             (main_model, self.draft_transformer, prompt_tokens, temperature, top_k),
-            ([], None, {})
+            ([], None, {}),
         )
         if token is None:
             return [], None, spec_meta or {}
         self._speculative_stats = spec_meta or {}
         return accepted_tokens, token, spec_meta or {}
 
-    async def _parallel_score(self, hidden_state: Any, candidates: List[Any], context: Any) -> List[float]:
+    async def _parallel_score(
+        self, hidden_state: Any, candidates: List[Any], context: Any
+    ) -> List[float]:
         if not candidates or not self.candidate_scorer:
             return [0.0] * len(candidates)
         loop = asyncio.get_event_loop()
         executor = self._get_executor()
         scorer = self.candidate_scorer
         futures = [
-            loop.run_in_executor(
-                executor,
-                scorer,
-                hidden_state,
-                cand,
-                context
-            )
+            loop.run_in_executor(executor, scorer, hidden_state, cand, context)
             for cand in candidates
         ]
         default_score = -0.5
@@ -796,7 +1012,13 @@ class CognitiveLoop:
                 scores.append(default_score)
         return scores
 
-    async def _per_token_consensus(self, token: Token, prompt_tokens: Tokens, chosen_index: int, extra_context: Dict[str, Any]) -> bool:
+    async def _per_token_consensus(
+        self,
+        token: Token,
+        prompt_tokens: Tokens,
+        chosen_index: int,
+        extra_context: Dict[str, Any],
+    ) -> bool:
         if not self.consensus or not hasattr(self.consensus, "approve"):
             return True
         proposal = {
@@ -805,7 +1027,7 @@ class CognitiveLoop:
             "position": len(prompt_tokens),
             "chosen_index": chosen_index,
             "timestamp": time.time(),
-            **extra_context
+            **extra_context,
         }
         try:
             approve_func = self.consensus.approve
@@ -818,22 +1040,33 @@ class CognitiveLoop:
         except (asyncio.TimeoutError, Exception):
             return True
 
-    async def _validate_token(self, token: Token, context: Any, hidden_state: Any) -> Tuple[Token, Optional[Dict[str, Any]]]:
+    async def _validate_token(
+        self, token: Token, context: Any, hidden_state: Any
+    ) -> Tuple[Token, Optional[Dict[str, Any]]]:
         if not self.safety or not hasattr(self.safety, "validate_generation"):
-            if hasattr(self.bridge, "world_model") and hasattr(self.bridge.world_model, "intervene_before_emit"):
-                intervention = await self._async_safe(self.bridge.world_model.intervene_before_emit,
-                                                      {"token": token, "context": context, "hidden_state": hidden_state}, {})
+            if hasattr(self.bridge, "world_model") and hasattr(
+                self.bridge.world_model, "intervene_before_emit"
+            ):
+                intervention = await self._async_safe(
+                    self.bridge.world_model.intervene_before_emit,
+                    {"token": token, "context": context, "hidden_state": hidden_state},
+                    {},
+                )
                 if intervention and intervention.get("modified_token") is not None:
                     return intervention["modified_token"], intervention
                 return token, None
             return token, None
         try:
-            final_token, notes = await self.bridge.validate_token(token, context, hidden_state)
+            final_token, notes = await self.bridge.validate_token(
+                token, context, hidden_state
+            )
             return final_token, notes
         except Exception:
             return token, None
 
-    async def _build_token_rationale(self, token: Token, hidden_state: Any, candidates: List[Any], context: Any) -> Dict[str, Any]:
+    async def _build_token_rationale(
+        self, token: Token, hidden_state: Any, candidates: List[Any], context: Any
+    ) -> Dict[str, Any]:
         if not self.runtime.attach_token_rationale:
             return {}
         rationale = {
@@ -843,7 +1076,9 @@ class CognitiveLoop:
         reasoning = getattr(self.bridge, "reasoning", None)
         if reasoning and hasattr(self.bridge, "explain_choice"):
             try:
-                explanation = await self.bridge.explain_choice(token, hidden_state, context)
+                explanation = await self.bridge.explain_choice(
+                    token, hidden_state, context
+                )
                 rationale["explanation"] = explanation
             except Exception:
                 pass
@@ -917,7 +1152,12 @@ class CognitiveLoop:
                 return self.tokenizer.decode(tokens)
             except Exception:
                 pass
-        if tokens and isinstance(tokens[0], int) and self.vocab and hasattr(self.vocab, "id_to_token"):
+        if (
+            tokens
+            and isinstance(tokens[0], int)
+            and self.vocab
+            and hasattr(self.vocab, "id_to_token")
+        ):
             try:
                 return "".join(self.vocab.id_to_token(t) for t in tokens)
             except Exception:

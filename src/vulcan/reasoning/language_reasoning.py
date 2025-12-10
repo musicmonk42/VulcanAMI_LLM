@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 LanguageReasoning
 
@@ -49,6 +50,7 @@ from typing import Any, Dict, List, Optional, Callable, Sequence, Tuple
 
 # --------------------------- Configuration --------------------------- #
 
+
 @dataclass
 class LanguageReasoningConfig:
     temperature: float = 0.7
@@ -58,7 +60,7 @@ class LanguageReasoningConfig:
     repetition_window: int = 64
     use_beam_search: bool = False
     beam_width: int = 4
-    beam_max_steps: int = 4              # beam expansion depth (local per-step)
+    beam_max_steps: int = 4  # beam expansion depth (local per-step)
     beam_length_penalty: float = 0.7
     min_probability_floor: float = 1e-12
     strategy_auto_switch_entropy: float = 4.0  # if entropy > threshold, switch to beam
@@ -75,6 +77,7 @@ class LanguageReasoningConfig:
 
 
 # --------------------------- Utility Functions --------------------------- #
+
 
 def _softmax(logits: Sequence[float]) -> List[float]:
     if not logits:
@@ -118,10 +121,7 @@ def _apply_top_p(logits: List[float], top_p: float) -> List[float]:
 
 
 def _apply_repetition_penalty(
-    logits: List[float],
-    generated: Sequence[Any],
-    penalty: float,
-    window: int
+    logits: List[float], generated: Sequence[Any], penalty: float, window: int
 ) -> List[float]:
     if penalty <= 1.0 or not generated:
         return logits
@@ -156,6 +156,7 @@ def _sample_index(filtered_logits: List[float], temperature: float) -> int:
 
 # --------------------------- LanguageReasoning --------------------------- #
 
+
 class LanguageReasoning:
     """
     Neural language generation as a reasoning mode.
@@ -167,10 +168,16 @@ class LanguageReasoning:
         config: Optional[LanguageReasoningConfig] = None,
         safety: Optional[Any] = None,
         world_model: Optional[Any] = None,
-        reranker: Optional[Callable[[List[Dict[str, Any]], Dict[str, Any]], List[Dict[str, Any]]]] = None,
-        bias_hook: Optional[Callable[[List[float], Dict[str, Any]], List[float]]] = None,
-        mask_hook: Optional[Callable[[List[float], Dict[str, Any]], List[float]]] = None,
-        random_seed: Optional[int] = None
+        reranker: Optional[
+            Callable[[List[Dict[str, Any]], Dict[str, Any]], List[Dict[str, Any]]]
+        ] = None,
+        bias_hook: Optional[
+            Callable[[List[float], Dict[str, Any]], List[float]]
+        ] = None,
+        mask_hook: Optional[
+            Callable[[List[float], Dict[str, Any]], List[float]]
+        ] = None,
+        random_seed: Optional[int] = None,
     ) -> None:
         """
         Args:
@@ -199,7 +206,7 @@ class LanguageReasoning:
         hidden_state: Any,
         generated_tokens: Sequence[Any],
         context: Optional[Dict[str, Any]] = None,
-        strategy: Optional[str] = None
+        strategy: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generate next token with reasoning trace.
@@ -237,10 +244,17 @@ class LanguageReasoning:
         # Dynamic top-k shrink if enabled
         effective_top_k = self.cfg.top_k
         if self.cfg.dynamic_top_k and ent < self.cfg.strategy_auto_switch_entropy / 2:
-            effective_top_k = max(self.cfg.dynamic_top_k_floor, int(effective_top_k * self.cfg.dynamic_top_k_decay))
+            effective_top_k = max(
+                self.cfg.dynamic_top_k_floor,
+                int(effective_top_k * self.cfg.dynamic_top_k_decay),
+            )
 
         # Step 4: Auto strategy switch if high entropy
-        chosen_strategy = strategy or ("beam" if (self.cfg.use_beam_search or ent > self.cfg.strategy_auto_switch_entropy) else "sample")
+        chosen_strategy = strategy or (
+            "beam"
+            if (self.cfg.use_beam_search or ent > self.cfg.strategy_auto_switch_entropy)
+            else "sample"
+        )
 
         # Step 5: Repetition penalty
         repetition_applied = False
@@ -250,35 +264,39 @@ class LanguageReasoning:
                 filtered_logits,
                 generated_tokens,
                 self.cfg.repetition_penalty,
-                self.cfg.repetition_window
+                self.cfg.repetition_window,
             )
             repetition_applied = filtered_logits != logits
 
         # Step 6: Branch by strategy
         if chosen_strategy == "greedy":
-            token_id = max(range(len(filtered_logits)), key=lambda i: filtered_logits[i])
-            candidates = self._build_candidate_list(filtered_logits, limit=self.cfg.max_candidates_return)
+            token_id = max(
+                range(len(filtered_logits)), key=lambda i: filtered_logits[i]
+            )
+            candidates = self._build_candidate_list(
+                filtered_logits, limit=self.cfg.max_candidates_return
+            )
             beam_info = None
         elif chosen_strategy == "beam":
             token_id, beam_info, candidates = self._beam_search(
-                hidden_state,
-                generated_tokens,
-                filtered_logits,
-                effective_top_k,
-                ent
+                hidden_state, generated_tokens, filtered_logits, effective_top_k, ent
             )
         else:  # 'sample'
             temp = self.cfg.temperature
             top_k_logits = _apply_top_k(filtered_logits, effective_top_k)
             top_p_logits = _apply_top_p(top_k_logits, self.cfg.top_p)
             token_id = _sample_index(top_p_logits, temp)
-            candidates = self._build_candidate_list(top_p_logits, limit=self.cfg.max_candidates_return)
+            candidates = self._build_candidate_list(
+                top_p_logits, limit=self.cfg.max_candidates_return
+            )
             beam_info = None
 
         # Step 7: Candidate reranking (optional)
         if self.reranker and candidates:
             try:
-                candidates = self.reranker(candidates, {"context": context, "entropy": ent})
+                candidates = self.reranker(
+                    candidates, {"context": context, "entropy": ent}
+                )
             except Exception:
                 pass
 
@@ -291,7 +309,7 @@ class LanguageReasoning:
         reasoning_meta = {
             "entropy": ent,
             "confidence": confidence,
-            "repetition_penalty_applied": repetition_applied
+            "repetition_penalty_applied": repetition_applied,
         }
 
         # Step 10: Final structure
@@ -304,9 +322,9 @@ class LanguageReasoning:
             "sampling": {
                 "temperature": self.cfg.temperature,
                 "top_k": effective_top_k,
-                "top_p": self.cfg.top_p
+                "top_p": self.cfg.top_p,
             },
-            "reasoning": reasoning_meta
+            "reasoning": reasoning_meta,
         }
 
     # --------------------- Internal Helpers --------------------- #
@@ -332,17 +350,16 @@ class LanguageReasoning:
             vocab_size = 100
         return [0.0] * vocab_size
 
-    def _build_candidate_list(self, logits: List[float], limit: int = 200) -> List[Dict[str, Any]]:
+    def _build_candidate_list(
+        self, logits: List[float], limit: int = 200
+    ) -> List[Dict[str, Any]]:
         probs = _softmax(logits)
         idxs = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
         out = []
         for rank, i in enumerate(idxs[:limit], start=1):
-            out.append({
-                "id": i,
-                "logit": logits[i],
-                "prob": probs[i],
-                "raw_rank": rank
-            })
+            out.append(
+                {"id": i, "logit": logits[i], "prob": probs[i], "raw_rank": rank}
+            )
         return out
 
     def _beam_search(
@@ -351,7 +368,7 @@ class LanguageReasoning:
         generated_tokens: Sequence[Any],
         logits: List[float],
         effective_top_k: int,
-        entropy_val: float
+        entropy_val: float,
     ) -> Tuple[int, Dict[str, Any], List[Dict[str, Any]]]:
         """
         Simplified local beam search over a single step expansion.
@@ -363,25 +380,25 @@ class LanguageReasoning:
         width = self.cfg.beam_width
         top_k_logits = _apply_top_k(logits, max(width, effective_top_k))
         probs = _softmax(top_k_logits)
-        indices = sorted(range(len(top_k_logits)), key=lambda i: top_k_logits[i], reverse=True)[:width]
+        indices = sorted(
+            range(len(top_k_logits)), key=lambda i: top_k_logits[i], reverse=True
+        )[:width]
 
         beam_paths: List[Dict[str, Any]] = []
         for idx in indices:
             p = probs[idx]
             score = p / max(1.0, self.cfg.beam_length_penalty)
-            beam_paths.append({
-                "token_id": idx,
-                "prob": p,
-                "score": score
-            })
+            beam_paths.append({"token_id": idx, "prob": p, "score": score})
 
         best = max(beam_paths, key=lambda b: b["score"])
-        candidate_list = self._build_candidate_list(top_k_logits, limit=self.cfg.max_candidates_return)
+        candidate_list = self._build_candidate_list(
+            top_k_logits, limit=self.cfg.max_candidates_return
+        )
         beam_info = {
             "paths": beam_paths,
             "chosen": best,
             "entropy": entropy_val,
-            "width": width
+            "width": width,
         }
         return best["token_id"], beam_info, candidate_list
 
@@ -391,14 +408,20 @@ class LanguageReasoning:
         if self.safety and hasattr(self.safety, "validate_generation"):
             try:
                 world_model = self.world_model
-                safe_tok = self.safety.validate_generation(token_id, context, world_model)
+                safe_tok = self.safety.validate_generation(
+                    token_id, context, world_model
+                )
                 if isinstance(safe_tok, int):
                     token_id = safe_tok
             except Exception:
                 pass
 
         # World model correction
-        if self.world_model and hasattr(self.world_model, "validate_generation") and hasattr(self.world_model, "suggest_correction"):
+        if (
+            self.world_model
+            and hasattr(self.world_model, "validate_generation")
+            and hasattr(self.world_model, "suggest_correction")
+        ):
             try:
                 ok = self.world_model.validate_generation(token_id, context)
                 if not ok:
@@ -420,11 +443,11 @@ class LanguageReasoning:
             "sampling": {
                 "temperature": self.cfg.temperature,
                 "top_k": self.cfg.top_k,
-                "top_p": self.cfg.top_p
+                "top_p": self.cfg.top_p,
             },
             "reasoning": {
                 "entropy": 0.0,
                 "confidence": 1.0,
-                "repetition_penalty_applied": False
-            }
+                "repetition_penalty_applied": False,
+            },
         }

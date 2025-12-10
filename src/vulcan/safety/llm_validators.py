@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 LLM Safety Validators (Fully Functional)
 
@@ -56,6 +57,7 @@ Tokens = Sequence[Token]
 # Common Data Structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SafetyEvent:
     kind: str
@@ -74,6 +76,7 @@ class SafetyEvent:
 # ---------------------------------------------------------------------------
 # Base Validator Interface (duck-typed)
 # ---------------------------------------------------------------------------
+
 
 class BaseValidator:
     name: str = "base"
@@ -101,10 +104,12 @@ class BaseValidator:
 # Toxicity Validator
 # ---------------------------------------------------------------------------
 
+
 class ToxicityValidator(BaseValidator):
     """
     Prevents toxic generations via pattern & lexicon scoring.
     """
+
     name = "toxicity"
 
     def __init__(self) -> None:
@@ -151,7 +156,11 @@ class ToxicityValidator(BaseValidator):
         return "[REDACTED]"
 
     def reason(self, token: Any, context: Dict[str, Any]) -> str:
-        return "matched toxic lexicon or pattern" if not self.check(token, context) else "non-toxic"
+        return (
+            "matched toxic lexicon or pattern"
+            if not self.check(token, context)
+            else "non-toxic"
+        )
 
     def applies(self, token: Any) -> bool:
         return isinstance(token, (str, int))
@@ -161,6 +170,7 @@ class ToxicityValidator(BaseValidator):
 # Hallucination Validator
 # ---------------------------------------------------------------------------
 
+
 class HallucinationValidator(BaseValidator):
     """
     Detects probable hallucinations using a world model interface (stub).
@@ -168,6 +178,7 @@ class HallucinationValidator(BaseValidator):
       - has_knowledge(token) -> bool
       - confidence(token) -> float in [0,1]
     """
+
     name = "hallucination"
 
     def __init__(self, low_conf_threshold: float = 0.25) -> None:
@@ -213,6 +224,7 @@ class HallucinationValidator(BaseValidator):
 # Structural Validator
 # ---------------------------------------------------------------------------
 
+
 class StructuralValidator(BaseValidator):
     """
     Validates structural integrity and well-formedness of tokens.
@@ -221,14 +233,15 @@ class StructuralValidator(BaseValidator):
     - Valid syntax patterns
     - Balanced delimiters
     """
+
     name = "structural"
 
     def __init__(self) -> None:
         self.delimiter_pairs = [
-            ('(', ')'),
-            ('[', ']'),
-            ('{', '}'),
-            ('<', '>'),
+            ("(", ")"),
+            ("[", "]"),
+            ("{", "}"),
+            ("<", ">"),
         ]
         self.threshold = 0.5
 
@@ -267,7 +280,7 @@ class StructuralValidator(BaseValidator):
                 risk += 0.3
 
         # Check for control characters
-        if any(ord(c) < 32 and c not in '\n\r\t' for c in text):
+        if any(ord(c) < 32 and c not in "\n\r\t" for c in text):
             risk += 0.3
 
         return min(1.0, risk)
@@ -294,6 +307,7 @@ class StructuralValidator(BaseValidator):
 # Ethical Validator
 # ---------------------------------------------------------------------------
 
+
 class EthicalValidator(BaseValidator):
     """
     Validates ethical considerations in token generation.
@@ -303,18 +317,33 @@ class EthicalValidator(BaseValidator):
     - Privacy violations
     - Manipulation attempts
     """
+
     name = "ethical"
 
     def __init__(self) -> None:
         # Ethical concern patterns
         self._concern_patterns = [
             (re.compile(r"\b(manipulate|deceive|trick|fool)\b", re.IGNORECASE), 0.6),
-            (re.compile(r"\b(discriminat(e|ion)|prejudice|bigot)\b", re.IGNORECASE), 0.8),
-            (re.compile(r"\b(harm|hurt|damage|destroy)\s+(people|humans|users)\b", re.IGNORECASE), 0.9),
+            (
+                re.compile(r"\b(discriminat(e|ion)|prejudice|bigot)\b", re.IGNORECASE),
+                0.8,
+            ),
+            (
+                re.compile(
+                    r"\b(harm|hurt|damage|destroy)\s+(people|humans|users)\b",
+                    re.IGNORECASE,
+                ),
+                0.9,
+            ),
             (re.compile(r"\b(steal|hack|exploit|breach)\b", re.IGNORECASE), 0.7),
-            (re.compile(r"\b(personal|private)\s+(data|information)\b", re.IGNORECASE), 0.5),
+            (
+                re.compile(
+                    r"\b(personal|private)\s+(data|information)\b", re.IGNORECASE
+                ),
+                0.5,
+            ),
         ]
-        
+
         # Ethical concern keywords
         self._concern_keywords = {
             "exploit": 0.7,
@@ -377,10 +406,12 @@ class EthicalValidator(BaseValidator):
 # Prompt Injection Validator
 # ---------------------------------------------------------------------------
 
+
 class PromptInjectionValidator(BaseValidator):
     """
     Detects prompt injection attempts (ignore instructions, system override).
     """
+
     name = "prompt_injection"
 
     def __init__(self) -> None:
@@ -412,7 +443,11 @@ class PromptInjectionValidator(BaseValidator):
         return "[NEUTRALIZED]"
 
     def reason(self, token: Any, context: Dict[str, Any]) -> str:
-        return "matched injection directive" if not self.check(token, context) else "no injection patterns"
+        return (
+            "matched injection directive"
+            if not self.check(token, context)
+            else "no injection patterns"
+        )
 
     def applies(self, token: Any) -> bool:
         return isinstance(token, (str, int))
@@ -421,6 +456,7 @@ class PromptInjectionValidator(BaseValidator):
 # ---------------------------------------------------------------------------
 # Enhanced Safety Validator (Aggregator)
 # ---------------------------------------------------------------------------
+
 
 class EnhancedSafetyValidator:
     """
@@ -500,7 +536,9 @@ class EnhancedSafetyValidator:
 
     # --------------------- Token-Level Validation (Async) --------------------- #
 
-    async def validate_generation_async(self, token: Token, context: Dict[str, Any], world_model: Any = None) -> Token:
+    async def validate_generation_async(
+        self, token: Token, context: Dict[str, Any], world_model: Any = None
+    ) -> Token:
         """
         Async variant for callers already in async contexts.
         """
@@ -529,7 +567,7 @@ class EnhancedSafetyValidator:
                     action="redacted",
                     reason=v.reason(token, context),
                     replacement=replacement_candidate,
-                    meta={"validator": v.name}
+                    meta={"validator": v.name},
                 )
                 self.last_events.append(ev)
                 replacement = replacement_candidate
@@ -556,14 +594,16 @@ class EnhancedSafetyValidator:
                                 action="corrected",
                                 reason="world model consistency failure",
                                 replacement=corr,
-                                meta={}
+                                meta={},
                             )
                             self.last_events.append(ev)
                             replacement = corr
             except Exception:
                 pass
 
-        if self.policy.get("block_on_high_risk", True) and highest_risk >= self.policy.get("high_risk_threshold", 0.9):
+        if self.policy.get(
+            "block_on_high_risk", True
+        ) and highest_risk >= self.policy.get("high_risk_threshold", 0.9):
             if replacement == original:
                 replacement = "[SAFE]"
                 ev = SafetyEvent(
@@ -573,7 +613,7 @@ class EnhancedSafetyValidator:
                     action="blocked",
                     reason="exceeded high risk threshold",
                     replacement=replacement,
-                    meta={}
+                    meta={},
                 )
                 self.last_events.append(ev)
 
@@ -581,7 +621,9 @@ class EnhancedSafetyValidator:
 
     # --------------------- Token-Level Validation (sync, async-aware) --------------------- #
 
-    def validate_generation(self, token: Token, context: Dict[str, Any], world_model: Any = None) -> Token:
+    def validate_generation(
+        self, token: Token, context: Dict[str, Any], world_model: Any = None
+    ) -> Token:
         """
         Synchronous facade:
         - Runs validator passes synchronously.
@@ -612,7 +654,7 @@ class EnhancedSafetyValidator:
                     action="redacted",
                     reason=v.reason(token, context),
                     replacement=replacement_candidate,
-                    meta={"validator": v.name}
+                    meta={"validator": v.name},
                 )
                 self.last_events.append(ev)
                 replacement = replacement_candidate
@@ -639,7 +681,7 @@ class EnhancedSafetyValidator:
                                 action="corrected",
                                 reason="world model consistency failure",
                                 replacement=corr,
-                                meta={}
+                                meta={},
                             )
                             self.last_events.append(ev)
                             replacement = corr
@@ -647,7 +689,9 @@ class EnhancedSafetyValidator:
                 pass
 
         # High-risk block policy
-        if self.policy.get("block_on_high_risk", True) and highest_risk >= self.policy.get("high_risk_threshold", 0.9):
+        if self.policy.get(
+            "block_on_high_risk", True
+        ) and highest_risk >= self.policy.get("high_risk_threshold", 0.9):
             # Force replacement with a neutral token if not already replaced
             if replacement == original:
                 replacement = "[SAFE]"
@@ -658,7 +702,7 @@ class EnhancedSafetyValidator:
                     action="blocked",
                     reason="exceeded high risk threshold",
                     replacement=replacement,
-                    meta={}
+                    meta={},
                 )
                 self.last_events.append(ev)
 
@@ -667,10 +711,7 @@ class EnhancedSafetyValidator:
     # --------------------- Sequence-Level Validation --------------------- #
 
     def validate_sequence(
-        self,
-        tokens: Tokens,
-        context: Dict[str, Any],
-        world_model: Any = None
+        self, tokens: Tokens, context: Dict[str, Any], world_model: Any = None
     ) -> Union[bool, List[Token]]:
         """
         Validate entire sequence:
@@ -693,7 +734,11 @@ class EnhancedSafetyValidator:
                 changed = True
             corrected.append(new_t)
             # Count toxicity events
-            toxicity_events += sum(1 for ev in self.last_events[-3:] if ev.kind == "toxicity" and ev.token == t)
+            toxicity_events += sum(
+                1
+                for ev in self.last_events[-3:]
+                if ev.kind == "toxicity" and ev.token == t
+            )
 
             if toxicity_events >= self.policy.get("max_sequence_toxicity_events", 3):
                 # Block entire sequence
@@ -703,7 +748,7 @@ class EnhancedSafetyValidator:
                     risk=1.0,
                     action="blocked",
                     reason="excessive toxicity events",
-                    meta={"count": toxicity_events}
+                    meta={"count": toxicity_events},
                 )
                 self.last_events.append(ev)
                 return False
@@ -712,7 +757,9 @@ class EnhancedSafetyValidator:
 
     # --------------------- Assessment Helper --------------------- #
 
-    def assess(self, token: Token, context: Dict[str, Any]) -> Tuple[Token, Optional[SafetyEvent]]:
+    def assess(
+        self, token: Token, context: Dict[str, Any]
+    ) -> Tuple[Token, Optional[SafetyEvent]]:
         """
         Single-token assessment returning (safe_token, event_if_any).
         Leaves full validate_generation logic intact but also returns last event.
@@ -743,8 +790,9 @@ class EnhancedSafetyValidator:
 # Convenience Factory
 # ---------------------------------------------------------------------------
 
+
 def build_default_safety_validator(
     extra_validators: Optional[List[BaseValidator]] = None,
-    policy: Optional[Dict[str, Any]] = None
+    policy: Optional[Dict[str, Any]] = None,
 ) -> EnhancedSafetyValidator:
     return EnhancedSafetyValidator(extra_validators=extra_validators, policy=policy)

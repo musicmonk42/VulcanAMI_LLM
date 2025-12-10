@@ -145,7 +145,7 @@ from .causal_graph import (
     CycleDetector,
     PathFinder,
     DSeparationChecker,
-    TopologicalSorter
+    TopologicalSorter,
 )
 
 # Import confidence calibration components
@@ -153,7 +153,7 @@ from .confidence_calibrator import (
     ConfidenceCalibrator,
     ModelConfidenceTracker,
     CalibrationBin,
-    PredictionRecord
+    PredictionRecord,
 )
 
 # Import correlation tracking components
@@ -168,7 +168,7 @@ from .correlation_tracker import (
     CorrelationStorage,
     ChangeDetector,
     CausalityTracker,
-    BaselineTracker
+    BaselineTracker,
 )
 
 # Import dynamics modeling components
@@ -184,7 +184,7 @@ from .dynamics_model import (
     StateClusterer,
     TransitionLearner,
     ModelFitter,
-    DynamicsApplier
+    DynamicsApplier,
 )
 
 # Import intervention management components
@@ -199,7 +199,7 @@ from .intervention_manager import (
     CostEstimator,
     InterventionScheduler,
     ConfounderDetector,
-    InterventionSimulator
+    InterventionSimulator,
 )
 
 # Import prediction engine components
@@ -214,7 +214,7 @@ from .prediction_engine import (
     PathClusterer,
     MonteCarloSampler,
     PredictionCombiner,
-    CombinationMethod
+    CombinationMethod,
 )
 
 # Import invariant detection components
@@ -227,7 +227,7 @@ from .invariant_detector import (
     InvariantValidator,
     InvariantIndexer,
     ConservationLawDetector,
-    LinearRelationshipDetector
+    LinearRelationshipDetector,
 )
 
 # Import world model core and router
@@ -238,7 +238,7 @@ from .world_model_core import (
     ObservationProcessor,
     InterventionManager,
     PredictionManager,
-    ConsistencyValidator
+    ConsistencyValidator,
 )
 
 from .world_model_router import (
@@ -250,15 +250,15 @@ from .world_model_router import (
     ObservationSignature,
     UpdateDependencyGraph,
     PatternLearner,
-    CostModel
+    CostModel,
 )
 
 # Try to import additional components if they exist
 _optional_imports_success = {}
-_optional_imports_success['prediction_engine'] = True
-_optional_imports_success['invariant_detector'] = True
-_optional_imports_success['world_model_core'] = True
-_optional_imports_success['world_model_router'] = True
+_optional_imports_success["prediction_engine"] = True
+_optional_imports_success["invariant_detector"] = True
+_optional_imports_success["world_model_core"] = True
+_optional_imports_success["world_model_router"] = True
 
 
 # Version info
@@ -269,108 +269,99 @@ __author__ = "VULCAN-AGI Team"
 # Define public API
 __all__ = [
     # Core Components
-    'CausalDAG',
-    'ConfidenceCalibrator',
-    'CorrelationTracker',
-    'DynamicsModel',
-    'InterventionExecutor',
-    'InterventionPrioritizer',
-    
+    "CausalDAG",
+    "ConfidenceCalibrator",
+    "CorrelationTracker",
+    "DynamicsModel",
+    "InterventionExecutor",
+    "InterventionPrioritizer",
     # Causal Graph Classes
-    'CausalEdge',
-    'CausalPath',
-    'EvidenceType',
-    'ProbabilityDistribution',
-    'GraphStructure',
-    'CycleDetector',
-    'PathFinder',
-    'DSeparationChecker',
-    'TopologicalSorter',
-    
+    "CausalEdge",
+    "CausalPath",
+    "EvidenceType",
+    "ProbabilityDistribution",
+    "GraphStructure",
+    "CycleDetector",
+    "PathFinder",
+    "DSeparationChecker",
+    "TopologicalSorter",
     # Confidence Calibration Classes
-    'ModelConfidenceTracker',
-    'CalibrationBin',
-    'PredictionRecord',
-    
+    "ModelConfidenceTracker",
+    "CalibrationBin",
+    "PredictionRecord",
     # Correlation Tracking Classes
-    'CorrelationMatrix',
-    'CorrelationEntry',
-    'CorrelationMethod',
-    'CorrelationCalculator',
-    'StatisticsTracker',
-    'DataBuffer',
-    'CorrelationStorage',
-    'ChangeDetector',
-    'CausalityTracker',
-    'BaselineTracker',
-    
+    "CorrelationMatrix",
+    "CorrelationEntry",
+    "CorrelationMethod",
+    "CorrelationCalculator",
+    "StatisticsTracker",
+    "DataBuffer",
+    "CorrelationStorage",
+    "ChangeDetector",
+    "CausalityTracker",
+    "BaselineTracker",
     # Dynamics Modeling Classes
-    'State',
-    'StateTransition',
-    'Condition',
-    'TemporalPattern',
-    'PatternType',
-    'TimeSeriesAnalyzer',
-    'PatternDetector',
-    'StateClusterer',
-    'TransitionLearner',
-    'ModelFitter',
-    'DynamicsApplier',
-    
+    "State",
+    "StateTransition",
+    "Condition",
+    "TemporalPattern",
+    "PatternType",
+    "TimeSeriesAnalyzer",
+    "PatternDetector",
+    "StateClusterer",
+    "TransitionLearner",
+    "ModelFitter",
+    "DynamicsApplier",
     # Intervention Management Classes
-    'InterventionCandidate',
-    'InterventionResult',
-    'InterventionType',
-    'Correlation',
-    'InformationGainEstimator',
-    'CostEstimator',
-    'InterventionScheduler',
-    'ConfounderDetector',
-    'InterventionSimulator',
-    
+    "InterventionCandidate",
+    "InterventionResult",
+    "InterventionType",
+    "Correlation",
+    "InformationGainEstimator",
+    "CostEstimator",
+    "InterventionScheduler",
+    "ConfounderDetector",
+    "InterventionSimulator",
     # Prediction Engine Classes
-    'EnsemblePredictor',
-    'Prediction',
-    'Path',
-    'PathCluster',
-    'PathTracer',
-    'PathAnalyzer',
-    'PathEffectCalculator',
-    'PathClusterer',
-    'MonteCarloSampler',
-    'PredictionCombiner',
-    'CombinationMethod',
-    
+    "EnsemblePredictor",
+    "Prediction",
+    "Path",
+    "PathCluster",
+    "PathTracer",
+    "PathAnalyzer",
+    "PathEffectCalculator",
+    "PathClusterer",
+    "MonteCarloSampler",
+    "PredictionCombiner",
+    "CombinationMethod",
     # Invariant Detection Classes
-    'InvariantDetector',
-    'InvariantRegistry',
-    'Invariant',
-    'InvariantType',
-    'InvariantEvaluator',
-    'InvariantValidator',
-    'InvariantIndexer',
-    'ConservationLawDetector',
-    'LinearRelationshipDetector',
-    
+    "InvariantDetector",
+    "InvariantRegistry",
+    "Invariant",
+    "InvariantType",
+    "InvariantEvaluator",
+    "InvariantValidator",
+    "InvariantIndexer",
+    "ConservationLawDetector",
+    "LinearRelationshipDetector",
     # World Model Core Classes
-    'WorldModel',
-    'Observation',
-    'ModelContext',
-    'ObservationProcessor',
-    'InterventionManager',
-    'PredictionManager',
-    'ConsistencyValidator',
-    
+    "WorldModel",
+    "Observation",
+    "ModelContext",
+    "ObservationProcessor",
+    "InterventionManager",
+    "PredictionManager",
+    "ConsistencyValidator",
     # World Model Router Classes
-    'WorldModelRouter',
-    'UpdatePlan',
-    'UpdateType',
-    'UpdatePriority',
-    'UpdateStrategy',
-    'ObservationSignature',
-    'UpdateDependencyGraph',
-    'PatternLearner',
-    'CostModel',
+    "WorldModelRouter",
+    "UpdatePlan",
+    "UpdateType",
+    "UpdatePriority",
+    "UpdateStrategy",
+    "ObservationSignature",
+    "UpdateDependencyGraph",
+    "PatternLearner",
+    "CostModel",
 ]
 
 
@@ -378,139 +369,151 @@ __all__ = [
 def get_available_components() -> Dict[str, bool]:
     """
     Get availability status of all world model components.
-    
+
     Returns:
         Dictionary mapping component names to availability status
     """
     return {
-        'causal_graph': True,
-        'confidence_calibrator': True,
-        'correlation_tracker': True,
-        'dynamics_model': True,
-        'intervention_manager': True,
-        'prediction_engine': True,
-        'invariant_detector': True,
-        'world_model_core': _optional_imports_success.get('world_model_core', False),
-        'world_model_router': _optional_imports_success.get('world_model_router', False),
+        "causal_graph": True,
+        "confidence_calibrator": True,
+        "correlation_tracker": True,
+        "dynamics_model": True,
+        "intervention_manager": True,
+        "prediction_engine": True,
+        "invariant_detector": True,
+        "world_model_core": _optional_imports_success.get("world_model_core", False),
+        "world_model_router": _optional_imports_success.get(
+            "world_model_router", False
+        ),
     }
 
 
 def check_dependencies() -> Dict[str, bool]:
     """
     Check availability of optional dependencies.
-    
+
     Returns:
         Dictionary mapping dependency names to availability status
     """
     dependencies = {}
-    
+
     # Check scipy
     try:
         import scipy
-        dependencies['scipy'] = True
+
+        dependencies["scipy"] = True
     except ImportError:
-        dependencies['scipy'] = False
-    
+        dependencies["scipy"] = False
+
     # Check sklearn
     try:
         import sklearn
-        dependencies['sklearn'] = True
+
+        dependencies["sklearn"] = True
     except ImportError:
-        dependencies['sklearn'] = False
-    
+        dependencies["sklearn"] = False
+
     # Check pandas
     try:
         import pandas
-        dependencies['pandas'] = True
+
+        dependencies["pandas"] = True
     except ImportError:
-        dependencies['pandas'] = False
-    
+        dependencies["pandas"] = False
+
     # Check networkx
     try:
         import networkx
-        dependencies['networkx'] = True
+
+        dependencies["networkx"] = True
     except ImportError:
-        dependencies['networkx'] = False
-    
+        dependencies["networkx"] = False
+
     # Check statsmodels
     try:
         import statsmodels
-        dependencies['statsmodels'] = True
+
+        dependencies["statsmodels"] = True
     except ImportError:
-        dependencies['statsmodels'] = False
-    
+        dependencies["statsmodels"] = False
+
     # Check safety validator (with protection against circular imports)
     try:
         # Use importlib to check if module exists without triggering full import chain
         import importlib.util
-        spec = importlib.util.find_spec('vulcan.safety.safety_validator')
+
+        spec = importlib.util.find_spec("vulcan.safety.safety_validator")
         if spec is not None:
             # Module exists, try to import to verify it's usable
             from ..safety.safety_validator import EnhancedSafetyValidator
-            dependencies['safety_validator'] = True
+
+            dependencies["safety_validator"] = True
         else:
-            dependencies['safety_validator'] = False
+            dependencies["safety_validator"] = False
     except (ImportError, AttributeError):
-        dependencies['safety_validator'] = False
-    
+        dependencies["safety_validator"] = False
+
     return dependencies
 
 
 def get_module_info() -> Dict[str, Any]:
     """
     Get comprehensive module information.
-    
+
     Returns:
         Dictionary with module metadata
     """
     return {
-        'version': __version__,
-        'author': __author__,
-        'components': get_available_components(),
-        'dependencies': check_dependencies(),
-        'core_features': [
-            'Unified WorldModel orchestrator with all components integrated',
-            'Intelligent routing with pattern learning and cost modeling',
-            'Causal DAG with cycle detection and path finding',
-            'Confidence calibration (isotonic, Platt, histogram, beta)',
-            'Correlation tracking with significance testing',
-            'Temporal dynamics modeling with state transitions',
-            'Intervention planning and execution with safety validation',
-            'Ensemble prediction with uncertainty quantification',
-            'Invariant detection (conservation laws, constraints, patterns)',
-            'Meta-reasoning layer for goal-level reasoning (optional)',
-            'Graphix IR integration for multi-agent consensus',
-            'Safety validation throughout all operations',
-            'Thread-safe operations with deadlock prevention',
-            'Graceful fallbacks for missing dependencies'
+        "version": __version__,
+        "author": __author__,
+        "components": get_available_components(),
+        "dependencies": check_dependencies(),
+        "core_features": [
+            "Unified WorldModel orchestrator with all components integrated",
+            "Intelligent routing with pattern learning and cost modeling",
+            "Causal DAG with cycle detection and path finding",
+            "Confidence calibration (isotonic, Platt, histogram, beta)",
+            "Correlation tracking with significance testing",
+            "Temporal dynamics modeling with state transitions",
+            "Intervention planning and execution with safety validation",
+            "Ensemble prediction with uncertainty quantification",
+            "Invariant detection (conservation laws, constraints, patterns)",
+            "Meta-reasoning layer for goal-level reasoning (optional)",
+            "Graphix IR integration for multi-agent consensus",
+            "Safety validation throughout all operations",
+            "Thread-safe operations with deadlock prevention",
+            "Graceful fallbacks for missing dependencies",
         ],
-        'safety_features': [
-            'Safety validator integration',
-            'Intervention blocking for unsafe operations',
-            'State transition validation',
-            'Audit logging support',
-            'Safety statistics tracking'
-        ]
+        "safety_features": [
+            "Safety validator integration",
+            "Intervention blocking for unsafe operations",
+            "State transition validation",
+            "Audit logging support",
+            "Safety statistics tracking",
+        ],
     }
 
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)
-logger.info("World Model module loaded - components: %s", 
-           [k for k, v in get_available_components().items() if v])
+logger.info(
+    "World Model module loaded - components: %s",
+    [k for k, v in get_available_components().items() if v],
+)
 
 # Log warnings for missing dependencies (excluding safety_validator which may be delayed due to circular imports)
 _deps = check_dependencies()
-missing_deps = [k for k, v in _deps.items() if not v and k != 'safety_validator']
+missing_deps = [k for k, v in _deps.items() if not v and k != "safety_validator"]
 if missing_deps:
     logger.warning("Operating with fallback implementations for: %s", missing_deps)
 
 # Safety validator check - only warn if the module file doesn't exist at all
 # (not if it's temporarily unavailable due to circular imports)
-if not _deps.get('safety_validator', False):
+if not _deps.get("safety_validator", False):
     # Double-check by looking for the module file
     import importlib.util
-    safety_spec = importlib.util.find_spec('vulcan.safety.safety_validator')
+
+    safety_spec = importlib.util.find_spec("vulcan.safety.safety_validator")
     if safety_spec is None:
         # Module truly doesn't exist
         logger.warning(
