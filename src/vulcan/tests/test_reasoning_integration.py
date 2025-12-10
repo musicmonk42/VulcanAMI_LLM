@@ -151,7 +151,7 @@ class TestUnifiedReasoningIntegration:
                 )
 
         # Verify at least some types worked
-        successful = list(results if r["success")]
+        successful = [r for r in results if r["success"]]
         print(f"\n✅ Successful: {len(successful)}/{len(results)}")
         assert len(successful) > 0, "At least one reasoning type should work"
 

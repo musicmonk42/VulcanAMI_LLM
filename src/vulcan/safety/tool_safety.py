@@ -750,7 +750,7 @@ class ToolSafetyManager:
             return False
         with self.lock:
             recent_uses = sum(
-                len(list(history if h["timestamp") > time.time() - 300])
+                len([h for h in history if h["timestamp"] > time.time() - 300])
                 for history in self.usage_history.values()
             )
             recent_failures = sum(
@@ -1072,7 +1072,7 @@ class ToolSafetyGovernor:
         high_risk_tools = self._identify_high_risk_tools(allowed_tools)
         if high_risk_tools and not selection_request.get("risk_approved", False):
             logger.warning(f"High-risk tools require approval: {high_risk_tools}")
-            allowed_tools = list(allowed_tools if t not in high_risk_tools)
+            allowed_tools = [t for t in allowed_tools if t not in high_risk_tools]
             veto_report.reasons.append(f"High-risk tools removed: {high_risk_tools}")
 
         consensus_tools = allowed_tools
@@ -1200,9 +1200,9 @@ class ToolSafetyGovernor:
         filtered = tools.copy()
         with self.lock:
             if self.blacklist:
-                filtered = list(filtered if t not in self.blacklist)
+                filtered = [t for t in filtered if t not in self.blacklist]
             if self.whitelist:
-                filtered = list(filtered if t in self.whitelist)
+                filtered = [t for t in filtered if t in self.whitelist]
         return filtered
 
     def _estimate_resources(self, tools: List[str]) -> Dict[str, float]:

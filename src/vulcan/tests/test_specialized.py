@@ -302,7 +302,7 @@ class TestEpisodicMemory:
 
         assert len(similar) >= 2
         # Should prefer coding episodes
-        coding_episodes = list(similar if ep.context.get("task") == "coding")
+        coding_episodes = [item for item in similar if ep.context.get("task"] == "coding")
         assert len(coding_episodes) >= 2
 
     def test_recall_by_tags(self, memory_config):

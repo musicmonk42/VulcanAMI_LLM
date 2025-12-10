@@ -1644,16 +1644,16 @@ class EnhancedProbabilisticReasoner:
 
         if self.diagnostics["mse_history"]:
             diagnostics["recent_mse"] = float(
-                np.mean(list(self.diagnostics["mse_history"])[-10:])
+                np.mean([self.diagnostics["mse_history"])[-10:])
             )
 
         if self.diagnostics["likelihood_history"]:
             diagnostics["recent_likelihood"] = float(
-                np.mean(list(self.diagnostics["likelihood_history"])[-10:])
+                np.mean([self.diagnostics["likelihood_history"])[-10:])
             )
 
         if self.diagnostics["optimization_history"]:
-            diagnostics["recent_optimizations"] = list(
+            diagnostics["recent_optimizations"] = [
                 self.diagnostics["optimization_history"]
             )[-5:]
 

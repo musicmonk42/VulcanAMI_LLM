@@ -362,7 +362,7 @@ class PatternTracker:
                 if pattern_type:
                     if pattern_type in self.observed_patterns:
                         return {
-                            pattern_type: list(self.observed_patterns[pattern_type])
+                            pattern_type: [self.observed_patterns[pattern_type])
                         }
                     return {}
 

@@ -1119,7 +1119,7 @@ class GovernanceManager:
                         "rejection_rate": metrics["rejected"] / total,
                         "timeout_rate": metrics["timeout"] / total,
                         "avg_response_time": (
-                            np.mean(list(metrics["average_response_time"]))
+                            np.mean([metrics["average_response_time"]))
                             if metrics["average_response_time"]
                             else 0
                         ),
@@ -1615,7 +1615,7 @@ class ValueAlignmentSystem:
         recommendations = []
 
         # Address critical violations first
-        critical_violations = list(violations if v.get("severity") == "critical")
+        critical_violations = [v for v in violations if v.get("severity"] == "critical")
         if critical_violations:
             recommendations.append(
                 "CRITICAL: Address safety and harm prevention issues immediately"
@@ -2004,7 +2004,7 @@ class HumanOversightInterface:
             emergency_enabled = self.emergency_stop_enabled
             recent_interventions = len(self.interventions)
             active_alerts_count = len(
-                list(self.alerts if not a.get("acknowledged"))
+                [a for a in self.alerts if not a.get("acknowledged"])
             )
 
         with self.governance.lock:
@@ -2066,7 +2066,7 @@ class HumanOversightInterface:
     def get_monitoring_dashboard(self) -> Dict[str, Any]:
         """Get monitoring dashboard data."""
         with self.lock:
-            active_alerts = list(self.alerts if not a["acknowledged")]
+            active_alerts = [a for a in self.alerts if not a["acknowledged"]]
             recent_feedback = list(self.collected_feedback)[-5:]
             automation_level = self.automation_level
 
@@ -2107,7 +2107,7 @@ class HumanOversightInterface:
 
         # Alert health (fewer alerts = better)
         with self.lock:
-            active_alerts = len(list(self.alerts if not a["acknowledged")])
+            active_alerts = len([a for a in self.alerts if not a["acknowledged"]])
 
         alert_health = max(0.0, 1.0 - (active_alerts / 10.0))  # 10+ alerts = 0 health
         health_factors.append(alert_health)

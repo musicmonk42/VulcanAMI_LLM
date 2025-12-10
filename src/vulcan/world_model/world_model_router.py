@@ -2033,10 +2033,10 @@ class WorldModelRouter:
                 "enabled": True,
                 "routing_records": len(self.csiu_routing_history),
                 "execution_records": len(
-                    list(self.execution_history if "csiu_before" in r)
+                    [r for r in self.execution_history if "csiu_before" in r]
                 ),
                 "outcome_records": len(
-                    list(self.csiu_routing_history if "success" in r)
+                    [r for r in self.csiu_routing_history if "success" in r]
                 ),
                 "note": "Internal tracking only, not for UX",
             }

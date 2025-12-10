@@ -270,7 +270,7 @@ class ConstraintManager:
 
         with self.lock:
             sorted_constraints = sorted(
-                list(self.constraints if c.active),
+                [c for c in self.constraints if c.active],
                 key=lambda x: x.priority,
                 reverse=True,
             )

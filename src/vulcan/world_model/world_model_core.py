@@ -1343,7 +1343,7 @@ class ConsistencyValidator:
         issues.extend(self._check_calibration_issues())
 
         # SELECT: Determine if auto-fix is needed
-        critical_issues = list(issues if i["severity") == "high"]
+        critical_issues = [i for i in issues if i["severity"] == "high"]
 
         # APPLY: Auto-fix critical issues
         if critical_issues:
@@ -2023,7 +2023,7 @@ class WorldModel:
             "get_safety_stats",
         ]
 
-        missing = list(required_methods if not hasattr(self.safety_validator, m))
+        missing = [m for m in required_methods if not hasattr(self.safety_validator, m])
 
         if missing:
             logger.error(

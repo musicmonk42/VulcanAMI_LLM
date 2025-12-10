@@ -1565,8 +1565,8 @@ class TemporalReasoner:
 
         # Add transitive constraints
         for e1 in list(network.keys()):
-            for e2 in list(network[e1].keys()):
-                for e3 in list(network[e2].keys()):
+            for e2 in [network[e1].keys()):
+                for e3 in [network[e2].keys()):
                     if e3 != e1:
                         # Compose relations
                         composed = self._compose_relations(
@@ -1780,7 +1780,7 @@ class TemporalReasoner:
                 in_degree[rel["event2"]] += 1
 
         # Initialize queue with events that have no predecessors
-        queue = deque(list(all_events if in_degree[e) == 0])
+        queue = deque([e for e in all_events if in_degree[e] == 0])
         sequence = []
 
         while queue:

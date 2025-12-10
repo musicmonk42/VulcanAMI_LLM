@@ -998,7 +998,7 @@ class ConceptMapper:
         # Factor 3: Measurement consistency
         consistency_scores = []
         for effect_type in effect_types:
-            type_effects = list(effects if e.effect_type == effect_type)
+            type_effects = [e for e in effects if e.effect_type == effect_type]
             if len(type_effects) > 1:
                 # Check pairwise consistency
                 for i, e1 in enumerate(type_effects):

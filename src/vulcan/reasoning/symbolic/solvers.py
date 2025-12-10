@@ -130,7 +130,7 @@ class Factor:
             return self._marginalize_gaussian(var)
 
         # Discrete marginalization
-        new_vars = list(self.variables if v != var)
+        new_vars = [v for v in self.variables if v != var]
         new_values = defaultdict(float)
 
         var_idx = self.variables.index(var)
@@ -146,7 +146,7 @@ class Factor:
         """Marginalize Gaussian factor."""
         # For linear Gaussian models, marginalization is analytical
         self.variables.index(var)
-        new_vars = list(self.variables if v != var)
+        new_vars = [v for v in self.variables if v != var]
 
         if self.mean_params is None or self.covariance is None:
             return Factor(variables=new_vars, values={})
@@ -688,7 +688,7 @@ class BayesianNetworkReasoner:
             List of parent assignments
         """
         # Separate observed and unobserved parents
-        unobserved = list(parents if p not in evidence)
+        unobserved = [p for p in parents if p not in evidence]
 
         if not unobserved:
             # All parents observed
@@ -765,7 +765,7 @@ class BayesianNetworkReasoner:
             remaining.remove(best_var)
 
             # Update graph (add fill edges)
-            neighbors = list(graph[best_var] & set(remaining))
+            neighbors = [graph[best_var] & set(remaining))
             for i, n1 in enumerate(neighbors):
                 for n2 in neighbors[i + 1 :]:
                     graph[n1].add(n2)
@@ -785,8 +785,8 @@ class BayesianNetworkReasoner:
             Updated factors
         """
         # Find factors containing var
-        relevant = list(factors if var in f.variables)
-        irrelevant = list(factors if var not in f.variables)
+        relevant = [f for f in factors if var in f.variables]
+        irrelevant = [f for f in factors if var not in f.variables]
 
         if not relevant:
             return factors
@@ -1195,7 +1195,7 @@ class BayesianNetworkReasoner:
 
         for sample in data:
             # Get missing variables
-            missing = list(self.variables if v not in sample)
+            missing = [v for v in self.variables if v not in sample]
             observed = {v: sample[v] for v in sample if v in self.variables}
 
             if not missing:
@@ -1388,7 +1388,7 @@ class BayesianNetworkReasoner:
         # Phase 1: Remove edges
         for order in range(len(variables)):
             for var_i in variables:
-                for var_j in list(adjacencies[var_i]):
+                for var_j in [adjacencies[var_i]):
                     # Test conditional independence given subsets of neighbors
                     neighbors = adjacencies[var_i] - {var_j}
 
@@ -1738,7 +1738,7 @@ class CSPSolver:
 
     def _select_unassigned_variable(self, assignment: Dict[str, Any]) -> str:
         """Select unassigned variable using MRV heuristic."""
-        unassigned = list(self.variables if v not in assignment)
+        unassigned = [v for v in self.variables if v not in assignment]
 
         # Choose variable with minimum remaining values
         return min(unassigned, key=lambda v: len(self.domains[v]))
@@ -1746,7 +1746,7 @@ class CSPSolver:
     def _order_domain_values(self, var: str, assignment: Dict[str, Any]) -> List[Any]:
         """Order domain values using LCV heuristic."""
         # For simplicity, return domain as-is
-        return list(self.domains[var])
+        return [self.domains[var])
 
     def _is_consistent(self, var: str, value: Any, assignment: Dict[str, Any]) -> bool:
         """Check if assignment is consistent with constraints."""
@@ -1773,7 +1773,7 @@ class CSPSolver:
 
         var = self._select_unassigned_variable(assignment)
 
-        for value in list(domains[var]):
+        for value in [domains[var]):
             if self._is_consistent(var, value, assignment):
                 assignment[var] = value
 

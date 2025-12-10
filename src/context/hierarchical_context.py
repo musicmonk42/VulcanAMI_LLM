@@ -928,7 +928,7 @@ class HierarchicalContext:
                 self._to_text(e.prompt), self._to_text(e.token)
             )
             # Check novelty
-            new_concepts = list(concepts if c not in seen_concepts)
+            new_concepts = [c for c in concepts if c not in seen_concepts]
             if new_concepts or len(diverse) < k // 2:
                 diverse.append(e)
                 seen_concepts.update(concepts)
@@ -973,16 +973,16 @@ class HierarchicalContext:
 
     def _find_frequent_episodic(self, min_freq: int) -> List[EpisodicItem]:
         """Find frequently accessed episodic items"""
-        return list(self.episodic if e.access_count >= min_freq)
+        return [e for e in self.episodic if e.access_count >= min_freq]
 
     def _find_recent_episodic(self) -> List[EpisodicItem]:
         """Find recent episodic items"""
         cutoff = time.time() - self.half_life
-        return list(self.episodic if e.ts > cutoff)
+        return [e for e in self.episodic if e.ts > cutoff]
 
     def _find_important_episodic(self) -> List[EpisodicItem]:
         """Find important episodic items"""
-        return list(self.episodic if e.importance > 0.7)
+        return [e for e in self.episodic if e.importance > 0.7]
 
     def _find_hybrid_episodic(self, min_freq: int) -> List[EpisodicItem]:
         """Find items using hybrid criteria"""
@@ -1104,7 +1104,7 @@ class HierarchicalContext:
                 if meta:
                     p.meta.update(meta)
                 # Merge signature terms
-                merged = list(dict.fromkeys((p.signature_terms or []) + sig))[:50]
+                merged = [dict.fromkeys((p.signature_terms or []) + sig))[:50]
                 p.signature_terms = merged
                 return
 
@@ -1234,7 +1234,7 @@ class HierarchicalContext:
             terms.extend(self._tokenize(t or ""))
 
         # Filter short terms
-        terms = list(terms if len(t) > 2)
+        terms = [t for t in terms if len(t] > 2)
 
         # Unique, preserve order
         seen = set()

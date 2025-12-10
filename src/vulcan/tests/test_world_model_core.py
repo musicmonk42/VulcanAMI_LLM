@@ -191,7 +191,7 @@ class MockInterventionManager:
             return False
 
     def get_pending_interventions(self) -> List[Intervention]:
-        return list(self.scheduled if i.status == "pending")
+        return [i for i in self.scheduled if i.status == "pending"]
 
     def get_statistics(self) -> Dict:
         return {
@@ -252,7 +252,7 @@ class MockPredictionManager:
         return pred
 
     def get_prediction_confidence(self, target: str) -> float:
-        target_preds = list(self.predictions if p.target == target)
+        target_preds = [p for p in self.predictions if p.target == target]
         if not target_preds:
             return 0.0
         return np.mean([p.confidence for p in target_preds])

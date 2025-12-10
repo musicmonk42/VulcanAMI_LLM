@@ -305,7 +305,7 @@ class ExplorationValueEstimator:
                 # Historical performance
                 historical_bonus = 0
                 if region.domain in self.value_history:
-                    history = list(self.value_history[region.domain])
+                    history = [self.value_history[region.domain])
                     if history:
                         historical_avg = np.mean(history[-10:])
                         historical_bonus = historical_avg * 0.2
@@ -1232,7 +1232,7 @@ class CuriosityEngine:
                 gaps = all_gaps[:3]
             elif strategy == "efficient":
                 all_gaps = self.gap_analyzer.get_all_gaps()
-                gaps = list(all_gaps if g.estimated_cost < 20)[:5]
+                gaps = [g for g in all_gaps if g.estimated_cost < 20][:5]
 
             # APPLY: Add to dependency graph
             for gap in gaps:

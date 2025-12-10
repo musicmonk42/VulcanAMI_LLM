@@ -1110,7 +1110,7 @@ class ModelInferenceValidator:
                         }
                     )
 
-        critical_violations = list(violations if v["severity") == "critical"]
+        critical_violations = [v for v in violations if v["severity"] == "critical"]
         safe = len(critical_violations) == 0
 
         return {

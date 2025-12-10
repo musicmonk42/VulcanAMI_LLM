@@ -958,7 +958,7 @@ class CuriosityRewardShaper:
 
             # Compute entropy using np.histogram (or fake version)
             hist, _ = _np.histogram(values, bins=10, density=True)
-            hist = list(hist if h > 0)  # Remove zero bins (list comprehension)
+            hist = [h for h in hist if h > 0]  # Remove zero bins (list comprehension)
 
             if len(hist) > 0:
                 # Use np.log2 (or fake version)

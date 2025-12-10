@@ -174,7 +174,7 @@ class CSIUEnforcement:
             window_start = now - self.config.cumulative_window_seconds
 
             # Filter to recent window
-            recent = list(self._influence_history if r.timestamp >= window_start)
+            recent = [r for r in self._influence_history if r.timestamp >= window_start]
 
             if not recent:
                 return {

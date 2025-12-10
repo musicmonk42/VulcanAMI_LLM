@@ -1333,7 +1333,7 @@ class ParameterAdjuster:
                     current = adjusted.get("strategy", "default")
 
                     if current in strategies:
-                        strategies = list(strategies if s != current)
+                        strategies = [s for s in strategies if s != current]
 
                     if strategies:
                         adjusted["strategy"] = strategies[0]
@@ -1799,7 +1799,7 @@ class IterativeExperimentDesigner:
                     and self.successful_adjustments[key]
                 ):
                     # Get most recent successful adjustment
-                    recent_adjustments = list(self.successful_adjustments[key])[-5:]
+                    recent_adjustments = [self.successful_adjustments[key])[-5:]
 
                     # Apply successful patterns
                     for adj in recent_adjustments:
