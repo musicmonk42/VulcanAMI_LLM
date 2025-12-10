@@ -159,7 +159,7 @@ class EmbeddingManager:
     def embed(self, text: str) -> List[float]:
         """Embed text with caching."""
         # Create cache key
-        cache_key = hashlib.md5(text.encode()).hexdigest()
+        cache_key = hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
 
         # Check cache
         if cache_key in self.cache:
@@ -872,7 +872,7 @@ class PersistentContextManager:
 
     def _get_cache_key(self, prompt: str) -> str:
         """Get cache key for prompt."""
-        return hashlib.md5(prompt.encode()).hexdigest()
+        return hashlib.md5(prompt.encode(), usedforsecurity=False).hexdigest()
 
     def _update_cache(self, key: str, result: RetrievalResult) -> None:
         """Update retrieval cache."""

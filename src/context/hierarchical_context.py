@@ -1283,7 +1283,7 @@ class HierarchicalContext:
     ) -> str:
         """Generate cache key"""
         combined = f"{qtext}:{max_items}:{strategy.value}"
-        return hashlib.md5(combined.encode()).hexdigest()
+        return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()
 
     def _update_cache(self, key: str, result: Dict[str, Any]) -> None:
         """Update cache with LRU eviction"""

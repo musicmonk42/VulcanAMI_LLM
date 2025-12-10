@@ -370,7 +370,7 @@ class S3Store:
     ) -> Dict[str, Any]:
         """Upload a single part."""
         # Placeholder - implement actual part upload
-        etag = hashlib.md5(data).hexdigest()
+        etag = hashlib.md5(data, usedforsecurity=False).hexdigest()
         return {"part_number": part_number, "etag": etag}
 
     def _complete_multipart_upload(

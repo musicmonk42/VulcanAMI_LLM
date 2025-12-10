@@ -146,7 +146,7 @@ class Concept:
             confidence: Initial confidence in the concept
         """
         self.concept_id = (
-            f"concept_{hashlib.md5(pattern_signature.encode()).hexdigest()[:8]}"
+            f"concept_{hashlib.md5(pattern_signature.encode(), usedforsecurity=False).hexdigest()[:8]}"
         )
         self.pattern_signature = pattern_signature
         self.grounded_effects = grounded_effects
@@ -661,7 +661,7 @@ class ConceptMapper:
             if hasattr(pattern, "expected_effects"):
                 for effect_name, effect_value in pattern.expected_effects.items():
                     effect = MeasurableEffect(
-                        effect_id=f"effect_{effect_name}_{hashlib.md5(effect_name.encode()).hexdigest()[:6]}",
+                        effect_id=f"effect_{effect_name}_{hashlib.md5(effect_name.encode(), usedforsecurity=False).hexdigest()[:6]}",
                         effect_type=self._categorize_effect(effect_name),
                         measurement=effect_value,
                         unit=self._infer_unit(effect_name, effect_value),
@@ -871,7 +871,7 @@ class ConceptMapper:
                 # Check consistency
                 if std_value < mean_value * 0.3 or std_value < 0.1:  # Consistent enough
                     effect = MeasurableEffect(
-                        effect_id=f"effect_{measure_name}_{hashlib.md5(measure_name.encode()).hexdigest()[:6]}",
+                        effect_id=f"effect_{measure_name}_{hashlib.md5(measure_name.encode(), usedforsecurity=False).hexdigest()[:6]}",
                         effect_type=self._categorize_effect(measure_name),
                         measurement=mean_value,
                         unit=self._infer_unit(measure_name, mean_value),
@@ -1243,7 +1243,7 @@ class ConceptMapper:
         elif hasattr(pattern, "pattern_signature"):
             return pattern.pattern_signature
         else:
-            return hashlib.md5(str(pattern).encode()).hexdigest()
+            return hashlib.md5(str(pattern).encode(), usedforsecurity=False).hexdigest()
 
     def _categorize_effect(self, measure_name: str) -> EffectType:
         """

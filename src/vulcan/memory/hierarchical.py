@@ -1192,7 +1192,7 @@ class HierarchicalMemory(BaseMemorySystem):
         content_str = str(content)[:1000]
         timestamp = str(time.time())
         combined = f"{content_str}_{timestamp}"
-        return hashlib.md5(combined.encode()).hexdigest()
+        return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()
 
     def _generate_embedding(self, content: Any) -> np.ndarray:
         """Generate embedding for content using sentence transformers or fallback."""
@@ -1382,7 +1382,7 @@ class HierarchicalMemory(BaseMemorySystem):
             key_parts.append(str(hash(str(query.content))))
 
         key_str = "_".join(key_parts)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
     def start_background_tasks(self):
         """Start background consolidation and pattern mining tasks."""

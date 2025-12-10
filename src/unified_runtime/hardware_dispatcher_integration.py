@@ -990,7 +990,7 @@ class HardwareDispatcherIntegration:
             if k != "params":  # Skip variable params
                 key_parts.append(f"{k}={v}")
 
-        return hashlib.md5("|".join(key_parts).encode()).hexdigest()
+        return hashlib.md5("|".join(key_parts).encode(), usedforsecurity=False).hexdigest()
 
     def _update_cache(self, key: str, result: DispatchResult):
         """Update result cache with LRU eviction"""

@@ -1975,7 +1975,7 @@ class APIGateway:
         except json.JSONDecodeError:
             return web.json_response({"error": "Invalid JSON"}, status=400)
 
-        cache_key = f"process:{hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()}"
+        cache_key = f"process:{hashlib.md5(json.dumps(data, sort_keys=True).encode(), usedforsecurity=False).hexdigest()}"
         cached = await self.cache_manager.get(cache_key)
 
         if cached:

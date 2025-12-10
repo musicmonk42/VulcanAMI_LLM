@@ -202,7 +202,7 @@ except ImportError:
 def _hash_to_float(s: str) -> float:
     """Helper to hash a string to a float in [0, 1]"""
     try:
-        hash_bytes = hashlib.md5(s.encode("utf-8")).digest()
+        hash_bytes = hashlib.md5(s.encode("utf-8"), usedforsecurity=False).digest()
         # Use first 4 bytes as an int
         hash_int = int.from_bytes(hash_bytes[:4], "little")
         # Normalize to [0, 1]
@@ -1124,7 +1124,7 @@ class CuriosityRewardShaper:
             # Convert state to a string representation that handles common types
             # Sort dict keys for consistent hashing
             state_repr = json.dumps(state, sort_keys=True, default=str)
-            return hashlib.md5(state_repr.encode("utf-8")).hexdigest()[:16]  # Use utf-8
+            return hashlib.md5(state_repr.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]  # Use utf-8
         except Exception as e:
             # Fallback for unhashable types
             logger.debug(f"Hashing state failed with JSON ({e}), using fallback hash.")

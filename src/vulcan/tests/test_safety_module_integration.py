@@ -140,7 +140,7 @@ class SafetyReport:
     reasons: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     audit_id: str = field(
-        default_factory=lambda: hashlib.md5(str(time.time()).encode()).hexdigest()[:16]
+        default_factory=lambda: hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:16]
     )
 
     def merge(self, other: "SafetyReport") -> "SafetyReport":
@@ -712,7 +712,7 @@ class RollbackManager:
         with self._lock:
             snapshot_id = hashlib.md5(
                 f"{time.time()}{len(self.snapshots)}".encode()
-            ).hexdigest()[:16]
+            , usedforsecurity=False).hexdigest()[:16]
             snapshot = RollbackSnapshot(
                 snapshot_id=snapshot_id,
                 timestamp=time.time(),
@@ -747,7 +747,7 @@ class RollbackManager:
         self, action: Dict, reason: str, duration_seconds: float = 3600
     ) -> str:
         with self._lock:
-            quarantine_id = hashlib.md5(f"{time.time()}{action}".encode()).hexdigest()[
+            quarantine_id = hashlib.md5(f"{time.time()}{action}".encode(), usedforsecurity=False).hexdigest()[
                 :16
             ]
             self.quarantine[quarantine_id] = {
@@ -796,7 +796,7 @@ class AuditLogger:
 
     def log_safety_decision(self, decision: Dict, report: SafetyReport) -> str:
         with self._lock:
-            entry_id = hashlib.md5(f"{time.time()}{decision}".encode()).hexdigest()[:16]
+            entry_id = hashlib.md5(f"{time.time()}{decision}".encode(), usedforsecurity=False).hexdigest()[:16]
             self.entries.append(
                 {
                     "entry_id": entry_id,
@@ -811,7 +811,7 @@ class AuditLogger:
 
     def log_event(self, event_type: str, data: Dict, severity: str = "info") -> str:
         with self._lock:
-            entry_id = hashlib.md5(f"{time.time()}{event_type}".encode()).hexdigest()[
+            entry_id = hashlib.md5(f"{time.time()}{event_type}".encode(), usedforsecurity=False).hexdigest()[
                 :16
             ]
             self.entries.append(
@@ -862,7 +862,7 @@ class GovernanceManager:
 
     def request_approval(self, action: Dict) -> Dict:
         with self._lock:
-            decision_id = hashlib.md5(f"{time.time()}{action}".encode()).hexdigest()[
+            decision_id = hashlib.md5(f"{time.time()}{action}".encode(), usedforsecurity=False).hexdigest()[
                 :16
             ]
             risk_score = action.get("risk_score", 0.5)
@@ -973,7 +973,7 @@ class HumanOversightInterface:
         self, alert_type: str, message: str, severity: str = "medium"
     ) -> str:
         with self._lock:
-            alert_id = hashlib.md5(f"{time.time()}{message}".encode()).hexdigest()[:16]
+            alert_id = hashlib.md5(f"{time.time()}{message}".encode(), usedforsecurity=False).hexdigest()[:16]
             self.alerts[alert_id] = {
                 "type": alert_type,
                 "message": message,

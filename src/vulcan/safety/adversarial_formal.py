@@ -2202,7 +2202,7 @@ class FormalVerifier:
         action_str = json.dumps(action, sort_keys=True, default=str)
         state_str = str(state)[:1000]  # Limit state string length
         combined = action_str + state_str
-        return hashlib.md5(combined.encode()).hexdigest()
+        return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()
 
     def _generate_formulae(
         self, action: Dict[str, Any], state: Any

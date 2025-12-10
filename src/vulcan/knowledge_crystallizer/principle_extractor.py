@@ -127,14 +127,14 @@ class Pattern:
                 },
                 sort_keys=True,
             )
-            return hashlib.md5(content.encode()).hexdigest()
+            return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
         except Exception as e:
             logger.warning("Failed to create signature: %s", e)
             # Fallback to id-based hash
             fallback = (
                 f"{self.pattern_type.value}_{len(self.components)}_{self.complexity}"
             )
-            return hashlib.md5(fallback.encode()).hexdigest()
+            return hashlib.md5(fallback.encode(), usedforsecurity=False).hexdigest()
 
     def is_similar_to(self, other: "Pattern", threshold: float = 0.7) -> bool:
         """Check if patterns are similar"""

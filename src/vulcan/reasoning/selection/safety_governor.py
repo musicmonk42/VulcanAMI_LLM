@@ -838,7 +838,7 @@ class SafetyGovernor:
                 "safety_level": context.safety_level.value,
                 "problem_hash": hashlib.md5(
                     str(context.problem)[:1000].encode()
-                ).hexdigest()[:8],
+                , usedforsecurity=False).hexdigest()[:8],
             }
 
             # Already bounded by deque maxlen
@@ -856,7 +856,7 @@ class SafetyGovernor:
             key_parts = [
                 context.tool_name,
                 str(context.safety_level.value),
-                hashlib.md5(problem_str.encode()).hexdigest()[:16],
+                hashlib.md5(problem_str.encode(), usedforsecurity=False).hexdigest()[:16],
             ]
 
             return "_".join(key_parts)

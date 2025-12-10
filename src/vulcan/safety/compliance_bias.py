@@ -1532,7 +1532,7 @@ class ComplianceMapper:
             "standards": [s.value for s in standards],
         }
         key_str = json.dumps(key_data, sort_keys=True, default=str)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
     def _log_compliance_check(
         self,
@@ -1804,7 +1804,7 @@ class BiasDetector:
             json.dumps(
                 {"action": action, "context": context}, sort_keys=True, default=str
             ).encode()
-        ).hexdigest()
+        , usedforsecurity=False).hexdigest()
 
         # Check cache
         cached_result = self.prediction_cache.get(cache_key)

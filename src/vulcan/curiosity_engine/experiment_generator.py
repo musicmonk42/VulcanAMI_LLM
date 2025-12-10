@@ -218,7 +218,7 @@ class Experiment:
         if not self.experiment_id:
             # FIX: Exclude timestamp for determinism
             content = f"{self.gap.id}_{self.experiment_type.value}_{self.iteration}"
-            self.experiment_id = hashlib.md5(content.encode()).hexdigest()[:12]
+            self.experiment_id = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:12]
 
             # Store timestamp in metadata instead
             if "created_at" not in self.metadata:

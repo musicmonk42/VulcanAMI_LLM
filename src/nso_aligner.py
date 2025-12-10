@@ -1390,7 +1390,7 @@ class NSOAligner:
         """Check proposal against real-world threat intelligence with bounded cache."""
         cache_key = hashlib.md5(
             json.dumps(proposal, sort_keys=True).encode()
-        ).hexdigest()
+        , usedforsecurity=False).hexdigest()
 
         current_time = time.time()
 
@@ -1838,7 +1838,7 @@ class NSOAligner:
                 self.redacted_items.append(f"call to '{func_id_str}'")
 
                 # Return a constant that doesn't contain the original function name
-                redaction_value = f"NSO_REDACTED_CALL_{hashlib.md5(func_id_str.encode()).hexdigest()[:8]}"
+                redaction_value = f"NSO_REDACTED_CALL_{hashlib.md5(func_id_str.encode(), usedforsecurity=False).hexdigest()[:8]}"
                 return ast.Constant(value=redaction_value)
 
             return self.generic_visit(node)

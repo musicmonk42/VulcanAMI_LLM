@@ -1463,7 +1463,7 @@ class DomainValidator:
 
             test_case = DomainTestCase(
                 domain=domain,
-                test_id=f"test_{domain}_{hashlib.md5(cache_key.encode()).hexdigest()[:8]}",
+                test_id=f"test_{domain}_{hashlib.md5(cache_key.encode(), usedforsecurity=False).hexdigest()[:8]}",
                 inputs=inputs,
                 expected_outputs=expected,
                 constraints=constraints,

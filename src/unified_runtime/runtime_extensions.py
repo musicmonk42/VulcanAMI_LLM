@@ -420,7 +420,7 @@ class SubgraphLearner:
         graph_str = json.dumps(graph_def, sort_keys=True)
         # Combine type and graph for a unique hash
         combined_str = f"{subgraph_type}:{graph_str}"
-        graph_hash = hashlib.md5(combined_str.encode()).hexdigest()[:12]
+        graph_hash = hashlib.md5(combined_str.encode(), usedforsecurity=False).hexdigest()[:12]
         return graph_hash
 
     def _apply_evolutionary_learning(self, pattern: SubgraphPattern) -> SubgraphPattern:

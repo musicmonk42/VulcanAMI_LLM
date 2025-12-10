@@ -2141,16 +2141,16 @@ class AdaptiveMultimodalProcessor(nn.Module):
                 float(data.flat[-1]) if data.size > 0 else 0,
                 float(data.mean()) if data.size > 0 else 0,
             )
-            return hashlib.md5(str(fingerprint).encode()).hexdigest()
+            return hashlib.md5(str(fingerprint).encode(), usedforsecurity=False).hexdigest()
 
         elif isinstance(data, PIL.Image.Image):
             # Hash image size and mode as fingerprint
             fingerprint = (data.size, data.mode)
-            return hashlib.md5(str(fingerprint).encode()).hexdigest()
+            return hashlib.md5(str(fingerprint).encode(), usedforsecurity=False).hexdigest()
 
         else:
             # Fallback for other types
-            return hashlib.md5(str(data).encode()).hexdigest()
+            return hashlib.md5(str(data).encode(), usedforsecurity=False).hexdigest()
 
     def cleanup(self):
         """Cleanup resources."""

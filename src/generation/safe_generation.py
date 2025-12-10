@@ -1294,7 +1294,7 @@ class SafeGeneration:
             sort_keys=True,
         )
         combined = f"{token}:{context_str}"
-        return hashlib.md5(combined.encode()).hexdigest()
+        return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()
 
     def _update_cache(self, key: str, token: Token, risk: float) -> None:
         """Update cache with LRU eviction"""

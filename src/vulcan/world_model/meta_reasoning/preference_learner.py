@@ -2289,7 +2289,7 @@ class PreferenceLearner:
             context_str = json.dumps(
                 context_items
             )  # Use items for better structure handling
-            return hashlib.md5(context_str.encode("utf-8")).hexdigest()[:16]
+            return hashlib.md5(context_str.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
         except Exception as e:
             logger.warning(
                 f"Failed to hash context with JSON ({e}), using fallback hash."

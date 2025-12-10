@@ -50,7 +50,7 @@ class ProblemGraph:
 
     def get_signature(self) -> str:
         content = str(sorted(self.nodes.keys())) + str(sorted(self.edges))
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
     def to_networkx(self):
         class MockGraph:

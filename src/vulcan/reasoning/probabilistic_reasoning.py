@@ -268,7 +268,7 @@ class FeatureExtractor:
             # Hash of keys
             key_hash = hashlib.md5(
                 "".join(sorted(str(k) for k in data.keys())).encode()
-            )
+            , usedforsecurity=False)
             key_hash_int = int(key_hash.hexdigest()[:8], 16)
             features.append(key_hash_int / 1e10)
 
@@ -344,7 +344,7 @@ class FeatureExtractor:
         features = []
         for i in range(10):
             seed_str = f"{category_str}_{i}"
-            hash_val = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+            hash_val = int(hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest()[:8], 16)
             features.append(hash_val % 100 / 100.0)
 
         return np.array(features).reshape(1, -1)
@@ -358,7 +358,7 @@ class FeatureExtractor:
         features = []
         for i in range(dim):
             seed_str = f"{text}_{i}"
-            hash_val = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+            hash_val = int(hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest()[:8], 16)
             # Map to [-1, 1] range
             features.append((hash_val % 10000) / 5000.0 - 1.0)
         return np.array(features)
@@ -416,7 +416,7 @@ class FeatureExtractor:
     def _compute_cache_key(self, data: Any) -> str:
         """Compute cache key for data"""
         try:
-            return hashlib.md5(str(data).encode()).hexdigest()
+            return hashlib.md5(str(data).encode(), usedforsecurity=False).hexdigest()
         except Exception:
             return str(id(data))
 

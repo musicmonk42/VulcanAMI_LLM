@@ -684,7 +684,7 @@ class EvidenceWeightedResolver:
 
             # Modify identifier
             if hasattr(variant, "concept_id"):
-                variant.concept_id = f"{base_concept.concept_id}_var_{hashlib.md5(str(new_pattern).encode()).hexdigest()[:8]}"
+                variant.concept_id = f"{base_concept.concept_id}_var_{hashlib.md5(str(new_pattern).encode(), usedforsecurity=False).hexdigest()[:8]}"
 
             if hasattr(variant, "name"):
                 variant.name = f"{base_concept.name}_variant"
@@ -1350,7 +1350,7 @@ class EvidenceWeightedResolver:
         concept = type("Concept", (), {})()
 
         concept.concept_id = (
-            f"concept_{hashlib.md5(str(pattern).encode()).hexdigest()[:8]}"
+            f"concept_{hashlib.md5(str(pattern).encode(), usedforsecurity=False).hexdigest()[:8]}"
         )
         concept.pattern = pattern
         concept.features = self._extract_pattern_features(pattern)

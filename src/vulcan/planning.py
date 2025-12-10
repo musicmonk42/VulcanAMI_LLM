@@ -2048,7 +2048,7 @@ class PlanLibrary:
     def _make_key(self, goal: str, context: Dict) -> str:
         """Create key for plan lookup."""
         context_str = json.dumps(context, sort_keys=True, default=str)
-        return hashlib.md5(f"{goal}_{context_str}".encode()).hexdigest()
+        return hashlib.md5(f"{goal}_{context_str}".encode(), usedforsecurity=False).hexdigest()
 
     def _evict_lru(self):
         """Evict least recently used plan."""
@@ -2343,7 +2343,7 @@ class ResourceAwareCompute:
     def _compute_cache_key(self, problem: Dict) -> str:
         """Compute cache key for problem."""
         key_str = json.dumps(problem, sort_keys=True, default=str)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
     def _estimate_requirements(self, problem: Dict, use_gpu: bool) -> Dict[str, float]:
         """Estimate resource requirements."""

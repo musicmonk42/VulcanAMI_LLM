@@ -484,7 +484,7 @@ class MemoryFederation:
 
     def _hash_key(self, key: str) -> int:
         """Hash key to integer for consistent hashing."""
-        hash_bytes = hashlib.md5(key.encode()).digest()
+        hash_bytes = hashlib.md5(key.encode(), usedforsecurity=False).digest()
         return int.from_bytes(hash_bytes[:4], "big")
 
     def start_monitoring(self):

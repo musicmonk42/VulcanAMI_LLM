@@ -802,7 +802,7 @@ class CrystallizationSelector:
         key_parts.append(str(context.get("cascade_failures_detected", False)))
 
         key_str = "|".join(key_parts)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
     def _apply_learning_adjustment(
         self, method: CrystallizationMethod, base_score: float

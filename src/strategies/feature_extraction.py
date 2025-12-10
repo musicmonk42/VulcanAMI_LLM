@@ -1231,7 +1231,7 @@ class MultiTierFeatureExtractor:
         else:
             problem_str = json.dumps(problem, sort_keys=True, default=str)
 
-        return hashlib.md5(problem_str.encode()).hexdigest()
+        return hashlib.md5(problem_str.encode(), usedforsecurity=False).hexdigest()
 
     def _cache_features(self, key: str, features: np.ndarray):
         """Cache extracted features"""

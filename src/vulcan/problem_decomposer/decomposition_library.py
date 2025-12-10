@@ -156,7 +156,7 @@ class Pattern:
             },
             sort_keys=True,
         )
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
 
 @dataclass
@@ -363,7 +363,7 @@ class DecompositionLibrary:
                 # Check cache
                 cache_key = (
                     pattern_id,
-                    hashlib.md5(str(query_features).encode()).hexdigest(),
+                    hashlib.md5(str(query_features).encode(), usedforsecurity=False).hexdigest(),
                 )
 
                 if cache_key in self.similarity_cache:
@@ -621,7 +621,7 @@ class DecompositionLibrary:
                     structure_info["features"] = sorted(features.keys())
 
                 content = json.dumps(structure_info, sort_keys=True)
-                signature = hashlib.md5(content.encode()).hexdigest()
+                signature = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
             # Index by signature
             self.pattern_index[signature] = pattern_id
@@ -721,7 +721,7 @@ class DecompositionLibrary:
 
         # Encode features into embedding
         feature_str = json.dumps(features, sort_keys=True)
-        hash_val = hashlib.md5(feature_str.encode()).hexdigest()
+        hash_val = hashlib.md5(feature_str.encode(), usedforsecurity=False).hexdigest()
 
         # Convert hash to numeric features
         for i in range(0, min(len(hash_val), embedding_size * 2), 2):

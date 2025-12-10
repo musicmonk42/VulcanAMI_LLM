@@ -51,7 +51,7 @@ class Individual:
     mutations: List[str] = field(default_factory=list)
     parent_ids: List[str] = field(default_factory=list)
     id: str = field(
-        default_factory=lambda: hashlib.md5(str(time.time()).encode()).hexdigest()[:8]
+        default_factory=lambda: hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8]
     )
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -1345,7 +1345,7 @@ class EvolutionEngine:
                             parent_ids=ind_data.get("parent_ids", []),
                             id=ind_data.get(
                                 "id",
-                                hashlib.md5(str(time.time()).encode()).hexdigest()[:8],
+                                hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8],
                             ),
                             metadata=ind_data.get("metadata", {}),
                         )
@@ -1360,7 +1360,7 @@ class EvolutionEngine:
                             generation=best_data["generation"],
                             id=best_data.get(
                                 "id",
-                                hashlib.md5(str(time.time()).encode()).hexdigest()[:8],
+                                hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8],
                             ),
                             metadata=best_data.get("metadata", {}),
                         )

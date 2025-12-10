@@ -124,7 +124,7 @@ except ImportError as e:
     class Concept:
         def __init__(self, pattern_signature, grounded_effects, confidence):
             self.concept_id = (
-                f"concept_{hashlib.md5(pattern_signature.encode()).hexdigest()[:8]}"
+                f"concept_{hashlib.md5(pattern_signature.encode(), usedforsecurity=False).hexdigest()[:8]}"
             )
             self.pattern_signature = pattern_signature
             self.grounded_effects = grounded_effects
@@ -160,7 +160,7 @@ except ImportError as e:
             self.safety_config = safety_config
 
         def map_pattern_to_concept(self, pattern, domain="general"):
-            pattern_sig = hashlib.md5(str(pattern).encode()).hexdigest()
+            pattern_sig = hashlib.md5(str(pattern).encode(), usedforsecurity=False).hexdigest()
             if pattern_sig not in self.concepts:
                 concept = Concept(pattern_sig, [], 0.5)
                 concept.domains.add(domain)
@@ -1007,7 +1007,7 @@ class SemanticBridge:
             Pattern signature for operation selection
         """
         pattern_str = str(pattern)
-        pattern_hash = hashlib.md5(pattern_str.encode()).hexdigest()
+        pattern_hash = hashlib.md5(pattern_str.encode(), usedforsecurity=False).hexdigest()
 
         # FIXED: Create cache key that includes outcome count to prevent staleness
         cache_key = f"{pattern_hash}_{len(outcomes)}"

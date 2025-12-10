@@ -765,7 +765,7 @@ class SemanticDecomposition(DecompositionStrategy):
             features.append(text.lower().count(char) / max(1, len(text)))
 
         # Hash-based features
-        hash_val = hashlib.md5(text.encode()).hexdigest()
+        hash_val = hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
         for i in range(0, 32, 4):
             features.append(int(hash_val[i : i + 4], 16) / 65535.0)
 

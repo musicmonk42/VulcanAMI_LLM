@@ -139,7 +139,7 @@ class KnowledgeGap:
         if not self.gap_id and not self.id:
             # Generate unique ID
             content = f"{self.type}_{self.domain}_{self.timestamp}"
-            hash_val = hashlib.md5(content.encode()).hexdigest()[:8]
+            hash_val = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:8]
             self.gap_id = f"{self.type}_{hash_val}"
             self.id = self.gap_id
         elif self.gap_id and not self.id:

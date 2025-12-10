@@ -31,7 +31,7 @@ class ProblemGraph:
         import hashlib
 
         content = str(sorted(self.nodes.keys())) + str(len(self.edges))
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
 
 @dataclass

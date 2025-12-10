@@ -1064,7 +1064,7 @@ class GovernedUnlearning:
         # FIXED: Use thread.ident for better uniqueness
         thread_id = threading.current_thread().ident or 0
         content = f"proposal_{time.time()}_{thread_id}"
-        return hashlib.md5(content.encode()).hexdigest()[:16]
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:16]
 
     def _generate_task_id(self) -> str:
         """
@@ -1076,7 +1076,7 @@ class GovernedUnlearning:
         # FIXED: Use thread.ident for better uniqueness
         thread_id = threading.current_thread().ident or 0
         content = f"task_{time.time()}_{thread_id}"
-        return hashlib.md5(content.encode()).hexdigest()[:16]
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:16]
 
     def shutdown(self) -> None:
         """Shutdown the unlearning system."""

@@ -925,7 +925,7 @@ class TransferEngine:
                     effect_type_enum = EffectType.SECONDARY
 
                 effect = ConceptEffect(
-                    effect_id=f"effect_{hashlib.md5(feature_name.encode()).hexdigest()[:8]}",
+                    effect_id=f"effect_{hashlib.md5(feature_name.encode(), usedforsecurity=False).hexdigest()[:8]}",
                     effect_type=effect_type_enum,
                     description=f"Feature-based effect: {feature_name}",
                     domain=getattr(concept, "domain", "general"),
@@ -1076,7 +1076,7 @@ class TransferEngine:
         if target_chars:
             for limitation in target_chars.limitations:
                 constraint = Constraint(
-                    constraint_id=f"constraint_{hashlib.md5(limitation.encode()).hexdigest()[:8]}",
+                    constraint_id=f"constraint_{hashlib.md5(limitation.encode(), usedforsecurity=False).hexdigest()[:8]}",
                     constraint_type=ConstraintType.INVARIANT,
                     description=f"Domain limitation: {limitation}",
                     condition=limitation,

@@ -238,7 +238,7 @@ class Pattern:
     def get_signature(self) -> str:
         """Get unique signature for pattern"""
         content = f"{self.pattern_type.value}_{self.description}_{self.complexity}"
-        return hashlib.md5(content.encode()).hexdigest()[:12]
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 @dataclass

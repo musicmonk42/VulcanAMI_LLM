@@ -96,7 +96,7 @@ class ExecutionContext:
         if not self.execution_id:
             # Generate unique execution ID
             exec_data = f"{id(self.graph)}_{time.time()}"
-            self.execution_id = hashlib.md5(exec_data.encode()).hexdigest()[:16]
+            self.execution_id = hashlib.md5(exec_data.encode(), usedforsecurity=False).hexdigest()[:16]
 
     def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
         """Get node by ID"""
@@ -1327,7 +1327,7 @@ class ExecutionEngine:
                 try:
                     input_repr = hashlib.md5(
                         json.dumps(input_val, sort_keys=True, default=str).encode()
-                    ).hexdigest()[:8]
+                    , usedforsecurity=False).hexdigest()[:8]
                 except (TypeError, ValueError) as e:
                     # If value can't be hashed, use type representation
                     logger.debug(f"Could not hash input value: {e}")
@@ -1351,7 +1351,7 @@ class ExecutionEngine:
             key_data["params"] = params_repr
             key_str = json.dumps(key_data, sort_keys=True, default=str)
 
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
     def _is_deterministic_node(self, node: Dict[str, Any]) -> bool:
         """Check if node produces deterministic output"""

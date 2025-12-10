@@ -64,7 +64,7 @@ class Pattern:
         import hashlib
 
         content = f"{self.pattern_id}_{self.pattern_type.value}_{self.complexity}"
-        return hashlib.md5(content.encode()).hexdigest()[:12]
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:12]
 
 
 @dataclass

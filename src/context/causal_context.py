@@ -1341,7 +1341,7 @@ class CausalContext:
     def _get_cache_key(self, qtext: str, limit: int, depth: int) -> str:
         """Generate cache key"""
         combined = f"{qtext}:{limit}:{depth}"
-        return hashlib.md5(combined.encode()).hexdigest()
+        return hashlib.md5(combined.encode(), usedforsecurity=False).hexdigest()
 
     def _update_cache(self, key: str, result: Dict[str, Any]) -> None:
         """Update cache with LRU eviction"""

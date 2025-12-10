@@ -343,7 +343,7 @@ class ProblemGraph:
             },
             sort_keys=True,
         )
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
 
 @dataclass

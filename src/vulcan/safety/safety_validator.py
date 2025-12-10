@@ -558,7 +558,7 @@ class EnhancedExplainabilityNode(ExplainabilityNode):
         data_str = json.dumps(data, sort_keys=True, default=str)
         import hashlib
 
-        return hashlib.md5(data_str.encode()).hexdigest()
+        return hashlib.md5(data_str.encode(), usedforsecurity=False).hexdigest()
 
     def _extract_feature_importance(self, shap_scores: Any) -> List[Dict[str, Any]]:
         if shap_scores is None:

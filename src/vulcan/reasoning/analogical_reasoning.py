@@ -1161,7 +1161,7 @@ class AnalogicalReasoner(AbstractReasoner):
                 },
                 sort_keys=True,
             )
-            cache_key = f"{source_domain}_{hashlib.md5(cache_str.encode()).hexdigest()}"
+            cache_key = f"{source_domain}_{hashlib.md5(cache_str.encode(), usedforsecurity=False).hexdigest()}"
         except Exception:
             # Fallback to id-based key if json serialization fails
             cache_key = f"{source_domain}_{id(target_problem)}"

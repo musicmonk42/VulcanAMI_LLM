@@ -1439,7 +1439,7 @@ class CostOptimizer:
         import hashlib
 
         content = f"opt_{time.time()}_{threading.current_thread().ident}"
-        return hashlib.md5(content.encode()).hexdigest()[:12]
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:12]
 
     def _trigger_budget_alert(self, level: str, status: Dict[str, Any]) -> None:
         """Trigger budget alert with proper error handling."""

@@ -233,7 +233,7 @@ class GraphValidator:
         try:
             # Create a stable hash of the graph content
             graph_str = json.dumps(graph, sort_keys=True, default=str)
-            graph_hash = hashlib.md5(graph_str.encode("utf-8")).hexdigest()
+            graph_hash = hashlib.md5(graph_str.encode("utf-8"), usedforsecurity=False).hexdigest()
         except Exception:
             graph_hash = ""  # Can't hash, skip caching
 

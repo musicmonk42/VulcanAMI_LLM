@@ -76,7 +76,7 @@ class EvolutionEngine:
     def _hash_graph(self, graph: Dict) -> str:
         """Create hash of graph for caching."""
         graph_str = json.dumps(graph, sort_keys=True, default=str)
-        return hashlib.md5(graph_str.encode()).hexdigest()
+        return hashlib.md5(graph_str.encode(), usedforsecurity=False).hexdigest()
 
     def _validate_graph(self, graph: Dict) -> Dict:
         """Validate and normalize graph structure."""
@@ -418,7 +418,7 @@ class EpisodicMemory(BaseMemorySystem):
         if self.current_episode:
             self.end_episode()
 
-        episode_id = f"episode_{time.time()}_{hashlib.md5(str(context).encode()).hexdigest()[:8]}"
+        episode_id = f"episode_{time.time()}_{hashlib.md5(str(context).encode(), usedforsecurity=False).hexdigest()[:8]}"
 
         self.current_episode = Episode(
             id=episode_id,
@@ -905,7 +905,7 @@ class EpisodicMemory(BaseMemorySystem):
         """Detect patterns in episode sequences."""
         # Create pattern signature
         pattern_sig = self._create_pattern_signature(episode)
-        pattern_hash = hashlib.md5(pattern_sig.encode()).hexdigest()
+        pattern_hash = hashlib.md5(pattern_sig.encode(), usedforsecurity=False).hexdigest()
 
         # Add to pattern chains
         self.episode_chains[pattern_hash].append(episode.id)
@@ -1094,7 +1094,7 @@ class SemanticMemory(BaseMemorySystem):
     ) -> str:
         """Add tool performance concept to semantic memory."""
 
-        concept_id = f"tool_concept_{hashlib.md5(name.encode()).hexdigest()[:16]}"
+        concept_id = f"tool_concept_{hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()[:16]}"
 
         # Check if concept exists
         if name in self.name_index:
@@ -1559,7 +1559,7 @@ class SemanticMemory(BaseMemorySystem):
         confidence: float = 0.5,
     ) -> str:
         """Add new concept."""
-        concept_id = f"concept_{hashlib.md5(name.encode()).hexdigest()[:16]}"
+        concept_id = f"concept_{hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()[:16]}"
 
         # Check if concept exists
         if name in self.name_index:
@@ -2174,7 +2174,7 @@ class ProceduralMemory(BaseMemorySystem):
         dependencies: List[str] = None,
     ) -> str:
         """Add new skill."""
-        skill_id = f"skill_{hashlib.md5(name.encode()).hexdigest()[:16]}"
+        skill_id = f"skill_{hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()[:16]}"
 
         # Check if skill exists
         existing = self.find_skill(name)

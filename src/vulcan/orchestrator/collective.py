@@ -1392,7 +1392,7 @@ class VULCANAGICollective:
                 graph_id=f"graph_{self.sys.step}",
                 agent_version="VULCAN_AGI_1.0",
                 policy_versions=self.sys.policies,
-                input_hash=hashlib.md5(str(result).encode()).hexdigest(),
+                input_hash=hashlib.md5(str(result).encode(), usedforsecurity=False).hexdigest(),
                 kernel_sig=None,
                 explainer_uri="",
                 ecdsa_sig="",

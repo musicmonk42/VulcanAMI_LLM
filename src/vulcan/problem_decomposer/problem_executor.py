@@ -87,7 +87,7 @@ except ImportError:
 #         metadata: Dict[str, Any] = field(default_factory=dict)
 #
 #         def get_signature(self):
-#             return hashlib.md5(str(self.nodes).encode()).hexdigest()
+#             return hashlib.md5(str(self.nodes).encode(), usedforsecurity=False).hexdigest()
 #
 #     @dataclass
 #     class DecompositionPlan:
@@ -322,7 +322,7 @@ class ProblemExecutor:
                 metadata: Dict[str, Any] = field(default_factory=dict)
 
                 def get_signature(self):
-                    return hashlib.md5(str(self.nodes).encode()).hexdigest()
+                    return hashlib.md5(str(self.nodes).encode(), usedforsecurity=False).hexdigest()
 
             self.ProblemGraph = FallbackProblemGraph
 
@@ -1792,7 +1792,7 @@ class ProblemExecutor:
     ) -> str:
         """Get cache key for problem and plan"""
         problem_sig = problem_graph.get_signature()
-        plan_sig = hashlib.md5(str(plan.steps).encode()).hexdigest()
+        plan_sig = hashlib.md5(str(plan.steps).encode(), usedforsecurity=False).hexdigest()
         return f"{problem_sig}_{plan_sig}"
 
     def _initialize_solvers(self) -> Dict[str, Callable]:
