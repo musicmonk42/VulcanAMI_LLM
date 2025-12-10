@@ -76,7 +76,7 @@ class EvolutionEngine:
     def _hash_graph(self, graph: Dict) -> str:
         """Create hash of graph for caching."""
         graph_str = json.dumps(graph, sort_keys=True, default=str)
-        return hashlib.md5(graph_str.encode(), usedforsecurity=False).hexdigest()
+        return hashlib.sha256(graph_str.encode()).hexdigest()
 
     def _validate_graph(self, graph: Dict) -> Dict:
         """Validate and normalize graph structure."""
@@ -418,7 +418,7 @@ class EpisodicMemory(BaseMemorySystem):
         if self.current_episode:
             self.end_episode()
 
-        episode_id = f"episode_{time.time()}_{hashlib.md5(str(context).encode(), usedforsecurity=False).hexdigest()[:8]}"
+        episode_id = f"episode_{time.time()}_{hashlib.sha256(str(context).encode()).hexdigest()[:8]}"
 
         self.current_episode = Episode(
             id=episode_id,
@@ -905,7 +905,7 @@ class EpisodicMemory(BaseMemorySystem):
         """Detect patterns in episode sequences."""
         # Create pattern signature
         pattern_sig = self._create_pattern_signature(episode)
-        pattern_hash = hashlib.md5(pattern_sig.encode(), usedforsecurity=False).hexdigest()
+        pattern_hash = hashlib.sha256(pattern_sig.encode()).hexdigest()
 
         # Add to pattern chains
         self.episode_chains[pattern_hash].append(episode.id)
@@ -1094,7 +1094,7 @@ class SemanticMemory(BaseMemorySystem):
     ) -> str:
         """Add tool performance concept to semantic memory."""
 
-        concept_id = f"tool_concept_{hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()[:16]}"
+        concept_id = f"tool_concept_{hashlib.sha256(name.encode()).hexdigest()[:16]}"
 
         # Check if concept exists
         if name in self.name_index:
@@ -1559,7 +1559,7 @@ class SemanticMemory(BaseMemorySystem):
         confidence: float = 0.5,
     ) -> str:
         """Add new concept."""
-        concept_id = f"concept_{hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()[:16]}"
+        concept_id = f"concept_{hashlib.sha256(name.encode()).hexdigest()[:16]}"
 
         # Check if concept exists
         if name in self.name_index:
@@ -2113,17 +2113,56 @@ class Skill:
             raise
 
     def _check_condition(self, condition: str, context: Any) -> bool:
-        """Check if condition is met."""
+        """Check if condition is met using safe expression evaluation.
+        
+        Fails securely by returning False when unsafe conditions are detected.
+        """
         try:
-            # Parse condition as Python expression
+            # Parse condition as Python expression using AST
             if isinstance(context, dict):
-                # Make context variables available
-                return eval(condition, {"__builtins__": {}}, context)
+                # Use ast module for safe evaluation of simple expressions
+                # This only allows literal structures and basic comparisons
+                
+                try:
+                    import ast
+                    # Parse the condition
+                    tree = ast.parse(condition, mode='eval')
+                    
+                    # Only allow safe operations (Python 3.8+ compatible)
+                    # Removed deprecated ast.Num, ast.Str, ast.NameConstant
+                    safe_nodes = (ast.Expression, ast.Constant,
+                                  ast.List, ast.Tuple, ast.Dict,
+                                  ast.Name, ast.Load, ast.Compare, ast.BoolOp,
+                                  ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, 
+                                  ast.LtE, ast.Gt, ast.GtE, ast.In, ast.NotIn,
+                                  ast.UnaryOp, ast.Not)
+                    
+                    for node in ast.walk(tree):
+                        if not isinstance(node, safe_nodes):
+                            logger.warning(f"Unsafe node in condition '{condition}': {type(node).__name__}")
+                            # Fail securely - return False instead of True
+                            return False
+                    
+                    # Create a restricted namespace with only the context variables
+                    # and no builtins
+                    namespace = {'__builtins__': {}}
+                    namespace.update(context)
+                    
+                    # Compile and evaluate the safe expression
+                    code = compile(tree, '<condition>', 'eval')
+                    return bool(eval(code, namespace, {}))
+                    
+                except (SyntaxError, ValueError, TypeError) as e:
+                    logger.debug(f"Could not parse condition '{condition}': {e}")
+                    # Fail securely - return False if we can't parse
+                    return False
             else:
                 # Simple existence check
                 return context is not None
-        except Exception as e:  # Default to true if can't evaluate
-            return True
+        except Exception as e:
+            logger.warning(f"Condition check failed for '{condition}': {e}")
+            # Fail securely - return False on any unexpected error
+            return False
 
     def _execute_string_step(self, step: str, context: Any) -> Any:
         """Execute string-based step."""
@@ -2174,7 +2213,7 @@ class ProceduralMemory(BaseMemorySystem):
         dependencies: List[str] = None,
     ) -> str:
         """Add new skill."""
-        skill_id = f"skill_{hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()[:16]}"
+        skill_id = f"skill_{hashlib.sha256(name.encode()).hexdigest()[:16]}"
 
         # Check if skill exists
         existing = self.find_skill(name)

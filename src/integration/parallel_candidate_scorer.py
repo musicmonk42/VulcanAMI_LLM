@@ -1276,6 +1276,7 @@ class VulcanCandidateScorer:
                     torch.load(
                         self.config.embedding.pretrained_model_path,
                         map_location=self.device,
+                        weights_only=True,
                     )
                 )
                 log.info(
@@ -1685,7 +1686,7 @@ class VulcanCandidateScorer:
         model_path = Path(path).with_suffix(".pt")
         if model_path.exists():
             self.embedder.load_state_dict(
-                torch.load(model_path, map_location=self.device)
+                torch.load(model_path, map_location=self.device, weights_only=True)
             )
 
         log.info(f"Scorer state loaded from {path}")

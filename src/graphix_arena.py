@@ -569,13 +569,20 @@ class GraphixArena:
     Production-ready Graphix Arena with comprehensive error handling and validation.
     """
 
-    def __init__(self, port: int = 8181):
-        """Initialize Graphix Arena."""
+    def __init__(self, port: int = 8181, host: str = "127.0.0.1"):
+        """Initialize Graphix Arena.
+        
+        Args:
+            port: Port to bind to (1024-65535)
+            host: Host address to bind to (default: 127.0.0.1 for localhost)
+                  Set to "0.0.0.0" to bind to all interfaces (less secure)
+        """
         # Validate port
         if not isinstance(port, int) or port < 1024 or port > 65535:
             raise ValueError(f"Port must be between 1024 and 65535, got {port}")
 
         self.port = port
+        self.host = host  # Store host address
 
         # Thread safety
         self.lock = threading.RLock()
@@ -1377,7 +1384,9 @@ class GraphixArena:
         """
         import uvicorn
 
-        logger.info(f"Starting Graphix Arena on http://0.0.0.0:{self.port}")
+        logger.info(f"Starting Graphix Arena on http://{self.host}:{self.port}")
+        if self.host == "0.0.0.0":
+            logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
         logger.info(
             "Security is ENABLED. Use the 'X-API-KEY' header for authentication."
         )
@@ -1386,7 +1395,7 @@ class GraphixArena:
         )
 
         # uvicorn.run is NOT async - do not await
-        uvicorn.run(app, host="0.0.0.0", port=self.port, log_level="info")
+        uvicorn.run(app, host=self.host, port=self.port, log_level="info")
 
 
 class FeedbackQueryParams(BaseModel):

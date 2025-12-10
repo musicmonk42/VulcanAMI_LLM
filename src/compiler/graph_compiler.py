@@ -284,7 +284,7 @@ class GraphOptimizer:
         for key in sorted(params.keys()):
             sig_parts.append(f"{key}={params[key]}")
 
-        return hashlib.md5("|".join(sig_parts).encode(), usedforsecurity=False).hexdigest()
+        return hashlib.sha256("|".join(sig_parts).encode()).hexdigest()
 
 
 class GraphCompiler:

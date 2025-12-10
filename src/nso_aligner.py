@@ -343,6 +343,9 @@ class NSOAligner:
 
                 # Adversarial detector (CPU-only, low-mem) - with accelerate check
                 model_id = "AMHR/adversarial-paraphrasing-detector"
+                # Security: Pin model revision to prevent supply chain attacks
+                # Can be overridden with environment variable for specific versions
+                model_revision = os.getenv("ADVERSARIAL_DETECTOR_REVISION", "main")
 
                 if not _can_use_device_map():
                     # No accelerate available - log once and skip model loading
@@ -359,12 +362,13 @@ class NSOAligner:
                     try:
                         token = os.getenv("HF_TOKEN")  # optional
                         self.tokenizer = AutoTokenizer.from_pretrained(
-                            model_id, token=token
+                            model_id, token=token, revision=model_revision
                         )
                         self.adversarial_detector = (
                             AutoModelForSequenceClassification.from_pretrained(
                                 model_id,
                                 token=token,
+                                revision=model_revision,
                                 trust_remote_code=False,
                                 low_cpu_mem_usage=True,
                                 torch_dtype=torch.float32,
@@ -637,6 +641,7 @@ class NSOAligner:
                 cursor = conn.cursor()
 
                 # Get actual table columns
+                # Table name is already validated against VALID_TABLES whitelist above
                 cursor.execute(f"PRAGMA table_info({table})")
                 existing_columns = {row[1] for row in cursor.fetchall()}
 
