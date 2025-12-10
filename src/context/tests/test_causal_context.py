@@ -569,14 +569,14 @@ class TestEdgeCases(unittest.TestCase):
         large_memory = {
             "episodic": [
                 {"prompt": f"p{i}", "token": f"t{i}", "trace": {}, "ts": time.time()}
-                for i in range(1000):
+                for i in range(1000)
             ],
             "semantic": [
                 {"concept": f"c{i}", "terms": [f"t{i}"], "freq": 1} for i in range(500)
             ],
             "procedural": [
                 {"name": f"proc{i}", "signature_terms": [f"s{i}"], "freq": 1}
-                for i in range(100):
+                for i in range(100)
             ],
         }
 
@@ -796,15 +796,15 @@ def run_performance_benchmark():
                 "trace": {},
                 "ts": time.time(),
             }
-            for i in range(500):
+            for i in range(500)
         ],
         "semantic": [
             {"concept": f"concept_{i}", "terms": [f"term_{i}"], "freq": i}
-            for i in range(200):
+            for i in range(200)
         ],
         "procedural": [
             {"name": f"proc_{i}", "signature_terms": [f"sig_{i}"], "freq": i}
-            for i in range(50):
+            for i in range(50)
         ],
     }
 
