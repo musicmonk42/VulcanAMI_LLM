@@ -41,7 +41,10 @@ def _docker_available_with_network() -> bool:
     try:
         # Skip Docker build tests in CI environments where they often fail
         # due to SSL certificate issues or network restrictions
-        if os.environ.get('CI', '').lower() in ('true', '1', 'yes'):
+        # Check for common CI environment variables
+        ci_vars = ['CI', 'CONTINUOUS_INTEGRATION', 'GITHUB_ACTIONS', 'TRAVIS', 
+                   'CIRCLECI', 'JENKINS_URL', 'GITLAB_CI', 'BUILDKITE']
+        if any(os.environ.get(var, '').lower() in ('true', '1', 'yes') for var in ci_vars):
             return False
             
         # Check if docker command exists
@@ -63,7 +66,7 @@ def _docker_available_with_network() -> bool:
             timeout=10
         )
         return result.returncode == 0
-    except (subprocess.TimeoutExpired, Exception):
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError, OSError) as e:
         return False
 
 
