@@ -447,18 +447,21 @@ class TestPathEffectCalculator:
     
     def test_effect_with_noise(self, effect_calculator, simple_path):
         """Test effect calculation with noise"""
+        # Ensure random state is not fixed
+        np.random.seed(None)
+        
         context = {
             'add_noise': True,
             'noise_level': 0.1
         }
         
         effects = []
-        for _ in range(10):
+        for _ in range(100):  # Increase samples for more reliable variation detection
             effect = effect_calculator.calculate_path_effect(simple_path, 1.0, context)
             effects.append(effect)
         
-        # Effects should vary due to noise
-        assert len(set(effects)) > 1
+        # Effects should vary due to noise - check with standard deviation
+        assert np.std(effects) > 0.01, "Effects should show variation when noise is added"
     
     def test_effect_with_moderators(self, effect_calculator, simple_path):
         """Test effect calculation with moderators"""
@@ -653,17 +656,20 @@ class TestMonteCarloSampler:
     
     def test_sample_variations(self, sampler, simple_path):
         """Test that samples have variations"""
+        # Ensure random state is not fixed
+        np.random.seed(None)
+        
         cluster = PathCluster(
             paths=[simple_path],
             correlation_matrix=np.array([[1.0]]),
             representative_path=simple_path
         )
         
-        samples = sampler.sample_from_cluster(cluster, n_samples=10)
+        samples = sampler.sample_from_cluster(cluster, n_samples=100)  # Increase samples
         
-        # Check that edge strengths vary
+        # Check that edge strengths vary using standard deviation
         strengths = [s.edges[0][2] for s in samples]
-        assert len(set(strengths)) > 1  # Should have variation
+        assert np.std(strengths) > 0.001, "Sampled edge strengths should show variation"
     
     def test_sample_from_empty_cluster(self, sampler):
         """Test sampling from empty cluster"""
