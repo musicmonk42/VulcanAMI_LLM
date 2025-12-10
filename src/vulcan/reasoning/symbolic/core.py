@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Term(ABC):
     """Base class for terms in first-order logic"""
-
+    pass
 
 
 @dataclass

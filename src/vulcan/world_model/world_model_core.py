@@ -2841,7 +2841,8 @@ class WorldModel:
 
         with self.lock:
             try:
-                self.motivational_introspection.objective_hierarchy
+                # Check if objective_hierarchy is available
+                _ = self.motivational_introspection.objective_hierarchy
 
                 return {
                     "status": "success",
