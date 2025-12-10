@@ -1264,7 +1264,7 @@ class ObjectiveNegotiator:
         ]
         # Add any proposal objectives not in the hierarchy order at the end (lower priority)
         ordered_objectives.extend(
-            [item for item in objectives_in_proposals if obj not in priority_order]
+            [item for item in objectives_in_proposals if item not in priority_order]
         )
 
         if not ordered_objectives:

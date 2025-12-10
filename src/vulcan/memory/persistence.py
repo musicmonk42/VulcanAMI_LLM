@@ -1261,7 +1261,7 @@ class MemoryPersistence:
 
             # Fsync directory for durability
             try:
-                dir_fd = os.open(file_path.parent, os.O_RDONLY, encoding="utf-8")
+                dir_fd = os.open(file_path.parent, os.O_RDONLY)
                 try:
                     os.fsync(dir_fd)
                 finally:
