@@ -684,42 +684,46 @@ class ProductionDeployment:
         # Unpack the world_model to get its sub-components if it exists
         world_model = components.get("world_model")
         if world_model and not isinstance(world_model, MagicMock):
+            # Get motivational_introspection which contains most meta-reasoning components as properties
+            motivational_intro = getattr(world_model, "motivational_introspection", None)
+            self_improvement = getattr(world_model, "self_improvement_drive", None)
+            
             meta_components = {
-                "self_improvement_drive": getattr(
-                    world_model, "self_improvement_drive", None
-                ),
-                "motivational_introspection": getattr(
-                    world_model, "motivational_introspection", None
-                ),
-                "objective_hierarchy": getattr(
-                    world_model, "objective_hierarchy", None
-                ),
-                "objective_negotiator": getattr(
-                    world_model, "objective_negotiator", None
-                ),
-                "goal_conflict_detector": getattr(
-                    world_model, "conflict_detector", None
-                ),
-                "preference_learner": getattr(world_model, "preference_learner", None),
-                "value_evolution_tracker": getattr(
-                    world_model, "value_evolution_tracker", None
-                ),
-                "ethical_boundary_monitor": getattr(
-                    world_model, "ethical_boundary_monitor", None
-                ),
-                "curiosity_reward_shaper": getattr(
-                    world_model, "curiosity_reward_shaper", None
-                ),
-                "internal_critic": getattr(world_model, "internal_critic", None),
+                # Top-level world_model attributes
+                "self_improvement_drive": self_improvement,
+                "motivational_introspection": motivational_intro,
                 "validation_tracker": getattr(world_model, "validation_tracker", None),
-                "transparency_interface": getattr(
-                    world_model, "transparency_interface", None
-                ),
-                "counterfactual_objectives": getattr(
-                    world_model, "counterfactual_reasoner", None
-                ),
-                # Add any other meta_reasoning components here
+                "transparency_interface": getattr(world_model, "transparency_interface", None),
+                "value_evolution_tracker": getattr(world_model, "value_evolution_tracker", None),
             }
+            
+            # Extract components from motivational_introspection properties
+            if motivational_intro and not isinstance(motivational_intro, MagicMock):
+                meta_components.update({
+                    "objective_hierarchy": getattr(motivational_intro, "objective_hierarchy", None),
+                    "objective_negotiator": getattr(motivational_intro, "objective_negotiator", None),
+                    "goal_conflict_detector": getattr(motivational_intro, "conflict_detector", None),
+                    "counterfactual_objectives": getattr(motivational_intro, "counterfactual_reasoner", None),
+                })
+            else:
+                # If motivational_introspection not available, set these to None
+                meta_components.update({
+                    "objective_hierarchy": None,
+                    "objective_negotiator": None,
+                    "goal_conflict_detector": None,
+                    "counterfactual_objectives": None,
+                })
+            
+            # Components that may not be implemented yet (setting to None to avoid missing keys)
+            meta_components.update({
+                "preference_learner": None,
+                "ethical_boundary_monitor": None,
+                "curiosity_reward_shaper": None,
+                "internal_critic": None,
+                # Note: Accessing private attribute _auto_apply_policy because SelfImprovementDrive
+                # doesn't expose a public property for this. Consider adding public accessor if needed.
+                "auto_apply_policy": getattr(self_improvement, "_auto_apply_policy", None) if self_improvement else None,
+            })
         else:
             meta_components = {}
 
