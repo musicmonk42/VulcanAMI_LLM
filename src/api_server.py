@@ -54,6 +54,9 @@ import socket
 import ssl
 import random
 
+# Use cryptographically secure random for security-relevant operations (timing jitter, etc.)
+secure_random = secrets.SystemRandom()
+
 # Optional dependencies
 try:
     import psutil
@@ -1321,8 +1324,8 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 "auth/login",
                 {**audit_details, "reason": "missing password or proof"},
             )
-            # Timing jitter
-            time.sleep(random.uniform(0.02, 0.05))
+            # Timing jitter (using cryptographically secure random)
+            time.sleep(secure_random.uniform(0.02, 0.05))
             self._send_error(401, "Invalid credentials")
             return
 
@@ -1333,7 +1336,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 "auth/login",
                 {**audit_details, "reason": "unknown_api_key"},
             )
-            time.sleep(random.uniform(0.02, 0.05))
+            time.sleep(secure_random.uniform(0.02, 0.05))
             self._send_error(401, "Invalid credentials")
             return
 
@@ -1371,7 +1374,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                     "auth/login",
                     {**audit_details, "reason": "invalid_timestamp"},
                 )
-                time.sleep(random.uniform(0.02, 0.05))
+                time.sleep(secure_random.uniform(0.02, 0.05))
                 self._send_error(401, "Invalid credentials")
                 return
 
@@ -1383,7 +1386,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                     "auth/login",
                     {**audit_details, "reason": "stale_or_future_timestamp"},
                 )
-                time.sleep(random.uniform(0.02, 0.05))
+                time.sleep(secure_random.uniform(0.02, 0.05))
                 self._send_error(401, "Invalid credentials")
                 return
 
@@ -1396,7 +1399,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                     "auth/login",
                     {**audit_details, "reason": "nonce_reuse"},
                 )
-                time.sleep(random.uniform(0.02, 0.05))
+                time.sleep(secure_random.uniform(0.02, 0.05))
                 self._send_error(401, "Invalid credentials")
                 return
             # Mark attempted regardless of success
