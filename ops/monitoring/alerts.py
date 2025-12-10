@@ -273,7 +273,7 @@ async def test_language_evolution_registry(registry):
         }
         prop_id = registry.submit_proposal(proposal)
         assert prop_id is not None
-        
+
         # Vote
         consensus = {
             "proposal_id": prop_id,
@@ -282,11 +282,11 @@ async def test_language_evolution_registry(registry):
         }
         reached = registry.record_vote(consensus)
         assert reached
-        
+
         # Deploy
         deployed = registry.deploy_grammar_version(prop_id, "test-1.0")
         assert deployed
-        
+
         integrity = registry.verify_audit_log_integrity()
         assert integrity
         duration_ms = (time.time() - start_time) * 1000
@@ -323,12 +323,12 @@ async def test_chaos(graph_generator, validator):
     async def chaos_task():
         graph = graph_generator.generate_graph(num_nodes=random.randint(1, MAX_NODES), topology=random.choice(list(GraphTopology)))
         return validator.validate_graph(graph)
-    
+
     start_time = time.time()
     try:
         async with TaskGroup() as tg:
             tasks = [tg.create_task(chaos_task()) for _ in range(CHAOS_ITERATIONS)]
-        
+
         results = [await t for t in tasks]
         valid_count = sum(1 for r in results if r.is_valid)
         assert valid_count > 0  # At least some should be valid

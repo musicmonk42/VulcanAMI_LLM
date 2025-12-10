@@ -20,14 +20,14 @@ VULCAN_PACK = os.path.join(BIN_DIR, 'vulcan-pack')
 def run_vulcan_pack(args, **kwargs):
     """
     Helper function to run vulcan-pack with proper platform-specific handling.
-    
+
     On Windows, Python scripts can't be executed directly - they need to be
     run with the Python interpreter.
-    
+
     Args:
         args: List of arguments to pass to vulcan-pack
         **kwargs: Additional arguments to pass to subprocess.run()
-    
+
     Returns:
         subprocess.CompletedProcess object
     """
@@ -37,11 +37,11 @@ def run_vulcan_pack(args, **kwargs):
     else:
         # On Unix/Linux, the shebang handles it
         command = [VULCAN_PACK] + args
-    
+
     # Set default values for common parameters
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
-    
+
     return subprocess.run(command, **kwargs)
 
 
@@ -52,7 +52,7 @@ class TestVulcanPack:
         """Test that vulcan-pack exists and is readable"""
         assert os.path.exists(VULCAN_PACK), f"vulcan-pack not found at {VULCAN_PACK}"
         assert os.path.isfile(VULCAN_PACK), f"vulcan-pack is not a file"
-        
+
         # On Unix/Linux, also check if it's executable
         if platform.system() != 'Windows':
             assert os.access(VULCAN_PACK, os.X_OK), f"vulcan-pack is not executable"
@@ -81,15 +81,15 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data', 'value': 123}, f)
-            
+
             # Create output pack
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             # Check result
             assert result.returncode == 0
             assert os.path.exists(output_file)
@@ -102,14 +102,14 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump([{'id': 1, 'data': 'test1'}, {'id': 2, 'data': 'test2'}], f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(output_file)
 
@@ -119,11 +119,11 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data' * 100}, f)
-            
+
             for level in [1, 3, 9]:
                 output_file = os.path.join(tmpdir, f'output_{level}.pack')
                 result = run_vulcan_pack(
-                    ['-i', input_file, '-o', output_file, 
+                    ['-i', input_file, '-o', output_file,
                      '--compression', str(level), '--no-dqs'],
                     timeout=30
                 )
@@ -136,19 +136,19 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
             stats_file = os.path.join(tmpdir, 'stats.json')
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file,
                  '--stats', stats_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(stats_file)
-            
+
             # Verify stats file is valid JSON
             with open(stats_file, 'r') as f:
                 stats = json.load(f)
@@ -162,15 +162,15 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
-                ['-i', input_file, '-o', output_file, 
+                ['-i', input_file, '-o', output_file,
                  '--verbose', '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
 
     def test_build_pack_quiet_mode(self):
@@ -179,15 +179,15 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file,
                  '--quiet', '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
 
     def test_build_pack_from_directory(self):
@@ -196,18 +196,18 @@ class TestVulcanPack:
             # Create some files in directory
             data_dir = os.path.join(tmpdir, 'data')
             os.makedirs(data_dir)
-            
+
             for i in range(3):
                 with open(os.path.join(data_dir, f'file{i}.txt'), 'w') as f:
                     f.write(f'test data {i}\n')
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-d', data_dir, '-o', output_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(output_file)
 
@@ -218,20 +218,20 @@ class TestVulcanPack:
             data_dir = os.path.join(tmpdir, 'data')
             sub_dir = os.path.join(data_dir, 'subdir')
             os.makedirs(sub_dir)
-            
+
             with open(os.path.join(data_dir, 'file1.txt'), 'w') as f:
                 f.write('top level\n')
             with open(os.path.join(sub_dir, 'file2.txt'), 'w') as f:
                 f.write('sub level\n')
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-d', data_dir, '-o', output_file,
                  '--recursive', '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(output_file)
 
@@ -241,21 +241,21 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
-            
+
             # Verify pack header
             with open(output_file, 'rb') as f:
                 magic = f.read(4)
                 assert magic == b'GPK2', "Pack file should start with GPK2 magic"
-                
+
                 version = struct.unpack('>I', f.read(4))[0]
                 assert version == 2, "Pack version should be 2"
 
@@ -265,15 +265,15 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file,
                  '--compression', '99', '--no-dqs'],
                 timeout=30
             )
-            
+
             # Should fail with invalid compression level
             assert result.returncode != 0
 
@@ -283,16 +283,16 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             # Test with custom threshold (will use mock DQS since service not available)
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file,
                  '--dqs-threshold', '0.90', '--no-dqs'],
                 timeout=30
             )
-            
+
             # With --no-dqs, should still work
             assert result.returncode == 0
 
@@ -302,15 +302,15 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file,
                  '--bloom-size', '256', '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
 
     def test_empty_input_handling(self):
@@ -319,14 +319,14 @@ class TestVulcanPack:
             # Create empty directory
             data_dir = os.path.join(tmpdir, 'empty')
             os.makedirs(data_dir)
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-d', data_dir, '-o', output_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             # Should handle empty input gracefully (may error or create empty pack)
             assert result.returncode in [0, 1]
 
@@ -337,20 +337,20 @@ class TestVulcanPack:
             for i in range(3):
                 with open(os.path.join(tmpdir, f'data{i}.txt'), 'w') as f:
                     f.write(f'data {i}\n')
-            
+
             # Create file list
             file_list = os.path.join(tmpdir, 'files.txt')
             with open(file_list, 'w') as f:
                 for i in range(3):
                     f.write(os.path.join(tmpdir, f'data{i}.txt') + '\n')
-            
+
             output_file = os.path.join(tmpdir, 'output.pack')
-            
+
             result = run_vulcan_pack(
                 ['-f', file_list, '-o', output_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(output_file)
 
@@ -362,7 +362,7 @@ class TestVulcanPack:
                 ['-i', '/nonexistent/file.json', '-o', output_file],
                 timeout=30
             )
-            
+
             # Should fail with error
             assert result.returncode != 0
 
@@ -372,15 +372,15 @@ class TestVulcanPack:
             input_file = os.path.join(tmpdir, 'input.json')
             with open(input_file, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             # Try to write to non-existent directory
             output_file = '/nonexistent/directory/output.pack'
-            
+
             result = run_vulcan_pack(
                 ['-i', input_file, '-o', output_file, '--no-dqs'],
                 timeout=30
             )
-            
+
             # Should fail
             assert result.returncode != 0
 

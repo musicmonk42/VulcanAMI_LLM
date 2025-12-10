@@ -19,26 +19,26 @@ VULCAN_CLI = os.path.join(BIN_DIR, 'vulcan-cli')
 def find_git_bash():
     """
     Find Git Bash executable on Windows, avoiding WSL.
-    
+
     Returns:
         str: Full path to bash.exe from Git installation
         None: If Git Bash not found
     """
     if platform.system() != 'Windows':
         return 'bash'  # Use system bash on Unix/Linux
-    
+
     # Common Git Bash installation paths on Windows
     common_paths = [
         r'C:\Program Files\Git\bin\bash.exe',
         r'C:\Program Files (x86)\Git\bin\bash.exe',
         r'C:\Git\bin\bash.exe',
     ]
-    
+
     # Check common paths first
     for path in common_paths:
         if os.path.exists(path):
             return path
-    
+
     # Try to find bash.exe using 'where' command (Windows equivalent of 'which')
     try:
         result = subprocess.run(
@@ -47,7 +47,7 @@ def find_git_bash():
             text=True,
             timeout=5
         )
-        
+
         if result.returncode == 0:
             # 'where' returns all matches, one per line
             for line in result.stdout.strip().split('\n'):
@@ -68,7 +68,7 @@ def find_git_bash():
                         continue
     except:
         pass
-    
+
     # Try using Git's installation directory from PATH
     git_path = shutil.which('git')
     if git_path:
@@ -78,14 +78,14 @@ def find_git_bash():
         bash_path = os.path.join(git_dir, 'bin', 'bash.exe')
         if os.path.exists(bash_path):
             return bash_path
-    
+
     return None
 
 
 def get_command_prefix():
     """
     Get the command prefix needed to execute bash scripts.
-    
+
     Returns:
         list: ['<path-to-git-bash>'] on Windows
               [] on Unix/Linux
@@ -104,31 +104,31 @@ def get_command_prefix():
 def run_vulcan_cli(args, **kwargs):
     """
     Helper function to run vulcan-cli with proper platform-specific handling.
-    
+
     Args:
         args: List of arguments to pass to vulcan-cli
         **kwargs: Additional arguments to pass to subprocess.run()
-    
+
     Returns:
         subprocess.CompletedProcess object
     """
     prefix = get_command_prefix()
     command = prefix + [VULCAN_CLI] + args
-    
+
     # Set default values for common parameters
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
-    
+
     return subprocess.run(command, **kwargs)
 
 
 def get_output(result):
     """
     Safely concatenate stdout and stderr, handling None values.
-    
+
     Args:
         result: subprocess.CompletedProcess object
-    
+
     Returns:
         str: Combined stdout and stderr output
     """
@@ -144,7 +144,7 @@ class TestVulcanCLI:
         """Test that vulcan-cli exists and is readable"""
         assert os.path.exists(VULCAN_CLI), f"vulcan-cli not found at {VULCAN_CLI}"
         assert os.path.isfile(VULCAN_CLI), f"vulcan-cli is not a file: {VULCAN_CLI}"
-        
+
         # On Unix/Linux, also check if it's executable
         if platform.system() != 'Windows':
             assert os.access(VULCAN_CLI, os.X_OK), f"vulcan-cli is not executable: {VULCAN_CLI}"
@@ -277,7 +277,7 @@ class TestVulcanCLI:
             "Git Bash not found. Please install Git for Windows from https://git-scm.com/download/win\n"
             "WSL bash is not supported for these tests due to path translation issues."
         )
-        
+
         # Verify it works
         result = subprocess.run([bash_path, '--version'], capture_output=True, text=True, timeout=5)
         assert result.returncode == 0, f"Git Bash found at {bash_path} but doesn't work"

@@ -21,7 +21,7 @@ print("-" * 80)
 try:
     from src.utils.cpu_capabilities import (get_capability_summary,
                                             get_cpu_capabilities)
-    
+
     caps = get_cpu_capabilities()
     print(get_capability_summary())
     print(f"\nDetailed capabilities:")
@@ -30,7 +30,7 @@ try:
     print(f"  Cores: {caps.cpu_cores}")
     print(f"  Best Vector Instruction Set: {caps.get_best_vector_instruction_set()}")
     print(f"  Performance Tier: {caps.get_performance_tier()}")
-    
+
     if caps.architecture.lower().startswith('arm') or caps.architecture.lower().startswith('aarch'):
         print(f"\nARM Features:")
         print(f"  NEON: {caps.has_neon}")
@@ -43,7 +43,7 @@ try:
         print(f"  AVX2: {caps.has_avx2}")
         print(f"  AVX-512F: {caps.has_avx512f}")
         print(f"  FMA: {caps.has_fma}")
-    
+
     print("\n✓ CPU Capabilities Detection PASSED")
 except Exception as e:
     print(f"\n✗ CPU Capabilities Detection FAILED: {e}")
@@ -56,19 +56,19 @@ print("-" * 80)
 try:
     # Import modules that should display enhanced warnings
     print("Loading modules to trigger warnings...")
-    
+
     # Capture warnings
     import io
     from contextlib import redirect_stderr
-    
+
     f = io.StringIO()
     with redirect_stderr(f):
         import specs.formal_grammar.language_evolution_registry as registry
-    
+
     warnings_output = f.getvalue()
     print("Warnings captured:")
     print(warnings_output if warnings_output else "(No warnings - features may be available)")
-    
+
     print("\n✓ Enhanced Warning Messages PASSED")
 except Exception as e:
     print(f"\n✗ Enhanced Warning Messages FAILED: {e}")
@@ -81,22 +81,22 @@ print("-" * 80)
 try:
     from src.persistant_memory_v46.zk import ZKProver
     from src.utils.performance_metrics import get_performance_tracker
-    
+
     tracker = get_performance_tracker()
-    
+
     # Generate some proofs to collect metrics
     print("Generating ZK proofs to collect performance metrics...")
     prover = ZKProver()
-    
+
     for i in range(5):
         proof = prover.generate_unlearning_proof(
             pattern=f'test_pattern_{i}',
             affected_packs=[f'pack{j}' for j in range(3)]
         )
-    
+
     print("\nPerformance Report:")
     print(tracker.format_report())
-    
+
     print("\n✓ Performance Metrics PASSED")
 except Exception as e:
     print(f"\n✗ Performance Metrics FAILED: {e}")

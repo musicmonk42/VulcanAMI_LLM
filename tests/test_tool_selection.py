@@ -20,7 +20,7 @@ def tool_selection_config():
     config_path = Path(__file__).parent / "configs" / "tool_selection.yaml"
     if not config_path.exists():
         config_path = Path(__file__).parent / ".." / "configs" / "tool_selection.yaml"
-    
+
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
@@ -61,12 +61,12 @@ class TestYAMLStructure:
         """Test that YAML file loads without errors."""
         assert tool_selection_config is not None
         assert isinstance(tool_selection_config, dict)
-    
+
     def test_defaults_section_exists(self, tool_selection_config):
         """Test that defaults section exists."""
         assert 'defaults' in tool_selection_config
         assert isinstance(tool_selection_config['defaults'], dict)
-    
+
     def test_top_level_structure(self, tool_selection_config):
         """Test that top-level structure is correct."""
         # Should have 'defaults' at minimum
@@ -78,39 +78,39 @@ class TestUtilityWeights:
     def test_utility_weights_exist(self, defaults):
         """Test that utility_weights section exists."""
         assert 'utility_weights' in defaults
-    
+
     def test_required_weight_fields(self, utility_weights):
         """Test that all required weight fields are present."""
         required_weights = ['quality', 'time_penalty', 'energy_penalty', 'risk_penalty']
         for weight in required_weights:
             assert weight in utility_weights, f"Missing weight: {weight}"
-    
+
     def test_weights_are_numeric(self, utility_weights):
         """Test that all weights are numeric."""
         for key, value in utility_weights.items():
             assert isinstance(value, (int, float)), \
                 f"Weight {key} should be numeric, got {type(value)}"
-    
+
     def test_weights_are_positive(self, utility_weights):
         """Test that all weights are positive."""
         for key, value in utility_weights.items():
             assert value > 0, f"Weight {key} should be positive, got {value}"
-    
+
     def test_weights_are_reasonable(self, utility_weights):
         """Test that weights are in reasonable range."""
         for key, value in utility_weights.items():
             assert 0 < value <= 100, \
                 f"Weight {key} should be between 0 and 100, got {value}"
-    
+
     def test_all_weights_equal_suggests_tuning_needed(self, utility_weights):
         """Test if all weights are equal (suggests default values)."""
         values = list(utility_weights.values())
         unique_values = set(values)
-        
+
         # Test passes regardless - this is informational
         # Equal weights are valid, though may need tuning for production
         assert len(unique_values) >= 1, "At least one weight value should exist"
-    
+
     def test_weight_ratios_make_sense(self, utility_weights):
         """Test that weight ratios are reasonable."""
         # Quality and risk should typically be weighted higher than penalties
@@ -118,7 +118,7 @@ class TestUtilityWeights:
         risk = utility_weights.get('risk_penalty', 1.0)
         time = utility_weights.get('time_penalty', 1.0)
         energy = utility_weights.get('energy_penalty', 1.0)
-        
+
         # Test passes regardless - equal weights are valid configuration
         # This is a guideline, not a hard requirement
         assert quality > 0 and risk > 0 and time > 0 and energy > 0, \
@@ -130,73 +130,73 @@ class TestCalibration:
     def test_calibration_exists(self, defaults):
         """Test that calibration section exists."""
         assert 'calibration' in defaults
-    
+
     def test_min_samples_defined(self, calibration):
         """Test that min_samples is defined."""
         assert 'min_samples' in calibration
-    
+
     def test_min_samples_positive(self, calibration):
         """Test that min_samples is positive."""
         min_samples = calibration['min_samples']
         assert min_samples > 0, "min_samples must be positive"
-    
+
     def test_min_samples_reasonable(self, calibration):
         """Test that min_samples is reasonable."""
         min_samples = calibration['min_samples']
         assert 10 <= min_samples <= 10000, \
             f"min_samples should be 10-10000, got {min_samples}"
-    
+
     def test_retrain_interval_defined(self, calibration):
         """Test that retrain_interval is defined."""
         assert 'retrain_interval' in calibration
-    
+
     def test_retrain_interval_positive(self, calibration):
         """Test that retrain_interval is positive."""
         retrain = calibration['retrain_interval']
         assert retrain > 0, "retrain_interval must be positive"
-    
+
     def test_retrain_interval_reasonable(self, calibration):
         """Test that retrain_interval is reasonable."""
         retrain = calibration['retrain_interval']
         assert 1 <= retrain <= 100000, \
             f"retrain_interval should be 1-100000, got {retrain}"
-    
+
     def test_temperature_scaling_defined(self, calibration):
         """Test that temperature_scaling is defined."""
         assert 'temperature_scaling' in calibration
-    
+
     def test_temperature_scaling_is_boolean(self, calibration):
         """Test that temperature_scaling is boolean."""
         temp_scaling = calibration['temperature_scaling']
         assert isinstance(temp_scaling, bool), \
             "temperature_scaling should be boolean"
-    
+
     def test_isotonic_regression_defined(self, calibration):
         """Test that isotonic_regression is defined."""
         assert 'isotonic_regression' in calibration
-    
+
     def test_isotonic_regression_is_boolean(self, calibration):
         """Test that isotonic_regression is boolean."""
         iso_reg = calibration['isotonic_regression']
         assert isinstance(iso_reg, bool), \
             "isotonic_regression should be boolean"
-    
+
     def test_min_samples_less_than_retrain_interval(self, calibration):
         """Test that min_samples is compatible with retrain_interval."""
         min_samples = calibration['min_samples']
         retrain = calibration['retrain_interval']
-        
+
         if min_samples > retrain:
             pytest.skip(
                 f"Warning: min_samples ({min_samples}) > retrain_interval ({retrain}). "
                 "You'll accumulate samples before first retraining."
             )
-    
+
     def test_calibration_methods_enabled(self, calibration):
         """Test that at least one calibration method is enabled."""
         temp_scaling = calibration.get('temperature_scaling', False)
         iso_reg = calibration.get('isotonic_regression', False)
-        
+
         assert temp_scaling or iso_reg, \
             "At least one calibration method should be enabled"
 
@@ -206,21 +206,21 @@ class TestPortfolioStrategies:
     def test_portfolio_strategies_exist(self, defaults):
         """Test that portfolio_strategies section exists."""
         assert 'portfolio_strategies' in defaults
-    
+
     def test_enabled_strategies_defined(self, portfolio_strategies):
         """Test that enabled strategies are defined."""
         assert 'enabled' in portfolio_strategies
-    
+
     def test_enabled_is_list(self, portfolio_strategies):
         """Test that enabled is a list."""
         enabled = portfolio_strategies['enabled']
         assert isinstance(enabled, list), "enabled should be a list"
-    
+
     def test_at_least_one_strategy_enabled(self, portfolio_strategies):
         """Test that at least one strategy is enabled."""
         enabled = portfolio_strategies['enabled']
         assert len(enabled) > 0, "At least one strategy should be enabled"
-    
+
     def test_strategy_names_valid(self, portfolio_strategies):
         """Test that strategy names are valid."""
         valid_strategies = {
@@ -231,30 +231,30 @@ class TestPortfolioStrategies:
             'cascade',
             'hybrid'
         }
-        
+
         enabled = portfolio_strategies['enabled']
         for strategy in enabled:
             assert strategy in valid_strategies, \
                 f"Invalid strategy: {strategy}. Valid: {valid_strategies}"
-    
+
     def test_no_duplicate_strategies(self, portfolio_strategies):
         """Test that no strategies are duplicated."""
         enabled = portfolio_strategies['enabled']
         assert len(enabled) == len(set(enabled)), \
             f"Duplicate strategies found: {enabled}"
-    
+
     def test_strategy_consistency(self, portfolio_strategies):
         """Test that strategy combination makes sense."""
         enabled = portfolio_strategies['enabled']
-        
+
         # If both parallel and sequential are enabled, that's valid
         has_parallel = 'speculative_parallel' in enabled
         has_sequential = 'sequential_refinement' in enabled
-        
+
         # Test passes - having both strategies is a valid configuration
         # Scheduler should handle appropriate selection based on workload
         assert isinstance(enabled, list), "Enabled strategies should be a list"
-    
+
     def test_single_strategy_included(self, portfolio_strategies):
         """Test that single strategy is included."""
         enabled = portfolio_strategies['enabled']
@@ -267,40 +267,40 @@ class TestCostModel:
     def test_cost_model_exists(self, defaults):
         """Test that cost_model section exists."""
         assert 'cost_model' in defaults
-    
+
     def test_track_variance_defined(self, cost_model):
         """Test that track_variance is defined."""
         assert 'track_variance' in cost_model
-    
+
     def test_track_variance_is_boolean(self, cost_model):
         """Test that track_variance is boolean."""
         track_var = cost_model['track_variance']
         assert isinstance(track_var, bool), "track_variance should be boolean"
-    
+
     def test_cold_start_penalty_defined(self, cost_model):
         """Test that cold_start_penalty_ms is defined."""
         assert 'cold_start_penalty_ms' in cost_model
-    
+
     def test_cold_start_penalty_positive(self, cost_model):
         """Test that cold_start_penalty_ms is positive."""
         penalty = cost_model['cold_start_penalty_ms']
         assert penalty >= 0, "cold_start_penalty_ms should be non-negative"
-    
+
     def test_cold_start_penalty_reasonable(self, cost_model):
         """Test that cold_start_penalty_ms is reasonable."""
         penalty = cost_model['cold_start_penalty_ms']
         assert 0 <= penalty <= 10000, \
             f"cold_start_penalty_ms should be 0-10000ms, got {penalty}"
-    
+
     def test_health_check_interval_defined(self, cost_model):
         """Test that health_check_interval is defined."""
         assert 'health_check_interval' in cost_model
-    
+
     def test_health_check_interval_positive(self, cost_model):
         """Test that health_check_interval is positive."""
         interval = cost_model['health_check_interval']
         assert interval > 0, "health_check_interval must be positive"
-    
+
     def test_health_check_interval_reasonable(self, cost_model):
         """Test that health_check_interval is reasonable."""
         interval = cost_model['health_check_interval']
@@ -314,27 +314,27 @@ class TestMissingFeatures:
         """Test that workload classification is missing."""
         assert 'workload_types' not in tool_selection_config, \
             "Workload classification not yet implemented"
-    
+
     def test_no_learning_rate(self, calibration):
         """Test that learning rate is missing."""
         assert 'learning_rate' not in calibration, \
             "Learning rate configuration not yet implemented"
-    
+
     def test_no_exploration_strategy(self, tool_selection_config):
         """Test that exploration strategy is missing."""
         assert 'exploration' not in tool_selection_config, \
             "Exploration strategy not yet implemented"
-    
+
     def test_no_cost_budget(self, tool_selection_config):
         """Test that cost budget is missing."""
         assert 'budget_constraints' not in tool_selection_config, \
             "Budget constraints not yet implemented"
-    
+
     def test_no_fallback_strategy(self, portfolio_strategies):
         """Test that fallback strategy is missing."""
         assert 'fallback' not in portfolio_strategies, \
             "Fallback strategy not yet implemented"
-    
+
     def test_no_timeout_config(self, tool_selection_config):
         """Test that timeout configuration is missing."""
         assert 'timeout_ms' not in tool_selection_config.get('defaults', {}), \
@@ -349,13 +349,13 @@ class TestDataTypes:
             for key, value in d.items():
                 if isinstance(value, dict):
                     check_numeric_recursive(value, f"{path}.{key}")
-                elif key in ['min_samples', 'retrain_interval', 'cold_start_penalty_ms', 
+                elif key in ['min_samples', 'retrain_interval', 'cold_start_penalty_ms',
                             'health_check_interval']:
                     assert isinstance(value, (int, float)), \
                         f"{path}.{key} should be numeric, got {type(value)}"
-        
+
         check_numeric_recursive(defaults)
-    
+
     def test_all_boolean_fields_are_boolean(self, defaults):
         """Test that boolean fields have correct types."""
         def check_boolean_recursive(d, path=""):
@@ -365,7 +365,7 @@ class TestDataTypes:
                 elif key in ['temperature_scaling', 'isotonic_regression', 'track_variance']:
                     assert isinstance(value, bool), \
                         f"{path}.{key} should be boolean, got {type(value)}"
-        
+
         check_boolean_recursive(defaults)
 
 
@@ -374,33 +374,33 @@ class TestLogicalConsistency:
     def test_calibration_sample_size_sufficient(self, calibration):
         """Test that min_samples is sufficient for calibration."""
         min_samples = calibration['min_samples']
-        
+
         if min_samples < 30:
             pytest.skip(
                 f"Warning: min_samples ({min_samples}) is small. "
                 "Consider 30+ samples for reliable calibration."
             )
-    
+
     def test_health_check_not_too_frequent(self, cost_model):
         """Test that health checks aren't too frequent."""
         interval = cost_model['health_check_interval']
-        
+
         if interval < 10:
             pytest.skip(
                 f"Warning: health_check_interval ({interval}s) is very frequent. "
                 "This may add overhead."
             )
-    
+
     def test_cold_start_penalty_reflects_reality(self, cost_model):
         """Test that cold start penalty is realistic."""
         penalty = cost_model['cold_start_penalty_ms']
-        
+
         if penalty == 0:
             pytest.skip(
                 "Warning: cold_start_penalty_ms is 0. "
                 "Most systems have some cold start cost."
             )
-        
+
         if penalty < 10:
             pytest.skip(
                 f"Warning: cold_start_penalty_ms ({penalty}ms) seems low. "
@@ -414,12 +414,12 @@ class TestHardwareIntegration:
         """Test that utility function is compatible with hardware metrics."""
         # Utility function should consider: quality, time, energy, risk
         # Hardware profiles provide: latency, throughput, energy_per_op
-        
+
         required_weights = ['quality', 'time_penalty', 'energy_penalty']
         for weight in required_weights:
             assert weight in utility_weights, \
                 f"Utility function missing {weight} for hardware selection"
-    
+
     def test_risk_penalty_defined_for_exotic_hardware(self, utility_weights):
         """Test that risk penalty exists for exotic hardware."""
         assert 'risk_penalty' in utility_weights, \
@@ -431,16 +431,16 @@ class TestStrategyConfiguration:
     def test_strategies_match_expected_patterns(self, portfolio_strategies):
         """Test that strategy names follow expected patterns."""
         enabled = portfolio_strategies['enabled']
-        
+
         for strategy in enabled:
             # Should be lowercase with underscores
             assert strategy.islower(), f"Strategy {strategy} should be lowercase"
             assert ' ' not in strategy, f"Strategy {strategy} should not contain spaces"
-    
+
     def test_strategy_parameters_missing(self, portfolio_strategies):
         """Test that strategy parameters are missing (document limitation)."""
         enabled = portfolio_strategies['enabled']
-        
+
         # Each strategy could have parameters
         for strategy in enabled:
             if strategy == 'speculative_parallel':
@@ -458,7 +458,7 @@ class TestOptimizationParameters:
         total = sum(utility_weights.values())
         # Any positive sum is valid - will be normalized at runtime
         assert total > 0
-    
+
     def test_can_compute_utility_score(self, utility_weights):
         """Test that utility score can be computed."""
         # Simulate hardware metrics
@@ -468,15 +468,15 @@ class TestOptimizationParameters:
             'energy_cost': 50,  # nJ
             'risk_score': 0.2
         }
-        
+
         # Compute utility (simplified)
         quality_component = utility_weights['quality'] * simulated_metrics['quality_score']
         time_component = utility_weights['time_penalty'] / simulated_metrics['time_cost']
         energy_component = utility_weights['energy_penalty'] / simulated_metrics['energy_cost']
         risk_component = utility_weights['risk_penalty'] * (1 - simulated_metrics['risk_score'])
-        
+
         utility = quality_component + time_component + energy_component + risk_component
-        
+
         assert utility > 0, "Utility score should be computable and positive"
 
 
@@ -504,10 +504,10 @@ class TestRecommendedEnhancements:
                 }
             }
         }
-        
+
         # Document this is missing
         assert 'workload_types' not in tool_selection_config
-    
+
     def test_should_add_exploration_strategy(self, tool_selection_config):
         """Document that exploration strategy should be added."""
         recommended_config = {
@@ -517,9 +517,9 @@ class TestRecommendedEnhancements:
                 'min_epsilon': 0.01
             }
         }
-        
+
         assert 'exploration' not in tool_selection_config
-    
+
     def test_should_add_budget_constraints(self, tool_selection_config):
         """Document that budget constraints should be added."""
         recommended_config = {
@@ -529,9 +529,9 @@ class TestRecommendedEnhancements:
                 'max_energy_uj': 10000
             }
         }
-        
+
         assert 'budget_constraints' not in tool_selection_config
-    
+
     def test_should_add_strategy_parameters(self, portfolio_strategies):
         """Document that strategy parameters should be added."""
         recommended_config = {
@@ -546,7 +546,7 @@ class TestRecommendedEnhancements:
                 }
             }
         }
-        
+
         assert 'strategy_config' not in portfolio_strategies
 
 
@@ -560,10 +560,10 @@ class TestConfigurationCompleteness:
             'portfolio_strategies',
             'cost_model'
         ]
-        
+
         for section in required_sections:
             assert section in defaults, f"Missing section: {section}"
-    
+
     def test_no_empty_sections(self, defaults):
         """Test that no sections are empty."""
         for key, value in defaults.items():
@@ -578,20 +578,20 @@ class TestIntegration:
     def test_config_supports_scheduler(self, tool_selection_config):
         """Test that config provides all info needed for a scheduler."""
         defaults = tool_selection_config['defaults']
-        
+
         # Scheduler needs:
         # 1. Utility weights to score options
         assert 'utility_weights' in defaults
-        
+
         # 2. Calibration to improve predictions
         assert 'calibration' in defaults
-        
+
         # 3. Portfolio strategies to choose execution mode
         assert 'portfolio_strategies' in defaults
-        
+
         # 4. Cost model to estimate costs
         assert 'cost_model' in defaults
-    
+
     def test_can_simulate_tool_selection(self, utility_weights, portfolio_strategies):
         """Test that tool selection can be simulated."""
         # Simulate tools
@@ -599,7 +599,7 @@ class TestIntegration:
             'tool_a': {'quality': 0.9, 'time': 100, 'energy': 50, 'risk': 0.1},
             'tool_b': {'quality': 0.7, 'time': 50, 'energy': 30, 'risk': 0.2}
         }
-        
+
         # Compute scores
         scores = {}
         for tool_name, metrics in tools.items():
@@ -610,28 +610,28 @@ class TestIntegration:
                 utility_weights['risk_penalty'] * (1 - metrics['risk'])
             )
             scores[tool_name] = score
-        
+
         # Should be able to rank tools
         best_tool = max(scores, key=scores.get)
         assert best_tool in tools
-    
+
     def test_strategy_selection_possible(self, portfolio_strategies):
         """Test that strategy selection is possible."""
         enabled = portfolio_strategies['enabled']
-        
+
         # For a given workload, should be able to select strategy
         workload_characteristics = {
             'uncertainty': 'high',
             'latency_requirement': 'strict',
             'cost_budget': 'flexible'
         }
-        
+
         # High uncertainty + flexible budget -> speculative_parallel
         if 'speculative_parallel' in enabled:
             selected_strategy = 'speculative_parallel'
         else:
             selected_strategy = enabled[0]
-        
+
         assert selected_strategy in enabled
 
 
@@ -643,13 +643,13 @@ class TestDocumentation:
         config_path = Path(__file__).parent / "configs" / "tool_selection.yaml"
         if not config_path.exists():
             config_path = Path(__file__).parent / ".." / "configs" / "tool_selection.yaml"
-        
+
         with open(config_path, 'r') as f:
             content = f.read()
-        
+
         # Should have some comments explaining configuration
         comment_count = content.count('#')
-        
+
         # Test passes - comments are optional, structure should be clear from key names
         assert len(content) > 0, "Configuration file should have content"
 

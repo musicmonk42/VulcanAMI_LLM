@@ -19,7 +19,7 @@ VULCAN_UNLEARN = os.path.join(BIN_DIR, 'vulcan-unlearn')
 def run_vulcan_unlearn(args, **kwargs):
     """
     Helper function to run vulcan-unlearn with proper platform-specific handling.
-    
+
     On Windows, Python scripts can't be executed directly - they need to be
     run with the Python interpreter.
     """
@@ -27,10 +27,10 @@ def run_vulcan_unlearn(args, **kwargs):
         command = [sys.executable, VULCAN_UNLEARN] + args
     else:
         command = [VULCAN_UNLEARN] + args
-    
+
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
-    
+
     return subprocess.run(command, **kwargs)
 
 
@@ -126,15 +126,15 @@ class TestVulcanUnlearn:
         """Test JSON output"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'unlearn.json')
-            
+
             result = run_vulcan_unlearn(
                 ['test_pattern', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
-            
+
             # Verify JSON structure
             with open(json_output, 'r') as f:
                 data = json.load(f)
@@ -146,7 +146,7 @@ class TestVulcanUnlearn:
     def test_unlearn_displays_summary(self):
         """Test that unlearn displays summary"""
         result = run_vulcan_unlearn(['test_pattern'], timeout=30)
-        
+
         output = result.stdout + result.stderr
         assert 'Pattern' in output or 'Records' in output or 'Summary' in output
 
@@ -186,7 +186,7 @@ class TestVulcanUnlearn:
     def test_unlearn_generates_audit_log(self):
         """Test that audit log is generated"""
         result = run_vulcan_unlearn(['test_pattern'], timeout=30)
-        
+
         output = result.stdout + result.stderr
         assert 'Audit' in output or 'audit' in output or 'SUCCESS' in output
 
@@ -194,13 +194,13 @@ class TestVulcanUnlearn:
         """Test combining multiple flags"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'result.json')
-            
+
             result = run_vulcan_unlearn(
                 ['test_pattern', '--strategy', 'deletion', '--fast-lane',
                  '--no-proof', '--verbose', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
 

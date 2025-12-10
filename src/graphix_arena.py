@@ -570,7 +570,7 @@ class GraphixArena:
 
     def __init__(self, port: int = 8181, host: str = "127.0.0.1"):
         """Initialize Graphix Arena.
-        
+
         Args:
             port: Port to bind to (1024-65535)
             host: Host address to bind to (default: 127.0.0.1 for localhost)

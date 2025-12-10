@@ -19,7 +19,7 @@ VULCAN_PROOF_VERIFY = os.path.join(BIN_DIR, 'vulcan-proof-verify-zk')
 def run_vulcan_proof_verify(args, **kwargs):
     """
     Helper function to run vulcan-proof-verify-zk with proper platform-specific handling.
-    
+
     On Windows, Python scripts can't be executed directly - they need to be
     run with the Python interpreter.
     """
@@ -27,10 +27,10 @@ def run_vulcan_proof_verify(args, **kwargs):
         command = [sys.executable, VULCAN_PROOF_VERIFY] + args
     else:
         command = [VULCAN_PROOF_VERIFY] + args
-    
+
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
-    
+
     return subprocess.run(command, **kwargs)
 
 
@@ -67,9 +67,9 @@ class TestVulcanProofVerifyZk:
             proof_file = os.path.join(tmpdir, 'proof.txt')
             with open(proof_file, 'w') as f:
                 f.write('test_proof_data_abc123')
-            
+
             result = run_vulcan_proof_verify([proof_file], timeout=30)
-            
+
             assert result.returncode == 0
 
     def test_verify_with_public_inputs(self):
@@ -78,12 +78,12 @@ class TestVulcanProofVerifyZk:
             public_inputs = os.path.join(tmpdir, 'inputs.json')
             with open(public_inputs, 'w') as f:
                 json.dump({'input1': 'value1', 'input2': 123}, f)
-            
+
             result = run_vulcan_proof_verify(
                 ['test_proof', '--public-inputs', public_inputs],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
 
     def test_verify_with_custom_circuit(self):
@@ -116,15 +116,15 @@ class TestVulcanProofVerifyZk:
         """Test JSON output"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'verify.json')
-            
+
             result = run_vulcan_proof_verify(
                 ['test_proof', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
-            
+
             # Verify JSON structure
             with open(json_output, 'r') as f:
                 data = json.load(f)
@@ -135,7 +135,7 @@ class TestVulcanProofVerifyZk:
     def test_verify_displays_result(self):
         """Test that verification displays result"""
         result = run_vulcan_proof_verify(['test_proof'], timeout=30)
-        
+
         output = result.stdout + result.stderr
         assert 'Proof' in output or 'Verification' in output or 'VALID' in output
 
@@ -150,15 +150,15 @@ class TestVulcanProofVerifyZk:
             public_inputs = os.path.join(tmpdir, 'inputs.json')
             with open(public_inputs, 'w') as f:
                 json.dump({'test': 'data'}, f)
-            
+
             json_output = os.path.join(tmpdir, 'result.json')
-            
+
             result = run_vulcan_proof_verify(
                 ['test_proof', '--public-inputs', public_inputs,
                  '--verbose', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
 
@@ -172,7 +172,7 @@ class TestVulcanProofVerifyZk:
     def test_verify_proof_hash_displayed(self):
         """Test that proof hash is displayed"""
         result = run_vulcan_proof_verify(['test_proof_with_hash'], timeout=30)
-        
+
         output = result.stdout + result.stderr
         assert 'hash' in output.lower() or 'Proof' in output
 

@@ -2108,7 +2108,7 @@ class Skill:
 
     def _check_condition(self, condition: str, context: Any) -> bool:
         """Check if condition is met using safe expression evaluation.
-        
+
         Fails securely by returning False when unsafe conditions are detected.
         """
         try:
@@ -2116,37 +2116,37 @@ class Skill:
             if isinstance(context, dict):
                 # Use ast module for safe evaluation of simple expressions
                 # This only allows literal structures and basic comparisons
-                
+
                 try:
                     import ast
 
                     # Parse the condition
                     tree = ast.parse(condition, mode='eval')
-                    
+
                     # Only allow safe operations (Python 3.8+ compatible)
                     # Removed deprecated ast.Num, ast.Str, ast.NameConstant
                     safe_nodes = (ast.Expression, ast.Constant,
                                   ast.List, ast.Tuple, ast.Dict,
                                   ast.Name, ast.Load, ast.Compare, ast.BoolOp,
-                                  ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, 
+                                  ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt,
                                   ast.LtE, ast.Gt, ast.GtE, ast.In, ast.NotIn,
                                   ast.UnaryOp, ast.Not)
-                    
+
                     for node in ast.walk(tree):
                         if not isinstance(node, safe_nodes):
                             logger.warning(f"Unsafe node in condition '{condition}': {type(node).__name__}")
                             # Fail securely - return False instead of True
                             return False
-                    
+
                     # Create a restricted namespace with only the context variables
                     # and no builtins
                     namespace = {'__builtins__': {}}
                     namespace.update(context)
-                    
+
                     # Compile and evaluate the safe expression
                     code = compile(tree, '<condition>', 'eval')
                     return bool(eval(code, namespace, {}))
-                    
+
                 except (SyntaxError, ValueError, TypeError) as e:
                     logger.debug(f"Could not parse condition '{condition}': {e}")
                     # Fail securely - return False if we can't parse

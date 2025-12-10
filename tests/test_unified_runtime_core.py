@@ -116,7 +116,7 @@ class MockRuntime(MagicMock):
         elif args and isinstance(args[0], (RealRuntimeConfig, MagicMock)):
             # Assume the first positional arg is the config if it's the right type
             passed_config = args[0]
-        
+
         # --- Configs/Core Properties ---
         # FIX: Explicitly use passed config if provided, otherwise create default/fallback
         if passed_config is not None:

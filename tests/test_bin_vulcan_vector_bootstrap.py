@@ -19,7 +19,7 @@ VULCAN_BOOTSTRAP = os.path.join(BIN_DIR, 'vulcan-vector-bootstrap')
 def run_vulcan_bootstrap(args, **kwargs):
     """
     Helper function to run vulcan-vector-bootstrap with proper platform-specific handling.
-    
+
     On Windows, Python scripts can't be executed directly - they need to be
     run with the Python interpreter.
     """
@@ -27,10 +27,10 @@ def run_vulcan_bootstrap(args, **kwargs):
         command = [sys.executable, VULCAN_BOOTSTRAP] + args
     else:
         command = [VULCAN_BOOTSTRAP] + args
-    
+
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
-    
+
     return subprocess.run(command, **kwargs)
 
 
@@ -144,15 +144,15 @@ class TestVulcanVectorBootstrap:
         """Test JSON output"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'bootstrap.json')
-            
+
             result = run_vulcan_bootstrap(
                 ['--tier', 'hot', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
-            
+
             # Verify JSON structure
             with open(json_output, 'r') as f:
                 data = json.load(f)
@@ -163,7 +163,7 @@ class TestVulcanVectorBootstrap:
     def test_bootstrap_displays_summary(self):
         """Test that bootstrap displays summary"""
         result = run_vulcan_bootstrap(['--tier', 'hot'], timeout=30)
-        
+
         output = result.stdout + result.stderr
         assert 'Bootstrap' in output or 'Collection' in output or 'Summary' in output
 
@@ -186,13 +186,13 @@ class TestVulcanVectorBootstrap:
         """Test combining all options"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'result.json')
-            
+
             result = run_vulcan_bootstrap(
                 ['--tier', 'hot', '--dimension', '256', '--metric', 'COSINE',
                  '--index-type', 'HNSW', '--verbose', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
 

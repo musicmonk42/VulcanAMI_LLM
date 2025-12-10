@@ -26,7 +26,7 @@ def run_demo():
     print("\n" + "="*60)
     print("GovernedTrainer Demo")
     print("="*60)
-    
+
     # Initialize trainer with safety parameters
     trainer = GovernedTrainer(
         learning_rate=1e-3,
@@ -42,13 +42,13 @@ def run_demo():
         random_seed=42,
         divergence_threshold=100.0,
     )
-    
+
     print(f"\n✓ Initialized GovernedTrainer with:")
     print(f"  - Learning Rate: {trainer.learning_rate}")
     print(f"  - Safety Checks: Enabled")
     print(f"  - Gradient Accumulation: {trainer.gradient_accumulation_steps} steps")
     print(f"  - Divergence Threshold: {trainer.divergence_threshold}")
-    
+
     print("\nDemo completed successfully!")
     print("For actual training, use: src/training/train_learnable_bigram.py")
     print("="*60 + "\n")

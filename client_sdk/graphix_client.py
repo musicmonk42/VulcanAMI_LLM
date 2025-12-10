@@ -7,20 +7,20 @@ Provides robust, feature-complete access to the registry, executor, and audit AP
 
 Usage:
     from graphix_client import GraphixClient
-    
+
     client = GraphixClient(
         registry_endpoint="http://localhost:8787",
         executor_endpoint="http://localhost:8788",  # Optional separate endpoint
         agent_id="agent-grok",
         private_key_path="keys/agent-grok.pem"
     )
-    
+
     # Real-time event handling
     async def handle_event(event):
         print(f"Received event: {event}")
-    
+
     await client.connect_websocket(handle_event)
-    
+
     # Submit with automatic retry
     response = await client.submit_graph_proposal(proposal)
 
@@ -61,10 +61,10 @@ class RetryConfig:
 class GraphixClient:
     """
     Production-ready client for Graphix IR services.
-    Features: authentication, request signing, retry logic, WebSocket events, 
+    Features: authentication, request signing, retry logic, WebSocket events,
     graph validation, caching, and multi-endpoint support.
     """
-    
+
     def __init__(
         self,
         registry_endpoint: str = "http://localhost:8787",
@@ -148,13 +148,13 @@ class GraphixClient:
         """Checks if the current auth token is expired or non-existent."""
         # Add 5 minute safety buffer to refresh token before it expires
         safety_buffer = timedelta(minutes=5)
-        return (self.auth_token is None or 
-                self.token_expiry is None or 
+        return (self.auth_token is None or
+                self.token_expiry is None or
                 datetime.utcnow() >= (self.token_expiry - safety_buffer))
 
     async def _fetch_new_token(self):
         """Simulates fetching a new authentication token from an auth endpoint.
-        
+
         NOTE: This is a simulated implementation for development/testing.
         In production, replace with actual authentication service call.
         """
@@ -529,11 +529,11 @@ async def main():
         # Health check
         health = await client.health_check()
         print(f"🏥 Service health: {health}")
-        
+
         # Get cached system status
         status = await client.get_status()
         print(f"📊 System status: {status}")
-        
+
         # Create and validate a graph
         test_graph = {
             "grammar_version": "3.4.0",
@@ -549,33 +549,33 @@ async def main():
                 {"id": "e2", "from": "process", "to": "output", "type": "data"}
             ]
         }
-        
+
         # Submit with automatic validation and retry
         print("📤 Submitting proposal...")
         response = await client.submit_graph_proposal(test_graph)
         print(f"✅ Proposal response: {response}")
-        
+
         # Vote on the proposal
         if response.get("status") == "success":
             vote_response = await client.vote_on_proposal(
-                test_graph["id"], 
-                "approve", 
+                test_graph["id"],
+                "approve",
                 "Comprehensive test looks good"
             )
             print(f"🗳️ Vote response: {vote_response}")
-            
+
             # Execute the graph
             execution_result = await client.execute_graph(test_graph)
             print(f"🚀 Execution result: {execution_result}")
-        
+
         # Get audit log with pagination
         audit_log = await client.get_audit_log(limit=5)
         print(f"📜 Recent audit entries: {len(audit_log.get('entries', []))}")
-        
+
         # Real-time event handling
         async def handle_event(event):
             print(f"Received event: {event}")
-        
+
         print("👂 Listening for real-time events... (Ctrl+C to exit)")
         await client.connect_websocket(handle_event)
         try:

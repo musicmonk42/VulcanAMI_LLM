@@ -508,7 +508,7 @@ class DatabaseManager:
         columns = self._get_column_names(validated_table)
         id_column = columns['id_column']
         data_column = columns['data_column']
-        
+
         try:
             row = self._exec_query(
                 f"SELECT {data_column} FROM {validated_table} WHERE {id_column} = ?",
@@ -537,7 +537,7 @@ class DatabaseManager:
         columns = self._get_column_names(validated_table)
         id_column = columns['id_column']
         data_column = columns['data_column']
-        
+
         try:
             self._exec_query(
                 f"INSERT OR REPLACE INTO {validated_table} ({id_column}, {data_column}) VALUES (?, ?)",

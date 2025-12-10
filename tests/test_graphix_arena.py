@@ -57,59 +57,59 @@ def valid_graph():
 
 class TestPydanticModels:
     """Test Pydantic models."""
-    
+
     def test_graph_spec_valid(self, valid_graph_spec):
         """Test valid GraphSpec."""
         spec = GraphSpec(**valid_graph_spec)
-        
+
         assert spec.spec_id == "test_spec_123"
         assert spec.parameters == {"param1": "value1"}
-    
+
     def test_graph_spec_invalid_id(self):
         """Test GraphSpec with invalid ID."""
         with pytest.raises(ValidationError, match="alphanumeric"):
             GraphSpec(spec_id="invalid!@#", parameters={})
-    
+
     def test_graph_spec_too_long(self):
         """Test GraphSpec with too long ID."""
         long_id = "x" * (MAX_GRAPH_ID_LENGTH + 1)
-        
+
         with pytest.raises(ValidationError):
             GraphSpec(spec_id=long_id, parameters={})
-    
+
     def test_node_valid(self):
         """Test valid Node."""
         node = Node(id="node1", label="Test Node", properties={"key": "value"})
-        
+
         assert node.id == "node1"
         assert node.label == "Test Node"
-    
+
     def test_node_invalid_id(self):
         """Test Node with invalid ID."""
         with pytest.raises(ValidationError):
             Node(id="", label="Test")
-    
+
     def test_edge_valid(self):
         """Test valid Edge."""
         edge = Edge(source_id="n1", target_id="n2", weight=0.5)
-        
+
         assert edge.source_id == "n1"
         assert edge.target_id == "n2"
         assert edge.weight == 0.5
-    
+
     def test_edge_invalid_weight(self):
         """Test Edge with invalid weight."""
         with pytest.raises(ValidationError):
             Edge(source_id="n1", target_id="n2", weight="invalid")
-    
+
     def test_graphix_ir_graph_valid(self, valid_graph):
         """Test valid GraphixIRGraph."""
         graph = GraphixIRGraph(**valid_graph)
-        
+
         assert graph.graph_id == "test_graph_123"
         assert len(graph.nodes) == 2
         assert len(graph.edges) == 1
-    
+
     def test_graphix_ir_graph_invalid_id(self):
         """Test GraphixIRGraph with invalid ID."""
         invalid_graph = {
@@ -117,141 +117,141 @@ class TestPydanticModels:
             "nodes": [{"id": "n1", "label": "N1"}],
             "edges": []
         }
-        
+
         with pytest.raises(ValidationError):
             GraphixIRGraph(**invalid_graph)
-    
+
     def test_graphix_ir_graph_no_nodes(self):
         """Test GraphixIRGraph with no nodes."""
         with pytest.raises(ValidationError, match="at least one node"):
             GraphixIRGraph(graph_id="test", nodes=[], edges=[])
-    
+
     def test_graphix_ir_graph_too_many_nodes(self):
         """Test GraphixIRGraph with too many nodes."""
         many_nodes = [
             {"id": f"node{i}", "label": f"Node {i}"}
             for i in range(10001)
         ]
-        
+
         with pytest.raises(ValidationError, match="cannot have more than"):
             GraphixIRGraph(graph_id="test", nodes=many_nodes, edges=[])
 
 
 class TestRebertPrune:
     """Test ReBERT pruning function."""
-    
+
     def test_rebert_prune_basic(self):
         """Test basic ReBERT pruning."""
         import numpy as np
-        
+
         tensor = np.array([0.05, 0.15, 0.25, 0.01])
         threshold = 0.1
-        
+
         pruned = rebert_prune(tensor, threshold=threshold)
-        
+
         assert isinstance(pruned, list)
-    
+
     def test_rebert_prune_invalid_threshold_type(self):
         """Test pruning with invalid threshold type."""
         import numpy as np
-        
+
         tensor = np.array([0.1, 0.2, 0.3])
-        
+
         # Should use default threshold
         pruned = rebert_prune(tensor, threshold="invalid")
-        
+
         assert isinstance(pruned, list)
-    
+
     def test_rebert_prune_threshold_clamping(self):
         """Test threshold clamping."""
         import numpy as np
-        
+
         tensor = np.array([0.1, 0.2, 0.3])
-        
+
         # Threshold above max
         pruned = rebert_prune(tensor, threshold=1.0)
-        
+
         assert isinstance(pruned, list)
 
 
 class TestGraphixArena:
     """Test GraphixArena class."""
-    
+
     def test_initialization(self):
         """Test arena initialization."""
         arena = GraphixArena(port=8183)
-        
+
         assert arena.port == 8183
         assert len(arena.agents) > 0
         assert arena.runtime is not None
-    
+
     def test_invalid_port(self):
         """Test initialization with invalid port."""
         with pytest.raises(ValueError, match="Port must be"):
             GraphixArena(port=100)
-        
+
         with pytest.raises(ValueError, match="Port must be"):
             GraphixArena(port=70000)
-    
+
     def test_agent_configuration(self, arena):
         """Test agent configuration."""
         assert "generator" in arena.agents
         assert "evolver" in arena.agents
         assert "visualizer" in arena.agents
-    
+
     @pytest.mark.asyncio
     async def test_run_agent_invalid_id(self, arena):
         """Test running agent with invalid ID."""
         request = Mock()
         request.json = AsyncMock(return_value={})
-        
+
         with pytest.raises(Exception):  # HTTPException
             await arena.run_agent_task("invalid!@#", request)
-    
+
     @pytest.mark.asyncio
     async def test_run_agent_too_long_id(self, arena):
         """Test running agent with too long ID."""
         long_id = "x" * (MAX_AGENT_ID_LENGTH + 1)
-        
+
         request = Mock()
         request.json = AsyncMock(return_value={})
-        
+
         with pytest.raises(Exception):  # HTTPException
             await arena.run_agent_task(long_id, request)
-    
+
     @pytest.mark.asyncio
     async def test_run_agent_not_found(self, arena):
         """Test running non-existent agent."""
         request = Mock()
         request.json = AsyncMock(return_value={})
-        
+
         with pytest.raises(AgentNotFoundException):
             await arena.run_agent_task("nonexistent", request)
-    
+
     @pytest.mark.asyncio
     async def test_run_agent_payload_too_large(self, arena):
         """Test running agent with oversized payload."""
         large_payload = {"data": "x" * (MAX_PAYLOAD_SIZE + 1)}
-        
+
         request = Mock()
         request.json = AsyncMock(return_value=large_payload)
-        
+
         with pytest.raises(Exception):  # HTTPException 413
             await arena.run_agent_task("generator", request)
-    
+
     def test_run_transparent_task(self, arena):
         """Test transparent task execution."""
         payload = {
             "input_tensor": [[1.0, 2.0], [3.0, 4.0]]
         }
-        
+
         result = arena.run_transparent_task("test_agent", "test task", payload)
-        
+
         assert isinstance(result, dict)
         assert 'interpretability' in result
         assert 'audit' in result
         assert 'observability' in result
-    
+
     @pytest.mark.asyncio
     async def test_run_shadow_task(self, arena):
         """Test shadow task execution."""
@@ -259,22 +259,22 @@ class TestGraphixArena:
             "graph_id": "test_graph",
             "data": "test"
         }
-        
+
         result = await arena.run_shadow_task("test_agent", "test task", payload)
-        
+
         assert isinstance(result, dict)
         assert 'status' in result
-    
+
     @pytest.mark.asyncio
     async def test_rollback_failed_task(self, arena):
         """Test task rollback."""
         payload = {"graph_id": "test"}
-        
+
         result = await arena.rollback_failed_task(payload, reason="test failure")
-        
+
         assert result['status'] == 'rollback'
         assert result['reason'] == "test failure"
-    
+
     @pytest.mark.asyncio
     async def test_feedback_ingestion_valid(self, arena):
         """Test valid feedback ingestion."""
@@ -285,11 +285,11 @@ class TestGraphixArena:
             "score": 0.9,
             "rationale": "Good performance"
         })
-        
+
         result = await arena.feedback_ingestion(request)
-        
+
         assert result['status'] == 'ok'
-    
+
     @pytest.mark.asyncio
     async def test_feedback_ingestion_missing_fields(self, arena):
         """Test feedback ingestion with missing fields."""
@@ -298,10 +298,10 @@ class TestGraphixArena:
             "graph_id": "test_graph"
             # Missing agent_id and score
         })
-        
+
         with pytest.raises(Exception):  # HTTPException 422
             await arena.feedback_ingestion(request)
-    
+
     @pytest.mark.asyncio
     async def test_feedback_ingestion_invalid_score(self, arena):
         """Test feedback ingestion with invalid score."""
@@ -311,10 +311,10 @@ class TestGraphixArena:
             "agent_id": "test_agent",
             "score": "invalid"
         })
-        
+
         with pytest.raises(Exception):  # HTTPException 422
             await arena.feedback_ingestion(request)
-    
+
     @pytest.mark.asyncio
     async def test_feedback_ingestion_negative_score(self, arena):
         """Test feedback with negative score triggers rollback."""
@@ -324,39 +324,39 @@ class TestGraphixArena:
             "agent_id": "test_agent",
             "score": -0.5
         })
-        
+
         result = await arena.feedback_ingestion(request)
-        
+
         assert result['status'] == 'ok'
-    
+
     def test_feedback_log_bounded(self, arena):
         """Test feedback log is bounded."""
         # Add many feedback entries
         for i in range(MAX_FEEDBACK_LOG_SIZE + 100):
             arena.feedback_log.append({"id": i})
-        
+
         assert len(arena.feedback_log) <= MAX_FEEDBACK_LOG_SIZE
-    
+
     @pytest.mark.asyncio
     async def test_tournament_task_valid(self, arena):
         """Test valid tournament task."""
         import numpy as np
-        
+
         request = Mock()
         request.json = AsyncMock(return_value={
             "proposals": ["graph1", "graph2", "graph3"],
             "fitness": [0.8, 0.9, 0.7]
         })
-        
+
         # Mock tournament manager
         if arena.tournament_manager:
             arena.tournament_manager.run_adaptive_tournament = Mock(return_value=[1])
-        
+
         # If no tournament manager, should raise 503
         if not arena.tournament_manager:
             with pytest.raises(Exception):  # HTTPException 503
                 await arena.run_tournament_task(request)
-    
+
     @pytest.mark.asyncio
     async def test_tournament_task_empty_proposals(self, arena):
         """Test tournament with empty proposals."""
@@ -365,11 +365,11 @@ class TestGraphixArena:
             "proposals": [],
             "fitness": []
         })
-        
+
         if arena.tournament_manager:
             with pytest.raises(Exception):  # HTTPException 400
                 await arena.run_tournament_task(request)
-    
+
     @pytest.mark.asyncio
     async def test_tournament_task_length_mismatch(self, arena):
         """Test tournament with length mismatch."""
@@ -378,53 +378,53 @@ class TestGraphixArena:
             "proposals": ["g1", "g2"],
             "fitness": [0.5]  # Mismatch
         })
-        
+
         if arena.tournament_manager:
             with pytest.raises(Exception):  # HTTPException 400
                 await arena.run_tournament_task(request)
-    
+
     def test_send_slack_alert_not_configured(self, arena):
         """Test Slack alert when not configured."""
         # Should not raise
         arena.send_slack_alert("Test message")
-    
+
     def test_llm_client_init_exception_logging(self):
         """Test that LLM client initialization exceptions are logged with traceback."""
         import logging
 
         # Capture log records
         log_records = []
-        
+
         class LogCapture(logging.Handler):
             def emit(self, record):
                 log_records.append(record)
-        
+
         handler = LogCapture()
         handler.setLevel(logging.ERROR)
-        
+
         graphix_logger = logging.getLogger("GraphixArena")
         graphix_logger.addHandler(handler)
-        
+
         try:
             # Mock GraphixLLMClient to raise an exception with empty message
             with patch('graphix_arena.GraphixLLMClient') as mock_client:
                 mock_client.side_effect = RuntimeError('')
-                
+
                 # Create new arena - should catch exception and log it
                 arena = GraphixArena(port=8186)
-                
+
                 # LLM client should be None due to exception
                 assert arena.llm_client is None
-                
+
                 # Check that an error was logged
                 error_records = [r for r in log_records if r.levelno >= logging.ERROR]
                 assert len(error_records) >= 1, "Expected at least one error log record"
-                
+
                 # Check that the error message includes exception type
                 error_messages = [r.getMessage() for r in error_records]
                 assert any('RuntimeError' in msg for msg in error_messages), \
                     f"Expected RuntimeError in error messages, got: {error_messages}"
-                
+
                 # Check that exc_info was captured
                 assert any(r.exc_info is not None for r in error_records), \
                     "Expected exc_info to be captured in error log"
@@ -434,14 +434,14 @@ class TestGraphixArena:
 
 class TestExceptionHandlers:
     """Test custom exception handlers."""
-    
+
     def test_agent_not_found_exception(self):
         """Test AgentNotFoundException."""
         exc = AgentNotFoundException("test_agent")
-        
+
         assert exc.agent_id == "test_agent"
         assert "test_agent" in str(exc)
-    
+
     def test_bias_detected_exception(self):
         """Test BiasDetectedException."""
         exc = BiasDetectedException(
@@ -450,7 +450,7 @@ class TestExceptionHandlers:
             label="risky",
             message="Bias detected"
         )
-        
+
         assert exc.agent_id == "test_agent"
         assert exc.graph_id == "test_graph"
         assert exc.label == "risky"

@@ -24,7 +24,7 @@ def clear_bytecode_cache():
     """Clear all bytecode cache files"""
     print("Clearing bytecode cache...")
     cache_cleared = 0
-    
+
     # Clear __pycache__ directories
     for pycache_dir in repo_root.rglob("__pycache__"):
         try:
@@ -33,7 +33,7 @@ def clear_bytecode_cache():
             cache_cleared += 1
         except Exception as e:
             print(f"  Warning: Could not remove {pycache_dir}: {e}")
-    
+
     # Clear .pyc files
     for pyc_file in repo_root.rglob("*.pyc"):
         try:
@@ -41,7 +41,7 @@ def clear_bytecode_cache():
             cache_cleared += 1
         except Exception as e:
             print(f"  Warning: Could not remove {pyc_file}: {e}")
-    
+
     print(f"✓ Cleared {cache_cleared} cached files/directories\n")
 
 
@@ -49,7 +49,7 @@ def check_imports():
     """Check if required modules can be imported"""
     print("Checking imports...")
     issues = []
-    
+
     try:
         from vulcan.world_model import world_model_core
         print("  ✓ vulcan.world_model.world_model_core imported")
@@ -57,7 +57,7 @@ def check_imports():
         issues.append(f"Cannot import world_model_core: {e}")
         print(f"  ✗ Cannot import world_model_core: {e}")
         return issues
-    
+
     try:
         from vulcan.world_model.world_model_core import WorldModel
         print("  ✓ WorldModel class imported")
@@ -65,14 +65,14 @@ def check_imports():
         issues.append(f"Cannot import WorldModel: {e}")
         print(f"  ✗ Cannot import WorldModel: {e}")
         return issues
-    
+
     try:
         from vulcan.world_model.meta_reasoning import SelfImprovementDrive
         print("  ✓ SelfImprovementDrive imported")
     except ImportError as e:
         issues.append(f"Cannot import SelfImprovementDrive: {e}")
         print(f"  ✗ Cannot import SelfImprovementDrive: {e}")
-    
+
     print()
     return issues
 
@@ -81,10 +81,10 @@ def check_worldmodel_methods():
     """Check if WorldModel has required methods"""
     print("Checking WorldModel methods...")
     issues = []
-    
+
     try:
         from vulcan.world_model.world_model_core import WorldModel
-        
+
         required_methods = [
             '_handle_improvement_alert',
             '_check_improvement_approval',
@@ -94,7 +94,7 @@ def check_worldmodel_methods():
             'report_error',
             'update_performance_metric'
         ]
-        
+
         for method_name in required_methods:
             if hasattr(WorldModel, method_name):
                 method = getattr(WorldModel, method_name)
@@ -106,11 +106,11 @@ def check_worldmodel_methods():
             else:
                 issues.append(f"WorldModel missing method: {method_name}")
                 print(f"  ✗ {method_name} is MISSING")
-        
+
     except Exception as e:
         issues.append(f"Error checking methods: {e}")
         print(f"  ✗ Error: {e}")
-    
+
     print()
     return issues
 
@@ -118,18 +118,18 @@ def check_worldmodel_methods():
 def run_module_diagnostics():
     """Run the built-in module diagnostics"""
     print("Running module diagnostics...\n")
-    
+
     try:
         from vulcan.world_model.world_model_core import (
             print_diagnostics, print_self_healing_diagnostics)
-        
+
         print_diagnostics()
         print_self_healing_diagnostics()
-        
+
     except Exception as e:
         print(f"✗ Error running module diagnostics: {e}")
         return False
-    
+
     return True
 
 
@@ -139,10 +139,10 @@ def main():
     print("VULCAN-AGI Self-Healing System Diagnostic Tool")
     print("=" * 70)
     print()
-    
+
     # Step 1: Clear bytecode cache
     clear_bytecode_cache()
-    
+
     # Step 2: Check imports
     import_issues = check_imports()
     if import_issues:
@@ -155,13 +155,13 @@ def main():
         print("You may need to install dependencies:")
         print("  pip install -r requirements.txt")
         return 1
-    
+
     # Step 3: Check WorldModel methods
     method_issues = check_worldmodel_methods()
-    
+
     # Step 4: Run module diagnostics
     diagnostics_ok = run_module_diagnostics()
-    
+
     # Summary
     print("=" * 70)
     if not method_issues and diagnostics_ok:
@@ -176,15 +176,15 @@ def main():
     else:
         print("✗ ISSUES DETECTED")
         print("=" * 70)
-        
+
         if method_issues:
             print("\nMethod issues:")
             for issue in method_issues:
                 print(f"  - {issue}")
-        
+
         if not diagnostics_ok:
             print("\n  - Module diagnostics failed")
-        
+
         print("\nRecommended actions:")
         print("  1. Ensure you're on the latest code:")
         print("     git pull origin main")
@@ -195,7 +195,7 @@ def main():
         print("     - Merge conflicts")
         print("     - Modified files not committed")
         print("     - Import path issues")
-        
+
         return 1
 
 

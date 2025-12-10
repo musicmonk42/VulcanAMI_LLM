@@ -31,7 +31,7 @@ def test_llm_validators():
             HallucinationValidator(),
             PromptInjectionValidator()
         ]
-        
+
         print("✅ All LLM validators available")
         return True
     except ImportError as e:
@@ -91,40 +91,40 @@ def test_safety_validator():
     """Test that safety validator dependencies are available"""
     print("\nTesting Safety Validator Dependencies...")
     missing = []
-    
+
     try:
         import numpy
         print(f"✅ numpy {numpy.__version__}")
     except ImportError:
         print("❌ numpy not available")
         missing.append("numpy")
-    
+
     try:
         import torch
         print(f"✅ torch {torch.__version__}")
     except ImportError:
         print("⚠️  torch not available")
         missing.append("torch")
-    
+
     try:
         import scipy
         print(f"✅ scipy {scipy.__version__}")
     except ImportError:
         print("❌ scipy not available")
         missing.append("scipy")
-    
+
     try:
         import statsmodels
         print(f"✅ statsmodels {statsmodels.__version__}")
     except ImportError:
         print("❌ statsmodels not available")
         missing.append("statsmodels")
-    
+
     if missing:
         print(f"   Missing: {', '.join(missing)}")
         print("   Run: pip install -r requirements.txt")
         return False
-    
+
     # If all dependencies available, try importing safety validator
     try:
         from src.vulcan.safety.safety_validator import EnhancedSafetyValidator
@@ -138,10 +138,10 @@ if __name__ == "__main__":
     print("=" * 70)
     print("VULCAN AMI LLM - Warning Resolution Test")
     print("=" * 70)
-    
+
     # Add current directory to path
     sys.path.insert(0, '.')
-    
+
     results = {
         "LLM Validators": test_llm_validators(),
         "BM25": test_bm25(),
@@ -150,24 +150,24 @@ if __name__ == "__main__":
         "cachetools": test_cachetools(),
         "Safety Validator": test_safety_validator()
     }
-    
+
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
-    
+
     passed = sum(1 for v in results.values() if v)
     total = len(results)
-    
+
     for name, status in results.items():
         symbol = "✅" if status else "⚠️ "
         print(f"{symbol} {name}")
-    
+
     print(f"\nResult: {passed}/{total} tests passed")
-    
+
     if passed < total:
         print("\nTo resolve remaining warnings, run:")
         print("  pip install -r requirements.txt")
     else:
         print("\n🎉 All warnings resolved!")
-    
+
     sys.exit(0 if passed == total else 1)
