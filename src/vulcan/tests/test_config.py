@@ -624,7 +624,7 @@ class TestConfigurationManager:
                 errors.append(e)
 
         threads = [
-            threading.Thread(target=set_config_thread, args=(i,)) for i in range(5)
+            threading.Thread(target=set_config_thread, args=(i,)) for i in range(5):
         ]
 
         for thread in threads:

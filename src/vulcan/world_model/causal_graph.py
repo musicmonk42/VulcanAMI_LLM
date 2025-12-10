@@ -1230,7 +1230,7 @@ class CycleDetector:
         min_weight = float("inf")
 
         for cycle in cycles:
-            for i in range(len(cycle))
+            for i in range(len(cycle)):
                 j = (i + 1) % len(cycle)
                 edge_key = (cycle[i], cycle[j])
 

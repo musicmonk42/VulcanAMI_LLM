@@ -1829,8 +1829,8 @@ def main():
         num_candidates = 1000
         candidates = [
             f"Candidate {i} with some random text "
-            + " ".join(f"word{random.randint(0, 1000)}" for _ in range(10))
-            for i in range(num_candidates)
+            + " ".join(f"word{random.randint(0, 1000)}" for _ in range(10)):
+            for i in range(num_candidates):
         ]
 
         print(f"\nBenchmarking {num_candidates} candidates...")

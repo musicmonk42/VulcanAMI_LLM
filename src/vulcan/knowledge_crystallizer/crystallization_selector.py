@@ -623,7 +623,7 @@ class CrystallizationSelector:
         # Simple pattern detection based on action types/names
         patterns = set()
 
-        for i in range(len(actions))
+        for i in range(len(actions)):
             # Single action patterns
             action_type = (
                 str(actions[i].get("type", actions[i]))

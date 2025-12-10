@@ -297,7 +297,7 @@ class HierarchicalMemory:
             )
 
             # Extract retrieved texts
-            for idx in top_k_indices.squeeze(0).to[):
+            for idx in top_k_indices.squeeze(0).tolist():
                 context_items.append(self.episodic[idx][0])
 
         retrieved_context = {

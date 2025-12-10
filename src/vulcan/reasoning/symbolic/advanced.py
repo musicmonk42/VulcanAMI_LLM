@@ -181,7 +181,7 @@ class FuzzyLogicReasoner:
             # Fallback without numpy
             x_values = [
                 sample_range[0] + i * (sample_range[1] - sample_range[0]) / num_samples
-                for i in range(num_samples)
+                for i in range(num_samples):
             ]
             memberships = [membership_func(x) for x in x_values]
 

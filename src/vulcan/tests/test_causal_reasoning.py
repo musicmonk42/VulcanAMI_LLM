@@ -1146,7 +1146,7 @@ class TestPerformance:
 
         # Create large graph
         for i in range(100):
-            for j in range(i + 1, min(i + 5, 100))
+            for j in range(i + 1, min(i + 5, 100)):
                 engine.add_causal_relationship(f"var_{i}", f"var_{j}")
 
         elapsed = time.time() - start

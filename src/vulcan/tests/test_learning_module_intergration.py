@@ -445,7 +445,7 @@ class TestRLHF:
                 "states": [torch.randn(TEST_EMBEDDING_DIM).detach() for _ in range(5)],
                 "actions": [torch.randn(TEST_EMBEDDING_DIM).detach() for _ in range(5)],
                 "log_probs": [
-                    torch.tensor(np.random.random()).detach() for _ in range(5)
+                    torch.tensor(np.random.random()).detach() for _ in range(5):
                 ],
             }
         ]

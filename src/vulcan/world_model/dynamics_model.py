@@ -386,7 +386,7 @@ class RobustOptimizer:
                     simplex[-1] = x_c
                 else:
                     # Shrink
-                    for i in range(1, len(simplex))
+                    for i in range(1, len(simplex)):
                         simplex[i] = simplex[0] + sigma * (simplex[i] - simplex[0])
 
             if callback:
@@ -523,7 +523,7 @@ class RobustOptimizer:
         grad = np.zeros_like(x)
         f0 = fun(x)
 
-        for i in range(len(x))
+        for i in range(len(x)):
             x_plus = x.copy()
             x_plus[i] += eps
             grad[i] = (fun(x_plus) - f0) / eps
@@ -830,7 +830,7 @@ class SimpleKMeans:
     def _calculate_inertia(self, X, centers, labels):
         """Calculate inertia"""
         inertia = 0
-        for i in range(len(X))
+        for i in range(len(X)):
             inertia += np.sum((X[i] - centers[labels[i]]) ** 2)
         return inertia
 
@@ -1889,7 +1889,7 @@ class DynamicsModel:
                 graph["nodes"].append(
                     {
                         "id": f"cluster_{i}",
-                        "center": center.to[)
+                        "center": center.tolist()
                         if isinstance(center, np.ndarray)
                         else center,
                         "size": sum(1 for label in self.cluster_labels if label == i),

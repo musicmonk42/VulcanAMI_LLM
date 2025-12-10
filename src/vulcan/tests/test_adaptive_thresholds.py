@@ -171,7 +171,7 @@ class TestAutoCalibration:
         # Simulate low success rate (30%)
         performance = [
             {"success": i % 10 < 3, "execution_time": 10.0, "complexity": 2.0}
-            for i in range(50)
+            for i in range(50):
         ]
 
         adaptive_thresholds.auto_calibrate(performance)
@@ -186,7 +186,7 @@ class TestAutoCalibration:
         # Simulate high success rate (95%)
         performance = [
             {"success": i % 20 < 19, "execution_time": 10.0, "complexity": 2.0}
-            for i in range(50)
+            for i in range(50):
         ]
 
         adaptive_thresholds.auto_calibrate(performance)
@@ -201,7 +201,7 @@ class TestAutoCalibration:
         # Simulate execution times close to timeout
         performance = [
             {"success": True, "execution_time": 55.0, "complexity": 2.0}
-            for _ in range(50)
+            for _ in range(50):
         ]
 
         adaptive_thresholds.auto_calibrate(performance)
@@ -216,7 +216,7 @@ class TestAutoCalibration:
         # Simulate high complexity problems
         performance = [
             {"success": True, "execution_time": 10.0, "complexity": 5.0}
-            for _ in range(50)
+            for _ in range(50):
         ]
 
         adaptive_thresholds.auto_calibrate(performance)
@@ -239,7 +239,7 @@ class TestAutoCalibration:
 
         performance = [
             {"success": True, "execution_time": 10.0, "complexity": 2.0}
-            for _ in range(30)
+            for _ in range(30):
         ]
 
         adaptive_thresholds.auto_calibrate(performance)

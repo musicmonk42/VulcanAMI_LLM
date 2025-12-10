@@ -566,20 +566,20 @@ class SyntheticDataGenerator:
         n_samples = 100
         x = np.random.randn(n_samples)
         y = 0.7 * x + np.random.randn(n_samples) * noise_level
-        return {"x": x.to[), "y": y.to[), "true_coefficient": 0.7}
+        return {"x": x.tolist(), "y": y.tolist(), "true_coefficient": 0.7}
 
     def _generate_generic_data(self, noise_level: float) -> Dict[str, Any]:
         """Generate generic synthetic data"""
         data = {
-            "inputs": np.random.randn(100, 10).to[),
-            "outputs": np.random.randint(0, 2, 100).to[),
+            "inputs": np.random.randn(100, 10).tolist(),
+            "outputs": np.random.randint(0, 2, 100).tolist(),
         }
 
         # Add noise
         if noise_level > 0:
             inputs = np.array(data["inputs"])
             inputs += np.random.randn(*inputs.shape) * noise_level
-            data["inputs"] = inputs.to[)
+            data["inputs"] = inputs.tolist()
 
         return data
 
@@ -850,7 +850,7 @@ class ExperimentBuilder:
             return {
                 "type": "synthetic",
                 "variable": target_var,
-                "values": np.linspace(0, 1, 10).to[),
+                "values": np.linspace(0, 1, 10).tolist(),
                 "duration": 10,
                 "control_group": True,
                 "randomization": "stratified",
@@ -1432,7 +1432,7 @@ class IterativeExperimentDesigner:
                 experiments = []
                 current_params = self._get_initial_parameters(gap)
 
-                for iteration in range(min(max_iterations, self.max_iterations))
+                for iteration in range(min(max_iterations, self.max_iterations)):
                     # EXAMINE & SELECT: Apply learned adjustments
                     current_params = self._apply_learned_adjustments(
                         current_params, gap.type

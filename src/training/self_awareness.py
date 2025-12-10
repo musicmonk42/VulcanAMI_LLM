@@ -626,7 +626,7 @@ def _combine_learned_and_counts(
     # 4. Interpolate distributions
     final_probs = [
         backoff_lambda * learned_probs[i] + (1 - backoff_lambda) * count_probs[i]
-        for i in range(V)
+        for i in range(V):
     ]
     # Final normalization (may be slightly off due to numeric issues)
     final_probs = _normalize(final_probs, eps)

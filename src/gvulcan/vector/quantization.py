@@ -117,9 +117,9 @@ def rotational_8bit(
 
     # Metadata
     meta = {
-        "scale": scale.squeeze().to[) if scale.size < 1000 else scale.mean(),
+        "scale": scale.squeeze().tolist() if scale.size < 1000 else scale.mean(),
         "has_rotation": rotation_matrix is not None,
-        "rotation_matrix": rotation_matrix.to[)
+        "rotation_matrix": rotation_matrix.tolist()
         if rotation_matrix is not None and rotation_matrix.size < 10000
         else None,
         "compression_ratio": compression_ratio,
@@ -224,10 +224,10 @@ def int4_with_ecc(
 
     meta = {
         "ecc": "xor_parity",
-        "ecc_parity": ecc_parity.to[),
+        "ecc_parity": ecc_parity.tolist(),
         "ecc_bits": ecc_bits,
         "ecc_overhead": ecc_overhead,
-        "scale": max_val.squeeze().to[) if max_val.size < 1000 else max_val.mean(),
+        "scale": max_val.squeeze().tolist() if max_val.size < 1000 else max_val.mean(),
         "compression_ratio": compression_ratio,
         "quantization_range": [-8, 7],
         "method": "int4_with_ecc",
@@ -355,7 +355,7 @@ def product_quantization(
         "n_subspaces": n_subspaces,
         "subspace_dim": subspace_dim,
         "n_centroids": n_centroids,
-        "codebooks": [cb.to[) for cb in codebooks],
+        "codebooks": [cb.tolist() for cb in codebooks],
         "compression_ratio": compression_ratio,
         "method": "product_quantization",
     }
@@ -477,8 +477,8 @@ def adaptive_quantization(
     compression_ratio = vectors.nbytes / (codes.nbytes + vmin.nbytes + vmax.nbytes)
 
     meta = {
-        "vmin": vmin.to[) if vmin.size < 1000 else float(vmin.mean()),
-        "vmax": vmax.to[) if vmax.size < 1000 else float(vmax.mean()),
+        "vmin": vmin.tolist() if vmin.size < 1000 else float(vmin.mean()),
+        "vmax": vmax.tolist() if vmax.size < 1000 else float(vmax.mean()),
         "target_bits": target_bits,
         "per_channel": per_channel,
         "compression_ratio": compression_ratio,
@@ -574,8 +574,8 @@ def scalar_quantization(
     meta = {
         "method": "scalar_quantization",
         "bits": bits,
-        "vmin": vmin.squeeze().to[) if vmin.size < 1000 else float(vmin.mean()),
-        "vmax": vmax.squeeze().to[) if vmax.size < 1000 else float(vmax.mean()),
+        "vmin": vmin.squeeze().tolist() if vmin.size < 1000 else float(vmin.mean()),
+        "vmax": vmax.squeeze().tolist() if vmax.size < 1000 else float(vmax.mean()),
         "quantization_range": [int(qmin), int(qmax)],
         "compression_ratio": compression_ratio,
         "original_dim": d,

@@ -125,7 +125,7 @@ class MockStrategy:
     def decompose(self, problem: ProblemGraph) -> DecompositionPlan:
         steps = [
             DecompositionStep(step_id=f"step_{i}", action_type="process")
-            for i in range(len(problem.nodes))
+            for i in range(len(problem.nodes)):
         ]
         return DecompositionPlan(steps=steps, confidence=0.8, strategy=self)
 

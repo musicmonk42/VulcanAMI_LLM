@@ -254,11 +254,11 @@ class VersionedDataLogger:
         # Serialize data
         try:
             if isinstance(data, np.ndarray):
-                serialized = pickle.dumps(data.to[))
+                serialized = pickle.dumps(data.tolist())
             elif isinstance(data, torch.Tensor):
-                serialized = pickle.dumps(data.detach().cpu().numpy().to[))
+                serialized = pickle.dumps(data.detach().cpu().numpy().tolist())
             elif isinstance(data, PIL.Image.Image):
-                serialized = pickle.dumps(np.array(data).to[))
+                serialized = pickle.dumps(np.array(data).tolist())
             else:
                 serialized = pickle.dumps(data)
         except Exception:
@@ -524,7 +524,7 @@ class DynamicModelManager:
             try:
                 # Check GPU memory
                 if torch.cuda.is_available():
-                    for i in range(torch.cuda.device_count())
+                    for i in range(torch.cuda.device_count()):
                         mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3  # GB
                         # mem_total could be used for future memory tracking
                         # mem_total = torch.cuda.mem_get_info(i)[1] / 1024**3
@@ -624,7 +624,7 @@ class DynamicModelManager:
                         torch.cuda.empty_cache()  # Second pass
 
                         # Log memory status after cleanup
-                        for i in range(torch.cuda.device_count())
+                        for i in range(torch.cuda.device_count()):
                             mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3
                             logger.info(
                                 f"GPU {i} memory after cleanup: {mem_free:.2f}GB free"
@@ -1445,7 +1445,7 @@ class ModalityFusion(nn.Module):
                     nn.ReLU(),
                     nn.Linear(embed_dim, embed_dim),
                 )
-                for _ in range(self.num_experts)
+                for _ in range(self.num_experts):
             ]
         )
         self.gating_network = nn.Sequential(

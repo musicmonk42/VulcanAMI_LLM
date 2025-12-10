@@ -226,7 +226,7 @@ class LearnableBigramModel:
             "transformer_layers": {
                 "bigram": {
                     prev: {nxt: float(init_scale) for nxt in range(vocab_size)}
-                    for prev in range(vocab_size)
+                    for prev in range(vocab_size):
                 }
             }
         }
@@ -299,15 +299,15 @@ class LearnableTrigramModel:
         tri = {
             p2: {
                 p1: {nxt: float(init_scale) for nxt in range(vocab_size)}
-                for p1 in range(vocab_size)
+                for p1 in range(vocab_size):
             }
-            for p2 in range(vocab_size)
+            for p2 in range(vocab_size):
         }
         data = {"trigram": tri}
         if separate_bigram:
             data["bigram_backoff"] = {
                 p1: {nxt: float(init_scale) for nxt in range(vocab_size)}
-                for p1 in range(vocab_size)
+                for p1 in range(vocab_size):
             }
         self.params = {"transformer_layers": data}
 
@@ -796,7 +796,7 @@ def combine_learned_and_counts(
     # 4. Interpolate
     final_probs = [
         backoff_lambda * learned_probs[i] + (1 - backoff_lambda) * count_probs[i]
-        for i in range(V)
+        for i in range(V):
     ]
     sum_f = sum(final_probs) or 1.0
     final_probs = [p / sum_f for p in final_probs]
@@ -903,7 +903,7 @@ def generate_tokens(
                     accum = [x / rows for x in accum]
                 logits = [
                     interp_lambda * tri_logits[i] + (1 - interp_lambda) * accum[i]
-                    for i in range(V)
+                    for i in range(V):
                 ]
 
         logits = _apply_repetition_penalty(logits, out, rep_penalty)
@@ -1272,7 +1272,7 @@ def run_training(args: argparse.Namespace) -> None:
         if counts is not None:
             seq = batch["sequence"]
             order = getattr(model, "order", 2)
-            for j in range(len(seq))
+            for j in range(len(seq)):
                 tok = seq[j]
                 counts.unigram[tok] += 1
                 counts.total += 1

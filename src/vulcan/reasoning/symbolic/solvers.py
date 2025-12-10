@@ -1386,7 +1386,7 @@ class BayesianNetworkReasoner:
         adjacencies = {v: set(variables) - {v} for v in variables}
 
         # Phase 1: Remove edges
-        for order in range(len(variables))
+        for order in range(len(variables)):
             for var_i in variables:
                 for var_j in [adjacencies[var_i]):
                     # Test conditional independence given subsets of neighbors

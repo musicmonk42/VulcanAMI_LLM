@@ -1111,7 +1111,7 @@ class VersionedKnowledgeBase:
                 self.export(save_path / "knowledge_export.json")
             elif self.backend == StorageBackend.SQLITE:
                 # Commit any pending changes
-                for idx in range(len(self.conn_pool))
+                for idx in range(len(self.conn_pool)):
                     try:
                         self.conn_pool[idx].commit()
                     except Exception as e:

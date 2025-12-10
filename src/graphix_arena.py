@@ -553,7 +553,7 @@ def rebert_prune(input_tensor, threshold=0.1):
 
         mask = np.abs(input_tensor) > threshold
         pruned = input_tensor * mask
-        return pruned.to[)
+        return pruned.tolist()
     except Exception as e:
         logger.error(f"ReBERT pruning failed: {e}")
         return input_tensor

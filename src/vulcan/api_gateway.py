@@ -2000,7 +2000,7 @@ class APIGateway:
             result = processor.process_input(data.get("input"))
 
             return {
-                "embedding": result.embedding.to[)
+                "embedding": result.embedding.tolist()
                 if hasattr(result.embedding, "tolist")
                 else list(result.embedding),
                 "modality": result.modality.value

@@ -254,7 +254,7 @@ class InterpretabilityEngine:
                     self.background_data,
                     mode="regression",
                     feature_names=[
-                        f"feature_{i}" for i in range(self.background_data.shape[1]
+                        f"feature_{i}" for i in range(self.background_data.shape[1)]
                     ],
                 )
                 logger.info("LIME explainer initialized")
@@ -413,7 +413,7 @@ class InterpretabilityEngine:
                 flat_gradients = gradients.flatten()
                 flat_tensor = tensor.flatten()
 
-                for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE))
+                for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE)):
                     # Perturb element
                     perturbed_flat = flat_tensor.copy()
                     perturbed_flat[i] += epsilon
@@ -570,7 +570,7 @@ class InterpretabilityEngine:
         flat_gradients = gradients.flatten()
         flat_tensor = tensor.flatten()
 
-        for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE))
+        for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE)):
             # Perturb
             perturbed_flat = flat_tensor.copy()
             perturbed_flat[i] += epsilon
@@ -1469,7 +1469,7 @@ class AdversarialTester:
         # Initialize population
         population = [
             base_tensor + np.random.randn(*base_tensor.shape).astype(np.float32) * 0.1
-            for _ in range(population_size)
+            for _ in range(population_size):
         ]
 
         best_adv = base_tensor.copy()

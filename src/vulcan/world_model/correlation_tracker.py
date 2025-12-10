@@ -862,7 +862,7 @@ class SimpleDataFrame:
         self.columns = (
             columns
             if columns is not None
-            else [range(self.data.shape[1] if self.data.ndim > 1 else 1]
+            else [range(self.data.shape[1] if self.data.ndim > 1 else 1)]
         )
 
     def __repr__(self):

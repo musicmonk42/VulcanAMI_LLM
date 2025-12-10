@@ -1054,7 +1054,7 @@ class TestPerformance:
         # Create many correlations
         correlations = [
             Correlation(f"var_{i}", f"var_{i + 1}", np.random.uniform(0.3, 0.9))
-            for i in range(100)
+            for i in range(100):
         ]
 
         prioritizer = InterventionPrioritizer()

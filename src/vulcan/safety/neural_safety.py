@@ -773,7 +773,7 @@ class NeuralSafetyValidator:
             config = self.model_configs[ModelType.CLASSIFIER]
             models[ModelType.CLASSIFIER] = {
                 f"model_{i}": SafetyClassifier(config)
-                for i in range(self.ensemble_size)
+                for i in range(self.ensemble_size):
             }
 
         # Anomaly detector

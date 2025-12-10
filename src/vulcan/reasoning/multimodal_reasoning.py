@@ -1058,8 +1058,8 @@ class MultiModalReasoningEngine:
 
                     # Create comprehensive conclusion
                     conclusion = {
-                        "reasoning_vector": reasoning_result.to[),
-                        "fusion_weights": fusion_weights.cpu().numpy().to[),
+                        "reasoning_vector": reasoning_result.tolist(),
+                        "fusion_weights": fusion_weights.cpu().numpy().tolist(),
                         "modalities": [m.value for m in inputs.keys()],
                         "neural_confidence": confidence_score,
                         "query_type": query.get("type", "unknown"),
@@ -1072,7 +1072,7 @@ class MultiModalReasoningEngine:
                     conclusion, confidence = self._neural_reasoning(
                         fused_features, query
                     )
-                    conclusion["fusion_weights"] = fusion_weights.cpu().numpy().to[)
+                    conclusion["fusion_weights"] = fusion_weights.cpu().numpy().tolist()
             else:
                 # ENHANCED: Advanced numpy-based gated fusion when PyTorch unavailable
                 logger.info("Using advanced numpy-based gated fusion")
@@ -1175,8 +1175,8 @@ class MultiModalReasoningEngine:
 
             # Create conclusion
             conclusion = {
-                "reasoning_vector": reasoning_output.to[),
-                "fusion_gates": normalized_gates.to[),
+                "reasoning_vector": reasoning_output.tolist(),
+                "fusion_gates": normalized_gates.tolist(),
                 "modalities": [m.value for m in modalities],
                 "gate_confidence": float(gate_confidence),
                 "feature_quality": float(feature_quality),
@@ -1376,7 +1376,7 @@ class MultiModalReasoningEngine:
                 result["predicted_class"] = int(np.argmax(scores))
                 result["class_probabilities"] = (
                     scores / (np.sum(scores) + 1e-10)
-                ).to[)
+                ).tolist()
 
             elif query_type == "similarity":
                 # Compute similarity metrics
@@ -1387,7 +1387,7 @@ class MultiModalReasoningEngine:
 
             elif query_type == "generation":
                 # Simulate generative output
-                result["generated_features"] = (features * 1.2).to[)[
+                result["generated_features"] = (features * 1.2).tolist()[
                     :20
                 ]  # Limit size
                 result["generation_quality"] = float(np.std(features))
@@ -1485,7 +1485,7 @@ class MultiModalReasoningEngine:
                     probs = exp_output / np.sum(exp_output)
                     conclusion = {
                         "type": "neural_classification",
-                        "probabilities": probs.flatten().to[)[:10],
+                        "probabilities": probs.flatten().tolist()[:10],
                         "predicted_class": int(np.argmax(probs)),
                         "analysis": output_analysis,
                     }
@@ -1504,7 +1504,7 @@ class MultiModalReasoningEngine:
                     # General neural reasoning
                     conclusion = {
                         "type": "neural_advanced",
-                        "reasoning_vector": reasoning_vector.flatten().to[)[:50],
+                        "reasoning_vector": reasoning_vector.flatten().tolist()[:50],
                         "analysis": output_analysis,
                         "query_type": query_type,
                         "neural_layers": "multi_layer_deep_network",

@@ -691,7 +691,7 @@ class GraphixExecutor:
 
         # Simple lookup: average embeddings for all tokens
         embeddings = []
-        for token_idx in range(len(tokens))
+        for token_idx in range(len(tokens)):
             # Get token ID (convert if needed)
             token_id = (
                 int(tokens[token_idx])
@@ -716,7 +716,7 @@ class GraphixExecutor:
             num_tokens = len(embeddings) // self.hidden_size
             averaged = [
                 sum(embeddings[i :: self.hidden_size]) / num_tokens
-                for i in range(self.hidden_size)
+                for i in range(self.hidden_size):
             ]
             return averaged
 

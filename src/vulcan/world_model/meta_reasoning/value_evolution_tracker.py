@@ -199,7 +199,7 @@ except ImportError:
                 if size > 0:
                     return [
                         [1.0 if i == j else 0.0 for j in range(size)]
-                        for i in range(size)
+                        for i in range(size):
                     ]
                 return [[0.0]]  # Fallback for invalid input
 
@@ -464,7 +464,7 @@ class ValueEvolutionAnalysis:
                     return str(data)
             elif NUMPY_AVAILABLE and isinstance(data, (_np.ndarray, _np.generic)):
                 if isinstance(data, _np.ndarray):
-                    return data.to[)
+                    return data.tolist()
                 elif isinstance(data, _np.generic):
                     return data.item()  # Convert numpy scalars
             elif isinstance(data, float) and (math.isnan(data) or math.isinf(data)):
@@ -1663,7 +1663,7 @@ class ValueEvolutionTracker:
                 # Simple EWMA formula applied iteratively
                 ewma = recent_values[0]  # Start with first value
                 alpha = self.ewma_alpha  # Smoothing factor
-                for i in range(1, len(recent_values))
+                for i in range(1, len(recent_values)):
                     ewma = alpha * recent_values[i] + (1 - alpha) * ewma
                 new_baseline_values[vname] = float(ewma)  # Ensure float
             elif trajectory.values:  # Fallback to simple mean if not enough for EWMA

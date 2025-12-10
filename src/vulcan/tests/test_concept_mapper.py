@@ -213,7 +213,7 @@ class TestGroundedEffects:
                 measurements={"accuracy": 0.93 + i * 0.01, "latency": 0.05 + i * 0.001},
                 domain="general",
             )
-            for i in range(5)
+            for i in range(5):
         ]
 
         effects = mapper.extract_measurable_effects(outcomes)
@@ -263,7 +263,7 @@ class TestGroundedEffects:
                 },
                 domain="general",
             )
-            for i in range(5)
+            for i in range(5):
         ]
 
         effects = mapper.extract_measurable_effects(outcomes)
@@ -306,7 +306,7 @@ class TestGroundedEffects:
                 measurements={"accuracy": 0.94},
                 domain="general",
             )
-            for i in range(6)
+            for i in range(6):
         ]
 
         is_consistent = mapper.validate_effect_consistency(pattern, effects)
@@ -493,7 +493,7 @@ class TestEvidenceTracking:
                 measurements={"accuracy": 0.95},
                 domain="general",
             )
-            for i in range(25)
+            for i in range(25):
         ]
 
         concept.update_evidence(outcomes)
@@ -657,7 +657,7 @@ class TestProcessPatternOutcomes:
                 measurements={"accuracy": 0.9},
                 domain="general",
             )
-            for i in range(6)
+            for i in range(6):
         ]
 
         concept = mapper.process_pattern_outcomes(pattern, outcomes)
@@ -683,7 +683,7 @@ class TestProcessPatternOutcomes:
                 measurements={"accuracy": 0.9},
                 domain="general",
             )
-            for i in range(6)
+            for i in range(6):
         ]
 
         concept1 = mapper.process_pattern_outcomes(pattern, outcomes1)
@@ -698,7 +698,7 @@ class TestProcessPatternOutcomes:
                 measurements={"accuracy": 0.95},
                 domain="general",
             )
-            for i in range(4)
+            for i in range(4):
         ]
 
         concept2 = mapper.process_pattern_outcomes(pattern, outcomes2)

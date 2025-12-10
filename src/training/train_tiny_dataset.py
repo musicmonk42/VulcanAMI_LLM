@@ -181,7 +181,7 @@ class TinyTextDataset:
             bigram_logp.append(
                 [
                     math.log((row[next_id] + alpha) / row_sum)
-                    for next_id in range(self.vocab_size)
+                    for next_id in range(self.vocab_size):
                 ]
             )
         return bigram_logp
@@ -194,7 +194,7 @@ class TinyTextDataset:
         return [
             math.sin((token_id + 1) * (i + 1) * 0.13) * 0.5
             + math.cos((token_id + 2) * (i + 3) * 0.07) * 0.5
-            for i in range(d)
+            for i in range(d):
         ]
 
     def _sequence_to_batch(self, seq: List[int]) -> Dict[str, Any]:

@@ -294,12 +294,12 @@ class AdvancedRewardModel:
 
             # Polynomial features (degree 2)
             if len(features) <= 20:  # Only for reasonable dimensions
-                for i in range(len(features))
+                for i in range(len(features)):
                     engineered.append(features[i] ** 2)
 
                 # Interaction terms (first few features)
-                for i in range(min(5, len(features))
-                    for j in range(i + 1, min(5, len(features))
+                for i in range(min(5, len(features)):
+                    for j in range(i + 1, min(5, len(features)):
                         engineered.append(features[i] * features[j])
 
             return np.array(engineered)
@@ -412,7 +412,7 @@ class PropensityScoreModel:
 
             self.models = {
                 action_id: LogisticRegression(max_iter=1000, random_state=42)
-                for action_id in range(n_actions)
+                for action_id in range(n_actions):
             }
         else:
             self.models = None
@@ -1342,7 +1342,7 @@ class AdaptiveBanditOrchestrator:
                                 "q_values": dict(bandit.q_values)
                                 if hasattr(bandit, "q_values")
                                 else {},
-                                "action_counts": bandit.action_counts.to[)
+                                "action_counts": bandit.action_counts.tolist()
                                 if hasattr(bandit, "action_counts")
                                 else [],
                                 "stats": dict(bandit.stats)

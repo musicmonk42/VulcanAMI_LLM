@@ -271,7 +271,7 @@ def train_self_awareness_transformer(config: Dict[str, Any]) -> Dict[str, Any]:
                     B, T, V = probs.size()
                     for b in range(B):
                         for t in range(T):
-                            pvec = probs[b, t, :].detach().cpu().to[)
+                            pvec = probs[b, t, :].detach().cpu().tolist()
                             entropy_inputs.append(pvec)
                             tgt = targets[b, t].item()
                             val_targets.append(tgt)

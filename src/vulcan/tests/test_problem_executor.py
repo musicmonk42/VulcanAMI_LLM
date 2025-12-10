@@ -530,7 +530,7 @@ def test_execute_parallel_all_success(basic_executor, simple_problem_graph):
             confidence=0.8,
             execution_logic=lambda inputs: {"success": True, "result": i},
         )
-        for i in range(3)
+        for i in range(3):
     ]
 
     outcome = basic_executor._execute_parallel(principles, simple_problem_graph)

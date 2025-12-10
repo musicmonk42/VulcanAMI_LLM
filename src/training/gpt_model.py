@@ -262,7 +262,7 @@ class GPTModel(nn.Module):
                     dropout=config.dropout,
                     ln_eps=config.layer_norm_eps,
                 )
-                for _ in range(config.n_layers)
+                for _ in range(config.n_layers):
             ]
         )
         self.ln_f = nn.LayerNorm(config.dim, eps=config.layer_norm_eps)

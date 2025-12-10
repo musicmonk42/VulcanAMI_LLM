@@ -798,7 +798,7 @@ class TestEdgeCases:
         results = db_manager.query_records("graph_proposals", where_clause="id LIKE ?", params=(f"{prefix}_%",))
         assert len(results) == num_threads
         saved_nums = {r.get('num') for r in results if isinstance(r, dict)}
-        assert saved_nums == set(range(num_threads)
+        assert saved_nums == set(range(num_threads))
 
 
     def test_malformed_json_in_proposal(self, registry_servicer, agent_registry):

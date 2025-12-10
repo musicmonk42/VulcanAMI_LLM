@@ -492,7 +492,7 @@ def generate_secure_password(length: int = 16) -> str:
         raise ValueError("Password length must be at least 12 characters")
 
     alphabet = string.ascii_letters + string.digits + string.punctuation
-    password = "".join(secrets.choice(alphabet) for _ in range(length)
+    password = "".join(secrets.choice(alphabet) for _ in range(length):
 
     # Ensure password has at least one of each character type
     if not any(c.islower() for c in password):

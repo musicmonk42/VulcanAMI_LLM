@@ -696,7 +696,7 @@ class SafeExperimentExecutor:
                 result["success"] = np.random.random() > 0.5
                 result["data"] = {
                     "discoveries": [
-                        f"latent_pattern_{i}" for i in range(np.random.randint(0, 3))
+                        f"latent_pattern_{i}" for i in range(np.random.randint(0, 3)):
                     ],
                     "confidence": np.random.random(),
                 }
@@ -718,7 +718,7 @@ class SafeExperimentExecutor:
         try:
             # Simple exploration simulation
             num_trials = experiment.parameters.get("num_trials", 20)
-            successes = sum(1 for _ in range(num_trials) if np.random.random() > 0.6)
+            successes = sum(1 for _ in range(num_trials) if np.random.random() > 0.6):
 
             result["success"] = successes > num_trials * 0.3
             result["data"] = {

@@ -831,7 +831,7 @@ class TestAIRuntime:
                 model="mock",
                 payload={"text": f"test{i}"}
             )
-            for i in range(3)
+            for i in range(3):
         ]
 
         results = await runtime.batch_execute(tasks)

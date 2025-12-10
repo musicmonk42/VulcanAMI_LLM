@@ -156,7 +156,7 @@ class GraphOptimizer:
         # Remove original nodes
         nodes_to_remove = []
         current = start_node
-        for _ in range(len(pattern))
+        for _ in range(len(pattern)):
             nodes_to_remove.append(current)
             successors = list(graph.successors(current))
             current = successors[0] if successors else None

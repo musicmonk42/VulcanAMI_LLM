@@ -555,7 +555,7 @@ class TournamentManager:
                     }
                 )
 
-            return winner_indices.to[)
+            return winner_indices.tolist()
 
         except ValidationError as e:
             logger.error(f"[{trace}] Validation error: {e}")
@@ -596,7 +596,7 @@ if __name__ == "__main__":
         return base + np.random.normal(0, 0.1, 16)
 
     proposals = [{"id": i, "cluster": i % 3} for i in range(30)]  # 3 distinct clusters
-    fitness = np.random.uniform(0.5, 1, size=30).to[)
+    fitness = np.random.uniform(0.5, 1, size=30).tolist()
 
     # Initialize with configurable parameters
     tm = TournamentManager(

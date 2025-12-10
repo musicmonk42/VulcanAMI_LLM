@@ -763,7 +763,7 @@ class KnowledgeCrystallizer:
                 exploratory_principles,
                 size=min(num_exploratory, len(exploratory_principles)),
                 replace=False,
-            ).to[)
+            ).tolist()
             valid_principles.extend(selected_exploratory)
 
         # Calculate confidence

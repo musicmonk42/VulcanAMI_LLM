@@ -303,7 +303,7 @@ class ProposalValidation:
                         return str(data)  # Represent NaN/inf as strings
                     return data
                 elif isinstance(data, np.ndarray):
-                    return data.to[)
+                    return data.tolist()
                 elif isinstance(data, np.generic):
                     return data.item()
                 else:

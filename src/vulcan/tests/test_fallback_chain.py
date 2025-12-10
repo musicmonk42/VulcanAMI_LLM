@@ -266,7 +266,7 @@ class TestExecutionPlan:
                 component_type=ComponentType.ATOMIC,
                 description=f"Component {i}",
             )
-            for i in range(3)
+            for i in range(3):
         ]
 
         plan.add_components(components)

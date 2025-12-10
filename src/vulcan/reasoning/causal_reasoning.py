@@ -464,7 +464,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                 data = pd.DataFrame(data, columns=variable_names)
             else:
                 data = pd.DataFrame(data)
-                variable_names = [f"var_{i}" for i in range(data.shape[1])]
+                variable_names = [f"var_{i}" for i in range(data.shape[1)])]
         elif PANDAS_AVAILABLE:
             variable_names = variable_names or list(data.columns)
         else:
@@ -475,7 +475,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
         if variable_names and PANDAS_AVAILABLE:
             for var in variable_names:
                 if var in data.columns:
-                    self.data_store[var].extend(data[var].to[))
+                    self.data_store[var].extend(data[var].tolist())
 
         # Run discovery algorithm
         try:
@@ -524,7 +524,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                     continue
 
                 # Test conditional independence
-                for k in range(min(5, n_vars):  # Limit conditioning set size)
+                for k in range(min(5, n_vars):  # Limit conditioning set size):
                     if self._test_conditional_independence(
                         data,
                         variable_names[i],

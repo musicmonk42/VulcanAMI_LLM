@@ -573,7 +573,7 @@ class TestUnifiedReasoner:
                 input_data=f"test{i}",
                 query={},
             )
-            for i in range(3)
+            for i in range(3):
         ]
 
         plan = ReasoningPlan(
@@ -1072,7 +1072,7 @@ class TestUnifiedReasoner:
                 input_data="test",
                 query={},
             )
-            for i in range(3)
+            for i in range(3):
         ]
 
         estimated_time = reasoner._estimate_plan_time(tasks)
@@ -1090,7 +1090,7 @@ class TestUnifiedReasoner:
                 input_data="test",
                 query={},
             )
-            for i in range(3)
+            for i in range(3):
         ]
 
         estimated_cost = reasoner._estimate_plan_cost(tasks)

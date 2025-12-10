@@ -189,7 +189,7 @@ class TestGovernanceLoop:
     def test_add_policy_limit(self, governance):
         """Test policy limit."""
         # Fill up to limit
-        for i in range(MAX_POLICIES - len(governance.policies))
+        for i in range(MAX_POLICIES - len(governance.policies)):
             policy = Policy(
                 id=f"policy_{i}",
                 name=f"Policy {i}",

@@ -155,7 +155,7 @@ class RobustIsotonicRegression:
         # Create step function representation
         # Find points where y changes
         unique_indices = [0]
-        for i in range(1, len(y_isotonic))
+        for i in range(1, len(y_isotonic)):
             if y_isotonic[i] != y_isotonic[i - 1]:
                 unique_indices.append(i)
         unique_indices.append(len(y_isotonic) - 1)

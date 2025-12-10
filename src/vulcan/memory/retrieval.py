@@ -714,7 +714,7 @@ class TemporalIndex:
 
             # Get memories in range
             results = []
-            for i in range(start_idx, min(end_idx, len(self.time_index))
+            for i in range(start_idx, min(end_idx, len(self.time_index)):
                 _, memory_id = self.time_index[i]
                 if memory_id in self.memory_map:
                     results.append(self.memory_map[memory_id])

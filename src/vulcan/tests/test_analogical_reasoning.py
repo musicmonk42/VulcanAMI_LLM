@@ -686,12 +686,12 @@ class TestPerformance:
                 attributes={"id": i, "type": "obj"},
                 entity_type="obj",
             )
-            for i in range(100)
+            for i in range(100):
         ]
 
         relations = [
             Relation(predicate="relates", arguments=[f"Entity_{i}", f"Entity_{i + 1}"])
-            for i in range(99)
+            for i in range(99):
         ]
 
         large_domain = {

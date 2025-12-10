@@ -629,8 +629,8 @@ class DistributionMonitor:
             # Add current distribution statistics
             if self.current_window.mean is not None:
                 stats["current_distribution"] = {
-                    "mean": self.current_window.mean.to[),
-                    "std": self.current_window.std.to[),
+                    "mean": self.current_window.mean.tolist(),
+                    "std": self.current_window.std.tolist(),
                 }
 
             # Add performance statistics

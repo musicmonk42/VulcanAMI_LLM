@@ -2268,7 +2268,7 @@ class PerformanceBenchmark:
             if len(throughputs) > 1:
                 scalability_factor = throughputs[-1] / throughputs[0]
                 ideal_factor = int(
-                    list(self.results["scalability"].keys())[-1].split("_")[1]
+                    list(self.resultslist("scalability"].keys())[-1].split("_")[1]
                 )
                 analysis["scalability_efficiency"] = scalability_factor / ideal_factor
 

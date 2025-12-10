@@ -95,7 +95,7 @@ class Pattern:
             serializable_components = []
             for c in self.components:
                 if isinstance(c, np.ndarray):
-                    serializable_components.append(("array", c.to[)))
+                    serializable_components.append(("array", c.tolist()))
                 elif hasattr(c, "to_dict"):
                     try:
                         serializable_components.append(("dict", c.to_dict()))
@@ -436,7 +436,7 @@ class PrincipleCandidate:
                 # Check for regular occurrence
                 intervals = [
                     timestamps[i + 1] - timestamps[i]
-                    for i in range(len(timestamps) - 1)
+                    for i in range(len(timestamps) - 1):
                 ]
                 if intervals:
                     mean_interval = np.mean(intervals)
@@ -1340,7 +1340,7 @@ class PrincipleExtractor:
             # Count transitions
             transitions = sum(
                 1
-                for i in range(1, len(success_sequence))
+                for i in range(1, len(success_sequence)):
                 if success_sequence[i] != success_sequence[i - 1]
             )
 
@@ -1467,7 +1467,7 @@ class PatternDetector:
                 return patterns
 
             # Look for action sequences
-            for window_size in range()
+            for window_size in range():
                 self.min_pattern_length,
                 min(self.max_pattern_length, len(trace.actions) + 1),
             ):
@@ -1555,7 +1555,7 @@ class PatternDetector:
             ]
 
             # Find repetitions
-            for length in range()
+            for length in range():
                 self.min_pattern_length,
                 min(self.max_pattern_length, len(action_types) // 2 + 1),
             ):
@@ -1713,7 +1713,7 @@ class PatternDetector:
             branches = []
 
             # Simple heuristic: next few actions after condition
-            for i in range(condition_idx + 1, min(condition_idx + 4, len(actions))
+            for i in range(condition_idx + 1, min(condition_idx + 4, len(actions)):
                 if i < len(actions):
                     action = actions[i]
                     branch = (

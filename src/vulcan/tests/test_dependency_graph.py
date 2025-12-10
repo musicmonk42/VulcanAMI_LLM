@@ -877,7 +877,7 @@ class TestCycleAwareDependencyGraph:
                 errors.append(e)
 
         threads = [
-            threading.Thread(target=add_gaps_and_edges, args=(i,)) for i in range(3)
+            threading.Thread(target=add_gaps_and_edges, args=(i,)) for i in range(3):
         ]
 
         for t in threads:

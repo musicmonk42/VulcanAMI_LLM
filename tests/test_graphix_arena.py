@@ -130,7 +130,7 @@ class TestPydanticModels:
         """Test GraphixIRGraph with too many nodes."""
         many_nodes = [
             {"id": f"node{i}", "label": f"Node {i}"}
-            for i in range(10001)
+            for i in range(10001):
         ]
 
         with pytest.raises(ValidationError, match="cannot have more than"):

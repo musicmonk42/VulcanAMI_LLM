@@ -316,7 +316,7 @@ class MetaCognitiveMonitor:
                 consistency_score *= 1 - confidence_std
 
         # Check phase transitions
-        for i in range(1, len(trace))
+        for i in range(1, len(trace)):
             curr_phase = trace[i].phase
             prev_phase = trace[i - 1].phase
 
@@ -399,7 +399,7 @@ class MetaCognitiveMonitor:
         coherence_score = 1.0
 
         # Check causal consistency
-        for i in range(1, len(trace))
+        for i in range(1, len(trace)):
             curr = trace[i]
             prev = trace[i - 1]
 
@@ -1197,9 +1197,9 @@ class CompositionalUnderstanding:
 
         # Try triple compositions if pairwise isn't good enough
         if best_error > 0.1 and len(known_primitives) >= 3:
-            for i in range(len(known_primitives))
-                for j in range(i + 1, len(known_primitives))
-                    for k in range(j + 1, len(known_primitives))
+            for i in range(len(known_primitives)):
+                for j in range(i + 1, len(known_primitives)):
+                    for k in range(j + 1, len(known_primitives)):
                         comp_ij = self.compose_concepts_neural(
                             known_primitives[i], known_primitives[j]
                         )

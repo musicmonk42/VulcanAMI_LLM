@@ -348,7 +348,7 @@ class TestSemanticDecomposition:
         class MockGraph:
             def __init__(self, num_nodes):
                 self.nodes = {
-                    f"node_{i}": {"data": f"unique_value_{i}"} for i in range(num_nodes)
+                    f"node_{i}": {"data": f"unique_value_{i}"} for i in range(num_nodes):
                 }
 
         # Create graph with more nodes than cache limit

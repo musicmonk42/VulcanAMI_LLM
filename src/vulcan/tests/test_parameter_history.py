@@ -177,7 +177,7 @@ class TestParameterHistoryManager:
 
         assert len(checkpoints) == 3
         # Check sorted by timestamp ascending
-        for i in range(1, len(checkpoints))
+        for i in range(1, len(checkpoints)):
             assert checkpoints[i]["timestamp"] >= checkpoints[i - 1]["timestamp"]
 
     def test_get_checkpoint_info(self, manager, model):

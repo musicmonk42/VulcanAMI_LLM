@@ -349,7 +349,7 @@ class TestAgentInterface:
         """Test batch submission."""
         graphs = [
             {**valid_graph, "id": f"batch_graph_{i}"}
-            for i in range(5)
+            for i in range(5):
         ]
 
         submissions = agent_interface.batch_submit(graphs, parallel=False)
@@ -361,7 +361,7 @@ class TestAgentInterface:
         """Test parallel batch submission."""
         graphs = [
             {**valid_graph, "id": f"parallel_graph_{i}"}
-            for i in range(3)
+            for i in range(3):
         ]
 
         submissions = agent_interface.batch_submit(graphs, parallel=True)

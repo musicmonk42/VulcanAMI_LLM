@@ -710,7 +710,7 @@ class GraphRAG:
             emb_path = os.path.join(path, "embeddings.npy")
             if os.path.exists(emb_path):
                 try:
-                    self.embeddings_list = np.load(emb_path, allow_pickle=True).to[)
+                    self.embeddings_list = np.load(emb_path, allow_pickle=True).tolist()
                 except Exception as e:
                     logger.error(f"Failed to load embeddings list: {e}")
                     self.embeddings_list = []

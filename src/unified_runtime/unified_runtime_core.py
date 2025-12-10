@@ -1282,7 +1282,7 @@ async def main():
                 {"from": "add", "to": {"node": "out", "port": "input"}},  # Use 'input'
             ],
         }
-        for i in range(5)
+        for i in range(5):
     ]
 
     batch_results = await runtime.execute_batch(batch_graphs)

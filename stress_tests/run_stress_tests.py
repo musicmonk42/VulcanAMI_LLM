@@ -1456,7 +1456,7 @@ async def test_metrics_collection(production_orchestrator: GenerationOrchestrato
     """Test metrics collection and reporting."""
     specs = [
         {"id": f"metric-{i}", "type": "Graph", "nodes": [], "edges": []}
-        for i in range(10)
+        for i in range(10):
     ]
 
     results, metrics = await production_orchestrator.run_stress_batch(
@@ -1566,14 +1566,14 @@ if __name__ == "__main__":
                 "type": "Graph",
                 "nodes": [
                     {"id": f"n{j}", "type": "Node"}
-                    for j in range(i % 10 + 1)
+                    for j in range(i % 10 + 1):
                 ],
                 "edges": [
                     {"from": f"n{j}", "to": f"n{(j+1) % (i % 10 + 1)}"}
-                    for j in range(i % 5)
+                    for j in range(i % 5):
                 ]
             }
-            for i in range(100)
+            for i in range(100):
         ]
 
         # Progress callback

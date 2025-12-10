@@ -191,7 +191,7 @@ class TestRLHFManager:
                 reward_signal=np.random.uniform(-1, 1),
                 metadata={},
             )
-            for i in range(5)
+            for i in range(5):
         ]
 
         # Initial reward model parameters
@@ -218,7 +218,7 @@ class TestRLHFManager:
                 reward_signal=0,
                 metadata={"preferred_over": torch.randn(EMBEDDING_DIM)},
             )
-            for i in range(5)
+            for i in range(5):
         ]
 
         # Update reward model
@@ -236,14 +236,14 @@ class TestRLHFManager:
             trajectory = {
                 "states": [
                     torch.randn(EMBEDDING_DIM).detach().requires_grad_(False)
-                    for _ in range(10)
+                    for _ in range(10):
                 ],
                 "actions": [
                     torch.randn(EMBEDDING_DIM).detach().requires_grad_(False)
-                    for _ in range(10)
+                    for _ in range(10):
                 ],
                 "log_probs": [
-                    torch.randn(1).detach().requires_grad_(False) for _ in range(10)
+                    torch.randn(1).detach().requires_grad_(False) for _ in range(10):
                 ],
             }
             trajectories.append(trajectory)

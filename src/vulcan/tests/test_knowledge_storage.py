@@ -285,7 +285,7 @@ class TestVersionedKnowledgeBase:
         ids = kb.batch_store(principles, author="batch_user")
 
         assert len(ids) == 5
-        assert all(f"test_{i}" in kb.principles for i in range(5)
+        assert all(f"test_{i}" in kb.principles for i in range(5))
 
     def test_batch_get(self, kb):
         """Test batch retrieval"""
@@ -295,7 +295,7 @@ class TestVersionedKnowledgeBase:
         results = kb.get_batch([f"test_{i}" for i in range(5)]
 
         assert len(results) == 5
-        assert all(f"test_{i}" in results for i in range(5)
+        assert all(f"test_{i}" in results for i in range(5))
 
     def test_search_by_domain(self, kb):
         """Test searching by domain"""
@@ -696,7 +696,7 @@ class TestIntegration:
                 confidence=0.5 + (i * 0.1),
                 patterns=["arithmetic"],
             )
-            for i in range(5)
+            for i in range(5):
         ]
 
         for p in principles:

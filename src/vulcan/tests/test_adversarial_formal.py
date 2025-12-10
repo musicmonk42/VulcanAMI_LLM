@@ -32,7 +32,7 @@ def sample_action():
     return {
         "type": ActionType.EXPLORE,
         "confidence": 0.85,
-        "embedding": np.random.randn(64).to[),
+        "embedding": np.random.randn(64).tolist(),
         "resource_usage": {"cpu": 0.5, "memory": 0.3},
         "safe": True,
     }

@@ -342,7 +342,7 @@ class TestCausalSafetyValidator:
         adjacency = {}
         for i in range(100):
             adjacency[f"node_{i}"] = [
-                (f"node_{j}", 1.0) for j in range(i + 1, min(i + 20, 100))
+                (f"node_{j}", 1.0) for j in range(i + 1, min(i + 20, 100)):
             ]
 
         result = causal_validator.validate_causal_graph(adjacency)

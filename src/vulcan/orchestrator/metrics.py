@@ -759,7 +759,7 @@ def compute_moving_average(
     result = []
     values = [v for _, v in timeseries]
 
-    for i in range(len(timeseries))
+    for i in range(len(timeseries)):
         if i < window_size - 1:
             # Not enough data yet
             avg = np.mean(values[: i + 1])

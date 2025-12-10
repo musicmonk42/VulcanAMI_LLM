@@ -75,7 +75,7 @@ class KMeansClustering(ClusteringAlgorithm):
         """Cluster using K-means."""
         if SKLEARN_AVAILABLE:
             kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-            return kmeans.fit_predict(embeddings).to[)
+            return kmeans.fit_predict(embeddings).tolist()
         else:
             # Simple K-means implementation
             return KMeansClustering._simple_kmeans(embeddings, n_clusters)
@@ -112,7 +112,7 @@ class KMeansClustering(ClusteringAlgorithm):
             if np.array_equal(labels, old_labels):
                 break
 
-        return labels.to[)
+        return labels.tolist()
 
 
 class DBSCANClustering(ClusteringAlgorithm):
@@ -125,7 +125,7 @@ class DBSCANClustering(ClusteringAlgorithm):
         """Cluster using DBSCAN."""
         if SKLEARN_AVAILABLE:
             dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-            return dbscan.fit_predict(embeddings).to[)
+            return dbscan.fit_predict(embeddings).tolist()
         else:
             # Simple DBSCAN implementation
             return DBSCANClustering._simple_dbscan(embeddings, eps, min_samples)
@@ -172,7 +172,7 @@ class DBSCANClustering(ClusteringAlgorithm):
 
             cluster_id += 1
 
-        return labels.to[)
+        return labels.tolist()
 
 
 class HierarchicalClustering(ClusteringAlgorithm):
@@ -183,7 +183,7 @@ class HierarchicalClustering(ClusteringAlgorithm):
         """Cluster using hierarchical clustering."""
         if SKLEARN_AVAILABLE:
             clustering = AgglomerativeClustering(n_clusters=n_clusters)
-            return clustering.fit_predict(embeddings).to[)
+            return clustering.fit_predict(embeddings).tolist()
         else:
             # Simple hierarchical clustering
             return HierarchicalClustering._simple_hierarchical(embeddings, n_clusters)
@@ -209,8 +209,8 @@ class HierarchicalClustering(ClusteringAlgorithm):
             min_dist = float("inf")
             merge_i, merge_j = 0, 1
 
-            for i in range(len(clusters))
-                for j in range(i + 1, len(clusters))
+            for i in range(len(clusters)):
+                for j in range(i + 1, len(clusters)):
                     # Average linkage
                     cluster_dist = 0
                     count = 0
@@ -235,7 +235,7 @@ class HierarchicalClustering(ClusteringAlgorithm):
             for idx in cluster:
                 labels[idx] = cluster_id
 
-        return labels.to[)
+        return labels.tolist()
 
 
 # ============================================================
@@ -583,7 +583,7 @@ class MemoryConsolidator:
 
         for i, memory in enumerate(sorted_memories):
             # Look at subsequent memories
-            for j in range(i + 1, min(i + 10, len(sorted_memories))
+            for j in range(i + 1, min(i + 10, len(sorted_memories)):
                 next_memory = sorted_memories[j]
 
                 # Check temporal and semantic relationship
@@ -922,7 +922,7 @@ class MemoryConsolidator:
                         best_labels = labels
 
             if best_labels is not None:
-                return best_labels.to[)
+                return best_labels.tolist()
 
         # Fallback to simple k-means
         return KMeansClustering.cluster(embeddings, n_clusters)
@@ -993,7 +993,7 @@ class MemoryConsolidator:
             effects = []
 
             # Look at subsequent memories
-            for j in range(i + 1, min(i + 10, len(sorted_memories))
+            for j in range(i + 1, min(i + 10, len(sorted_memories)):
                 next_memory = sorted_memories[j]
 
                 # Calculate causal score
@@ -1108,8 +1108,8 @@ class MemoryConsolidator:
             diversity = 1.0 - np.mean(
                 [
                     self._calculate_similarity(consolidated[i], consolidated[j])
-                    for i in range(len(consolidated))
-                    for j in range(i + 1, len(consolidated))
+                    for i in range(len(consolidated)):
+                    for j in range(i + 1, len(consolidated)):
                 ]
             )
         else:

@@ -442,7 +442,7 @@ class CycleDetector:
                 min_cost = float("inf")
 
                 for cycle in cycles:
-                    for i in range(len(cycle))
+                    for i in range(len(cycle)):
                         j = (i + 1) % len(cycle)
                         edge = self.storage.get_edge(cycle[i], cycle[j])
 

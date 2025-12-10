@@ -267,9 +267,9 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             abs_vals = np.abs(tensor)
 
             if abs_vals.sum() > 0:
-                shap_scores = (abs_vals / abs_vals.sum()).to[)
+                shap_scores = (abs_vals / abs_vals.sum()).tolist()
             else:
-                shap_scores = abs_vals.to[)
+                shap_scores = abs_vals.tolist()
 
             result["shap_scores"] = shap_scores
             result["method"] = "abs_norm"
@@ -315,9 +315,9 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             if np.sum(np.abs(shap_scores)) > 0:
                 shap_scores = (
                     np.abs(shap_scores) / np.sum(np.abs(shap_scores))
-                ).to[)
+                ).tolist()
             else:
-                shap_scores = shap_scores.to[)
+                shap_scores = shap_scores.tolist()
 
             result["shap_scores"] = shap_scores
 
@@ -329,9 +329,9 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             # Fallback on error
             abs_vals = np.abs(tensor)
             if abs_vals.sum() > 0:
-                shap_scores = (abs_vals / abs_vals.sum()).to[)
+                shap_scores = (abs_vals / abs_vals.sum()).tolist()
             else:
-                shap_scores = abs_vals.to[)
+                shap_scores = abs_vals.tolist()
 
             result["shap_scores"] = shap_scores
             result["method"] = "abs_norm_fallback"

@@ -1436,9 +1436,9 @@ class ObjectiveNegotiator:
         # Ensure corner cases and equal weight are included if missed
         if len(unique_results) < n + 1:
             corners = [
-                tuple(1.0 if j == i else 0.0 for j in range(n) for i in range(n))
+                tuple(1.0 if j == i else 0.0 for j in range(n) for i in range(n)):
             ]
-            equal = tuple(1.0 / n for _ in range(n)
+            equal = tuple(1.0 / n for _ in range(n):
 
             for case in corners + [equal]:
                 rounded_case = tuple(round(x, 8) for x in case)

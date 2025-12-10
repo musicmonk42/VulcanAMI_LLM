@@ -470,7 +470,7 @@ class TestConcurrency:
 
         threads = [
             threading.Thread(target=aggregate, args=(f"proposal{i}",))
-            for i in range(5)
+            for i in range(5):
         ]
 
         for t in threads:

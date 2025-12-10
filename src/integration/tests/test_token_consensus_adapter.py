@@ -183,7 +183,7 @@ class TestTokenConsensusAdapter:
 
         proposals = [
             {"type": "token_emission", "token": f"test{i}", "position": i}
-            for i in range(5)
+            for i in range(5):
         ]
 
         for proposal in proposals:

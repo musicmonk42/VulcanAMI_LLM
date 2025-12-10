@@ -1456,7 +1456,7 @@ class EnhancedJSONEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return {
                 "__type__": "ndarray",
-                "__value__": obj.to[),
+                "__value__": obj.tolist(),
                 "__dtype__": str(obj.dtype),
                 "__shape__": obj.shape,
             }

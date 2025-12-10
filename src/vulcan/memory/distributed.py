@@ -802,7 +802,7 @@ class DistributedMemory(BaseMemorySystem):
                 "id": memory.id,
                 "type": memory.type.value,
                 "content": memory.content,
-                "embedding": memory.embedding.to[)
+                "embedding": memory.embedding.tolist()
                 if memory.embedding is not None
                 else None,
                 "timestamp": memory.timestamp,
@@ -867,7 +867,7 @@ class DistributedMemory(BaseMemorySystem):
         query_data = {
             "query_type": query.query_type,
             "content": query.content,
-            "embedding": query.embedding.to[)
+            "embedding": query.embedding.tolist()
             if query.embedding is not None
             else None,
             "filters": query.filters,
@@ -1120,7 +1120,7 @@ class DistributedMemory(BaseMemorySystem):
                         "id": memory.id,
                         "type": memory.type.value,
                         "content": memory.content,
-                        "embedding": memory.embedding.to[)
+                        "embedding": memory.embedding.tolist()
                         if memory.embedding is not None
                         else None,
                         "timestamp": memory.timestamp,
@@ -1176,7 +1176,7 @@ class DistributedMemory(BaseMemorySystem):
                     "id": memory.id,
                     "type": memory.type.value,
                     "content": memory.content,
-                    "embedding": memory.embedding.to[)
+                    "embedding": memory.embedding.tolist()
                     if memory.embedding is not None
                     else None,
                     "timestamp": memory.timestamp,

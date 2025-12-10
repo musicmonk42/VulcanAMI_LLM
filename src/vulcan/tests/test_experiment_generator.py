@@ -256,7 +256,7 @@ class TestConstraint:
         satisfied, msg = constraint.check("x" * 200)
         assert satisfied is False
 
-    def test_check_output_constraint_[self):
+    def test_check_output_constraint_list(self):
         """Test output constraint with list of allowed values"""
         constraint = Constraint("output_values", "output", ["yes", "no", "maybe"])
 
@@ -949,7 +949,7 @@ class TestExperimentGenerator:
                 errors.append(e)
 
         threads = [
-            threading.Thread(target=generate_experiments, args=(i,)) for i in range(3)
+            threading.Thread(target=generate_experiments, args=(i,)) for i in range(3):
         ]
 
         for t in threads:

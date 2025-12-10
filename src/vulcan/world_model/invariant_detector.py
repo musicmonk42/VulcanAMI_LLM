@@ -909,7 +909,7 @@ if not SCIPY_AVAILABLE:
             grad = np.zeros_like(x)
             f0 = fun(x)
 
-            for i in range(len(x))
+            for i in range(len(x)):
                 x_plus = x.copy()
                 x_plus[i] += eps
                 grad[i] = (fun(x_plus) - f0) / eps

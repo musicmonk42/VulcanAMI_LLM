@@ -1152,8 +1152,8 @@ class TestPerformance:
         start = time_module.time()
 
         # Calculate all pairwise correlations
-        for i in range(len(paths))
-            for j in range(i + 1, len(paths))
+        for i in range(len(paths)):
+            for j in range(i + 1, len(paths)):
                 path_analyzer.calculate_path_correlation(paths[i], paths[j])
 
         elapsed = time_module.time() - start

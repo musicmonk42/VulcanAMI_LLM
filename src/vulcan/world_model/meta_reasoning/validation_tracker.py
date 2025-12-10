@@ -2002,7 +2002,7 @@ class ValidationTracker:
             return str(data) if math.isnan(data) or math.isinf(data) else data
         # Use NUMPY_AVAILABLE flag for numpy types
         elif NUMPY_AVAILABLE and isinstance(data, np.ndarray):
-            return data.to[)
+            return data.tolist()
         elif NUMPY_AVAILABLE and isinstance(data, np.generic):
             # Ensure item() returns basic python type
             item = data.item()

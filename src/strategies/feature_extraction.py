@@ -508,7 +508,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
         for i, token in enumerate(tokens):
             if token.lower() in connectives:
                 # Find next connective or end
-                for j in range(i + 1, min(i + 20, len(tokens)):)
+                for j in range(i + 1, min(i + 20, len(tokens)):):
                     if tokens[j].lower() in connectives or j == len(tokens) - 1:
                         distances.append(j - i)
                         break

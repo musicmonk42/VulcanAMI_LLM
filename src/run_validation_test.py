@@ -813,9 +813,9 @@ async def test_tournament_validation():
                 ],
                 "edges": [],
             }
-            for i in range(5)
+            for i in range(5):
         ]
-        fitness = np.random.rand(5).to[)
+        fitness = np.random.rand(5).tolist()
         winners = tm.run_adaptive_tournament(
             proposals, fitness, lambda x: np.random.rand(16)
         )

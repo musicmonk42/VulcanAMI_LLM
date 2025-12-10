@@ -2749,7 +2749,7 @@ class WorldModel:
 
             # APPLY: Execute interventions
             results = []
-            for _ in range(len(scheduled))
+            for _ in range(len(scheduled)):
                 result = self.intervention_manager.execute_next_intervention()
                 if result:
                     results.append(result)

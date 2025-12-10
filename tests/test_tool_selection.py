@@ -211,7 +211,7 @@ class TestPortfolioStrategies:
         """Test that enabled strategies are defined."""
         assert 'enabled' in portfolio_strategies
 
-    def test_enabled_is_[self, portfolio_strategies):
+    def test_enabled_is_list(self, portfolio_strategies):
         """Test that enabled is a list."""
         enabled = portfolio_strategies['enabled']
         assert isinstance(enabled, list), "enabled should be a list"

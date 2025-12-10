@@ -550,7 +550,7 @@ class EnhancedGraphixDemo:
                 proposals.append(variant)
 
             # Generate fitness scores
-            fitness = np.random.uniform(0.5, 1.0, size=population_size).to[)
+            fitness = np.random.uniform(0.5, 1.0, size=population_size).tolist()
 
             # Embedding function with noise
             def embed(p):

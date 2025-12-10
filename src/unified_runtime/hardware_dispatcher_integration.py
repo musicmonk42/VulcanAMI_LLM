@@ -635,7 +635,7 @@ class HardwareDispatcherIntegration:
 
             # Convert back to list if inputs were lists
             if input_was_list:
-                return result.to[)
+                return result.tolist()
 
             return result
         else:

@@ -133,7 +133,7 @@ def _apply_repetition_penalty(
     if not counts:
         return logits
     out = logits[:]
-    for i in range(len(out))
+    for i in range(len(out)):
         if counts.get(i, 0) > 0:
             out[i] = out[i] / penalty
     return out
@@ -335,7 +335,7 @@ class LanguageReasoning:
                 if isinstance(l, list):
                     return l
                 if hasattr(l, "tolist"):
-                    return l.to[)
+                    return l.tolist()
             except Exception:
                 return []
         # Fallback uniform logits of limited vocab

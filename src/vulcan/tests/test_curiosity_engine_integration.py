@@ -605,7 +605,7 @@ class TestConcurrentOperations:
                 estimated_cost=20.0,
                 complexity=0.6,
             )
-            for i in range(5)
+            for i in range(5):
         ]
 
         def generate_experiments(gap):
@@ -778,7 +778,7 @@ class TestPerformanceAndScaling:
                 estimated_cost=20.0,
                 complexity=0.6,
             )
-            for i in range(50)
+            for i in range(50):
         ]
 
         start_time = time.time()
@@ -805,7 +805,7 @@ class TestPerformanceAndScaling:
                 estimated_cost=20.0,
                 gap_id=f"gap_{i}",
             )
-            for i in range(100)
+            for i in range(100):
         ]
 
         start_time = time.time()

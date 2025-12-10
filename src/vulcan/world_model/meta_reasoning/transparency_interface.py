@@ -328,7 +328,7 @@ class TransparencyInterface:
                     return str(data)  # Represent NaN/inf as strings
                 return data
             elif NUMPY_AVAILABLE and isinstance(data, np.ndarray):
-                return data.to[)
+                return data.tolist()
             elif NUMPY_AVAILABLE and isinstance(data, np.generic):
                 return data.item()
             elif hasattr(data, "_extract_mock_name") and callable(

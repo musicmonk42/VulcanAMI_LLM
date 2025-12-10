@@ -924,8 +924,8 @@ class DataAugmentor:
             total_pairs = 0
             diverse_pairs = 0
 
-            for i in range(len(self.generated_graphs))
-                for j in range(i + 1, len(self.generated_graphs))
+            for i in range(len(self.generated_graphs)):
+                for j in range(i + 1, len(self.generated_graphs)):
                     total_pairs += 1
 
                     # Simple diversity: different node counts or edge counts

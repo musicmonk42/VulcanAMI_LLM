@@ -139,7 +139,7 @@ def penalize_repetition(
     for t in rec:
         counts[t] = counts.get(t, 0) + 1
     out = logits[:]
-    for idx in range(len(out))
+    for idx in range(len(out)):
         if counts.get(idx, 0) > 0:
             if out[idx] > 0:
                 out[idx] = out[idx] / penalty
@@ -854,7 +854,7 @@ class CognitiveLoop:
                 if isinstance(logits, list):
                     return logits
                 if hasattr(logits, "tolist"):
-                    return logits.to[)
+                    return logits.tolist()
             except Exception:
                 pass
         vocab_size = getattr(self.transformer, "vocab_size", None)

@@ -27,14 +27,14 @@ def sample_proposals():
     """Create sample proposals."""
     return [
         {"id": i, "data": f"proposal_{i}"}
-        for i in range(20)
+        for i in range(20):
     ]
 
 
 @pytest.fixture
 def sample_fitness():
     """Create sample fitness values."""
-    return np.random.uniform(0.5, 1.0, 20).to[)
+    return np.random.uniform(0.5, 1.0, 20).tolist()
 
 
 @pytest.fixture

@@ -231,7 +231,7 @@ def _compute_awareness(
             B, T, V = probs.size()
             for b in range(B):
                 for t in range(T):
-                    pvec = probs[b, t, :].detach().cpu().to[)
+                    pvec = probs[b, t, :].detach().cpu().tolist()
                     entropy_inputs.append(pvec)
                     tgt = targets[b, t].item()
                     targets_all.append(tgt)

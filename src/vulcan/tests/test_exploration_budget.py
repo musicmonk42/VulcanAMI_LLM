@@ -676,7 +676,7 @@ class TestDynamicBudget:
                 errors.append(e)
 
         threads = [
-            threading.Thread(target=perform_operations, args=(i,)) for i in range(3)
+            threading.Thread(target=perform_operations, args=(i,)) for i in range(3):
         ]
 
         for t in threads:

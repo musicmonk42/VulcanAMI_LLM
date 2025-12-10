@@ -96,11 +96,11 @@ except ImportError:
             "type": "Graph",
             "nodes": [
                 {"id": f"n{i}", "type": "InputNode", "params": {"value": f"input_{i}"}}
-                for i in range(num_nodes)
+                for i in range(num_nodes):
             ],
             "edges": [
                 {"from": f"n{i}", "to": f"n{i + 1}", "type": "data"}
-                for i in range(num_nodes - 1)
+                for i in range(num_nodes - 1):
             ],
         }
 

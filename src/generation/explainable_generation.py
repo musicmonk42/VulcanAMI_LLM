@@ -1186,14 +1186,14 @@ class ExplainableGeneration:
 
         # Detect confidence drops (potential issues)
         confidence_drops = []
-        for i in range(1, len(confidences))
+        for i in range(1, len(confidences)):
             if confidences[i] < confidences[i - 1] - 0.2:
                 confidence_drops.append(i)
 
         # Detect strategy changes
         strategies = [e["decision"].get("strategy") for e in explanations]
         strategy_changes = []
-        for i in range(1, len(strategies))
+        for i in range(1, len(strategies)):
             if strategies[i] != strategies[i - 1]:
                 strategy_changes.append((i, strategies[i - 1], strategies[i]))
 

@@ -1704,7 +1704,7 @@ class BruteForceSearch(DecompositionStrategy):
             problem_size = len(list(problem_graph.nodes()))
 
         # Try different decomposition sizes
-        for num_parts in range(2, min(problem_size + 1, self.max_depth + 1))
+        for num_parts in range(2, min(problem_size + 1, self.max_depth + 1)):
             decomposition = self._try_decomposition(problem_graph, num_parts)
 
             if decomposition and self._is_valid_decomposition(decomposition):

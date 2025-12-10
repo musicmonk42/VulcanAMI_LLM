@@ -935,7 +935,7 @@ class AnomalyAnalyzer:
                         "index": original_idx,
                         "prediction": predictions[original_idx],
                         "anomaly_score": abs(score),  # Convert to positive
-                        "features": features[idx].to[),
+                        "features": features[idx].tolist(),
                     }
                     anomalies.append(anomaly)
 

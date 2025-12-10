@@ -195,7 +195,7 @@ class MockRuntime(MagicMock):
         async def mock_execute_batch_side_effect(graphs: List[Dict[str, Any]], *args, **kwargs) -> List[Dict[str, Any]]:
             if not getattr(self.config, 'enable_batch', False):
                  raise RuntimeError("Batch mode is not enabled")
-            return list({'status': 'success', 'graph_index': i} for i, _ in enumerate(graphs)]
+            return [{'status': 'success', 'graph_index': i} for i, _ in enumerate(graphs)]
         self.execute_batch = AsyncMock(side_effect=mock_execute_batch_side_effect)
         self._execute_batch_side_effect_func = mock_execute_batch_side_effect # Store for potential reuse
 
@@ -755,7 +755,7 @@ class TestEdgeCases:
 
     def test_io_count_overflow(self, runtime_ec):
         initial = runtime_ec.get_io_count()
-        for i in range(150): runtime_ec.safe_print(f"Msg {i}")
+        for i in range(150): runtime_ec.safe_print(f"Msg {i}"):
         assert runtime_ec.safe_print.call_count == 150
         count = runtime_ec.get_io_count()
         assert count == initial # Mock doesn't change value

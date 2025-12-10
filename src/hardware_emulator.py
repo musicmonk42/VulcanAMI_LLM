@@ -373,7 +373,7 @@ class HardwareEmulator:
 
                 # Apply noise to each batch element
                 noisy_result = np.empty_like(result)
-                for i in range(result.shape[0]):
+                for i in range(result.shape[0)]):
                     # FIX: Convert scale element to float before injecting noise
                     scale_val = float(scales[i])
                     noisy_result[i] = self._inject_noise(result[i], scale=scale_val)

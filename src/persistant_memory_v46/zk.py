@@ -364,7 +364,7 @@ class ZKProver:
                 model_weights = [secrets.randbelow(2**64) for _ in range(model_size)]
                 gradient_updates = [secrets.randbelow(2**64) for _ in range(model_size)]
                 affected_samples = [
-                    secrets.randbelow(2**64) for _ in range(num_samples)
+                    secrets.randbelow(2**64) for _ in range(num_samples):
                 ]
 
                 # Generate proof using real Groth16

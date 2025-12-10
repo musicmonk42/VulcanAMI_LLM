@@ -593,7 +593,7 @@ class TestIntegration:
 
             threads = [
                 threading.Thread(target=run_execution, args=(f"tool_{i}",))
-                for i in range(5)
+                for i in range(5):
             ]
 
             for t in threads:
@@ -612,7 +612,7 @@ class TestIntegration:
 class TestEdgeCases:
     """Test edge cases and error conditions"""
 
-    def test_empty_tool_[self):
+    def test_empty_tool_list(self):
         """Test execution with empty tool list"""
         executor = PortfolioExecutor(tools={})
 
@@ -655,7 +655,7 @@ class TestEdgeCases:
         """Test when all tools fail"""
         tools = {
             f"fail_{i}": MockTool(f"fail_{i}", 0.1, 0.8, should_fail=True)
-            for i in range(3)
+            for i in range(3):
         }
 
         executor = PortfolioExecutor(tools=tools)

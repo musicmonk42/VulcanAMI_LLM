@@ -1668,15 +1668,15 @@ class DomainValidator:
                 inputs["variables"] = ["x", "y"]
             elif domain == "classification":
                 inputs["classes"] = ["A", "B", "C"]
-                inputs["features"] = np.random.randn(10, 5).to[)
+                inputs["features"] = np.random.randn(10, 5).tolist()
             elif domain == "prediction":
-                inputs["time_series"] = np.random.randn(20).to[)
+                inputs["time_series"] = np.random.randn(20).tolist()
                 inputs["horizon"] = 5
             elif domain == "generation":
                 inputs["seed"] = int(np.random.randint(1000))
                 inputs["length"] = 100
             elif domain == "analysis":
-                inputs["data"] = np.random.randn(50, 10).to[)
+                inputs["data"] = np.random.randn(50, 10).tolist()
                 inputs["analysis_type"] = "exploratory"
 
             return inputs
@@ -2239,7 +2239,7 @@ class ImbalanceHandler:
             return {
                 "data_size": size,
                 "feature_count": complexity,
-                "data": np.random.randn(min(size, 100), complexity).to[),
+                "data": np.random.randn(min(size, 100), complexity).tolist(),
                 "characteristics": characteristics,
             }
         except Exception as e:

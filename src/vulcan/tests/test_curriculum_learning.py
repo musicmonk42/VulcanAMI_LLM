@@ -437,7 +437,7 @@ class TestCurriculumLearner:
 class TestEdgeCases:
     """Test edge cases and error handling"""
 
-    def test_empty_task_[self):
+    def test_empty_task_list(self):
         """Test handling of empty task list"""
         learner = CurriculumLearner()
         curriculum = learner.generate_curriculum([])

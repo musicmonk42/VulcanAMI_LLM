@@ -1294,7 +1294,7 @@ if __name__ == "__main__":
             logits.append(row)
         hidden_states = [
             [_random.uniform(-0.5, 0.5) for _ in range(hidden_dim)]
-            for _ in range(seq_len)
+            for _ in range(seq_len):
         ]
         return {
             "tokens": tokens,

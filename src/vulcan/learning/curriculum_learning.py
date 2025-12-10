@@ -312,7 +312,7 @@ class CurriculumLearner:
             else:
                 # Linear distribution
                 boundaries = [
-                    (i / n_stages, (i + 1) / n_stages) for i in range(n_stages)
+                    (i / n_stages, (i + 1) / n_stages) for i in range(n_stages):
                 ]
 
             for i, (start_pct, end_pct) in enumerate(boundaries):

@@ -775,7 +775,7 @@ class TestEdgeCases:
                 "target_value": 0.95,
                 "weight": 1.0,
             }
-            for i in range(3)
+            for i in range(3):
         ]
 
         result = negotiator.negotiate_multi_agent_proposals(proposals)
@@ -826,7 +826,7 @@ class TestEdgeCases:
                 "target_value": 0.8,
                 "weight": 1.0,
             }
-            for i in range(10)
+            for i in range(10):
         ]
 
         result = negotiator.negotiate_multi_agent_proposals(proposals)

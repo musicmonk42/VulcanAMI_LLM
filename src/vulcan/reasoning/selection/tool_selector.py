@@ -557,7 +557,7 @@ class DistributionMonitor:
             current_data = np.vstack(list(self.current_window))
 
             # Perform K-S test on each feature dimension
-            for i in range(self.reference_data.shape[1]):
+            for i in range(self.reference_data.shape[1)]):
                 try:
                     stat, p_value = ks_2samp(
                         self.reference_data[:, i], current_data[:, i]

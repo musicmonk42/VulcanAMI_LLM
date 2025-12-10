@@ -622,7 +622,7 @@ class TestThreadSafety:
 
         threads = [
             threading.Thread(target=register, args=(f"agent_{i}",))
-            for i in range(10)
+            for i in range(10):
         ]
 
         for t in threads:

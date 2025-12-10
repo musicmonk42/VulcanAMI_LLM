@@ -866,7 +866,7 @@ class TestThreadSafety(unittest.TestCase):
 
         # Create and start threads
         threads = [
-            threading.Thread(target=increment_counter) for _ in range(num_threads)
+            threading.Thread(target=increment_counter) for _ in range(num_threads):
         ]
         for t in threads:
             t.start()
@@ -888,7 +888,7 @@ class TestThreadSafety(unittest.TestCase):
 
         # Create and start threads with different values
         threads = [
-            threading.Thread(target=update_gauge, args=(i,)) for i in range(num_threads)
+            threading.Thread(target=update_gauge, args=(i,)) for i in range(num_threads):
         ]
         for t in threads:
             t.start()
