@@ -24,6 +24,18 @@ except ImportError:
     torch = None
     logger.warning("torch not available - continual learning will be disabled")
 
+# List of torch-dependent components
+TORCH_DEPENDENT_COMPONENTS = [
+    "EnhancedContinualLearner",
+    "MetaLearner",
+    "MetaLearningAlgorithm",
+    "TaskDetector",
+    "CompositionalUnderstanding",
+    "MetaCognitiveMonitor",
+    "LiveFeedbackProcessor",
+    "RLHFManager",
+]
+
 # Import torch-free components
 from .curriculum_learning import (CurriculumLearner,
                                   LearnedDifficultyEstimator, PacingStrategy)
@@ -40,23 +52,13 @@ if TORCH_AVAILABLE:
         from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
     except Exception as e:
         logger.error(f"Failed to import torch-dependent learning components: {e}")
-        EnhancedContinualLearner = None
-        MetaLearner = None
-        MetaLearningAlgorithm = None
-        TaskDetector = None
-        CompositionalUnderstanding = None
-        MetaCognitiveMonitor = None
-        LiveFeedbackProcessor = None
-        RLHFManager = None
+        # Set all to None if import fails
+        for component in TORCH_DEPENDENT_COMPONENTS:
+            globals()[component] = None
 else:
-    EnhancedContinualLearner = None
-    MetaLearner = None
-    MetaLearningAlgorithm = None
-    TaskDetector = None
-    CompositionalUnderstanding = None
-    MetaCognitiveMonitor = None
-    LiveFeedbackProcessor = None
-    RLHFManager = None
+    # Set all to None if torch not available
+    for component in TORCH_DEPENDENT_COMPONENTS:
+        globals()[component] = None
 
 # Import world model (no torch dependency)
 try:
@@ -100,7 +102,7 @@ class UnifiedLearningSystem:
                 use_progressive=True,
             )
         else:
-            logger.warning("EnhancedContinualLearner not available (torch not installed)")
+            logger.warning("EnhancedContinualLearner not available (torch not installed or import failed)")
             self.continual_learner = None
 
         # CRITICAL: Connect metacognitive monitor AFTER continual learner is initialized

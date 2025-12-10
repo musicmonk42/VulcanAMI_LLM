@@ -720,6 +720,8 @@ class ProductionDeployment:
                 "ethical_boundary_monitor": None,
                 "curiosity_reward_shaper": None,
                 "internal_critic": None,
+                # Note: Accessing private attribute _auto_apply_policy because SelfImprovementDrive
+                # doesn't expose a public property for this. Consider adding public accessor if needed.
                 "auto_apply_policy": getattr(self_improvement, "_auto_apply_policy", None) if self_improvement else None,
             })
         else:
