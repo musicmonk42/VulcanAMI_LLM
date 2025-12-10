@@ -155,7 +155,8 @@ class TestTokenBucketRateLimiter:
         
         limiter.consume(10)
         available = limiter.available_tokens()
-        assert available == 10
+        # Use approximate equality due to time elapsed and floating-point precision
+        assert abs(available - 10) < 0.1  # Allow small tolerance for time-based refill
     
     def test_thread_safety(self):
         """Test thread-safe token consumption"""
