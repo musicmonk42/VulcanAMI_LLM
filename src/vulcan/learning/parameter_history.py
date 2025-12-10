@@ -290,7 +290,9 @@ class ParameterHistoryManager:
         self, checkpoint_path: str, model: nn.Module, strict: bool = True
     ) -> Dict[str, Any]:
         """Load checkpoint into model with validation
-        SECURITY: Use weights_only=True to prevent deserialization attacks"""
+        SECURITY NOTE: weights_only is set to False to support full checkpoint loading
+        including metadata and optimizer state. For production use with untrusted sources,
+        consider using weights_only=True and loading metadata separately."""
         # FIXED: Convert to Path object and resolve
         path = Path(checkpoint_path).resolve()
 
@@ -304,10 +306,12 @@ class ParameterHistoryManager:
                 import gzip
 
                 with gzip.open(path, "rb") as f:
-                    # SECURITY FIX: Use weights_only=True to prevent arbitrary code execution
+                    # NOTE: weights_only=False allows loading metadata but increases risk
+                    # TODO: Consider separating weight loading from metadata loading
                     checkpoint = torch.load(f, map_location="cpu", weights_only=False)
             else:
-                # SECURITY FIX: Use weights_only=True to prevent arbitrary code execution
+                # NOTE: weights_only=False allows loading metadata but increases risk
+                # TODO: Consider separating weight loading from metadata loading
                 checkpoint = torch.load(path, map_location="cpu", weights_only=False)
 
             # Validate checksum
@@ -336,7 +340,9 @@ class ParameterHistoryManager:
 
     def validate_checkpoint(self, checkpoint_path: str) -> bool:
         """Validate checkpoint integrity using checksum
-        SECURITY: Use weights_only=True to prevent deserialization attacks"""
+        SECURITY NOTE: weights_only is set to False to support full checkpoint validation
+        including metadata. For production use with untrusted sources, consider using
+        weights_only=True and validating metadata separately."""
         try:
             # FIXED: Convert to Path object and resolve
             path = Path(checkpoint_path).resolve()
@@ -347,10 +353,12 @@ class ParameterHistoryManager:
                 import gzip
 
                 with gzip.open(path, "rb") as f:
-                    # SECURITY FIX: Use weights_only=True to prevent arbitrary code execution
+                    # NOTE: weights_only=False allows loading metadata but increases risk
+                    # TODO: Consider separating weight loading from metadata loading
                     checkpoint = torch.load(f, map_location="cpu", weights_only=False)
             else:
-                # SECURITY FIX: Use weights_only=True to prevent arbitrary code execution
+                # NOTE: weights_only=False allows loading metadata but increases risk
+                # TODO: Consider separating weight loading from metadata loading
                 checkpoint = torch.load(path, map_location="cpu", weights_only=False)
 
             # Verify checksum

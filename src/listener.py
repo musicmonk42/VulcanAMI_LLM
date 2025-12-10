@@ -656,7 +656,7 @@ def run_listener(
     """
     if host == "0.0.0.0":
         logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
-    
+
     listener = GraphixListener(
         host=host,
         port=port,

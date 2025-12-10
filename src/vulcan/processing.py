@@ -62,11 +62,12 @@ class GraphixTransformer:
         # A mock configuration, assuming it initializes the LLM's embedding layer
         self.embedding_dim = embedding_dim
         self.device = "cpu"  # Mock device
-        # SECURITY: Added revision parameter to pin model version
-        # Using a stable release revision for security
+        # SECURITY: Pin to specific release tag instead of 'main' for reproducibility
+        # TODO: Update to a specific commit hash or stable release tag (e.g., "v1.0.0")
+        # For now using 'main' as a placeholder - should be updated in production
         self.tokenizer = AutoTokenizer.from_pretrained(
             "bert-base-uncased",
-            revision="main"  # Pin to a specific revision for security
+            revision="main"  # FIXME: Replace with specific release tag or commit hash
         )
 
     def get_embeddings(self, text: Union[str, List[str]]) -> torch.Tensor:
@@ -722,14 +723,15 @@ class DynamicModelManager:
             return model, None
 
         elif modality in ["vision", "audio"]:
-            # SECURITY: Added revision parameter to pin model version
+            # SECURITY: Pin to specific release tag instead of 'main' for reproducibility
+            # TODO: Update to specific commit hash or stable release tag
             model = AutoModel.from_pretrained(
                 model_name,
-                revision="main"  # Pin to a specific revision for security
+                revision="main"  # FIXME: Replace with specific release tag or commit hash
             )
             processor = AutoImageProcessor.from_pretrained(
                 model_name,
-                revision="main"  # Pin to a specific revision for security
+                revision="main"  # FIXME: Replace with specific release tag or commit hash
             )
 
             if device != "cpu" and torch.cuda.is_available():

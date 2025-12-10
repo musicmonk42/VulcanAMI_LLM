@@ -1109,11 +1109,7 @@ class PersistenceLayer:
                 # Count records in each table
                 # SECURITY: Use whitelist of allowed table names to prevent SQL injection
                 allowed_tables = {"graphs", "evolutions", "knowledge", "sessions"}
-                for table in ["graphs", "evolutions", "knowledge", "sessions"]:
-                    # Double-check table name is in whitelist
-                    if table not in allowed_tables:
-                        logger.error(f"Invalid table name: {table}")
-                        continue
+                for table in allowed_tables:
                     # Safe to use f-string here because table name is from hardcoded whitelist
                     cursor.execute(f"SELECT COUNT(*) FROM {table}")  # nosec B608
                     stats[f"{table}_count"] = cursor.fetchone()[0]
