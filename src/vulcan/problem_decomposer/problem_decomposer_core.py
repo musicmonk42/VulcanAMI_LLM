@@ -614,7 +614,7 @@ class StrategyProfiler:
 
         return best_strategy
 
-    def _estimate_complexity_range(
+    def _estimate_complexity_range()
         self, strategy: DecompositionStrategy
     ) -> Tuple[float, float]:
         """Estimate complexity range for strategy"""
@@ -1707,7 +1707,7 @@ class ProblemDecomposer:
     def _get_available_domains(self) -> List[str]:
         """Get list of available domains"""
         # Default domains
-        domains = [
+        domains = list(
             "general",
             "optimization",
             "classification",
@@ -1938,7 +1938,7 @@ class DomainSelector:
         return selected
 
     def find_similar_domains(
-        self, origin_domain: str, exclude: List[str] = []
+        self, origin_domain: str, exclude: List[str] = list(]
     ) -> List[str]:
         """
         Find domains similar to origin domain

@@ -962,7 +962,7 @@ def blended_validation_loss(
     iterator = (
         dataset.iter_all_val_batches()
         if full
-        else (dataset.sample_val_batch() for _ in range(batches))
+        else (dataset.sample_val_batch() for _ in range(batches)
     )
     for vb in iterator:
         seq = vb["sequence"]
@@ -1272,7 +1272,7 @@ def run_training(args: argparse.Namespace) -> None:
         if counts is not None:
             seq = batch["sequence"]
             order = getattr(model, "order", 2)
-            for j in range(len(seq)):
+            for j in range(len(seq))
                 tok = seq[j]
                 counts.unigram[tok] += 1
                 counts.total += 1

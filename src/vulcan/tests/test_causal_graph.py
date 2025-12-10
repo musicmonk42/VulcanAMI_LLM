@@ -715,7 +715,7 @@ class TestEdgeCases:
         """Test performance with larger graph"""
         # Create a graph with 100 nodes
         for i in range(100):
-            for j in range(i + 1, min(i + 5, 100)):
+            for j in range(i + 1, min(i + 5, 100))
                 empty_dag.add_edge(f"N{i}", f"N{j}", 0.5, EvidenceType.CORRELATION)
 
         # Test that operations still work
@@ -792,7 +792,7 @@ class TestPerformance:
 
         # Create large DAG
         for i in range(100):
-            for j in range(i + 1, min(i + 10, 100)):
+            for j in range(i + 1, min(i + 10, 100))
                 dag.add_edge(f"N{i}", f"N{j}", 0.5, EvidenceType.CORRELATION)
 
         # Time cycle detection

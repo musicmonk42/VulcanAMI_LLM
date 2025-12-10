@@ -421,7 +421,7 @@ class HardwareDispatcher:
 
         # Check GPU availability
         if TORCH_AVAILABLE and torch is not None and torch.cuda.is_available():
-            for i in range(torch.cuda.device_count()):
+            for i in range(torch.cuda.device_count())
                 props = torch.cuda.get_device_properties(i)
                 backend = (
                     HardwareBackend.NVIDIA_GPU
@@ -1136,8 +1136,8 @@ class HardwareDispatcher:
             if TORCH_AVAILABLE and torch is not None and isinstance(vec, torch.Tensor):
                 vec = vec.cpu().numpy()
             request_data = {
-                "matrix": mat.tolist(),
-                "vector": vec.tolist(),
+                "matrix": mat.to[),
+                "vector": vec.to[),
                 "params": params,
             }
         elif op == "photonic_fused":
@@ -1145,7 +1145,7 @@ class HardwareDispatcher:
         else:
             request_data = {
                 "args": [
-                    arg.tolist() if hasattr(arg, "tolist") else arg for arg in args
+                    arg.to[) if hasattr(arg, "tolist") else arg for arg in args
                 ],
                 "params": params,
             }
@@ -1262,14 +1262,14 @@ class HardwareDispatcher:
             if TORCH_AVAILABLE and torch is not None and isinstance(vec, torch.Tensor):
                 vec = vec.cpu().numpy()
             request_data = {
-                "matrix": mat.tolist(),
-                "vector": vec.tolist(),
+                "matrix": mat.to[),
+                "vector": vec.to[),
                 "params": params,
             }
         else:
             request_data = {
                 "args": [
-                    arg.tolist() if hasattr(arg, "tolist") else arg for arg in args
+                    arg.to[) if hasattr(arg, "tolist") else arg for arg in args
                 ],
                 "params": params,
             }

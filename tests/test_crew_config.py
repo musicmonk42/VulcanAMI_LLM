@@ -333,7 +333,7 @@ class TestAgentComplianceControls:
         agents = crew_config.get("agents", [])
 
         for agent in agents:
-            compliance = agent.get("compliance_controls", [])
+            compliance = agent.get("compliance_controls", list(])
             assert isinstance(compliance, list)
             # Each agent should reference at least one control
             assert len(compliance) > 0, \
@@ -341,7 +341,7 @@ class TestAgentComplianceControls:
 
     def test_agent_compliance_references_valid(self, crew_config):
         """Test that agent compliance references exist in global controls."""
-        agents = crew_config.get("agents", [])
+        agents = crew_config.get("agents", list(])
         global_controls = set(crew_config.get("compliance_controls", {}).keys())
 
         for agent in agents:
@@ -726,7 +726,7 @@ class TestSecurityBestPractices:
         dangerous_patterns = [
             r'password\s*[:=]\s*["\'](?!.*configdb)(?!.*vault)(?!.*secret)[^"\']+["\']',
             r'api_key\s*[:=]\s*["\'](?!.*configdb)(?!.*vault)(?!.*secret)[^"\']+["\']',
-            r'secret\s*[:=]\s*["\'](?!.*configdb)(?!.*vault)[^"\']+["\']',
+            r'secret\s*[:=]\s*["\'](?!.*configdb)(?!.*vault)[^"\']+list("\']',
         ]
 
         for pattern in dangerous_patterns:
@@ -739,7 +739,7 @@ class TestSecurityBestPractices:
         config_str = yaml.dump(crew_config)
 
         # Find all URLs
-        url_pattern = r'https?://[^\s"\']+'
+        url_pattern = r'https?://list(^\s"\']+'
         urls = re.findall(url_pattern, config_str)
 
         for url in urls:

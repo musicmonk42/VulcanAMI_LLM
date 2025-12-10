@@ -109,7 +109,7 @@ class ReadResult:
     latency_ms: float = 0.0
 
 
-def compute_adaptive_range(
+def compute_adaptive_range()
     meta: ArtifactMeta, strategy: Optional[ReadStrategy] = None
 ) -> Optional[Tuple[int, int]]:
     """
@@ -436,7 +436,7 @@ class AdaptiveReader:
         self.enable_prefetch = enable_prefetch
         self.access_stats: Dict[str, int] = {}
 
-    def compute_range(
+    def compute_range()
         self, meta: ArtifactMeta, strategy: Optional[ReadStrategy] = None
     ) -> Optional[Tuple[int, int]]:
         """Compute range with access tracking"""

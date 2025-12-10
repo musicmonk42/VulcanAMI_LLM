@@ -1606,7 +1606,7 @@ class VULCANAGICollective:
                     thread.join(timeout=timeout / max(len(worker_threads), 1))
 
                 # Check again
-                still_alive = [t for t in worker_threads if t.is_alive(])
+                still_alive = [t for t in worker_threads if t.is_alive()
                 if still_alive:
                     logger.error(
                         f"{len(still_alive)} threads still alive after shutdown: "

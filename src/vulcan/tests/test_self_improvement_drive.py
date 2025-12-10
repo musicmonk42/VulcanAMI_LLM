@@ -1405,7 +1405,7 @@ class TestThreadSafety:
 class TestEdgeCases:
     """Test edge cases"""
 
-    def test_empty_objectives_list(self, config_path, temp_dir):
+    def test_empty_objectives_[self, config_path, temp_dir):
         """Test handling empty objectives list"""
         config = {
             "drives": {

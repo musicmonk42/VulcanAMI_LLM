@@ -267,9 +267,9 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             abs_vals = np.abs(tensor)
 
             if abs_vals.sum() > 0:
-                shap_scores = (abs_vals / abs_vals.sum()).tolist()
+                shap_scores = (abs_vals / abs_vals.sum()).to[)
             else:
-                shap_scores = abs_vals.tolist()
+                shap_scores = abs_vals.to[)
 
             result["shap_scores"] = shap_scores
             result["method"] = "abs_norm"
@@ -315,9 +315,9 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             if np.sum(np.abs(shap_scores)) > 0:
                 shap_scores = (
                     np.abs(shap_scores) / np.sum(np.abs(shap_scores))
-                ).tolist()
+                ).to[)
             else:
-                shap_scores = shap_scores.tolist()
+                shap_scores = shap_scores.to[)
 
             result["shap_scores"] = shap_scores
 
@@ -329,9 +329,9 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             # Fallback on error
             abs_vals = np.abs(tensor)
             if abs_vals.sum() > 0:
-                shap_scores = (abs_vals / abs_vals.sum()).tolist()
+                shap_scores = (abs_vals / abs_vals.sum()).to[)
             else:
-                shap_scores = abs_vals.tolist()
+                shap_scores = abs_vals.to[)
 
             result["shap_scores"] = shap_scores
             result["method"] = "abs_norm_fallback"
@@ -406,8 +406,8 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             )
 
             cax = ax.matshow(attn_weights, cmap="viridis")
-            ax.set_xticks(range(len(node_labels)))
-            ax.set_yticks(range(len(node_labels)))
+            ax.set_xticks(range(len(node_labels))
+            ax.set_yticks(range(len(node_labels))
             ax.set_xticklabels(node_labels, rotation=90)
             ax.set_yticklabels(node_labels)
             fig.colorbar(cax)
@@ -887,8 +887,8 @@ if __name__ == "__main__":
     print("\n4. Relation Tracing:")
     test_graph = {
         "nodes": [
-            {"id": "node1", "label": "A", "embedding": np.random.rand(16).tolist()},
-            {"id": "node2", "label": "B", "embedding": np.random.rand(16).tolist()},
+            {"id": "node1", "label": "A", "embedding": np.random.rand(16).tolist(),
+            {"id": "node2", "label": "B", "embedding": np.random.rand(16).tolist(),
         ]
     }
 

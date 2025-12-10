@@ -1207,7 +1207,7 @@ class ConceptMapper:
 
             # Get domain-specific thresholds
             domain = getattr(
-                pattern, "domain", outcomes[0].domain if outcomes else "general"
+                pattern, "domain", outcomes[0).domain if outcomes else "general"
             )
             thresholds = self.get_thresholds_for_domain(domain)
             min_instances = thresholds["min_instances"]

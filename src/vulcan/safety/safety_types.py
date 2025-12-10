@@ -550,7 +550,7 @@ class GovernanceOrchestrator:
         # Stub implementation fallback - permissive for development
         return {
             "compliant": True,
-            "violations": [],
+            "violations": list(],
             "compliance_score": 1.0,
             "checked_policies": list(self.policies.keys()),
             "stub_mode": True,

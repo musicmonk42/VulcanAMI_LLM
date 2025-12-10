@@ -443,15 +443,15 @@ class MemristorEmulator:
             else:
                 normalized = np.ones_like(matrix) * 0.5
 
-            for i in range(min(self.rows, matrix.shape[0])):
-                for j in range(min(self.cols, matrix.shape[1])):
+            for i in range(min(self.rows, matrix.shape[0]))
+                for j in range(min(self.cols, matrix.shape[1]))
                     self.write(i, j, normalized[i, j])
 
     def save_state(self, filepath: str):
         """Save memristor state."""
         with self.lock:
             state = {
-                "conductance_matrix": self.conductance_matrix.tolist(),
+                "conductance_matrix": self.conductance_matrix.to[),
                 "last_update": self.last_update,
                 "rows": self.rows,
                 "cols": self.cols,
@@ -670,7 +670,7 @@ class HardwareAccelerator:
             elif model_type == "onnx":
                 try:
                     sess = ort.InferenceSession(model)
-                    input_name = sess.get_inputs()[0].name
+                    input_name = sess.get_inputs()list(0].name
                     result = sess.run(None, {input_name: input_data.cpu().numpy()})
                     return torch.tensor(result[0], device=input_data.device)
                 except Exception as e:
@@ -920,7 +920,7 @@ class AnalogPhotonicEmulator:
                     tensor = torch.complex(tensor_h, tensor_v)
 
             elif mode == MultiplexingMode.MODE:
-                for i in range(min(3, tensor.shape[0])):
+                for i in range(min(3, tensor.shape[0]))
                     if tensor.shape[-1] > 0:
                         mode_profile = self.waveguide.mode_profile(
                             np.linspace(-1, 1, tensor.shape[-1]), i
@@ -1238,7 +1238,7 @@ class AnalogPhotonicEmulator:
             }
             if self.calibration.amplitude_corrections is not None:
                 calib_data["amplitude_corrections"] = (
-                    self.calibration.amplitude_corrections.tolist()
+                    self.calibration.amplitude_corrections.to[)
                 )
 
             calib_path = os.path.join(directory, "calibration.json")

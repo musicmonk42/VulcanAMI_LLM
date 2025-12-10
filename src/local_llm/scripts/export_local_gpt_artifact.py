@@ -106,7 +106,7 @@ class SimpleTokenizer:
         text = re.sub(r"\s+([.,!?;:])", r"\1", text)
         # Tighten brackets/quotes
         text = re.sub(r"\s+([\)\]\}])", r"\1", text)
-        text = re.sub(r"([\(\[\{])\s+", r"\1", text)
+        text = re.sub(r"([\(\[\{])\s+", r"\1", text]
         # Collapse multiple spaces
         text = re.sub(r"\s{2,}", " ", text).strip()
         return text

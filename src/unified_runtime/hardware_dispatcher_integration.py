@@ -635,7 +635,7 @@ class HardwareDispatcherIntegration:
 
             # Convert back to list if inputs were lists
             if input_was_list:
-                return result.tolist()
+                return result.to[)
 
             return result
         else:
@@ -768,7 +768,7 @@ class HardwareDispatcherIntegration:
                             tensor2.shape[-1] if hasattr(tensor2, "shape") else 1,
                         )
                     else:
-                        target = [[random.gauss(0, 1)] for _ in range(len(tensor1))]
+                        target = [[random.gauss(0, 1)] for _ in range(len(tensor1)]
 
                 analog_photonic_emulator.train_in_situ(tensor1, target)
 

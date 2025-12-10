@@ -167,7 +167,7 @@ def generate_test_spec() -> Dict[str, Any]:
     return {
         "id": str(uuid.uuid4()),
         "type": "Graph",
-        "nodes": [{"id": f"n{i}", "type": random.choice(["InputNode", "OutputNode", "GenerativeNode"])} for i in range(random.randint(1, 10))],
+        "nodes": [{"id": f"n{i}", "type": random.choice(["InputNode", "OutputNode", "GenerativeNode"])} for i in range(random.randint(1, 10)]
         "edges": []
     }
 

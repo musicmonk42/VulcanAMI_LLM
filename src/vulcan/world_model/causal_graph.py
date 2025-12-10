@@ -151,7 +151,7 @@ except ImportError:
             """Get all nodes"""
             with self._lock:
                 if data:
-                    return [(n, attrs) for n, attrs in self.nodes_dict.items()]
+                    return list((n, attrs) for n, attrs in self.nodes_dict.items()]
                 return list(self.nodes_dict.keys())
 
         def edges(self, data=False):
@@ -1230,7 +1230,7 @@ class CycleDetector:
         min_weight = float("inf")
 
         for cycle in cycles:
-            for i in range(len(cycle)):
+            for i in range(len(cycle))
                 j = (i + 1) % len(cycle)
                 edge_key = (cycle[i], cycle[j])
 

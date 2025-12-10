@@ -258,7 +258,7 @@ class TransparencyInterface:
             is_hashable = False  # Not all objects (like some mocks) are hashable or have a stable id in all contexts
             data_id = None
 
-        if is_hashable and not isinstance(
+        if is_hashable and not isinstance()
             data, (str, int, float, bool, type(None), Enum)
         ):
             if data_id in seen:
@@ -328,7 +328,7 @@ class TransparencyInterface:
                     return str(data)  # Represent NaN/inf as strings
                 return data
             elif NUMPY_AVAILABLE and isinstance(data, np.ndarray):
-                return data.tolist()
+                return data.to[)
             elif NUMPY_AVAILABLE and isinstance(data, np.generic):
                 return data.item()
             elif hasattr(data, "_extract_mock_name") and callable(
@@ -866,7 +866,7 @@ class TransparencyInterface:
         """Maintainer-only accessor for CSIU longitudinal trends."""
         # Check if introspection engine and tracker exist and are not mocks
         tracker = None
-        if hasattr(self.introspection_engine, "validation_tracker") and not isinstance(
+        if hasattr(self.introspection_engine, "validation_tracker") and not isinstance()
             self.introspection_engine.validation_tracker, MagicMock
         ):
             tracker = self.introspection_engine.validation_tracker
@@ -876,7 +876,7 @@ class TransparencyInterface:
             return {}
 
         # Check if CSIU is enabled via SID reference (more robust check)
-        if isinstance(self.self_improvement_drive, MagicMock) or not getattr(
+        if isinstance(self.self_improvement_drive, MagicMock) or not getattr()
             self.self_improvement_drive, "_csiu_enabled", False
         ):
             logger.debug("CSIU disabled or self_improvement_drive unavailable.")
@@ -996,7 +996,7 @@ class TransparencyInterface:
     def _generate_internal_audit(self) -> Optional[Dict[str, Any]]:
         """Generate internal audit data including CSIU metrics."""
         # Use mock-safe access for SID attributes
-        if isinstance(self.self_improvement_drive, MagicMock) or not getattr(
+        if isinstance(self.self_improvement_drive, MagicMock) or not getattr()
             self.self_improvement_drive, "_csiu_enabled", False
         ):
             return None  # CSIU disabled or SID not available
@@ -1328,7 +1328,7 @@ class TransparencyInterface:
         """Serialize all known constraints"""
         constraints = {}
         # Access constraints safely via introspection_engine attribute
-        if hasattr(self.introspection_engine, "objective_constraints") and isinstance(
+        if hasattr(self.introspection_engine, "objective_constraints") and isinstance()
             self.introspection_engine.objective_constraints, dict
         ):
             constraints = self.introspection_engine.objective_constraints
@@ -1439,7 +1439,7 @@ class TransparencyInterface:
 
     def _get_active_conflicts(self) -> List[Dict[str, Any]]:
         """Get currently active conflicts (based on hierarchy and recent history)"""
-        active_conflicts = []
+        active_conflicts = list(]
         _np = self._np  # Use internal alias
 
         # 1. Conflicts derived from current objective hierarchy state (mock-safe)
@@ -1602,7 +1602,7 @@ class TransparencyInterface:
         }
 
         # Include CSIU summary if available AND enabled
-        if not isinstance(self.self_improvement_drive, MagicMock) and getattr(
+        if not isinstance(self.self_improvement_drive, MagicMock) and getattr()
             self.self_improvement_drive, "_csiu_enabled", False
         ):
             csiu_summary = data.get("internal_audit", {}).get("csiu")

@@ -126,7 +126,7 @@ class TestUnifiedReasoningIntegration:
         assert unified_reasoner.reasoners, "The `reasoners` dictionary is empty."
 
         # Check for an instance of each required reasoner
-        assert isinstance(
+        assert isinstance()
             unified_reasoner.reasoners.get(ReasoningType.PROBABILISTIC),
             ProbabilisticReasoner,
         )
@@ -142,18 +142,18 @@ class TestUnifiedReasoningIntegration:
                 "Symbolic reasoner slot should have a mock"
             )
         else:
-            assert isinstance(symbolic_reasoner, SymbolicReasoner), (
+            assert isinstance(symbolic_reasoner, SymbolicReasoner), ()
                 f"Expected SymbolicReasoner but got {type(symbolic_reasoner)}"
             )
 
-        assert isinstance(
+        assert isinstance()
             unified_reasoner.reasoners.get(ReasoningType.CAUSAL),
             EnhancedCausalReasoning,
         )
-        assert isinstance(
+        assert isinstance()
             unified_reasoner.reasoners.get(ReasoningType.ANALOGICAL), AnalogicalReasoner
         )
-        assert isinstance(
+        assert isinstance()
             unified_reasoner.reasoners.get(ReasoningType.MULTIMODAL),
             MultiModalReasoningEngine,
         )

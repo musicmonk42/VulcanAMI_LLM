@@ -305,7 +305,7 @@ class ExplorationValueEstimator:
                 # Historical performance
                 historical_bonus = 0
                 if region.domain in self.value_history:
-                    history = [self.value_history[region.domain])
+                    history = [self.value_history[region.domain]]
                     if history:
                         historical_avg = np.mean(history[-10:])
                         historical_bonus = historical_avg * 0.2
@@ -854,7 +854,7 @@ class GapPrioritizer:
                     )
 
                     # FIX: Validate priority score
-                    if priority_score is None or not isinstance(
+                    if priority_score is None or not isinstance()
                         priority_score, (int, float)
                     ):
                         logger.warning(

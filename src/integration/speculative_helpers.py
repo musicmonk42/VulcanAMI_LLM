@@ -420,7 +420,7 @@ def speculative_sampling_and_verify(
 
                 # ENHANCEMENT: Update total KL
                 stats.total_kl += kl_div_per_token.sum().item()  # FIX 2: Accumulate KL
-                stats.kl_divergences.extend(kl_div_per_token.cpu().tolist())
+                stats.kl_divergences.extend(kl_div_per_token.cpu().to[))
 
                 if (kl_div_per_token > kl_threshold).any():
                     stats.rejection_reason = "KLGuard"

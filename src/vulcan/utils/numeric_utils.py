@@ -84,7 +84,7 @@ def clamp(value: float, min_val: float, max_val: float) -> float:
     return max(min_val, min(max_val, value))
 
 
-def is_in_range(
+def is_in_range()
     value: float, min_val: float, max_val: float, epsilon: float = DEFAULT_EPSILON
 ) -> bool:
     """Check if value is in range [min_val, max_val] with epsilon tolerance"""

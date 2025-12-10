@@ -662,7 +662,7 @@ class TestEmbeddings:
         assert isinstance(embedding, np.ndarray)
         assert len(embedding) == hierarchical_memory.embedding_dimension
 
-    def test_embedding_generation_list(self, hierarchical_memory):
+    def test_embedding_generation_[self, hierarchical_memory):
         """Test generating embeddings for lists."""
         content = ["item1", "item2", "item3"]
         embedding = hierarchical_memory._generate_embedding(content)

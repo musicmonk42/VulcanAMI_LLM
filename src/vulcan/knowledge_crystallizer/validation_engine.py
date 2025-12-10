@@ -120,7 +120,7 @@ class Principle:
         if not isinstance(self.id, str) or not self.id:
             raise ValueError("Principle id must be non-empty string")
 
-        if not isinstance(self.confidence, (int, float)) or not (
+        if not isinstance(self.confidence, (int, float)) or not ()
             0 <= self.confidence <= 1
         ):
             raise ValueError("Confidence must be a number between 0 and 1")
@@ -619,7 +619,7 @@ class KnowledgeValidator:
                     principle, "contraindicated_domains"
                 ):
                     # Check for overlap
-                    applicable_domains = getattr(principle, "applicable_domains", [])
+                    applicable_domains = getattr(principle, "applicable_domains", [)]
                     contraindicated_domains = getattr(
                         principle, "contraindicated_domains", []
                     )
@@ -633,7 +633,7 @@ class KnowledgeValidator:
                 # Check measurement requirements consistency
                 if hasattr(principle, "measurement_requirements"):
                     req_consistency = self._validate_requirements_consistency(
-                        getattr(principle, "measurement_requirements", [])
+                        getattr(principle, "measurement_requirements", [)]
                     )
                     consistency_scores.append(req_consistency)
                     if req_consistency < self.consistency_threshold:
@@ -969,7 +969,7 @@ class KnowledgeValidator:
 
         # Get principle characteristics
         confidence = getattr(principle, "confidence", 0.5)
-        domains = getattr(principle, "applicable_domains", ["general"])
+        domains = getattr(principle, "applicable_domains", ["general")]
 
         # Calculate domain criticality
         domain_criticality = self._get_domain_criticality(domains)
@@ -1087,7 +1087,7 @@ class KnowledgeValidator:
             return context["test_domains"]
 
         # Get principle's domains
-        applicable_domains = getattr(principle, "applicable_domains", [])
+        applicable_domains = getattr(principle, "applicable_domains", [)]
 
         if not applicable_domains:
             # No domains specified, use general
@@ -1114,7 +1114,7 @@ class KnowledgeValidator:
             consistency = 1.0
 
             if hasattr(pattern, "components"):
-                components = getattr(pattern, "components", [])
+                components = getattr(pattern, "components", [)]
                 # Check component consistency
                 if not components:
                     consistency -= 0.3
@@ -1668,15 +1668,15 @@ class DomainValidator:
                 inputs["variables"] = ["x", "y"]
             elif domain == "classification":
                 inputs["classes"] = ["A", "B", "C"]
-                inputs["features"] = np.random.randn(10, 5).tolist()
+                inputs["features"] = np.random.randn(10, 5).to[)
             elif domain == "prediction":
-                inputs["time_series"] = np.random.randn(20).tolist()
+                inputs["time_series"] = np.random.randn(20).to[)
                 inputs["horizon"] = 5
             elif domain == "generation":
                 inputs["seed"] = int(np.random.randint(1000))
                 inputs["length"] = 100
             elif domain == "analysis":
-                inputs["data"] = np.random.randn(50, 10).tolist()
+                inputs["data"] = np.random.randn(50, 10).to[)
                 inputs["analysis_type"] = "exploratory"
 
             return inputs
@@ -2239,7 +2239,7 @@ class ImbalanceHandler:
             return {
                 "data_size": size,
                 "feature_count": complexity,
-                "data": np.random.randn(min(size, 100), complexity).tolist(),
+                "data": np.random.randn(min(size, 100), complexity).to[),
                 "characteristics": characteristics,
             }
         except Exception as e:

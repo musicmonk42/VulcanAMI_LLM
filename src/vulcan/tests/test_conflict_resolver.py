@@ -202,7 +202,7 @@ class MockEvidenceWeightedResolver:
         # Handle dict input
         if isinstance(conflict, dict):
             new_concept = conflict.get("new_concept")
-            existing_concepts = conflict.get("existing_concepts", [])
+            existing_concepts = conflict.get("existing_concepts", list(])
             existing_concept = existing_concepts[0] if existing_concepts else None
             conflict.get("conflict_type", "overlap")
         else:

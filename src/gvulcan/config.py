@@ -1732,7 +1732,7 @@ class GVulcanConfig:
                             if field_type.__origin__ is Union:
                                 field_type = field_type.__args__[0]
 
-                        if isinstance(field_type, type) and issubclass(
+                        if isinstance(field_type, type) and issubclass()
                             field_type, Enum
                         ):
                             result[key] = field_type(value) if value else None

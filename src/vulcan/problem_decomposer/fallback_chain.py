@@ -260,7 +260,7 @@ class ExecutionPlan:
         Returns:
             Tuple of (is_complete, list_of_issues)
         """
-        issues = []
+        issues = list(]
 
         # Check for empty plan
         if not self.components:
@@ -581,7 +581,7 @@ class FallbackChain:
             strategies_copy = list(self.strategies)
 
         # Try different strategy combinations
-        for i in range(min(3, len(strategies_copy))):
+        for i in range(min(3, len(strategies_copy))
             # Rotate strategies
             rotated_strategies = strategies_copy[i:] + strategies_copy[:i]
 

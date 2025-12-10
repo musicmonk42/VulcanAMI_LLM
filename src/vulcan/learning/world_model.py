@@ -671,7 +671,7 @@ class UnifiedWorldModel(nn.Module):
 
         current_state = initial_state
 
-        for i in range(min(horizon, len(action_sequence))):
+        for i in range(min(horizon, len(action_sequence))
             action = action_sequence[i].to(self.device)
 
             # FIXED: Ensure action has batch dimension
@@ -903,7 +903,7 @@ class UnifiedWorldModel(nn.Module):
             sim_reward = 0
 
             with torch.no_grad():
-                for _ in range(horizon - len(path)):
+                for _ in range(horizon - len(path))
                     action = random.choice(candidate_actions)
                     # FIXED: Ensure action has proper dimension
                     if action.dim() == 1:
@@ -1324,7 +1324,7 @@ class StateAbstractor(nn.Module):
         # Decoders for reconstruction
         self.decoders = nn.ModuleList()
 
-        for level in reversed(range(num_levels)):
+        for level in reversed(range(num_levels))
             in_dim = state_dim // (2 ** (level + 1))
             in_dim = max(in_dim, 32)
             out_dim = state_dim // (2**level) if level > 0 else state_dim

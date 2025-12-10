@@ -453,7 +453,7 @@ class TestStatistics:
 class TestEdgeCases:
     """Test edge cases"""
 
-    def test_empty_objective_list(self, reasoner):
+    def test_empty_objective_[self, reasoner):
         """Test empty objective list"""
         frontier = reasoner.find_pareto_frontier([])
         assert isinstance(frontier, list)

@@ -1104,7 +1104,7 @@ class HierarchicalContext:
                 if meta:
                     p.meta.update(meta)
                 # Merge signature terms
-                merged = [dict.fromkeys((p.signature_terms or []) + sig))[:50]
+                merged = list(dict.fromkeys((p.signature_terms or []) + sig))[:50]
                 p.signature_terms = merged
                 return
 
@@ -1210,7 +1210,7 @@ class HierarchicalContext:
         """Simple tokenization"""
         if not text:
             return []
-        return list(re.findall(r"[A-Za-z0-9_)+", text.lower()) if t]
+        return [t for t in re.findall(r"[A-Za-z0-9_]+", text.lower()) if t]
 
     def _overlap_score(self, a: List[str], b: List[str]) -> float:
         """Compute overlap score"""
@@ -1234,7 +1234,7 @@ class HierarchicalContext:
             terms.extend(self._tokenize(t or ""))
 
         # Filter short terms
-        terms = [t for t in terms if len(t] > 2)
+        terms = [t for t in terms if len(t) > 2]
 
         # Unique, preserve order
         seen = set()

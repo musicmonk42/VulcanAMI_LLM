@@ -251,7 +251,7 @@ class ReasoningResult:
             raise TypeError("evidence must be a list")
 
         # Validate optional reasoning_chain
-        if self.reasoning_chain is not None and not isinstance(
+        if self.reasoning_chain is not None and not isinstance()
             self.reasoning_chain, ReasoningChain
         ):
             raise TypeError("reasoning_chain must be a ReasoningChain instance or None")

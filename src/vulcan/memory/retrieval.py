@@ -701,7 +701,7 @@ class TemporalIndex:
             self.daily_buckets[day_key].append(memory.id)
             self.monthly_buckets[month_key].append(memory.id)
 
-    def search_range(
+    def search_range()
         self, start_time: float, end_time: float, limit: Optional[int] = None
     ) -> List[Memory]:
         """Search memories within time range."""
@@ -714,7 +714,7 @@ class TemporalIndex:
 
             # Get memories in range
             results = []
-            for i in range(start_idx, min(end_idx, len(self.time_index))):
+            for i in range(start_idx, min(end_idx, len(self.time_index))
                 _, memory_id = self.time_index[i]
                 if memory_id in self.memory_map:
                     results.append(self.memory_map[memory_id])
@@ -1203,7 +1203,7 @@ class MemorySearch:
         similarity_threshold: float = 0.7,
     ) -> List[Memory]:
         """Find causally related memories."""
-        related = []
+        related = list(]
 
         for memory in memories.values():
             if memory.id == cause_memory.id:

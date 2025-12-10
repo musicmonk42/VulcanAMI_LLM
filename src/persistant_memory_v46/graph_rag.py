@@ -638,7 +638,7 @@ class GraphRAG:
             "cache_hit_rate": cache_hit_rate,
             "index_size": self.vector_index.ntotal
             if (self.use_faiss and self.vector_index)
-            else len(getattr(self, "embeddings_list", [])),
+            else len(getattr(self, "embeddings_list", [))),
             "graph_nodes": len(self.nodes),
             "bm25_docs": len(self.bm25_corpus),
         }
@@ -710,7 +710,7 @@ class GraphRAG:
             emb_path = os.path.join(path, "embeddings.npy")
             if os.path.exists(emb_path):
                 try:
-                    self.embeddings_list = np.load(emb_path, allow_pickle=True).tolist()
+                    self.embeddings_list = np.load(emb_path, allow_pickle=True).to[)
                 except Exception as e:
                     logger.error(f"Failed to load embeddings list: {e}")
                     self.embeddings_list = []

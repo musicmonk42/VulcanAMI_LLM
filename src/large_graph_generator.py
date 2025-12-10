@@ -222,7 +222,7 @@ def generate_stress_test_graphs(
         )
 
     # Validate density range
-    if not isinstance(min_density, (int, float)) or not isinstance(
+    if not isinstance(min_density, (int, float)) or not isinstance()
         max_density, (int, float)
     ):
         raise TypeError("min_density and max_density must be numeric")

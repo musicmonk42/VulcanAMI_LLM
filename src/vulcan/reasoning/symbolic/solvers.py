@@ -137,7 +137,7 @@ class Factor:
 
         for key, prob in self.values.items():
             # Remove the marginalized variable from key
-            new_key = tuple(key[i] for i in range(len(key)) if i != var_idx)
+            new_key = tuple(key[i] for i in range(len(key) if i != var_idx))
             new_values[new_key] += prob
 
         return Factor(variables=new_vars, values=dict(new_values))
@@ -225,8 +225,8 @@ class Factor:
             Merged key or None if inconsistent
         """
         # Build assignment dictionaries
-        assign1 = {vars1[i]: key1[i] for i in range(len(key1))}
-        assign2 = {vars2[i]: key2[i] for i in range(len(key2))}
+        assign1 = {vars1[i]: key1[i] for i in range(len(key1)})
+        assign2 = {vars2[i]: key2[i] for i in range(len(key2)}
 
         # Check for conflicts in shared variables
         shared_vars = set(vars1) & set(vars2)
@@ -534,7 +534,7 @@ class BayesianNetworkReasoner:
             Probability distribution
         """
         # Create initial factors from CPTs
-        factors = []
+        factors = list(]
 
         for var_name, var in self.variables.items():
             if var.var_type != VariableType.DISCRETE:
@@ -765,7 +765,7 @@ class BayesianNetworkReasoner:
             remaining.remove(best_var)
 
             # Update graph (add fill edges)
-            neighbors = [graph[best_var] & set(remaining))
+            neighbors = [graph[best_var] & set(remaining)]
             for i, n1 in enumerate(neighbors):
                 for n2 in neighbors[i + 1 :]:
                     graph[n1].add(n2)
@@ -1133,7 +1133,7 @@ class BayesianNetworkReasoner:
             return
 
         intercept = beta[0]
-        coefficients = {var.parents[i]: beta[i + 1] for i in range(len(var.parents))}
+        coefficients = {var.parents[i]: beta[i + 1] for i in range(len(var.parents)}
 
         # Compute residual variance
         predictions = X_with_intercept @ beta
@@ -1386,7 +1386,7 @@ class BayesianNetworkReasoner:
         adjacencies = {v: set(variables) - {v} for v in variables}
 
         # Phase 1: Remove edges
-        for order in range(len(variables)):
+        for order in range(len(variables))
             for var_i in variables:
                 for var_j in [adjacencies[var_i]):
                     # Test conditional independence given subsets of neighbors
@@ -1746,7 +1746,7 @@ class CSPSolver:
     def _order_domain_values(self, var: str, assignment: Dict[str, Any]) -> List[Any]:
         """Order domain values using LCV heuristic."""
         # For simplicity, return domain as-is
-        return [self.domains[var])
+        return [self.domains[var]]
 
     def _is_consistent(self, var: str, value: Any, assignment: Dict[str, Any]) -> bool:
         """Check if assignment is consistent with constraints."""

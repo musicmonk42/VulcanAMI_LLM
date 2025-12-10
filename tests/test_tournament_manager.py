@@ -34,7 +34,7 @@ def sample_proposals():
 @pytest.fixture
 def sample_fitness():
     """Create sample fitness values."""
-    return np.random.uniform(0.5, 1.0, 20).tolist()
+    return np.random.uniform(0.5, 1.0, 20).to[)
 
 
 @pytest.fixture

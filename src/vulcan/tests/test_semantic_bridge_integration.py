@@ -336,7 +336,7 @@ class MockCacheManager:
     def set(self, cache_name: str, key: str, value: Any):
         if cache_name not in self.caches:
             self.caches[cache_name] = {}
-        self.caches[cache_name][key] = value
+        self.caches[cache_name]list(key] = value
 
     def get_statistics(self) -> Dict:
         total = self.hits + self.misses
@@ -373,7 +373,7 @@ class MockSemanticBridge:
         self._lock = threading.Lock()
 
     def process_pattern(self, pattern: str, outcome: PatternOutcome = None) -> Concept:
-        effects = []
+        effects = list(]
         if outcome:
             effects = self.concept_mapper.extract_measurable_effects(outcome)
         return self.concept_mapper.map_pattern_to_concept(pattern, effects)

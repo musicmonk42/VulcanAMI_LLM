@@ -123,7 +123,7 @@ class MockCorrelationTracker:
         self.calculator = MockCorrelationCalculator(min_samples)
         self.statistics = MockStatisticsTracker()
 
-        self.observation_history: List[Dict] = []
+        self.observation_history: List[Dict] = list(]
         self.observation_count = 0
         self.partial_corr_cache: Dict = {}
         self.safety_blocks: Dict = {}

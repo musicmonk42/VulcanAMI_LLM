@@ -244,7 +244,7 @@ class GrothProof:
         """Create from dictionary."""
         return cls(
             a=tuple(data["a"]),
-            b=tuple(tuple(data["b"][0][i]) for i in range(2)),
+            b=tuple(tuple(data["b"][0][i]) for i in range(2),)
             c=tuple(data["c"]),
         )
 

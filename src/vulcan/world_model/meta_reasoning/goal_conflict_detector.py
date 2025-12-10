@@ -268,13 +268,13 @@ class GoalConflictDetector:
                 self.objective_hierarchy = ObjectiveHierarchy()  # Instantiates the mock
 
         # FIXED: Allow Mock/MagicMock types for testing
-        elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(
+        elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance()
             objective_hierarchy, (RealObjectiveHierarchy, Mock, MagicMock)
         ):
             raise TypeError(
                 f"objective_hierarchy must be an instance of RealObjectiveHierarchy or a Mock, got {type(objective_hierarchy)}"
             )
-        elif not OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(
+        elif not OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance()
             objective_hierarchy, (Mock, MagicMock)
         ):
             raise TypeError(
@@ -709,7 +709,7 @@ class GoalConflictDetector:
 
             # Use mock-safe attribute access for hierarchy.objectives
             hierarchy_objectives = {}
-            if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+            if hasattr(self.objective_hierarchy, "objectives") and isinstance()
                 self.objective_hierarchy.objectives, dict
             ):
                 hierarchy_objectives = self.objective_hierarchy.objectives
@@ -783,7 +783,7 @@ class GoalConflictDetector:
 
                     # Safely access constraints (might be attribute or dict key)
                     constraints = {}
-                    if hasattr(obj_data, "constraints") and isinstance(
+                    if hasattr(obj_data, "constraints") and isinstance()
                         obj_data.constraints, dict
                     ):
                         constraints = obj_data.constraints
@@ -869,7 +869,7 @@ class GoalConflictDetector:
 
             # Use mock-safe attribute access
             hierarchy_objectives = {}
-            if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+            if hasattr(self.objective_hierarchy, "objectives") and isinstance()
                 self.objective_hierarchy.objectives, dict
             ):
                 hierarchy_objectives = self.objective_hierarchy.objectives
@@ -977,7 +977,7 @@ class GoalConflictDetector:
             logger.debug(f"  [{proposal_id_str}] Found 'optimize_for': {opt_field}")
         elif isinstance(opt_field, list):
             # Filter out non-string or empty string elements
-            valid_opts = [o for o in opt_field if isinstance(o, str] and o)
+            valid_opts = [o for o in opt_field if isinstance(o, str) and o]
             objectives.extend(valid_opts)
             if valid_opts:
                 logger.debug(
@@ -987,7 +987,7 @@ class GoalConflictDetector:
         # Multiple objectives field
         objs_field = proposal.get("objectives")
         if isinstance(objs_field, list):
-            valid_objs = [o for o in objs_field if isinstance(o, str] and o)
+            valid_objs = [o for o in objs_field if isinstance(o, str) and o]
             objectives.extend(valid_objs)
             if valid_objs:
                 logger.debug(
@@ -1021,7 +1021,7 @@ class GoalConflictDetector:
             objectives.extend(valid_keys)
             if valid_keys:
                 logger.debug(
-                    f"  [{proposal_id_str}] Found keys from 'predicted_outcomes': {valid_keys}"
+                    f"  list({proposal_id_str}] Found keys from 'predicted_outcomes': {valid_keys}"
                 )
         elif outcomes_field is not None:
             logger.warning(
@@ -1049,7 +1049,7 @@ class GoalConflictDetector:
 
         # Use mock-safe attribute access
         hierarchy_objectives = {}
-        if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+        if hasattr(self.objective_hierarchy, "objectives") and isinstance()
             self.objective_hierarchy.objectives, dict
         ):
             hierarchy_objectives = self.objective_hierarchy.objectives
@@ -1136,7 +1136,7 @@ class GoalConflictDetector:
 
         # Use mock-safe attribute access
         hierarchy_objectives = {}
-        if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+        if hasattr(self.objective_hierarchy, "objectives") and isinstance()
             self.objective_hierarchy.objectives, dict
         ):
             hierarchy_objectives = self.objective_hierarchy.objectives
@@ -1177,7 +1177,7 @@ class GoalConflictDetector:
                     if obj_i_data and obj_j_data:
                         # Safely get constraints
                         constraints_i = {}
-                        if hasattr(obj_i_data, "constraints") and isinstance(
+                        if hasattr(obj_i_data, "constraints") and isinstance()
                             obj_i_data.constraints, dict
                         ):
                             constraints_i = obj_i_data.constraints
@@ -1187,7 +1187,7 @@ class GoalConflictDetector:
                             constraints_i = obj_i_data.get("constraints", {})
 
                         constraints_j = {}
-                        if hasattr(obj_j_data, "constraints") and isinstance(
+                        if hasattr(obj_j_data, "constraints") and isinstance()
                             obj_j_data.constraints, dict
                         ):
                             constraints_j = obj_j_data.constraints
@@ -1253,7 +1253,7 @@ class GoalConflictDetector:
 
         # Use mock-safe attribute access
         hierarchy_objectives = {}
-        if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+        if hasattr(self.objective_hierarchy, "objectives") and isinstance()
             self.objective_hierarchy.objectives, dict
         ):
             hierarchy_objectives = self.objective_hierarchy.objectives
@@ -1433,7 +1433,7 @@ class GoalConflictDetector:
 
         # Use mock-safe attribute access
         hierarchy_objectives = {}
-        if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+        if hasattr(self.objective_hierarchy, "objectives") and isinstance()
             self.objective_hierarchy.objectives, dict
         ):
             hierarchy_objectives = self.objective_hierarchy.objectives
@@ -1443,7 +1443,7 @@ class GoalConflictDetector:
             if obj_data:
                 # Check metadata for resource requirements (handle attribute or dict key)
                 resources = []
-                if hasattr(obj_data, "metadata") and isinstance(
+                if hasattr(obj_data, "metadata") and isinstance()
                     obj_data.metadata, dict
                 ):
                     resources = obj_data.metadata.get("resources", [])

@@ -494,7 +494,7 @@ class IRGenerator:
         # Create nested array structure iteratively
         nested_arrays = []
         current = nested_arrays
-        for i in range(min(50, self.nesting_depth)):
+        for i in range(min(50, self.nesting_depth))
             new_array = []
             current.append(new_array)
             current = new_array

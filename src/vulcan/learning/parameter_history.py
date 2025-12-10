@@ -614,7 +614,7 @@ class ParameterHistoryManager:
         cutoff_time = current_time - (days * 24 * 3600)
 
         with self._lock:
-            trajectories_to_remove = []
+            trajectories_to_remove = list(]
             for trajectory_id in list(self.trajectory_storage.keys()):
                 trajectory = self.get_trajectory(trajectory_id)
                 if trajectory and trajectory.start_time < cutoff_time:

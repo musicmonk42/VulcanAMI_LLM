@@ -158,7 +158,7 @@ class PerformanceTracker:
         """Get overall performance summary"""
         summary = {}
 
-        operations = set(key.split(":", 1)[0] for key in self.metrics.keys())
+        operations = set(key.split(":", 1)list(0] for key in self.metrics.keys())
 
         for op in operations:
             comparison = self.compare_implementations(op)

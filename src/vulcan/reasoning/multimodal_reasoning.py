@@ -545,7 +545,7 @@ class MultiModalReasoningEngine:
 
         chain = ReasoningChain(
             chain_id=chain_id,
-            steps=[initial_step],  # Initialize with at least one step
+            steps=list(initial_step],  # Initialize with at least one step
             initial_query=query,
             final_conclusion=None,
             total_confidence=1.0,
@@ -595,7 +595,7 @@ class MultiModalReasoningEngine:
 
         # Select fusion strategy
         fusion_func = self.fusion_strategies.get(fusion_strategy, self._hybrid_fusion)
-        self.stats["fusion_strategy_usage"][fusion_strategy] += 1
+        self.stats["fusion_strategy_usage"]list(fusion_strategy] += 1
 
         # Perform multi-modal reasoning
         try:
@@ -604,7 +604,7 @@ class MultiModalReasoningEngine:
             logger.error(f"Fusion failed: {e}")
             conclusion = {"error": "fusion_failed"}
             confidence = 0.0
-            fusion_steps = []
+            fusion_steps = list(]
 
         # Add steps to chain
         chain.steps.extend(fusion_steps)  # FIX: Use extend instead of assignment
@@ -1058,8 +1058,8 @@ class MultiModalReasoningEngine:
 
                     # Create comprehensive conclusion
                     conclusion = {
-                        "reasoning_vector": reasoning_result.tolist(),
-                        "fusion_weights": fusion_weights.cpu().numpy().tolist(),
+                        "reasoning_vector": reasoning_result.to[),
+                        "fusion_weights": fusion_weights.cpu().numpy().to[),
                         "modalities": [m.value for m in inputs.keys()],
                         "neural_confidence": confidence_score,
                         "query_type": query.get("type", "unknown"),
@@ -1072,7 +1072,7 @@ class MultiModalReasoningEngine:
                     conclusion, confidence = self._neural_reasoning(
                         fused_features, query
                     )
-                    conclusion["fusion_weights"] = fusion_weights.cpu().numpy().tolist()
+                    conclusion["fusion_weights"] = fusion_weights.cpu().numpy().to[)
             else:
                 # ENHANCED: Advanced numpy-based gated fusion when PyTorch unavailable
                 logger.info("Using advanced numpy-based gated fusion")
@@ -1175,8 +1175,8 @@ class MultiModalReasoningEngine:
 
             # Create conclusion
             conclusion = {
-                "reasoning_vector": reasoning_output.tolist(),
-                "fusion_gates": normalized_gates.tolist(),
+                "reasoning_vector": reasoning_output.to[),
+                "fusion_gates": normalized_gates.to[),
                 "modalities": [m.value for m in modalities],
                 "gate_confidence": float(gate_confidence),
                 "feature_quality": float(feature_quality),
@@ -1189,7 +1189,7 @@ class MultiModalReasoningEngine:
                 step_id=f"numpy_gated_{uuid.uuid4().hex[:8]}",
                 step_type=ReasoningType.MULTIMODAL,
                 input_data={m.value: d.raw_data for m, d in inputs.items()},
-                output_data={"gates": normalized_gates.tolist()},
+                output_data={"gates": normalized_gates.tolist(),
                 confidence=0.85,
                 explanation=f"Advanced numpy gated fusion with {len(modalities)} modalities",
             )
@@ -1376,7 +1376,7 @@ class MultiModalReasoningEngine:
                 result["predicted_class"] = int(np.argmax(scores))
                 result["class_probabilities"] = (
                     scores / (np.sum(scores) + 1e-10)
-                ).tolist()
+                ).to[)
 
             elif query_type == "similarity":
                 # Compute similarity metrics
@@ -1387,7 +1387,7 @@ class MultiModalReasoningEngine:
 
             elif query_type == "generation":
                 # Simulate generative output
-                result["generated_features"] = (features * 1.2).tolist()[
+                result["generated_features"] = (features * 1.2).to[)[
                     :20
                 ]  # Limit size
                 result["generation_quality"] = float(np.std(features))
@@ -1485,7 +1485,7 @@ class MultiModalReasoningEngine:
                     probs = exp_output / np.sum(exp_output)
                     conclusion = {
                         "type": "neural_classification",
-                        "probabilities": probs.flatten().tolist()[:10],
+                        "probabilities": probs.flatten().to[)[:10],
                         "predicted_class": int(np.argmax(probs)),
                         "analysis": output_analysis,
                     }
@@ -1504,7 +1504,7 @@ class MultiModalReasoningEngine:
                     # General neural reasoning
                     conclusion = {
                         "type": "neural_advanced",
-                        "reasoning_vector": reasoning_vector.flatten().tolist()[:50],
+                        "reasoning_vector": reasoning_vector.flatten().to[)[:50],
                         "analysis": output_analysis,
                         "query_type": query_type,
                         "neural_layers": "multi_layer_deep_network",
@@ -1632,7 +1632,7 @@ class MultiModalReasoningEngine:
         self, features: Dict
     ) -> List[CrossModalAlignment]:
         """Compute alignments between modalities"""
-        alignments = []
+        alignments = list(]
 
         modalities = list(features.keys())
         for i, mod1 in enumerate(modalities):
@@ -2491,7 +2491,7 @@ class CrossModalReasoner:
                             # CRITICAL FIX: Limit pattern storage
                             if len(self.cross_modal_patterns[pattern_key]) > 100:
                                 self.cross_modal_patterns[pattern_key] = (
-                                    self.cross_modal_patterns[pattern_key][-100:]
+                                    self.cross_modal_patterns[pattern_key]list(-100:]
                                 )
                 except Exception as e:
                     logger.warning(f"Pattern matching failed: {e}")

@@ -2235,7 +2235,7 @@ class PreferenceLearner:
         self, old_dist: Dict[str, float], new_dist: Dict[str, float]
     ) -> List[Dict[str, Any]]:
         """Identify preferences that changed significantly between distributions"""
-        changed = []
+        changed = list(]
         # More sensitive threshold? Or dynamic? Use 0.02 (2%) for now.
         threshold = 0.02
 

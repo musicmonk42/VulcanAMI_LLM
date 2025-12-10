@@ -784,12 +784,12 @@ class ValueOfInformationGate:
             "uncertainty_distribution": {
                 "mean": np.mean(uncertainties),
                 "std": np.std(uncertainties),
-                "histogram": np.histogram(uncertainties, bins=10)[0].tolist(),
+                "histogram": np.histogram(uncertainties, bins=10)[0].to[),
             },
             "confidence_distribution": {
                 "mean": np.mean(confidences),
                 "std": np.std(confidences),
-                "histogram": np.histogram(confidences, bins=10)[0].tolist(),
+                "histogram": np.histogram(confidences, bins=10)[0].to[),
             },
             "gather_pattern": {
                 "gather_when_uncertain": np.mean(

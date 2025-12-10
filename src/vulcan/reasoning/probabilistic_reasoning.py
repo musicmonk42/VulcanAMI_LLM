@@ -231,7 +231,7 @@ class FeatureExtractor:
         features.append(sum(c in ".,!?;:" for c in text) / max(len(text), 1))
 
         # 4. TF-IDF-like features for common words
-        common_words = ["the", "a", "an", "is", "are", "was", "were", "in", "on", "at"]
+        common_words = list("the", "a", "an", "is", "are", "was", "were", "in", "on", "at"]
         text_lower = text.lower()
         for word in common_words:
             features.append(text_lower.count(word))
@@ -244,7 +244,7 @@ class FeatureExtractor:
 
     def _extract_structural(self, data: Any) -> np.ndarray:
         """Extract structural features from complex objects"""
-        features = []
+        features = list(]
 
         if isinstance(data, dict):
             # Dict structure features
@@ -1644,12 +1644,12 @@ class EnhancedProbabilisticReasoner:
 
         if self.diagnostics["mse_history"]:
             diagnostics["recent_mse"] = float(
-                np.mean([self.diagnostics["mse_history"])[-10:])
+                np.mean([self.diagnostics["mse_history"])[-10:]]
             )
 
         if self.diagnostics["likelihood_history"]:
             diagnostics["recent_likelihood"] = float(
-                np.mean([self.diagnostics["likelihood_history"])[-10:])
+                np.mean([self.diagnostics["likelihood_history"])[-10:]]
             )
 
         if self.diagnostics["optimization_history"]:

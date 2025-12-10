@@ -483,7 +483,7 @@ class PerformanceTracker:
                 )
             else:
                 # Extract failure reason
-                errors = getattr(outcome, "errors", [])
+                errors = getattr(outcome, "errors", [)]
                 if errors:
                     failure_reason = (
                         errors[0] if isinstance(errors, list) else str(errors)

@@ -699,7 +699,7 @@ class TestCSPSolver:
 
         # Variables: row for each column
         for col in range(n):
-            solver.add_variable(f"Q{col}", list(range(n)))
+            solver.add_variable(f"Q{col}", list(range(n)
 
         # Constraints: no two queens in same row or diagonal
         for col1 in range(n):

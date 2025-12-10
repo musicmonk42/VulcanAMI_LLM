@@ -146,7 +146,7 @@ class S3Store:
             f"Operation failed after {self.max_retries} attempts"
         ) from last_error
 
-    def get_object_range(
+    def get_object_range()
         self, path: str, byte_range: Optional[Tuple[int, int]] = None
     ) -> Tuple[bytes, Dict[str, Any]]:
         """

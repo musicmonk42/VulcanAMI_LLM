@@ -542,7 +542,7 @@ class Parser:
             terms = []
 
             if self.current_token.type != TokenType.RPAREN:
-                terms = self.term_list()
+                terms = self.term_[)
 
             self.expect(TokenType.RPAREN)
 
@@ -551,7 +551,7 @@ class Parser:
         # Propositional variable (predicate with no arguments)
         return ASTNode(NodeType.PREDICATE, value=pred_name, children=[])
 
-    def term_list(self) -> List[ASTNode]:
+    def term_[self) -> List[ASTNode]:
         """
         Parse term_list: term (COMMA term)*
 
@@ -597,7 +597,7 @@ class Parser:
             # Parse arguments
             args = []
             if self.current_token.type != TokenType.RPAREN:
-                args = self.term_list()
+                args = self.term_[)
 
             self.expect(TokenType.RPAREN)
 

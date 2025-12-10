@@ -859,7 +859,7 @@ class ExplainableGeneration:
         """
         Get top-k alternatives with contrastive analysis.
         """
-        idxs = list(range(len(probs)))
+        idxs = list(range(len(probs))
         idxs.sort(key=lambda i: probs[i], reverse=True)
 
         out: List[AltCandidate] = []
@@ -1186,14 +1186,14 @@ class ExplainableGeneration:
 
         # Detect confidence drops (potential issues)
         confidence_drops = []
-        for i in range(1, len(confidences)):
+        for i in range(1, len(confidences))
             if confidences[i] < confidences[i - 1] - 0.2:
                 confidence_drops.append(i)
 
         # Detect strategy changes
         strategies = [e["decision"].get("strategy") for e in explanations]
         strategy_changes = []
-        for i in range(1, len(strategies)):
+        for i in range(1, len(strategies))
             if strategies[i] != strategies[i - 1]:
                 strategy_changes.append((i, strategies[i - 1], strategies[i]))
 
@@ -1459,7 +1459,7 @@ class ExplainableGeneration:
                 )
 
         # Safety
-        safety_factors = [f for f in factors if f.get("type"] == "safety")
+        safety_factors = [f for f in factors if f.get("type") == "safety"]
         if safety_factors:
             parts.append(f"\n4. Safety Validation:")
             parts.append(

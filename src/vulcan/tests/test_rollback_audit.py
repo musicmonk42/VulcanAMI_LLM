@@ -745,7 +745,7 @@ class TestAuditLogger:
             audit_logger.query_logs(sort_order="INJECT")
 
     @pytest.mark.timeout(10)
-    def test_query_filters_whitelist(self, audit_logger):
+    def test_query_filters_white[self, audit_logger):
         """Test that only whitelisted filter fields are allowed."""
         # Log entry
         audit_logger.log_event("test", {"data": "test"})

@@ -932,7 +932,7 @@ class ObjectiveHierarchy:
             for obj_name, obj in self.objectives.items():
                 # Dependencies
                 valid_deps = set()
-                for dep in getattr(obj, "dependencies", []):
+                for dep in getattr(obj, "dependencies", [)):
                     if dep in all_objective_names:
                         valid_deps.add(dep)
                     else:
@@ -944,7 +944,7 @@ class ObjectiveHierarchy:
 
                 # Conflicts (bidirectional)
                 valid_conflicts = set()
-                for conflict in getattr(obj, "conflicts_with", []):
+                for conflict in getattr(obj, "conflicts_with", [)):
                     if conflict in all_objective_names:
                         valid_conflicts.add(conflict)
                         # Add reverse link immediately
@@ -967,7 +967,7 @@ class ObjectiveHierarchy:
                         )
 
                 # Parent-child (from explicit children attribute - less common)
-                children_list = getattr(obj, "children", [])
+                children_list = getattr(obj, "children", [)]
                 if children_list:
                     valid_children = {c for c in children_list if c in self.objectives}
                     if len(valid_children) != len(children_list):
@@ -988,7 +988,7 @@ class ObjectiveHierarchy:
     def _detect_circular_dependencies(self) -> List[List[str]]:
         """Detect circular dependencies using DFS"""
 
-        cycles = []
+        cycles = list(]
         path = set()  # Nodes currently in the recursion stack for this path
         visited = set()  # Nodes visited in any path
 
@@ -1013,7 +1013,7 @@ class ObjectiveHierarchy:
                     # For simplicity, we'll just report the nodes involved in cycles found this way.
                     # This might report multiple edges involved in the same cycle.
                     cycles.append(
-                        [node, neighbor]
+                        list(node, neighbor]
                     )  # Report the edge causing cycle detection
                     return True  # Indicate cycle found
 
@@ -1043,17 +1043,17 @@ class ObjectiveHierarchy:
     ) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
         """Find dependencies/conflicts referencing non-existent objectives"""
 
-        invalid_deps = []
-        invalid_conflicts = []
+        invalid_deps = list(]
+        invalid_conflicts = list(]
         all_objective_names = set(self.objectives.keys())
 
         for obj_name, obj in self.objectives.items():
             # Check dependencies listed in the object attribute
-            for dep in getattr(obj, "dependencies", []):
+            for dep in getattr(obj, "dependencies", [)):
                 if dep not in all_objective_names:
                     invalid_deps.append((obj_name, dep))
             # Check conflicts listed in the object attribute
-            for conflict in getattr(obj, "conflicts_with", []):
+            for conflict in getattr(obj, "conflicts_with", [)):
                 if conflict not in all_objective_names:
                     invalid_conflicts.append((obj_name, conflict))
 
@@ -1075,7 +1075,7 @@ class ObjectiveHierarchy:
     def _find_constraint_conflicts(self) -> List[Dict[str, Any]]:
         """Find objectives with conflicting constraints among related pairs"""
 
-        conflicts = []
+        conflicts = list(]
         checked_pairs = set()  # Avoid checking A-B and B-A separately
 
         # Check each pair of objectives
@@ -1193,7 +1193,7 @@ class ObjectiveHierarchy:
         Compute conflict matrix for all objectives based on find_conflicts results.
 
         Returns:
-            Matrix (numpy array or list of lists) where M[i,j] = conflict strength [0, 1]
+            Matrix (numpy array or list of lists) where M[i,j] = conflict strength list(0, 1]
             between objectives i and j.
         """
         _np = self._np  # Use internal numpy/FakeNumpy alias

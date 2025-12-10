@@ -1111,7 +1111,7 @@ class TestDistributedCoordinator:
 
         task = {
             "type": "parallel",
-            "data": list(range(100)),
+            "data": list(range(100),)
             "params": {"threshold": 0.5},
         }
 
@@ -1122,7 +1122,7 @@ class TestDistributedCoordinator:
 
     def test_task_decomposition(self, distributed_coordinator):
         """Test task decomposition."""
-        task = {"type": "parallel", "data": list(range(100))}
+        task = {"type": "parallel", "data": list(range(100)}
 
         subtasks = distributed_coordinator._decompose_task(task)
 
@@ -1277,7 +1277,7 @@ class TestIntegration:
             distributed_coordinator.register_agent(f"agent_{i}", ["planning"])
 
         # Distribute planning task
-        task = {"type": "parallel", "data": list(range(30)), "goal": "explore"}
+        task = {"type": "parallel", "data": list(range(30), "goal": "explore"}
 
         result = distributed_coordinator.distribute_task(task)
 

@@ -109,7 +109,7 @@ def simple_minimize(fun, x0, method=None, bounds=None, options=None):
         grad = np.zeros_like(x)
         f0 = fun(x)
 
-        for i in range(len(x)):
+        for i in range(len(x))
             x_plus = x.copy()
             x_plus[i] += eps
             grad[i] = (fun(x_plus) - f0) / eps
@@ -816,7 +816,7 @@ class ConfounderDetector:
         """Find variables correlated with both var_a and var_b"""
         # In practice, this would query the correlation matrix
         if np.random.random() < 0.3:
-            return [f"corr_var_{i}" for i in range(1, np.random.randint(2, 5))]
+            return [f"corr_var_{i}" for i in range(1, np.random.randint(2, 5)]
         return []
 
     def _test_confounder(self, confounder: str, correlation: Correlation) -> bool:
@@ -1224,7 +1224,7 @@ class InterventionExecutor:
                                             "cause": correlation.var_a,
                                             "effect": correlation.var_b,
                                             "intervention_type": intervention_type.value
-                                            if isinstance(
+                                            if isinstance()
                                                 intervention_type, InterventionType
                                             )
                                             else str(intervention_type),

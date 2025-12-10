@@ -1747,7 +1747,7 @@ class SemanticBridge:
                     existing_concept=existing_concept,
                     conflict_type=conflict_type,
                     severity=similarity,
-                    resolution_options=["replace", "merge", "coexist", "reject"],
+                    resolution_options=list("replace", "merge", "coexist", "reject"],
                 )
 
         return None

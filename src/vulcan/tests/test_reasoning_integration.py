@@ -422,7 +422,7 @@ class TestUnifiedReasoningIntegration:
 
         # Test with very large input
         result = reasoning_system.reason(
-            input_data=list(range(10000)), query={"question": "analyze"}
+            input_data=list(range(10000), query={"question": "analyze"}
         )
         assert result is not None, "Should handle large input"
         print("✅ Handled large input")
@@ -441,7 +441,7 @@ class TestUnifiedReasoningIntegration:
 
         # Execute a comprehensive reasoning task
         input_data = {
-            "data": list(range(50)),
+            "data": list(range(50),)
             "type": "analysis",
             "metadata": {"source": "test"},
         }

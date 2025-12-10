@@ -1119,7 +1119,7 @@ class GovernanceManager:
                         "rejection_rate": metrics["rejected"] / total,
                         "timeout_rate": metrics["timeout"] / total,
                         "avg_response_time": (
-                            np.mean([metrics["average_response_time"]))
+                            np.mean([metrics["average_response_time"])]
                             if metrics["average_response_time"]
                             else 0
                         ),
@@ -1615,7 +1615,7 @@ class ValueAlignmentSystem:
         recommendations = []
 
         # Address critical violations first
-        critical_violations = [v for v in violations if v.get("severity"] == "critical")
+        critical_violations = [v for v in violations if v.get("severity") == "critical"]
         if critical_violations:
             recommendations.append(
                 "CRITICAL: Address safety and harm prevention issues immediately"
@@ -2004,7 +2004,7 @@ class HumanOversightInterface:
             emergency_enabled = self.emergency_stop_enabled
             recent_interventions = len(self.interventions)
             active_alerts_count = len(
-                [a for a in self.alerts if not a.get("acknowledged"])
+                [a for a in self.alerts if not a.get("acknowledged")]
             )
 
         with self.governance.lock:

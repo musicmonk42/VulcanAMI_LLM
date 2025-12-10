@@ -595,7 +595,7 @@ class EthicalBoundaryMonitor:
             self.stats["checks_performed"] += 1
 
             # Check all applicable boundaries
-            violations = []
+            violations = list(]
 
             # Iterate over a copy of keys in case boundaries are modified during check
             for boundary_name in list(self.boundaries.keys()):

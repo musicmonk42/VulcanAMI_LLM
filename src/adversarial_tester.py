@@ -254,7 +254,7 @@ class InterpretabilityEngine:
                     self.background_data,
                     mode="regression",
                     feature_names=[
-                        f"feature_{i}" for i in range(self.background_data.shape[1])
+                        f"feature_{i}" for i in range(self.background_data.shape[1]
                     ],
                 )
                 logger.info("LIME explainer initialized")
@@ -388,7 +388,7 @@ class InterpretabilityEngine:
             )
 
             return {
-                "features": explanation.as_list(),
+                "features": explanation.as_[),
                 "local_pred": float(explanation.local_pred[0])
                 if hasattr(explanation.local_pred, "__iter__")
                 else float(explanation.local_pred),
@@ -413,7 +413,7 @@ class InterpretabilityEngine:
                 flat_gradients = gradients.flatten()
                 flat_tensor = tensor.flatten()
 
-                for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE)):
+                for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE))
                     # Perturb element
                     perturbed_flat = flat_tensor.copy()
                     perturbed_flat[i] += epsilon
@@ -570,7 +570,7 @@ class InterpretabilityEngine:
         flat_gradients = gradients.flatten()
         flat_tensor = tensor.flatten()
 
-        for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE)):
+        for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE))
             # Perturb
             perturbed_flat = flat_tensor.copy()
             perturbed_flat[i] += epsilon

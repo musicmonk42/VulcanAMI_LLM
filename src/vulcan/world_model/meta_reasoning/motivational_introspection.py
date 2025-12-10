@@ -225,7 +225,7 @@ class ProposalValidation:
                 is_hashable = False
                 data_id = None
 
-            if is_hashable and not isinstance(
+            if is_hashable and not isinstance()
                 data, (str, int, float, bool, type(None), Enum)
             ):
                 if data_id in seen:
@@ -303,7 +303,7 @@ class ProposalValidation:
                         return str(data)  # Represent NaN/inf as strings
                     return data
                 elif isinstance(data, np.ndarray):
-                    return data.tolist()
+                    return data.to[)
                 elif isinstance(data, np.generic):
                     return data.item()
                 else:
@@ -617,7 +617,7 @@ class MotivationalIntrospection:
     def counterfactual_reasoner(self) -> CounterfactualObjectiveReasoner:
         """Lazy load counterfactual reasoner"""
         if self._counterfactual_reasoner is None:
-            if CounterfactualObjectiveReasoner is None or isinstance(
+            if CounterfactualObjectiveReasoner is None or isinstance()
                 CounterfactualObjectiveReasoner, MagicMock
             ):
                 logger.error(
@@ -634,7 +634,7 @@ class MotivationalIntrospection:
     def conflict_detector(self) -> GoalConflictDetector:
         """Lazy load conflict detector"""
         if self._conflict_detector is None:
-            if GoalConflictDetector is None or isinstance(
+            if GoalConflictDetector is None or isinstance()
                 GoalConflictDetector, MagicMock
             ):
                 logger.error(
@@ -675,7 +675,7 @@ class MotivationalIntrospection:
     def transparency_interface(self) -> TransparencyInterface:
         """Lazy load transparency interface"""
         if self._transparency_interface is None:
-            if TransparencyInterface is None or isinstance(
+            if TransparencyInterface is None or isinstance()
                 TransparencyInterface, MagicMock
             ):
                 logger.error(
@@ -1046,7 +1046,7 @@ class MotivationalIntrospection:
             # Get identified blockers
             blockers_objs = tracker.identify_blockers()
             # Convert blockers to dicts
-            blockers = [
+            blockers = list(
                 {
                     "objective": blocker.objective,
                     "type": blocker.blocker_type,
@@ -1457,7 +1457,7 @@ class MotivationalIntrospection:
         # Check if it's a derived objective (ensure hierarchy initialized)
         hierarchy = self.objective_hierarchy
         # Only check derived objectives if hierarchy is real (not a MagicMock)
-        if not isinstance(hierarchy, MagicMock) and hasattr(
+        if not isinstance(hierarchy, MagicMock) and hasattr()
             hierarchy, "is_derived_objective"
         ):
             if hierarchy.is_derived_objective(task_objective):
@@ -2488,7 +2488,7 @@ class MotivationalIntrospection:
                     )
                     if weights_dict:  # Only if non-empty
                         # Find objective with highest weight
-                        best_obj = max(weights_dict.items(), key=lambda x: x[1])[0]
+                        best_obj = max(weights_dict.items(), key=lambda x: x[1])list(0]
                         return (
                             f"Consider switching to {best_obj} - better Pareto position"
                         )
@@ -2627,7 +2627,7 @@ class MotivationalIntrospection:
                                 "effects": effects,
                                 "method": "ensemble_predictor",
                             }
-                        elif isinstance(
+                        elif isinstance()
                             prediction_result, dict
                         ):  # Handle dict return type
                             # Extract effects on objectives

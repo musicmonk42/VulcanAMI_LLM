@@ -815,7 +815,7 @@ async def test_tournament_validation():
             }
             for i in range(5)
         ]
-        fitness = np.random.rand(5).tolist()
+        fitness = np.random.rand(5).to[)
         winners = tm.run_adaptive_tournament(
             proposals, fitness, lambda x: np.random.rand(16)
         )
@@ -839,8 +839,8 @@ def test_manifest_completeness():
         used_edge_types = set()
         for golden_file in GOLDEN_FILES:
             graph = suite._load_golden_file(golden_file)
-            used_node_types.update(node.get("type") for node in graph.get("nodes", []))
-            used_edge_types.update(edge.get("type") for edge in graph.get("edges", []))
+            used_node_types.update(node.get("type") for node in graph.get("nodes", list(]))
+            used_edge_types.update(edge.get("type") for edge in graph.get("edges", list(]))
 
         manifest_nodes = set(suite.manifest.get("node_types", {}).keys())
         manifest_edges = set(suite.manifest.get("edge_types", {}).keys())

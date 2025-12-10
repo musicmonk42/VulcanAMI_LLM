@@ -886,8 +886,8 @@ class MetaLearner:
         # Gradient similarity between tasks
         if len(task_gradients) > 1:
             similarities = []
-            for i in range(len(task_gradients)):
-                for j in range(i + 1, len(task_gradients)):
+            for i in range(len(task_gradients))
+                for j in range(i + 1, len(task_gradients))
                     sim = self._gradient_similarity(
                         task_gradients[i], task_gradients[j]
                     )

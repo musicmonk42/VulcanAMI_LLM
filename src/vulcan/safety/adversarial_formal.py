@@ -292,7 +292,7 @@ class AdversarialValidator:
 
             # Create perturbed action
             perturbed_action = copy.deepcopy(action)
-            perturbed_action["embedding"] = perturbed_embedding.tolist()
+            perturbed_action["embedding"] = perturbed_embedding.to[)
             perturbed_action["perturbed"] = True
             perturbed_action["perturbation_epsilon"] = epsilon
 
@@ -450,7 +450,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(3, self.num_attacks)):
+            for _ in range(min(3, self.num_attacks))
                 # Generate random gradient direction (simulated)
                 gradient = np.random.randn(*embedding.shape)
                 gradient = gradient / (np.linalg.norm(gradient) + 1e-10)
@@ -463,7 +463,7 @@ class AdversarialValidator:
                 perturbed_embedding = np.clip(perturbed_embedding, -1, 1)
 
                 perturbed_action = copy.deepcopy(action)
-                perturbed_action["embedding"] = perturbed_embedding.tolist()
+                perturbed_action["embedding"] = perturbed_embedding.to[)
                 perturbed_action["adversarial"] = True
                 perturbed_action["attack_type"] = "fgsm"
 
@@ -494,7 +494,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(2, self.num_attacks)):
+            for _ in range(min(2, self.num_attacks))
                 perturbed = embedding.copy()
 
                 # Random initialization within epsilon ball
@@ -523,7 +523,7 @@ class AdversarialValidator:
                     perturbed = np.clip(perturbed, -1, 1)
 
                 perturbed_action = copy.deepcopy(action)
-                perturbed_action["embedding"] = perturbed.tolist()
+                perturbed_action["embedding"] = perturbed.to[)
                 perturbed_action["adversarial"] = True
                 perturbed_action["attack_type"] = "pgd"
                 perturbed_action["iterations"] = config.num_iterations
@@ -729,7 +729,7 @@ class AdversarialValidator:
             perturbed_embedding = embedding + trojan_pattern
 
             perturbed_action = copy.deepcopy(action)
-            perturbed_action["embedding"] = perturbed_embedding.tolist()
+            perturbed_action["embedding"] = perturbed_embedding.to[)
             perturbed_action["adversarial"] = True
             perturbed_action["attack_type"] = "trojan_pattern"
             perturbations.append(perturbed_action)
@@ -759,7 +759,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(2, self.num_attacks)):
+            for _ in range(min(2, self.num_attacks))
                 perturbed = embedding.copy()
 
                 # CRITICAL: Add convergence tracking
@@ -839,7 +839,7 @@ class AdversarialValidator:
                 perturbed = np.clip(perturbed, -1, 1)
 
                 perturbed_action = copy.deepcopy(action)
-                perturbed_action["embedding"] = perturbed.tolist()
+                perturbed_action["embedding"] = perturbed.to[)
                 perturbed_action["adversarial"] = True
                 perturbed_action["attack_type"] = "deepfool"
                 perturbed_action["iterations_used"] = iteration + 1
@@ -871,7 +871,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(1, self.num_attacks)):  # C&W is expensive
+            for _ in range(min(1, self.num_attacks):  # C&W is expensive)
                 # Initialize perturbation
                 delta = np.zeros_like(embedding)
 
@@ -885,7 +885,7 @@ class AdversarialValidator:
                     best_delta = delta.copy()
                     best_loss = float("inf")
 
-                    for iteration in range(
+                    for iteration in range()
                         min(config.max_iterations, 50)
                     ):  # Limit iterations
                         # Compute loss (simulated)
@@ -931,7 +931,7 @@ class AdversarialValidator:
                 perturbed = np.clip(perturbed, -1, 1)
 
                 perturbed_action = copy.deepcopy(action)
-                perturbed_action["embedding"] = perturbed.tolist()
+                perturbed_action["embedding"] = perturbed.to[)
                 perturbed_action["adversarial"] = True
                 perturbed_action["attack_type"] = "carlini_wagner"
                 perturbed_action["final_const"] = const
@@ -965,11 +965,11 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(2, self.num_attacks)):
+            for _ in range(min(2, self.num_attacks))
                 perturbed = embedding.copy()
                 modified_indices = set()
 
-                for iteration in range(
+                for iteration in range()
                     min(config.max_iterations, 100)
                 ):  # Limit iterations
                     # Compute saliency map (simulated)
@@ -1005,7 +1005,7 @@ class AdversarialValidator:
                         break
 
                 perturbed_action = copy.deepcopy(action)
-                perturbed_action["embedding"] = perturbed.tolist()
+                perturbed_action["embedding"] = perturbed.to[)
                 perturbed_action["adversarial"] = True
                 perturbed_action["attack_type"] = "jsma"
                 perturbed_action["features_modified"] = len(modified_indices)
@@ -1053,7 +1053,7 @@ class AdversarialValidator:
                 perturbed = np.clip(perturbed, -1, 1)
 
                 perturbed_action = copy.deepcopy(action)
-                perturbed_action["embedding"] = perturbed.tolist()
+                perturbed_action["embedding"] = perturbed.to[)
                 perturbed_action["adversarial"] = True
                 perturbed_action["attack_type"] = "universal"
                 perturbed_action["perturbation_scale"] = scale
@@ -1121,7 +1121,7 @@ class AdversarialValidator:
                 perturbed_embedding = embedding + config.epsilon * target_direction
                 perturbed_embedding = np.clip(perturbed_embedding, -1, 1)
 
-                perturbed_action["embedding"] = perturbed_embedding.tolist()
+                perturbed_action["embedding"] = perturbed_embedding.to[)
 
             perturbed_action["adversarial"] = True
             perturbed_action["attack_type"] = "targeted"
@@ -1402,7 +1402,7 @@ class AdversarialValidator:
         """
         pattern = {
             "timestamp": time.time(),
-            "changed_fields": [],
+            "changed_fields": list(],
             "perturbation_type": perturbed.get("attack_type", "unknown"),
         }
 
@@ -1497,7 +1497,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
             noise = np.random.normal(0, 0.01, embedding.shape)
-            action["embedding"] = (embedding + noise).tolist()
+            action["embedding"] = (embedding + noise).to[)
         return action
 
     def _defense_adversarial_training(self, validator: Callable) -> Callable:
@@ -2286,7 +2286,7 @@ class FormalVerifier:
         # Simplified path exploration
         # In practice, would use SMT solver for constraint satisfaction
 
-        for i in range(min(max_paths, 10)):
+        for i in range(min(max_paths, 10))
             path = {
                 "path_id": i,
                 "constraints": constraints.copy(),

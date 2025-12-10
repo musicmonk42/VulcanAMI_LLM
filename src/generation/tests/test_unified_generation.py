@@ -347,7 +347,7 @@ class TestAdvancedFeatures(unittest.TestCase):
 
     def test_max_candidates_override(self):
         """Test max_candidates override"""
-        module = MockModule("test", tokens=list(range(20)), scores=[0.1] * 20)
+        module = MockModule("test", tokens=list(range(20), scores=[0.1] * 20)
 
         candidates = self.gen.generate_candidates(
             hidden_state=self.hidden_state,

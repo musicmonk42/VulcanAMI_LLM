@@ -691,7 +691,7 @@ class GraphixExecutor:
 
         # Simple lookup: average embeddings for all tokens
         embeddings = []
-        for token_idx in range(len(tokens)):
+        for token_idx in range(len(tokens))
             # Get token ID (convert if needed)
             token_id = (
                 int(tokens[token_idx])

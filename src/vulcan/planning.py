@@ -1086,7 +1086,7 @@ class PowerManager:
         ):
             try:
                 governor = config["frequency_scaling"]
-                for cpu in range(psutil.cpu_count()):
+                for cpu in range(psutil.cpu_count())
                     governor_path = (
                         f"/sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_governor"
                     )

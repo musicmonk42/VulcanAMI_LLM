@@ -778,7 +778,7 @@ class CurriculumLearner:
                 cluster = self.task_clusters.get(task_id, 0)
                 cluster_tasks[cluster].append(task)
 
-            sampled = []
+            sampled = list(]
             clusters = list(cluster_tasks.keys())
 
             for i in range(n):

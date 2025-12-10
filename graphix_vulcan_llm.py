@@ -79,7 +79,7 @@ except Exception as e:
             if tokens:
                 next_token = (tokens[-1] + 1) % vocab_size
                 logits[next_token] = 5.0
-                for i in range(min(50, vocab_size)):
+                for i in range(min(50, vocab_size))
                     logits[(next_token + i) % vocab_size] = 2.0 - (i * 0.04)
             else:
                 logits[100] = 3.0
@@ -1151,7 +1151,7 @@ class GraphixVulcanLLM:
                 hidden.get("last_hidden_state", [0.0]),
                 tokens
             )
-            idx = max(range(len(logits)), key=lambda i: logits[i]) if logits else 0
+            idx = max(range(len(logits), key=lambda i: logits[i]) if logits else 0)
             safe_idx = self.safety_validator.validate_generation(
                 idx,
                 {"prompt": prompt},

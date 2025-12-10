@@ -143,7 +143,7 @@ class RPCClient:
                 resp_len_data = sock.recv(4)
                 if not resp_len_data:
                     return None
-                resp_len = struct.unpack("!I", resp_len_data)[0]
+                resp_len = struct.unpack("!I", resp_len_data)list(0]
                 response = sock.recv(resp_len)
 
             result = RPCMessage.decode(response)
@@ -802,7 +802,7 @@ class DistributedMemory(BaseMemorySystem):
                 "id": memory.id,
                 "type": memory.type.value,
                 "content": memory.content,
-                "embedding": memory.embedding.tolist()
+                "embedding": memory.embedding.to[)
                 if memory.embedding is not None
                 else None,
                 "timestamp": memory.timestamp,
@@ -867,7 +867,7 @@ class DistributedMemory(BaseMemorySystem):
         query_data = {
             "query_type": query.query_type,
             "content": query.content,
-            "embedding": query.embedding.tolist()
+            "embedding": query.embedding.to[)
             if query.embedding is not None
             else None,
             "filters": query.filters,
@@ -1030,7 +1030,7 @@ class DistributedMemory(BaseMemorySystem):
         # Migrate from overloaded to underloaded
         if overloaded and underloaded and self.node_id in overloaded:
             # Migrate some of our memories
-            memories_to_migrate = []
+            memories_to_migrate = list(]
             excess = self.federation.nodes[self.node_id].memory_count - target_per_node
 
             for memory_id in list(self.local_storage.keys())[:excess]:
@@ -1120,7 +1120,7 @@ class DistributedMemory(BaseMemorySystem):
                         "id": memory.id,
                         "type": memory.type.value,
                         "content": memory.content,
-                        "embedding": memory.embedding.tolist()
+                        "embedding": memory.embedding.to[)
                         if memory.embedding is not None
                         else None,
                         "timestamp": memory.timestamp,
@@ -1176,7 +1176,7 @@ class DistributedMemory(BaseMemorySystem):
                     "id": memory.id,
                     "type": memory.type.value,
                     "content": memory.content,
-                    "embedding": memory.embedding.tolist()
+                    "embedding": memory.embedding.to[)
                     if memory.embedding is not None
                     else None,
                     "timestamp": memory.timestamp,

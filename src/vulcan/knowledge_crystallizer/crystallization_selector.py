@@ -571,7 +571,7 @@ class CrystallizationSelector:
 
         # FIX: Analyze actions with defensive check for non-iterable objects
         if hasattr(trace, "actions"):
-            actions = getattr(trace, "actions", [])
+            actions = getattr(trace, "actions", [)]
             try:
                 characteristics.action_count = len(actions)
 
@@ -623,7 +623,7 @@ class CrystallizationSelector:
         # Simple pattern detection based on action types/names
         patterns = set()
 
-        for i in range(len(actions)):
+        for i in range(len(actions))
             # Single action patterns
             action_type = (
                 str(actions[i].get("type", actions[i]))
@@ -673,7 +673,7 @@ class CrystallizationSelector:
     def _detect_dependencies(self, trace: Any) -> bool:
         """Detect dependencies in trace"""
         if hasattr(trace, "dependencies"):
-            deps = getattr(trace, "dependencies", [])
+            deps = getattr(trace, "dependencies", [)]
             try:
                 return len(deps) > 0
             except (TypeError, AttributeError):
@@ -693,7 +693,7 @@ class CrystallizationSelector:
         # Action count factor - FIXED: Better thresholds for high counts
         if hasattr(trace, "actions"):
             try:
-                action_count = len(getattr(trace, "actions", []))
+                action_count = len(getattr(trace, "actions", [))]
                 if action_count > 100:
                     complexity_score += 4  # Very high action count
                 elif action_count > 50:

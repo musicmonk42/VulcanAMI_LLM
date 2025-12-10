@@ -612,7 +612,7 @@ class TestIntegration:
 class TestEdgeCases:
     """Test edge cases and error conditions"""
 
-    def test_empty_tool_list(self):
+    def test_empty_tool_[self):
         """Test execution with empty tool list"""
         executor = PortfolioExecutor(tools={})
 
@@ -621,7 +621,7 @@ class TestEdgeCases:
 
             result = executor.execute(
                 strategy=ExecutionStrategy.SINGLE,
-                tool_names=[],
+                tool_names=list(],
                 problem="test",
                 constraints=constraints,
             )
@@ -641,7 +641,7 @@ class TestEdgeCases:
 
             result = executor.execute(
                 strategy=ExecutionStrategy.SINGLE,
-                tool_names=["tool"],
+                tool_names=list("tool"],
                 problem="test",
                 constraints=constraints,
             )

@@ -644,7 +644,7 @@ class LSTMEmbedder(BasedEmbedder):
         """Encode sequences to embeddings."""
         self.eval()
 
-        if isinstance(sequences, (str, list)) and not isinstance(sequences, List[int]):
+        if isinstance(sequences, (str, list)) and not isinstance(sequences, List[int):
             if isinstance(sequences, str):
                 sequences = [sequences]
 
@@ -756,7 +756,7 @@ class TransformerEmbedder(BasedEmbedder):
         """Encode sequences to embeddings."""
         self.eval()
 
-        if isinstance(sequences, (str, list)) and not isinstance(sequences, List[int]):
+        if isinstance(sequences, (str, list)) and not isinstance(sequences, List[int):
             if isinstance(sequences, str):
                 sequences = [sequences]
 
@@ -880,7 +880,7 @@ class HybridLSTMAttentionEmbedder(BasedEmbedder):
         """Encode sequences to embeddings."""
         self.eval()
 
-        if isinstance(sequences, (str, list)) and not isinstance(sequences, List[int]):
+        if isinstance(sequences, (str, list)) and not isinstance(sequences, List[int):
             if isinstance(sequences, str):
                 sequences = [sequences]
 
@@ -1385,7 +1385,7 @@ class VulcanCandidateScorer:
             penalties["diversity"] = 0.0
 
         # OOV penalty
-        vocab = context.get("vocab", set(range(self.config.embedding.vocab_size)))
+        vocab = context.get("vocab", set(range(self.config.embedding.vocab_size))
         penalties["oov"] = self.penalty_calc.calculate_oov_penalty(
             candidate_tokens, vocab
         )
@@ -1788,7 +1788,7 @@ def main():
             "prompt_text": "The quick brown fox jumps over the lazy dog",
             "prompt_tokens": [1, 2, 3, 4, 5, 6, 7, 8, 9],
             "previous_candidates": [],
-            "vocab": set(range(10000)),
+            "vocab": set(range(10000),)
         }
 
         # Test candidates

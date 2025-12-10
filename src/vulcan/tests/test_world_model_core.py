@@ -110,7 +110,7 @@ class MockObservationProcessor:
             for var in observation.variables:
                 values = [obs.variables.get(var, 0) for obs in self.observation_buffer]
                 if len(values) >= 5:
-                    trend = np.polyfit(range(len(values)), values, 1)[0]
+                    trend = np.polyfit(range(len(values), values, 1)[0]
                     patterns["trends"][var] = (
                         "increasing"
                         if trend > 0.1

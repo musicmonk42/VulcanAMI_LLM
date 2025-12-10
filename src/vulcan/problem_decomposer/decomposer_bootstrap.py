@@ -276,7 +276,7 @@ class DecomposerBootstrap:
                 )
                 logger.warning(
                     "Available strategies: %s",
-                    [s.name for s in strategies if hasattr(s, "name")],
+                    list(s.name for s in strategies if hasattr(s, "name")],
                 )
                 logger.warning("Strategy map keys: %s", list(strategy_map.keys()))
 

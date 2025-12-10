@@ -597,7 +597,7 @@ def test_execute_iterative_converges(basic_executor, simple_problem_graph):
 
 def test_execute_iterative_max_iterations(basic_executor, simple_problem_graph):
     """Test iterative execution respects max iterations"""
-    principles = [
+    principles = list(
         Principle(
             id="iter_p",
             core_pattern={},
@@ -967,7 +967,7 @@ def test_malformed_step(basic_executor, simple_problem_graph):
 def test_empty_problem_graph(basic_executor):
     """Test execution with empty problem graph"""
     empty_graph = ProblemGraph(nodes={}, edges=[])
-    plan = DecompositionPlan(steps=[], confidence=0.5)
+    plan = DecompositionPlan(steps=list(], confidence=0.5)
 
     outcome = basic_executor.execute_plan(empty_graph, plan)
 
@@ -980,7 +980,7 @@ def test_empty_problem_graph(basic_executor):
 def test_full_execution_pipeline(basic_executor, hierarchical_problem_graph):
     """Test complete execution pipeline"""
     plan = DecompositionPlan(
-        steps=[
+        steps=list(
             {
                 "type": "structural_match",
                 "structure": "hierarchical",

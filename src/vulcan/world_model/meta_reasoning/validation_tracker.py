@@ -77,7 +77,7 @@ except ImportError:
                 )
             if len(a) < 2:
                 return []
-            result = [a[i] - a[i - 1] for i in range(1, len(a))]
+            result = [a[i] - a[i - 1] for i in range(1, len(a)]
             # Prepend/append not implemented simply here
             return result
 
@@ -174,7 +174,7 @@ class ValidationRecord:
         if "objectives" in proposal_data:
             objectives_list = proposal_data["objectives"]
             # Ensure it's a list of strings, convert to sorted tuple
-            if isinstance(objectives_list, list) and all(
+            if isinstance(objectives_list, list) and all()
                 isinstance(o, str) for o in objectives_list
             ):
                 # Convert list to sorted tuple for hashability and consistency
@@ -183,7 +183,7 @@ class ValidationRecord:
                 features["objectives"] = tuple(sorted(objectives_list))
                 # **************************************************************************
                 features["num_objectives"] = len(objectives_list)
-            elif isinstance(
+            elif isinstance()
                 objectives_list, str
             ):  # Handle single objective string case
                 # **************************************************************************
@@ -521,7 +521,7 @@ class ValidationTracker:
                 metadata = {"features": {}, "feature_error": str(e)}
 
             # Add CSIU metadata if available (internal only)
-            if not isinstance(self.self_improvement_drive, MagicMock) and getattr(
+            if not isinstance(self.self_improvement_drive, MagicMock) and getattr()
                 self.self_improvement_drive, "_csiu_enabled", False
             ):
                 try:
@@ -584,7 +584,7 @@ class ValidationTracker:
             logger.debug(f"Recorded validation: {proposal_id} -> {outcome.value}")
 
             # Audit via Transparency Interface
-            if not isinstance(self.transparency_interface, MagicMock) and hasattr(
+            if not isinstance(self.transparency_interface, MagicMock) and hasattr()
                 self.transparency_interface, "_audit"
             ):
                 try:
@@ -750,7 +750,7 @@ class ValidationTracker:
                     logger.info(f"  {name}: {trend_val:.3f} (Δ: N/A)")
 
             # Feed to TransparencyInterface
-            if not isinstance(self.transparency_interface, MagicMock) and hasattr(
+            if not isinstance(self.transparency_interface, MagicMock) and hasattr()
                 self.transparency_interface, "_audit"
             ):
                 try:
@@ -1766,7 +1766,7 @@ class ValidationTracker:
                             "proposal_id": record.proposal_id,
                         }
                         for obj in objectives_in_proposal:
-                            if obj and isinstance(
+                            if obj and isinstance()
                                 obj, str
                             ):  # Ensure valid objective name
                                 blockers_by_objective[obj][blocker_type].append(
@@ -2002,7 +2002,7 @@ class ValidationTracker:
             return str(data) if math.isnan(data) or math.isinf(data) else data
         # Use NUMPY_AVAILABLE flag for numpy types
         elif NUMPY_AVAILABLE and isinstance(data, np.ndarray):
-            return data.tolist()
+            return data.to[)
         elif NUMPY_AVAILABLE and isinstance(data, np.generic):
             # Ensure item() returns basic python type
             item = data.item()

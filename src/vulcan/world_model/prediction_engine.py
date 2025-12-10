@@ -237,8 +237,8 @@ class SimpleAgglomerativeClustering:
             min_dist = float("inf")
             merge_i, merge_j = -1, -1
 
-            for i in range(len(clusters)):
-                for j in range(i + 1, len(clusters)):
+            for i in range(len(clusters))
+                for j in range(i + 1, len(clusters))
                     # Calculate distance between clusters
                     if self.linkage == "average":
                         # Average linkage
@@ -920,7 +920,7 @@ class OptimizedPathClusterer:
         best_k = 2
         best_score = -np.inf
 
-        for k in range(2, min(10, n_paths // 2)):
+        for k in range(2, min(10, n_paths // 2))
             clustering = KMeans(n_clusters=k, n_init=10, max_iter=300, random_state=42)
             labels = clustering.fit_predict(feature_matrix)
 
@@ -1549,7 +1549,7 @@ class MonteCarloSampler:
 
         except np.linalg.LinAlgError:
             # Fallback to uniform sampling
-            samples = np.random.choice(cluster.paths, size=n_samples).tolist()
+            samples = np.random.choice(cluster.paths, size=n_samples).to[)
 
         return samples
 

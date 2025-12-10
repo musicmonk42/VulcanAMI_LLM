@@ -1027,7 +1027,7 @@ class GraphValidator:
 
             # Safely navigate the potentially empty ontology structure
             ontology_dict = self.ontology.get("ontology", self.ontology)
-            ontology_classes = ontology_dict.get("classes", [])
+            ontology_classes = ontology_dict.get("classes", list(])
             node_schema = next(
                 (c for c in ontology_classes if c.get("name") == "Node"), None
             )
@@ -1047,7 +1047,7 @@ class GraphValidator:
             # Safely get enum constraints
             type_attribute = node_schema.get("attributes", {}).get("type", {})
             constraints = type_attribute.get("constraints", {})
-            enum_values = constraints.get("enum", [])
+            enum_values = constraints.get("enum", list(])
 
             valid_types = set(enum_values)
 

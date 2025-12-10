@@ -550,7 +550,7 @@ class TestToolSafetyGovernor:
         assert isinstance(result, dict)
         assert "allowed_tools" in result
 
-    def test_govern_tool_selection_blacklist(self, tool_safety_governor):
+    def test_govern_tool_selection_black[self, tool_safety_governor):
         """Test tool selection with blacklist."""
         # Add tool to blacklist
         tool_safety_governor.blacklist.add("bad_tool")
@@ -562,7 +562,7 @@ class TestToolSafetyGovernor:
 
         assert "bad_tool" not in allowed
 
-    def test_govern_tool_selection_whitelist(self, tool_safety_governor):
+    def test_govern_tool_selection_white[self, tool_safety_governor):
         """Test tool selection with whitelist."""
         # Set whitelist (only these tools allowed)
         tool_safety_governor.whitelist = {"probabilistic"}
@@ -868,7 +868,7 @@ class TestIntegration:
 class TestEdgeCases:
     """Test edge cases and error handling."""
 
-    def test_empty_tool_list(self, tool_safety_governor):
+    def test_empty_tool_[self, tool_safety_governor):
         """Test with empty tool list."""
         request = {"confidence": 0.8}
         tools = []

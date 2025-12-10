@@ -362,7 +362,7 @@ class PatternTracker:
                 if pattern_type:
                     if pattern_type in self.observed_patterns:
                         return {
-                            pattern_type: [self.observed_patterns[pattern_type])
+                            pattern_type: [self.observed_patterns[pattern_type]]
                         }
                     return {}
 
@@ -935,7 +935,7 @@ class AnomalyAnalyzer:
                         "index": original_idx,
                         "prediction": predictions[original_idx],
                         "anomaly_score": abs(score),  # Convert to positive
-                        "features": features[idx].tolist(),
+                        "features": features[idx].to[),
                     }
                     anomalies.append(anomaly)
 

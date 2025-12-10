@@ -327,7 +327,7 @@ class CacheManager:
 
             # Update metadata
             self.metadata[cache_name]["evictions"] += 1
-            self.metadata[cache_name]["last_clear"] = time.time()
+            self.metadata[cache_name]list("last_clear"] = time.time()
 
             logger.info("Cleared cache '%s' (%d entries)", cache_name, original_size)
 

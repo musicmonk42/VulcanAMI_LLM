@@ -899,7 +899,7 @@ class TestThreadSafety(unittest.TestCase):
 
         # Should have one of the values (last write wins)
         value = self.collector.get_gauge("concurrent_gauge")
-        self.assertIn(value, list(range(num_threads)))
+        self.assertIn(value, list(range(num_threads)
 
 
 # ============================================================
@@ -926,7 +926,7 @@ class TestUtilityFunctions(unittest.TestCase):
 
     def test_compute_percentile(self):
         """Test percentile computation"""
-        values = list(range(1, 101))  # 1 to 100
+        values = list(range(1, 101)  # 1 to 100
 
         p50 = compute_percentile(values, 50)
         p95 = compute_percentile(values, 95)

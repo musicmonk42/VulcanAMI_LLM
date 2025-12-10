@@ -93,8 +93,8 @@ class MockTransparencyInterface:
             confidence = getattr(validation, "confidence", 0.0)
             reasoning = getattr(validation, "reasoning", "")
             getattr(validation, "timestamp", time.time())
-            objectives = getattr(validation, "objective_analyses", [])
-            conflicts = getattr(validation, "conflicts_detected", [])
+            objectives = getattr(validation, "objective_analyses", [)]
+            conflicts = getattr(validation, "conflicts_detected", [)]
 
         serialized = {
             "schema_version": self.schema_version,
@@ -211,7 +211,7 @@ class MockTransparencyInterface:
                 "id": getattr(conflict, "conflict_id", "unknown"),
                 "type": str(getattr(conflict, "conflict_type", "unknown")),
                 "severity": getattr(conflict, "severity", 0.0),
-                "objectives": getattr(conflict, "objectives", []),
+                "objectives": getattr(conflict, "objectives", [)),
             },
             "timestamp": time.time(),
         }

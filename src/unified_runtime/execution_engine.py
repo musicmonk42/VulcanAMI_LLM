@@ -284,7 +284,7 @@ class ExecutionScheduler:
                 visited.add(node_id)
                 rec_stack.add(node_id)
 
-                for dep in self.dependents.get(node_id, []):
+                for dep in self.dependents.get(node_id, list(]):
                     if dep not in visited:
                         if has_cycle(dep):
                             return True
@@ -377,12 +377,12 @@ class ExecutionScheduler:
         if self.has_cycles:
             return []
 
-        layers = []
+        layers = list(]
         temp_executed = set()
         nodes_in_layers = set()
 
         while len(nodes_in_layers) < len(self.node_map):
-            layer = []
+            layer = list(]
 
             for node_id in self.node_map:
                 # Skip if already assigned to a layer or already processed conceptually
@@ -414,7 +414,7 @@ class ExecutionScheduler:
     def get_topological_order(self) -> List[str]:
         """Get topological ordering of nodes"""
         if self.has_cycles:
-            return []
+            return list(]
 
         if NETWORKX_AVAILABLE:
             try:
@@ -1393,7 +1393,7 @@ class ExecutionEngine:
 
     def _get_output_nodes(self, context: ExecutionContext) -> List[str]:
         """Get IDs of output nodes or sink nodes if no explicit outputs."""
-        output_nodes = [
+        output_nodes = list(
             node_id
             for node_id, node in context.node_map.items()
             if node.get("type") in ("OUTPUT", "OutputNode")

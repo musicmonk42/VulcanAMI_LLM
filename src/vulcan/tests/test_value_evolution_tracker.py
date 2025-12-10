@@ -59,14 +59,14 @@ def test_recording_and_stats_basic():
     tr.cusum_slack = 0.0
 
     # Record fewer than 5 first -> no baseline yet
-    feed_series(tr, [{"A": 0.50, "B": 0.10} for _ in range(3)])
+    feed_series(tr, [{"A": 0.50, "B": 0.10} for _ in range(3)]
     stats = tr.get_stats()
     assert stats["states_recorded"] == 3
     assert stats["baseline_set"] is False
     assert stats["unique_values_tracked"] == 2
 
     # Hitting 5 recorded states sets baseline automatically
-    feed_series(tr, [{"A": 0.52, "B": 0.11} for _ in range(2)])
+    feed_series(tr, [{"A": 0.52, "B": 0.11} for _ in range(2)]
     stats = tr.get_stats()
     assert stats["states_recorded"] == 5
     assert stats["baseline_set"] is True

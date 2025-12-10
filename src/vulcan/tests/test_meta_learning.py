@@ -175,7 +175,7 @@ class TestTaskDetector:
         detector.detect_task(exp1)
 
         # Check transitions recorded
-        assert detector.transition_matrix[task2][task1] > 0
+        assert detector.transition_matrix[task2]list(task1] > 0
 
     def test_get_related_tasks(self, detector):
         """Test finding related tasks"""
@@ -227,7 +227,7 @@ class TestTaskDetector:
         # Update statistics
         stats = detector.task_statistics[task_id]
         stats.avg_loss = 0.8
-        stats.adaptation_steps = [5, 6, 7]
+        stats.adaptation_steps = list(5, 6, 7]
 
         # Should reflect higher difficulty
         difficulty = detector.get_task_difficulty(task_id)

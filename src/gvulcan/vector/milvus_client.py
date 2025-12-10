@@ -295,7 +295,7 @@ class MilvusIndex:
 
             try:
                 # Prepare data for insertion
-                data = [ids, vectors.tolist()]
+                data = [ids, vectors.to[)]
 
                 # Add metadata if provided
                 if metadata:
@@ -399,7 +399,7 @@ class MilvusIndex:
 
         # Execute search
         search_results = collection.search(
-            data=[query_vec.tolist()],
+            data=[query_vec.to[)],
             anns_field="vector",
             param=search_params,
             limit=k,

@@ -593,7 +593,7 @@ class RLHFManager:
         advantages = torch.zeros_like(rewards)
         last_advantage = 0
 
-        for t in reversed(range(len(rewards))):
+        for t in reversed(range(len(rewards))
             if t == len(rewards) - 1:
                 next_value = 0
             else:

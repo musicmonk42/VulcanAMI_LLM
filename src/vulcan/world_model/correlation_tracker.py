@@ -543,7 +543,7 @@ class RobustKendallCorrelation:
         n = len(x)
 
         # Create array of (x, y) pairs with original indices
-        pairs = np.column_stack([x, y, np.arange(n)])
+        pairs = np.column_stack([x, y, np.arange(n)]
 
         # Sort by x, then by y
         sorted_pairs = pairs[np.lexsort((pairs[:, 1], pairs[:, 0]))]
@@ -858,11 +858,11 @@ class SimpleDataFrame:
         else:
             self.data = np.array(data)
 
-        self.index = index if index is not None else list(range(len(self.data)))
+        self.index = index if index is not None else list(range(len(self.data))
         self.columns = (
             columns
             if columns is not None
-            else [range(self.data.shape[1] if self.data.ndim > 1 else 1))
+            else [range(self.data.shape[1] if self.data.ndim > 1 else 1]
         )
 
     def __repr__(self):
@@ -1089,12 +1089,12 @@ class DataBuffer:
             if self._cache_valid.get(var_a, False):
                 data_a = self._array_cache[var_a][-min_len:]
             else:
-                data_a = np.array([self.buffers[var_a])[-min_len:])
+                data_a = np.array([self.buffers[var_a])[-min_len:]]
 
             if self._cache_valid.get(var_b, False):
                 data_b = self._array_cache[var_b][-min_len:]
             else:
-                data_b = np.array([self.buffers[var_b])[-min_len:])
+                data_b = np.array([self.buffers[var_b])[-min_len:]]
 
             return data_a, data_b
 
@@ -1136,7 +1136,7 @@ class DataBuffer:
 
             result = {}
             for var in variables:
-                data = [self.buffers[var])
+                data = [self.buffers[var]]
                 result[var] = np.array(data[-min_len:])
 
             return result
@@ -1261,7 +1261,7 @@ class ChangeDetector:
     def _detect_change(self, key: Tuple[str, str]):
         """Detect change in correlation"""
 
-        history = [self.history[key])
+        history = [self.history[key]]
 
         if len(history) < 20:
             return

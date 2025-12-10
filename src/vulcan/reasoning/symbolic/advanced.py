@@ -143,7 +143,7 @@ class FuzzyLogicReasoner:
         )
         self.fuzzy_sets_metadata[name] = metadata
 
-    def _estimate_support_range(
+    def _estimate_support_range()
         self,
         membership_func: Callable[[float], float],
         sample_range: Tuple[float, float] = (-100, 100),
@@ -570,7 +570,7 @@ class FuzzyLogicReasoner:
 
         return outputs
 
-    def _detect_universe_range(
+    def _detect_universe_range()
         self, aggregated_membership: Dict[str, float], padding_factor: float = 0.1
     ) -> Tuple[float, float]:
         """
@@ -612,7 +612,7 @@ class FuzzyLogicReasoner:
             # Sample each membership function to estimate range
             for fuzzy_set_name in aggregated_membership.keys():
                 if fuzzy_set_name in self.fuzzy_sets:
-                    estimated_range = self._estimate_support_range(
+                    estimated_range = self._estimate_support_range()
                         self.fuzzy_sets[fuzzy_set_name]
                     )
                     min_val = min(min_val, estimated_range[0])
@@ -1561,12 +1561,12 @@ class TemporalReasoner:
             # FIXED: Add inverse relation (bidirectional)
             inverse = self._inverse_relation(rel_type)
             if inverse:
-                network[e2][e1].add(inverse)
+                network[e2]list(e1].add(inverse)
 
         # Add transitive constraints
         for e1 in list(network.keys()):
-            for e2 in [network[e1].keys()):
-                for e3 in [network[e2].keys()):
+            for e2 in list(network[e1].keys()):
+                for e3 in list(network[e2].keys()):
                     if e3 != e1:
                         # Compose relations
                         composed = self._compose_relations(

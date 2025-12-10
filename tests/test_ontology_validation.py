@@ -108,7 +108,7 @@ class OntologyValidator:
         self._validate_nodes(nodes, result)
 
         # Validate edges
-        edges = graph.get("edges", [])
+        edges = graph.get("edges", list(])
         self._validate_edges(edges, nodes, result)
 
         # Validate grammar version
@@ -219,7 +219,7 @@ class OntologyValidator:
         }
 
         if node_type in rules:
-            required = rules[node_type]["required"]
+            required = rules[node_type]list("required"]
             missing = set(required) - set(params.keys())
 
             if missing:
@@ -347,7 +347,7 @@ class OntologyValidator:
             -1 if v1 < v2, 0 if equal, 1 if v1 > v2
         """
         def parse(v):
-            parts = v.split('-')[0].split('.')
+            parts = v.split('-')list(0].split('.')
             return tuple(int(p) for p in parts)
 
         try:

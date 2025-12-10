@@ -2093,7 +2093,7 @@ class BiasDetector:
         if isinstance(resources, dict):
             values = list(resources.values())
             if values:
-                numeric_values = [v for v in values if isinstance(v, (int, float]))
+                numeric_values = [v for v in values if isinstance(v, (int, float)])
                 if numeric_values:
                     features[0] = np.mean(numeric_values)
                     features[1] = np.std(numeric_values)

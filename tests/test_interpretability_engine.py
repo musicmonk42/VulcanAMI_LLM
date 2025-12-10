@@ -464,7 +464,7 @@ class TestTraceRelations:
         """Test basic relation tracing."""
         graph = {
             "nodes": [
-                {"id": "n1", "embedding": np.random.rand(10).tolist()}
+                {"id": "n1", "embedding": np.random.rand(10).tolist()
             ]
         }
 
@@ -478,7 +478,7 @@ class TestTraceRelations:
         """Test with custom threshold."""
         graph = {
             "nodes": [
-                {"id": "n1", "embedding": tensor.tolist()}  # Identical
+                {"id": "n1", "embedding": tensor.tolist()  # Identical
             ]
         }
 
@@ -576,7 +576,7 @@ class TestExplainAndTrace:
         """Test with graph."""
         graph = {
             "nodes": [
-                {"id": "n1", "embedding": np.random.rand(10).tolist()}
+                {"id": "n1", "embedding": np.random.rand(10).tolist()
             ]
         }
 

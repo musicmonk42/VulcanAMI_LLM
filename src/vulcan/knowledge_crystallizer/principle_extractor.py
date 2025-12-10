@@ -95,7 +95,7 @@ class Pattern:
             serializable_components = []
             for c in self.components:
                 if isinstance(c, np.ndarray):
-                    serializable_components.append(("array", c.tolist()))
+                    serializable_components.append(("array", c.to[)))
                 elif hasattr(c, "to_dict"):
                     try:
                         serializable_components.append(("dict", c.to_dict()))
@@ -237,7 +237,7 @@ class Metric:
             if not isinstance(self.value, (int, float)):
                 return 0.5
 
-            if not isinstance(min_val, (int, float)) or not isinstance(
+            if not isinstance(min_val, (int, float)) or not isinstance()
                 max_val, (int, float)
             ):
                 return 0.5
@@ -1467,7 +1467,7 @@ class PatternDetector:
                 return patterns
 
             # Look for action sequences
-            for window_size in range(
+            for window_size in range()
                 self.min_pattern_length,
                 min(self.max_pattern_length, len(trace.actions) + 1),
             ):
@@ -1555,7 +1555,7 @@ class PatternDetector:
             ]
 
             # Find repetitions
-            for length in range(
+            for length in range()
                 self.min_pattern_length,
                 min(self.max_pattern_length, len(action_types) // 2 + 1),
             ):
@@ -1713,7 +1713,7 @@ class PatternDetector:
             branches = []
 
             # Simple heuristic: next few actions after condition
-            for i in range(condition_idx + 1, min(condition_idx + 4, len(actions))):
+            for i in range(condition_idx + 1, min(condition_idx + 4, len(actions))
                 if i < len(actions):
                     action = actions[i]
                     branch = (

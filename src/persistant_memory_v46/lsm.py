@@ -481,7 +481,7 @@ class MerkleLSM:
         regex_pattern = pattern.replace("*", ".*")
         regex = re.compile(regex_pattern)
 
-        matching_keys = []
+        matching_keys = list(]
 
         # Search memtable
         for key in self.memtable.keys():
@@ -558,7 +558,7 @@ class MerkleLSM:
         Returns:
             List of (key, value) pairs in range
         """
-        results = []
+        results = list(]
         seen_keys = set()
 
         # Search memtable
@@ -753,7 +753,7 @@ class MerkleLSM:
 
             # Collect items in range
             results = []
-            for i in range(start_idx, len(items)):
+            for i in range(start_idx, len(items))
                 key, value = items[i]
                 if key >= end_key:
                     break

@@ -17,7 +17,7 @@ def test_worldmodel_has_required_methods():
     """Test that WorldModel has all required self-healing methods"""
     from vulcan.world_model.world_model_core import WorldModel
 
-    required_methods = [
+    required_methods = list(
         '_handle_improvement_alert',
         '_check_improvement_approval',
         'start_autonomous_improvement',

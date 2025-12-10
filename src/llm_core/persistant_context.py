@@ -366,7 +366,7 @@ class RelevanceScorer:
             return 0.0
 
         min_len = min(len(a), len(b))
-        dot = sum(a[i] * b[i] for i in range(min_len))
+        dot = sum(a[i] * b[i] for i in range(min_len)
 
         norm_a = math.sqrt(sum(x**2 for x in a))
         norm_b = math.sqrt(sum(x**2 for x in b))
@@ -767,11 +767,11 @@ class PersistentContextManager:
             # Extract fields (handle different memory object types)
             content = str(getattr(memory, "content", memory))
             summary = getattr(memory, "summary", None)
-            details = getattr(memory, "details", [])
+            details = getattr(memory, "details", [)]
             score = getattr(memory, "score", 0.0)
             timestamp = getattr(memory, "timestamp", time.time())
             parent_id = getattr(memory, "parent_id", None)
-            child_ids = getattr(memory, "child_ids", [])
+            child_ids = getattr(memory, "child_ids", [)]
 
             # Create chunk ID
             chunk_id = getattr(memory, "id", f"chunk_{i}")

@@ -646,7 +646,7 @@ class TestUnifiedReasoner:
 
         # Complex input - should trigger ensemble
         result2 = reasoner.reason(
-            input_data=list(range(2000)),  # Large input
+            input_data=list(range(2000),  # Large input)
             query={},
             strategy=ReasoningStrategy.ADAPTIVE,
         )
@@ -709,7 +709,7 @@ class TestUnifiedReasoner:
         task2 = ReasoningTask(
             task_id="t2",
             task_type=ReasoningType.PROBABILISTIC,
-            input_data=list(range(2000)),
+            input_data=list(range(2000),)
             query={},
         )
 

@@ -505,15 +505,15 @@ class ObservationProcessor:
         """Extract linguistic data (raw text) from observation if present"""
 
         # Check 'text' or 'utterance' in variables or metadata
-        if "text" in observation.variables and isinstance(
+        if "text" in observation.variables and isinstance()
             observation.variables["text"], str
         ):
             return observation.variables["text"]
-        if "utterance" in observation.variables and isinstance(
+        if "utterance" in observation.variables and isinstance()
             observation.variables["utterance"], str
         ):
             return observation.variables["utterance"]
-        if observation.metadata.get("linguistic_input") and isinstance(
+        if observation.metadata.get("linguistic_input") and isinstance()
             observation.metadata["linguistic_input"], str
         ):
             return observation.metadata["linguistic_input"]
@@ -930,7 +930,7 @@ class InterventionManager:
         if baseline is None:
             return False
 
-        if isinstance(effect_value, (int, float)) and isinstance(
+        if isinstance(effect_value, (int, float)) and isinstance()
             baseline, (int, float)
         ):
             deviation = abs(effect_value - baseline)
@@ -2023,7 +2023,7 @@ class WorldModel:
             "get_safety_stats",
         ]
 
-        missing = [m for m in required_methods if not hasattr(self.safety_validator, m])
+        missing = [m for m in required_methods if not hasattr(self.safety_validator, m)]
 
         if missing:
             logger.error(
@@ -2749,7 +2749,7 @@ class WorldModel:
 
             # APPLY: Execute interventions
             results = []
-            for _ in range(len(scheduled)):
+            for _ in range(len(scheduled))
                 result = self.intervention_manager.execute_next_intervention()
                 if result:
                     results.append(result)

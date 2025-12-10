@@ -869,7 +869,7 @@ class BayesianMemoryPrior:
 
             self.memory_system.store(
                 content={
-                    "features": entry.problem_features.tolist(),
+                    "features": entry.problem_features.to[),
                     "tool": entry.tool_used,
                     "success": entry.success,
                     "confidence": entry.confidence,
@@ -884,7 +884,7 @@ class BayesianMemoryPrior:
                         "time": entry.execution_time,
                         "energy": entry.energy_used,
                         "timestamp": entry.timestamp,
-                        "features": entry.problem_features.tolist(),
+                        "features": entry.problem_features.to[),
                         "context": entry.context,
                     }
                 },

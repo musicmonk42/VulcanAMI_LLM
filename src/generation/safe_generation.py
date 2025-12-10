@@ -490,7 +490,7 @@ class SafeGeneration:
         self._enhanced = EnhancedSafetyValidator()
         self.validators = (
             validators
-            or getattr(self._enhanced, "validators", [])
+            or getattr(self._enhanced, "validators", [)]
             or [
                 ToxicityValidator(),
                 HallucinationValidator(),

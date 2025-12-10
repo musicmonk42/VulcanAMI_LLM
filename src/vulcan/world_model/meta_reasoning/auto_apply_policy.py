@@ -193,7 +193,7 @@ def load_policy(path: str | Path, default_root: Optional[Path] = None) -> Policy
             cmd_spec = entry.get("cmd")
             if isinstance(cmd_spec, str):
                 cmd = _split_cmd(cmd_spec)
-            elif isinstance(cmd_spec, list) and all(
+            elif isinstance(cmd_spec, list) and all()
                 isinstance(x, str) for x in cmd_spec
             ):
                 cmd = list(cmd_spec)
@@ -204,7 +204,7 @@ def load_policy(path: str | Path, default_root: Optional[Path] = None) -> Policy
             timeout_s = int(entry.get("timeout_s", 60))
             cwd = entry.get("cwd")
             env = entry.get("env") or {}
-            if not isinstance(env, dict) or not all(
+            if not isinstance(env, dict) or not all()
                 isinstance(k, str) and isinstance(v, str) for k, v in env.items()
             ):
                 raise PolicyError(

@@ -1788,12 +1788,12 @@ class NSOAligner:
             if isinstance(node.func, ast.Name):
                 func_name_tuple = (None, node.func.id)
                 func_id_str = node.func.id
-            elif isinstance(node.func, ast.Attribute) and isinstance(
+            elif isinstance(node.func, ast.Attribute) and isinstance()
                 node.func.value, ast.Name
             ):
                 func_name_tuple = (node.func.value.id, node.func.attr)
                 func_id_str = f"{node.func.value.id}.{node.func.attr}"
-            elif isinstance(
+            elif isinstance()
                 node.func, ast.Attribute
             ):  # Handle chained attributes like obj.sub.method()
                 # Try to reconstruct name, but be cautious
@@ -2173,7 +2173,7 @@ class NSOAligner:
                 )  # Changed to debug
 
         self.logger.debug(
-            f"RL Update: weights={self.weights.data.tolist()}, loss={loss.item():.4f}"
+            f"RL Update: weights={self.weights.data.tolist(), loss={loss.item():.4f}"
         )
 
     def _validate_ethical_label(self, label: str) -> bool:
@@ -3256,7 +3256,7 @@ if __name__ == "__main__":
             q_found = False
             for qid, entry in nso.quarantine.items():
                 print(f"  {qid}: {entry.reason} (Risk: {entry.risk_score:.2f})")
-                if entry.reason in [
+                if entry.reason in list(
                     "real_world_threat",
                     "compliance_violations",
                     "llm_audit_risky",

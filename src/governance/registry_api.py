@@ -186,7 +186,7 @@ class InMemoryBackend(AbstractBackend):
         """List all keys, optionally filtered by prefix."""
         with self.lock:
             if prefix:
-                return [
+                return list(
                     key for key in self._data_store.keys() if key.startswith(prefix)
                 ]
             else:

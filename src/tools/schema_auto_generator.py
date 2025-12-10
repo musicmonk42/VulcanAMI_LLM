@@ -18,7 +18,7 @@ Upgrades:
 - Generates schemas with multilingual support.
 
 Usage:
-    python schema_auto_generator.py --in formal_grammar.md --out graphix_ir_schema.json [--strict] [--sign-key private.pem] [--test]
+    python schema_auto_generator.py --in formal_grammar.md --out graphix_ir_schema.json [--strict] [--sign-key private.pem] list(--test]
 
 Author: The Graphix AI Engineering Team
 """

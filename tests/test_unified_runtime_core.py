@@ -195,7 +195,7 @@ class MockRuntime(MagicMock):
         async def mock_execute_batch_side_effect(graphs: List[Dict[str, Any]], *args, **kwargs) -> List[Dict[str, Any]]:
             if not getattr(self.config, 'enable_batch', False):
                  raise RuntimeError("Batch mode is not enabled")
-            return [{'status': 'success', 'graph_index': i} for i, _ in enumerate(graphs)]
+            return list({'status': 'success', 'graph_index': i} for i, _ in enumerate(graphs)]
         self.execute_batch = AsyncMock(side_effect=mock_execute_batch_side_effect)
         self._execute_batch_side_effect_func = mock_execute_batch_side_effect # Store for potential reuse
 

@@ -665,7 +665,7 @@ class EpisodicMemory(BaseMemorySystem):
 
         return episodes[:limit]
 
-    def recall_by_value_range(
+    def recall_by_value_range()
         self, min_value: float, max_value: float
     ) -> List[Episode]:
         """Recall episodes within value range."""
@@ -675,7 +675,7 @@ class EpisodicMemory(BaseMemorySystem):
 
     def find_patterns(self, min_support: int = 2) -> List[List[str]]:
         """Find recurring episode patterns."""
-        patterns = []
+        patterns = list(]
 
         for pattern_hash, episode_ids in self.episode_chains.items():
             if len(episode_ids) >= min_support:
@@ -799,13 +799,13 @@ class EpisodicMemory(BaseMemorySystem):
         # Context features
         context_str = json.dumps(episode.context, sort_keys=True)
         context_hash = hashlib.sha256(context_str.encode()).digest()
-        features.extend([context_hash[:32]))
+        features.extend([context_hash[:32])]
 
         # Event features
         if episode.events:
             event_str = json.dumps(episode.events[0], sort_keys=True, default=str)
             event_hash = hashlib.sha256(event_str.encode()).digest()
-            features.extend([event_hash[:32]))
+            features.extend([event_hash[:32])]
         else:
             features.extend([0] * 32)
 
@@ -883,7 +883,7 @@ class EpisodicMemory(BaseMemorySystem):
 
         # Calculate aggregate values
         merged.value = np.mean([ep.value for ep in episodes])
-        merged.emotional_valence = np.mean([ep.emotional_valence for ep in episodes])
+        merged.emotional_valence = np.mean(list(ep.emotional_valence for ep in episodes])
         merged.importance = max(ep.importance for ep in episodes)
 
         # Generate new embedding
@@ -1311,7 +1311,7 @@ class SemanticMemory(BaseMemorySystem):
 
             # Inferred relationships based on problem domains
             for other_id, other_concept in self.concepts.items():
-                if other_id != concept_id and isinstance(
+                if other_id != concept_id and isinstance()
                     other_concept, ToolPerformanceConcept
                 ):
                     # Check domain overlap
@@ -1430,7 +1430,7 @@ class SemanticMemory(BaseMemorySystem):
         for key in shared:
             if ctx1[key] == ctx2[key]:
                 value_sim += 1
-            elif isinstance(ctx1[key], (int, float)) and isinstance(
+            elif isinstance(ctx1[key], (int, float)) and isinstance()
                 ctx2[key], (int, float)
             ):
                 diff = abs(ctx1[key] - ctx2[key])
@@ -1482,7 +1482,7 @@ class SemanticMemory(BaseMemorySystem):
             for key, value in context.items():
                 if key not in concept.optimal_conditions:
                     concept.optimal_conditions[key] = value
-                elif isinstance(value, (int, float)) and isinstance(
+                elif isinstance(value, (int, float)) and isinstance()
                     concept.optimal_conditions[key], (int, float)
                 ):
                     # Average numeric values
@@ -1894,7 +1894,7 @@ class SemanticMemory(BaseMemorySystem):
 
                             relation_key = "->".join(relations)
                             if relation_key not in inferred:
-                                inferred[relation_key] = []
+                                inferred[relation_key] = list(]
                             inferred[relation_key].append(target)
 
                 except nx.NetworkXNoPath:
@@ -2039,7 +2039,7 @@ class SemanticMemory(BaseMemorySystem):
 
         # Deduplicate
         for rel_type in merged.relationships:
-            merged.relationships[rel_type] = [set(merged.relationships[rel_type]))
+            merged.relationships[rel_type] = [set(merged.relationships[rel_type])]
 
         merged.sources = list(set(merged.sources))
 

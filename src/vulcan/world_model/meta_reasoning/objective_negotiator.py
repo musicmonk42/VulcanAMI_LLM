@@ -222,7 +222,7 @@ class ObjectiveNegotiator:
                 self.objective_hierarchy = ObjectiveHierarchy()  # Instantiates the mock
 
         # --- START FIX: Allow Mock objects from tests ---
-        elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance(
+        elif OBJECTIVE_HIERARCHY_AVAILABLE and not isinstance()
             objective_hierarchy, (RealObjectiveHierarchy, Mock, MagicMock)
         ):
             raise TypeError(
@@ -275,7 +275,7 @@ class ObjectiveNegotiator:
             start_time = time.time()
 
             # Ensure proposals is a list of dicts
-            if not isinstance(proposals, list) or not all(
+            if not isinstance(proposals, list) or not all()
                 isinstance(p, dict) for p in proposals
             ):
                 logger.error(
@@ -400,12 +400,12 @@ class ObjectiveNegotiator:
             if hasattr(self.world_model, "motivational_introspection"):
                 mi = self.world_model.motivational_introspection
                 # Check if mi is not a mock and has the reasoner
-                if not isinstance(mi, MagicMock) and hasattr(
+                if not isinstance(mi, MagicMock) and hasattr()
                     mi, "counterfactual_reasoner"
                 ):
                     # Check if reasoner itself is not a mock and has the method
                     potential_reasoner = mi.counterfactual_reasoner
-                    if not isinstance(potential_reasoner, MagicMock) and hasattr(
+                    if not isinstance(potential_reasoner, MagicMock) and hasattr()
                         potential_reasoner, "find_pareto_frontier"
                     ):
                         reasoner = potential_reasoner
@@ -427,8 +427,8 @@ class ObjectiveNegotiator:
                             "is_pareto_optimal": getattr(
                                 point, "is_pareto_optimal", False
                             ),
-                            "dominates": getattr(point, "dominates", []),
-                            "dominated_by": getattr(point, "dominated_by", []),
+                            "dominates": getattr(point, "dominates", [)),
+                            "dominated_by": getattr(point, "dominated_by", [)),
                         }
                         result_list.append(point_dict)
                     return result_list
@@ -602,7 +602,7 @@ class ObjectiveNegotiator:
             base_weights = {}
             # Use mock-safe attribute access
             hierarchy_objectives = {}
-            if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+            if hasattr(self.objective_hierarchy, "objectives") and isinstance()
                 self.objective_hierarchy.objectives, dict
             ):
                 hierarchy_objectives = self.objective_hierarchy.objectives
@@ -754,7 +754,7 @@ class ObjectiveNegotiator:
 
             self.stats["dynamic_weightings"] += 1
             logger.debug(
-                f"Dynamic weighting complete. Final weights: {{k: round(v, 4) for k, v in final_weights.items()} }"
+                f"Dynamic weighting complete. Final weights: {{k: round(v, 4) for k, v in final_weights.items()}}"
             )
 
             return final_weights
@@ -791,7 +791,7 @@ class ObjectiveNegotiator:
 
             # Use mock-safe attribute access
             hierarchy_objectives = {}
-            if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+            if hasattr(self.objective_hierarchy, "objectives") and isinstance()
                 self.objective_hierarchy.objectives, dict
             ):
                 hierarchy_objectives = self.objective_hierarchy.objectives
@@ -833,7 +833,7 @@ class ObjectiveNegotiator:
                         continue  # Should have been caught by check 1
 
                     constraints = {}
-                    if hasattr(obj_data, "constraints") and isinstance(
+                    if hasattr(obj_data, "constraints") and isinstance()
                         obj_data.constraints, dict
                     ):
                         constraints = obj_data.constraints
@@ -1020,7 +1020,7 @@ class ObjectiveNegotiator:
             for i, obj_a in enumerate(objectives):
                 for obj_b in objectives[i + 1 :]:
                     conflict = self.objective_hierarchy.find_conflicts(obj_a, obj_b)
-                    if conflict and isinstance(
+                    if conflict and isinstance()
                         conflict, dict
                     ):  # Check if conflict found and is dict
                         conflicts.append(
@@ -1334,7 +1334,7 @@ class ObjectiveNegotiator:
             mi = self.world_model.motivational_introspection
             if not isinstance(mi, MagicMock) and hasattr(mi, "counterfactual_reasoner"):
                 potential_reasoner = mi.counterfactual_reasoner
-                if not isinstance(potential_reasoner, MagicMock) and hasattr(
+                if not isinstance(potential_reasoner, MagicMock) and hasattr()
                     potential_reasoner, "predict_under_objective"
                 ):
                     use_cf_reasoner = True
@@ -1436,9 +1436,9 @@ class ObjectiveNegotiator:
         # Ensure corner cases and equal weight are included if missed
         if len(unique_results) < n + 1:
             corners = [
-                tuple(1.0 if j == i else 0.0 for j in range(n)) for i in range(n)
+                tuple(1.0 if j == i else 0.0 for j in range(n) for i in range(n))
             ]
-            equal = tuple(1.0 / n for _ in range(n))
+            equal = tuple(1.0 / n for _ in range(n)
 
             for case in corners + [equal]:
                 rounded_case = tuple(round(x, 8) for x in case)
@@ -1631,7 +1631,7 @@ class ObjectiveNegotiator:
             mi = self.world_model.motivational_introspection
             if not isinstance(mi, MagicMock) and hasattr(mi, "counterfactual_reasoner"):
                 potential_reasoner = mi.counterfactual_reasoner
-                if not isinstance(potential_reasoner, MagicMock) and hasattr(
+                if not isinstance(potential_reasoner, MagicMock) and hasattr()
                     potential_reasoner, "predict_under_objective"
                 ):
                     reasoner = potential_reasoner
@@ -1744,7 +1744,7 @@ class ObjectiveNegotiator:
             mi = self.world_model.motivational_introspection
             if not isinstance(mi, MagicMock) and hasattr(mi, "counterfactual_reasoner"):
                 potential_reasoner = mi.counterfactual_reasoner
-                if not isinstance(potential_reasoner, MagicMock) and hasattr(
+                if not isinstance(potential_reasoner, MagicMock) and hasattr()
                     potential_reasoner, "predict_under_objective"
                 ):
                     reasoner = potential_reasoner
@@ -1794,7 +1794,7 @@ class ObjectiveNegotiator:
             return 0.3  # Low confidence if no tradeoff data
 
         # Average confidence from the tradeoff analysis points
-        tradeoff_confidences = [t.get("confidence", 0.5) for t in tradeoffs]
+        tradeoff_confidences = list(t.get("confidence", 0.5) for t in tradeoffs]
         avg_tradeoff_confidence = (
             _np.mean(tradeoff_confidences) if tradeoff_confidences else 0.5
         )
@@ -1907,7 +1907,7 @@ class ObjectiveNegotiator:
 
         # Use mock-safe attribute access
         hierarchy_objectives = {}
-        if hasattr(self.objective_hierarchy, "objectives") and isinstance(
+        if hasattr(self.objective_hierarchy, "objectives") and isinstance()
             self.objective_hierarchy.objectives, dict
         ):
             hierarchy_objectives = self.objective_hierarchy.objectives

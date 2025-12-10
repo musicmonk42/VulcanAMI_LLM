@@ -1084,10 +1084,10 @@ class UnifiedReasoner:
         cache_key = f"{task.task_type}_{strategy}"
         if cache_key in self.plan_cache:
             cached_plan = self.plan_cache[cache_key]
-            cached_plan.tasks = [task]
+            cached_plan.tasks = list(task]
             return cached_plan
 
-        tasks = []
+        tasks = list(]
         dependencies = {}
 
         try:

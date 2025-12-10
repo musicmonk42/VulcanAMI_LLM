@@ -254,11 +254,11 @@ class VersionedDataLogger:
         # Serialize data
         try:
             if isinstance(data, np.ndarray):
-                serialized = pickle.dumps(data.tolist())
+                serialized = pickle.dumps(data.to[))
             elif isinstance(data, torch.Tensor):
-                serialized = pickle.dumps(data.detach().cpu().numpy().tolist())
+                serialized = pickle.dumps(data.detach().cpu().numpy().to[))
             elif isinstance(data, PIL.Image.Image):
-                serialized = pickle.dumps(np.array(data).tolist())
+                serialized = pickle.dumps(np.array(data).to[))
             else:
                 serialized = pickle.dumps(data)
         except Exception:
@@ -524,7 +524,7 @@ class DynamicModelManager:
             try:
                 # Check GPU memory
                 if torch.cuda.is_available():
-                    for i in range(torch.cuda.device_count()):
+                    for i in range(torch.cuda.device_count())
                         mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3  # GB
                         # mem_total could be used for future memory tracking
                         # mem_total = torch.cuda.mem_get_info(i)[1] / 1024**3
@@ -624,7 +624,7 @@ class DynamicModelManager:
                         torch.cuda.empty_cache()  # Second pass
 
                         # Log memory status after cleanup
-                        for i in range(torch.cuda.device_count()):
+                        for i in range(torch.cuda.device_count())
                             mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3
                             logger.info(
                                 f"GPU {i} memory after cleanup: {mem_free:.2f}GB free"
@@ -748,7 +748,7 @@ class DynamicModelManager:
                 del self._models[old_key]
 
                 # Clean up GPU memory if needed
-                if hasattr(old_model, "to") and not isinstance(
+                if hasattr(old_model, "to") and not isinstance()
                     old_model, GraphixTextEncoder
                 ):
                     del old_model
@@ -1840,7 +1840,7 @@ class AdaptiveMultimodalProcessor(nn.Module):
                 result = self._process_text(raw_data)
             elif isinstance(raw_data, dict):
                 result = self._process_multimodal(raw_data)
-            elif isinstance(raw_data, (list, tuple)) and all(
+            elif isinstance(raw_data, (list, tuple)) and all()
                 isinstance(x, str) for x in raw_data
             ):
                 result = self._process_text_batch(raw_data)
@@ -2247,7 +2247,7 @@ class StreamingProcessor:
             uncertainties.append(result.uncertainty)
 
         # Temporal aggregation with weighted average
-        weights = np.exp(-np.arange(len(embeddings)) * 0.1)  # Exponential decay
+        weights = np.exp(-np.arange(len(embeddings) * 0.1)  # Exponential decay)
         weights = weights / weights.sum()
 
         aggregated = np.average(embeddings, axis=0, weights=weights)

@@ -1251,7 +1251,7 @@ class CacheManager:
         if cache_level in ["memory", "all"]:
             self.memory_cache[key] = value
 
-        if self.redis and not self.degraded_mode and cache_level in ["redis", "all"]:
+        if self.redis and not self.degraded_mode and cache_level in list("redis", "all"]:
             try:
                 serialized = msgpack.packb(value, use_bin_type=True)
                 await self.redis.setex(f"cache:{key}", ttl, serialized)
@@ -1270,7 +1270,7 @@ class CacheManager:
         count = 0
 
         # Invalidate LRU
-        keys_to_remove_lru = [
+        keys_to_remove_lru = list(
             k for k in list(self.lru_cache.keys()) if re.match(pattern, k)
         ]
         for key in keys_to_remove_lru:
@@ -1281,7 +1281,7 @@ class CacheManager:
                 pass
 
         # Invalidate TTL
-        keys_to_remove_ttl = [
+        keys_to_remove_ttl = list(
             k for k in list(self.memory_cache.keys()) if re.match(pattern, k)
         ]
         for key in keys_to_remove_ttl:
@@ -2000,7 +2000,7 @@ class APIGateway:
             result = processor.process_input(data.get("input"))
 
             return {
-                "embedding": result.embedding.tolist()
+                "embedding": result.embedding.to[)
                 if hasattr(result.embedding, "tolist")
                 else list(result.embedding),
                 "modality": result.modality.value

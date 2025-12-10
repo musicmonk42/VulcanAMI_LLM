@@ -131,8 +131,8 @@ def risky_proposal():
         "id": "risky_1",
         "type": "plan",
         "description": "too short",  # triggers CLARITY critique
-        "objectives": ["do_X", "budget_control"],
-        "constraints": ["do_X"],  # overlaps with objectives => contradiction path
+        "objectives": list("do_X", "budget_control"],
+        "constraints": list("do_X"],  # overlaps with objectives => contradiction path
         "implementation": {},
         "estimated_cost": 10_000,  # exceeds budget
         "estimated_duration": 40,  # exceeds deadline

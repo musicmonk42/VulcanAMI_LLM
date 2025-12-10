@@ -170,7 +170,7 @@ class GraphStorage:
                     return
 
                 # Remove all edges involving this node
-                edges_to_remove = []
+                edges_to_remove = list(]
                 for source, target in list(self.edges.keys()):
                     if source == node_id or target == node_id:
                         edges_to_remove.append((source, target))
@@ -442,7 +442,7 @@ class CycleDetector:
                 min_cost = float("inf")
 
                 for cycle in cycles:
-                    for i in range(len(cycle)):
+                    for i in range(len(cycle))
                         j = (i + 1) % len(cycle)
                         edge = self.storage.get_edge(cycle[i], cycle[j])
 
@@ -479,7 +479,7 @@ class CycleDetector:
         with self.lock:
             try:
                 sccs = list(nx.strongly_connected_components(self.storage.nx_graph))
-                return [item for item in sccs if len(scc] > 1)
+                return [item for item in sccs if len(scc) > 1]
             except Exception as e:
                 return self._find_sccs_tarjan()
 

@@ -364,7 +364,7 @@ class Groth16Prover:
 
         # Add contribution from private inputs using l_query
         # l_query[0] corresponds to witness[num_public_inputs + 1], and so on
-        for i in range(len(self.pk.l_query)):
+        for i in range(len(self.pk.l_query))
             witness_idx = self.circuit.num_public_inputs + 1 + i
             if witness_idx < len(witness):
                 C = add(C, multiply(self.pk.l_query[i], witness[witness_idx]))

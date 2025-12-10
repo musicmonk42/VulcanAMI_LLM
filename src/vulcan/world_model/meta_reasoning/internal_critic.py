@@ -419,7 +419,7 @@ class InternalCritic:
             f"  Strict mode: {strict_mode}, Adaptive weights: {self.adaptive_weights}"
         )
         logger.info(
-            f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
+            f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()}}"
         )
 
     def evaluate_proposal(
@@ -624,7 +624,7 @@ class InternalCritic:
             List of generated critiques
         """
         with self.lock:
-            critiques = []
+            critiques = list(]
             # Construct a minimal proposal-like structure for evaluation functions
             pseudo_proposal = {
                 "id": f"critique_{aspect}_{time.time_ns()}",
@@ -632,7 +632,7 @@ class InternalCritic:
             }
 
             perspectives_to_check = (
-                [perspective] if perspective else list(self.perspective_weights.keys())
+                list(perspective] if perspective else list(self.perspective_weights.keys())
             )
 
             for persp in perspectives_to_check:
@@ -2061,7 +2061,7 @@ class InternalCritic:
                     }
 
                 logger.debug(
-                    f"New perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
+                    f"New perspective weights: {{p.value: w for p, w in self.perspective_weights.items()}}"
                 )
 
         # Optional: Slightly decrease weights of perspectives that gave high scores to a failed proposal? (More complex logic)

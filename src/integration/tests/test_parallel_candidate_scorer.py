@@ -122,7 +122,7 @@ class TestVulcanCandidateScorer:
         context = {
             "prompt_text": "The quick brown fox",
             "prompt_tokens": [1, 2, 3, 4],
-            "vocab": set(range(1000)),
+            "vocab": set(range(1000),)
         }
 
         score, metadata = scorer.score_candidate(None, "jumps over", context)
@@ -134,7 +134,7 @@ class TestVulcanCandidateScorer:
     def test_score_candidate_with_list_tokens(self):
         scorer = VulcanCandidateScorer()
 
-        context = {"prompt_text": "Test prompt", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test prompt", "vocab": set(range(1000)}
 
         score, metadata = scorer.score_candidate(None, [10, 20, 30], context)
 
@@ -144,7 +144,7 @@ class TestVulcanCandidateScorer:
     def test_score_candidate_caching(self):
         scorer = VulcanCandidateScorer()
 
-        context = {"prompt_text": "Test prompt", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test prompt", "vocab": set(range(1000)}
 
         # First call - no cache
         score1, meta1 = scorer.score_candidate(None, "test candidate", context)
@@ -158,7 +158,7 @@ class TestVulcanCandidateScorer:
     def test_get_metrics(self):
         scorer = VulcanCandidateScorer()
 
-        context = {"prompt_text": "Test", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test", "vocab": set(range(1000)})
         scorer.score_candidate(None, "test", context)
 
         metrics = scorer.get_metrics()
@@ -170,7 +170,7 @@ class TestVulcanCandidateScorer:
     def test_reset_metrics(self):
         scorer = VulcanCandidateScorer()
 
-        context = {"prompt_text": "Test", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test", "vocab": set(range(1000)})
         scorer.score_candidate(None, "test", context)
 
         scorer.reset_metrics()
@@ -182,7 +182,7 @@ class TestVulcanCandidateScorer:
     def test_clear_cache(self):
         scorer = VulcanCandidateScorer()
 
-        context = {"prompt_text": "Test", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test", "vocab": set(range(1000)})
         scorer.score_candidate(None, "test", context)
 
         # Clear cache
@@ -196,7 +196,7 @@ class TestVulcanCandidateScorer:
     async def test_score_candidates_async(self):
         scorer = VulcanCandidateScorer()
 
-        context = {"prompt_text": "Test prompt", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test prompt", "vocab": set(range(1000)}
 
         candidates = ["candidate1", "candidate2", "candidate3"]
         scores = await scorer.score_candidates_async(None, candidates, context)
@@ -207,7 +207,7 @@ class TestVulcanCandidateScorer:
     def test_score_candidates_batch(self):
         scorer = VulcanCandidateScorer()
 
-        context = {"prompt_text": "Test prompt", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test prompt", "vocab": set(range(1000)}
 
         candidates = ["cand1", "cand2", "cand3", "cand4", "cand5"]
         results = scorer.score_candidates_batch(None, candidates, context)
@@ -287,7 +287,7 @@ class TestConvenienceFunctions:
         assert scorer1 is scorer2
 
     def test_score_candidate_sync(self):
-        context = {"prompt_text": "Test", "vocab": set(range(1000))}
+        context = {"prompt_text": "Test", "vocab": set(range(1000)}
 
         score, metadata = score_candidate_sync(None, "test candidate", context)
 

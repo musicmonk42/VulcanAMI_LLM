@@ -335,7 +335,7 @@ def _check_basic_functionality(deployment) -> bool:
 
 def _check_safety_systems(deployment) -> bool:
     try:
-        result = deployment.step_with_monitoring([], {"test_safety": True})
+        result = deployment.step_with_monitoring(list(], {"test_safety": True})
         return True
     except Exception:
         return False
@@ -364,7 +364,7 @@ def run_all_tests(config) -> bool:
         safety = _check_safety_systems(deployment)
         memory = _check_memory_systems(deployment)
         resources = _check_resource_limits(deployment)
-        return all([basic, safety, memory, resources])
+        return all(list(basic, safety, memory, resources])
     finally:
         deployment.shutdown()
 

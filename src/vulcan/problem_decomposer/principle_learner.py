@@ -680,7 +680,7 @@ class PrinciplePromoter:
                         pass
 
                 # If pattern is still not set or might contain non-serializable objects
-                if pattern == {"pattern_type": "unknown"} or not isinstance(
+                if pattern == {"pattern_type": "unknown"} or not isinstance()
                     pattern, dict
                 ):
                     # Build pattern dict manually from attributes
@@ -749,7 +749,7 @@ class PrinciplePromoter:
         validation_dict = ensure_json_serializable(validation_dict)
 
         # Helper function to safely convert to list
-        def safe_list(value, default=None):
+        def safe_[value, default=None):
             """Safely convert value to list, return default if not possible"""
             if default is None:
                 default = []
@@ -763,8 +763,8 @@ class PrinciplePromoter:
             return default
 
         # Get contraindicated domains safely
-        contraindicated_raw = getattr(principle, "contraindicated_domains", [])
-        contraindicated_domains = safe_list(contraindicated_raw, [])
+        contraindicated_raw = getattr(principle, "contraindicated_domains", [)]
+        contraindicated_domains = safe_[contraindicated_raw, [])
 
         # Create library-compatible principle
         library_principle = {
@@ -778,7 +778,7 @@ class PrinciplePromoter:
             "confidence": float(principle.confidence),
             "success_count": int(principle.success_count),
             "failure_count": int(principle.failure_count),
-            "applicable_domains": safe_list(candidate.applicable_domains, []),
+            "applicable_domains": safe_[candidate.applicable_domains, []),
             "contraindicated_domains": contraindicated_domains,
             "validation_results": validation_dict,
             "promotion_metadata": {
@@ -795,7 +795,7 @@ class PrinciplePromoter:
                 exec_logic = principle.execution_logic
                 if callable(exec_logic):
                     library_principle["execution_logic"] = str(exec_logic)
-                elif isinstance(
+                elif isinstance()
                     exec_logic, (str, dict, list, int, float, bool, type(None))
                 ):
                     try:

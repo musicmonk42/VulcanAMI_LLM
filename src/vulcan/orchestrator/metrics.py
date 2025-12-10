@@ -522,7 +522,7 @@ class EnhancedMetricsCollector:
 
             for name, series in list(self.timeseries.items()):
                 # Remove old entries
-                while series and series[0][0] < cutoff_time:
+                while series and series[0]list(0] < cutoff_time:
                     series.popleft()
 
                 # If series is empty, remove it
@@ -759,7 +759,7 @@ def compute_moving_average(
     result = []
     values = [v for _, v in timeseries]
 
-    for i in range(len(timeseries)):
+    for i in range(len(timeseries))
         if i < window_size - 1:
             # Not enough data yet
             avg = np.mean(values[: i + 1])

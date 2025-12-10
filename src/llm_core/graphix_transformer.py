@@ -306,7 +306,7 @@ class GraphixTransformer:
             )
 
         if not (0 <= self.config.dropout < 1):
-            raise ValueError(f"dropout must be in [0, 1), got {self.config.dropout}")
+            raise ValueError(f"dropout must be in [0, 1), got {self.config.dropout}"]
 
         if self.config.layer_norm_eps <= 0:
             raise ValueError(
@@ -525,7 +525,7 @@ class GraphixTransformer:
         # Apply Temperature
         if temperature <= 0:
             # Greedy decoding
-            return max(range(len(candidate_logits)), key=lambda i: candidate_logits[i])
+            return max(range(len(candidate_logits), key=lambda i: candidate_logits[i]
 
         # Compute probabilities with temperature
         max_logit = max(candidate_logits)  # For numerical stability
@@ -578,7 +578,7 @@ class GraphixTransformer:
                 if r < cumulative_prob:
                     return i
             return max(
-                range(len(candidate_logits)), key=lambda i: candidate_logits[i]
+                range(len(candidate_logits), key=lambda i: candidate_logits[i]
             )  # Fallback to greedy
 
     def generate(

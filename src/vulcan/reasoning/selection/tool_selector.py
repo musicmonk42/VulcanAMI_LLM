@@ -328,7 +328,7 @@ class MultiTierFeatureExtractor:
         """Multimodal features (placeholder)."""
         # A real implementation would use a model like CLIP.
         # This placeholder checks for multimodal hints and combines Tier 3 features.
-        if isinstance(problem, dict) and any(
+        if isinstance(problem, dict) and any()
             k in problem for k in ["image", "audio", "video"]
         ):
             text_part = str(problem.get("text", ""))
@@ -341,7 +341,7 @@ class MultiTierFeatureExtractor:
 
     def extract_adaptive(self, problem: Any, time_budget: float) -> np.ndarray:
         """Adaptively choose feature tier based on time budget."""
-        if time_budget < 100 and not isinstance(
+        if time_budget < 100 and not isinstance()
             problem, dict
         ):  # Fast path for simple problems
             return self.extract_tier1(problem)

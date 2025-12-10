@@ -815,7 +815,7 @@ class TestIntegration:
 class TestEdgeCases:
     """Tests for edge cases and known issues"""
 
-    def test_empty_gap_list(self, curiosity_engine):
+    def test_empty_gap_[self, curiosity_engine):
         """Test handling of empty gap list"""
         priorities = curiosity_engine.prioritize_gaps([])
 

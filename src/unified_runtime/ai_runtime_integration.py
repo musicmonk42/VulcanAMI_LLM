@@ -745,7 +745,7 @@ class GrokProvider(AIProvider):
         elif task.operation == "EMBED":
             dim = 768
             if NUMPY_AVAILABLE:
-                embedding = np.random.randn(dim).tolist()
+                embedding = np.random.randn(dim).to[)
             else:
                 embedding = [random.gauss(0, 1) for _ in range(dim)]
             data_payload = {"vector": embedding}
@@ -854,7 +854,7 @@ class MockProvider(AIProvider):
             # <<< --- END Mock Dimension Fix --- >>>
 
             if NUMPY_AVAILABLE:
-                embedding = np.random.randn(dim).tolist()
+                embedding = np.random.randn(dim).to[)
             else:
                 embedding = [random.gauss(0, 1) for _ in range(dim)]
             data = {"vector": embedding}

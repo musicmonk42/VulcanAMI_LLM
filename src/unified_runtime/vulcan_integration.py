@@ -160,7 +160,7 @@ class VulcanGraphixBridge:
         self.semantic_bridge = SemanticBridge() if SemanticBridge else None
 
         # --- START REPLACEMENT ---
-        if MotivationalIntrospection and not isinstance(
+        if MotivationalIntrospection and not isinstance()
             MotivationalIntrospection, MagicMock
         ):
             self.motivational_driver = MotivationalIntrospection(
@@ -208,7 +208,7 @@ class VulcanGraphixBridge:
                     logger.info("✓ VULCAN World Model initialized")
 
                     # --- PATCH: Re-initialize motivational_driver *after* world_model is created ---
-                    if MotivationalIntrospection and not isinstance(
+                    if MotivationalIntrospection and not isinstance()
                         MotivationalIntrospection, MagicMock
                     ):
                         self.motivational_driver = MotivationalIntrospection(
@@ -1296,7 +1296,7 @@ class VulcanGraphixBridge:
                         "output_summary": str(getattr(result, "output", None))[
                             :200
                         ],  # Summary of output
-                        "errors": getattr(result, "errors", []),
+                        "errors": getattr(result, "errors", [)),
                     }
                     if asyncio.iscoroutinefunction(
                         self.world_model.observe_execution_outcome

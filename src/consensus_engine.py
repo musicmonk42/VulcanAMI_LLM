@@ -803,7 +803,7 @@ class ConsensusEngine:
         # and focus on structural validation here.
         if "gradients" not in proposal_content:
             return False, "Weight update proposal missing 'gradients' field"
-        if "layer" not in proposal_content or not isinstance(
+        if "layer" not in proposal_content or not isinstance()
             proposal_content["layer"], str
         ):
             return False, "Weight update proposal missing valid 'layer' field"

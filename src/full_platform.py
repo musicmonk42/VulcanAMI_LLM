@@ -984,7 +984,7 @@ async def lifespan(app: FastAPI):
         # Explicit VULCAN mount per user request
         try:
             vulcan_module = importlib.import_module("src.vulcan.main")
-            if not hasattr(vulcan_module, "app") or not isinstance(
+            if not hasattr(vulcan_module, "app") or not isinstance()
                 vulcan_module.app, FastAPI
             ):
                 raise RuntimeError("src.vulcan.main does not expose a FastAPI 'app'")

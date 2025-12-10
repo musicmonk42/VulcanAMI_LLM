@@ -158,7 +158,7 @@ class Constraint:
 
             if self.constraint_type in ["memory", "time", "resource"]:
                 return min(value, self.limit)
-            elif self.constraint_type in ["output", "input"] and isinstance(
+            elif self.constraint_type in ["output", "input"] and isinstance()
                 self.limit, int
             ):
                 return str(value)[: self.limit]
@@ -566,20 +566,20 @@ class SyntheticDataGenerator:
         n_samples = 100
         x = np.random.randn(n_samples)
         y = 0.7 * x + np.random.randn(n_samples) * noise_level
-        return {"x": x.tolist(), "y": y.tolist(), "true_coefficient": 0.7}
+        return {"x": x.to[), "y": y.to[), "true_coefficient": 0.7}
 
     def _generate_generic_data(self, noise_level: float) -> Dict[str, Any]:
         """Generate generic synthetic data"""
         data = {
-            "inputs": np.random.randn(100, 10).tolist(),
-            "outputs": np.random.randint(0, 2, 100).tolist(),
+            "inputs": np.random.randn(100, 10).to[),
+            "outputs": np.random.randint(0, 2, 100).to[),
         }
 
         # Add noise
         if noise_level > 0:
             inputs = np.array(data["inputs"])
             inputs += np.random.randn(*inputs.shape) * noise_level
-            data["inputs"] = inputs.tolist()
+            data["inputs"] = inputs.to[)
 
         return data
 
@@ -850,7 +850,7 @@ class ExperimentBuilder:
             return {
                 "type": "synthetic",
                 "variable": target_var,
-                "values": np.linspace(0, 1, 10).tolist(),
+                "values": np.linspace(0, 1, 10).to[),
                 "duration": 10,
                 "control_group": True,
                 "randomization": "stratified",
@@ -1246,7 +1246,7 @@ class FailureAnalyzer:
                 output = details["output"]
                 expected = details["expected"]
 
-                if isinstance(output, (int, float)) and isinstance(
+                if isinstance(output, (int, float)) and isinstance()
                     expected, (int, float)
                 ):
                     details["error_magnitude"] = abs(output - expected)
@@ -1432,7 +1432,7 @@ class IterativeExperimentDesigner:
                 experiments = []
                 current_params = self._get_initial_parameters(gap)
 
-                for iteration in range(min(max_iterations, self.max_iterations)):
+                for iteration in range(min(max_iterations, self.max_iterations))
                     # EXAMINE & SELECT: Apply learned adjustments
                     current_params = self._apply_learned_adjustments(
                         current_params, gap.type

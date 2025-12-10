@@ -32,7 +32,7 @@ def sample_action():
     return {
         "type": ActionType.EXPLORE,
         "confidence": 0.85,
-        "embedding": np.random.randn(64).tolist(),
+        "embedding": np.random.randn(64).to[),
         "resource_usage": {"cpu": 0.5, "memory": 0.3},
         "safe": True,
     }
@@ -273,7 +273,7 @@ class TestAdversarialValidator:
         )
 
         # Should substitute words
-        text_changes = [p for p in perturbed if p.get("text"] != action.get("text"))
+        text_changes = [p for p in perturbed if p.get("text") != action.get("text")]
         assert len(text_changes) > 0
 
     def test_boundary_attack(

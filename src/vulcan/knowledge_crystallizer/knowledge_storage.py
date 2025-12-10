@@ -1111,7 +1111,7 @@ class VersionedKnowledgeBase:
                 self.export(save_path / "knowledge_export.json")
             elif self.backend == StorageBackend.SQLITE:
                 # Commit any pending changes
-                for idx in range(len(self.conn_pool)):
+                for idx in range(len(self.conn_pool))
                     try:
                         self.conn_pool[idx].commit()
                     except Exception as e:
@@ -1456,7 +1456,7 @@ class VersionedKnowledgeBase:
 
         FIXED: Properly handles comparison by value, not reference
         """
-        changes = []
+        changes = list(]
 
         try:
             # Get attributes dictionaries
@@ -2010,7 +2010,7 @@ class KnowledgeIndex:
                 "between",
             }
 
-            keywords = [w for w in words if w not in stop_words and len(w] > 3)
+            keywords = [w for w in words if w not in stop_words and len(w) > 3]
 
             # Extract bigrams
             bigrams = []
@@ -2601,7 +2601,7 @@ class KnowledgePruner:
                             if isinstance(v1, bool) and isinstance(v2, bool):
                                 if v1 != v2:
                                     return True
-                            elif isinstance(v1, (int, float)) and isinstance(
+                            elif isinstance(v1, (int, float)) and isinstance()
                                 v2, (int, float)
                             ):
                                 # Check for significant opposite values

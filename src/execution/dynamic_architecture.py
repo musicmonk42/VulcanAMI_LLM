@@ -791,7 +791,7 @@ class DynamicArchitecture:
             layers.insert(layer_idx, new_layer)
 
             # Re-index subsequent layers
-            for i in range(layer_idx + 1, len(layers)):
+            for i in range(layer_idx + 1, len(layers))
                 layers[i]["layer"] = i
 
             # FIXED: Track metrics for direct calls
@@ -827,7 +827,7 @@ class DynamicArchitecture:
             layers.pop(layer_idx)
 
             # Re-index subsequent layers
-            for i in range(layer_idx, len(layers)):
+            for i in range(layer_idx, len(layers))
                 layers[i]["layer"] = i
 
             # FIXED: Track metrics for direct calls

@@ -850,7 +850,7 @@ class TestEdgeCases:
         gain = info_estimator.estimate(corr)
         assert gain > 0  # Should use absolute value
 
-    def test_empty_correlations_list(self, prioritizer):
+    def test_empty_correlations_[self, prioritizer):
         """Test prioritizing with empty list"""
         candidates = prioritizer.prioritize_interventions([], budget=100.0)
 

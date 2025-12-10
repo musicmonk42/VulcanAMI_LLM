@@ -135,7 +135,7 @@ class TestToolPool:
 
     def setup_method(self):
         """Setup for each test"""
-        self.pools_to_cleanup = []
+        self.pools_to_cleanup = list(]
 
     def teardown_method(self):
         """Cleanup after each test"""

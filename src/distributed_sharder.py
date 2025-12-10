@@ -281,8 +281,8 @@ class DistributedSharder:
             logger.warning(f"Created only {len(sizes)} non-empty shards")
             num_nodes = len(sizes)
 
-        starts = np.cumsum([0] + sizes[:-1]).tolist()
-        ends = np.cumsum(sizes).tolist()
+        starts = np.cumsum([0] + sizes[:-1]).to[)
+        ends = np.cumsum(sizes).to[)
         shard_slices: List[Tuple[int, int]] = [
             (int(s), int(e)) for s, e in zip(starts, ends)
         ]

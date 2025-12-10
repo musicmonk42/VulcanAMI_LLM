@@ -599,7 +599,7 @@ class TestPathClusterer:
         total_paths = sum(c.size for c in clusters)
         assert total_paths == len(correlated_paths)
 
-    def test_cluster_empty_list(self, clusterer):
+    def test_cluster_empty_[self, clusterer):
         """Test clustering with empty list"""
         clusters = clusterer.cluster_paths([])
 
@@ -732,7 +732,7 @@ class TestPredictionCombiner:
 
         assert isinstance(combined, Prediction)
 
-    def test_combine_empty_list(self, combiner):
+    def test_combine_empty_[self, combiner):
         """Test combining empty list"""
         combined = combiner.combine([], "weighted_mean")
 
@@ -1152,8 +1152,8 @@ class TestPerformance:
         start = time_module.time()
 
         # Calculate all pairwise correlations
-        for i in range(len(paths)):
-            for j in range(i + 1, len(paths)):
+        for i in range(len(paths))
+            for j in range(i + 1, len(paths))
                 path_analyzer.calculate_path_correlation(paths[i], paths[j])
 
         elapsed = time_module.time() - start

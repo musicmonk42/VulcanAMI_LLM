@@ -185,7 +185,7 @@ except ImportError:
 
         @staticmethod
         def arange(stop, start=0, step=1, dtype=None):
-            return list(range(start, stop, step))
+            return list(range(start, stop, step)
 
         @staticmethod
         def clip(a, a_min, a_max, out=None):
@@ -1097,7 +1097,7 @@ class CuriosityRewardShaper:
         """Convert features dict to numpy vector or list"""
         # Use fake numpy if needed
         _np = np if NUMPY_AVAILABLE else FakeNumpy
-        vec = []
+        vec = list(]
 
         # Sort keys for consistent vector order
         for key in sorted(features.keys()):
@@ -1292,7 +1292,7 @@ class CuriosityRewardShaper:
         # Update novelty trend (simple linear regression on recent history)
         if len(self.novelty_history) >= 20:
             recent = list(self.novelty_history)[-20:]
-            x = _np.arange(len(recent))  # Use fake numpy if needed
+            x = _np.arange(len(recent)  # Use fake numpy if needed)
             y = _np.array(recent)  # Use fake numpy if needed
 
             # Linear regression using np.vstack/np.ones/np.lstsq (or fake versions)

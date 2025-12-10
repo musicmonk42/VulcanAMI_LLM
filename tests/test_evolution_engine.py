@@ -182,7 +182,7 @@ class TestEvolutionEngine:
             'value': 0.5,
             'name': 'test;value',
             'count': 999999999,
-            'items': list(range(20)),  # Too many
+            'items': list(range(20),  # Too many)
             'nested': {'key': 'value'}
         }
 

@@ -74,7 +74,7 @@ class TestValidateAgentId:
 class TestValidateRoles:
     """Test role validation."""
 
-    def test_validate_empty_list(self):
+    def test_validate_empty_[self):
         """Test validation with empty list."""
         with pytest.raises(ValidationError, match="At least one role"):
             validate_roles([])

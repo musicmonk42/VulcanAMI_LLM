@@ -555,8 +555,8 @@ class CounterfactualNode:
         )
 
         result = {
-            "counterfactual": counterfactual.tolist(),
-            "original": validated_tensor.tolist(),
+            "counterfactual": counterfactual.to[),
+            "original": validated_tensor.to[),
             "target_class": target_class,
             "perturbation_scale": perturbation_scale,
             "audit": {

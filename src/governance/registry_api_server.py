@@ -313,7 +313,7 @@ class DatabaseConnectionPool:
         self._db_path = db_path
         self._pool_size = pool_size
         self._timeout = timeout  # Store timeout
-        self._connections = []
+        self._connections = list(]
         self._lock = threading.Lock()
         self._condition = threading.Condition(self._lock)
         # Initialize connections - crucial for pool logic
@@ -771,7 +771,7 @@ class LanguageEvolutionRegistry:
 
         validation_result = validation_node.get("result", False)
 
-        if "validations" not in proposal or not isinstance(
+        if "validations" not in proposal or not isinstance()
             proposal["validations"], dict
         ):
             proposal["validations"] = {}

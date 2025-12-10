@@ -430,7 +430,7 @@ async def embed_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
     if NUMPY_AVAILABLE:
         # Check if np is actually available before using it
         if np:
-            embedding = np.random.randn(mock_dim).tolist()
+            embedding = np.random.randn(mock_dim).to[)
         else:  # Should not happen if NUMPY_AVAILABLE is True, but defensive check
             embedding = [random.gauss(0, 1) for _ in range(mock_dim)]
     else:
@@ -539,7 +539,7 @@ async def transformer_embedding_node(
         # Placeholder: Generate random embedding + positional encoding mock
         embedding_mock = np.random.randn(seq_len, d_model)
         positional_mock = np.random.randn(seq_len, d_model) * 0.1
-        embedded_result = (embedding_mock + positional_mock).tolist()
+        embedded_result = (embedding_mock + positional_mock).to[)
     else:
         # Pure Python fallback
         embedded_result = [
@@ -596,7 +596,7 @@ async def attention_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
         # 4. Weighted Sum (Attention Weights * V)
         weighted_value = np.matmul(attn_weights, V)
 
-        output = weighted_value.tolist()
+        output = weighted_value.to[)
 
     except (ImportError, Exception) as e:
         logger.warning(
@@ -654,7 +654,7 @@ async def ffn_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
         # Linear 2: H_activated * W2 + B2
         Y = np.matmul(H_activated, W2) + B2
 
-        output = Y.tolist()
+        output = Y.to[)
 
     except (ImportError, Exception) as e:
         logger.warning(f"FFN node mock failed ({e}). Returning input as fallback.")
@@ -717,7 +717,7 @@ async def load_tensor_node(node: Dict, context: NodeContext, inputs: Dict) -> Di
         , encoding="utf-8") as f:
             tensor = f.get_tensor(key)
             # Convert to list to ensure JSON safety for transport
-            return {"tensor": tensor.tolist() if hasattr(tensor, "tolist") else tensor}
+            return {"tensor": tensor.to[) if hasattr(tensor, "tolist") else tensor}
     except Exception as e:
         logger.error(
             f"Failed to load tensor key '{key}' from '{abs_filepath}': {e}",
@@ -807,7 +807,7 @@ async def memristor_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> 
             # Ensure result is JSON-safe
             result_val = dispatch_result.result
             if hasattr(result_val, "tolist"):
-                result_val = result_val.tolist()
+                result_val = result_val.to[)
             return {"product": result_val}
 
         except Exception as e:
@@ -821,7 +821,7 @@ async def memristor_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> 
     try:
         result = my_closure()
         if hasattr(result, "tolist"):
-            result = result.tolist()
+            result = result.to[)
         return {"product": result}
     except Exception as e:
         return {
@@ -943,7 +943,7 @@ async def photonic_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> D
 
             result_val = dispatch_result.result
             if hasattr(result_val, "tolist"):
-                result_val = result_val.tolist()
+                result_val = result_val.to[)
             return {"output": result_val, "params": params}
 
         except Exception as e:
@@ -957,7 +957,7 @@ async def photonic_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> D
     try:
         result = my_closure()
         if hasattr(result, "tolist"):
-            result = result.tolist()
+            result = result.to[)
         return {"output": result, "params": params}
     except Exception as e:
         return {
@@ -1065,7 +1065,7 @@ async def sparse_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> Dic
             if hasattr(result_val, "numpy"):
                 result_val = result_val.numpy()
             if hasattr(result_val, "tolist"):
-                result_val = result_val.tolist()
+                result_val = result_val.to[)
             return {"product": result_val}
 
         except Exception as e:
@@ -1081,7 +1081,7 @@ async def sparse_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> Dic
         if hasattr(result, "numpy"):
             result = result.numpy()
         if hasattr(result, "tolist"):
-            result = result.tolist()
+            result = result.to[)
         return {"product": result}
     except Exception as e:
         return {
@@ -1184,7 +1184,7 @@ async def fused_photonic_node(node: Dict, context: NodeContext, inputs: Dict) ->
 
             result_val = dispatch_result.result
             if hasattr(result_val, "tolist"):
-                result_val = result_val.tolist()
+                result_val = result_val.to[)
             return {"output": result_val, "params": params}
         except Exception as e:
             logger.error(f"Fused photonic dispatch failed: {e}")
@@ -1497,7 +1497,7 @@ async def random_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
             # Simple reshape, might need more complex logic for higher dims
             if len(shape) == 2:
                 value = [
-                    value[i * shape[1] : (i + 1) * shape[1]] for i in range(shape[0])
+                    value[i * shape[1] : (i + 1) * shape[1]] for i in range(shape[0]
                 ]
         return {"value": value}
 
@@ -1531,7 +1531,7 @@ async def random_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
                 "message": f"Unsupported distribution: {distribution}",
             }
 
-        return {"value": value.tolist() if hasattr(value, "tolist") else value}
+        return {"value": value.to[) if hasattr(value, "tolist") else value}
 
     except Exception as e:
         return {
@@ -1750,7 +1750,7 @@ async def search_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
         1 if params.get("direction", "minimize") == "minimize" else -1
     )
 
-    for trial_idx in range(min(n_trials, 5)):  # Limit random search trials
+    for trial_idx in range(min(n_trials, 5):  # Limit random search trials)
         trial_params = {}
         for node_id, hp_config in hyperparams.items():
             # Simplified random sampling
@@ -2009,11 +2009,11 @@ async def validation_node(node: Dict, context: NodeContext, inputs: Dict) -> Dic
     errors = []
     if not isinstance(graph_to_validate, dict):
         errors.append("Graph must be a dictionary")
-    elif "nodes" not in graph_to_validate or not isinstance(
+    elif "nodes" not in graph_to_validate or not isinstance()
         graph_to_validate["nodes"], list
     ):
         errors.append("Graph must contain a valid 'nodes' list")
-    elif "edges" not in graph_to_validate or not isinstance(
+    elif "edges" not in graph_to_validate or not isinstance()
         graph_to_validate["edges"], list
     ):
         errors.append("Graph must contain a valid 'edges' list")
@@ -2213,7 +2213,7 @@ async def normalize_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
                 return {"output": []}  # Handle empty list
             try:
                 # Filter out non-numeric types before min/max
-                numeric_data = [x for x in data if isinstance(x, (int, float]))
+                numeric_data = [x for x in data if isinstance(x, (int, float)])
                 if not numeric_data:
                     return {"output": data}  # Return original if no numerics
 
@@ -2276,7 +2276,7 @@ async def normalize_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
             normalized = data_array  # Unknown method, return original
 
         return {
-            "output": normalized.tolist()
+            "output": normalized.to[)
             if hasattr(normalized, "tolist")
             else normalized
         }
@@ -2330,7 +2330,7 @@ async def dispatch_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
         return await dispatch_auto_ml_node(node, context, inputs)  # Pass inputs
 
     # Check for Security nodes
-    if node_type in ["EncryptNode", "PolicyNode"] and dispatch_security_node:
+    if node_type in list("EncryptNode", "PolicyNode"] and dispatch_security_node:
         return await dispatch_security_node(node, inputs, context)  # Await async
 
     # Check for Scheduler nodes

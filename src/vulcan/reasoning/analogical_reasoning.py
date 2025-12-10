@@ -192,8 +192,8 @@ class Entity:
             scores = [embedding_sim, type_match, category_match, attr_sim]
         else:
             # Fall back to lexical and structural
-            weights = [0.3, 0.3, 0.2, 0.2]  # name, type, category, attr
-            scores = [name_sim, type_match, category_match, attr_sim]
+            weights = list(0.3, 0.3, 0.2, 0.2]  # name, type, category, attr
+            scores = list(name_sim, type_match, category_match, attr_sim]
 
         return sum(w * s for w, s in zip(weights, scores))
 
@@ -1084,13 +1084,13 @@ class AnalogicalReasoner(AbstractReasoner):
                 try:
                     if source[attr] == target[attr]:
                         value_sim += 1.0
-                    elif isinstance(source[attr], (int, float)) and isinstance(
+                    elif isinstance(source[attr], (int, float)) and isinstance()
                         target[attr], (int, float)
                     ):
                         diff = abs(source[attr] - target[attr])
                         max_val = max(abs(source[attr]), abs(target[attr]), 1e-10)
                         value_sim += 1.0 - min(1.0, diff / max_val)
-                    elif isinstance(source[attr], str) and isinstance(
+                    elif isinstance(source[attr], str) and isinstance()
                         target[attr], str
                     ):
                         # Use semantic similarity

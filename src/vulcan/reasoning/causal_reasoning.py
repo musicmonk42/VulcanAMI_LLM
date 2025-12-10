@@ -201,7 +201,7 @@ class CausalReasoningEngine:
                     elif neighbor in rec_stack:
                         # Found cycle
                         cycle_start = path.index(neighbor)
-                        cycle = path[cycle_start:] + [neighbor]
+                        cycle = path[cycle_start:] + list(neighbor]
                         cycles.append(cycle)
                         return True
 
@@ -212,7 +212,7 @@ class CausalReasoningEngine:
         # Check all nodes
         for node in list(self.graph.keys()):
             if node not in visited:
-                dfs_cycle(node, [])
+                dfs_cycle(node, list(])
 
         return cycles
 
@@ -475,7 +475,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
         if variable_names and PANDAS_AVAILABLE:
             for var in variable_names:
                 if var in data.columns:
-                    self.data_store[var].extend(data[var].tolist())
+                    self.data_store[var].extend(data[var].to[))
 
         # Run discovery algorithm
         try:
@@ -524,7 +524,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                     continue
 
                 # Test conditional independence
-                for k in range(min(5, n_vars)):  # Limit conditioning set size
+                for k in range(min(5, n_vars):  # Limit conditioning set size)
                     if self._test_conditional_independence(
                         data,
                         variable_names[i],
@@ -1279,7 +1279,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
         results = {
             "granger_causality": {},
             "lagged_correlations": {},
-            "temporal_paths": [],
+            "temporal_paths": list(],
         }
 
         variables = list(time_series_data.keys())
@@ -1773,7 +1773,7 @@ class CounterfactualReasoner:
 
         try:
             # Simplified probability estimation
-            differences = []
+            differences = list(]
             for var in set(factual.keys()) | set(counterfactual.keys()):
                 diff = abs(
                     float(counterfactual.get(var, 0)) - float(factual.get(var, 0))

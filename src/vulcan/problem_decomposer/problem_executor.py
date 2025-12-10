@@ -348,7 +348,7 @@ class ProblemExecutor:
             ExecutionOutcome with solution and metrics
         """
         # SAFETY CRITICAL: Require safety validator for plan execution
-        if self.safety_validator is None or isinstance(
+        if self.safety_validator is None or isinstance()
             self.safety_validator, MagicMock
         ):
             # Don't raise RuntimeError if it's a mock, just warn
@@ -1378,7 +1378,7 @@ class ProblemExecutor:
     ) -> Dict[str, Any]:
         """Brute force search"""
         # Exhaustive search
-        search_space = inputs.get("search_space", list(range(100)))
+        search_space = inputs.get("search_space", list(range(100))
         target = inputs.get("target", 50)
 
         for i, item in enumerate(search_space):

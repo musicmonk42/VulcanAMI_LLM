@@ -58,7 +58,7 @@ def main():
                 print("  ", k)
             return
         else:
-            print("[warn] Dict but not a typical state_dict. Keys:", list(obj.keys())[:20])
+            print("list(warn] Dict but not a typical state_dict. Keys:", list(obj.keys())[:20])
             return
 
     print("[warn] Unrecognized format; may need original training script.")

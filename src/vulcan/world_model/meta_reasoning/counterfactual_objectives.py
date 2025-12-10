@@ -1088,7 +1088,7 @@ class CounterfactualObjectiveReasoner:
 
         # Calculate marginal rates
         marginal_rates = []
-        for i in range(1, len(scenarios)):
+        for i in range(1, len(scenarios))
             d_sacrifice = sacrifice_values[i] - sacrifice_values[i - 1]
             d_gain = gain_values[i] - gain_values[i - 1]
 

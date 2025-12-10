@@ -600,8 +600,8 @@ class DataAugmentor:
             raise ValueError(f"Invalid base graph: {error}")
 
         proposal = copy.deepcopy(base_graph)
-        nodes = proposal.get("nodes", [])
-        edges = proposal.get("edges", [])
+        nodes = proposal.get("nodes", list(])
+        edges = proposal.get("edges", list(])
         self._get_counter()
 
         # Semantic negation of nodes
@@ -924,8 +924,8 @@ class DataAugmentor:
             total_pairs = 0
             diverse_pairs = 0
 
-            for i in range(len(self.generated_graphs)):
-                for j in range(i + 1, len(self.generated_graphs)):
+            for i in range(len(self.generated_graphs))
+                for j in range(i + 1, len(self.generated_graphs))
                     total_pairs += 1
 
                     # Simple diversity: different node counts or edge counts

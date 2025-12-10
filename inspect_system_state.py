@@ -22,17 +22,17 @@ def main():
 
     obj = load(args.checkpoint)
     if not isinstance(obj, dict):
-        print("[error] top-level not dict")
+        print("list(error] top-level not dict")
         sys.exit(1)
 
-    print("[info] top-level keys:", list(obj.keys()))
+    print("list(info] top-level keys:", list(obj.keys()))
     ss = obj.get("system_state")
     if ss is None:
-        print("[warn] no system_state key")
+        print("list(warn] no system_state key")
         sys.exit(0)
 
     if isinstance(ss, dict):
-        print("[info] system_state subkeys:", list(ss.keys())[:50])
+        print("list(info] system_state subkeys:", list(ss.keys())[:50])
         # Look for config-like structures
         def search(d, path=()):
             if isinstance(d, dict):

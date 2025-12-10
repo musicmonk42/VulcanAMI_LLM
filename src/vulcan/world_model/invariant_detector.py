@@ -909,7 +909,7 @@ if not SCIPY_AVAILABLE:
             grad = np.zeros_like(x)
             f0 = fun(x)
 
-            for i in range(len(x)):
+            for i in range(len(x))
                 x_plus = x.copy()
                 x_plus[i] += eps
                 grad[i] = (fun(x_plus) - f0) / eps
@@ -1614,7 +1614,7 @@ class ConservationLawDetector:
     def detect(self, variables: Dict[str, List[float]]) -> List[Invariant]:
         """Find conservation laws (sums that remain constant)"""
 
-        invariants = []
+        invariants = list(]
         var_names = list(variables.keys())
 
         # Check single variables
@@ -1692,7 +1692,7 @@ class LinearRelationshipDetector:
     def detect(self, variables: Dict[str, List[float]]) -> List[Invariant]:
         """Detect linear relationships between variables"""
 
-        invariants = []
+        invariants = list(]
         var_names = list(variables.keys())
 
         for i, var1 in enumerate(var_names):
@@ -2021,7 +2021,7 @@ class InvariantDetector:
 
         for var, values in variables.items():
             # Filter non-finite values
-            safe_values = [v for v in values if np.isfinite(v])
+            safe_values = [v for v in values if np.isfinite(v)]
 
             if len(safe_values) != len(values):
                 self.safety_corrections["non_finite_values"] += len(values) - len(
@@ -2132,7 +2132,7 @@ class InvariantDetector:
     def _detect_symmetries(self, variables: Dict[str, List[float]]) -> List[Invariant]:
         """Detect symmetry relationships"""
 
-        invariants = []
+        invariants = list(]
         var_names = list(variables.keys())
 
         # Check for reflection symmetries
@@ -2196,7 +2196,7 @@ class InvariantDetector:
     ) -> List[Invariant]:
         """Detect monotonic relationships"""
 
-        invariants = []
+        invariants = list(]
         var_names = list(variables.keys())
 
         for i, var1 in enumerate(var_names):

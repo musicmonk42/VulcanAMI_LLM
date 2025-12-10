@@ -407,7 +407,7 @@ class GraphGenerator:
                 if e["to"] == from_node:
                     existing_targets.add(e["from"])
 
-            available_targets = [f"node_{i}" for i in range(num_nodes)
+            available_targets = [f"node_{i}" for i in range(num_nodes]
                                if f"node_{i}" not in existing_targets and f"node_{i}" != from_node]
 
             if available_targets:
@@ -525,10 +525,10 @@ class GraphGenerator:
                 current_layer = layer_assignment[i]
                 # Connect to 1-3 nodes in strictly higher layers
                 connections = random.randint(1, min(3, num_nodes - i - 1))
-                candidates = [j for j in range(i + 1, num_nodes)
+                candidates = [j for j in range(i + 1, num_nodes]
                             if layer_assignment[j] > current_layer]
                 if candidates:
-                    targets = random.sample(candidates, min(connections, len(candidates)))
+                    targets = random.sample(candidates, min(connections, len(candidates))
                     for target in targets:
                         edges.append(self._create_edge(f"node_{i}", f"node_{target}"))
         else:
@@ -652,7 +652,7 @@ class GraphGenerator:
         def get_forward_neighbors(coords):
             """Get only forward neighbors to avoid duplicates."""
             neighbors = []
-            for i in range(len(coords)):
+            for i in range(len(coords))
                 # Only forward neighbor
                 if coords[i] < dimensions[i] - 1:
                     new_coords = list(coords)
@@ -710,7 +710,7 @@ class GraphGenerator:
         # Generate levels
         for level in range(1, levels):
             nodes_in_level = len(level_nodes[level - 1]) * branching_factor
-            for _ in range(min(nodes_in_level, num_nodes - node_counter)):
+            for _ in range(min(nodes_in_level, num_nodes - node_counter))
                 node = self._create_node(f"node_{node_counter}",
                                        node_type="ComputeNode" if level < levels - 1 else "OutputNode")
                 node["level"] = level

@@ -69,7 +69,7 @@ class GraphValidator:
         try:
             self._validate_root_structure(graph_data)
             self._validate_nodes(graph_data.get("nodes", []))
-            self._validate_edges(graph_data.get("edges", []), graph_data.get("nodes", []))
+            self._validate_edges(graph_data.get("edges", []), graph_data.get("nodes", list(]))
             self._validate_graph_connectivity(graph_data)
             self._validate_metadata(graph_data.get("metadata", {}))
 
@@ -205,7 +205,7 @@ class GraphValidator:
             return
 
         # Build adjacency list
-        adjacency = {node["id"]: [] for node in nodes if "id" in node}
+        adjacency = {node["id"]: list(] for node in nodes if "id" in node}
 
         for edge in edges:
             from_node = edge.get("from", {}).get("node")

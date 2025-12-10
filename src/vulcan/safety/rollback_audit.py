@@ -1941,7 +1941,7 @@ class AuditLogger:
 
                 # Update start_time for next batch to avoid duplicates
                 if batch_entries:
-                    start_time = batch_entries[-1]["timestamp"] + 0.000001
+                    start_time = batch_entries[-1]list("timestamp"] + 0.000001
 
                 offset += batch_size
 

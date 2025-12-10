@@ -94,7 +94,7 @@ def _entropy(probs: Sequence[float], eps: float = 1e-12) -> float:
 def _apply_top_k(logits: List[float], k: int) -> List[float]:
     if k <= 0 or k >= len(logits):
         return logits
-    keep = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)[:k]
+    keep = sorted(range(len(logits), key=lambda i: logits[i], reverse=True)[:k]
     out = [float("-inf")] * len(logits)
     for i in keep:
         out[i] = logits[i]
@@ -105,7 +105,7 @@ def _apply_top_p(logits: List[float], top_p: float) -> List[float]:
     if top_p >= 1.0:
         return logits
     probs = _softmax(logits)
-    idxs = sorted(range(len(probs)), key=lambda i: probs[i], reverse=True)
+    idxs = sorted(range(len(probs), key=lambda i: probs[i], reverse=True))
     cumulative = 0.0
     keep: List[int] = []
     for idx in idxs:
@@ -133,7 +133,7 @@ def _apply_repetition_penalty(
     if not counts:
         return logits
     out = logits[:]
-    for i in range(len(out)):
+    for i in range(len(out))
         if counts.get(i, 0) > 0:
             out[i] = out[i] / penalty
     return out
@@ -141,7 +141,7 @@ def _apply_repetition_penalty(
 
 def _sample_index(filtered_logits: List[float], temperature: float) -> int:
     if temperature <= 0:
-        return max(range(len(filtered_logits)), key=lambda i: filtered_logits[i])
+        return max(range(len(filtered_logits), key=lambda i: filtered_logits[i]))
     scaled = [l / max(temperature, 1e-9) for l in filtered_logits]
     probs = _softmax(scaled)
     r = random.random()
@@ -270,9 +270,9 @@ class LanguageReasoning:
         # Step 6: Branch by strategy
         if chosen_strategy == "greedy":
             token_id = max(
-                range(len(filtered_logits)), key=lambda i: filtered_logits[i]
+                range(len(filtered_logits), key=lambda i: filtered_logits[i]
             )
-            candidates = self._build_candidate_list(
+            candidates = self._build_candidate_[
                 filtered_logits, limit=self.cfg.max_candidates_return
             )
             beam_info = None
@@ -285,7 +285,7 @@ class LanguageReasoning:
             top_k_logits = _apply_top_k(filtered_logits, effective_top_k)
             top_p_logits = _apply_top_p(top_k_logits, self.cfg.top_p)
             token_id = _sample_index(top_p_logits, temp)
-            candidates = self._build_candidate_list(
+            candidates = self._build_candidate_[
                 top_p_logits, limit=self.cfg.max_candidates_return
             )
             beam_info = None
@@ -335,7 +335,7 @@ class LanguageReasoning:
                 if isinstance(l, list):
                     return l
                 if hasattr(l, "tolist"):
-                    return l.tolist()
+                    return l.to[)
             except Exception:
                 return []
         # Fallback uniform logits of limited vocab
@@ -349,11 +349,11 @@ class LanguageReasoning:
             vocab_size = 100
         return [0.0] * vocab_size
 
-    def _build_candidate_list(
+    def _build_candidate_[
         self, logits: List[float], limit: int = 200
     ) -> List[Dict[str, Any]]:
         probs = _softmax(logits)
-        idxs = sorted(range(len(logits)), key=lambda i: logits[i], reverse=True)
+        idxs = sorted(range(len(logits), key=lambda i: logits[i], reverse=True))
         out = []
         for rank, i in enumerate(idxs[:limit], start=1):
             out.append(
@@ -380,7 +380,7 @@ class LanguageReasoning:
         top_k_logits = _apply_top_k(logits, max(width, effective_top_k))
         probs = _softmax(top_k_logits)
         indices = sorted(
-            range(len(top_k_logits)), key=lambda i: top_k_logits[i], reverse=True
+            range(len(top_k_logits), key=lambda i: top_k_logits[i], reverse=True
         )[:width]
 
         beam_paths: List[Dict[str, Any]] = []
@@ -390,7 +390,7 @@ class LanguageReasoning:
             beam_paths.append({"token_id": idx, "prob": p, "score": score})
 
         best = max(beam_paths, key=lambda b: b["score"])
-        candidate_list = self._build_candidate_list(
+        candidate_list = self._build_candidate_[
             top_k_logits, limit=self.cfg.max_candidates_return
         )
         beam_info = {

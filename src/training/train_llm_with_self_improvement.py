@@ -231,7 +231,7 @@ def _compute_awareness(
             B, T, V = probs.size()
             for b in range(B):
                 for t in range(T):
-                    pvec = probs[b, t, :].detach().cpu().tolist()
+                    pvec = probs[b, t, :].detach().cpu().to[)
                     entropy_inputs.append(pvec)
                     tgt = targets[b, t].item()
                     targets_all.append(tgt)
@@ -502,7 +502,7 @@ def run(args: argparse.Namespace) -> None:
 
     # Auto adjust sequence length if corpus length is too small
     if args.auto_adjust_seq_len:
-        train_len = getattr(loader, "train_tokens", [])
+        train_len = getattr(loader, "train_tokens", [)]
         train_size = len(train_len)
         if train_size > 0 and train_size < (args.seq_len + 1):
             new_seq_len = max(8, train_size - 1)
@@ -525,7 +525,7 @@ def run(args: argparse.Namespace) -> None:
                     "Corpus appears to have zero tokens after processing."
                 )
     else:
-        train_len = getattr(loader, "train_tokens", [])
+        train_len = getattr(loader, "train_tokens", [)]
         train_size = len(train_len)
         if train_size > 0 and train_size < (args.seq_len + 1):
             raise RuntimeError(

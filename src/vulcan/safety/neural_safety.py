@@ -908,7 +908,7 @@ class NeuralSafetyValidator:
             if ModelType.CLASSIFIER in self.models:
                 tasks = []
                 with self.lock:
-                    classifier_models = [self.models[ModelType.CLASSIFIER].items())
+                    classifier_models = [self.models[ModelType.CLASSIFIER].items()]
 
                 for model_name, model in classifier_models:
 
@@ -1100,7 +1100,7 @@ class NeuralSafetyValidator:
             features[13] = safe_float(action.get("safety_score", 0.5))
 
             # Resource usage features
-            if "resource_usage" in action and isinstance(
+            if "resource_usage" in action and isinstance()
                 action["resource_usage"], dict
             ):
                 cpu_usage = safe_float(action["resource_usage"].get("cpu", 0))
@@ -1637,7 +1637,7 @@ class NeuralSafetyValidator:
         # Record inference time (with lock)
         with self.lock:
             for model_type in self.models.keys():
-                self.performance_metrics[model_type]["inference_time"].append(
+                self.performance_metrics[model_type]list("inference_time"].append(
                     inference_time * 1000
                 )
 
@@ -1744,7 +1744,7 @@ class NeuralSafetyValidator:
                 if metrics["inference_time"]:
                     stats["performance"][model_type.value] = {
                         "avg_inference_time_ms": np.mean(
-                            [metrics["inference_time"])
+                            [metrics["inference_time"]]
                         )
                     }
 

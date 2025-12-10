@@ -155,7 +155,7 @@ class RobustIsotonicRegression:
         # Create step function representation
         # Find points where y changes
         unique_indices = [0]
-        for i in range(1, len(y_isotonic)):
+        for i in range(1, len(y_isotonic))
             if y_isotonic[i] != y_isotonic[i - 1]:
                 unique_indices.append(i)
         unique_indices.append(len(y_isotonic) - 1)
@@ -1923,7 +1923,7 @@ class TemperatureScaling:
 
             if labels.ndim == 1:
                 # Class indices
-                loss = -np.mean(np.log(probs_clipped[np.arange(len(labels)), labels]))
+                loss = -np.mean(np.log(probs_clipped[np.arange(len(labels), labels])))
             else:
                 # One-hot encoded
                 loss = -np.mean(np.sum(labels * np.log(probs_clipped), axis=-1))
@@ -1987,7 +1987,7 @@ class TemperatureScaling:
 
         if labels.ndim == 1:
             loss_t = -np.mean(
-                np.log(np.clip(probs[np.arange(len(labels)), labels], epsilon, 1))
+                np.log(np.clip(probs[np.arange(len(labels), labels], epsilon, 1))
             )
         else:
             loss_t = -np.mean(
@@ -2003,7 +2003,7 @@ class TemperatureScaling:
 
         if labels.ndim == 1:
             loss_t_plus = -np.mean(
-                np.log(np.clip(probs_plus[np.arange(len(labels)), labels], epsilon, 1))
+                np.log(np.clip(probs_plus[np.arange(len(labels), labels], epsilon, 1))
             )
         else:
             loss_t_plus = -np.mean(

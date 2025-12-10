@@ -1796,9 +1796,7 @@ class WorldModelRouter:
                 if hasattr(self.world_model.correlation_tracker, "correlation_matrix"):
                     known_vars = set(
                         getattr(
-                            self.world_model.correlation_tracker.correlation_matrix,
-                            "variables",
-                            [],
+                            self.world_model.correlation_tracker.correlation_matrix, "variables", [),
                         )
                     )
 

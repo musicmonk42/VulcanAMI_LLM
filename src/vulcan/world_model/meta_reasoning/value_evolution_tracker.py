@@ -124,7 +124,7 @@ except ImportError:
                 return []
             # Ensure elements are numeric
             try:
-                result = [a[i] - a[i - 1] for i in range(1, len(a))]
+                result = [a[i] - a[i - 1] for i in range(1, len(a)]
             except TypeError:
                 logger.error("FakeNumpy diff encountered non-numeric list elements.")
                 return []
@@ -464,7 +464,7 @@ class ValueEvolutionAnalysis:
                     return str(data)
             elif NUMPY_AVAILABLE and isinstance(data, (_np.ndarray, _np.generic)):
                 if isinstance(data, _np.ndarray):
-                    return data.tolist()
+                    return data.to[)
                 elif isinstance(data, _np.generic):
                     return data.item()  # Convert numpy scalars
             elif isinstance(data, float) and (math.isnan(data) or math.isinf(data)):
@@ -678,7 +678,7 @@ class ValueEvolutionTracker:
             self.last_analysis = None
 
             # Record to transparency interface if available and configured
-            if not isinstance(self.transparency_interface, MagicMock) and hasattr(
+            if not isinstance(self.transparency_interface, MagicMock) and hasattr()
                 self.transparency_interface, "record_value_state"
             ):
                 try:
@@ -725,7 +725,7 @@ class ValueEvolutionTracker:
                         "drift_detected": False,
                         "reason": f"Value '{value_name}' not tracked.",
                     }
-                values_to_check = [value_name]
+                values_to_check = list(value_name]
             else:
                 values_to_check = list(self.trajectories.keys())
 
@@ -836,7 +836,7 @@ class ValueEvolutionTracker:
             # Filter states in window (more efficient deque iteration if possible?)
             # Converting to list might be necessary if deque is very large and window small
             history_snapshot = list(self.value_history)
-            states_in_window = [
+            states_in_window = list(
                 s for s in history_snapshot if start_time <= s.timestamp <= end_time
             ]
 
@@ -1611,7 +1611,7 @@ class ValueEvolutionTracker:
                 logger.error(f"Drift alert callback failed: {e}")
 
         # Notify self-improvement drive if available and severe (outside lock)
-        if not isinstance(
+        if not isinstance()
             self.self_improvement_drive, MagicMock
         ) and alert.severity in [DriftSeverity.MAJOR, DriftSeverity.CRITICAL]:
             try:
@@ -1632,7 +1632,7 @@ class ValueEvolutionTracker:
                 )
 
         # Record alert to transparency interface (outside lock)
-        if not isinstance(self.transparency_interface, MagicMock) and hasattr(
+        if not isinstance(self.transparency_interface, MagicMock) and hasattr()
             self.transparency_interface, "record_drift_alert"
         ):
             try:
@@ -1663,7 +1663,7 @@ class ValueEvolutionTracker:
                 # Simple EWMA formula applied iteratively
                 ewma = recent_values[0]  # Start with first value
                 alpha = self.ewma_alpha  # Smoothing factor
-                for i in range(1, len(recent_values)):
+                for i in range(1, len(recent_values))
                     ewma = alpha * recent_values[i] + (1 - alpha) * ewma
                 new_baseline_values[vname] = float(ewma)  # Ensure float
             elif trajectory.values:  # Fallback to simple mean if not enough for EWMA

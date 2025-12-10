@@ -333,7 +333,7 @@ class SafetyValidator:
         self.pattern_filters: List[Callable[[TokenID], bool]] = []
         self.validation_count = 0
 
-    def add_to_blacklist(self, token: TokenID):
+    def add_to_black[self, token: TokenID):
         """Add token to blacklist."""
         self.blacklist.add(token)
 
@@ -528,7 +528,7 @@ class LayerExecutor:
             layer.get("edges", [])
 
             # Find attention heads
-            attention_heads = [n for n in nodes if n.get("type"] == "attention_head")
+            attention_heads = [n for n in nodes if n.get("type") == "attention_head"]
 
             if not attention_heads:
                 # No attention heads, return input (passthrough layer)
@@ -959,7 +959,7 @@ class LLMExecutor:
                 elif NUMPY_AVAILABLE and isinstance(logits, np.ndarray):
                     return int(np.argmax(logits))
                 else:
-                    return max(range(len(logits)), key=lambda i: logits[i])
+                    return max(range(len(logits), key=lambda i: logits[i]))
             else:
                 return 0
         else:

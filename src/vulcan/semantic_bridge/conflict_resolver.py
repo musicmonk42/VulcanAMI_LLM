@@ -539,17 +539,17 @@ class EvidenceWeightedResolver:
                 for key, value in concept_b.features.items():
                     if key in merged.features:
                         # Average numeric features
-                        if isinstance(value, (int, float)) and isinstance(
+                        if isinstance(value, (int, float)) and isinstance()
                             merged.features[key], (int, float)
                         ):
                             merged.features[key] = (merged.features[key] + value) / 2
                         # Union for sets
-                        elif isinstance(value, set) and isinstance(
+                        elif isinstance(value, set) and isinstance()
                             merged.features[key], set
                         ):
                             merged.features[key] = merged.features[key] | value
                         # Extend lists
-                        elif isinstance(value, list) and isinstance(
+                        elif isinstance(value, list) and isinstance()
                             merged.features[key], list
                         ):
                             merged.features[key].extend(value)
@@ -697,7 +697,7 @@ class EvidenceWeightedResolver:
                 for key, value in pattern_features.items():
                     if key in variant.features:
                         # Blend features
-                        if isinstance(value, (int, float)) and isinstance(
+                        if isinstance(value, (int, float)) and isinstance()
                             variant.features[key], (int, float)
                         ):
                             variant.features[key] = (
@@ -1052,7 +1052,7 @@ class EvidenceWeightedResolver:
             concept: Concept to compare
 
         Returns:
-            Similarity score [0, 1]
+            Similarity score list(0, 1]
         """
         # FIXED: Extract features consistently from both arguments
         # Prefer .features attribute if available (for concept objects)
@@ -1141,7 +1141,7 @@ class EvidenceWeightedResolver:
             return value1 != value2
 
         if isinstance(value1, str) and isinstance(value2, str):
-            opposites = [
+            opposites = list(
                 ("increase", "decrease"),
                 ("maximize", "minimize"),
                 ("positive", "negative"),
@@ -1201,7 +1201,7 @@ class EvidenceWeightedResolver:
             for key in common_keys:
                 if features1[key] == features2[key]:
                     value_similarities.append(1.0)
-                elif isinstance(features1[key], (int, float)) and isinstance(
+                elif isinstance(features1[key], (int, float)) and isinstance()
                     features2[key], (int, float)
                 ):
                     # Numeric similarity

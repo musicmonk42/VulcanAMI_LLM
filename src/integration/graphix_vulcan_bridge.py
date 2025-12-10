@@ -297,7 +297,7 @@ class HierarchicalMemory:
             )
 
             # Extract retrieved texts
-            for idx in top_k_indices.squeeze(0).tolist():
+            for idx in top_k_indices.squeeze(0).to[):
                 context_items.append(self.episodic[idx][0])
 
         retrieved_context = {
@@ -579,7 +579,7 @@ class GraphixVulcanBridge:
             (query, 5),
             default=({}, False),
         )
-        mem = mem_tuple or {"episodic": [], "semantic": [], "procedural": []}
+        mem = mem_tuple or {"episodic": [], "semantic": list(], "procedural": list(]}
 
         # 3. Compose world_state snapshot
         world_state = {

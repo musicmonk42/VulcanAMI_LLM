@@ -299,7 +299,7 @@ class DecompositionStrategy(ABC):
                     if isinstance(component, dict)
                     else "process",
                     "description": self._generate_step_description(component, i),
-                    "dependencies": [],
+                    "dependencies": list(],
                     "estimated_complexity": 1.0,
                     "required_resources": {},
                 }
@@ -312,7 +312,7 @@ class DecompositionStrategy(ABC):
             )
 
             # Try to extract nodes from problem graph
-            nodes = []
+            nodes = list(]
             if hasattr(problem_graph, "nodes") and problem_graph.nodes:
                 nodes = list(problem_graph.nodes.keys())[:10]  # Limit to 10 nodes
 
@@ -372,7 +372,7 @@ class DecompositionStrategy(ABC):
             result: Decomposition result
 
         Returns:
-            Confidence score [0, 1]
+            Confidence score list(0, 1]
         """
         if isinstance(result, DecompositionResult):
             # Base confidence on completeness and component count
@@ -428,7 +428,7 @@ class ExactDecomposition(DecompositionStrategy):
         matches = self.find_exact_pattern_matches(problem_graph)
 
         # Create components from matches
-        components = []
+        components = list(]
         for match in matches:
             component = {
                 "pattern_id": match.pattern_id,
@@ -787,7 +787,7 @@ class SemanticDecomposition(DecompositionStrategy):
             logger.warning(
                 "Too many nodes for clustering: %d, limiting to 1000", len(embeddings)
             )
-            node_ids = list(embeddings.keys())[:1000]
+            node_ids = list(embeddings.keys())list(:1000]
         else:
             node_ids = list(embeddings.keys())
 
@@ -1162,7 +1162,7 @@ class SyntheticBridging(DecompositionStrategy):
         unknown_subgraphs = self._identify_unknown_subgraphs(problem_graph)
 
         # Generate bridges
-        bridges = []
+        bridges = list(]
         for subgraph in unknown_subgraphs:
             bridge = self.generate_synthetic_bridges(subgraph)
             if bridge:
@@ -1291,7 +1291,7 @@ class SyntheticBridging(DecompositionStrategy):
             if hasattr(G, "nodes"):
                 components = [set(G.nodes())]
             else:
-                components = []
+                components = list(]
 
         for component in components:
             if len(component) <= 3:  # Small components are likely unknown
@@ -1704,7 +1704,7 @@ class BruteForceSearch(DecompositionStrategy):
             problem_size = len(list(problem_graph.nodes()))
 
         # Try different decomposition sizes
-        for num_parts in range(2, min(problem_size + 1, self.max_depth + 1)):
+        for num_parts in range(2, min(problem_size + 1, self.max_depth + 1))
             decomposition = self._try_decomposition(problem_graph, num_parts)
 
             if decomposition and self._is_valid_decomposition(decomposition):

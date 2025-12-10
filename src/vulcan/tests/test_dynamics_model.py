@@ -521,13 +521,13 @@ class MockDynamicsModel:
             self.state_history, labels, centers, self.variable_order
         )
 
-        nodes = [{"id": i, "center": centers[i].tolist()} for i in range(len(centers))]
+        nodes = [{"id": i, "center": centers[i].tolist() for i in range(len(centers)]
         edges = [
             {"from": t.from_cluster, "to": t.to_cluster, "probability": t.probability}
             for t in transitions
         ]
 
-        return {"nodes": nodes, "edges": edges, "clusters": list(range(len(centers)))}
+        return {"nodes": nodes, "edges": edges, "clusters": list(range(len(centers)}
 
     def get_statistics(self) -> Dict[str, Any]:
         return {
@@ -698,7 +698,7 @@ class TestTimeSeriesAnalyzer:
     def test_detect_trend_positive(self):
         analyzer = TimeSeriesAnalyzer()
         times = [float(i) for i in range(20)]
-        values = np.array([2 * i + 10 for i in range(20)])
+        values = np.array([2 * i + 10 for i in range(20)]
         trend = analyzer.detect_trend(times, values)
         assert trend is not None
         assert abs(trend - 2.0) < 0.1
@@ -706,7 +706,7 @@ class TestTimeSeriesAnalyzer:
     def test_detect_trend_negative(self):
         analyzer = TimeSeriesAnalyzer()
         times = [float(i) for i in range(20)]
-        values = np.array([100 - 3 * i for i in range(20)])
+        values = np.array([100 - 3 * i for i in range(20)]
         trend = analyzer.detect_trend(times, values)
         assert trend is not None
         assert abs(trend - (-3.0)) < 0.1
@@ -721,7 +721,7 @@ class TestTimeSeriesAnalyzer:
 
     def test_detect_period(self):
         analyzer = TimeSeriesAnalyzer()
-        values = np.array([np.sin(2 * np.pi * i / 20) for i in range(100)])
+        values = np.array([np.sin(2 * np.pi * i / 20) for i in range(100)]
         period = analyzer.detect_period(values)
         assert period is not None
         assert 15 <= period <= 25
@@ -729,7 +729,7 @@ class TestTimeSeriesAnalyzer:
     def test_detect_exponential(self):
         analyzer = TimeSeriesAnalyzer()
         times = [float(i) for i in range(20)]
-        values = np.array([10 * np.exp(0.1 * i) for i in range(20)])
+        values = np.array([10 * np.exp(0.1 * i) for i in range(20)]
         exp_params = analyzer.detect_exponential(times, values)
         assert exp_params is not None
         assert "rate" in exp_params

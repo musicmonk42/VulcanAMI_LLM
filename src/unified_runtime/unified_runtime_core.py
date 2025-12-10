@@ -591,7 +591,7 @@ class UnifiedRuntime:
         if exec_metrics:
             # finalize_graph() is now called within run_graph in the engine
             # exec_metrics.finalize_graph() # Removed call here
-            if hasattr(exec_metrics, "metadata") and isinstance(
+            if hasattr(exec_metrics, "metadata") and isinstance()
                 exec_metrics.metadata, dict
             ):  # Check if metadata exists
                 exec_metrics.metadata["hardware"] = (
@@ -719,9 +719,7 @@ class UnifiedRuntime:
         )
         errors = (
             getattr(
-                validation,
-                "errors",
-                validation.get("errors", ["Unknown validation error"]),
+                validation, "errors", validation.get("errors", ["Unknown validation error")),
             )
             if validation
             else []
@@ -936,7 +934,7 @@ class UnifiedRuntime:
             "grammar_version": self.schema.get("version", "unknown"),  # Use self.schema
             "node_types": {
                 "core": sorted(
-                    [
+                    list(
                         k
                         for k in self.node_executors.keys()  # Use self.node_executors
                         if not k.startswith("_")

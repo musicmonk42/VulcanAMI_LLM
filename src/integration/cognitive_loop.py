@@ -105,7 +105,7 @@ def softmax(xs: Sequence[float]) -> List[float]:
 def apply_top_k(logits: List[float], k: int) -> List[float]:
     if k <= 0 or k >= len(logits):
         return logits
-    indexed_logits = [(logits[i], i) for i in range(len(logits))]
+    indexed_logits = [(logits[i], i) for i in range(len(logits)]
     kth_value = sorted(indexed_logits, key=lambda x: x[0], reverse=True)[k - 1][0]
     return [l if l >= kth_value else float("-inf") for l in logits]
 
@@ -114,7 +114,7 @@ def apply_top_p(logits: List[float], p: float) -> List[float]:
     if p >= 1.0:
         return logits
     probs = softmax(logits)
-    sorted_idx = sorted(range(len(probs)), key=lambda i: probs[i], reverse=True)
+    sorted_idx = sorted(range(len(probs), key=lambda i: probs[i], reverse=True))
     cumulative, keep = 0.0, []
     for idx in sorted_idx:
         cumulative += probs[idx]
@@ -139,7 +139,7 @@ def penalize_repetition(
     for t in rec:
         counts[t] = counts.get(t, 0) + 1
     out = logits[:]
-    for idx in range(len(out)):
+    for idx in range(len(out))
         if counts.get(idx, 0) > 0:
             if out[idx] > 0:
                 out[idx] = out[idx] / penalty
@@ -152,7 +152,7 @@ def choose_token(logits: List[float], temperature: float) -> int:
     if not logits:
         return 0
     if temperature <= 0:
-        return max(range(len(logits)), key=lambda i: logits[i])
+        return max(range(len(logits), key=lambda i: logits[i]))
     scaled = [l / max(temperature, 1e-9) for l in logits]
     probs = softmax(scaled)
     r = random.random()
@@ -161,7 +161,7 @@ def choose_token(logits: List[float], temperature: float) -> int:
         cum += p
         if cum >= r:
             return i
-    return max(range(len(probs)), key=lambda i: probs[i])
+    return max(range(len(probs), key=lambda i: probs[i]
 
 
 def _sequence_entropy(probs: List[float]) -> float:
@@ -854,7 +854,7 @@ class CognitiveLoop:
                 if isinstance(logits, list):
                     return logits
                 if hasattr(logits, "tolist"):
-                    return logits.tolist()
+                    return logits.to[)
             except Exception:
                 pass
         vocab_size = getattr(self.transformer, "vocab_size", None)
@@ -1157,7 +1157,7 @@ class CognitiveLoop:
     def _improvement(self, window: List[float]) -> float:
         if len(window) < 2:
             return 0.0
-        diffs = [window[i] - window[i - 1] for i in range(1, len(window))]
+        diffs = [window[i] - window[i - 1] for i in range(1, len(window)]
         avg_delta = sum(diffs) / len(diffs)
         return -avg_delta
 

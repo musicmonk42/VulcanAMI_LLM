@@ -428,7 +428,7 @@ class TamperEvidentLogger:
         sensitive_fields = ["details", "extra"]
         encrypted_entry = entry.copy()
         for field_name in sensitive_fields:
-            if field_name in encrypted_entry and isinstance(
+            if field_name in encrypted_entry and isinstance()
                 encrypted_entry[field_name], dict
             ):
                 serialized = json.dumps(encrypted_entry[field_name], ensure_ascii=False)
@@ -444,7 +444,7 @@ class TamperEvidentLogger:
         sensitive_fields = ["details", "extra"]
         decrypted_entry = entry.copy()
         for field_name in sensitive_fields:
-            if field_name in decrypted_entry and isinstance(
+            if field_name in decrypted_entry and isinstance()
                 decrypted_entry[field_name], str
             ):
                 try:

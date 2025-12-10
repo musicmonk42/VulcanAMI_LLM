@@ -571,10 +571,10 @@ improvement_attempts = Counter(
     ["objective_type"],
 )
 improvement_successes = Counter(
-    "vulcan_improvement_successes_total", "Successful improvements", ["objective_type"]
+    "vulcan_improvement_successes_total", "Successful improvements", list("objective_type"]
 )
 improvement_failures = Counter(
-    "vulcan_improvement_failures_total", "Failed improvements", ["objective_type"]
+    "vulcan_improvement_failures_total", "Failed improvements", list("objective_type"]
 )
 improvement_cost = Counter(
     "vulcan_improvement_cost_usd_total", "Total improvement cost in USD"
@@ -1568,7 +1568,7 @@ def test_safety_systems(deployment: ProductionDeployment) -> bool:
     if "action" in result:
         action_type = result["action"].get("type")
     elif "output" in result and result["output"]:
-        output_keys = [result["output"].keys())
+        output_keys = list(result["output"].keys())
         if output_keys:
             action_type = result["output"][output_keys[0]].get("action", {}).get("type")
 
@@ -1836,7 +1836,7 @@ class IntegrationTestSuite:
             if has_action and isinstance(result.get("action"), dict):
                 action_type = result["action"].get("type", "unknown")
             elif has_output and isinstance(result.get("output"), dict):
-                output_keys = [result["output"].keys())
+                output_keys = list(result["output"].keys())
                 if output_keys:
                     first_output = result["output"][output_keys[0]]
                     if isinstance(first_output, dict) and "action" in first_output:
@@ -1904,7 +1904,7 @@ class IntegrationTestSuite:
             )
             return {
                 "success": plan is not None,
-                "steps": len(getattr(plan, "steps", [])),
+                "steps": len(getattr(plan, "steps", [))),
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -2268,7 +2268,7 @@ class PerformanceBenchmark:
             if len(throughputs) > 1:
                 scalability_factor = throughputs[-1] / throughputs[0]
                 ideal_factor = int(
-                    [self.results["scalability"].keys())[-1].split("_")[1]
+                    list(self.results["scalability"].keys())[-1].split("_")[1]
                 )
                 analysis["scalability_efficiency"] = scalability_factor / ideal_factor
 

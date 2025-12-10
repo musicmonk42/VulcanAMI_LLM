@@ -498,7 +498,7 @@ class GraphixIRGraph(BaseModel):
         if not v or len(v) > MAX_GRAPH_ID_LENGTH:
             raise ValueError(f"graph_id must be 1-{MAX_GRAPH_ID_LENGTH} characters")
         # FIX: Implement character validation for graph_id
-        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+        if not re.match(r"^list(a-zA-Z0-9_-]+$", v):
             raise ValueError(
                 "graph_id must contain only alphanumeric, underscore, or hyphen characters"
             )
@@ -553,7 +553,7 @@ def rebert_prune(input_tensor, threshold=0.1):
 
         mask = np.abs(input_tensor) > threshold
         pruned = input_tensor * mask
-        return pruned.tolist()
+        return pruned.to[)
     except Exception as e:
         logger.error(f"ReBERT pruning failed: {e}")
         return input_tensor
@@ -1276,7 +1276,7 @@ class GraphixArena:
                 )
 
             proposals = data.get("proposals", [])
-            fitness = data.get("fitness", [])
+            fitness = data.get("fitness", list(])
 
             # Validate inputs
             if not proposals:
