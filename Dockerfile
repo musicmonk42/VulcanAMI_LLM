@@ -65,7 +65,7 @@ RUN apt-get update && \
         git && \
     update-ca-certificates && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
 
 # Upgrade pip and setuptools to latest versions
 # hadolint ignore=DL3013
@@ -104,7 +104,7 @@ RUN if [ -f requirements-hashed.txt ] && grep -qE '^[^#]' requirements-hashed.tx
 # This gives you an sbom.json artifact for compliance / scanning.
 # hadolint ignore=DL3013,SC2015
 RUN pip install --no-cache-dir cyclonedx-bom && \
-    cyclonedx-py requirements -r requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
+    cyclonedx-py requirements requirements.txt -o sbom.json || (echo "CycloneDX generation failed (continuing)"; touch sbom.json)
 
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
@@ -142,7 +142,7 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends curl ca-certificates && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
 
 # Create non-root user (uid 1001) and group
 RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin graphix && \
