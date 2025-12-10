@@ -38,6 +38,9 @@ from vulcan.world_model.prediction_engine import (
     EnsemblePredictor
 )
 
+# Test constants
+TEST_RANDOM_SEED = 42  # Fixed seed for reproducible randomness tests
+
 
 # ============================================================================
 # Fixtures
@@ -448,7 +451,7 @@ class TestPathEffectCalculator:
     def test_effect_with_noise(self, effect_calculator, simple_path):
         """Test effect calculation with noise"""
         # Use a specific seed that ensures variation is detected
-        np.random.seed(42)
+        np.random.seed(TEST_RANDOM_SEED)
         
         context = {
             'add_noise': True,
@@ -657,7 +660,7 @@ class TestMonteCarloSampler:
     def test_sample_variations(self, sampler, simple_path):
         """Test that samples have variations"""
         # Use a specific seed that ensures variation is detected
-        np.random.seed(42)
+        np.random.seed(TEST_RANDOM_SEED)
         
         cluster = PathCluster(
             paths=[simple_path],
