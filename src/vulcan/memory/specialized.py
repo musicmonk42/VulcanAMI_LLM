@@ -2113,32 +2113,35 @@ class Skill:
             raise
 
     def _check_condition(self, condition: str, context: Any) -> bool:
-        """Check if condition is met using safe expression evaluation."""
+        """Check if condition is met using safe expression evaluation.
+        
+        Fails securely by returning False when unsafe conditions are detected.
+        """
         try:
             # Parse condition as Python expression using AST
             if isinstance(context, dict):
                 # Use ast module for safe evaluation of simple expressions
-                # This only allows literal structures (strings, numbers, tuples, lists, dicts, booleans, and None)
-                # For more complex conditions, use a safe expression parser
+                # This only allows literal structures and basic comparisons
                 
-                # Try to parse as a simple literal first
                 try:
                     import ast
                     # Parse the condition
                     tree = ast.parse(condition, mode='eval')
                     
-                    # Only allow safe operations
-                    safe_nodes = (ast.Expression, ast.Constant, ast.Num, ast.Str, 
-                                  ast.List, ast.Tuple, ast.Dict, ast.NameConstant,
+                    # Only allow safe operations (Python 3.8+ compatible)
+                    # Removed deprecated ast.Num, ast.Str, ast.NameConstant
+                    safe_nodes = (ast.Expression, ast.Constant,
+                                  ast.List, ast.Tuple, ast.Dict,
                                   ast.Name, ast.Load, ast.Compare, ast.BoolOp,
                                   ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, 
                                   ast.LtE, ast.Gt, ast.GtE, ast.In, ast.NotIn,
-                                  ast.UnaryOp, ast.Not, ast.USub)
+                                  ast.UnaryOp, ast.Not)
                     
                     for node in ast.walk(tree):
                         if not isinstance(node, safe_nodes):
-                            logger.warning(f"Unsafe node in condition: {type(node).__name__}")
-                            return True  # Default to true if can't safely evaluate
+                            logger.warning(f"Unsafe node in condition '{condition}': {type(node).__name__}")
+                            # Fail securely - return False instead of True
+                            return False
                     
                     # Create a restricted namespace with only the context variables
                     # and no builtins
@@ -2151,13 +2154,15 @@ class Skill:
                     
                 except (SyntaxError, ValueError, TypeError) as e:
                     logger.debug(f"Could not parse condition '{condition}': {e}")
-                    return True  # Default to true if can't parse
+                    # Fail securely - return False if we can't parse
+                    return False
             else:
                 # Simple existence check
                 return context is not None
         except Exception as e:
-            logger.warning(f"Condition check failed: {e}")
-            return True  # Default to true if can't evaluate
+            logger.warning(f"Condition check failed for '{condition}': {e}")
+            # Fail securely - return False on any unexpected error
+            return False
 
     def _execute_string_step(self, step: str, context: Any) -> Any:
         """Execute string-based step."""
