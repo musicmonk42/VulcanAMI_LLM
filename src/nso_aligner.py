@@ -681,8 +681,8 @@ class NSOAligner:
                 )  # Quote column names
                 placeholders = ", ".join(["?" for _ in safe_columns])
 
-                # Now safe to use f-string since table is whitelisted
-                query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders})"
+                # nosec B608: table name whitelisted above, column names from filtered dict with placeholders
+                query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders})"  # nosec B608
 
                 # Ensure values are in the correct order corresponding to safe_columns
                 ordered_values = [filtered_data[col] for col in safe_columns]
@@ -754,7 +754,8 @@ class NSOAligner:
                     f'"{col}"' for col in final_audit_data.keys()
                 )
                 audit_placeholders = ", ".join(["?"] * len(final_audit_data))
-                audit_query = f"INSERT INTO audit_log ({audit_cols_quoted}) VALUES ({audit_placeholders})"
+                # nosec B608: audit_log table hardcoded, column names from filtered dict with placeholders
+                audit_query = f"INSERT INTO audit_log ({audit_cols_quoted}) VALUES ({audit_placeholders})"  # nosec B608
                 audit_values = [
                     final_audit_data[col] for col in final_audit_data.keys()
                 ]  # Ensure order

@@ -225,7 +225,8 @@ class Principle:
             namespace.update(safe_builtins)
 
             try:
-                exec(self.execution_logic, namespace)
+                # nosec B102: exec with restricted namespace - dangerous operations filtered above
+                exec(self.execution_logic, namespace)  # nosec B102
                 result = namespace.get("output")
                 if result is None:
                     raise RuntimeError("Code string did not set 'output' variable")

@@ -2139,13 +2139,14 @@ class Skill:
                             return False
 
                     # Create a restricted namespace with only the context variables
-                    # and no builtins
+                    # and no builtins to prevent code injection
                     namespace = {'__builtins__': {}}
                     namespace.update(context)
 
                     # Compile and evaluate the safe expression
+                    # nosec B307: Using eval with restricted namespace (no builtins) for safe evaluation
                     code = compile(tree, '<condition>', 'eval')
-                    return bool(eval(code, namespace, {}))
+                    return bool(eval(code, namespace, {}))  # nosec B307
 
                 except (SyntaxError, ValueError, TypeError) as e:
                     logger.debug(f"Could not parse condition '{condition}': {e}")

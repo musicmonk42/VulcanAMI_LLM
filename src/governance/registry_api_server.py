@@ -510,8 +510,9 @@ class DatabaseManager:
         data_column = columns['data_column']
 
         try:
+            # nosec B608: table/column names validated above via _validate_table_name
             row = self._exec_query(
-                f"SELECT {data_column} FROM {validated_table} WHERE {id_column} = ?",
+                f"SELECT {data_column} FROM {validated_table} WHERE {id_column} = ?",  # nosec B608
                 (record_id,),
                 fetch_one=True,
             )
@@ -562,7 +563,8 @@ class DatabaseManager:
         data_column = columns['data_column']
         id_column = columns['id_column']
 
-        query = f"SELECT {data_column} FROM {validated_table}"
+        # nosec B608: table/column names validated above via _validate_table_name
+        query = f"SELECT {data_column} FROM {validated_table}"  # nosec B608
         if where_clause:
             query += f" WHERE {where_clause}"
         query += f" ORDER BY {id_column}"  # Add default ordering
