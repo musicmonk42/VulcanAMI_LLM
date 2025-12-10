@@ -51,6 +51,9 @@ from typing import Dict, List, Any, Optional, Tuple, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
+# Initialize logger early - before it's used in import blocks
+logger = logging.getLogger(__name__)
+
 # NOTE: This patch assumes a class named SelfImprovementDrive exists.
 # Additions: policy loading, auto-apply gate, and robust get_status.
 
@@ -101,9 +104,6 @@ try:
 except ImportError:
     # Fallback if safe execution module not available
     get_safe_executor = None
-
-
-logger = logging.getLogger(__name__)
 
 
 class TriggerType(Enum):

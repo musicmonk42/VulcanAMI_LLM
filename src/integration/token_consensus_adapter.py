@@ -5,7 +5,7 @@ import inspect
 import logging
 import time
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, Optional, Callable, Union
+from typing import Any, Dict, Optional, Callable, Union, List
 
 log = logging.getLogger(__name__)
 

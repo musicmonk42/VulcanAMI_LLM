@@ -19,6 +19,9 @@ import pickle
 import hashlib
 from abc import ABC, abstractmethod
 
+# Initialize logger at module level
+logger = logging.getLogger(__name__)
+
 try:
     import nltk
 
@@ -30,36 +33,28 @@ try:
         try:
             nltk.download("punkt_tab", quiet=True)
         except Exception as e:
-            logger.debug(
-                f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}"
-            )
+            logger.debug(f"Failed to download punkt_tab: {e}")
     try:
         nltk.data.find("tokenizers/punkt")
     except LookupError:
         try:
             nltk.download("punkt", quiet=True)
         except Exception as e:
-            logger.debug(
-                f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}"
-            )
+            logger.debug(f"Failed to download punkt: {e}")
     try:
         nltk.data.find("taggers/averaged_perceptron_tagger")
     except LookupError:
         try:
             nltk.download("averaged_perceptron_tagger", quiet=True)
         except Exception as e:
-            logger.debug(
-                f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}"
-            )
+            logger.debug(f"Failed to download averaged_perceptron_tagger: {e}")
     try:
         nltk.data.find("taggers/averaged_perceptron_tagger_eng")
     except LookupError:
         try:
             nltk.download("averaged_perceptron_tagger_eng", quiet=True)
         except Exception as e:
-            logger.debug(
-                f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}"
-            )
+            logger.debug(f"Failed to download averaged_perceptron_tagger_eng: {e}")
 except ImportError:
     HAS_NLTK = False
     nltk = None

@@ -1637,7 +1637,7 @@ def serve(port: int = 50051, db_path: str = DB_PATH):
         # For this example, let's assume it's in the same package 'src.governance'
         from . import registry_pb2_grpc  # Requires __init__.py and compiled protos
 
-        pb2_grpc.add_RegistryServiceServicer_to_server(
+        registry_pb2_grpc.add_RegistryServiceServicer_to_server(
             RegistryServicer(
                 registry_api=registry_api,
                 lang_evolution_registry=lang_evolution_registry,

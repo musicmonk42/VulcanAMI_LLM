@@ -732,9 +732,7 @@ if __name__ == "__main__":
             node = {"type": "ExplainabilityNode", "params": {"method": "saliency"}}
             dispatch_explainability_node(node, context4)
         except Exception as e:
-            logger.debug(
-                f"{self.__class__.__name__ if hasattr(self, '__class__') else 'Operation'} error: {e}"
-            )
+            logger.debug(f"ExplainabilityNode error: {e}")
 
     print(f"   Audit entries: {len(context4['audit_log'])}")
     print(

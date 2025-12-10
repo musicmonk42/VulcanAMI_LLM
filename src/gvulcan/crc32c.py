@@ -7,7 +7,7 @@ streaming data, batch processing, validation, and performance optimization.
 
 from __future__ import annotations
 import google_crc32c
-from typing import Iterable, List, Optional, Union, BinaryIO
+from typing import Iterable, List, Optional, Union, BinaryIO, Dict
 from dataclasses import dataclass
 from pathlib import Path
 import logging
