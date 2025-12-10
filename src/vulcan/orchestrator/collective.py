@@ -509,14 +509,14 @@ class VULCANAGICollective:
                 self.deps.experiment_generator.complete_experiment(
                     experiment.experiment_id, {"success": False, "error": str(e)}
                 )
-            except:
+            except Exception:
                 pass
 
             try:
                 self.deps.self_improvement_drive.record_outcome(
                     objective_type, False, {"error": str(e)}
                 )
-            except:
+            except Exception:
                 pass
 
     def _execute_improvement_direct(self, improvement_action: Dict[str, Any]):

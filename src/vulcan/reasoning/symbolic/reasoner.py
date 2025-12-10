@@ -916,7 +916,7 @@ class HybridReasoner:
             try:
                 prob_result = self.probabilistic.query(query_str, evidence)
                 result["probabilistic"] = prob_result
-            except:
+            except Exception:
                 pass
 
         # Combine results

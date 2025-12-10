@@ -1670,7 +1670,7 @@ class MultiModalReasoningEngine:
             score = np.random.random()  # Would use actual alignment algorithm
 
             return {"score": float(score), "mapping": {}, "confidence": float(score)}
-        except:
+        except Exception:
             return {"score": 0.0, "mapping": {}, "confidence": 0.0}
 
     def _apply_alignments(
@@ -2201,7 +2201,7 @@ class MultiModalReasoningEngine:
             if chain and chain.total_confidence:
                 explanation += f"Confidence: {chain.total_confidence:.2f}"
             return explanation
-        except:
+        except Exception:
             return f"Multimodal reasoning completed with {strategy} fusion"
 
     def _learn_from_fusion(

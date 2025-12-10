@@ -132,7 +132,7 @@ def shutdown_executor_with_timeout(executor, executor_name: str, timeout: float 
         # Try force shutdown as last resort
         try:
             executor.shutdown(wait=False)
-        except:
+        except Exception:
             pass
 
 

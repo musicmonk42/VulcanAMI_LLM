@@ -699,7 +699,7 @@ class TestEdgeCases:
             dist = prior.compute_prior(features, tools)
             # May get uniform or error, but shouldn't crash
             assert True
-        except:
+        except Exception:
             # Acceptable to raise exception for invalid input
             assert True
 

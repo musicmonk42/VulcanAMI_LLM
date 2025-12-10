@@ -377,7 +377,7 @@ class AdvancedRewardModel:
                     try:
                         pred = model.predict(features_scaled)[0]
                         predictions.append(pred)
-                    except:
+                    except Exception:
                         pass
 
             if not predictions:
@@ -748,7 +748,7 @@ class ContextualBandit:
         try:
             discretized = np.round(context.features * 10) / 10
             return str(discretized.tobytes())
-        except:
+        except Exception:
             return "default_context"
 
     def _get_tool_name(self, action_id: int) -> str:
@@ -773,7 +773,7 @@ class ContextualBandit:
                     return self.exploration_rate / self.n_actions
             else:
                 return 1.0 / self.n_actions
-        except:
+        except Exception:
             return 1.0 / self.n_actions
 
 

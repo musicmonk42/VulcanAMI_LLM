@@ -26,7 +26,7 @@ def initialize_llvm():
         target = llvm.Target.from_default_triple()
         if target:
             return  # Already initialized successfully
-    except:
+    except Exception:
         pass  # Need to initialize
 
     # Initialize LLVM core

@@ -199,7 +199,7 @@ class FeatureExtractor:
             try:
                 arr = np.array(data, dtype=float)
                 return arr.flatten().reshape(1, -1)
-            except:
+            except Exception:
                 return self._extract_fallback(data)
         elif isinstance(data, dict):
             values = [v for v in data.values() if isinstance(v, (int, float))]
@@ -417,7 +417,7 @@ class FeatureExtractor:
         """Compute cache key for data"""
         try:
             return hashlib.md5(str(data).encode()).hexdigest()
-        except:
+        except Exception:
             return str(id(data))
 
 
@@ -593,7 +593,7 @@ class KernelParameterOptimizer:
                 gp_copy.kernel_.theta = params
                 gp_copy.fit(X, y)
                 return -gp_copy.log_marginal_likelihood_value_
-            except:
+            except Exception:
                 return 1e10
 
         bounds = gp.kernel_.bounds
@@ -654,7 +654,7 @@ class MaxValueEntropySearch:
             try:
                 mean, std = gp.predict(x.reshape(1, -1), return_std=True)
                 predictions.append((mean[0], std[0]))
-            except:
+            except Exception:
                 predictions.append((0.0, 1.0))
 
         if not predictions:
@@ -735,7 +735,7 @@ class MaxValueEntropySearch:
                     # Sample function values
                     f_sample = np.random.normal(mean, np.maximum(std, 1e-6))
                     sample_values.append(f_sample)
-                except:
+                except Exception:
                     sample_values.append(np.zeros(len(X_candidates)))
 
             # Average over ensemble

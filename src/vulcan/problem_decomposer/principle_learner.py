@@ -150,14 +150,14 @@ def ensure_json_serializable(obj: Any) -> Any:
     if hasattr(obj, "to_dict") and callable(obj.to_dict):
         try:
             return ensure_json_serializable(obj.to_dict())
-        except:
+        except Exception:
             pass
 
     # Handle objects with __dict__
     if hasattr(obj, "__dict__"):
         try:
             return ensure_json_serializable(obj.__dict__)
-        except:
+        except Exception:
             pass
 
     # Last resort: convert to string
@@ -679,7 +679,7 @@ class PrinciplePromoter:
         # Safely convert validation results
         try:
             validation_dict = candidate.validation_results.to_dict()
-        except:
+        except Exception:
             validation_dict = {
                 "success_rate": candidate.validation_results.success_rate,
                 "overall_confidence": candidate.validation_results.overall_confidence,
@@ -699,7 +699,7 @@ class PrinciplePromoter:
                 ):
                     try:
                         pattern = principle.core_pattern.to_dict()
-                    except:
+                    except Exception:
                         pass
 
                 # If pattern is still not set or might contain non-serializable objects
@@ -735,7 +735,7 @@ class PrinciplePromoter:
                             try:
                                 json.dumps(val)
                                 pattern_dict[attr] = val
-                            except:
+                            except Exception:
                                 # Convert to string if not serializable
                                 if isinstance(val, (list, tuple)):
                                     pattern_dict[attr] = [str(v) for v in val]
@@ -781,7 +781,7 @@ class PrinciplePromoter:
             if hasattr(value, "__iter__") and not isinstance(value, (str, bytes, dict)):
                 try:
                     return list(value)
-                except:
+                except Exception:
                     return default
             return default
 
@@ -824,7 +824,7 @@ class PrinciplePromoter:
                     try:
                         json.dumps(exec_logic)
                         library_principle["execution_logic"] = exec_logic
-                    except:
+                    except Exception:
                         library_principle["execution_logic"] = str(exec_logic)
                 else:
                     library_principle["execution_logic"] = str(exec_logic)

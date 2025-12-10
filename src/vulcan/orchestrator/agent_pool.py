@@ -538,7 +538,7 @@ class AgentPoolManager:
                         process.join(timeout=1)
                 try:
                     process.close()
-                except:
+                except Exception:
                     pass
                 del self.agent_processes[agent_id]
 

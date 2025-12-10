@@ -697,7 +697,7 @@ class DecompositionLibrary:
                 if features["is_dag"]:
                     try:
                         features["longest_path"] = nx.dag_longest_path_length(graph)
-                    except:
+                    except Exception:
                         features["longest_path"] = 1
 
             # Degree statistics
@@ -774,7 +774,7 @@ class DecompositionLibrary:
         try:
             nodes1 = len(list(graph1.nodes()))
             nodes2 = len(list(graph2.nodes()))
-        except:
+        except Exception:
             return 0.0
 
         if nodes1 == 0 and nodes2 == 0:

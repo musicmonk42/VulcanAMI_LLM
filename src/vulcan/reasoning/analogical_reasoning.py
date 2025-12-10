@@ -213,7 +213,7 @@ class Entity:
             return float(
                 np.clip(np.dot(emb1_flat, emb2_flat) / (norm1 * norm2), -1.0, 1.0)
             )
-        except:
+        except Exception:
             return 0.0
 
     def _attribute_similarity(self, attrs1: Dict, attrs2: Dict) -> float:
@@ -479,7 +479,7 @@ class SemanticEnricher:
                 doc = nlp(entity.name)
                 if doc:
                     entity.pos_tag = doc[0].pos_ if len(doc) > 0 else None
-            except:
+            except Exception:
                 pass
 
         # Cache
@@ -550,7 +550,7 @@ class SemanticEnricher:
                         self._tfidf_vectorizer.fit(self._tfidf_corpus)
 
                     vector = self._tfidf_vectorizer.transform([text]).toarray()[0]
-                except:
+                except Exception:
                     # If transform fails, use character embedding
                     return self._character_embedding(text)
             else:
@@ -736,7 +736,7 @@ class GoalRelevanceAnalyzer:
                 for token in doc:
                     if token.pos_ in ["NOUN", "PROPN"] and not token.is_stop:
                         entities.add(token.text.lower())
-            except:
+            except Exception:
                 pass
 
         # Fallback: extract capitalized words and nouns heuristically
@@ -764,7 +764,7 @@ class GoalRelevanceAnalyzer:
                 for token in doc:
                     if token.pos_ == "ADJ" and not token.is_stop:
                         concepts.add(token.text.lower())
-            except:
+            except Exception:
                 pass
 
         # Fallback: extract action words
@@ -914,7 +914,7 @@ class GoalRelevanceAnalyzer:
                         return 0.5
 
             return 0.3
-        except:
+        except Exception:
             return 0.5
 
     def filter_by_relevance(
@@ -1111,7 +1111,7 @@ class AnalogicalReasoner(AbstractReasoner):
 
         try:
             cache_key = f"{hash(str(source))}_{hash(str(target))}"
-        except:
+        except Exception:
             cache_key = f"{id(source)}_{id(target)}"
 
         self.mapping_cache[cache_key] = {
@@ -1162,7 +1162,7 @@ class AnalogicalReasoner(AbstractReasoner):
                 sort_keys=True,
             )
             cache_key = f"{source_domain}_{hashlib.md5(cache_str.encode()).hexdigest()}"
-        except:
+        except Exception:
             # Fallback to id-based key if json serialization fails
             cache_key = f"{source_domain}_{id(target_problem)}"
 
@@ -1729,7 +1729,7 @@ class AnalogicalReasoner(AbstractReasoner):
                         higher_order_count += 1
 
             return higher_order_count / max(len(relation_mappings), 1)
-        except:
+        except Exception:
             return 0.0
 
     def _extract_entities(self, structure: Dict) -> Set:
@@ -1874,7 +1874,7 @@ class AnalogicalReasoner(AbstractReasoner):
                     level += 1
 
             return min(level, 5)
-        except:
+        except Exception:
             return 0
 
     def _map_solution(self, source_solution: Any, mappings: Dict[str, str]) -> Any:
@@ -1922,7 +1922,7 @@ class AnalogicalReasoner(AbstractReasoner):
                 explanation += f"\n{len(mapping.relation_mappings)} structural relations preserved\n"
 
             return explanation
-        except:
+        except Exception:
             return "Analogical mapping completed"
 
     def _learn_from_mapping(self, source_domain: str, mapping: AnalogicalMapping):
@@ -2107,7 +2107,7 @@ class AnalogicalReasoner(AbstractReasoner):
                         self.semantic_enricher._tfidf_vectorizer.fit(
                             self.semantic_enricher._tfidf_corpus
                         )
-                    except:
+                    except Exception:
                         pass
 
             if NETWORKX_AVAILABLE:

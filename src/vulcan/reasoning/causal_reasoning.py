@@ -732,7 +732,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                             mechanism = self.mechanisms[(current_var, successor)]
                             try:
                                 effect_value = mechanism(current_val)
-                            except:
+                            except Exception:
                                 effect_value = current_val
                         else:
                             # Default linear mechanism
@@ -916,16 +916,16 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             # CRITICAL FIX: Check paths exist, not just direct edges
             try:
                 has_path_to_treatment = nx.has_path(self.causal_dag, node, treatment)
-            except:
+            except Exception:
                 has_path_to_treatment = False
 
             try:
                 has_path_to_outcome = nx.has_path(self.causal_dag, node, outcome)
-            except:
+            except Exception:
                 has_path_to_outcome = False
 
             return has_path_to_treatment and has_path_to_outcome
-        except:
+        except Exception:
             return False
 
     def compute_causal_effect(
@@ -1053,7 +1053,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             descendants = set()
             try:
                 descendants = nx.descendants(self.causal_dag, treatment)
-            except:
+            except Exception:
                 pass
 
             # If adjustment set contains any descendants, it's invalid
@@ -1592,7 +1592,7 @@ class CounterfactualReasoner:
             counter_val = counterfactual_state.get(var, 0)
             try:
                 differences[var] = float(counter_val - fact_val)
-            except:
+            except Exception:
                 differences[var] = 0.0
 
         # Estimate probability of counterfactual
@@ -1634,7 +1634,7 @@ class CounterfactualReasoner:
                 differences[var] = float(
                     counterfactual_state[var] - factual_state.get(var, 0)
                 )
-            except:
+            except Exception:
                 differences[var] = 0.0
 
         return CounterfactualResult(
@@ -1687,7 +1687,7 @@ class CounterfactualReasoner:
                                     result[desc] = eq_info["equation"](
                                         *parent_values, 0
                                     )
-                                except:
+                                except Exception:
                                     result[desc] = twin_network.get(
                                         f"{desc}_factual", 0
                                     )
@@ -1752,7 +1752,7 @@ class CounterfactualReasoner:
         if self.causal_model.causal_dag and NETWORKX_AVAILABLE:
             try:
                 ordered_vars = list(nx.topological_sort(self.causal_model.causal_dag))
-            except:
+            except Exception:
                 ordered_vars = list(model.keys())
         else:
             ordered_vars = list(model.keys())

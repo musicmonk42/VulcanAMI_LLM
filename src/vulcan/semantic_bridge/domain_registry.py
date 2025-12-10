@@ -835,7 +835,7 @@ class DomainRegistry:
                             1.0, path_length / 5
                         )  # Normalize to [0, 1]
                         distances.append(graph_distance)
-                    except:
+                    except Exception:
                         distances.append(1.0)
 
                 # Calculate weighted average

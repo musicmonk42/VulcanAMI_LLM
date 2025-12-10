@@ -965,7 +965,7 @@ class SemanticBridge:
                                 var, concept_vars
                             )
                             paths.extend(var_paths)
-                        except:
+                        except Exception:
                             pass
 
                     insights["causal_paths"] = len(paths)

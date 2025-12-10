@@ -1419,7 +1419,7 @@ async def health_check():
                 health_checks["self_improvement"] = hasattr(
                     world_model, "improvement_running"
                 )
-        except:
+        except Exception:
             pass
 
         # Add LLM check

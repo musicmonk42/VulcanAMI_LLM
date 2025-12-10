@@ -96,7 +96,7 @@ class MemoryBoundedDeque:
                 # Rough estimate: JSON size
                 return len(json.dumps(item, default=str))
             return sys.getsizeof(item)
-        except:
+        except Exception:
             return 1024  # Default 1KB if estimation fails
 
     def get_memory_usage_mb(self) -> float:
@@ -530,7 +530,7 @@ class RollbackManager:
                 if file_path.exists():
                     try:
                         file_path.unlink()
-                    except:
+                    except Exception:
                         pass
                 raise
 
@@ -947,7 +947,7 @@ class RollbackManager:
                 {"state": snapshot.state, "action_log": snapshot.action_log}
             )
             return len(data)
-        except:
+        except Exception:
             return 0
 
     def _send_quarantine_notification(
@@ -1276,7 +1276,7 @@ class AuditLogger:
                     if last_line:
                         entry = json.loads(last_line)
                         return entry.get("hash", "")
-            except:
+            except Exception:
                 pass
         return hashlib.sha256(b"genesis").hexdigest()
 

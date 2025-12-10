@@ -110,7 +110,7 @@ class Condition:
                 return val in self.value
             elif self.operator == "contains":
                 return self.value in val if hasattr(val, "__contains__") else False
-        except:
+        except Exception:
             return False
         return False
 
@@ -2534,7 +2534,7 @@ class TestErrorHandling:
                 action = {"type": ActionType.OPTIMIZE, "confidence": 0.8}
                 try:
                     validator.validate_action_comprehensive(action, {"state": {}})
-                except:
+                except Exception:
                     pass
                 time.sleep(0.1)
 

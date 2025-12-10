@@ -172,7 +172,7 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
     for flag in ["_is_shutdown", "_shutdown", "shutdown_flag"]:
         try:
             setattr(reasoner, flag, True)
-        except:
+        except Exception:
             pass
 
     # Daemonize executor threads IMMEDIATELY
@@ -181,16 +181,16 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
             for t in list(reasoner.executor._threads):
                 try:
                     t.daemon = True
-                except:
+                except Exception:
                     pass
             try:
                 reasoner.executor._threads.clear()
-            except:
+            except Exception:
                 pass
 
         try:
             reasoner.executor.shutdown(wait=False, cancel_futures=True)
-        except:
+        except Exception:
             pass
         reasoner.executor = None
 
@@ -213,7 +213,7 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
             for flag in ["_shutdown", "_is_shutdown", "shutdown_flag"]:
                 try:
                     setattr(comp, flag, True)
-                except:
+                except Exception:
                     pass
 
             # Find and daemonize all threads
@@ -235,20 +235,20 @@ def force_shutdown_reasoner(reasoner, timeout=0.5):
                 if thread and hasattr(thread, "daemon"):
                     try:
                         thread.daemon = True
-                    except:
+                    except Exception:
                         pass
 
             # Try shutdown with minimal timeout
             if hasattr(comp, "shutdown"):
                 try:
                     comp.shutdown(timeout=0.01)
-                except:
+                except Exception:
                     pass
 
             # Nullify component reference
             try:
                 setattr(reasoner, comp_name, None)
-            except:
+            except Exception:
                 pass
 
     # Force garbage collection

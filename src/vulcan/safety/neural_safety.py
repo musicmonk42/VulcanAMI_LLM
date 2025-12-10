@@ -73,7 +73,7 @@ class MemoryBoundedDeque:
                 try:
                     old_size = sys.getsizeof(pickle.dumps(old_item))
                     self.current_size_bytes -= old_size
-                except:
+                except Exception:
                     self.current_size_bytes -= 1024  # Estimate
 
             # Add new item

@@ -174,7 +174,7 @@ class TimeSeriesAnalyzer:
             log_values = np.log(values)
             coeffs = np.polyfit(times, log_values, 1)
             return {"rate": float(coeffs[0]), "base": float(np.exp(coeffs[1]))}
-        except:
+        except Exception:
             return None
 
 

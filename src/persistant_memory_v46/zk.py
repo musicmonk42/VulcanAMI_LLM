@@ -338,7 +338,7 @@ class ZKProver:
             try:
                 perf_context = track_zk_proof_generation(implementation)
                 perf_context.__enter__()
-            except:
+            except Exception:
                 perf_context = None
 
         try:
@@ -472,7 +472,7 @@ class ZKProver:
             if perf_context is not None:
                 try:
                     perf_context.__exit__(None, None, None)
-                except:
+                except Exception:
                     pass
 
     def verify_unlearning_proof(self, proof: Dict[str, Any]) -> bool:

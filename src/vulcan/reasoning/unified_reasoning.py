@@ -628,7 +628,7 @@ class UnifiedReasoner:
             for thread in self.executor._threads:
                 try:
                     thread.daemon = True
-                except:
+                except Exception:
                     pass
 
         # Configuration
@@ -644,7 +644,7 @@ class UnifiedReasoner:
                 self.default_selection_mode = selection_components["SelectionMode"][
                     default_mode
                 ]
-            except:
+            except Exception:
                 self.default_selection_mode = None
 
         # Model persistence
@@ -702,7 +702,7 @@ class UnifiedReasoner:
                     for thread in component.executor._threads:
                         try:
                             thread.daemon = True
-                        except:
+                        except Exception:
                             pass
         except Exception as e:
             logger.debug(f"Could not daemonize all threads in component: {e}")
@@ -1658,7 +1658,7 @@ class UnifiedReasoner:
                 arr = np.array(input_data)
                 if np.issubdtype(arr.dtype, np.number):
                     scores[ReasoningType.PROBABILISTIC] += 0.6  # Increased from 0.4
-            except:
+            except Exception:
                 pass
 
         # FIX: Reduced symbolic preference for plain strings

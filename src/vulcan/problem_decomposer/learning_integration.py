@@ -1193,19 +1193,19 @@ class UnifiedDecomposerLearner:
         if self.continual_learner:
             try:
                 self.continual_learner.shutdown()
-            except:
+            except Exception:
                 pass
 
         if self.rlhf_manager:
             try:
                 self.rlhf_manager.shutdown()
-            except:
+            except Exception:
                 pass
 
         if self.meta_learner:
             try:
                 self.meta_learner.shutdown()
-            except:
+            except Exception:
                 pass
 
         logger.info("UnifiedDecomposerLearner shutdown complete")

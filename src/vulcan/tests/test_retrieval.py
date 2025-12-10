@@ -896,7 +896,7 @@ class TestEdgeCases:
         try:
             index.add("test", embedding)
             # NaN will be normalized to 0
-        except:
+        except Exception:
             pass
 
     def test_very_large_k_search(self, sample_embeddings):

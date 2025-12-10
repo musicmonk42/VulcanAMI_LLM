@@ -205,7 +205,7 @@ class ReasoningExplainer:
         else:
             try:
                 return json.dumps(query)[:100] + "..."
-            except:
+            except Exception:
                 return str(query)[:100] + "..."
 
     def _summarize_data(self, data: Any) -> str:
@@ -227,7 +227,7 @@ class ReasoningExplainer:
         else:
             try:
                 return str(type(data).__name__)
-            except:
+            except Exception:
                 return "Unknown"
 
     def _format_conclusion(self, conclusion: Any) -> str:
@@ -484,7 +484,7 @@ class SafetyAwareReasoning:
                                 "is_safe": False,
                                 "reason": "Result contains unsafe content",
                             }
-                    except:
+                    except Exception:
                         continue
 
         # Check if result is a dict with error indicators
@@ -505,9 +505,9 @@ class SafetyAwareReasoning:
                                 "is_safe": False,
                                 "reason": "Result contains potentially unsafe content",
                             }
-                    except:
+                    except Exception:
                         continue
-            except:
+            except Exception:
                 pass
 
         # Output is safe

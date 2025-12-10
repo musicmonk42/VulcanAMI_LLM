@@ -107,7 +107,7 @@ except ImportError:
                         if has_cycle(node):
                             return False
                 return True
-            except:
+            except Exception:
                 return True  # Fallback
 
         @staticmethod
@@ -542,7 +542,7 @@ class ExactDecomposition(DecompositionStrategy):
 
                 matcher = isomorphism.DiGraphMatcher(G, pattern)
                 return matcher.subgraph_is_isomorphic()
-            except:
+            except Exception:
                 pass
 
         # Fallback to simple check
@@ -1105,7 +1105,7 @@ class StructuralDecomposition(DecompositionStrategy):
                         "confidence": min(1.0, len(cycles) / len(nodes_list)),
                         "cycles": cycles,
                     }
-            except:
+            except Exception:
                 pass
 
         return None

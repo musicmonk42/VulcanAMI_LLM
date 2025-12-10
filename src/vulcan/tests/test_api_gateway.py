@@ -215,7 +215,7 @@ async def redis():
     # Async cleanup - no need for run_until_complete
     try:
         await client.close()
-    except:
+    except Exception:
         pass
 
 
@@ -269,7 +269,7 @@ async def cache_manager(redis):
     # Async cleanup - no need for run_until_complete
     try:
         await manager.cleanup()
-    except:
+    except Exception:
         pass
 
 

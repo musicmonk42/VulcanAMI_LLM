@@ -1113,14 +1113,14 @@ class TimeSeriesAnalyzer:
                 peaks, _ = signal.find_peaks(autocorr, height=0.3)
                 if len(peaks) > 0:
                     return False
-        except:
+        except Exception:
             pass
 
         if STATSMODELS_AVAILABLE:
             try:
                 result = adfuller(values)
                 return result[1] < p_value_threshold
-            except:
+            except Exception:
                 pass
 
         mid = len(values) // 2
@@ -1185,7 +1185,7 @@ class TimeSeriesAnalyzer:
 
             if abs(r_value) > 0.8:
                 return {"rate": slope, "confidence": abs(r_value)}
-        except:
+        except Exception:
             pass
 
         return None
@@ -1384,7 +1384,7 @@ class ModelFitter:
             score = model.score(X, y)
             if score > self.min_score:
                 return model
-        except:
+        except Exception:
             pass
 
         return None
@@ -1406,7 +1406,7 @@ class ModelFitter:
                 return lambda x, dt: model.predict(poly_features.transform([[x, dt]]))[
                     0
                 ]
-        except:
+        except Exception:
             pass
 
         return None
@@ -1431,7 +1431,7 @@ class ModelFitter:
             models.append(
                 ("linear", abs(r_value), {"slope": slope, "intercept": intercept})
             )
-        except:
+        except Exception:
             pass
 
         try:
@@ -1444,7 +1444,7 @@ class ModelFitter:
                     {"rate": slope, "initial": np.exp(intercept)},
                 )
             )
-        except:
+        except Exception:
             pass
 
         if models:

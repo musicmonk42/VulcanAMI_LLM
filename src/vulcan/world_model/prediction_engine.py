@@ -931,7 +931,7 @@ class OptimizedPathClusterer:
                 if score > best_score:
                     best_score = score
                     best_k = k
-            except:
+            except Exception:
                 pass
 
         # Final clustering with best k

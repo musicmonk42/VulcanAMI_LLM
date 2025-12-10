@@ -227,7 +227,7 @@ class MemoryIndex:
             if self.use_faiss and self.faiss_index is not None:
                 del self.faiss_index
                 self.faiss_index = None
-        except:
+        except Exception:
             pass
 
 
@@ -369,7 +369,7 @@ class BayesianMemoryPrior:
         # CRITICAL FIX: Check cache with proper key generation
         try:
             cache_key = f"{features.tobytes()}_{str(sorted(available_tools))}"
-        except:
+        except Exception:
             cache_key = f"{hash(str(features))}_{hash(str(sorted(available_tools)))}"
 
         current_time = time.time()
@@ -995,7 +995,7 @@ class BayesianMemoryPrior:
             # Cleanup index
             if hasattr(self, "memory_index"):
                 del self.memory_index
-        except:
+        except Exception:
             pass
 
 
@@ -1142,5 +1142,5 @@ class AdaptivePriorSelector:
             for prior in self.priors.values():
                 del prior
             self.priors.clear()
-        except:
+        except Exception:
             pass

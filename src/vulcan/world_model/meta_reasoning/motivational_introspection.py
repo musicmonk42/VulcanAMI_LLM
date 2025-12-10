@@ -2285,7 +2285,7 @@ class MotivationalIntrospection:
             return reasoning
         try:
             return str(reasoning)  # Handle mocks
-        except:
+        except Exception:
             return None
 
     def _calculate_proposal_similarity(
@@ -2328,7 +2328,7 @@ class MotivationalIntrospection:
                     try:  # Try string comparison
                         if str(val_a) == str(val_b):
                             matching_values += 1
-                    except:
+                    except Exception:
                         pass  # Cannot compare
                 elif val_a == val_b:
                     matching_values += 1

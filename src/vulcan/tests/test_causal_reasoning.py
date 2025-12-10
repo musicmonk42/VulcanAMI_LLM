@@ -923,7 +923,7 @@ class TestThreadSafety:
             for i in range(10):
                 try:
                     engine.add_causal_relationship(f"X_{start}_{i}", f"Y_{start}_{i}")
-                except:
+                except Exception:
                     pass
 
         with ThreadPoolExecutor(max_workers=5) as executor:

@@ -1552,7 +1552,7 @@ class CorrelationMatrix:
             try:
                 p_value = 2.0 * (1.0 - t_dist.cdf(abs(t_stat), df))
                 return float(p_value)
-            except:
+            except Exception:
                 pass
 
         # Approximate using normal distribution for large df

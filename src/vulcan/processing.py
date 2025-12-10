@@ -257,7 +257,7 @@ class VersionedDataLogger:
                 serialized = pickle.dumps(np.array(data).tolist())
             else:
                 serialized = pickle.dumps(data)
-        except:
+        except Exception:
             serialized = pickle.dumps(str(data))
 
         # Compute hash
@@ -304,7 +304,7 @@ class VersionedDataLogger:
         try:
             # Force Python to close any open handles to the file
             gc.collect()
-        except:
+        except Exception:
             pass
 
         # Move current log to archive
@@ -350,7 +350,7 @@ class VersionedDataLogger:
                             return input_data, output_data
                         else:
                             return entry["input_summary"], entry["output_summary"]
-        except:
+        except Exception:
             pass
 
         return None
@@ -421,7 +421,7 @@ class VersionedDataLogger:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except:
+        except Exception:
             pass
 
 
@@ -781,7 +781,7 @@ class DynamicModelManager:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except:
+        except Exception:
             pass
 
 
@@ -1080,7 +1080,7 @@ class WorkloadManager:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except:
+        except Exception:
             pass
 
 
@@ -2170,7 +2170,7 @@ class AdaptiveMultimodalProcessor(nn.Module):
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
+        except Exception:
             pass
 
 
@@ -2272,7 +2272,7 @@ class StreamingProcessor:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
+        except Exception:
             pass
 
 
@@ -2456,5 +2456,5 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except:
+        except Exception:
             pass
