@@ -247,7 +247,7 @@ class TestFactors(unittest.TestCase):
         explanation = self.explainer.explain(token=1, chain=chain)
 
         factors = explanation.get("factors", [])
-        strategy_factors = [f for f in factors if f.get("type"] == "strategy")
+        strategy_factors = [f for f in factors if f.get("type") == "strategy"]
 
         # Should have strategy factor
         if strategy_factors:
@@ -295,7 +295,7 @@ class TestFactors(unittest.TestCase):
         explanation = self.explainer.explain(token=1, chain=chain)
 
         factors = explanation.get("factors", [])
-        consensus_factors = [f for f in factors if f.get("type"] == "consensus")
+        consensus_factors = [f for f in factors if f.get("type") == "consensus"]
 
         if consensus_factors:
             self.assertIn("agreement", consensus_factors[0])

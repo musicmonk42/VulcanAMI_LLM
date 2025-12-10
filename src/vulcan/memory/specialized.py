@@ -799,13 +799,13 @@ class EpisodicMemory(BaseMemorySystem):
         # Context features
         context_str = json.dumps(episode.context, sort_keys=True)
         context_hash = hashlib.sha256(context_str.encode()).digest()
-        features.extend([context_hash[:32]))
+        features.extend(list(context_hash[:32]))
 
         # Event features
         if episode.events:
             event_str = json.dumps(episode.events[0], sort_keys=True, default=str)
             event_hash = hashlib.sha256(event_str.encode()).digest()
-            features.extend([event_hash[:32]))
+            features.extend(list(event_hash[:32]))
         else:
             features.extend([0] * 32)
 
@@ -2039,7 +2039,7 @@ class SemanticMemory(BaseMemorySystem):
 
         # Deduplicate
         for rel_type in merged.relationships:
-            merged.relationships[rel_type] = [set(merged.relationships[rel_type]))
+            merged.relationships[rel_type] = set(merged.relationships[rel_type])
 
         merged.sources = list(set(merged.sources))
 

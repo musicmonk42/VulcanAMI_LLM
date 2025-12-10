@@ -320,7 +320,7 @@ def get_env_metadata() -> Dict[str, Any]:
 
     # Find CI environment variable
     ci_env = "none"
-    ci_vars = list(os.environ.keys() if k.lower().endswith("ci"))
+    ci_vars = [k for k in os.environ.keys() if k.lower().endswith("ci")]
     if ci_vars:
         ci_env = ci_vars[0]
 

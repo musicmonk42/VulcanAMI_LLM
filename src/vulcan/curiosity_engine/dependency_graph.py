@@ -479,7 +479,7 @@ class CycleDetector:
         with self.lock:
             try:
                 sccs = list(nx.strongly_connected_components(self.storage.nx_graph))
-                return [item for item in sccs if len(scc] > 1)
+                return [scc for scc in sccs if len(scc) > 1]
             except Exception as e:
                 return self._find_sccs_tarjan()
 

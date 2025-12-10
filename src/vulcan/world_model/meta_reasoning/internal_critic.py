@@ -419,7 +419,7 @@ class InternalCritic:
             f"  Strict mode: {strict_mode}, Adaptive weights: {self.adaptive_weights}"
         )
         logger.info(
-            f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
+            f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()}}"
         )
 
     def evaluate_proposal(
@@ -929,7 +929,7 @@ class InternalCritic:
                 )
 
             # Ensure all items in proposals list are dicts
-            valid_proposals = [p for p in proposals if isinstance(p, dict])
+            valid_proposals = [p for p in proposals if isinstance(p, dict)]
             if len(valid_proposals) != len(proposals):
                 logger.warning(
                     f"Some items in proposals list were not dicts ({len(proposals) - len(valid_proposals)} ignored)."
@@ -1609,7 +1609,7 @@ class InternalCritic:
 
         # Placeholder: Check for key sections
         expected = ["description", "steps", "validation"]
-        missing = [k for k in expected if not proposal.get(k])
+        missing = [k for k in expected if not proposal.get(k)]
         if missing:
             score -= 0.2 * len(missing)
             critiques.append(
@@ -2061,7 +2061,7 @@ class InternalCritic:
                     }
 
                 logger.debug(
-                    f"New perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
+                    f"New perspective weights: {{p.value: w for p, w in self.perspective_weights.items()}}"
                 )
 
         # Optional: Slightly decrease weights of perspectives that gave high scores to a failed proposal? (More complex logic)

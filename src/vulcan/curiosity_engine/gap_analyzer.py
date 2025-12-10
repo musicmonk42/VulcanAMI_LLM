@@ -362,7 +362,7 @@ class PatternTracker:
                 if pattern_type:
                     if pattern_type in self.observed_patterns:
                         return {
-                            pattern_type: [self.observed_patterns[pattern_type])
+                            pattern_type: list(self.observed_patterns[pattern_type])
                         }
                     return {}
 
@@ -464,10 +464,10 @@ class GapRegistry:
                     "total_gaps_found": self.total_gaps_found,
                     "gaps_by_type": dict(self.gaps_by_type),
                     "active_gaps": len(
-                        list(self.identified_gaps.values() if not g.addressed)
+                        [g for g in self.identified_gaps.values() if not g.addressed]
                     ),
                     "addressed_gaps": len(
-                        list(self.identified_gaps.values() if g.addressed)
+                        [g for g in self.identified_gaps.values() if g.addressed]
                     ),
                     "success_rates": success_rates,
                 }

@@ -2023,7 +2023,7 @@ class WorldModel:
             "get_safety_stats",
         ]
 
-        missing = [m for m in required_methods if not hasattr(self.safety_validator, m])
+        missing = [m for m in required_methods if not hasattr(self.safety_validator, m)]
 
         if missing:
             logger.error(
