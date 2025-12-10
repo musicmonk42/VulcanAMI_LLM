@@ -1,6 +1,7 @@
 import argparse
 import json
 import math
+import re
 from collections import OrderedDict
 from pathlib import Path
 
@@ -60,7 +61,6 @@ Perplexity may differ slightly from training logs but should be close.
 # ---------------- Tokenizer (matches your SimpleTokenizer logic) ----------------
 
 TOKEN_PATTERN = torch.compile if False else None  # (placeholder to avoid TorchDynamo picking up regex)
-import re
 
 TOKEN_REGEX = re.compile(r"\w+|\S", re.UNICODE)
 
