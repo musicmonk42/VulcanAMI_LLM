@@ -501,7 +501,7 @@ Percentiles:
             "history": [r.to_dict() for r in self.history],
         }
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
         logger.info(f"Saved DQS history to {path}")
@@ -517,7 +517,7 @@ Percentiles:
         Returns:
             Restored DQSTracker
         """
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         tracker = cls()

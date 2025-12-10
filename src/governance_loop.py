@@ -856,7 +856,7 @@ class GovernanceLoop:
         temp_path = path.with_suffix(".tmp")
 
         try:
-            with open(temp_path, "w") as f:
+            with open(temp_path, "w", encoding="utf-8") as f:
                 json.dump(policies_data, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
@@ -889,7 +889,7 @@ class GovernanceLoop:
             raise PermissionError(f"No read permission for {filepath}")
 
         try:
-            with open(filepath, "r") as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 policies_data = json.load(f)
 
             if not isinstance(policies_data, dict):
@@ -906,7 +906,7 @@ class GovernanceLoop:
                         continue
 
                     required_fields = ["name", "type", "priority", "rules"]
-                    missing_fields = [f for f in required_fields if f not in data]
+                    missing_fields = list(required_fields if f not in data)
                     if missing_fields:
                         errors.append(
                             f"Policy {policy_id}: Missing fields {missing_fields}"

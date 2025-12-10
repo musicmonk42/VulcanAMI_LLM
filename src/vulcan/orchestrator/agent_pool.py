@@ -988,7 +988,7 @@ class AgentPoolManager:
                     # Archive oldest 1000 records
                     records_to_archive = list(self.provenance_records.items())[:1000]
 
-                    with open(archive_file, "w") as f:
+                    with open(archive_file, "w", encoding="utf-8") as f:
                         for job_id, prov in records_to_archive:
                             try:
                                 f.write(json.dumps(prov.to_dict(), default=str) + "\n")

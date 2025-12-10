@@ -1122,7 +1122,7 @@ class ConfigurationManager:
             return False
 
         try:
-            with open(file_path, "r") as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 if file_path.suffix == ".json":
                     config = json.load(f)
                 elif file_path.suffix in [".yaml", ".yml"]:
@@ -1380,7 +1380,7 @@ class ConfigurationManager:
         profile_file = self.config_dir / f"profile_{profile.value}.json"
 
         try:
-            with open(profile_file, "w") as f:
+            with open(profile_file, "w", encoding="utf-8") as f:
                 json.dump(profile_config, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to create default profile file: {e}")
@@ -1492,7 +1492,7 @@ class ConfigurationManager:
                 if include_metadata:
                     export_data["metadata"] = self.metadata
 
-            with open(file_path, "w") as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 if file_path.suffix == ".json":
                     json.dump(export_data, f, indent=2, default=str)
                 elif file_path.suffix in [".yaml", ".yml"]:
@@ -1798,7 +1798,7 @@ def load_intrinsic_drives_from_file(file_path: str = None) -> Dict[str, Any]:
         )
 
     try:
-        with open(file_path, "r") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load intrinsic drives config from {file_path}: {e}")
@@ -1918,7 +1918,7 @@ class ConfigurationAPI:
         success = self.config_manager.export(file_path)
 
         if success:
-            with open(file_path, "r") as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
             return {"success": True, "content": content}
         else:

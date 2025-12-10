@@ -257,7 +257,7 @@ class ValidationTestSuite:
                 return cached
 
         try:
-            with open(MANIFEST_PATH, "r") as f:
+            with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
                 if self.enable_caching:
                     file_cache.set(MANIFEST_PATH, manifest)
@@ -276,7 +276,7 @@ class ValidationTestSuite:
                 return cached
 
         try:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 content = json.load(f)
                 if self.enable_caching:
                     file_cache.set(path, content)

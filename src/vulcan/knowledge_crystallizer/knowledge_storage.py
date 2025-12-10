@@ -983,7 +983,7 @@ class VersionedKnowledgeBase:
                 path.parent.mkdir(parents=True, exist_ok=True)
 
                 if format == "json":
-                    with open(path, "w") as f:
+                    with open(path, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2)
                 elif format == "pickle":
                     with open(path, "wb") as f:
@@ -992,7 +992,7 @@ class VersionedKnowledgeBase:
                 # Compress if requested
                 if self.compression == CompressionType.GZIP:
                     with open(path, "rb") as f_in:
-                        with gzip.open(path.with_suffix(".gz"), "wb") as f_out:
+                        with gzip.open(path.with_suffix(".gz", encoding="utf-8"), "wb") as f_out:
                             shutil.copyfileobj(f_in, f_out)
                     path.unlink()  # Remove uncompressed file
                     logger.info(
@@ -1032,7 +1032,7 @@ class VersionedKnowledgeBase:
                 else:
                     # Load based on extension
                     if path.suffix == ".json":
-                        with open(path, "r") as f:
+                        with open(path, "r", encoding="utf-8") as f:
                             data = json.load(f)
                     else:
                         with open(path, "rb") as f:
@@ -2010,7 +2010,7 @@ class KnowledgeIndex:
                 "between",
             }
 
-            keywords = [w for w in words if w not in stop_words and len(w) > 3]
+            keywords = list(words if w not in stop_words and len(w) > 3)
 
             # Extract bigrams
             bigrams = []

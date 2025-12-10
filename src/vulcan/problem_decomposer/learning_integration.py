@@ -1123,7 +1123,7 @@ class UnifiedDecomposerLearner:
         # Save coordinator state
         coord_path = path / f"coordinator_{timestamp}.json"
         try:
-            with open(coord_path, "w") as f:
+            with open(coord_path, "w", encoding="utf-8") as f:
                 json.dump(self.coordinator.integration_stats, f, indent=2)
             saved_paths["coordinator"] = str(coord_path)
         except Exception as e:

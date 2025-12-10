@@ -900,7 +900,7 @@ class SafetyGovernor:
             with self.lock:
                 audit_data = list(self.audit_trail)
 
-            with open(export_path, "w") as f:
+            with open(export_path, "w", encoding="utf-8") as f:
                 json.dump(audit_data, f, indent=2, default=str)
 
             logger.info(f"Audit trail exported to {export_path}")

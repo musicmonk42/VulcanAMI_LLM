@@ -680,7 +680,7 @@ class DistributionMonitor:
 
             # Save statistics
             stats = self.get_statistics()
-            with open(save_path / "statistics.json", "w") as f:
+            with open(save_path / "statistics.json", "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2)
 
             # Save detection history

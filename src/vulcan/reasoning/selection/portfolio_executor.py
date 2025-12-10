@@ -212,7 +212,7 @@ class PortfolioExecutor:
                 )
 
             # Validate tools exist
-            valid_tools = [t for t in tool_names if t in self.tools]
+            valid_tools = list(tool_names if t in self.tools)
             if not valid_tools:
                 raise ValueError(f"No valid tools found in {tool_names}")
 

@@ -1232,7 +1232,7 @@ class CuriosityEngine:
                 gaps = all_gaps[:3]
             elif strategy == "efficient":
                 all_gaps = self.gap_analyzer.get_all_gaps()
-                gaps = [g for g in all_gaps if g.estimated_cost < 20][:5]
+                gaps = list(all_gaps if g.estimated_cost < 20)[:5]
 
             # APPLY: Add to dependency graph
             for gap in gaps:

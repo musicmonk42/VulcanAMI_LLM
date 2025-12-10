@@ -1608,7 +1608,7 @@ class AgentRegistry:
                     with self.agents_lock:
                         # Clean expired keys
                         for agent in self.agents.values():
-                            expired_keys = [k for k in agent.keys if k.is_expired()]
+                            expired_keys = list(agent.keys if k.is_expired())
                             for key in expired_keys:
                                 key.is_active = False
                                 with self.revoked_keys_lock:

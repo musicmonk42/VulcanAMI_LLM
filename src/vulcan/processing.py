@@ -234,7 +234,7 @@ class VersionedDataLogger:
         # Write to log
         with self.log_lock:
             # FIXED: Write directly to file, don't accumulate unbounded in memory
-            with open(self.log_file, "a") as f:
+            with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, default=str) + "\n")
 
             # Keep only recent entries in memory for quick access
@@ -344,7 +344,7 @@ class VersionedDataLogger:
 
         # If not in memory, search log file
         try:
-            with open(self.log_file, "r") as f:
+            with open(self.log_file, "r", encoding="utf-8") as f:
                 for line in f:
                     entry = json.loads(line)
                     if entry["log_id"] == log_id:

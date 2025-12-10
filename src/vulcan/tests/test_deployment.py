@@ -321,7 +321,7 @@ class MockDeployment:
             "step": self.collective.sys.step,
             "cid": self.collective.sys.CID,
         }
-        with open(metadata_path, "w") as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f)
 
         self._last_checkpointed_step = self.collective.sys.step
@@ -358,7 +358,7 @@ class MockDeployment:
             }
 
             if metadata_file.exists():
-                with open(metadata_file, "r") as f:
+                with open(metadata_file, "r", encoding="utf-8") as f:
                     metadata = json.load(f)
                 checkpoint_info.update(metadata)
 

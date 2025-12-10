@@ -191,16 +191,16 @@ class MockInterventionManager:
             return False
 
     def get_pending_interventions(self) -> List[Intervention]:
-        return [i for i in self.scheduled if i.status == "pending"]
+        return list(self.scheduled if i.status == "pending")
 
     def get_statistics(self) -> Dict:
         return {
             "total_interventions": len(self.interventions),
             "pending": len(
-                [i for i in self.interventions.values() if i.status == "pending"]
+                list(self.interventions.values() if i.status == "pending")
             ),
             "executed": len(
-                [i for i in self.interventions.values() if i.status == "executed"]
+                list(self.interventions.values() if i.status == "executed")
             ),
         }
 
@@ -252,7 +252,7 @@ class MockPredictionManager:
         return pred
 
     def get_prediction_confidence(self, target: str) -> float:
-        target_preds = [p for p in self.predictions if p.target == target]
+        target_preds = list(self.predictions if p.target == target)
         if not target_preds:
             return 0.0
         return np.mean([p.confidence for p in target_preds])

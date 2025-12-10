@@ -1252,7 +1252,7 @@ class ChangeDetector:
         """Get detected changes"""
 
         with self.lock:
-            filtered = [c for c in self.change_points if abs(c["change"]) >= min_change]
+            filtered = list(self.change_points if abs(c["change")) >= min_change]
 
             filtered.sort(key=lambda x: x["timestamp"], reverse=True)
 
@@ -1907,7 +1907,7 @@ class CorrelationTracker:
                 "corrections": dict(self.safety_corrections),
             }
 
-        with open(save_path / "correlation_state.json", "w") as f:
+        with open(save_path / "correlation_state.json", "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
 
         logger.info(f"Correlation tracker state saved to {save_path}")

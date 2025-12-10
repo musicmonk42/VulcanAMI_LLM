@@ -2093,7 +2093,7 @@ class BiasDetector:
         if isinstance(resources, dict):
             values = list(resources.values())
             if values:
-                numeric_values = [v for v in values if isinstance(v, (int, float))]
+                numeric_values = list(values if isinstance(v, (int, float)))
                 if numeric_values:
                     features[0] = np.mean(numeric_values)
                     features[1] = np.std(numeric_values)
@@ -2176,7 +2176,7 @@ class BiasDetector:
         if "group_rates" in context:
             rates = context["group_rates"]
             if isinstance(rates, dict):
-                rate_values = [v for v in rates.values() if isinstance(v, (int, float))]
+                rate_values = list(rates.values() if isinstance(v, (int, float)))
                 if rate_values:
                     features[0] = np.mean(rate_values)
                     features[1] = np.std(rate_values)

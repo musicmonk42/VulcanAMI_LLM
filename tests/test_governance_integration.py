@@ -784,7 +784,7 @@ class TestConcurrencyIntegration:
             t.join()
 
         # All submissions should succeed and have unique IDs
-        successful_ids = [v for v in results.values() if not isinstance(v, str) or not v.startswith("Error")]
+        successful_ids = list(results.values() if not isinstance(v, str) or not v.startswith("Error"))
         print(f"Concurrent submission results: {results}")
         assert len(successful_ids) == 10, f"Expected 10 successful submissions, got {len(successful_ids)}"
         assert len(set(successful_ids)) == 10, "Proposal IDs were not unique"

@@ -85,7 +85,7 @@ class TestVulcanPackVerify:
         with tempfile.TemporaryDirectory() as tmpdir:
             # First create a valid pack
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -111,7 +111,7 @@ class TestVulcanPackVerify:
         """Test full verification mode"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -134,7 +134,7 @@ class TestVulcanPackVerify:
         """Test verbose verification"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -155,7 +155,7 @@ class TestVulcanPackVerify:
         """Test quiet verification"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -176,7 +176,7 @@ class TestVulcanPackVerify:
         """Test JSON output"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -196,7 +196,7 @@ class TestVulcanPackVerify:
             assert os.path.exists(json_output)
 
             # Verify JSON structure
-            with open(json_output, 'r') as f:
+            with open(json_output, 'r', encoding="utf-8") as f:
                 data = json.load(f)
                 assert 'success' in data
                 assert 'errors' in data
@@ -233,7 +233,7 @@ class TestVulcanPackVerify:
         """Test --merkle flag"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -255,7 +255,7 @@ class TestVulcanPackVerify:
         """Test --bloom flag"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -277,7 +277,7 @@ class TestVulcanPackVerify:
         """Test --checksums flag"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -300,7 +300,7 @@ class TestVulcanPackVerify:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a valid pack first
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')
@@ -311,7 +311,7 @@ class TestVulcanPackVerify:
             )
 
             # Corrupt the pack by modifying bytes
-            with open(pack_file, 'r+b') as f:
+            with open(pack_file, 'r+b', encoding="utf-8") as f:
                 f.seek(50)
                 f.write(b'\xFF' * 10)
 
@@ -328,7 +328,7 @@ class TestVulcanPackVerify:
         with tempfile.TemporaryDirectory() as tmpdir:
             for i in range(3):
                 input_file = os.path.join(tmpdir, f'input{i}.json')
-                with open(input_file, 'w') as f:
+                with open(input_file, 'w', encoding="utf-8") as f:
                     json.dump({'test': f'data{i}'}, f)
 
                 pack_file = os.path.join(tmpdir, f'test{i}.pack')
@@ -349,7 +349,7 @@ class TestVulcanPackVerify:
         """Test that verify displays pack information"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             pack_file = os.path.join(tmpdir, 'test.pack')

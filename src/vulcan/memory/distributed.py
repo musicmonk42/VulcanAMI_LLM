@@ -468,7 +468,7 @@ class MemoryFederation:
         # Find target nodes for migration
         for memory_id in node.primary_for:
             new_nodes = self.get_nodes_for_key(memory_id, count=3)
-            new_nodes = [nid for nid in new_nodes if nid != node_id]
+            new_nodes = list(new_nodes if nid != node_id)
 
             if new_nodes:
                 # Trigger migration

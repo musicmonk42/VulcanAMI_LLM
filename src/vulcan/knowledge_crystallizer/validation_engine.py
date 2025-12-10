@@ -1020,7 +1020,7 @@ class KnowledgeValidator:
 
         # Remove duplicates while preserving order
         seen = set()
-        levels = [l for l in levels if not (l in seen or seen.add(l))]
+        levels = list(levels if not (l in seen or seen.add(l)))
 
         logger.debug(
             "Selected validation levels for principle (confidence=%.2f, criticality=%.2f): %s",
@@ -1915,7 +1915,7 @@ if __name__ == '__main__':
                 stderr=subprocess.PIPE,
                 text=True,
                 preexec_fn=set_limits,
-            )
+            , encoding="utf-8")
 
             try:
                 stdout, stderr = process.communicate(timeout=timeout)
@@ -1950,7 +1950,7 @@ if __name__ == '__main__':
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-            )
+            , encoding="utf-8")
 
             try:
                 stdout, stderr = process.communicate(timeout=timeout)

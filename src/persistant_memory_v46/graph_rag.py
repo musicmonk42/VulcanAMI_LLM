@@ -205,7 +205,7 @@ class GraphRAG:
 
         if YAML_AVAILABLE:
             try:
-                with open(path) as f:
+                with open(path, encoding="utf-8") as f:
                     return yaml.safe_load(f)
             except Exception as e:
                 logger.error(f"Failed to load YAML config {path}: {e}")
@@ -214,7 +214,7 @@ class GraphRAG:
             # Fallback to JSON
             if path.endswith(".json"):
                 try:
-                    with open(path) as f:
+                    with open(path, encoding="utf-8") as f:
                         return json.load(f)
                 except Exception as e:
                     logger.error(f"Failed to load JSON config {path}: {e}")
@@ -671,7 +671,7 @@ class GraphRAG:
         }
 
         try:
-            with open(os.path.join(path, "metadata.json"), "w") as f:
+            with open(os.path.join(path, "metadata.json", encoding="utf-8"), "w") as f:
                 json.dump(meta, f)
         except Exception as e:
             logger.error(f"Failed to save metadata.json: {e}")
@@ -690,7 +690,7 @@ class GraphRAG:
                 logger.error(f"Error serializing node {node_id}: {e}")
 
         try:
-            with open(os.path.join(path, "nodes.json"), "w") as f:
+            with open(os.path.join(path, "nodes.json", encoding="utf-8"), "w") as f:
                 json.dump(nodes_data, f)
         except Exception as e:
             logger.error(f"Failed to save nodes.json: {e}")
@@ -719,7 +719,7 @@ class GraphRAG:
         meta_path = os.path.join(path, "metadata.json")
         if os.path.exists(meta_path):
             try:
-                with open(meta_path) as f:
+                with open(meta_path, encoding="utf-8") as f:
                     meta = json.load(f)
                     self.index_to_node_id = {
                         int(k): v for k, v in meta.get("index_to_node_id", {}).items()
@@ -745,7 +745,7 @@ class GraphRAG:
         nodes_path = os.path.join(path, "nodes.json")
         if os.path.exists(nodes_path):
             try:
-                with open(nodes_path) as f:
+                with open(nodes_path, encoding="utf-8") as f:
                     nodes_data = json.load(f)
             except Exception as e:
                 logger.error(f"Failed to load nodes.json: {e}")

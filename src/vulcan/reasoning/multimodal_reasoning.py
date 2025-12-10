@@ -1571,7 +1571,7 @@ class MultiModalReasoningEngine:
             return weighted_votes.most_common(1)[0][0]
 
         # Weighted average for numerical conclusions (float)
-        numeric_conclusions = [c for c in conclusions if isinstance(c, float)]
+        numeric_conclusions = list(conclusions if isinstance(c, float))
         numeric_weights = [
             w for c, w in zip(conclusions, weights) if isinstance(c, float)
         ]
@@ -2303,11 +2303,11 @@ class MultiModalReasoningEngine:
                     "successful_fusions": list(self.successful_fusions),
                 }
 
-                with open(path / "learning_data.json", "w") as f:
+                with open(path / "learning_data.json", "w", encoding="utf-8") as f:
                     json.dump(learning_data, f, indent=2)
 
             # Save statistics
-            with open(path / "statistics.json", "w") as f:
+            with open(path / "statistics.json", "w", encoding="utf-8") as f:
                 json.dump(self.get_statistics(), f, indent=2)
 
             logger.info(f"Models saved to {path}")
@@ -2346,7 +2346,7 @@ class MultiModalReasoningEngine:
             # Load learning parameters
             learning_path = path / "learning_data.json"
             if learning_path.exists() and self.enable_learning:
-                with open(learning_path, "r") as f:
+                with open(learning_path, "r", encoding="utf-8") as f:
                     learning_data = json.load(f)
 
                 self.fusion_weights = defaultdict(

@@ -795,7 +795,7 @@ class TestEdgeCases:
 
         # Corrupt metadata file
         metadata_path = persistence._get_metadata_path(sample_memory.id)
-        with open(metadata_path, "w") as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             f.write("corrupted data {{{")
 
         # Try to load - should handle gracefully

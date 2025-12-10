@@ -143,12 +143,12 @@ class MockRiskAdjuster:
             self._load_config(config_path)
 
     def _load_config(self, path: Path):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             config = json.load(f)
             self.base_thresholds.update(config.get("thresholds", {}))
 
     def save_config(self, path: Path):
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump({"thresholds": self.base_thresholds}, f)
 
     def get_adjusted_thresholds(self, domain: str, criticality: float) -> Dict:
@@ -343,7 +343,7 @@ class MockDomainRegistry:
 
         data = {"domains": {name: p.to_dict() for name, p in self.domains.items()}}
 
-        with open(path / "registry.json", "w") as f:
+        with open(path / "registry.json", "w", encoding="utf-8") as f:
             json.dump(data, f)
 
     def _load_registry(self):
@@ -354,7 +354,7 @@ class MockDomainRegistry:
         if not path.exists():
             return
 
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         for name, pdata in data.get("domains", {}).items():

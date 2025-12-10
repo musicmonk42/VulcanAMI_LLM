@@ -813,7 +813,7 @@ class UtilityModel:
             with self.stats_lock:
                 config["statistics"] = dict(self.computation_stats)
 
-            with open(save_path, "w") as f:
+            with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2)
 
             logger.info(f"Utility model configuration saved to {save_path}")
@@ -830,7 +830,7 @@ class UtilityModel:
                 logger.warning(f"Configuration file {load_path} not found")
                 return
 
-            with open(load_path, "r") as f:
+            with open(load_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
 
             # Load mode weights

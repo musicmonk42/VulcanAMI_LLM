@@ -174,7 +174,7 @@ class CSIUEnforcement:
             window_start = now - self.config.cumulative_window_seconds
 
             # Filter to recent window
-            recent = [r for r in self._influence_history if r.timestamp >= window_start]
+            recent = list(self._influence_history if r.timestamp >= window_start)
 
             if not recent:
                 return {
@@ -413,7 +413,7 @@ class CSIUEnforcement:
 
         if path:
             path.parent.mkdir(parents=True, exist_ok=True)
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(records, f, indent=2)
             logger.info(f"CSIU audit trail exported to {path} ({len(records)} records)")
 

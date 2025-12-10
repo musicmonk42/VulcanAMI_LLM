@@ -1168,7 +1168,7 @@ class ProblemExecutor:
         elif operation == "filter":
             threshold = params.get("threshold", 0)
             if isinstance(data, list):
-                result = [x for x in data if x > threshold]
+                result = list(data if x > threshold)
             else:
                 result = data
         elif operation == "map":
@@ -1633,7 +1633,7 @@ class ProblemExecutor:
                 in_degree[target] += 1
 
         # Find nodes with no incoming edges
-        queue = [node for node in nodes if in_degree[node] == 0]
+        queue = list(nodes if in_degree[node) == 0]
         ordered = []
 
         while queue:
@@ -1660,7 +1660,7 @@ class ProblemExecutor:
         elif transform_type == "filter":
             # Filter data
             if "data" in current_data and isinstance(current_data["data"], list):
-                filtered = [x for x in current_data["data"] if x > 0]
+                filtered = list(current_data["data") if x > 0]
                 return {"data": filtered}
             return current_data
         elif transform_type == "aggregate":

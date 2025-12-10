@@ -421,7 +421,7 @@ class TestSubgraphLearner:
         pattern_file = learner.learned_dir / f"{pattern_id}.json"
         assert pattern_file.exists()
 
-        with open(pattern_file, 'r') as f:
+        with open(pattern_file, 'r', encoding="utf-8") as f:
             data = json.load(f)
             assert data['pattern_id'] == pattern_id
             assert data['name'] == "Persistent"

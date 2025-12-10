@@ -634,7 +634,7 @@ class ToolSafetyGovernor:
             for t in expired:
                 del self.quarantine_list[t]
 
-            available_tools = [t for t in tools if t not in self.quarantine_list]
+            available_tools = list(tools if t not in self.quarantine_list)
 
             allowed, report = self.manager.veto_tool_selection(available_tools, request)
 
@@ -964,7 +964,7 @@ class HumanOversightInterface:
             "automation_level": self.automation_level,
             "emergency_stop_enabled": self.emergency_stop_enabled,
             "active_alerts": len(
-                [a for a in self.alerts.values() if not a.get("acknowledged")]
+                list(self.alerts.values() if not a.get("acknowledged"))
             ),
         }
 

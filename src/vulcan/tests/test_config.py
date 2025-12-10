@@ -106,7 +106,7 @@ def sample_config():
 def sample_config_file(temp_config_dir, sample_config):
     """Create sample configuration file."""
     config_file = temp_config_dir / "test_config.json"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         json.dump(sample_config, f)
     return config_file
 
@@ -115,7 +115,7 @@ def sample_config_file(temp_config_dir, sample_config):
 def sample_yaml_config_file(temp_config_dir, sample_config):
     """Create sample YAML configuration file."""
     config_file = temp_config_dir / "test_config.yaml"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         yaml.dump(sample_config, f)
     return config_file
 
@@ -509,7 +509,7 @@ class TestConfigurationManager:
         assert success == True
         assert export_file.exists()
 
-        with open(export_file, "r") as f:
+        with open(export_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         assert "configuration" in data
@@ -1194,7 +1194,7 @@ class TestIntegration:
 
         # File layer
         config_file = temp_config_dir / "test.json"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump({"agent_config": {"agent_id": "file-agent"}}, f)
         manager.load_from_file(config_file)
         assert manager.get("agent_config.agent_id") == "file-agent"

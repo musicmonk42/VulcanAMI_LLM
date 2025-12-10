@@ -649,7 +649,7 @@ class ParameterHistoryManager:
 
         try:
             # FIXED: Use Path.open() for consistency
-            with path.open("w") as f:
+            with path.open("w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2, default=str)
             logger.info(f"Exported checkpoint history to: {export_path}")
         except Exception as e:
@@ -664,7 +664,7 @@ class ParameterHistoryManager:
             raise FileNotFoundError(f"Import file not found: {import_path}")
 
         # FIXED: Use Path.open() for consistency
-        with path.open("r") as f:
+        with path.open("r", encoding="utf-8") as f:
             import_data = json.load(f)
 
         with self._lock:
@@ -764,7 +764,7 @@ class ParameterHistoryManager:
                 history_data = list(self.parameter_history)
 
             # FIXED: Use Path.open() for consistency
-            with history_file.open("w") as f:
+            with history_file.open("w", encoding="utf-8") as f:
                 json.dump(history_data, f, indent=2, default=str)
 
         except Exception as e:
@@ -783,7 +783,7 @@ class ParameterHistoryManager:
         if history_file.exists():
             try:
                 # FIXED: Use Path.open() for consistency
-                with history_file.open("r") as f:
+                with history_file.open("r", encoding="utf-8") as f:
                     history = json.load(f)
 
                 with self._lock:

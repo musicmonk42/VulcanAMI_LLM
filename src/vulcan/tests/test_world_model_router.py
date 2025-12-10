@@ -187,7 +187,7 @@ class MockPatternLearner:
         if len(self.pattern_history) < 10:
             return
 
-        successful = [p for p in self.pattern_history if p["success"]]
+        successful = list(self.pattern_history if p["success")]
         if not successful:
             return
 

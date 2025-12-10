@@ -539,7 +539,7 @@ class UnifiedLearningSystem:
             )
 
         # Save unified stats
-        with open(save_dir / "unified_stats.json", "w") as f:
+        with open(save_dir / "unified_stats.json", "w", encoding="utf-8") as f:
             import json
 
             json.dump(self.get_unified_stats(), f, indent=2, default=str)

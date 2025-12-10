@@ -441,7 +441,7 @@ class SubgraphLearner:
     def _save_pattern(self, pattern: SubgraphPattern):
         """Save pattern to disk"""
         pattern_file = self.learned_dir / f"{pattern.pattern_id}.json"
-        with open(pattern_file, "w") as f:
+        with open(pattern_file, "w", encoding="utf-8") as f:
             json.dump(pattern.to_dict(), f, indent=2)
 
     def _evict_least_used(self):
@@ -476,7 +476,7 @@ class SubgraphLearner:
 
         for pattern_file in self.learned_dir.glob("*.json"):
             try:
-                with open(pattern_file, "r") as f:
+                with open(pattern_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Convert timestamps
@@ -1093,7 +1093,7 @@ def create_runtime_extensions(
 def load_extension_config(config_file: str) -> Dict[str, Any]:
     """Load extension configuration from file"""
     try:
-        with open(config_file, "r") as f:
+        with open(config_file, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load config: {e}")

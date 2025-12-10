@@ -431,7 +431,7 @@ def create_manifest(
             manifest[str(file_path)] = "ERROR"
 
     if output_path:
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
         logger.info(f"Wrote manifest to {output_path}")
 
@@ -450,7 +450,7 @@ def verify_manifest(manifest_path: Union[str, Path]) -> Dict[str, bool]:
     """
     import json
 
-    with open(manifest_path, "r") as f:
+    with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
     results = {}

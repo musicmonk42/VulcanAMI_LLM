@@ -595,7 +595,7 @@ class PersistenceLayer:
 
             db_signature = self._sign_data(db_bytes)
 
-            with open(backup_db_path.with_suffix(".sig"), "w") as f:
+            with open(backup_db_path.with_suffix(".sig", encoding="utf-8"), "w") as f:
                 f.write(db_signature)
 
             logger.info(f"Created signed backup at {backup_db_path}")
@@ -614,7 +614,7 @@ class PersistenceLayer:
         """Remove old backups, keeping only MAX_BACKUP_COUNT most recent."""
         try:
             backups = sorted(
-                [f for f in self.backup_path.glob("backup_*.db")],
+                list(self.backup_path.glob("backup_*.db")),
                 key=lambda x: x.stat().st_mtime,
                 reverse=True,
             )
@@ -650,7 +650,7 @@ class PersistenceLayer:
             with open(backup_file, "rb") as f:
                 db_bytes = f.read()
 
-            with open(sig_file, "r") as f:
+            with open(sig_file, "r", encoding="utf-8") as f:
                 signature = f.read().strip()
 
             if not self._verify_signature(db_bytes, signature, use_cache=False):
@@ -727,7 +727,7 @@ class PersistenceLayer:
                     logger.info(f"Rotated audit log to {rotated_path}")
 
             # Append to log
-            with open(self.audit_log_path, "a") as f:
+            with open(self.audit_log_path, "a", encoding="utf-8") as f:
                 f.write(log_line + "\n")
 
     def _extract_features(self, graph: Dict) -> Dict:

@@ -127,7 +127,7 @@ class HardwareProfileManager:
     def _load_profiles_from_file(self, path: str):
         """Load hardware profiles from JSON file"""
         try:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             for backend_name, profile_data in data.items():

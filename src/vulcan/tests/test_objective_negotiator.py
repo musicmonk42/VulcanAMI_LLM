@@ -158,7 +158,7 @@ class TestNegotiateMultiAgentProposals:
         result = negotiator.negotiate_multi_agent_proposals(sample_proposals)
 
         assert isinstance(result, NegotiationResult)
-        assert result.outcome in [e for e in NegotiationOutcome]
+        assert result.outcome in list(NegotiationOutcome)
         assert isinstance(result.agreed_objectives, dict)
 
     def test_negotiate_empty_proposals(self, negotiator):

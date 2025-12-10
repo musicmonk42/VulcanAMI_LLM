@@ -262,7 +262,7 @@ def test_detect_violations_no_enforcement_and_filters():
     assert len(all_found) == 2
 
     # Manual filter by boundary name
-    limited = [v for v in all_found if v.boundary_violated == "warn_debug_mark"]
+    limited = list(all_found if v.boundary_violated == "warn_debug_mark")
     assert len(limited) == 1
     assert limited[0].boundary_violated == "warn_debug_mark"
 

@@ -1821,7 +1821,7 @@ class ModelConfidenceTracker:
                 "successful_updates": self.successful_updates,
             }
 
-        with open(save_path / "confidence_state.json", "w") as f:
+        with open(save_path / "confidence_state.json", "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
 
         logger.info(f"Confidence tracker state saved to {save_path}")
@@ -1834,7 +1834,7 @@ class ModelConfidenceTracker:
             logger.warning(f"No saved state found at {load_path}")
             return
 
-        with open(load_path / "confidence_state.json", "r") as f:
+        with open(load_path / "confidence_state.json", "r", encoding="utf-8") as f:
             state = json.load(f)
 
         with self.lock:

@@ -483,7 +483,7 @@ class TestRollbackManager:
         assert export_path.exists()
 
         # Verify export content
-        with open(export_path, "r") as f:
+        with open(export_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["snapshot_id"] == snapshot_id
@@ -812,7 +812,7 @@ class TestAuditLogger:
         assert export_path.exists()
 
         # Verify content
-        with open(export_path, "r") as f:
+        with open(export_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         assert isinstance(data, list)

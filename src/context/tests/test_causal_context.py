@@ -45,7 +45,7 @@ class MockWorldModel:
     def extract_concepts(self, text):
         """Extract concepts from text"""
         words = text.lower().split()
-        return [w for w in words if len(w) > 2][:10]
+        return list(words if len(w) > 2)[:10]
 
     def get_related_concepts(self, concepts):
         """Get related concepts"""

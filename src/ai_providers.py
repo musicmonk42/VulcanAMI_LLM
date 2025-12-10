@@ -317,9 +317,9 @@ class ProviderClient:
             try:
                 if self.connection_pool:
                     opener = self.connection_pool.get_opener()
-                    response = opener.open(req, timeout=timeout)
+                    response = opener.open(req, timeout=timeout, encoding="utf-8")
                 else:
-                    response = request.urlopen(req, timeout=timeout)
+                    response = request.urlopen(req, timeout=timeout, encoding="utf-8")
 
                 response_data = response.read().decode("utf-8")
                 return json.loads(response_data)

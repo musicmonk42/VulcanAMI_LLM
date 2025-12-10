@@ -888,7 +888,7 @@ class SelectionCache:
                 pickle.dump(list(self.warm_entries), f)
 
             # Save statistics
-            with open(save_path / "statistics.json", "w") as f:
+            with open(save_path / "statistics.json", "w", encoding="utf-8") as f:
                 json.dump(self.get_statistics(), f, indent=2, default=str)
 
             logger.info(f"Cache saved to {save_path}")

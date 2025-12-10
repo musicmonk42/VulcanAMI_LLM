@@ -198,7 +198,7 @@ GRAPH_SCHEMA = None
 try:
     schema_path = Path("schemas/graph_v1_3_1.json")
     if schema_path.exists():
-        with open(schema_path, "r") as f:
+        with open(schema_path, "r", encoding="utf-8") as f:
             GRAPH_SCHEMA = json.load(f)
 except Exception as e:
     logger.warning(f"Could not load graph schema: {e}")
@@ -270,7 +270,7 @@ class ConstraintManager:
 
         with self.lock:
             sorted_constraints = sorted(
-                [c for c in self.constraints if c.active],
+                list(self.constraints if c.active),
                 key=lambda x: x.priority,
                 reverse=True,
             )

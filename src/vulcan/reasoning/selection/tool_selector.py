@@ -239,7 +239,7 @@ class StochasticCostModel:
 
     def save_model(self, path: str):
         Path(path).mkdir(parents=True, exist_ok=True)
-        with open(Path(path) / "cost_model.pkl", "wb") as f:
+        with open(Path(path, encoding="utf-8") / "cost_model.pkl", "wb") as f:
             pickle.dump(self.models, f)
 
     def load_model(self, path: str):
@@ -414,7 +414,7 @@ class CalibratedDecisionMaker:
 
     def save_calibration(self, path: str):
         Path(path).mkdir(parents=True, exist_ok=True)
-        with open(Path(path) / "calibration.pkl", "wb") as f:
+        with open(Path(path, encoding="utf-8") / "calibration.pkl", "wb") as f:
             pickle.dump(self.calibrators, f)
 
     def load_calibration(self, path: str):
@@ -735,7 +735,7 @@ class ToolSelectionBandit:
         else:
             # CRITICAL FIX: Save fallback statistics when disabled
             Path(path).mkdir(parents=True, exist_ok=True)
-            with open(Path(path) / "bandit_statistics.pkl", "wb") as f:
+            with open(Path(path, encoding="utf-8") / "bandit_statistics.pkl", "wb") as f:
                 pickle.dump(self.statistics, f)
 
     def load_model(self, path: str):
@@ -907,7 +907,7 @@ class ToolSelector:
             try:
                 config_path = Path(merged_config["config_file"])
                 if config_path.exists():
-                    with open(config_path, "r") as f:
+                    with open(config_path, "r", encoding="utf-8") as f:
                         file_config = json.load(f)
                         merged_config.update(file_config)
             except Exception as e:
@@ -1664,7 +1664,7 @@ class ToolSelector:
             self.calibrator.save_calibration(save_path / "calibration")
 
             # Save statistics
-            with open(save_path / "statistics.json", "w") as f:
+            with open(save_path / "statistics.json", "w", encoding="utf-8") as f:
                 json.dump(self.get_statistics(), f, indent=2, default=str)
 
             logger.info(f"Tool selector state saved to {save_path}")

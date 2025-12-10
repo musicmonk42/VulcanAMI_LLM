@@ -725,7 +725,7 @@ class GraphixArena:
                     Path(__file__).parent.parent / "configs" / "tool_selection.yaml"
                 )
                 if config_path.exists():
-                    with open(config_path, "r") as f:
+                    with open(config_path, "r", encoding="utf-8") as f:
                         self.tool_selection_config = yaml.safe_load(f)
                     logger.info("Loaded tool_selection.yaml configuration.")
                 else:

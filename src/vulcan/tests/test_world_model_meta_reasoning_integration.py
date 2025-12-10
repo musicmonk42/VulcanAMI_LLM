@@ -135,7 +135,7 @@ def self_improvement_drive(temp_config_dir):
             "hist_enabled": True,
         },
     }
-    with open(config_path, "w") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f)
     return SelfImprovementDrive(config_path=str(config_path))
 

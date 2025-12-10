@@ -1352,7 +1352,7 @@ class AdversarialValidator:
         patterns = []
 
         # Analyze successful attacks
-        successful_attacks = [r for r in attack_results if r.get("successful", False)]
+        successful_attacks = list(attack_results if r.get("successful", False))
 
         if successful_attacks:
             # Group by attack type

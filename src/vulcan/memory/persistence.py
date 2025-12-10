@@ -1261,7 +1261,7 @@ class MemoryPersistence:
 
             # Fsync directory for durability
             try:
-                dir_fd = os.open(file_path.parent, os.O_RDONLY)
+                dir_fd = os.open(file_path.parent, os.O_RDONLY, encoding="utf-8")
                 try:
                     os.fsync(dir_fd)
                 finally:
@@ -1697,7 +1697,7 @@ class MemoryPersistence:
         metadata_path.parent.mkdir(parents=True, exist_ok=True)
 
         temp_path = metadata_path.with_suffix(metadata_path.suffix + ".tmp")
-        with open(temp_path, "w") as f:
+        with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)
         temp_path.replace(metadata_path)
 
@@ -1708,7 +1708,7 @@ class MemoryPersistence:
         if not metadata_path.exists():
             return None
 
-        with open(metadata_path, "r") as f:
+        with open(metadata_path, "r", encoding="utf-8") as f:
             return json.load(f)
 
     def cleanup_old_versions(self, max_age_days: int = 30) -> int:

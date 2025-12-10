@@ -482,7 +482,7 @@ class TestStatePersistence(unittest.TestCase):
         # Verify file exists and is valid JSON
         self.assertTrue(Path(self.temp_path).exists())
 
-        with open(self.temp_path, "r") as f:
+        with open(self.temp_path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         self.assertIn("layers", state)

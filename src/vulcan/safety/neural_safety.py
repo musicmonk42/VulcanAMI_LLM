@@ -921,7 +921,7 @@ class NeuralSafetyValidator:
                 try:
                     results = await asyncio.gather(*tasks, return_exceptions=True)
                     # Filter out exceptions
-                    valid_results = [r for r in results if not isinstance(r, Exception)]
+                    valid_results = list(results if not isinstance(r, Exception))
 
                     if valid_results:
                         predictions["classifier_ensemble"] = {

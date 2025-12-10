@@ -833,7 +833,7 @@ class RepackMonitor:
         if window_hours:
             cutoff = datetime.now() - timedelta(hours=window_hours)
             # In production, would filter by timestamp
-            # repacks = [r for r in repacks if r.timestamp > cutoff]
+            # repacks = list(repacks if r.timestamp > cutoff)
 
         if not repacks:
             return {

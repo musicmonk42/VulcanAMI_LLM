@@ -842,7 +842,7 @@ class SemanticBridge:
             history_file = storage_path / "operation_history.jsonl"
 
             # Append new entries
-            with open(history_file, "a") as f:
+            with open(history_file, "a", encoding="utf-8") as f:
                 for entry in list(self.operation_history):
                     # Convert to JSON-serializable format
                     serialized = {
@@ -881,7 +881,7 @@ class SemanticBridge:
             if not history_file.exists():
                 return
 
-            with open(history_file, "r") as f:
+            with open(history_file, "r", encoding="utf-8") as f:
                 for line in f:
                     try:
                         entry = json.loads(line.strip())

@@ -100,7 +100,7 @@ class TestTokenConsensusAdapter:
         assert adapter._successes == 0
 
     @pytest.mark.asyncio
-    async def test_approve_no_engine_fail_open(self):
+    async def test_approve_no_engine_fail_open(self, encoding="utf-8"):
         adapter = TokenConsensusAdapter(
             engine=None, config=ConsensusAdapterConfig(fail_closed=False)
         )

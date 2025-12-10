@@ -528,7 +528,7 @@ class LayerExecutor:
             layer.get("edges", [])
 
             # Find attention heads
-            attention_heads = [n for n in nodes if n.get("type") == "attention_head"]
+            attention_heads = list(nodes if n.get("type") == "attention_head")
 
             if not attention_heads:
                 # No attention heads, return input (passthrough layer)
@@ -1093,14 +1093,14 @@ class LLMExecutor:
         }
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, default=str)
 
         log.info(f"Executor state saved to {path}")
 
     def load_state(self, path: str):
         """Load executor state."""
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         self.metrics = state.get("metrics", {})

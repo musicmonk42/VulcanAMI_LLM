@@ -1681,17 +1681,17 @@ class GVulcanConfig:
         path.parent.mkdir(parents=True, exist_ok=True)
 
         if format == "json":
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
         elif format == "yaml":
             import yaml
 
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(data, f, default_flow_style=False)
         elif format == "toml":
             import toml
 
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 toml.dump(data, f)
         else:
             raise ValueError(f"Unsupported format: {format}")
@@ -1706,7 +1706,7 @@ class GVulcanConfig:
             ext = path.suffix.lower()
             format = ext[1:] if ext else "json"
 
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             if format == "json":
                 data = json.load(f)
             elif format == "yaml":

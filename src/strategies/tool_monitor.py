@@ -680,7 +680,7 @@ class ToolMonitor:
             "health_status": self.get_health_status().value,
             "tool_rankings": self.get_tool_rankings(),
             "active_alerts": len(
-                [a for a in self.alerts if time.time() - a.timestamp < 3600]
+                list(self.alerts if time.time() - a.timestamp < 3600)
             ),
             "recent_alerts": [a.to_dict() for a in list(self.alerts)[-10:]],
         }
@@ -827,13 +827,13 @@ class ToolMonitor:
         metrics = self.get_metrics_summary()
 
         if format == "json":
-            with open(export_path, "w") as f:
+            with open(export_path, "w", encoding="utf-8") as f:
                 json.dump(metrics, f, indent=2, default=str)
         elif format == "csv":
             # Export tool metrics as CSV
             import csv
 
-            with open(export_path, "w", newline="") as f:
+            with open(export_path, "w", newline="", encoding="utf-8") as f:
                 if self.tool_metrics:
                     fieldnames = list(
                         next(iter(self.tool_metrics.values())).to_dict().keys()

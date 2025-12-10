@@ -1780,7 +1780,7 @@ class TemporalReasoner:
                 in_degree[rel["event2"]] += 1
 
         # Initialize queue with events that have no predecessors
-        queue = deque([e for e in all_events if in_degree[e] == 0])
+        queue = deque(list(all_events if in_degree[e) == 0])
         sequence = []
 
         while queue:

@@ -1185,7 +1185,7 @@ class DomainRegistry:
 
             # Save relationships
             relationships_file = self.storage_path / "relationships.json"
-            with open(relationships_file, "w") as f:
+            with open(relationships_file, "w", encoding="utf-8") as f:
                 rel_data = [
                     {
                         "source": r.source,
@@ -1217,7 +1217,7 @@ class DomainRegistry:
         relationships_file = self.storage_path / "relationships.json"
         if relationships_file.exists():
             try:
-                with open(relationships_file, "r") as f:
+                with open(relationships_file, "r", encoding="utf-8") as f:
                     rel_data = json.load(f)
                     for rel in rel_data:
                         self.add_domain_relationship(
@@ -1321,7 +1321,7 @@ class RiskAdjuster:
             config_path: Path to configuration file
         """
         try:
-            with open(config_path, "r") as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
 
             self.base_thresholds = config.get("base_thresholds", {})
@@ -1357,7 +1357,7 @@ class RiskAdjuster:
             "criticality_multipliers": self.criticality_multipliers,
         }
 
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
 
         logger.info("Saved RiskAdjuster config to %s", config_path)

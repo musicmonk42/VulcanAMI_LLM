@@ -2021,7 +2021,7 @@ class InvariantDetector:
 
         for var, values in variables.items():
             # Filter non-finite values
-            safe_values = [v for v in values if np.isfinite(v)]
+            safe_values = list(values if np.isfinite(v))
 
             if len(safe_values) != len(values):
                 self.safety_corrections["non_finite_values"] += len(values) - len(

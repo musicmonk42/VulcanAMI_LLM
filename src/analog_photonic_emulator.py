@@ -456,14 +456,14 @@ class MemristorEmulator:
                 "rows": self.rows,
                 "cols": self.cols,
             }
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(state, f)
         logger.info(f"Memristor state saved to {filepath}")
 
     def load_state(self, filepath: str):
         """Load memristor state."""
         with self.lock:
-            with open(filepath, "r") as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 state = json.load(f)
 
             if state["rows"] != self.rows or state["cols"] != self.cols:
@@ -1242,7 +1242,7 @@ class AnalogPhotonicEmulator:
                 )
 
             calib_path = os.path.join(directory, "calibration.json")
-            with open(calib_path, "w") as f:
+            with open(calib_path, "w", encoding="utf-8") as f:
                 json.dump(calib_data, f)
 
         logger.info(f"State saved to {directory}")
@@ -1259,7 +1259,7 @@ class AnalogPhotonicEmulator:
         # Load calibration
         calib_path = os.path.join(directory, "calibration.json")
         if os.path.exists(calib_path):
-            with open(calib_path, "r") as f:
+            with open(calib_path, "r", encoding="utf-8") as f:
                 calib_data = json.load(f)
 
             with self.calibration_lock:

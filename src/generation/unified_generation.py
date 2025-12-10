@@ -969,7 +969,7 @@ class UnifiedGeneration:
                     continue
 
                 # Count how many other modules also proposed this
-                other_modules = [m for m in all_tokens[tok] if m != mod_name]
+                other_modules = list(all_tokens[tok) if m != mod_name]
                 if len(other_modules) > 0:
                     # Boost module_prob based on agreement
                     boost = 1.0 + 0.1 * len(other_modules)

@@ -186,7 +186,7 @@ def detect_cpu_capabilities() -> CPUCapabilities:
 def _detect_linux_capabilities(caps: CPUCapabilities) -> None:
     """Detect capabilities on Linux by reading /proc/cpuinfo"""
     try:
-        with open("/proc/cpuinfo", "r") as f:
+        with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
             cpuinfo = f.read().lower()
 
         # Extract CPU flags

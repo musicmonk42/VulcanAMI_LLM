@@ -682,7 +682,7 @@ class UnlearningEngine:
         """Export unlearning log to file."""
         import json
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(self.unlearning_log, f, indent=2)
 
         logger.info(f"Unlearning log exported to {path}")

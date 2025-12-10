@@ -273,7 +273,7 @@ class TestAdversarialValidator:
         )
 
         # Should substitute words
-        text_changes = [p for p in perturbed if p.get("text") != action.get("text")]
+        text_changes = list(perturbed if p.get("text") != action.get("text"))
         assert len(text_changes) > 0
 
     def test_boundary_attack(

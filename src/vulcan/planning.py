@@ -1091,7 +1091,7 @@ class PowerManager:
                         f"/sys/devices/system/cpu/cpu{cpu}/cpufreq/scaling_governor"
                     )
                     if os.path.exists(governor_path):
-                        with open(governor_path, "w") as f:
+                        with open(governor_path, "w", encoding="utf-8") as f:
                             f.write(governor)
             except Exception as e:
                 logger.debug(f"Could not set CPU governor: {e}")

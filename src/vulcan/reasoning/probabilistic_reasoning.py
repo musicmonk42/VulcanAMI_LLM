@@ -193,7 +193,7 @@ class FeatureExtractor:
             except Exception:
                 return self._extract_fallback(data)
         elif isinstance(data, dict):
-            values = [v for v in data.values() if isinstance(v, (int, float))]
+            values = list(data.values() if isinstance(v, (int, float)))
             if values:
                 return np.array(values).reshape(1, -1)
 

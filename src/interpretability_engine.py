@@ -757,7 +757,7 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
                 filename = f"relational_trace_{tensor_id}_{now}.json"
                 path = os.path.join(self.log_dir, filename)
 
-                with open(path, "w") as f:
+                with open(path, "w", encoding="utf-8") as f:
                     json.dump(trace, f, indent=2)
 
                 self.logger.info(f"Relational trace logged to {path}")
@@ -829,7 +829,7 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
             raise TypeError(f"path must be string, got {type(path)}")
 
         try:
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(result, f, indent=2)
 
             self.logger.info(f"Result saved to {path}")

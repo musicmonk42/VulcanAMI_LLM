@@ -481,7 +481,7 @@ class TestProvenance(unittest.TestCase):
         )
 
         # Find token 1 which should have provenance from both modules
-        token_1_candidates = [c for c in candidates if c["token"] == 1]
+        token_1_candidates = list(candidates if c["token") == 1]
         if token_1_candidates:
             c = token_1_candidates[0]
             module_names = [p["module"] for p in c["provenance"]]

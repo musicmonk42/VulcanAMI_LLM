@@ -276,7 +276,7 @@ class DistributedSharder:
         sizes = [(base + 1 if i < rem else base) for i in range(num_nodes)]
 
         # Filter out zero-size shards
-        sizes = [s for s in sizes if s > 0]
+        sizes = list(sizes if s > 0)
         if len(sizes) < num_nodes:
             logger.warning(f"Created only {len(sizes)} non-empty shards")
             num_nodes = len(sizes)

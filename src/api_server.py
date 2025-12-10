@@ -1777,7 +1777,7 @@ class GraphAPIServer:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=10, encoding="utf-8") as response:
                 if response.status >= 300:
                     self.logger.error(
                         f"Callback to {url} failed with status {response.status}"
@@ -1920,10 +1920,10 @@ class GraphAPIServer:
         with self.locks["proposals"]:
             total_proposals = len(self.proposals)
             open_proposals = len(
-                [p for p in self.proposals.values() if p.status == "open"]
+                list(self.proposals.values() if p.status == "open")
             )
             approved_proposals = len(
-                [p for p in self.proposals.values() if p.status == "approved"]
+                list(self.proposals.values() if p.status == "approved")
             )
         with self.locks["agents"]:
             total_agents = len(self.agents)

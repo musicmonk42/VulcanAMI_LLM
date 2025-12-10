@@ -928,7 +928,7 @@ class HierarchicalContext:
                 self._to_text(e.prompt), self._to_text(e.token)
             )
             # Check novelty
-            new_concepts = [c for c in concepts if c not in seen_concepts]
+            new_concepts = list(concepts if c not in seen_concepts)
             if new_concepts or len(diverse) < k // 2:
                 diverse.append(e)
                 seen_concepts.update(concepts)
@@ -973,16 +973,16 @@ class HierarchicalContext:
 
     def _find_frequent_episodic(self, min_freq: int) -> List[EpisodicItem]:
         """Find frequently accessed episodic items"""
-        return [e for e in self.episodic if e.access_count >= min_freq]
+        return list(self.episodic if e.access_count >= min_freq)
 
     def _find_recent_episodic(self) -> List[EpisodicItem]:
         """Find recent episodic items"""
         cutoff = time.time() - self.half_life
-        return [e for e in self.episodic if e.ts > cutoff]
+        return list(self.episodic if e.ts > cutoff)
 
     def _find_important_episodic(self) -> List[EpisodicItem]:
         """Find important episodic items"""
-        return [e for e in self.episodic if e.importance > 0.7]
+        return list(self.episodic if e.importance > 0.7)
 
     def _find_hybrid_episodic(self, min_freq: int) -> List[EpisodicItem]:
         """Find items using hybrid criteria"""
@@ -1210,7 +1210,7 @@ class HierarchicalContext:
         """Simple tokenization"""
         if not text:
             return []
-        return [t for t in re.findall(r"[A-Za-z0-9_]+", text.lower()) if t]
+        return list(re.findall(r"[A-Za-z0-9_)+", text.lower()) if t]
 
     def _overlap_score(self, a: List[str], b: List[str]) -> float:
         """Compute overlap score"""
@@ -1234,7 +1234,7 @@ class HierarchicalContext:
             terms.extend(self._tokenize(t or ""))
 
         # Filter short terms
-        terms = [t for t in terms if len(t) > 2]
+        terms = list(terms if len(t) > 2)
 
         # Unique, preserve order
         seen = set()

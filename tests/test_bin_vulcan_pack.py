@@ -79,7 +79,7 @@ class TestVulcanPack:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create input JSON
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data', 'value': 123}, f)
 
             # Create output pack
@@ -100,7 +100,7 @@ class TestVulcanPack:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create input JSON array
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump([{'id': 1, 'data': 'test1'}, {'id': 2, 'data': 'test2'}], f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -117,7 +117,7 @@ class TestVulcanPack:
         """Test different compression levels"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data' * 100}, f)
 
             for level in [1, 3, 9]:
@@ -134,7 +134,7 @@ class TestVulcanPack:
         """Test statistics output to JSON"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -150,7 +150,7 @@ class TestVulcanPack:
             assert os.path.exists(stats_file)
 
             # Verify stats file is valid JSON
-            with open(stats_file, 'r') as f:
+            with open(stats_file, 'r', encoding="utf-8") as f:
                 stats = json.load(f)
                 assert 'chunk_count' in stats
                 assert 'total_size' in stats
@@ -160,7 +160,7 @@ class TestVulcanPack:
         """Test verbose mode"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -177,7 +177,7 @@ class TestVulcanPack:
         """Test quiet mode"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -198,7 +198,7 @@ class TestVulcanPack:
             os.makedirs(data_dir)
 
             for i in range(3):
-                with open(os.path.join(data_dir, f'file{i}.txt'), 'w') as f:
+                with open(os.path.join(data_dir, f'file{i}.txt', encoding="utf-8"), 'w') as f:
                     f.write(f'test data {i}\n')
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -219,9 +219,9 @@ class TestVulcanPack:
             sub_dir = os.path.join(data_dir, 'subdir')
             os.makedirs(sub_dir)
 
-            with open(os.path.join(data_dir, 'file1.txt'), 'w') as f:
+            with open(os.path.join(data_dir, 'file1.txt', encoding="utf-8"), 'w') as f:
                 f.write('top level\n')
-            with open(os.path.join(sub_dir, 'file2.txt'), 'w') as f:
+            with open(os.path.join(sub_dir, 'file2.txt', encoding="utf-8"), 'w') as f:
                 f.write('sub level\n')
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -239,7 +239,7 @@ class TestVulcanPack:
         """Test that pack header has correct structure"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -263,7 +263,7 @@ class TestVulcanPack:
         """Test invalid compression level is rejected"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -281,7 +281,7 @@ class TestVulcanPack:
         """Test DQS threshold parameter"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -300,7 +300,7 @@ class TestVulcanPack:
         """Test bloom filter size parameter"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -335,12 +335,12 @@ class TestVulcanPack:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create some data files
             for i in range(3):
-                with open(os.path.join(tmpdir, f'data{i}.txt'), 'w') as f:
+                with open(os.path.join(tmpdir, f'data{i}.txt', encoding="utf-8"), 'w') as f:
                     f.write(f'data {i}\n')
 
             # Create file list
             file_list = os.path.join(tmpdir, 'files.txt')
-            with open(file_list, 'w') as f:
+            with open(file_list, 'w', encoding="utf-8") as f:
                 for i in range(3):
                     f.write(os.path.join(tmpdir, f'data{i}.txt') + '\n')
 
@@ -370,7 +370,7 @@ class TestVulcanPack:
         """Test error handling when output directory doesn't exist"""
         with tempfile.TemporaryDirectory() as tmpdir:
             input_file = os.path.join(tmpdir, 'input.json')
-            with open(input_file, 'w') as f:
+            with open(input_file, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             # Try to write to non-existent directory

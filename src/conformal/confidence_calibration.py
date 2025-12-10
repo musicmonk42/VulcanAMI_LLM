@@ -726,7 +726,7 @@ class CalibratedDecisionMaker:
             for tool, metrics in self.metrics.items()
         }
 
-        with open(save_path / "metrics.json", "w") as f:
+        with open(save_path / "metrics.json", "w", encoding="utf-8") as f:
             json.dump(metrics_dict, f, indent=2)
 
         logger.info(f"Calibration saved to {save_path}")
@@ -746,7 +746,7 @@ class CalibratedDecisionMaker:
         # Load metrics
         metrics_file = load_path / "metrics.json"
         if metrics_file.exists():
-            with open(metrics_file, "r") as f:
+            with open(metrics_file, "r", encoding="utf-8") as f:
                 metrics_dict = json.load(f)
 
                 for tool, metrics in metrics_dict.items():

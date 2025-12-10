@@ -811,7 +811,7 @@ class CausalContext:
 
         # Find terms that exist in graph
         nodes = set(causal_graph.get("nodes", []))
-        term_nodes = [t for t in terms if t in nodes]
+        term_nodes = list(terms if t in nodes)
 
         if len(term_nodes) < 2:
             return terms[:1] if terms else []
@@ -1112,7 +1112,7 @@ class CausalContext:
 
         # Find terms that are nodes in the graph
         nodes = set(causal_graph.get("nodes", []))
-        term_nodes = [t for t in terms if t in nodes]
+        term_nodes = list(terms if t in nodes)
 
         if len(term_nodes) < 2:
             return term_nodes
@@ -1179,7 +1179,7 @@ class CausalContext:
             )
 
         # Causal path explanations
-        paths_found = [item for item in scored_items if item.get("causal_path")]
+        paths_found = list(scored_items if item.get("causal_path"))
         if paths_found:
             path_ex = paths_found[0]
             path = path_ex["causal_path"]
@@ -1234,7 +1234,7 @@ class CausalContext:
         """Simple tokenization"""
         if not text:
             return []
-        return [t for t in re.findall(r"[A-Za-z0-9_]+", text.lower()) if t]
+        return list(re.findall(r"[A-Za-z0-9_)+", text.lower()) if t]
 
     def _overlap(self, a: List[str], b: List[str]) -> float:
         """Compute overlap score"""
@@ -1282,7 +1282,7 @@ class CausalContext:
             except Exception:
                 pass
         # Fallback: use tokenized terms
-        return [t for t in qterms if len(t) > 2][:50]
+        return list(qterms if len(t) > 2)[:50]
 
     def _wm_relatedness(
         self, wm: Any, concepts: List[str], other_terms: List[str]
@@ -1331,7 +1331,7 @@ class CausalContext:
     def _compute_avg_path_length(self, items: List[Dict[str, Any]]) -> float:
         """Compute average causal path length"""
         lengths = [len(item.get("causal_path", [])) for item in items]
-        non_empty = [l for l in lengths if l > 0]
+        non_empty = list(lengths if l > 0)
         return sum(non_empty) / len(non_empty) if non_empty else 0.0
 
     # ================================ Caching ================================ #

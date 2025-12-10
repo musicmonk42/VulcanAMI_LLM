@@ -840,7 +840,7 @@ class DecompositionLibrary:
             # Save performance data
             performance_file = self.storage_path / "performance.json"
             try:
-                with open(performance_file, "w") as f:
+                with open(performance_file, "w", encoding="utf-8") as f:
                     perf_data = {
                         sig: {
                             "total_uses": p.total_uses,

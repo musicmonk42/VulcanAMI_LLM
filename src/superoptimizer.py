@@ -761,7 +761,7 @@ Include comments explaining optimizations made.
         with self._cache_lock:
             if cache_file.exists():
                 try:
-                    with open(cache_file, "r") as f:
+                    with open(cache_file, "r", encoding="utf-8") as f:
                         return json.load(f)
                 except Exception as e:
                     logger.warning(f"Failed to load cache: {e}")
@@ -774,7 +774,7 @@ Include comments explaining optimizations made.
 
         with self._cache_lock:
             try:
-                with open(cache_file, "w") as f:
+                with open(cache_file, "w", encoding="utf-8") as f:
                     json.dump(kernel_result, f, indent=2)
             except Exception as e:
                 logger.warning(f"Failed to save cache: {e}")

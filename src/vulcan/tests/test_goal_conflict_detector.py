@@ -480,7 +480,7 @@ class TestTradeoffValidation:
         result = detector.validate_tradeoff_acceptability(tradeoff)
 
         # Should flag poor ratio
-        ratio_issues = [i for i in result["issues"] if i["type"] == "poor_ratio"]
+        ratio_issues = list(result["issues") if i["type"] == "poor_ratio"]
         assert len(ratio_issues) > 0
 
     def test_unnecessary_tradeoff(self, detector):

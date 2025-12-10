@@ -160,7 +160,7 @@ class MockInvariantIndexer:
         for var in variables:
             for inv in self.by_variable.get(var, []):
                 result.add(inv.id)
-        return [i for i in self.all_invariants if i.id in result]
+        return list(self.all_invariants if i.id in result)
 
 
 class MockInvariantRegistry:

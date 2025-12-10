@@ -342,7 +342,7 @@ class BloomFilter:
             "data": self.to_bytes().hex(),
         }
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)
 
         logger.info(f"Saved BloomFilter to {path}")
@@ -358,7 +358,7 @@ class BloomFilter:
         Returns:
             Loaded BloomFilter
         """
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
 
         data = bytes.fromhex(metadata["data"])

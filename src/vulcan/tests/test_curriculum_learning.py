@@ -426,7 +426,7 @@ class TestCurriculumLearner:
         structure_file = tmp_path / "curriculum_structure.json"
         assert structure_file.exists()
 
-        with open(structure_file, "r") as f:
+        with open(structure_file, "r", encoding="utf-8") as f:
             structure = json.load(f)
 
         assert "num_stages" in structure

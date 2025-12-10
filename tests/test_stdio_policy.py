@@ -157,10 +157,10 @@ class TestSafePrint:
 
     def test_safe_print_to_file(self, temp_jsonl_file):
         """Test printing to file."""
-        with open(temp_jsonl_file, 'w') as f:
+        with open(temp_jsonl_file, 'w', encoding="utf-8") as f:
             safe_print("Test output", file=f)
 
-        with open(temp_jsonl_file, 'r') as f:
+        with open(temp_jsonl_file, 'r', encoding="utf-8") as f:
             content = f.read()
 
         assert "Test output" in content
@@ -184,7 +184,7 @@ class TestSafePrint:
         assert "Test Message" in output.getvalue()
 
         # Check JSONL file
-        with open(temp_jsonl_file, 'r') as f:
+        with open(temp_jsonl_file, 'r', encoding="utf-8") as f:
             line = f.readline()
             entry = json.loads(line)
 
@@ -401,7 +401,7 @@ class TestThreadSafety:
             t.join()
 
         # Check that all lines are valid JSON
-        with open(temp_jsonl_file, 'r') as f:
+        with open(temp_jsonl_file, 'r', encoding="utf-8") as f:
             lines = f.readlines()
 
         assert len(lines) == 15  # 3 threads * 5 messages

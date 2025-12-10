@@ -525,7 +525,7 @@ class DataAugmentor:
 
             elif op == "add_edge" and len(nodes) > 1:
                 # Add semantic edge
-                available_nodes = [n for n in nodes if "id" in n]
+                available_nodes = list(nodes if "id" in n)
 
                 if len(available_nodes) >= 2:
                     src_node = self.rng.choice(available_nodes)
@@ -775,7 +775,7 @@ class DataAugmentor:
                 if len(nodes) > 1:
                     for _ in range(min(3, len(nodes) - 1)):
                         target = self.rng.choice(
-                            [n for n in nodes if n["id"] != adv_node_id]
+                            list(nodes if n["id") != adv_node_id]
                         )
                         edges.append(
                             {

@@ -489,7 +489,7 @@ class TestEvolutionEngine:
             assert os.path.exists(filepath)
 
             # Verify file contents
-            with open(filepath) as f:
+            with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
             assert 'generation' in data

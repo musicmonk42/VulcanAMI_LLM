@@ -576,7 +576,7 @@ class TestCircuitBreaker:
         assert circuit_breaker.state[service] == "closed"
 
     @pytest.mark.asyncio
-    async def test_half_open_fails_back_to_open(self, circuit_breaker):
+    async def test_half_open_fails_back_to_open(self, circuit_breaker, encoding="utf-8"):
         """Test half-open returns to open on failure."""
         service = "unstable_service"
 

@@ -315,7 +315,7 @@ if not _auto_apply_available:
         "FileCheckResult",
         "GatesReport",
     ]
-    __all__ = [item for item in __all__ if item not in _auto_apply_symbols]
+    __all__ = list(__all__ if item not in _auto_apply_symbols)
 
 
 # Module-level documentation

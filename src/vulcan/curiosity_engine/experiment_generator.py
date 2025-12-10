@@ -1333,7 +1333,7 @@ class ParameterAdjuster:
                     current = adjusted.get("strategy", "default")
 
                     if current in strategies:
-                        strategies = [s for s in strategies if s != current]
+                        strategies = list(strategies if s != current)
 
                     if strategies:
                         adjusted["strategy"] = strategies[0]

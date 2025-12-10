@@ -607,7 +607,7 @@ class TestSaveJson:
 
         # Verify content
         import json
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding="utf-8") as f:
             loaded = json.load(f)
 
         assert loaded == data

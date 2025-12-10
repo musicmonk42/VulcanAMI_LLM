@@ -807,7 +807,7 @@ class ValueOfInformationGate:
             "value_distribution": {
                 "positive_value_rate": sum(1 for v in net_values if v > 0)
                 / len(net_values),
-                "mean_positive_value": np.mean([v for v in net_values if v > 0])
+                "mean_positive_value": np.mean(list(net_values if v > 0))
                 if any(v > 0 for v in net_values)
                 else 0,
             },
@@ -828,7 +828,7 @@ class ValueOfInformationGate:
             },
         }
 
-        with open(save_path / "voi_state.json", "w") as f:
+        with open(save_path / "voi_state.json", "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, default=str)
 
         # Save cost history
@@ -849,7 +849,7 @@ class ValueOfInformationGate:
         # Load configuration
         state_file = load_path / "voi_state.json"
         if state_file.exists():
-            with open(state_file, "r") as f:
+            with open(state_file, "r", encoding="utf-8") as f:
                 state = json.load(f)
 
             self.voi_threshold = state["thresholds"]["voi_threshold"]

@@ -65,7 +65,7 @@ class TestVulcanProofVerifyZk:
         """Test verifying proof from file"""
         with tempfile.TemporaryDirectory() as tmpdir:
             proof_file = os.path.join(tmpdir, 'proof.txt')
-            with open(proof_file, 'w') as f:
+            with open(proof_file, 'w', encoding="utf-8") as f:
                 f.write('test_proof_data_abc123')
 
             result = run_vulcan_proof_verify([proof_file], timeout=30)
@@ -76,7 +76,7 @@ class TestVulcanProofVerifyZk:
         """Test verifying with public inputs"""
         with tempfile.TemporaryDirectory() as tmpdir:
             public_inputs = os.path.join(tmpdir, 'inputs.json')
-            with open(public_inputs, 'w') as f:
+            with open(public_inputs, 'w', encoding="utf-8") as f:
                 json.dump({'input1': 'value1', 'input2': 123}, f)
 
             result = run_vulcan_proof_verify(
@@ -126,7 +126,7 @@ class TestVulcanProofVerifyZk:
             assert os.path.exists(json_output)
 
             # Verify JSON structure
-            with open(json_output, 'r') as f:
+            with open(json_output, 'r', encoding="utf-8") as f:
                 data = json.load(f)
                 assert 'valid' in data
                 assert 'proof_hash' in data
@@ -148,7 +148,7 @@ class TestVulcanProofVerifyZk:
         """Test combining all options"""
         with tempfile.TemporaryDirectory() as tmpdir:
             public_inputs = os.path.join(tmpdir, 'inputs.json')
-            with open(public_inputs, 'w') as f:
+            with open(public_inputs, 'w', encoding="utf-8") as f:
                 json.dump({'test': 'data'}, f)
 
             json_output = os.path.join(tmpdir, 'result.json')

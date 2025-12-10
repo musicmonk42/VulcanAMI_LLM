@@ -1415,14 +1415,14 @@ class DynamicArchitecture:
         state = self.get_state()
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, default=str)
 
         logger.info(f"Architecture state saved to {path}")
 
     def load_state(self, path: str):
         """Load architecture state from file."""
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         layers = state.get("layers", [])

@@ -510,7 +510,7 @@ class TestAdaptiveAdmissionController:
         assert decision == AdmissionDecision.ADMIT
         assert isinstance(info, dict)
 
-    def test_reject_when_circuit_open(self, controller):
+    def test_reject_when_circuit_open(self, controller, encoding="utf-8"):
         """Test rejection when circuit breaker is open"""
         # Force circuit breaker open
         for _ in range(10):

@@ -139,7 +139,7 @@ class CompiledBinaryCache:
         index_file = self.cache_dir / "index.json"
         if index_file.exists():
             try:
-                with open(index_file, "r") as f:
+                with open(index_file, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception:
                 return {}
@@ -149,7 +149,7 @@ class CompiledBinaryCache:
         """Save cache index"""
         index_file = self.cache_dir / "index.json"
         try:
-            with open(index_file, "w") as f:
+            with open(index_file, "w", encoding="utf-8") as f:
                 json.dump(self.cache_index, f)
         except Exception:
             pass

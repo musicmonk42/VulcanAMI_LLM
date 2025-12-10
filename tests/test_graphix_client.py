@@ -210,7 +210,7 @@ class TestGraphixClientInit:
 
     def test_schema_loading(self, mock_schema):
         """Test schema loading on initialization."""
-        with patch('builtins.open', mock_open(read_data=json.dumps(mock_schema))):
+        with patch('builtins.open', mock_open(read_data=json.dumps(mock_schema, encoding="utf-8"))):
             with patch('pathlib.Path.exists', return_value=True):
                 client = GraphixClient()
                 assert client.schema is not None

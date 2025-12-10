@@ -342,7 +342,7 @@ class TestDashboardExport:
         path = obs.export_dashboard()
 
         # Verify notification is in dashboard
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             import json
             dashboard = json.load(f)
 

@@ -699,7 +699,7 @@ async def rate_limiting(request: Request, call_next):
     with rate_limit_lock:
         bucket = rate_limit_storage.setdefault(client_id, [])
         # Evict old timestamps
-        rate_limit_storage[client_id] = [t for t in bucket if t > window_start]
+        rate_limit_storage[client_id] = list(bucket if t > window_start)
 
         if len(rate_limit_storage[client_id]) >= settings.rate_limit_requests:
             logger.warning(f"Rate limit exceeded for {client_id}")
@@ -2232,7 +2232,7 @@ class PerformanceBenchmark:
         }
 
         report_path = f"benchmark_{int(time.time())}.json"
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, default=str)
 
         logger.info(f"Benchmark report saved to {report_path}")

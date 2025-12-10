@@ -2430,7 +2430,7 @@ class ProceduralMemory(BaseMemorySystem):
     def compose_skills(self, skill_names: List[str], new_name: str) -> str:
         """Compose multiple skills into new skill."""
         skills = [self.find_skill(name) for name in skill_names]
-        skills = [s for s in skills if s is not None]
+        skills = list(skills if s is not None)
 
         if not skills:
             raise ValueError("No valid skills found")

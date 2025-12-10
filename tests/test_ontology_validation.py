@@ -619,7 +619,7 @@ class TestValidatorInitialization:
     def test_load_invalid_json(self, tmp_path):
         """Test loading invalid JSON."""
         ontology_file = tmp_path / "invalid.json"
-        with open(ontology_file, 'w') as f:
+        with open(ontology_file, 'w', encoding="utf-8") as f:
             f.write("{invalid json")
 
         validator = OntologyValidator()

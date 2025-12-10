@@ -272,7 +272,7 @@ class TelemetryCollector:
                 },
             )
 
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5, encoding="utf-8") as response:
                 if response.status == 200:
                     logger.debug("Telemetry reported successfully")
 
@@ -370,9 +370,9 @@ class HTTPCommunicator:
             if self.ssl_context:
                 response = urllib.request.urlopen(
                     req, timeout=self.config.timeout, context=self.ssl_context
-                )
+                , encoding="utf-8")
             else:
-                response = urllib.request.urlopen(req, timeout=self.config.timeout)
+                response = urllib.request.urlopen(req, timeout=self.config.timeout, encoding="utf-8")
 
             response_data = response.read()
 
@@ -601,7 +601,7 @@ class WebSocketCommunicator:
             logger.error(f"WebSocket connection failed: {e}")
             return False
 
-    def _on_open(self, ws):
+    def _on_open(self, ws, encoding="utf-8"):
         """Handle WebSocket open event."""
         with self.connected_lock:
             self.connected = True
@@ -1680,7 +1680,7 @@ class AgentInterface:
 
     def load_state(self, filepath: str):
         """Load interface state from file."""
-        with open(filepath, "r") as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         # Restore history

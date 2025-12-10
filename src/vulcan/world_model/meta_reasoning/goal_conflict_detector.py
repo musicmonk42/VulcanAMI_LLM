@@ -924,7 +924,7 @@ class GoalConflictDetector:
                 )
 
             acceptable = (
-                len([i for i in issues if i["severity"] in ["high", "critical"]]) == 0
+                len(list(issues if i["severity") in ["high", "critical"]]) == 0
             )
             # Simple confidence calc - adjust based on severity and number of issues
             confidence = max(
@@ -977,7 +977,7 @@ class GoalConflictDetector:
             logger.debug(f"  [{proposal_id_str}] Found 'optimize_for': {opt_field}")
         elif isinstance(opt_field, list):
             # Filter out non-string or empty string elements
-            valid_opts = [o for o in opt_field if isinstance(o, str) and o]
+            valid_opts = list(opt_field if isinstance(o, str) and o)
             objectives.extend(valid_opts)
             if valid_opts:
                 logger.debug(
@@ -987,7 +987,7 @@ class GoalConflictDetector:
         # Multiple objectives field
         objs_field = proposal.get("objectives")
         if isinstance(objs_field, list):
-            valid_objs = [o for o in objs_field if isinstance(o, str) and o]
+            valid_objs = list(objs_field if isinstance(o, str) and o)
             objectives.extend(valid_objs)
             if valid_objs:
                 logger.debug(
@@ -1003,7 +1003,7 @@ class GoalConflictDetector:
         weights_field = proposal.get("objective_weights")
         # Check if it's actually a dict before trying to access .keys()
         if isinstance(weights_field, dict):
-            valid_keys = [k for k in weights_field.keys() if isinstance(k, str) and k]
+            valid_keys = list(weights_field.keys() if isinstance(k, str) and k)
             objectives.extend(valid_keys)
             if valid_keys:
                 logger.debug(
@@ -1017,7 +1017,7 @@ class GoalConflictDetector:
         # Add objectives from predicted_outcomes as well
         outcomes_field = proposal.get("predicted_outcomes")
         if isinstance(outcomes_field, dict):
-            valid_keys = [k for k in outcomes_field.keys() if isinstance(k, str) and k]
+            valid_keys = list(outcomes_field.keys() if isinstance(k, str) and k)
             objectives.extend(valid_keys)
             if valid_keys:
                 logger.debug(

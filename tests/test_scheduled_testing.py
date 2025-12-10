@@ -225,7 +225,7 @@ class TestResultSaving:
                 assert len(results_files) == 1
 
                 # Verify contents
-                with open(results_files[0]) as f:
+                with open(results_files[0], encoding="utf-8") as f:
                     saved_summary = json.load(f)
 
                 assert saved_summary['success'] is True

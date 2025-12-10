@@ -1068,7 +1068,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             X_cols = [treatment] + list(covariates)
 
             # Remove columns that don't exist
-            X_cols = [col for col in X_cols if col in data.columns]
+            X_cols = list(X_cols if col in data.columns)
 
             if treatment not in data.columns or outcome not in data.columns:
                 return 0.0
@@ -1404,7 +1404,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             try:
                 graph_file = self.model_path / f"{name}_graph.json"
                 graph_data = nx.node_link_data(self.causal_dag, edges="edges")
-                with open(graph_file, "w") as f:
+                with open(graph_file, "w", encoding="utf-8") as f:
                     json.dump(graph_data, f)
             except Exception as e:
                 logger.error(f"Failed to save graph: {e}")
@@ -1438,7 +1438,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             if NETWORKX_AVAILABLE:
                 graph_file = self.model_path / f"{name}_graph.json"
                 if graph_file.exists():
-                    with open(graph_file, "r") as f:
+                    with open(graph_file, "r", encoding="utf-8") as f:
                         graph_data = json.load(f)
                     self.causal_dag = nx.node_link_graph(graph_data, edges="edges")
 

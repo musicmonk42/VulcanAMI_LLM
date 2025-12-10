@@ -634,7 +634,7 @@ class ProbabilisticReasoner:
         """
         for var_name in self.variables:
             # Find rules concluding this variable
-            relevant_rules = [r for r in self.rules if r["conclusion"] == var_name]
+            relevant_rules = list(self.rules if r["conclusion") == var_name]
 
             if not relevant_rules:
                 # No rules - use prior

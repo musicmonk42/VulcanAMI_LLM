@@ -383,9 +383,9 @@ class ServiceRegistry:
             endpoints = self.services.get(name, [])
 
             if version:
-                endpoints = [e for e in endpoints if e.version == version]
+                endpoints = list(endpoints if e.version == version)
 
-            healthy_endpoints = [e for e in endpoints if e.is_healthy]
+            healthy_endpoints = list(endpoints if e.is_healthy)
 
             if not healthy_endpoints:
                 return None
@@ -1784,7 +1784,7 @@ class APIGateway:
         users_file = os.getenv("GATEWAY_USERS_FILE")
         if users_file and os.path.exists(users_file):
             try:
-                with open(users_file, "r") as f:
+                with open(users_file, "r", encoding="utf-8") as f:
                     users_data = json.load(f)
                 count = 0
                 for user_entry in users_data:
@@ -2458,7 +2458,7 @@ def main():
     config = AgentConfig()
     if args.config:
         try:
-            with open(args.config) as f:
+            with open(args.config, encoding="utf-8") as f:
                 config_data = json.load(f)
                 for key, value in config_data.items():
                     if hasattr(config, key):

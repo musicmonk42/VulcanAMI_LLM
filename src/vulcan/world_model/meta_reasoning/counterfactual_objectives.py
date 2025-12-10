@@ -1010,7 +1010,7 @@ class CounterfactualObjectiveReasoner:
             pareto_points.append(pareto_point)
 
         # Return only Pareto-optimal points
-        return [p for p in pareto_points if p.is_pareto_optimal]
+        return list(pareto_points if p.is_pareto_optimal)
 
     def _check_dominance(
         self,

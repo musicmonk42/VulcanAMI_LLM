@@ -714,7 +714,7 @@ async def load_tensor_node(node: Dict, context: NodeContext, inputs: Dict) -> Di
         device_choice = "cpu"  # Load to CPU first
         with safe_open(
             abs_filepath, framework=framework_choice, device=device_choice
-        ) as f:
+        , encoding="utf-8") as f:
             tensor = f.get_tensor(key)
             # Convert to list to ensure JSON safety for transport
             return {"tensor": tensor.tolist() if hasattr(tensor, "tolist") else tensor}
@@ -1933,7 +1933,7 @@ async def consensus_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
     """
     votes_input = inputs.get("votes", [])
     # Ensure votes is a list of dicts
-    votes = [v for v in votes_input if isinstance(v, dict)]
+    votes = list(votes_input if isinstance(v, dict))
 
     threshold = node.get("params", {}).get("threshold", 0.5)
     # Ensure threshold is valid
@@ -2213,7 +2213,7 @@ async def normalize_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
                 return {"output": []}  # Handle empty list
             try:
                 # Filter out non-numeric types before min/max
-                numeric_data = [x for x in data if isinstance(x, (int, float))]
+                numeric_data = list(data if isinstance(x, (int, float)))
                 if not numeric_data:
                     return {"output": data}  # Return original if no numerics
 

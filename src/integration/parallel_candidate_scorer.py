@@ -350,14 +350,14 @@ class VulcanScorerConfig:
 
     def save(self, path: str):
         """Save configuration to file."""
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(asdict(self), f, indent=2, default=str)
         log.info(f"Configuration saved to {path}")
 
     @classmethod
     def load(cls, path: str) -> "VulcanScorerConfig":
         """Load configuration from file."""
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         # Reconstruct nested dataclasses
         config = cls(
