@@ -6,13 +6,15 @@ support for different quantization methods, dynamic routing, and performance opt
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Tuple
-from enum import Enum
-import numpy as np
+
 import logging
-from pymilvus import Collection, connections, utility
 import time
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+from pymilvus import Collection, connections, utility
 
 logger = logging.getLogger(__name__)
 

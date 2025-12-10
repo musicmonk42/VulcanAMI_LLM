@@ -48,16 +48,16 @@ Thread-Safety: All operations protected by RLock
 Performance: Optimized with caching and indexing
 """
 
-import time
-import re
-import threading
 import hashlib
 import json
 import math
-from collections import defaultdict, Counter, deque
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple, Union, Set, Callable
+import re
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 Token = Union[int, str]
 Tokens = List[Token]

@@ -17,30 +17,27 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.gvulcan.zk import (
-    Circuit,
-    R1CSConstraint,
-    Groth16Prover,
-    generate_proof_for_unlearning,
-    verify_unlearning_proof,
-)
-from src.gvulcan.merkle import MerkleTree
 import hashlib
+
+from src.gvulcan.merkle import MerkleTree
+from src.gvulcan.zk import (Circuit, Groth16Prover, R1CSConstraint,
+                            generate_proof_for_unlearning,
+                            verify_unlearning_proof)
 
 
 def create_model_commitment(weights: list) -> bytes:
     """
     Create a Merkle root commitment for model weights.
-    
+
     Args:
         weights: List of model weights
-        
+
     Returns:
         Merkle root hash
     """
     # Hash each weight
     leaves = [hashlib.sha256(str(w).encode()).digest() for w in weights]
-    
+
     # Build Merkle tree
     tree = MerkleTree(leaves)
     return tree.root()  # Call root method
@@ -51,49 +48,49 @@ def main():
     print("VulcanAMI Platform Integration: ZK Proofs for Unlearning")
     print("=" * 70)
     print()
-    
+
     # Step 1: Simulate model before unlearning
     print("1. Creating Model State Commitments")
     print("-" * 70)
-    
+
     weights_before = [0.5, 0.3, 0.8, 0.2, 0.6]
     weights_after = [0.5, 0.0, 0.8, 0.0, 0.6]  # Weights at indices 1,3 unlearned
-    
+
     root_before = create_model_commitment(weights_before)
     root_after = create_model_commitment(weights_after)
-    
+
     print(f"   Model weights before: {weights_before}")
     print(f"   Model weights after:  {weights_after}")
     print(f"   Merkle root before:   {root_before.hex()[:32]}...")
     print(f"   Merkle root after:    {root_after.hex()[:32]}...")
     print(f"   ✓ State commitments created")
     print()
-    
+
     # Step 2: Create unlearning pattern
     print("2. Defining Unlearning Pattern")
     print("-" * 70)
-    
+
     affected_samples = [1, 3]  # Indices that were unlearned
     pattern_data = f"unlearn:{','.join(map(str, affected_samples))}"
     pattern_hash_bytes = hashlib.sha256(pattern_data.encode()).digest()
     pattern_hash = int.from_bytes(pattern_hash_bytes[:8], 'big')
-    
+
     print(f"   Affected sample indices: {affected_samples}")
     print(f"   Pattern identifier: {pattern_hash}")
     print()
-    
+
     # Step 3: Generate ZK proof of unlearning
     print("3. Generating ZK Proof of Unlearning")
     print("-" * 70)
-    
+
     # Convert Merkle roots to integers for circuit
     merkle_before_int = int.from_bytes(root_before[:8], 'big')
     merkle_after_int = int.from_bytes(root_after[:8], 'big')
-    
+
     print("   Creating proof...")
     print("   - Public inputs: merkle_before, merkle_after, pattern_hash")
     print("   - Private inputs: model weights, gradients, affected samples")
-    
+
     try:
         proof, vk = generate_proof_for_unlearning(
             merkle_root_before=merkle_before_int,
@@ -103,7 +100,7 @@ def main():
             gradient_updates=[0] * len(weights_before),  # Simplified
             affected_samples=affected_samples
         )
-        
+
         proof_size = len(proof.to_bytes())
         print(f"   ✓ Proof generated: {proof_size} bytes")
         print()
@@ -112,11 +109,11 @@ def main():
         print("   (This is expected for the simplified circuit)")
         print()
         return
-    
+
     # Step 4: Verify the proof
     print("4. Verifying Unlearning Proof")
     print("-" * 70)
-    
+
     is_valid = verify_unlearning_proof(
         proof=proof,
         vk=vk,
@@ -126,7 +123,7 @@ def main():
         num_samples=len(affected_samples),
         model_size=len(weights_before)
     )
-    
+
     if is_valid:
         print("   ✓ Proof VALID: Unlearning verified!")
         print("   - Model state changed correctly")
@@ -136,7 +133,7 @@ def main():
     else:
         print("   ✗ Proof INVALID")
     print()
-    
+
     # Step 5: Show integration benefits
     print("5. Platform Integration Benefits")
     print("-" * 70)
@@ -146,7 +143,7 @@ def main():
     print("   ✓ Efficiency: Constant-size proofs (~256 bytes)")
     print("   ✓ Scalability: Works for large models")
     print()
-    
+
     print("=" * 70)
     print("Integration Complete!")
     print("=" * 70)

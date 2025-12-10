@@ -5,19 +5,20 @@ Implements hierarchical feature extraction with increasing complexity and cost,
 from simple syntactic features to deep semantic and multimodal analysis.
 """
 
-import numpy as np
-from typing import Dict, List, Any, Optional, Tuple, Union, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, Counter
-from enum import Enum
-import logging
-import time
-import re
-import json
-from pathlib import Path
-import pickle
 import hashlib
+import json
+import logging
+import pickle
+import re
+import time
 from abc import ABC, abstractmethod
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 # Initialize logger at module level
 logger = logging.getLogger(__name__)
@@ -59,9 +60,9 @@ except ImportError:
     HAS_NLTK = False
     nltk = None
 
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
-from sklearn.decomposition import PCA, TruncatedSVD
 import networkx as nx
+from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
 logger = logging.getLogger(__name__)
 

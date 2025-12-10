@@ -2,17 +2,18 @@
 Curriculum learning implementation with adaptive difficulty
 """
 
-import numpy as np
-from typing import Any, Callable, List, Optional, Dict, Tuple, Union
-from dataclasses import dataclass, asdict
-from enum import Enum
-import logging
-import time
-import pickle
 import json
-from pathlib import Path
-from collections import deque, defaultdict
+import logging
+import pickle
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
@@ -612,6 +613,7 @@ class CurriculumLearner:
         # FIX 605: Import scipy inside try block and handle all exceptions properly
         try:
             import warnings
+
             from scipy.optimize import curve_fit
 
             def learning_curve(t, rate, asymptote):

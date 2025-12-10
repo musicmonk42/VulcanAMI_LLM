@@ -20,18 +20,19 @@ CSIU: CSIU-aware tie-breaking for near-equal plans (prefers clarity↑ / entropy
 CSIU: Records routing outcomes for learning better tie-breaks over time
 """
 
-import time
-import numpy as np
 import inspect
-from typing import Dict, List, Any, Optional, Tuple, Set, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
-import threading
-import logging
-from pathlib import Path
 import json
+import logging
 import pickle
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

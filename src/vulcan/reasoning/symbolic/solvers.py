@@ -35,17 +35,18 @@ FIXES APPLIED:
 All components are production-ready with comprehensive error handling.
 """
 
-from typing import List, Dict, Set, Tuple, Optional, Any, Callable, Union
+import copy
+import logging
+import math
+import random
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-import copy
-import math
-import random
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+
 import numpy as np
 from scipy import stats
 from scipy.linalg import cho_factor, cho_solve
-import logging
 
 logger = logging.getLogger(__name__)
 

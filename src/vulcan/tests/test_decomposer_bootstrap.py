@@ -10,52 +10,36 @@ Tests:
 - Integration validation
 """
 
-import pytest
 import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import components to test
-from problem_decomposer.decomposer_bootstrap import (
-    DecomposerBootstrap,
-    create_decomposer,
-    create_test_problem,
-    validate_decomposer_setup,
-    run_bootstrap_test,
-    get_bootstrap,
-)
-
-from problem_decomposer.problem_decomposer_core import (
-    ProblemDecomposer,
-    ProblemGraph,
-    DecompositionPlan,
-    ExecutionOutcome,
-)
-
-from problem_decomposer.decomposition_strategies import (
-    DecompositionStrategy,
-    ExactDecomposition,
-    SemanticDecomposition,
-    StructuralDecomposition,
-    SyntheticBridging,
-    AnalogicalDecomposition,
-    BruteForceSearch,
-)
-
-from problem_decomposer.decomposition_library import (
-    StratifiedDecompositionLibrary,
-    DecompositionPrinciple,
-    Context,
-    Pattern,
-)
-
-from problem_decomposer.fallback_chain import FallbackChain
 from problem_decomposer.adaptive_thresholds import AdaptiveThresholds
+# Import components to test
+from problem_decomposer.decomposer_bootstrap import (DecomposerBootstrap,
+                                                     create_decomposer,
+                                                     create_test_problem,
+                                                     get_bootstrap,
+                                                     run_bootstrap_test,
+                                                     validate_decomposer_setup)
+from problem_decomposer.decomposition_library import (
+    Context, DecompositionPrinciple, Pattern, StratifiedDecompositionLibrary)
+from problem_decomposer.decomposition_strategies import (
+    AnalogicalDecomposition, BruteForceSearch, DecompositionStrategy,
+    ExactDecomposition, SemanticDecomposition, StructuralDecomposition,
+    SyntheticBridging)
+from problem_decomposer.fallback_chain import FallbackChain
+from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
+                                                        ExecutionOutcome,
+                                                        ProblemDecomposer,
+                                                        ProblemGraph)
 
 # Configure logging
 logging.basicConfig(

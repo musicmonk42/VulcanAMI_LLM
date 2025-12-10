@@ -16,29 +16,23 @@ Tests cover:
 - Size limits and eviction
 """
 
-import pytest
-import numpy as np
-import time
-import threading
-from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
-from collections import deque
-
-
 # Add parent directory to path for imports
 import sys
+import threading
+import time
+from collections import deque
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from semantic_bridge.concept_mapper import (
-    ConceptMapper,
-    Concept,
-    PatternOutcome,
-    MeasurableEffect,
-    EffectType,
-    GroundingStatus,
-)
+from semantic_bridge.concept_mapper import (Concept, ConceptMapper, EffectType,
+                                            GroundingStatus, MeasurableEffect,
+                                            PatternOutcome)
 
 
 # Mock classes for testing

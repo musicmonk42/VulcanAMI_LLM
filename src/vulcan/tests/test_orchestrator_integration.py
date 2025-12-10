@@ -3,22 +3,22 @@ test_orchestrator_integration.py
 Comprehensive integration tests without vulcan imports (no thread spawning)
 """
 
-import pytest
 import asyncio
-import time
-import tempfile
-import json
-import threading
-import hashlib
-import pickle
 import gc
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Set
+import hashlib
+import json
+import pickle
+import tempfile
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from concurrent.futures import ThreadPoolExecutor
-import numpy as np
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums

@@ -18,19 +18,19 @@ CRITICAL NOTES:
 - The force_shutdown_reasoner function makes ALL threads daemon immediately to prevent hangs
 """
 
-import pytest
-import time
-import tempfile
-import shutil
-import threading
-from pathlib import Path
-from typing import Dict, List, Any
-from unittest.mock import Mock, MagicMock, patch
-import numpy as np
 import gc
-
+import shutil
 # CRITICAL: Mock problematic components BEFORE any imports that might load them
 import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -47,24 +47,15 @@ sys.modules["src.unified_runtime.execution_metrics"] = mock_execution_metrics
 sys.modules["vulcan.processing"] = mock_processing
 sys.modules["vulcan.safety.rollback_audit"] = mock_rollback_audit
 
+from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
+                                              ReasoningStep, ReasoningType)
 # Now import the module to test
-from vulcan.reasoning.unified_reasoning import (
-    UnifiedReasoner,
-    ReasoningStrategy,
-    ReasoningTask,
-    ReasoningPlan,
-    _load_selection_components,
-    _load_reasoning_components,
-    _load_optional_components,
-)
-
-from vulcan.reasoning.reasoning_types import (
-    ReasoningType,
-    ReasoningStep,
-    ReasoningChain,
-    ReasoningResult,
-)
-
+from vulcan.reasoning.unified_reasoning import (ReasoningPlan,
+                                                ReasoningStrategy,
+                                                ReasoningTask, UnifiedReasoner,
+                                                _load_optional_components,
+                                                _load_reasoning_components,
+                                                _load_selection_components)
 
 # =============================================================================
 # MODULE-LEVEL SHARED REASONER (CRITICAL PERFORMANCE OPTIMIZATION)

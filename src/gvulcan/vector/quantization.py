@@ -7,10 +7,12 @@ and error-correcting codes.
 """
 
 from __future__ import annotations
-from typing import Tuple, Dict, Any, Optional
-from dataclasses import dataclass
-import numpy as np
+
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

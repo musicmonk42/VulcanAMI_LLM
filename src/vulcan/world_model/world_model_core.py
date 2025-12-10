@@ -18,23 +18,23 @@ FIXED: Initialization order for Meta-reasoning components to prevent MagicMock f
   to generate code changes, validate them, apply them to the file system, and commit the result.
 """
 
-import time
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import numpy as np
-import json
-from pathlib import (
-    Path as FilePath,
-)  # <-- FIX: Use alias 'FilePath' to avoid name conflict
-import threading
-import sys
-import os
-import subprocess
 import ast
 import difflib
+import json
+import logging
+import os
+import subprocess
+import sys
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from pathlib import \
+    Path as FilePath  # <-- FIX: Use alias 'FilePath' to avoid name conflict
+from typing import Any, Dict, List, Optional, Set, Tuple
 from unittest.mock import MagicMock
+
+import numpy as np
 
 # 🚨 BEGIN PRODUCTION LLM IMPORTS 🚨
 try:
@@ -86,8 +86,8 @@ def _lazy_import_safety_validator():
     global EnhancedSafetyValidator, SafetyConfig
     if EnhancedSafetyValidator is None:
         try:
-            from ..safety.safety_validator import EnhancedSafetyValidator
             from ..safety.safety_types import SafetyConfig
+            from ..safety.safety_validator import EnhancedSafetyValidator
 
             logger.info("Safety validator lazy loaded successfully")
         except ImportError as e:
@@ -153,13 +153,11 @@ def _lazy_import_intervention_manager():
         InterventionCandidate
     if Correlation is None:
         try:
-            from .intervention_manager import (
-                Correlation,
-                InterventionPrioritizer,
-                InterventionExecutor,
-                InterventionResult,
-                InterventionCandidate,
-            )
+            from .intervention_manager import (Correlation,
+                                               InterventionCandidate,
+                                               InterventionExecutor,
+                                               InterventionPrioritizer,
+                                               InterventionResult)
 
             logger.info("Intervention manager components lazy loaded successfully")
             return True
@@ -176,7 +174,7 @@ def _lazy_import_prediction_engine():
     global Path, EnsemblePredictor, Prediction
     if Path is None:
         try:
-            from .prediction_engine import Path, EnsemblePredictor, Prediction
+            from .prediction_engine import EnsemblePredictor, Path, Prediction
 
             logger.info("Prediction engine components lazy loaded successfully")
             return True
@@ -193,12 +191,8 @@ def _lazy_import_invariant_detector():
     global InvariantRegistry, InvariantDetector, Invariant, InvariantType
     if InvariantRegistry is None:
         try:
-            from .invariant_detector import (
-                InvariantRegistry,
-                InvariantDetector,
-                Invariant,
-                InvariantType,
-            )
+            from .invariant_detector import (Invariant, InvariantDetector,
+                                             InvariantRegistry, InvariantType)
 
             logger.info("InvariantDetector components imported successfully")
         except ImportError as e:
@@ -211,10 +205,8 @@ def _lazy_import_confidence_calibrator():
     global ConfidenceCalibrator, ModelConfidenceTracker
     if ConfidenceCalibrator is None:
         try:
-            from .confidence_calibrator import (
-                ConfidenceCalibrator,
-                ModelConfidenceTracker,
-            )
+            from .confidence_calibrator import (ConfidenceCalibrator,
+                                                ModelConfidenceTracker)
 
             logger.info("ConfidenceCalibrator components imported successfully")
         except ImportError as e:
@@ -227,7 +219,7 @@ def _lazy_import_world_model_router():
     global WorldModelRouter, UpdatePlan
     if WorldModelRouter is None:
         try:
-            from .world_model_router import WorldModelRouter, UpdatePlan
+            from .world_model_router import UpdatePlan, WorldModelRouter
 
             logger.info("WorldModelRouter imported successfully")
         except ImportError as e:
@@ -250,18 +242,15 @@ def _lazy_import_meta_reasoning():
         ImprovementObjective
     if MotivationalIntrospection is None:
         try:
-            from .meta_reasoning import (
-                MotivationalIntrospection,
-                ObjectiveHierarchy,
-                CounterfactualObjectiveReasoner,
-                GoalConflictDetector,
-                ObjectiveNegotiator,
-                ValidationTracker,
-                TransparencyInterface,
-                SelfImprovementDrive,
-                TriggerType,
-                ImprovementObjective,
-            )
+            from .meta_reasoning import (CounterfactualObjectiveReasoner,
+                                         GoalConflictDetector,
+                                         ImprovementObjective,
+                                         MotivationalIntrospection,
+                                         ObjectiveHierarchy,
+                                         ObjectiveNegotiator,
+                                         SelfImprovementDrive,
+                                         TransparencyInterface, TriggerType,
+                                         ValidationTracker)
 
             logger.info("Meta-reasoning components lazy loaded successfully")
         except ImportError as e:
@@ -1624,7 +1613,8 @@ class WorldModel:
         if EnhancedSafetyValidator and SafetyConfig:
             try:
                 # Import singleton initializer
-                from ..safety.safety_validator import initialize_all_safety_components
+                from ..safety.safety_validator import \
+                    initialize_all_safety_components
 
                 safety_config = config.get("safety_config", {})
                 self.safety_validator = initialize_all_safety_components(

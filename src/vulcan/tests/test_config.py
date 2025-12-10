@@ -19,58 +19,35 @@ compatible with Cerberus top-level document validation which expects direct fiel
 This is a SOURCE CODE bug, not a test bug, but tests are modified to work around it.
 """
 
-import pytest
-import os
-import json
-import yaml
-import tempfile
-import shutil
-import threading
 import asyncio
+import json
+import os
+import shutil
+import tempfile
+import threading
 import time
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from src.vulcan.config import (
-    ConfigLayer,
-    ConfigValidationLevel,
-    ProfileType,
-    ModalityType,
-    SafetyLevel,
-    ActionType,
-    GoalType,
-    ExecutionStrategy,
-    SelectionMode,
-    ConfigSchema,
-    ConfigValidator,
-    ConfigurationManager,
-    ConfigurationAPI,
-    AgentConfig,
-    ResourceLimits,
-    SafetyPolicies,
-    LearningConfig,
-    ToolSelectionConfig,
-    HierarchicalGoalSystem,
-    get_config,
-    set_config,
-    load_profile,
-    validate_config,
-    export_config,
-    get_tool_selection_config,
-    get_utility_weights,
-    get_portfolio_strategy,
-    initialize_config,
-    validate_all_dependencies,
-    _get_config_manager,
-    EMBEDDING_DIM,
-    LATENT_DIM,
-    HIDDEN_DIM,
-    BATCH_SIZE,
-    LEARNING_RATE,
-    GAMMA,
-    TAU,
-)
+import pytest
+import yaml
+
+from src.vulcan.config import (BATCH_SIZE, EMBEDDING_DIM, GAMMA, HIDDEN_DIM,
+                               LATENT_DIM, LEARNING_RATE, TAU, ActionType,
+                               AgentConfig, ConfigLayer, ConfigSchema,
+                               ConfigurationAPI, ConfigurationManager,
+                               ConfigValidationLevel, ConfigValidator,
+                               ExecutionStrategy, GoalType,
+                               HierarchicalGoalSystem, LearningConfig,
+                               ModalityType, ProfileType, ResourceLimits,
+                               SafetyLevel, SafetyPolicies, SelectionMode,
+                               ToolSelectionConfig, _get_config_manager,
+                               export_config, get_config,
+                               get_portfolio_strategy,
+                               get_tool_selection_config, get_utility_weights,
+                               initialize_config, load_profile, set_config,
+                               validate_all_dependencies, validate_config)
 
 # ============================================================
 # FIXTURES

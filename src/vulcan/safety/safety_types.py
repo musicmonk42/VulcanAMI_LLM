@@ -4,15 +4,15 @@ Safety types and data structures for VULCAN-AGI Safety Module.
 Contains all shared enums, dataclasses, and base interfaces used across safety components.
 """
 
-import uuid
-import time
-import json
 import hashlib
+import json
+import time
 import traceback
-from typing import Any, Dict, List, Optional, Tuple, Callable, Union
-from dataclasses import dataclass, field, asdict
-from enum import Enum
+import uuid
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 # ============================================================
 # ENUMERATIONS

@@ -4,25 +4,26 @@ Governance and value alignment systems for VULCAN-AGI Safety Module.
 Implements human oversight, value alignment verification, and multi-stakeholder governance.
 """
 
-import logging
-import time
-import json
-import numpy as np
-import hashlib
-import uuid
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Set
-from collections import defaultdict, deque
-from datetime import datetime, timedelta
-from pathlib import Path
-from enum import Enum
-from dataclasses import dataclass, field, asdict
-import threading
-from concurrent.futures import ThreadPoolExecutor
-import sqlite3
-import pickle
 import atexit
+import hashlib
+import json
+import logging
+import pickle
+import sqlite3
+import threading
+import time
+import uuid
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .safety_types import SafetyReport, SafetyViolationType, ActionType
+import numpy as np
+
+from .safety_types import ActionType, SafetyReport, SafetyViolationType
 
 logger = logging.getLogger(__name__)
 

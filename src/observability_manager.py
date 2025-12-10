@@ -1,22 +1,17 @@
-import os
 import json
 import logging
-import time
+import os
 import shutil
 import threading
-from pathlib import Path
-from typing import Any, Dict, Optional, List
+import time
 from collections import deque
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 import numpy as np
-from prometheus_client import (
-    CollectorRegistry,
-    generate_latest,
-    Counter,
-    Gauge,
-    Histogram,
-)
+from prometheus_client import (CollectorRegistry, Counter, Gauge, Histogram,
+                               generate_latest)
 
 try:
     import graphviz

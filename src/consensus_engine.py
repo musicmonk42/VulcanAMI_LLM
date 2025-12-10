@@ -5,18 +5,18 @@ Version: 2.0.1 - Test failures fixed
 Distributed consensus for governance with trust-weighted voting.
 """
 
-import json
+import copy
 import hashlib
+import json
 import logging
 import threading
 import time
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from collections import defaultdict
-import copy
 import uuid
+from collections import defaultdict
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 # Configure logging
 logging.basicConfig(

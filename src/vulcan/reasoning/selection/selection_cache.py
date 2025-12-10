@@ -8,22 +8,23 @@ Fixed version with proper size calculation and disk cache limits.
 PATCH 5: Interruptible cleanup loop with Event-based shutdown.
 """
 
-import time
-import pickle
-import json
 import hashlib
-import threading
-import sys
-from typing import Dict, Any, Optional, Tuple, List, Callable
-from dataclasses import dataclass, field
-from collections import OrderedDict, defaultdict, deque
-from enum import Enum
-import numpy as np
-import logging
-from pathlib import Path
-import zlib
 import heapq
+import json
+import logging
+import pickle
+import sys
+import threading
+import time
 import weakref
+import zlib
+from collections import OrderedDict, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

@@ -5,13 +5,13 @@
 # FIXED: test_shutdown - increased wait time for thread shutdown
 # ============================================================
 
-import unittest
 import sys
-import time
 import threading
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+import time
+import unittest
 from collections import deque
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent
@@ -19,16 +19,11 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.metrics import (
-    EnhancedMetricsCollector,
-    MetricType,
-    AggregationType,
-    create_metrics_collector,
-    compute_percentile,
-    compute_moving_average,
-    compute_rate,
-)
-
+from vulcan.orchestrator.metrics import (AggregationType,
+                                         EnhancedMetricsCollector, MetricType,
+                                         compute_moving_average,
+                                         compute_percentile, compute_rate,
+                                         create_metrics_collector)
 
 # ============================================================
 # TEST: ENUMS

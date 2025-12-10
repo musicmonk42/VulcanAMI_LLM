@@ -17,27 +17,25 @@ Tests cover:
 FIXED: SafetyConfig parameters, safety test expectations, removed references to already-tested logic
 """
 
-import pytest
-import numpy as np
-import time
 import threading
-from typing import Dict, Any, List
+import time
+from typing import Any, Dict, List
+
+import numpy as np
+import pytest
 
 # FIXED: Correct import path for vulcan project structure
-from vulcan.world_model.intervention_manager import (
-    InterventionType,
-    Correlation,
-    InterventionCandidate,
-    InterventionResult,
-    InformationGainEstimator,
-    CostEstimator,
-    InterventionScheduler,
-    ConfounderDetector,
-    InterventionSimulator,
-    InterventionPrioritizer,
-    InterventionExecutor,
-)
-
+from vulcan.world_model.intervention_manager import (ConfounderDetector,
+                                                     Correlation,
+                                                     CostEstimator,
+                                                     InformationGainEstimator,
+                                                     InterventionCandidate,
+                                                     InterventionExecutor,
+                                                     InterventionPrioritizer,
+                                                     InterventionResult,
+                                                     InterventionScheduler,
+                                                     InterventionSimulator,
+                                                     InterventionType)
 
 # ============================================================================
 # Fixtures

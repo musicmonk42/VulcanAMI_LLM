@@ -4,29 +4,25 @@ Comprehensive test suite for adversarial validation and formal verification.
 Tests AdversarialValidator and FormalVerifier classes.
 """
 
-import pytest
-import numpy as np
-import time
 import copy
-from unittest.mock import Mock, patch, MagicMock
+import time
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip(
     "torch", reason="PyTorch required for adversarial_formal tests"
 )
 
-from vulcan.safety.adversarial_formal import (
-    AdversarialValidator,
-    FormalVerifier,
-    AttackType,
-    AttackConfig,
-    PropertyType,
-    FormalProperty,
-    timeout,
-)
-from vulcan.safety.safety_types import SafetyReport, SafetyViolationType, ActionType
-
+from vulcan.safety.adversarial_formal import (AdversarialValidator,
+                                              AttackConfig, AttackType,
+                                              FormalProperty, FormalVerifier,
+                                              PropertyType, timeout)
+from vulcan.safety.safety_types import (ActionType, SafetyReport,
+                                        SafetyViolationType)
 
 # ============================================================
 # FIXTURES

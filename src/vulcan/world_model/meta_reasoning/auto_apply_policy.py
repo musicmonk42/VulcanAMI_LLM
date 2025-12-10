@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import fnmatch
 import hashlib
+# logger = logging.getLogger(__name__) # Original logger
+# --- START FIX: Replace YAML import block ---
 import logging
 import os
 import shlex
@@ -20,10 +22,6 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
-
-# logger = logging.getLogger(__name__) # Original logger
-# --- START FIX: Replace YAML import block ---
-import logging
 
 logger = logging.getLogger(__name__)
 try:

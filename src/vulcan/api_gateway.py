@@ -12,46 +12,47 @@
 # ============================================================
 
 import asyncio
-import json
-import time
+import base64
 import hashlib
-import jwt
-import uuid
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
+import hmac
+import json
 import logging
-from datetime import datetime, timedelta
-import aiohttp
-from aiohttp import web
-from redis import asyncio as aioredis
-from redis.asyncio import ConnectionError as RedisConnectionError
-import numpy as np
-from functools import wraps
+import os
+import re
+import secrets
+import signal
+import time
 import traceback
-import prometheus_client
-from prometheus_client import Counter, Histogram, Gauge
-import graphene
-from graphql import GraphQLError
-import websockets
-from circuitbreaker import circuit
+import uuid
+from collections import defaultdict, deque
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import aiohttp
 import consul
-from cachetools import TTLCache, LRUCache
+import graphene
 import grpc
+import jwt
 import msgpack
+import numpy as np
+import opentracing
+import prometheus_client
+import websockets
+from aiohttp import web
+from cachetools import LRUCache, TTLCache
+from circuitbreaker import circuit
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from ratelimit import limits, sleep_and_retry
-import opentracing
+from graphql import GraphQLError
 from jaeger_client import Config as JaegerConfig
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import base64
-import re
-import os
-import signal
-import hmac
-import secrets
+from prometheus_client import Counter, Gauge, Histogram
+from ratelimit import limits, sleep_and_retry
+from redis import asyncio as aioredis
+from redis.asyncio import ConnectionError as RedisConnectionError
 
 # Optional secure hash libraries
 try:
@@ -70,7 +71,7 @@ except Exception:
 
 # FIXED: Local imports with proper error handling and stubs
 try:
-    from .config import AgentConfig, ModalityType, ActionType
+    from .config import ActionType, AgentConfig, ModalityType
 except ImportError:
     logging.warning("Config module not found, using stubs")
     from dataclasses import dataclass
@@ -97,7 +98,7 @@ except ImportError:
 
 # FIXED: Import from orchestrator submodule
 try:
-    from .orchestrator import VULCANAGICollective, ProductionDeployment
+    from .orchestrator import ProductionDeployment, VULCANAGICollective
 except ImportError:
     logging.warning("Orchestrator module not found, using stub")
 
@@ -180,7 +181,7 @@ except ImportError:
 
 
 try:
-    from .safety import SafetyValidator, GovernanceOrchestrator
+    from .safety import GovernanceOrchestrator, SafetyValidator
 except ImportError:
     logging.warning("Safety module not found, using stub")
 

@@ -8,13 +8,13 @@ Provides runtime metrics for:
 - FAISS vector search (AVX-512 vs. AVX2 vs. NEON)
 """
 
-import time
 import logging
-import threading
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
 import statistics
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

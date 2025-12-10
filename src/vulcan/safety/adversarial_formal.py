@@ -4,30 +4,31 @@ Adversarial validation and formal verification for VULCAN-AGI Safety Module.
 Tests robustness against attacks and verifies formal safety properties.
 """
 
-import logging
-import time
+import copy
+import hashlib
+import itertools
 import json
+import logging
+import platform
+import random
 import signal
 import sys
-import platform
+import threading
+import time
+from collections import defaultdict, deque
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Any, Dict, List, Optional, Tuple, Callable, Union
-from collections import defaultdict, deque
-from datetime import datetime
-from pathlib import Path
-from contextlib import contextmanager
-import hashlib
-import copy
-import itertools
-import random
-from enum import Enum
-from dataclasses import dataclass, field
-import threading
 
-from .safety_types import SafetyReport, SafetyViolationType, ActionType
+from .safety_types import ActionType, SafetyReport, SafetyViolationType
 
 logger = logging.getLogger(__name__)
 

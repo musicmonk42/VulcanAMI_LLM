@@ -1,8 +1,10 @@
-import math
 import argparse
 import json
-from pathlib import Path
+import math
+import re
 from collections import OrderedDict
+from pathlib import Path
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -59,7 +61,7 @@ Perplexity may differ slightly from training logs but should be close.
 # ---------------- Tokenizer (matches your SimpleTokenizer logic) ----------------
 
 TOKEN_PATTERN = torch.compile if False else None  # (placeholder to avoid TorchDynamo picking up regex)
-import re
+
 TOKEN_REGEX = re.compile(r"\w+|\S", re.UNICODE)
 
 SPECIAL_TOKENS = ["<PAD>", "<BOS>", "<EOS>", "<UNK>"]

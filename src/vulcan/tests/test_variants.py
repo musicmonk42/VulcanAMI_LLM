@@ -3,16 +3,17 @@
 # Comprehensive test suite for variants.py
 # ============================================================
 
-import unittest
-import sys
-import time
 import asyncio
+import sys
 import threading
-import numpy as np
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+import time
+import unittest
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
+
+import numpy as np
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent
@@ -20,20 +21,14 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.variants import (
-    ParallelOrchestrator,
-    FaultTolerantOrchestrator,
-    AdaptiveOrchestrator,
-    PerformanceMonitor,
-    StrategySelector,
-    PerceptionError,
-    ReasoningError,
-    ExecutionError,
-    shutdown_executor_with_timeout,
-    SUPPORTS_EXECUTOR_TIMEOUT,
-    PYTHON_VERSION,
-)
-
+from vulcan.orchestrator.variants import (PYTHON_VERSION,
+                                          SUPPORTS_EXECUTOR_TIMEOUT,
+                                          AdaptiveOrchestrator, ExecutionError,
+                                          FaultTolerantOrchestrator,
+                                          ParallelOrchestrator,
+                                          PerceptionError, PerformanceMonitor,
+                                          ReasoningError, StrategySelector,
+                                          shutdown_executor_with_timeout)
 
 # ============================================================
 # TEST HELPERS

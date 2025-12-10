@@ -11,28 +11,22 @@ Tests:
 - Cross-domain patterns
 """
 
-import pytest
-import numpy as np
 import logging
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
+import numpy as np
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
 from problem_decomposer.decomposition_library import (
-    DecompositionLibrary,
-    StratifiedDecompositionLibrary,
-    Pattern,
-    Context,
-    DecompositionPrinciple,
-    PatternPerformance,
-    PatternStatus,
-    DomainCategory,
-)
+    Context, DecompositionLibrary, DecompositionPrinciple, DomainCategory,
+    Pattern, PatternPerformance, PatternStatus, StratifiedDecompositionLibrary)
 
 # Configure logging
 logging.basicConfig(

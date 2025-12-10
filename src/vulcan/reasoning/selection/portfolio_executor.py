@@ -8,19 +8,21 @@ Fixed version with proper resource management and timeout handling.
 """
 
 import asyncio
-import time
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Callable, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
-import numpy as np
-import logging
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed, TimeoutError
-import signal
-import queue
 import json
+import logging
+import queue
+import signal
+import threading
+import time
+from collections import defaultdict, deque
+from concurrent.futures import (Future, ThreadPoolExecutor, TimeoutError,
+                                as_completed)
+from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

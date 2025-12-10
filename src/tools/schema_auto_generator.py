@@ -23,15 +23,15 @@ Usage:
 Author: The Graphix AI Engineering Team
 """
 
-import re
-import json
-import hashlib
 import argparse
+import hashlib
+import json
+import re
 from datetime import datetime
-from typing import Dict, Any, List, Set, Union, Tuple, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 try:
-    from ecdsa import SigningKey, NIST256p, VerifyingKey
+    from ecdsa import NIST256p, SigningKey, VerifyingKey
 
     ECDSA_AVAILABLE = True
 except ImportError:

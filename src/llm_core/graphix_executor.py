@@ -44,17 +44,17 @@ A comprehensive executor for Graphix IR graphs with enterprise features:
 - Numerical stability checks
 """
 
-import math
-import time
-import random
-import logging
 import hashlib
-from typing import Any, Dict, List, Optional, Tuple, Sequence, Union, Callable
+import json
+import logging
+import math
+import random
+import time
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict, OrderedDict
 from functools import lru_cache
-import json
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 logger = logging.getLogger(__name__)
 

@@ -11,30 +11,27 @@ ULTIMATE FIX: Monkey-patch applied at import time, shutdown waits for threads pr
 PRODUCTION FIX: Skips heavy UnifiedRuntime initialization during tests to prevent segfaults.
 """
 
-import time
-import logging
-from typing import Any, Dict, List, Optional, Union, Tuple, Set, Callable
-from collections import defaultdict, deque
-from dataclasses import dataclass, field
-from enum import Enum
-from datetime import datetime
-from pathlib import Path
-import pickle
 import json
-import numpy as np
-import threading
-import uuid
+import logging
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
+import pickle
+import threading
+import time
+import uuid
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-# Core reasoning imports
-from .reasoning_types import (
-    ReasoningType,
-    ReasoningStep,
-    ReasoningChain,
-    ReasoningResult,
-)
+import numpy as np
+
 from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+# Core reasoning imports
+from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
+                              ReasoningType)
 
 logger = logging.getLogger(__name__)
 
@@ -72,23 +69,17 @@ def _load_selection_components():
 
     try:
         # Prefer package-root re-exports from vulcan.reasoning.selection
-        from vulcan.reasoning.selection import (
-            ToolSelector,
-            SelectionRequest,
-            SelectionResult,
-            SelectionMode,
-            UtilityModel,
-            UtilityContext,
-            ContextMode,
-            PortfolioExecutor,
-            ExecutionStrategy,
-            ExecutionMonitor,
-            SafetyGovernor,
-            SelectionCache,
-            WarmStartPool,
-            StochasticCostModel,
-            CostComponent,
-        )
+        from vulcan.reasoning.selection import (ContextMode, CostComponent,
+                                                ExecutionMonitor,
+                                                ExecutionStrategy,
+                                                PortfolioExecutor,
+                                                SafetyGovernor, SelectionCache,
+                                                SelectionMode,
+                                                SelectionRequest,
+                                                SelectionResult,
+                                                StochasticCostModel,
+                                                ToolSelector, UtilityContext,
+                                                UtilityModel, WarmStartPool)
 
         # NUCLEAR FIX: Apply monkey-patch IMMEDIATELY after import, before any instantiation
         if not hasattr(SelectionCache, "_original_init_patched"):
@@ -121,9 +112,8 @@ def _load_selection_components():
 
         # Optional: only if you later add it; don't hard-require it
         try:
-            from vulcan.reasoning.selection.confidence_calibration import (
-                CalibratedDecisionMaker,
-            )
+            from vulcan.reasoning.selection.confidence_calibration import \
+                CalibratedDecisionMaker
         except Exception:
             CalibratedDecisionMaker = None
 
@@ -161,7 +151,8 @@ def _load_reasoning_components():
     _REASONING_COMPONENTS = {}
 
     try:
-        from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+        from vulcan.reasoning.probabilistic_reasoning import \
+            ProbabilisticReasoner
 
         _REASONING_COMPONENTS["ProbabilisticReasoner"] = ProbabilisticReasoner
     except ImportError as e:
@@ -199,7 +190,8 @@ def _load_reasoning_components():
         logger.warning(f"AnalogicalReasoner not available: {e}")
 
     try:
-        from vulcan.reasoning.multimodal_reasoning import MultiModalReasoningEngine
+        from vulcan.reasoning.multimodal_reasoning import \
+            MultiModalReasoningEngine
 
         _REASONING_COMPONENTS["MultiModalReasoningEngine"] = MultiModalReasoningEngine
     except ImportError as e:

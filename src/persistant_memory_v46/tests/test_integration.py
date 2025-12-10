@@ -8,28 +8,28 @@ Tests the interaction between all modules:
 - Complete end-to-end workflows
 """
 
-import pytest
 import asyncio
-import numpy as np
-from unittest.mock import Mock, patch
-from typing import List, Dict, Any
-
 import sys
+from typing import Any, Dict, List
+from unittest.mock import Mock, patch
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
 
 # Import all modules
 try:
-    from __init__ import create_memory_system, quick_start, get_system_info
+    from __init__ import create_memory_system, get_system_info, quick_start
 
     INIT_AVAILABLE = True
 except ImportError:
     INIT_AVAILABLE = False
 
+from lsm import BloomFilter, MerkleLSM
 from store import PackfileStore
-from lsm import MerkleLSM, BloomFilter
-from unlearning import UnlearningEngine, GradientSurgeryUnlearner
-from zk import ZKProver, MerkleTree
+from unlearning import GradientSurgeryUnlearner, UnlearningEngine
+from zk import MerkleTree, ZKProver
 
 
 class TestMemorySystemCreation:

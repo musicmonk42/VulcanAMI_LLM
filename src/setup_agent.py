@@ -15,11 +15,11 @@ FIXES APPLIED:
 - Fixed import to work from within src directory
 """
 
-import logging
 import argparse
+import logging
 import sys
-from typing import List, Optional
 from pathlib import Path
+from typing import List, Optional
 
 # FIXED: Import from within src directory (no "src." prefix needed)
 try:

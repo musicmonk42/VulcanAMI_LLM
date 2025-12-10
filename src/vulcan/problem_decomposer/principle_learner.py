@@ -10,83 +10,61 @@ IMPLEMENTATION COMPLETE - All components functional and integrated
 
 from __future__ import annotations
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-import time
-import threading
 import hashlib
 import json
+import logging
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 # Import decomposer components
 try:
-    from .problem_decomposer_core import (
-        ProblemGraph,
-        DecompositionPlan,
-        ExecutionOutcome,
-        ProblemSignature,
-    )
     from .decomposition_library import StratifiedDecompositionLibrary
+    from .problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
+                                          ProblemGraph, ProblemSignature)
 except ImportError:
-    from problem_decomposer_core import (
-        ProblemGraph,
-        DecompositionPlan,
-        ExecutionOutcome,
-        ProblemSignature,
-    )
     from decomposition_library import StratifiedDecompositionLibrary
+    from problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
+                                         ProblemGraph, ProblemSignature)
 
 # Import knowledge crystallizer components
 try:
-    from ..knowledge_crystallizer.knowledge_crystallizer_core import (
-        KnowledgeCrystallizer,
-        ExecutionTrace as CrystallizerTrace,
-    )
-    from ..knowledge_crystallizer.principle_extractor import (
-        Principle,
-        ExecutionTrace,
-        Metric,
-        MetricType,
-        Pattern,
-        PatternType,
-    )
-    from ..knowledge_crystallizer.validation_engine import (
-        KnowledgeValidator,
-        ValidationResult,
-        ValidationResults,
-    )
+    from ..knowledge_crystallizer.knowledge_crystallizer_core import \
+        ExecutionTrace as CrystallizerTrace
+    from ..knowledge_crystallizer.knowledge_crystallizer_core import \
+        KnowledgeCrystallizer
     from ..knowledge_crystallizer.knowledge_storage import (
-        VersionedKnowledgeBase,
-        KnowledgeIndex,
-        KnowledgePruner,
-    )
+        KnowledgeIndex, KnowledgePruner, VersionedKnowledgeBase)
+    from ..knowledge_crystallizer.principle_extractor import (ExecutionTrace,
+                                                              Metric,
+                                                              MetricType,
+                                                              Pattern,
+                                                              PatternType,
+                                                              Principle)
+    from ..knowledge_crystallizer.validation_engine import (KnowledgeValidator,
+                                                            ValidationResult,
+                                                            ValidationResults)
 except ImportError:
     try:
-        from knowledge_crystallizer.knowledge_crystallizer_core import (
-            KnowledgeCrystallizer,
-            ExecutionTrace as CrystallizerTrace,
-        )
-        from knowledge_crystallizer.principle_extractor import (
-            Principle,
-            ExecutionTrace,
-            Metric,
-            MetricType,
-            Pattern,
-            PatternType,
-        )
-        from knowledge_crystallizer.validation_engine import (
-            KnowledgeValidator,
-            ValidationResult,
-            ValidationResults,
-        )
+        from knowledge_crystallizer.knowledge_crystallizer_core import \
+            ExecutionTrace as CrystallizerTrace
+        from knowledge_crystallizer.knowledge_crystallizer_core import \
+            KnowledgeCrystallizer
         from knowledge_crystallizer.knowledge_storage import (
-            VersionedKnowledgeBase,
-            KnowledgeIndex,
-            KnowledgePruner,
-        )
+            KnowledgeIndex, KnowledgePruner, VersionedKnowledgeBase)
+        from knowledge_crystallizer.principle_extractor import (ExecutionTrace,
+                                                                Metric,
+                                                                MetricType,
+                                                                Pattern,
+                                                                PatternType,
+                                                                Principle)
+        from knowledge_crystallizer.validation_engine import (
+            KnowledgeValidator, ValidationResult, ValidationResults)
     except ImportError:
         logging.warning("Knowledge crystallizer components not available")
         KnowledgeCrystallizer = None
@@ -1385,11 +1363,8 @@ def test_principle_learning():
         learner = PrincipleLearner(library)
 
         # Create test problem
-        from problem_decomposer_core import (
-            ProblemGraph,
-            DecompositionPlan,
-            ExecutionOutcome,
-        )
+        from problem_decomposer_core import (DecompositionPlan,
+                                             ExecutionOutcome, ProblemGraph)
 
         problem = ProblemGraph(
             nodes={"A": {}, "B": {}, "C": {}},
@@ -1400,7 +1375,8 @@ def test_principle_learning():
         problem.complexity_score = 2.0
 
         # Create test plan
-        from problem_decomposer_core import DecompositionStep, DecompositionStrategy
+        from problem_decomposer_core import (DecompositionStep,
+                                             DecompositionStrategy)
 
         plan = DecompositionPlan(
             problem_signature="test_problem",

@@ -3,14 +3,14 @@ Tests for vulcan-prefetch-vectors Python script
 
 This version includes Windows compatibility fixes.
 """
-import subprocess
-import pytest
+import json
 import os
+import platform
+import subprocess
 import sys
 import tempfile
-import json
-import platform
 
+import pytest
 
 BIN_DIR = os.path.join(os.path.dirname(__file__), '..', 'bin')
 VULCAN_PREFETCH = os.path.join(BIN_DIR, 'vulcan-prefetch-vectors')
@@ -19,7 +19,7 @@ VULCAN_PREFETCH = os.path.join(BIN_DIR, 'vulcan-prefetch-vectors')
 def run_vulcan_prefetch(args, **kwargs):
     """
     Helper function to run vulcan-prefetch-vectors with proper platform-specific handling.
-    
+
     On Windows, Python scripts can't be executed directly - they need to be
     run with the Python interpreter.
     """
@@ -27,10 +27,10 @@ def run_vulcan_prefetch(args, **kwargs):
         command = [sys.executable, VULCAN_PREFETCH] + args
     else:
         command = [VULCAN_PREFETCH] + args
-    
+
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
-    
+
     return subprocess.run(command, **kwargs)
 
 
@@ -111,12 +111,12 @@ class TestVulcanPrefetchVectors:
         """Test JSON output"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'prefetch.json')
-            
+
             result = run_vulcan_prefetch(['query-123', '--json', json_output], timeout=30)
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
-            
+
             # Verify JSON structure
             with open(json_output, 'r') as f:
                 data = json.load(f)
@@ -128,7 +128,7 @@ class TestVulcanPrefetchVectors:
     def test_prefetch_displays_summary(self):
         """Test that prefetch displays summary"""
         result = run_vulcan_prefetch(['query-123'], timeout=30)
-        
+
         output = result.stdout + result.stderr
         assert 'Query' in output or 'Vectors' in output or 'Summary' in output
 
@@ -151,13 +151,13 @@ class TestVulcanPrefetchVectors:
         """Test combining all options"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'result.json')
-            
+
             result = run_vulcan_prefetch(
                 ['query-123', '--tier', 'hot', '--top-k', '200',
                  '--strategy', 'ml_predicted', '--verbose', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
 

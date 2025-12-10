@@ -62,16 +62,16 @@ License: MIT (or your project's license)
 
 from __future__ import annotations
 
-import os
-import sys
+import atexit
 import io
 import json
-import time
-import atexit
-import threading
 import logging
+import os
+import sys
+import threading
+import time
 from dataclasses import dataclass, field
-from typing import Any, Optional, TextIO, Callable, Dict
+from typing import Any, Callable, Dict, Optional, TextIO
 
 # Set up logger for this module
 _logger = logging.getLogger("stdio_policy")

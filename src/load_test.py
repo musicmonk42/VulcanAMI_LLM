@@ -6,20 +6,20 @@ Comprehensive load testing using Locust with proper concurrency control,
 error handling, and observability integration.
 """
 
-import os
-import sys
 import csv
 import json
-import time
 import logging
+import os
+import platform
 import random
 import socket
-import platform
+import sys
 import threading
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+import time
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Testing mode flag - set before expensive imports
 _TESTING_MODE = os.environ.get("LOAD_TEST_TESTING_MODE", "false").lower() == "true"
@@ -27,12 +27,13 @@ _TESTING_MODE = os.environ.get("LOAD_TEST_TESTING_MODE", "false").lower() == "tr
 # Conditional imports based on testing mode
 if not _TESTING_MODE:
     from faker import Faker
-    from locust import HttpUser, task, between, events, LoadTestShape, constant
+    from locust import HttpUser, LoadTestShape, between, constant, events, task
     from locust.env import Environment
 else:
     # Minimal imports for testing - avoid expensive initialization
     try:
-        from locust import HttpUser, task, between, events, LoadTestShape, constant
+        from locust import (HttpUser, LoadTestShape, between, constant, events,
+                            task)
         from locust.env import Environment
 
         # Only import Faker if needed, lazily
@@ -106,12 +107,8 @@ except ImportError:
 
 
 try:
-    from observability_manager import (
-        log_to_prometheus,
-        notify_error,
-        notify_success,
-        send_metric_event,
-    )
+    from observability_manager import (log_to_prometheus, notify_error,
+                                       notify_success, send_metric_event)
 
     OBSERVABILITY_AVAILABLE = True
 except ImportError:

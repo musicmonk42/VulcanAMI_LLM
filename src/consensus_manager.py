@@ -5,16 +5,16 @@ Version: 2.0.0 - All issues fixed, stubs implemented
 Distributed consensus with Raft-inspired leader election and robust vote aggregation.
 """
 
-import os
-import time
-import math
-import random
 import logging
+import math
+import os
+import random
 import threading
-from typing import Dict, List, Tuple, Optional, Any
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 # Optional Ray - only used when backend="ray" AND safe to run
 try:
@@ -27,7 +27,7 @@ except ImportError:
 
 # Optional Prometheus - soft dependency
 try:
-    from prometheus_client import Histogram, Counter
+    from prometheus_client import Counter, Histogram
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
@@ -608,7 +608,8 @@ class ConsensusManager:
         - Future cancellation on completion
         - Bounded retries
         """
-        from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+        from concurrent.futures import (FIRST_COMPLETED, ThreadPoolExecutor,
+                                        wait)
 
         yes = 0
         attempts = {a: 0 for a in agents}

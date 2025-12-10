@@ -11,29 +11,24 @@ This module wires up all components of the decomposition system:
 
 import logging
 import threading
-from typing import Dict, List, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Import all decomposition components
 try:
-    from .problem_decomposer_core import ProblemDecomposer, ProblemGraph
-    from .decomposition_strategies import (
-        ExactDecomposition,
-        SemanticDecomposition,
-        StructuralDecomposition,
-        SyntheticBridging,
-        AnalogicalDecomposition,
-        BruteForceSearch,
-        DecompositionStrategy,
-    )
-    from .decomposition_library import (
-        StratifiedDecompositionLibrary,
-        Pattern,
-        Context,
-        DecompositionPrinciple,
-    )
-    from .fallback_chain import FallbackChain
     from .adaptive_thresholds import AdaptiveThresholds
+    from .decomposition_library import (Context, DecompositionPrinciple,
+                                        Pattern,
+                                        StratifiedDecompositionLibrary)
+    from .decomposition_strategies import (AnalogicalDecomposition,
+                                           BruteForceSearch,
+                                           DecompositionStrategy,
+                                           ExactDecomposition,
+                                           SemanticDecomposition,
+                                           StructuralDecomposition,
+                                           SyntheticBridging)
+    from .fallback_chain import FallbackChain
+    from .problem_decomposer_core import ProblemDecomposer, ProblemGraph
     from .problem_executor import ProblemExecutor
 except ImportError as e:
     logging.error(f"Failed to import decomposer components: {e}")

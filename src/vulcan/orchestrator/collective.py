@@ -5,18 +5,19 @@
 # INTEGRATED: Self-improvement drive with experiment generation and execution
 # ============================================================
 
+import hashlib
 import logging
 import threading
 import time
-import hashlib
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple
 from collections import deque
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
-from .dependencies import EnhancedCollectiveDeps
+import numpy as np
+
+from .agent_lifecycle import AgentCapability, AgentState
 from .agent_pool import AgentPoolManager
-from .agent_lifecycle import AgentState, AgentCapability
+from .dependencies import EnhancedCollectiveDeps
 
 # Import the WorldModel class to access its internal execution method
 try:
@@ -417,7 +418,8 @@ class VULCANAGICollective:
         try:
             # Try to import from curiosity_engine
             try:
-                from ..curiosity_engine.experiment_generator import KnowledgeGap
+                from ..curiosity_engine.experiment_generator import \
+                    KnowledgeGap
             except ImportError:
                 # Fallback: try from curiosity_engine directly
                 from curiosity_engine.experiment_generator import KnowledgeGap

@@ -10,20 +10,21 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for learning_module tests"
 )
 
-import torch.nn as nn
-import numpy as np
-import time
-import tempfile
-import shutil
-from pathlib import Path
-from typing import Dict, Any, List
 import asyncio
-import threading
-from unittest.mock import Mock, patch, MagicMock
-from enum import Enum
-import unittest  # ADDED for self.fail
 import os  # ADDED for psutil
+import shutil
+import tempfile
+import threading
+import time
+import unittest  # ADDED for self.fail
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
 import psutil  # ADDED for memory test
+import torch.nn as nn
 
 
 # Define MetaLearningAlgorithm enum for tests if not available
@@ -39,24 +40,15 @@ class MetaLearningAlgorithm(Enum):
 # Import all learning components
 # Assuming src.vulcan.learning is in the path
 try:
-    from src.vulcan.learning import (
-        UnifiedLearningSystem,
-        EnhancedContinualLearner,
-        CurriculumLearner,
-        MetaLearner,
-        MetaCognitiveMonitor,
-        ParameterHistoryManager,
-        RLHFManager,
-        UnifiedWorldModel,
-        LearningConfig,
-        TaskInfo,
-        FeedbackData,
-        LearningMode,
-        PlanningAlgorithm,
-        PacingStrategy,
-    )
-    from src.vulcan.learning.learning_types import LearningTrajectory
     from src.vulcan.config import EMBEDDING_DIM
+    from src.vulcan.learning import (CurriculumLearner,
+                                     EnhancedContinualLearner, FeedbackData,
+                                     LearningConfig, LearningMode,
+                                     MetaCognitiveMonitor, MetaLearner,
+                                     PacingStrategy, ParameterHistoryManager,
+                                     PlanningAlgorithm, RLHFManager, TaskInfo,
+                                     UnifiedLearningSystem, UnifiedWorldModel)
+    from src.vulcan.learning.learning_types import LearningTrajectory
 except ImportError:
     # Fallback for environment where src is not in path
     print("Warning: Could not import from src.vulcan.learning. Check PYTHONPATH.")

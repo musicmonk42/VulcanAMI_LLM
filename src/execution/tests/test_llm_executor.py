@@ -13,36 +13,24 @@ Tests all major functionality including:
 - Error handling and recovery
 """
 
-import sys
-import unittest
-import tempfile
 import json
-import time
+import sys
+import tempfile
 import threading
+import time
+import unittest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 # Add the uploads directory to path
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from llm_executor import (
-    LLMExecutor,
-    ExecutorConfig,
-    ExecutionMode,
-    SafetyLevel,
-    CacheStrategy,
-    ExecutionResult,
-    LayerExecutionContext,
-    AttentionHeadResult,
-    SafetyValidationResult,
-    ExecutionCache,
-    SafetyValidator,
-    LayerExecutor,
-    create_default_executor,
-    create_parallel_executor,
-    TORCH_AVAILABLE,
-    NUMPY_AVAILABLE,
-)
+from llm_executor import (NUMPY_AVAILABLE, TORCH_AVAILABLE,
+                          AttentionHeadResult, CacheStrategy, ExecutionCache,
+                          ExecutionMode, ExecutionResult, ExecutorConfig,
+                          LayerExecutionContext, LayerExecutor, LLMExecutor,
+                          SafetyLevel, SafetyValidationResult, SafetyValidator,
+                          create_default_executor, create_parallel_executor)
 
 # Try to import torch/numpy for tests
 if TORCH_AVAILABLE:

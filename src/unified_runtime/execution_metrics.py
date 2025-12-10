@@ -11,12 +11,12 @@ used safely both in the core execution engine and at UnifiedRuntime scope.
 
 from __future__ import annotations
 
-import time
 import os
 import threading
-from typing import Dict, Any, Optional, Deque, List, Tuple
-from dataclasses import dataclass, field, asdict
-from collections import deque, defaultdict
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 # psutil is optional. We degrade gracefully if not installed.
 try:

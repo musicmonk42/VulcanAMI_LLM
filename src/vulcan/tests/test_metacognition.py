@@ -7,25 +7,23 @@ import pytest
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for metacognition tests")
 
+import shutil
+import tempfile
+import time
+from collections import deque
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-import time
-from pathlib import Path
-import tempfile
-import shutil
-from unittest.mock import Mock, patch, MagicMock
-from collections import deque
 
-from vulcan.learning.metacognition import (
-    ReasoningPhase,
-    ReasoningStep,
-    CausalRelation,
-    MetaCognitiveMonitor,
-    ConfidenceEstimator,
-    CompositionalUnderstanding,
-)
 from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
+from vulcan.learning.metacognition import (CausalRelation,
+                                           CompositionalUnderstanding,
+                                           ConfidenceEstimator,
+                                           MetaCognitiveMonitor,
+                                           ReasoningPhase, ReasoningStep)
 
 
 class SimpleModel(nn.Module):

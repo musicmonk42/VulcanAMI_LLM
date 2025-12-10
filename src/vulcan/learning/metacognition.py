@@ -2,22 +2,23 @@
 Meta-cognitive monitoring and compositional understanding
 """
 
+import json
+import logging
+import pickle
+import threading
+import time
+from collections import Counter, deque
+from dataclasses import asdict, dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import networkx as nx
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
-from collections import deque, Counter
-from dataclasses import dataclass, asdict
-import logging
-import time
-import pickle
-import json
-from pathlib import Path
-from enum import Enum
-import threading
 from scipy import stats
-import networkx as nx
 
 from ..config import EMBEDDING_DIM, HIDDEN_DIM
 from ..security_fixes import safe_pickle_load

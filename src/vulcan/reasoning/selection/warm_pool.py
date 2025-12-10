@@ -7,21 +7,22 @@ and ensure fast tool execution when needed.
 Fixed version with proper error handling, thread safety, and interruptible threads.
 """
 
-import time
-import threading
+import json
+import logging
+import pickle
 import queue
-from typing import Dict, Any, Optional, List, Callable, Tuple
+import threading
+import time
+import weakref
+from collections import defaultdict, deque
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict, deque
-import logging
-import psutil
-import numpy as np
 from pathlib import Path
-import json
-import pickle
-from concurrent.futures import ThreadPoolExecutor, Future
-import weakref
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
+import psutil
 
 logger = logging.getLogger(__name__)
 

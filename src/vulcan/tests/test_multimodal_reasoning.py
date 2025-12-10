@@ -12,32 +12,28 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for multimodal_reasoning tests"
 )
 
-import numpy as np
-import tempfile
-import shutil
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import logging
+import shutil
+import tempfile
 import warnings
-from typing import Dict, Any
+from pathlib import Path
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
 
 # Filter warnings during tests
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
-from vulcan.reasoning.multimodal_reasoning import (
-    ModalityType,
-    FusionStrategy,
-    ModalityData,
-    CrossModalAlignment,
-    MultiModalReasoningEngine,
-    CrossModalReasoner,
-    AttentionFusion,
-    GatedFusion,
-    TORCH_AVAILABLE,
-)
-
-from vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
+from vulcan.reasoning.multimodal_reasoning import (TORCH_AVAILABLE,
+                                                   AttentionFusion,
+                                                   CrossModalAlignment,
+                                                   CrossModalReasoner,
+                                                   FusionStrategy, GatedFusion,
+                                                   ModalityData, ModalityType,
+                                                   MultiModalReasoningEngine)
+from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
 
 
 # Fixtures

@@ -12,31 +12,22 @@ Tests cover:
 All tests validate the FIXED implementations.
 """
 
-import pytest
 import time
 from typing import List
 
-# Import the classes we're testing
-from src.vulcan.reasoning.symbolic.provers import (
-    BaseProver,
-    TableauProver,
-    ResolutionProver,
-    ModelEliminationProver,
-    ConnectionMethodProver,
-    NaturalDeductionProver,
-    ParallelProver,
-)
+import pytest
 
 # Import core types needed for testing
-from src.vulcan.reasoning.symbolic.core import (
-    Variable,
-    Constant,
-    Function,
-    Literal,
-    Clause,
-    ProofNode,
-)
-
+from src.vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
+                                                Literal, ProofNode, Variable)
+# Import the classes we're testing
+from src.vulcan.reasoning.symbolic.provers import (BaseProver,
+                                                   ConnectionMethodProver,
+                                                   ModelEliminationProver,
+                                                   NaturalDeductionProver,
+                                                   ParallelProver,
+                                                   ResolutionProver,
+                                                   TableauProver)
 
 # ============================================================================
 # HELPER FUNCTIONS

@@ -1,18 +1,19 @@
 """Memory retrieval, search, and indexing"""
 
-import numpy as np
-import time
-import logging
-from typing import Any, Dict, List, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field
-import threading
-import pickle
-import json
-from collections import defaultdict, deque
 import heapq
-from pathlib import Path
-import re
+import json
+import logging
 import math
+import pickle
+import re
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # FAISS for vector search - Robust loader to prevent shadow variable bug
 # --- FIX START ---
@@ -35,8 +36,8 @@ FAISS_AVAILABLE = HAS_FAISS
 # Additional indexing libraries
 try:
     import whoosh
+    from whoosh.fields import DATETIME, ID, NUMERIC, TEXT, Schema
     from whoosh.index import create_in, open_dir
-    from whoosh.fields import Schema, TEXT, ID, NUMERIC, DATETIME
     from whoosh.qparser import QueryParser
     from whoosh.writing import AsyncWriter
 
@@ -54,8 +55,8 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-from .base import Memory, MemoryQuery
 from ..security_fixes import safe_pickle_load
+from .base import Memory, MemoryQuery
 
 logger = logging.getLogger(__name__)
 

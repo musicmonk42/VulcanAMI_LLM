@@ -14,29 +14,29 @@ Composition:
 - FIXED: Improved get_logits() API for easier usage
 """
 
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional, Sequence, Union
-import math
-import random
-import json  # Used for simplified save/load structure
-from functools import lru_cache  # Enhancement 2: IR caching
 import bisect  # For Top-P sampling
 import hashlib  # For tokenizer hashing
+import json  # Used for simplified save/load structure
+import math
+import random
+from dataclasses import asdict, dataclass
+from functools import lru_cache  # Enhancement 2: IR caching
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 # Handle both absolute and relative imports gracefully
 try:
     from .graphix_executor import GraphixExecutor
     from .ir_attention import IRAttention
+    from .ir_embeddings import IREmbeddings
     from .ir_feedforward import IRFeedForward
     from .ir_layer_norm import IRLayerNorm
-    from .ir_embeddings import IREmbeddings
 except ImportError:
     # Fallback to absolute imports if relative imports fail
     from graphix_executor import GraphixExecutor
     from ir_attention import IRAttention
+    from ir_embeddings import IREmbeddings
     from ir_feedforward import IRFeedForward
     from ir_layer_norm import IRLayerNorm
-    from ir_embeddings import IREmbeddings
 
 TokenLike = Union[str, int]
 TokensLike = Union[str, Sequence[TokenLike]]
@@ -944,8 +944,8 @@ if __name__ == "__main__":
 
     # Test save/load
     print("\n6. Testing save/load...")
-    import tempfile
     import os
+    import tempfile
 
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         tmp_path = tmp.name

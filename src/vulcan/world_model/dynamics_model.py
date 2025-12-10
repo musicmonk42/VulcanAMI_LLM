@@ -9,18 +9,19 @@ FIXED: All API compatibility issues, statistical corrections, and numerical stab
 FIXED: Pattern priority and temporal extrapolation for accurate predictions
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Union, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-from pathlib import Path
-from enum import Enum
-import threading
-import warnings
 import importlib  # Added for lazy loading
+import json
+import logging
+import threading
+import time
+import warnings
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 # Import safety validator (lazy-loaded in DynamicsModel)
 # try:
@@ -64,10 +65,10 @@ except ImportError:
 
 # Protected imports with fallbacks
 try:
-    from scipy import stats, signal
-    from scipy.stats import norm
-    from scipy.optimize import minimize, OptimizeResult
+    from scipy import signal, stats
+    from scipy.optimize import OptimizeResult, minimize
     from scipy.special import erf
+    from scipy.stats import norm
 
     SCIPY_AVAILABLE = True
 except ImportError:
@@ -75,9 +76,9 @@ except ImportError:
     logging.warning("scipy not available, using comprehensive fallback implementations")
 
 try:
+    from sklearn.cluster import KMeans
     from sklearn.linear_model import LinearRegression
     from sklearn.preprocessing import PolynomialFeatures
-    from sklearn.cluster import KMeans
 
     SKLEARN_AVAILABLE = True
 except ImportError:

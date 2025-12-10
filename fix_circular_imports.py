@@ -21,29 +21,29 @@ problem_modules = [
 for name, module_path, class_name in problem_modules:
     print(f"\n{name}:")
     print("-" * 70)
-    
+
     try:
         # Try to import the module
         module = __import__(module_path, fromlist=[class_name])
-        
+
         # Try to get the class
         cls = getattr(module, class_name)
         print(f"  ✅ {class_name} imported successfully")
-        
+
     except ImportError as e:
         print(f"  ❌ Import failed: {e}")
         print(f"  📁 Check file: src/{module_path.replace('.', '/')}.py")
-        
+
         # Analyze the error
         if "circular import" in str(e).lower():
             print(f"  🔄 CIRCULAR IMPORT DETECTED")
             print(f"  💡 Solution: Move shared imports to a separate module")
             print(f"     Example: Create vulcan/safety/types.py for shared types")
-            
+
     except AttributeError as e:
         print(f"  ⚠️  Module imports but {class_name} not found: {e}")
         print(f"  💡 Check if {class_name} is defined in the file")
-        
+
     except Exception as e:
         print(f"  ❌ Unexpected error: {e}")
 

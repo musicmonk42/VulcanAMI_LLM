@@ -72,6 +72,8 @@ jobs:
           df -h
           echo "Removing unnecessary files to free up disk space..."
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf /usr/local/.ghcup || true
+          sudo rm -rf /usr/share/swift || true
           sudo docker system prune -af --volumes || true
           sudo docker image prune -af || true
           sudo docker builder prune -af || true
@@ -80,6 +82,9 @@ jobs:
           sudo rm -rf /var/lib/apt/lists/* || true
           sudo rm -rf /tmp/* || true
           sudo rm -rf ~/.cache/* || true
+          sudo rm -rf /var/cache/* || true
+          sudo rm -rf /usr/local/share/chromium || true
+          sudo rm -rf /usr/local/share/powershell || true
           echo "Disk space after cleanup:"
           df -h
 
@@ -228,6 +233,8 @@ jobs:
           df -h
           echo "Removing unnecessary files to free up disk space..."
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf /usr/local/.ghcup || true
+          sudo rm -rf /usr/share/swift || true
           sudo docker system prune -af --volumes || true
           sudo docker image prune -af || true
           sudo docker builder prune -af || true
@@ -236,6 +243,9 @@ jobs:
           sudo rm -rf /var/lib/apt/lists/* || true
           sudo rm -rf /tmp/* || true
           sudo rm -rf ~/.cache/* || true
+          sudo rm -rf /var/cache/* || true
+          sudo rm -rf /usr/local/share/chromium || true
+          sudo rm -rf /usr/local/share/powershell || true
           echo "Disk space after cleanup:"
           df -h
 

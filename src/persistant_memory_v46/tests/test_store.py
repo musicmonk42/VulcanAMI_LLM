@@ -11,18 +11,18 @@ Tests cover:
 - Edge cases
 """
 
-import pytest
 import asyncio
 import hashlib
-import time
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
-from typing import Dict, Any
-
 import sys
+import time
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
+
+import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from store import S3Store, PackfileStore
+from store import PackfileStore, S3Store
 
 
 class TestS3Store:

@@ -7,16 +7,17 @@ to optimize tool selection decisions based on context and constraints.
 Fixed version with variable name collision resolved and proper error handling.
 """
 
-import numpy as np
-import time as time_module
+import json
+import logging
 import threading
-from typing import Dict, Any, Optional, Tuple, List, Callable, Union
+import time as time_module
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-import logging
-from collections import defaultdict, deque
-import json
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

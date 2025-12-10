@@ -3,34 +3,30 @@ knowledge_crystallizer_core.py - Main crystallization orchestrator for Knowledge
 Part of the VULCAN-AGI system
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-from pathlib import Path
-from enum import Enum
-import hashlib
 import copy
+import hashlib
+import json
+import logging
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-# Import other components
-from .principle_extractor import PrincipleExtractor, Principle
-from .validation_engine import KnowledgeValidator, ValidationResult
-from .contraindication_tracker import (
-    ContraindicationDatabase,
-    ContraindicationGraph,
-    CascadeAnalyzer,
-    Contraindication,
-)
+import numpy as np
+
+from .contraindication_tracker import (CascadeAnalyzer, Contraindication,
+                                       ContraindicationDatabase,
+                                       ContraindicationGraph)
+from .crystallization_selector import (CrystallizationMethod,
+                                       CrystallizationSelector,
+                                       MethodSelection)
 from .knowledge_storage import VersionedKnowledgeBase
-from .crystallization_selector import (
-    CrystallizationSelector,
-    CrystallizationMethod,
-    MethodSelection,
-)
+# Import other components
+from .principle_extractor import Principle, PrincipleExtractor
+from .validation_engine import KnowledgeValidator, ValidationResult
 
 logger = logging.getLogger(__name__)
 

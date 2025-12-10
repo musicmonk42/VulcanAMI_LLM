@@ -31,26 +31,23 @@ os.environ['SAMPLING_INTERVAL'] = '0.5'
 
 # Now proceed with regular imports
 import asyncio
-import pytest
-import time
+import gc
 import json
 import logging
 import threading
-import gc
-from typing import Any, Dict
+import time
 from pathlib import Path
+from typing import Any, Dict
 
-from unified_runtime.unified_runtime_core import (
-    UnifiedRuntime,
-    RuntimeConfig,
-    get_runtime,
-    execute_graph,
-    execute_batch,
-    async_cleanup,
-)
-from unified_runtime.execution_engine import ExecutionStatus, ExecutionMode
-from unified_runtime.graph_validator import ValidationResult, ValidationError
+import pytest
+
+from unified_runtime.execution_engine import ExecutionMode, ExecutionStatus
+from unified_runtime.graph_validator import ValidationError, ValidationResult
 from unified_runtime.node_handlers import AI_ERRORS
+from unified_runtime.unified_runtime_core import (RuntimeConfig,
+                                                  UnifiedRuntime,
+                                                  async_cleanup, execute_batch,
+                                                  execute_graph, get_runtime)
 
 logger = logging.getLogger(__name__)
 
@@ -67,15 +64,15 @@ def cleanup_threads():
     """
     # Record threads at start
     threads_before = threading.active_count()
-    
+
     yield  # Run the test
-    
+
     # Force garbage collection
     gc.collect()
-    
+
     # Give threads time to cleanup
     time.sleep(0.5)
-    
+
     # Check for thread leaks
     threads_after = threading.active_count()
     if threads_after > threads_before + 2:  # Allow 2 extra threads
@@ -142,10 +139,10 @@ async def test_timeout_handling():
     finally:
         # CRITICAL: Enhanced cleanup
         runtime.cleanup()
-        
+
         # Give threads time to exit
         await asyncio.sleep(0.2)
-        
+
         # Force any remaining cleanup
         gc.collect()
 
@@ -156,54 +153,54 @@ async def test_zzz_final_cleanup_verification():
     """
     Final test (runs last due to 'zzz' prefix) to verify no thread leaks.
     This ensures all previous tests cleaned up properly.
-    
+
     NOTE: This test is advisory - it warns about thread leaks but doesn't
     fail the test suite for daemon threads which auto-terminate on exit.
     """
     # Force cleanup
     gc.collect()
     await asyncio.sleep(1.0)
-    
+
     # Check thread count
     active_threads = threading.active_count()
     thread_list = threading.enumerate()
-    
+
     logger.info(f"Final thread count: {active_threads}")
     for t in thread_list:
         logger.info(f"  - {t.name}: daemon={t.daemon}, alive={t.is_alive()}")
-    
+
     # Count non-daemon threads (these are the problematic ones)
     non_daemon_threads = [t for t in thread_list if not t.daemon and t.name != 'MainThread']
     daemon_threads = [t for t in thread_list if t.daemon]
-    
+
     # Expected threads that are acceptable:
     # - MainThread (always present)
     # - pytest_timeout thread (if using pytest-timeout)
     # - Any daemon threads (they auto-terminate on process exit)
-    
+
     # Filter out known acceptable non-daemon threads
     acceptable_patterns = [
         'MainThread',
         'pytest_timeout',  # From pytest-timeout plugin
     ]
-    
+
     problematic_threads = [
-        t for t in non_daemon_threads 
+        t for t in non_daemon_threads
         if not any(pattern in t.name for pattern in acceptable_patterns)
     ]
-    
+
     # Log daemon threads as informational (not errors)
     if daemon_threads:
         logger.info(f"Daemon threads (acceptable, will auto-terminate): {[t.name for t in daemon_threads]}")
-    
+
     # Only fail on non-daemon thread leaks that aren't from pytest itself
     if problematic_threads:
         logger.warning(
             f"Non-daemon thread leak detected: {[t.name for t in problematic_threads]}. "
             "These threads will NOT auto-terminate and may cause resource issues."
         )
-    
-    # Relaxed assertion: 
+
+    # Relaxed assertion:
     # - Allow unlimited daemon threads (they're harmless)
     # - Only fail if there are unexpected non-daemon threads
     # - The threshold is now based on problematic threads, not total count
@@ -211,7 +208,7 @@ async def test_zzz_final_cleanup_verification():
         f"Non-daemon thread leak detected: {[t.name for t in problematic_threads]}. "
         f"All threads: {[t.name for t in thread_list]}"
     )
-    
+
     # Log success with thread summary
     logger.info(
         f"Thread cleanup verified: {len(daemon_threads)} daemon threads (acceptable), "

@@ -10,41 +10,28 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import pytest
-import numpy as np
-import time
-import tempfile
-import shutil
 import os
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from collections import deque
-
+import shutil
 # Import the module under test
 import sys
+import tempfile
+import time
+from collections import deque
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.specialized import (
-    Episode,
-    EpisodicMemory,
-    Concept,
-    ToolPerformanceConcept,
-    SemanticMemory,
-    Skill,
-    ProceduralMemory,
-    WorkingMemoryBuffer,
-    WorkingMemory,
-    NETWORKX_AVAILABLE,
-)
-
-from vulcan.memory.base import (
-    Memory,
-    MemoryType,
-    MemoryConfig,
-    MemoryQuery,
-    RetrievalResult,
-)
+from vulcan.memory.base import (Memory, MemoryConfig, MemoryQuery, MemoryType,
+                                RetrievalResult)
+from vulcan.memory.specialized import (NETWORKX_AVAILABLE, Concept, Episode,
+                                       EpisodicMemory, ProceduralMemory,
+                                       SemanticMemory, Skill,
+                                       ToolPerformanceConcept, WorkingMemory,
+                                       WorkingMemoryBuffer)
 
 # ============================================================
 # FIXTURES

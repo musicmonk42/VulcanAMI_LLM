@@ -7,7 +7,9 @@ of arithmetic circuits.
 """
 
 from __future__ import annotations
+
 from typing import List, Tuple
+
 from .field import FieldElement
 
 

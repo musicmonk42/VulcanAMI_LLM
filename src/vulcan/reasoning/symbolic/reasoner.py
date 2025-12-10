@@ -40,37 +40,22 @@ FIXES APPLIED:
 All components are production-ready with complete implementations.
 """
 
-from typing import List, Dict, Set, Tuple, Optional, Any, Union, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
-import re
-import math
-import logging
 import copy
+import logging
+import math
+import re
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .core import (
-    Term,
-    Variable,
-    Constant,
-    Function,
-    Literal,
-    Clause,
-    Unifier,
-    ProofNode,
-    KnowledgeBase,
-)
-from .provers import (
-    BaseProver,
-    TableauProver,
-    ResolutionProver,
-    ModelEliminationProver,
-    ParallelProver,
-)
-from .solvers import BayesianNetworkReasoner, VariableType, CSPSolver
-
+from .core import (Clause, Constant, Function, KnowledgeBase, Literal,
+                   ProofNode, Term, Unifier, Variable)
 # FIX: This import will now work correctly after the move of the classes
-from .parsing import Lexer, Parser, ASTConverter
+from .parsing import ASTConverter, Lexer, Parser
+from .provers import (BaseProver, ModelEliminationProver, ParallelProver,
+                      ResolutionProver, TableauProver)
+from .solvers import BayesianNetworkReasoner, CSPSolver, VariableType
 
 logger = logging.getLogger(__name__)
 

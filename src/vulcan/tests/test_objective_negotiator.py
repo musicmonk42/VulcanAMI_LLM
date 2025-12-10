@@ -2,20 +2,16 @@
 test_objective_negotiator.py - Unit tests for ObjectiveNegotiator
 """
 
-import pytest
-import numpy as np
 import time
-from unittest.mock import Mock, MagicMock, patch
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 from vulcan.world_model.meta_reasoning.objective_negotiator import (
-    ObjectiveNegotiator,
-    AgentProposal,
-    NegotiationResult,
-    NegotiationOutcome,
-    NegotiationStrategy,
-    ConflictResolution,
-)
+    AgentProposal, ConflictResolution, NegotiationOutcome, NegotiationResult,
+    NegotiationStrategy, ObjectiveNegotiator)
 
 
 @pytest.fixture

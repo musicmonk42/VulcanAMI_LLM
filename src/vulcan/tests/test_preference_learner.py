@@ -13,23 +13,17 @@ from __future__ import annotations
 
 import json
 import time
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict, deque
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import Mock, patch
 
+import numpy as np
 import pytest
 
 # Import the module under test.
 from src.vulcan.world_model.meta_reasoning.preference_learner import (
-    PreferenceLearner,
-    Preference,
-    PreferenceSignal,
-    PreferencePrediction,
-    PreferenceSignalType,
-    PreferenceStrength,
-    BanditArm,
-)
+    BanditArm, Preference, PreferenceLearner, PreferencePrediction,
+    PreferenceSignal, PreferenceSignalType, PreferenceStrength)
 
 # ---------------------------
 # Fixtures and Helpers

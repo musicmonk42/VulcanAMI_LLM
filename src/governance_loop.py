@@ -6,19 +6,19 @@ Version: 2.0.0 - All issues fixed, thread-safe, validated
 Autonomous policy management and compliance monitoring
 """
 
-import os
+import asyncio
 import copy
-import time
-import logging
-import json
 import hashlib
-from typing import Dict, Any, List, Optional, Set, Tuple, Callable
-from dataclasses import dataclass, field
+import json
+import logging
+import os
+import threading
+import time
 from collections import defaultdict, deque
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-import threading
-import asyncio
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # Configure logging
 logging.basicConfig(

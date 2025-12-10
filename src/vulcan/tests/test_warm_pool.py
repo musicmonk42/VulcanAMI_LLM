@@ -5,23 +5,20 @@ Tests pool management, scaling policies, health checking,
 demand prediction, and resource monitoring.
 """
 
-import pytest
-import time
 import threading
-from unittest.mock import Mock, patch, MagicMock
+import time
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Import the warm pool module
-from vulcan.reasoning.selection.warm_pool import (
-    WarmStartPool,
-    ToolPool,
-    PoolInstance,
-    PoolStatistics,
-    PoolState,
-    ScalingPolicy,
-    ResourceMonitor,
-    DemandPredictor,
-)
+from vulcan.reasoning.selection.warm_pool import (DemandPredictor,
+                                                  PoolInstance, PoolState,
+                                                  PoolStatistics,
+                                                  ResourceMonitor,
+                                                  ScalingPolicy, ToolPool,
+                                                  WarmStartPool)
 
 
 class MockTool:

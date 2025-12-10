@@ -4,12 +4,11 @@ Core reasoning types and data structures
 Fixed version with comprehensive validation and error handling.
 """
 
+import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
-import time
-from abc import ABC, abstractmethod
-
 
 # Import ModalityType - with fallback if config.py doesn't exist
 try:

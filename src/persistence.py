@@ -6,19 +6,19 @@ thread safety, and performance optimizations.
 All critical bugs from the original implementation have been fixed.
 """
 
-import json
-import os
 import hashlib
+import json
+import logging
+import os
 import pickle
 import sqlite3
 import threading
 import time
-import logging
-from typing import Dict, List, Any, Optional, Tuple
+from collections import OrderedDict, defaultdict, deque
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from contextlib import contextmanager
-from collections import defaultdict, deque, OrderedDict
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import networkx as nx
@@ -28,10 +28,10 @@ except ImportError:
     NETWORKX_AVAILABLE = False
     nx = None
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.backends import default_backend
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # Configure logging
@@ -547,8 +547,9 @@ class PersistenceLayer:
             for table, (id_col, data_col) in tables_and_cols.items():
                 # Only verify unverified entries unless force is True
                 where_clause = "" if force else " WHERE signature_verified = 0"
+                # nosec B608: table/column names from hardcoded tables_and_cols dict
                 query = (
-                    f"SELECT {id_col}, {data_col}, signature FROM {table}{where_clause}"
+                    f"SELECT {id_col}, {data_col}, signature FROM {table}{where_clause}"  # nosec B608
                 )
 
                 for item_id, data, signature in cursor.execute(query).fetchall():
@@ -556,8 +557,9 @@ class PersistenceLayer:
                         data.encode("utf-8"), signature, use_cache=False
                     ):
                         # Mark as verified
+                        # nosec B608: table/column names from hardcoded tables_and_cols dict
                         cursor.execute(
-                            f"UPDATE {table} SET signature_verified = 1 WHERE {id_col} = ?",
+                            f"UPDATE {table} SET signature_verified = 1 WHERE {id_col} = ?",  # nosec B608
                             (item_id,),
                         )
                         verified_count += 1
@@ -1054,11 +1056,12 @@ class PersistenceLayer:
             where_clause = " AND ".join(where_parts) if where_parts else "1=1"
 
             with self._get_connection() as conn:
+                # nosec B608: where_clause built from validated parameters above
                 cursor = conn.execute(
                     f"""SELECT graph_id, features, graph_data, signature
                         FROM graphs
                         WHERE {where_clause}
-                        LIMIT ?""",
+                        LIMIT ?""",  # nosec B608
                     params + [limit],
                 )
 
@@ -1104,8 +1107,9 @@ class PersistenceLayer:
                 cursor = conn.cursor()
 
                 # Count records in each table
+                # nosec B608: table names from hardcoded list
                 for table in ["graphs", "evolutions", "knowledge", "sessions"]:
-                    cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                    cursor.execute(f"SELECT COUNT(*) FROM {table}")  # nosec B608
                     stats[f"{table}_count"] = cursor.fetchone()[0]
 
                 # Database file size

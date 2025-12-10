@@ -1,9 +1,9 @@
-import importlib
 import argparse
-import sys
-import os
-from pathlib import Path
+import importlib
 import math
+import os
+import sys
+from pathlib import Path
 
 # If you use torch for loss calculation; uncomment if required:
 import torch
@@ -39,7 +39,7 @@ def load_tokenizer(tokenizer_class_path, vocab_path):
 
 def _load_model(model_class_path, checkpoint_path, device):
     """
-    Load custom model using its class-based loader. 
+    Load custom model using its class-based loader.
     This implementation uses .load(path) classmethod if available.
     """
     ModelClass = _dynamic_import(model_class_path)
@@ -116,7 +116,7 @@ def main():
                 out = model.encode(ids[:-1])
             else:
                 raise ValueError("Model missing forward/encode/callable method for inference")
-            
+
             if hasattr(model, "executor") and hasattr(model.executor, "get_logits"):
                 logits = model.executor.get_logits(out.get("hidden_states", []), ids[:-1])
             elif "logits" in out:

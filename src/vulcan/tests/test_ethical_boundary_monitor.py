@@ -13,22 +13,16 @@ Notes:
 from __future__ import annotations
 
 import json
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import pytest
-import re
 
 # Import the module under test. These names must match the public API.
 from src.vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
-    EthicalBoundaryMonitor,
-    EnforcementLevel,
-    BoundaryCategory,
-    ViolationSeverity,
-    EthicalBoundary,
-    EthicalViolation,
-    BoundaryType,
-)
+    BoundaryCategory, BoundaryType, EnforcementLevel, EthicalBoundary,
+    EthicalBoundaryMonitor, EthicalViolation, ViolationSeverity)
 
 # ---------------------------
 # Helpers

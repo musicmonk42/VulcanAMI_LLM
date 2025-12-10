@@ -22,26 +22,18 @@
 #   depends on multiple weightings.
 
 import math
+import threading
 import time
 import types
-import threading
 from collections import defaultdict
 
 import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.internal_critic import (
-    InternalCritic,
-    Critique,
-    Evaluation,
-    Risk,
-    ComparisonResult,
-    PerspectiveScore,
-    CritiqueLevel,
-    EvaluationPerspective,
-    RiskCategory,
-    RiskSeverity,
-)
+    ComparisonResult, Critique, CritiqueLevel, Evaluation,
+    EvaluationPerspective, InternalCritic, PerspectiveScore, Risk,
+    RiskCategory, RiskSeverity)
 
 # ---------------------------
 # Dependency stubs

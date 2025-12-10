@@ -5,19 +5,21 @@ Fixed version with complete ModalityType definition and numerical stability impr
 FULLY IMPLEMENTED VERSION with real feature extraction.
 """
 
-from typing import Any, Dict, List, Tuple, Optional, Union, Callable, TYPE_CHECKING
+import json
+import logging
+import pickle
+import threading
+import time
+import uuid
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-import numpy as np
-import uuid
-import time
-import logging
 from pathlib import Path
-import pickle
-import json
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
-import threading
+from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple,
+                    Union)
+
+import numpy as np
 
 if TYPE_CHECKING:
     import torch
@@ -33,12 +35,8 @@ except ImportError:
     torch = None  # type: ignore
     logging.getLogger(__name__).warning("PyTorch not available, neural fusion disabled")
 
-from .reasoning_types import (
-    ReasoningStep,
-    ReasoningChain,
-    ReasoningResult,
-    ReasoningType,
-)
+from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
+                              ReasoningType)
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +61,8 @@ except ImportError:
 # Vision feature extraction dependencies
 try:
     import timm
-    from PIL import Image
     import torchvision.transforms as transforms
+    from PIL import Image
 
     VISION_AVAILABLE = True
 except ImportError:
@@ -74,7 +72,7 @@ except ImportError:
 # Audio feature extraction dependencies
 try:
     import librosa
-    from transformers import Wav2Vec2Processor, Wav2Vec2Model
+    from transformers import Wav2Vec2Model, Wav2Vec2Processor
 
     AUDIO_AVAILABLE = True
 except ImportError:

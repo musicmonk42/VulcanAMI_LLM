@@ -2,18 +2,16 @@
 test_counterfactual_objectives.py - Unit tests for CounterfactualObjectiveReasoner
 """
 
-import pytest
-import numpy as np
 import time
-from unittest.mock import Mock, MagicMock, patch
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 from vulcan.world_model.meta_reasoning.counterfactual_objectives import (
-    CounterfactualObjectiveReasoner,
-    CounterfactualOutcome,
-    ObjectiveComparison,
-    ParetoPoint,
-)
+    CounterfactualObjectiveReasoner, CounterfactualOutcome,
+    ObjectiveComparison, ParetoPoint)
 
 
 @pytest.fixture

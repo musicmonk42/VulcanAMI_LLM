@@ -10,19 +10,19 @@ Tests cover:
 - Async operations
 """
 
-import pytest
 import asyncio
-import numpy as np
 import pickle
-import zlib
-from unittest.mock import Mock, patch
-from typing import List
-
 import sys
+import zlib
+from typing import List
+from unittest.mock import Mock, patch
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from lsm import BloomFilter, Packfile, MerkleNode, MerkleLSMDAG, MerkleLSM
+from lsm import BloomFilter, MerkleLSM, MerkleLSMDAG, MerkleNode, Packfile
 
 
 class TestBloomFilter:

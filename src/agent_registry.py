@@ -7,35 +7,34 @@ A comprehensive registry for managing agent identities with proper cryptographic
 signatures, key management, certificate support, and enterprise security features.
 """
 
-import json
-import logging
 import hashlib
 import hmac
-import time
+import json
+import logging
 import os
 import secrets
-import threading
 import sqlite3
-from pathlib import Path
-from typing import Dict, Optional, List, Tuple, Any, Union, Set
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
-from enum import Enum
+import tempfile
+import threading
+import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
-import tempfile
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-# Cryptographic imports
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, padding, ed25519, ec
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
-from cryptography.x509 import load_pem_x509_certificate, Certificate
-from cryptography.x509.oid import NameOID
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import constant_time
+from cryptography.hazmat.backends import default_backend
+# Cryptographic imports
+from cryptography.hazmat.primitives import constant_time, hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.x509 import Certificate, load_pem_x509_certificate
+from cryptography.x509.oid import NameOID
 
 try:
     from vulcan_integration import VulcanGraphixBridge

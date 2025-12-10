@@ -11,32 +11,20 @@ Tests cover:
 - Thread safety
 """
 
-import pytest
-import time
 import threading
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+import time
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 from vulcan.curiosity_engine.experiment_generator import (
-    ExperimentType,
-    FailureType,
-    Constraint,
-    KnowledgeGap,
-    Experiment,
-    FailureAnalysis,
-    ExperimentTemplates,
-    ExperimentCache,
-    ExperimentTracker,
-    SyntheticDataGenerator,
-    DomainSimilarityCalculator,
-    ExperimentBuilder,
-    ExperimentGenerator,
-    FailureAnalyzer,
-    ParameterAdjuster,
-    IterativeExperimentDesigner,
-)
-
+    Constraint, DomainSimilarityCalculator, Experiment, ExperimentBuilder,
+    ExperimentCache, ExperimentGenerator, ExperimentTemplates,
+    ExperimentTracker, ExperimentType, FailureAnalysis, FailureAnalyzer,
+    FailureType, IterativeExperimentDesigner, KnowledgeGap, ParameterAdjuster,
+    SyntheticDataGenerator)
 
 # ============================================================================
 # Fixtures

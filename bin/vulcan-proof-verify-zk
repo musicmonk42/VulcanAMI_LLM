@@ -4,8 +4,14 @@
 # Version: 4.6.0
 ################################################################################
 
-import sys, os, argparse, json, logging, hashlib, subprocess
-from typing import Dict, Any
+import argparse
+import hashlib
+import json
+import logging
+import os
+import subprocess
+import sys
+from typing import Any, Dict
 
 VERSION = "4.6.0"
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')

@@ -10,24 +10,19 @@ Revision / Fix Notes (Applied):
 4. FIXED: Made atexit handlers non-blocking during pytest runs to prevent test freeze.
 """
 
+import atexit
+import json
 import logging
+import os
 import threading
 import time
-import json
-import atexit
-import os
-from typing import Any, Dict, List, Optional, Tuple, Callable
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .safety_types import (
-    ToolSafetyLevel,
-    ToolSafetyContract,
-    SafetyViolationType,
-    SafetyReport,
-    ActionType,
-    Condition,
-)
+from .safety_types import (ActionType, Condition, SafetyReport,
+                           SafetyViolationType, ToolSafetyContract,
+                           ToolSafetyLevel)
 
 logger = logging.getLogger(__name__)
 

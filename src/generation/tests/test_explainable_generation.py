@@ -13,25 +13,19 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import unittest
 import math
 import sys
-from unittest.mock import Mock, MagicMock, patch
+import unittest
+from unittest.mock import MagicMock, Mock, patch
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from explainable_generation import (
-    ExplainableGeneration,
-    ExplanationLevel,
-    AttributionMethod,
-    AltCandidate,
-    DecisionSummary,
-    FeatureAttribution,
-    CausalEvent,
-    CounterfactualAnalysis,
-    ContextContribution,
-)
+from explainable_generation import (AltCandidate, AttributionMethod,
+                                    CausalEvent, ContextContribution,
+                                    CounterfactualAnalysis, DecisionSummary,
+                                    ExplainableGeneration, ExplanationLevel,
+                                    FeatureAttribution)
 
 
 class MockBridge:

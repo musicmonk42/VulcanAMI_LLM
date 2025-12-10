@@ -7,18 +7,19 @@ import pytest
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for rlhf_feedback tests")
 
-import torch.nn as nn
-import numpy as np
 import asyncio
-import aiohttp
-import time
-from unittest.mock import Mock, patch, MagicMock, AsyncMock, create_autospec
 import threading
+import time
 from collections import deque
+from unittest.mock import AsyncMock, MagicMock, Mock, create_autospec, patch
 
-from vulcan.learning.rlhf_feedback import RLHFManager, LiveFeedbackProcessor
-from vulcan.learning.learning_types import LearningConfig, FeedbackData
+import aiohttp
+import numpy as np
+import torch.nn as nn
+
 from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
+from vulcan.learning.learning_types import FeedbackData, LearningConfig
+from vulcan.learning.rlhf_feedback import LiveFeedbackProcessor, RLHFManager
 
 
 class SimpleModel(nn.Module):

@@ -11,29 +11,25 @@ Tests:
 - Statistics tracking
 """
 
-import pytest
-import numpy as np
 import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
-from unittest.mock import Mock, MagicMock
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock
+
+import numpy as np
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
-from problem_decomposer.fallback_chain import (
-    FallbackChain,
-    ExecutionPlan,
-    DecompositionComponent,
-    DecompositionFailure,
-    StrategyStatus,
-    FailureType,
-    ComponentType,
-)
-
+from problem_decomposer.fallback_chain import (ComponentType,
+                                               DecompositionComponent,
+                                               DecompositionFailure,
+                                               ExecutionPlan, FailureType,
+                                               FallbackChain, StrategyStatus)
 from problem_decomposer.problem_decomposer_core import ProblemGraph
 
 # Configure logging

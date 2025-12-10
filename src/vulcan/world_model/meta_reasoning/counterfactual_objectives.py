@@ -13,14 +13,15 @@ Learns from validation history to improve predictions.
 """
 
 import logging
-import time
-import numpy as np
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
 from itertools import combinations
+from typing import Any, Dict, List, Optional, Set, Tuple
 from unittest.mock import MagicMock  # ADDED as per fix steps
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

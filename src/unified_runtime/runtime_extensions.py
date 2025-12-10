@@ -3,22 +3,22 @@ Runtime Extensions Module for Graphix IR
 Learning, evolution, explainability, and autonomous optimization capabilities
 """
 
-import json
-import time
 import hashlib
-import os
-import shutil
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Set, Callable
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from collections import defaultdict, deque
+import json
 import logging
-import traceback
-import random
-from datetime import datetime, timedelta
-import threading
+import os
 import pickle
+import random
+import shutil
+import threading
+import time
+import traceback
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 try:
     import numpy as np

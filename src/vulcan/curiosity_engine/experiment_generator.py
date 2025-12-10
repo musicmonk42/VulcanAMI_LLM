@@ -5,21 +5,22 @@ Part of the VULCAN-AGI system
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-from pathlib import Path
-from enum import Enum
 import copy
-from functools import lru_cache
 import hashlib
+import json
+import logging
 import threading
+import time
 import uuid
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 from unittest.mock import MagicMock
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

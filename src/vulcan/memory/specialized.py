@@ -1,30 +1,24 @@
 """Specialized memory types: Episodic, Semantic, Procedural, Working"""
 
-import numpy as np
-import time
-import logging
+import ast
+import copy
 import hashlib
 import json
-import pickle
-from typing import Any, Dict, List, Optional, Tuple, Set, Callable, Union
-from dataclasses import dataclass, field, asdict
-from collections import deque, defaultdict, Counter
-from datetime import datetime, timedelta
-import threading
-import re
-import ast
+import logging
 import operator
-import copy
+import pickle
+import re
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .base import (
-    Memory,
-    MemoryType,
-    MemoryConfig,
-    BaseMemorySystem,
-    MemoryQuery,
-    RetrievalResult,
-    MemoryStats,
-)
+import numpy as np
+
+from .base import (BaseMemorySystem, Memory, MemoryConfig, MemoryQuery,
+                   MemoryStats, MemoryType, RetrievalResult)
 from .hierarchical import HierarchicalMemory
 
 # Try to import optional dependencies
@@ -2114,7 +2108,7 @@ class Skill:
 
     def _check_condition(self, condition: str, context: Any) -> bool:
         """Check if condition is met using safe expression evaluation.
-        
+
         Fails securely by returning False when unsafe conditions are detected.
         """
         try:
@@ -2122,36 +2116,38 @@ class Skill:
             if isinstance(context, dict):
                 # Use ast module for safe evaluation of simple expressions
                 # This only allows literal structures and basic comparisons
-                
+
                 try:
                     import ast
+
                     # Parse the condition
                     tree = ast.parse(condition, mode='eval')
-                    
+
                     # Only allow safe operations (Python 3.8+ compatible)
                     # Removed deprecated ast.Num, ast.Str, ast.NameConstant
                     safe_nodes = (ast.Expression, ast.Constant,
                                   ast.List, ast.Tuple, ast.Dict,
                                   ast.Name, ast.Load, ast.Compare, ast.BoolOp,
-                                  ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt, 
+                                  ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt,
                                   ast.LtE, ast.Gt, ast.GtE, ast.In, ast.NotIn,
                                   ast.UnaryOp, ast.Not)
-                    
+
                     for node in ast.walk(tree):
                         if not isinstance(node, safe_nodes):
                             logger.warning(f"Unsafe node in condition '{condition}': {type(node).__name__}")
                             # Fail securely - return False instead of True
                             return False
-                    
+
                     # Create a restricted namespace with only the context variables
-                    # and no builtins
+                    # and no builtins to prevent code injection
                     namespace = {'__builtins__': {}}
                     namespace.update(context)
-                    
+
                     # Compile and evaluate the safe expression
+                    # nosec B307: Using eval with restricted namespace (no builtins) for safe evaluation
                     code = compile(tree, '<condition>', 'eval')
-                    return bool(eval(code, namespace, {}))
-                    
+                    return bool(eval(code, namespace, {}))  # nosec B307
+
                 except (SyntaxError, ValueError, TypeError) as e:
                     logger.debug(f"Could not parse condition '{condition}': {e}")
                     # Fail securely - return False if we can't parse

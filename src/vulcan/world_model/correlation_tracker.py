@@ -8,18 +8,19 @@ COMPLETE: Robust correlation implementations with accurate p-values and tie hand
 FIXED: All API compatibility issues, memory leaks, and statistical corrections
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
 import json
-from pathlib import Path
-from enum import Enum
+import logging
 import threading
+import time
 import warnings
-from math import sqrt, log, exp, erf
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from math import erf, exp, log, sqrt
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # Import shared types to avoid circular dependencies
 try:
@@ -42,8 +43,8 @@ def _lazy_import_safety_validator():
     global EnhancedSafetyValidator, SafetyConfig
     if EnhancedSafetyValidator is None:
         try:
-            from ..safety.safety_validator import EnhancedSafetyValidator
             from ..safety.safety_types import SafetyConfig
+            from ..safety.safety_validator import EnhancedSafetyValidator
 
             logger.info("Safety validator lazy loaded successfully")
         except ImportError as e:
@@ -70,8 +71,9 @@ def _lazy_import_world_model():
 # Protected imports with fallbacks
 try:
     from scipy import stats
-    from scipy.stats import pearsonr, spearmanr, kendalltau, t as t_dist
     from scipy.special import betainc
+    from scipy.stats import kendalltau, pearsonr, spearmanr
+    from scipy.stats import t as t_dist
 
     SCIPY_AVAILABLE = True
 except ImportError:

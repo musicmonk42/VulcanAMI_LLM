@@ -4,28 +4,29 @@
 # ENHANCED: Real resource monitoring, network management, power control, survival protocols
 # ============================================================
 
-import numpy as np
-import time
-from typing import Any, Dict, List, Optional, Tuple, Set, Union, Callable
-from collections import defaultdict, deque
-from dataclasses import dataclass, field
-from enum import Enum
-import logging
-import hashlib
-import threading
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
-import heapq
-from queue import PriorityQueue, Queue
-import copy
-import json
 import asyncio
-import weakref
+import copy
 import gc
-import platform
+import hashlib
+import heapq
+import json
+import logging
 import os
+import platform
 import socket
 import subprocess
+import threading
+import time
+import weakref
+from collections import defaultdict, deque
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from enum import Enum
+from queue import PriorityQueue, Queue
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # System monitoring imports
 try:

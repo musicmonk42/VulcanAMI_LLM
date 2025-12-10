@@ -20,11 +20,11 @@ Revision Notes (Fixes Applied):
 3. Minor doc clarifications; all original logic preserved untruncated.
 """
 
+import logging
 import math
 import random
-from typing import Any, Dict, Tuple, List, Optional, Callable
 from collections import defaultdict
-import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

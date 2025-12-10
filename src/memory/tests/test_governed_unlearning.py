@@ -1,24 +1,19 @@
 """Comprehensive test suite for governed_unlearning.py"""
 
-import pytest
-import time
-import threading
-from unittest.mock import Mock
 import sys
+import threading
+import time
+from unittest.mock import Mock
+
+import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from governed_unlearning import (
-    ProposalStatus,
-    UnlearningMethod,
-    UrgencyLevel,
-    IRProposal,
-    GovernanceResult,
-    UnlearningTask,
-    UnlearningMetrics,
-    UnlearningAuditLogger,
-    GovernedUnlearning,
-)
+from governed_unlearning import (GovernanceResult, GovernedUnlearning,
+                                 IRProposal, ProposalStatus,
+                                 UnlearningAuditLogger, UnlearningMethod,
+                                 UnlearningMetrics, UnlearningTask,
+                                 UrgencyLevel)
 
 # ============================================================
 # TEST DATA CLASSES

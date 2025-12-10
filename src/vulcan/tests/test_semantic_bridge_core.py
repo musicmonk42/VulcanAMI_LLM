@@ -3,15 +3,15 @@ test_semantic_bridge_core.py - PURE MOCK VERSION
 Tests semantic bridge core functionality without spawning threads.
 """
 
-import pytest
-import time
 import threading
-from typing import Dict, List, Any, Optional, Set
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set
 from unittest.mock import Mock
 
+import pytest
 
 # ============================================================================
 # Mock Enums

@@ -5,16 +5,17 @@ This conftest.py ensures the src directory is in the Python path
 so that `from vulcan.xxx import yyy` style imports work correctly.
 """
 
-import sys
+import asyncio
+import gc
 import os
 import pathlib
-import pytest
-import asyncio
-import warnings
+import sys
 import threading
-import gc
 import uuid
+import warnings
 from unittest.mock import Mock
+
+import pytest
 
 # Add src directory to Python path
 ROOT = pathlib.Path(__file__).resolve().parents[3]  # Go up to repo root
@@ -349,10 +350,10 @@ def cleanup_session_resources():
 
     # 2. Stop any EnhancedResourceMonitor threads
     try:
-        from vulcan import planning
-
         # Suppress torch.distributed deprecation warnings during cleanup
         import warnings
+
+        from vulcan import planning
 
         with warnings.catch_warnings():
             warnings.filterwarnings(

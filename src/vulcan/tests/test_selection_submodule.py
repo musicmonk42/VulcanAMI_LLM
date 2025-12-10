@@ -13,35 +13,28 @@ This is a complement to the broader integration test.
 To run: `pytest src/vulcan/tests/test_selection_submodule.py`
 """
 
-import unittest
-import time
-import numpy as np
 import logging
 import sys
+import time
+import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+import numpy as np
 
 # Add the 'src' directory to the Python path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 try:
     from vulcan.reasoning.selection.admission_control import (
-        AdmissionControlIntegration,
-        Request,
-        RequestPriority,
-        AdmissionDecision,
-    )
+        AdmissionControlIntegration, AdmissionDecision, Request,
+        RequestPriority)
     from vulcan.reasoning.selection.portfolio_executor import (
-        PortfolioExecutor,
-        ExecutionStrategy,
-        PortfolioResult,
-    )
+        ExecutionStrategy, PortfolioExecutor, PortfolioResult)
+    from vulcan.reasoning.selection.utility_model import (ContextMode,
+                                                          UtilityContext,
+                                                          UtilityModel)
     from vulcan.reasoning.selection.warm_pool import WarmStartPool
-    from vulcan.reasoning.selection.utility_model import (
-        UtilityModel,
-        UtilityContext,
-        ContextMode,
-    )
 except ImportError as e:
     print(f"Failed to import selection modules: {e}")
     print(

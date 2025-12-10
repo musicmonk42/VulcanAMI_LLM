@@ -4,8 +4,8 @@ import asyncio
 import inspect
 import logging
 import time
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, Optional, Callable, Union, List
+from dataclasses import asdict, dataclass
+from typing import Any, Callable, Dict, List, Optional, Union
 
 log = logging.getLogger(__name__)
 

@@ -5,11 +5,11 @@ Includes terms, literals, clauses, unification, and proof nodes.
 All core functionality extracted from symbolic_reasoning.py.
 """
 
-from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Set
-from abc import ABC
 import copy
 import logging
+from abc import ABC
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 

@@ -14,27 +14,21 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import pytest
-import numpy as np
 import threading
 import time
-from typing import List, Set
 from collections import defaultdict
+from typing import List, Set
+
+import numpy as np
+import pytest
 
 # Import the module under test
-from vulcan.world_model.causal_graph import (
-    CausalDAG,
-    CausalEdge,
-    CausalPath,
-    EvidenceType,
-    ProbabilityDistribution,
-    GraphStructure,
-    CycleDetector,
-    PathFinder,
-    DSeparationChecker,
-    TopologicalSorter,
-)
-
+from vulcan.world_model.causal_graph import (CausalDAG, CausalEdge, CausalPath,
+                                             CycleDetector, DSeparationChecker,
+                                             EvidenceType, GraphStructure,
+                                             PathFinder,
+                                             ProbabilityDistribution,
+                                             TopologicalSorter)
 
 # ==================== FIXTURES ====================
 

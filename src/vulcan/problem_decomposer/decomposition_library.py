@@ -3,19 +3,20 @@ decomposition_library.py - Pattern and principle library for problem decomposer
 Part of the VULCAN-AGI system
 """
 
-import numpy as np
-import logging
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-import time
-import json
-import pickle
-from pathlib import Path
-from enum import Enum
 import hashlib
 import heapq
+import json
+import logging
+import pickle
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 # Optional imports with fallbacks
 try:
@@ -1053,20 +1054,16 @@ class StratifiedDecompositionLibrary(DecompositionLibrary):
         # This would return actual strategy objects in full implementation
         # For now, return a mock strategy
         try:
-            from .decomposition_strategies import (
-                DecompositionStrategy,
-                ExactDecomposition,
-                SemanticDecomposition,
-                StructuralDecomposition,
-            )
+            from .decomposition_strategies import (DecompositionStrategy,
+                                                   ExactDecomposition,
+                                                   SemanticDecomposition,
+                                                   StructuralDecomposition)
         except ImportError:
             try:
-                from decomposition_strategies import (
-                    DecompositionStrategy,
-                    ExactDecomposition,
-                    SemanticDecomposition,
-                    StructuralDecomposition,
-                )
+                from decomposition_strategies import (DecompositionStrategy,
+                                                      ExactDecomposition,
+                                                      SemanticDecomposition,
+                                                      StructuralDecomposition)
             except ImportError:
                 logger.warning("Could not import decomposition strategies")
                 return None

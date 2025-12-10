@@ -3,28 +3,24 @@ test_knowledge_crystallizer_core.py - Comprehensive tests for Knowledge Crystall
 Part of the VULCAN-AGI system test suite
 """
 
-import pytest
 import time
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
 
+import numpy as np
+import pytest
+
+from vulcan.knowledge_crystallizer.contraindication_tracker import \
+    Contraindication
+from vulcan.knowledge_crystallizer.crystallization_selector import \
+    CrystallizationMethod
 # Import the module components to test
 from vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
-    CrystallizationMode,
-    ApplicationMode,
-    ExecutionTrace,
-    CrystallizationResult,
-    ApplicationResult,
-    ImbalanceHandler,
-    KnowledgeCrystallizer,
-    KnowledgeApplicator,
-)
+    ApplicationMode, ApplicationResult, CrystallizationMode,
+    CrystallizationResult, ExecutionTrace, ImbalanceHandler,
+    KnowledgeApplicator, KnowledgeCrystallizer)
 from vulcan.knowledge_crystallizer.principle_extractor import Principle
 from vulcan.knowledge_crystallizer.validation_engine import ValidationResult
-from vulcan.knowledge_crystallizer.contraindication_tracker import Contraindication
-from vulcan.knowledge_crystallizer.crystallization_selector import CrystallizationMethod
-
 
 # ============================================================================
 # FIXTURES

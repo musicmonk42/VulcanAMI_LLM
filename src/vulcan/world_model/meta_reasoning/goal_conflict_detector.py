@@ -21,15 +21,13 @@ FIXED(test_world_model_meta_reasoning_integration): Corrected call signature for
 """
 
 import logging
-import time
-
-# import numpy as np # Original import
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
 import threading
-
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+# import numpy as np # Original import
+from typing import Any, Dict, List, Optional, Set, Tuple
 # FIXED: Import Mock for type checking in __init__
 from unittest.mock import MagicMock, Mock
 
@@ -108,12 +106,12 @@ except ImportError:
 
 # Replacement block:
 try:
-    from .objective_hierarchy import ObjectiveHierarchy as RealObjectiveHierarchy
-    from .objective_hierarchy import Objective as RealObjective
-    from .objective_hierarchy import ObjectiveType as RealObjectiveType
-
     # Rename imported ConflictType to avoid clash with local definition
     from .objective_hierarchy import ConflictType as RealHierarchyConflictType
+    from .objective_hierarchy import Objective as RealObjective
+    from .objective_hierarchy import \
+        ObjectiveHierarchy as RealObjectiveHierarchy
+    from .objective_hierarchy import ObjectiveType as RealObjectiveType
 
     ObjectiveHierarchy = RealObjectiveHierarchy
     Objective = RealObjective

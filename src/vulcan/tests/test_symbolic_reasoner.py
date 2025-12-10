@@ -9,27 +9,18 @@ Tests cover:
 All tests validate the FIXED implementations.
 """
 
-import pytest
 import time
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-# Import the classes we're testing
-from src.vulcan.reasoning.symbolic.reasoner import (
-    SymbolicReasoner,
-    ProbabilisticReasoner,
-    HybridReasoner,
-)
+import pytest
 
 # Import core types for validation
-from src.vulcan.reasoning.symbolic.core import (
-    Variable,
-    Constant,
-    Function,
-    Literal,
-    Clause,
-    ProofNode,
-)
-
+from src.vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
+                                                Literal, ProofNode, Variable)
+# Import the classes we're testing
+from src.vulcan.reasoning.symbolic.reasoner import (HybridReasoner,
+                                                    ProbabilisticReasoner,
+                                                    SymbolicReasoner)
 
 # ============================================================================
 # SYMBOLIC REASONER TESTS

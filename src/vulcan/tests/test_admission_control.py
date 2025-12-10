@@ -5,33 +5,24 @@ Tests rate limiting, circuit breakers, resource monitoring, priority queues,
 and adaptive admission control with proper thread safety validation.
 """
 
-import pytest
-import time
-import threading
-from typing import Dict, Any
-from unittest.mock import Mock, MagicMock, patch
-import psutil
-
 # Import the module to test
 import sys
+import threading
+import time
 from pathlib import Path
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
+
+import psutil
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from vulcan.reasoning.selection.admission_control import (
-    RequestPriority,
-    AdmissionDecision,
-    SystemHealth,
-    Request,
-    AdmissionMetrics,
-    TokenBucketRateLimiter,
-    SlidingWindowRateLimiter,
-    CircuitBreaker,
-    ResourceMonitor,
-    PriorityQueue,
-    AdaptiveAdmissionController,
-    AdmissionControlIntegration,
-)
+    AdaptiveAdmissionController, AdmissionControlIntegration,
+    AdmissionDecision, AdmissionMetrics, CircuitBreaker, PriorityQueue,
+    Request, RequestPriority, ResourceMonitor, SlidingWindowRateLimiter,
+    SystemHealth, TokenBucketRateLimiter)
 
 
 class TestEnums:

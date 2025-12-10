@@ -10,19 +10,20 @@ FULLY IMPLEMENTED VERSION with:
 - Deep attribute understanding
 """
 
-from typing import Any, Dict, List, Set, Tuple, Optional, Union, Callable
-from collections import defaultdict, deque
-from dataclasses import dataclass, field
-import logging
-import numpy as np
-from pathlib import Path
-import pickle
-import json
-import time
-from enum import Enum
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import hashlib
+import json
+import logging
+import pickle
 import re
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,9 @@ except ImportError:
     logger.warning("NetworkX not available, graph matching disabled")
 
 try:
-    from sklearn.metrics.pairwise import cosine_similarity
     from sklearn.cluster import KMeans
     from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
 
     SKLEARN_AVAILABLE = True
 except ImportError:

@@ -2,21 +2,22 @@
 Meta-learning implementation with task detection
 """
 
+import json
+import logging
+import pickle
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple, Union
-from collections import defaultdict, deque
-from dataclasses import dataclass, asdict
-import logging
-import time
-import json
-import pickle
-from pathlib import Path
-from enum import Enum
-import threading
+import torch.optim as optim
 
 # Safe import of ModalityType
 try:
@@ -28,9 +29,9 @@ except (ImportError, AttributeError):
     MODALITY_TYPE_AVAILABLE = False
 
 from ..config import EMBEDDING_DIM, HIDDEN_DIM
+from ..security_fixes import safe_pickle_load
 from .learning_types import LearningConfig
 from .parameter_history import ParameterHistoryManager
-from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 

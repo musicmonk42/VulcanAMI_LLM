@@ -50,32 +50,29 @@ NOTE: To revert to original scheduling behavior, remove the warmup gating around
 """
 
 from __future__ import annotations
+
 import argparse
 import json
-import os
-import time
 import math
+import os
 import random
-from typing import Dict, Any, List
+import time
+from typing import Any, Dict, List
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from src.training.data_loader import CorpusDataLoader
-from src.training.gpt_model import GPTModel, GPTConfig
-from src.training.self_awareness import (
-    calculate_distinct_n,
-    build_extended_awareness,
-    awareness_summary,
-    summarize_entropies,
-    calculate_ece,
-    calculate_mce,
-    calculate_adaptive_ece,
-)
 from src.training.awareness_thresholds import AwarenessThresholds
+from src.training.data_loader import CorpusDataLoader
 from src.training.drift_detection import detect_drift
+from src.training.gpt_model import GPTConfig, GPTModel
 from src.training.post_training_report import generate_report
+from src.training.self_awareness import (awareness_summary,
+                                         build_extended_awareness,
+                                         calculate_adaptive_ece,
+                                         calculate_distinct_n, calculate_ece,
+                                         calculate_mce, summarize_entropies)
 
 
 # -------------------------------------------------------------------

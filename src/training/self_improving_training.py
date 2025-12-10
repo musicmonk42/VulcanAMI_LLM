@@ -37,17 +37,17 @@ This version includes additional fixes and enhancements:
 11. Added optional integration stub for external trainer adjustments.
 """
 
-import math
-import random
-import time
-import statistics
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple, Callable, Set
-from collections import defaultdict, deque
-from enum import Enum
 import logging
+import math
+import random
+import statistics
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 

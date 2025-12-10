@@ -5,16 +5,16 @@ Version: 2.0.0 - All crashes fixed, semantic augmentation implemented
 Generates high-quality synthetic, counterfactual, and adversarial graph proposals.
 """
 
-import random
 import copy
 import hashlib
 import json
-import threading
 import logging
-from typing import Dict, Any, List, Optional, Callable, Tuple, Set
-from datetime import datetime
+import random
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # Configure logging
 logging.basicConfig(

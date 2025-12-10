@@ -5,29 +5,28 @@ Tests all utility functions, weight management, context handling,
 and the complete UtilityModel API including caching and learning.
 """
 
-import pytest
-import numpy as np
-import time
-import threading
-import tempfile
 import json
+import tempfile
+import threading
+import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import numpy as np
+import pytest
+
 # Import the utility model module
-from vulcan.reasoning.selection.utility_model import (
-    UtilityModel,
-    UtilityWeights,
-    UtilityContext,
-    UtilityComponents,
-    ContextMode,
-    LinearUtility,
-    ExponentialUtility,
-    LogarithmicUtility,
-    ThresholdUtility,
-    SigmoidUtility,
-    UtilityFunction,
-)
+from vulcan.reasoning.selection.utility_model import (ContextMode,
+                                                      ExponentialUtility,
+                                                      LinearUtility,
+                                                      LogarithmicUtility,
+                                                      SigmoidUtility,
+                                                      ThresholdUtility,
+                                                      UtilityComponents,
+                                                      UtilityContext,
+                                                      UtilityFunction,
+                                                      UtilityModel,
+                                                      UtilityWeights)
 
 
 class TestUtilityWeights:

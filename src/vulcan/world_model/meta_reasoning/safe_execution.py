@@ -13,17 +13,17 @@ This module provides sandboxed execution of improvement actions with:
 Security: CRITICAL
 """
 
-import subprocess
 import logging
-import time
-import shlex
 import os
-import tempfile
+import shlex
 import shutil
-from typing import Dict, Any, List, Optional, Tuple
+import subprocess
+import tempfile
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
-import threading
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

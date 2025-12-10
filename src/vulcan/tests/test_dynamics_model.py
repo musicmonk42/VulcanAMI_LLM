@@ -3,16 +3,16 @@ test_dynamics_model.py - PURE MOCK VERSION
 Tests dynamics model without spawning threads.
 """
 
-import pytest
-import numpy as np
-import time
 import threading
-from typing import Dict, Any, List, Optional, Tuple
+import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import deque
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import Mock
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums

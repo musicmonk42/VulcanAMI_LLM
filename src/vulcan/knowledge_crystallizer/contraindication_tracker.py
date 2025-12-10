@@ -3,18 +3,20 @@ contraindication_tracker.py - Contraindication tracking for Knowledge Crystalliz
 Part of the VULCAN-AGI system
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field, asdict
-from collections import defaultdict, deque, Counter
-import time
-import json
-from pathlib import Path
-from enum import Enum
-import threading
-import pickle
 import hashlib
+import json
+import logging
+import pickle
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
+
 from ..security_fixes import safe_pickle_load
 
 # Optional imports with fallbacks

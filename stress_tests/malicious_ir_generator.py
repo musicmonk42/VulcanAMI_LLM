@@ -5,14 +5,14 @@ Generates comprehensive set of malicious/invalid Graphix IR graphs for stress te
 Security-hardened version with obfuscated patterns and proper error handling.
 """
 
+import base64
 import json
+import os
 import random
 import string
-import os
-import base64
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
 from collections import defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 # Configuration constants
 DEFAULT_OVERSIZED_NODES = 1000
@@ -23,7 +23,7 @@ MAX_SAFE_RECURSION_DEPTH = 50
 
 class PatternGenerator:
     """Generates obfuscated test patterns to avoid creating weaponizable exploits."""
-    
+
     @staticmethod
     def get_sql_pattern(index: int = 0) -> str:
         """Generate SQL injection test pattern."""
@@ -34,7 +34,7 @@ class PatternGenerator:
             "'; EXEC_CMD --"
         ]
         return patterns[index % len(patterns)]
-    
+
     @staticmethod
     def get_command_pattern(index: int = 0) -> str:
         """Generate command injection test pattern."""
@@ -45,7 +45,7 @@ class PatternGenerator:
             "`BACKTICK_CMD`"
         ]
         return patterns[index % len(patterns)]
-    
+
     @staticmethod
     def get_xss_pattern(index: int = 0) -> str:
         """Generate XSS test pattern."""
@@ -56,7 +56,7 @@ class PatternGenerator:
             "onload=HANDLER"
         ]
         return patterns[index % len(patterns)]
-    
+
     @staticmethod
     def get_path_pattern(index: int = 0) -> str:
         """Generate path traversal test pattern."""
@@ -67,7 +67,7 @@ class PatternGenerator:
             "C:\\Windows\\SYSTEM_FILE"
         ]
         return patterns[index % len(patterns)]
-    
+
     @staticmethod
     def get_template_pattern(index: int = 0) -> str:
         """Generate template injection test pattern."""
@@ -84,11 +84,11 @@ class IRGenerator:
     Comprehensive generator for invalid/malicious IR graphs for stress testing.
     Security-hardened with obfuscated patterns and proper error handling.
     """
-    
+
     def __init__(self, seed: Optional[int] = None, verbose: bool = False):
         """
         Initialize the IR generator with optional seed for reproducibility.
-        
+
         Args:
             seed: Random seed for reproducible test generation
             verbose: Whether to print detailed generation information
@@ -100,23 +100,23 @@ class IRGenerator:
         else:
             self.seed = random.randint(0, 1000000)
             random.seed(self.seed)
-        
+
         self.generated_count = 0
         self.output_dir = "test_ir"
-        
+
         # Track generated IDs for reference testing
         self.valid_node_ids = []
         self.invalid_node_ids = []
-        
+
         # Pattern generator for security-safe test patterns
         self.patterns = PatternGenerator()
-        
+
         # Configuration
         self.oversized_nodes = DEFAULT_OVERSIZED_NODES
         self.oversized_edges = DEFAULT_OVERSIZED_EDGES
         self.buffer_size_kb = DEFAULT_BUFFER_SIZE_KB
         self.nesting_depth = DEFAULT_NESTING_DEPTH
-    
+
     def configure(self, oversized_nodes: int = None, oversized_edges: int = None,
                  buffer_size_kb: int = None, nesting_depth: int = None):
         """Configure generator parameters."""
@@ -128,7 +128,7 @@ class IRGenerator:
             self.buffer_size_kb = buffer_size_kb
         if nesting_depth is not None:
             self.nesting_depth = min(nesting_depth, MAX_SAFE_RECURSION_DEPTH)
-    
+
     def generate_invalid_graph(self) -> Dict[str, Any]:
         """
         Generate a random invalid graph with various types of malicious patterns.
@@ -150,20 +150,20 @@ class IRGenerator:
             self._generate_oversized_graph,
             self._generate_malformed_json_graph
         ]
-        
+
         strategy = random.choice(strategies)
         graph = strategy()
         self.generated_count += 1
-        
+
         if self.verbose:
             print(f"Generated {strategy.__name__} graph (#{self.generated_count})")
-        
+
         return graph
-    
+
     def _generate_missing_fields_graph(self) -> Dict[str, Any]:
         """Generate a graph with missing required fields - deterministic removal."""
         graph_id = self._generate_id("missing_fields")
-        
+
         # Create base graph with intentional missing fields
         base_graph = {
             "grammar_version": "1.0.0",
@@ -178,27 +178,27 @@ class IRGenerator:
                 {"to": "node2"}  # Missing from field
             ]
         }
-        
+
         # Deterministically remove fields based on seed
         fields_to_remove = ["grammar_version", "type", "nodes", "edges"]
         # Use generator count for determinism
         remove_count = (self.generated_count % 2) + 1
         remove_indices = [(self.generated_count + i) % len(fields_to_remove) for i in range(remove_count)]
-        
+
         for idx in sorted(remove_indices, reverse=True):
             field = fields_to_remove[idx]
             if field in base_graph:
                 del base_graph[field]
-        
+
         return base_graph
-    
+
     def _generate_invalid_types_graph(self) -> Dict[str, Any]:
         """Generate a graph with invalid data types for fields."""
         graph_id = self._generate_id("invalid_types")
-        
+
         # Rotate through different invalid type combinations
         type_index = self.generated_count % 4
-        
+
         if type_index == 0:
             return {
                 "grammar_version": 1.0,  # Number instead of string
@@ -231,18 +231,18 @@ class IRGenerator:
                 "nodes": 999,
                 "edges": "string_edges"
             }
-    
+
     def _generate_circular_dependency_graph(self) -> Dict[str, Any]:
         """Generate a graph with circular dependencies including complex cycles."""
         graph_id = self._generate_id("circular")
-        
+
         nodes = []
         edges = []
-        
+
         # Simple self-loop
         nodes.append({"id": "self_loop", "type": "ComputeNode"})
         edges.append({"from": "self_loop", "to": "self_loop"})
-        
+
         # Two-node cycle
         nodes.extend([
             {"id": "cycle_a", "type": "ComputeNode"},
@@ -252,7 +252,7 @@ class IRGenerator:
             {"from": "cycle_a", "to": "cycle_b"},
             {"from": "cycle_b", "to": "cycle_a"}
         ])
-        
+
         # Three-node cycle
         nodes.extend([
             {"id": "tri_1", "type": "ComputeNode"},
@@ -264,7 +264,7 @@ class IRGenerator:
             {"from": "tri_2", "to": "tri_3"},
             {"from": "tri_3", "to": "tri_1"}
         ])
-        
+
         # Complex cycle with multiple paths (5-node strongly connected component)
         nodes.extend([
             {"id": "scc_1", "type": "ComputeNode"},
@@ -282,7 +282,7 @@ class IRGenerator:
             {"from": "scc_1", "to": "scc_3"},  # Shortcut
             {"from": "scc_3", "to": "scc_5"},  # Another shortcut
         ])
-        
+
         # Nested cycles (two cycles sharing a node)
         nodes.extend([
             {"id": "shared", "type": "ComputeNode"},
@@ -295,7 +295,7 @@ class IRGenerator:
             {"from": "shared", "to": "cycle2_node"},
             {"from": "cycle2_node", "to": "shared"}
         ])
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -308,13 +308,13 @@ class IRGenerator:
                 "cycle_count": 6
             }
         }
-    
+
     def _generate_duplicate_ids_graph(self) -> Dict[str, Any]:
         """Generate a graph with duplicate node and edge IDs."""
         graph_id = self._generate_id("duplicates")
-        
+
         duplicate_id = "duplicate_node"
-        
+
         # Multiple unique nodes plus duplicates
         nodes = [
             {"id": duplicate_id, "type": "InputNode"},
@@ -325,14 +325,14 @@ class IRGenerator:
             {"id": "unique_node_3", "type": "AggregateNode"},
             {"id": "unique_node_1", "type": "FilterNode"},  # Duplicate of unique_node_1
         ]
-        
+
         edges = [
             {"id": "edge1", "from": duplicate_id, "to": "unique_node_1"},
             {"id": "edge1", "from": "unique_node_1", "to": duplicate_id},  # Duplicate edge ID
             {"id": "edge2", "from": "unique_node_2", "to": "unique_node_3"},
             {"id": "edge1", "from": "unique_node_3", "to": "unique_node_2"},  # Another duplicate
         ]
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -340,17 +340,17 @@ class IRGenerator:
             "nodes": nodes,
             "edges": edges
         }
-    
+
     def _generate_invalid_references_graph(self) -> Dict[str, Any]:
         """Generate a graph with edges referencing non-existent nodes."""
         graph_id = self._generate_id("invalid_refs")
-        
+
         nodes = [
             {"id": "existing_1", "type": "InputNode"},
             {"id": "existing_2", "type": "OutputNode"},
             {"id": "existing_3", "type": "ComputeNode"}
         ]
-        
+
         # Test various types of invalid references
         edges = [
             {"from": "existing_1", "to": "non_existent_1"},
@@ -362,7 +362,7 @@ class IRGenerator:
             {"from": "   ", "to": "existing_2"},  # Whitespace-only reference
             {"from": "existing_1", "to": "EXISTING_1"},  # Case-sensitive mismatch
         ]
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -370,16 +370,16 @@ class IRGenerator:
             "nodes": nodes,
             "edges": edges
         }
-    
+
     def _generate_buffer_overflow_graph(self) -> Dict[str, Any]:
         """Generate a graph designed to test buffer overflow vulnerabilities."""
         graph_id = self._generate_id("buffer_overflow")
-        
+
         # Create configurable large strings
         buffer_size = self.buffer_size_kb * 1024
         overflow_string = "A" * buffer_size
         long_id = "node_" + "x" * (buffer_size // 10)
-        
+
         nodes = [
             {"id": long_id, "type": "ComputeNode"},
             {"id": "normal", "type": overflow_string},
@@ -404,11 +404,11 @@ class IRGenerator:
                 "large_array": ["x" * 1000 for _ in range(100)]
             }
         ]
-        
+
         edges = [
             {"from": long_id, "to": "normal", "label": overflow_string}
         ]
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -421,11 +421,11 @@ class IRGenerator:
                 "test_type": "buffer_overflow"
             }
         }
-    
+
     def _generate_injection_attempt_graph(self) -> Dict[str, Any]:
         """Generate a graph with various injection attack patterns (obfuscated)."""
         graph_id = self._generate_id("injection")
-        
+
         # Use pattern generator for security-safe patterns
         nodes = [
             {"id": self.patterns.get_sql_pattern(0), "type": "ComputeNode"},
@@ -444,12 +444,12 @@ class IRGenerator:
                 "data": base64.b64encode(self.patterns.get_xss_pattern(1).encode()).decode()
             }
         ]
-        
+
         edges = [
             {"from": self.patterns.get_sql_pattern(0), "to": self.patterns.get_command_pattern(0)},
             {"from": "normal_node", "to": self.patterns.get_path_pattern(0)}
         ]
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -466,11 +466,11 @@ class IRGenerator:
                 ]
             }
         }
-    
+
     def _generate_deeply_nested_graph(self) -> Dict[str, Any]:
         """Generate a graph with extremely deep nesting (iterative to avoid recursion limit)."""
         graph_id = self._generate_id("deeply_nested")
-        
+
         # Create deeply nested structure iteratively to avoid recursion limit
         def create_nested_structure_iterative(depth: int) -> Dict[str, Any]:
             result = {"value": "bottom", "depth": 0}
@@ -480,9 +480,9 @@ class IRGenerator:
                     "nested": result
                 }
             return result
-        
+
         deep_structure = create_nested_structure_iterative(self.nesting_depth)
-        
+
         nodes = [
             {
                 "id": "nested_node",
@@ -490,7 +490,7 @@ class IRGenerator:
                 "metadata": deep_structure
             }
         ]
-        
+
         # Create nested array structure iteratively
         nested_arrays = []
         current = nested_arrays
@@ -499,7 +499,7 @@ class IRGenerator:
             current.append(new_array)
             current = new_array
         current.append({"id": "deep_array_node", "type": "Node"})
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -513,11 +513,11 @@ class IRGenerator:
                 "test_type": "deep_nesting"
             }
         }
-    
+
     def _generate_null_fields_graph(self) -> Dict[str, Any]:
         """Generate a graph with null values in various fields."""
         graph_id = self._generate_id("null_fields")
-        
+
         return {
             "grammar_version": None,
             "id": graph_id,
@@ -537,27 +537,27 @@ class IRGenerator:
             ],
             "metadata": None
         }
-    
+
     def _generate_empty_graph(self) -> Dict[str, Any]:
         """Generate various forms of empty graphs (deterministic based on count)."""
         graph_id = self._generate_id("empty")
-        
+
         # Use generated count for deterministic selection
         variant_index = self.generated_count % 4
-        
+
         empty_variants = [
             {},  # Completely empty
             {"nodes": [], "edges": []},  # Empty arrays
             {"id": graph_id},  # Only ID
             {"grammar_version": "1.0.0", "id": "", "type": "", "nodes": [], "edges": []}  # Empty strings
         ]
-        
+
         return empty_variants[variant_index]
-    
+
     def _generate_unicode_exploit_graph(self) -> Dict[str, Any]:
         """Generate a graph with problematic Unicode characters."""
         graph_id = self._generate_id("unicode")
-        
+
         # Various problematic Unicode scenarios (properly escaped)
         rtl_override = "\u202E"  # Right-to-left override
         zero_width = "\u200B"  # Zero-width space
@@ -565,10 +565,10 @@ class IRGenerator:
         combining_chars = "a\u0300\u0301\u0302\u0303\u0304"  # Multiple combining characters
         emoji_spam = "🔥" * 1000
         mixed_scripts = "ЛатинtекстÐ中文עברית"
-        
+
         # Handle null byte specially - encode it for storage but mark for special handling
         null_byte_marker = "<NULL_BYTE>"
-        
+
         nodes = [
             {"id": f"node{rtl_override}1", "type": "ComputeNode"},
             {"id": f"node{null_byte_marker}2", "type": "InputNode", "has_null_byte": True},
@@ -586,11 +586,11 @@ class IRGenerator:
                 "mixed": mixed_scripts
             }
         ]
-        
+
         edges = [
             {"from": f"node{rtl_override}1", "to": f"{zero_width}invisible{zero_width}"}
         ]
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -603,11 +603,11 @@ class IRGenerator:
                 "null_byte_marker": null_byte_marker
             }
         }
-    
+
     def _generate_type_confusion_graph(self) -> Dict[str, Any]:
         """Generate a graph with intentional type confusion."""
         graph_id = self._generate_id("type_confusion")
-        
+
         # Mix different representations testing parser type handling
         # Note: JSON serialization will normalize these, but the dict representation
         # tests parser's handling of mixed types before serialization
@@ -644,11 +644,11 @@ class IRGenerator:
                 ]
             }
         }
-    
+
     def _generate_oversized_graph(self) -> Dict[str, Any]:
         """Generate an extremely large graph to test size limits (configurable)."""
         graph_id = self._generate_id("oversized")
-        
+
         nodes = []
         for i in range(self.oversized_nodes):
             nodes.append({
@@ -661,7 +661,7 @@ class IRGenerator:
                     "description": f"This is node {i} with some padding text" * 10
                 }
             })
-        
+
         edges = []
         for i in range(self.oversized_edges):
             edges.append({
@@ -670,7 +670,7 @@ class IRGenerator:
                 "weight": random.random(),
                 "type": random.choice(["data", "control", "dependency"])
             })
-        
+
         return {
             "grammar_version": "1.0.0",
             "id": graph_id,
@@ -684,7 +684,7 @@ class IRGenerator:
                 "approximate_size_mb": (self.oversized_nodes * 2) / 1024
             }
         }
-    
+
     def _generate_malformed_json_graph(self) -> Dict[str, Any]:
         """
         Generate a graph that tests special JSON values.
@@ -692,7 +692,7 @@ class IRGenerator:
         custom JSON encoding. The save_graph() method handles serialization.
         """
         graph_id = self._generate_id("malformed")
-        
+
         # Include special values that require custom JSON handling
         return {
             "grammar_version": "1.0.0",
@@ -722,27 +722,27 @@ class IRGenerator:
                 "contains_special_floats": True
             }
         }
-    
+
     def _generate_id(self, prefix: str = "graph") -> str:
         """Generate a unique ID for graphs."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         random_suffix = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
         return f"{prefix}_{timestamp}_{random_suffix}"
-    
+
     def generate_batch(self, count: int = 10, shuffle: bool = True) -> List[Dict[str, Any]]:
         """
         Generate a batch of invalid graphs with various malicious patterns.
         Ensures at least one of each type is generated.
-        
+
         Args:
             count: Number of graphs to generate
             shuffle: Whether to randomize the order of graph types
-            
+
         Returns:
             List of generated graphs
         """
         graphs = []
-        
+
         # Ensure we generate at least one of each type
         generation_methods = [
             self._generate_missing_fields_graph,
@@ -760,43 +760,43 @@ class IRGenerator:
             self._generate_oversized_graph,
             self._generate_malformed_json_graph
         ]
-        
+
         # Generate at least one of each type if count allows
         for i, method in enumerate(generation_methods):
             if i < count:
                 graphs.append(method())
-        
+
         # Fill remaining with random selections
         while len(graphs) < count:
             method = random.choice(generation_methods)
             graphs.append(method())
-        
+
         if shuffle:
             random.shuffle(graphs)
-        
+
         return graphs
-    
+
     def save_graph(self, graph: Dict[str, Any], output_dir: Optional[str] = None):
         """
         Save the graph to a JSON file with proper error handling.
-        
+
         Args:
             graph: The graph to save
             output_dir: Directory to save to (uses self.output_dir if not specified)
         """
         if output_dir is None:
             output_dir = self.output_dir
-            
+
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Generate filename based on graph ID or create one
         if isinstance(graph, dict) and "id" in graph:
             filename = f"{graph['id']}.json"
         else:
             filename = f"malformed_{self.generated_count}.json"
-        
+
         file_path = os.path.join(output_dir, filename)
-        
+
         try:
             # Custom JSON encoder for special float values
             def json_encoder(obj):
@@ -808,14 +808,14 @@ class IRGenerator:
                     elif obj == float('-inf'):
                         return "-Infinity"
                 return obj
-            
+
             # Use separate variable for error file to avoid scope confusion
             with open(file_path, "w", encoding='utf-8') as output_file:
                 json.dump(graph, output_file, indent=2, ensure_ascii=False, default=json_encoder)
-                
+
             if self.verbose:
                 print(f"Saved graph to: {file_path}")
-                
+
         except Exception as e:
             print(f"Error saving graph: {e}")
             # Save as .txt if JSON serialization fails - use different variable name
@@ -827,22 +827,22 @@ class IRGenerator:
                 print(f"Saved error details to: {error_file_path}")
             except Exception as save_error:
                 print(f"Failed to save error file: {save_error}")
-    
+
     def save_batch(self, graphs: List[Dict[str, Any]], output_dir: Optional[str] = None):
         """
         Save a batch of graphs to files.
-        
+
         Args:
             graphs: List of graphs to save
             output_dir: Directory to save to
         """
         for graph in graphs:
             self.save_graph(graph, output_dir)
-    
+
     def generate_report(self) -> Dict[str, Any]:
         """
         Generate a report of the testing session.
-        
+
         Returns:
             Dictionary containing test generation statistics
         """
@@ -875,14 +875,14 @@ class IRGenerator:
             ],
             "security_note": "All injection patterns are obfuscated for safety"
         }
-    
+
     def validate_generated_graphs(self, graphs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Validate that generated graphs actually violate expected constraints.
-        
+
         Args:
             graphs: List of graphs to validate
-            
+
         Returns:
             Validation report
         """
@@ -891,34 +891,34 @@ class IRGenerator:
             "violations_found": defaultdict(int),
             "graphs_by_type": defaultdict(int)
         }
-        
+
         for graph in graphs:
             # Determine graph type from ID
             graph_id = graph.get("id", "unknown")
             if isinstance(graph_id, str):
                 graph_type = graph_id.split("_")[0] if "_" in graph_id else "unknown"
                 validation_results["graphs_by_type"][graph_type] += 1
-            
+
             # Check for common violations
             if "grammar_version" not in graph or graph.get("grammar_version") is None:
                 validation_results["violations_found"]["missing_grammar_version"] += 1
-            
+
             if "id" not in graph or graph.get("id") is None:
                 validation_results["violations_found"]["missing_id"] += 1
-            
+
             if "type" not in graph or graph.get("type") is None:
                 validation_results["violations_found"]["missing_type"] += 1
-            
+
             if "nodes" not in graph:
                 validation_results["violations_found"]["missing_nodes"] += 1
             elif not isinstance(graph.get("nodes"), list):
                 validation_results["violations_found"]["nodes_not_array"] += 1
-            
+
             if "edges" not in graph:
                 validation_results["violations_found"]["missing_edges"] += 1
             elif not isinstance(graph.get("edges"), list):
                 validation_results["violations_found"]["edges_not_array"] += 1
-        
+
         return dict(validation_results)
 
 def main():
@@ -927,7 +927,7 @@ def main():
     """
     # Initialize generator with verbose output
     generator = IRGenerator(verbose=True)
-    
+
     # Configure generator
     generator.configure(
         oversized_nodes=1000,
@@ -935,31 +935,31 @@ def main():
         buffer_size_kb=100,
         nesting_depth=50
     )
-    
+
     print(f"Starting malicious IR generation with seed: {generator.seed}")
     print("-" * 50)
-    
+
     # Generate a comprehensive batch of test cases
     graphs = generator.generate_batch(count=20, shuffle=True)
-    
+
     # Save all generated graphs
     generator.save_batch(graphs)
-    
+
     # Validate generated graphs
     validation_report = generator.validate_generated_graphs(graphs)
     print("\nValidation Report:")
     print(f"  Total graphs: {validation_report['total_graphs']}")
     print(f"  Violations found: {dict(validation_report['violations_found'])}")
     print(f"  Graphs by type: {dict(validation_report['graphs_by_type'])}")
-    
+
     # Save the generation report
     report = generator.generate_report()
     report["validation"] = validation_report
-    
+
     report_path = os.path.join(generator.output_dir, "generation_report.json")
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
-    
+
     print("-" * 50)
     print(f"Generation complete!")
     print(f"Generated {len(graphs)} malicious graphs")

@@ -8,18 +8,18 @@
 # FIXED: Converted long time.sleep calls to interruptible self._shutdown_event.wait().
 # ============================================================
 
-import logging
-import threading
-import multiprocessing
-import time
-import uuid
-import json
 import hashlib
+import json
+import logging
+import multiprocessing
+import threading
+import time
 import traceback
-from typing import Any, Dict, Optional, List, Tuple
-from pathlib import Path
+import uuid
 from collections import defaultdict
 from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import psutil with fallback for missing or broken installations
 try:
@@ -36,23 +36,11 @@ except ImportError:
         "psutil not available, system resource monitoring will be disabled"
     )
 
-from .agent_lifecycle import (
-    AgentState,
-    AgentCapability,
-    AgentMetadata,
-    JobProvenance,
-    StateTransitionRules,
-    create_agent_metadata,
-    create_job_provenance,
-)
-from .task_queues import (
-    TaskQueueInterface,
-    RayTaskQueue,
-    CeleryTaskQueue,
-    CustomTaskQueue,
-    create_task_queue,
-    TaskStatus,
-)
+from .agent_lifecycle import (AgentCapability, AgentMetadata, AgentState,
+                              JobProvenance, StateTransitionRules,
+                              create_agent_metadata, create_job_provenance)
+from .task_queues import (CeleryTaskQueue, CustomTaskQueue, RayTaskQueue,
+                          TaskQueueInterface, TaskStatus, create_task_queue)
 
 # ============================================================
 # CONSTANTS

@@ -20,32 +20,26 @@
 # FIXED: Refactored checkpoint locking to avoid nested RLock acquisition.
 # ============================================================
 
-import logging
-import time
-import pickle
 import asyncio
 import json
+import logging
 import os
+import pickle
 import sys
-from typing import Any, Dict, List, Optional
-from pathlib import Path
+import time
 from datetime import datetime
+from pathlib import Path
 from threading import RLock
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
-from .collective import VULCANAGICollective
-from .variants import (
-    ParallelOrchestrator,
-    AdaptiveOrchestrator,
-    FaultTolerantOrchestrator,
-)
-from .dependencies import (
-    EnhancedCollectiveDeps,
-    validate_dependencies,
-    print_dependency_report,
-)
-from .metrics import EnhancedMetricsCollector
 from .agent_lifecycle import AgentState
+from .collective import VULCANAGICollective
+from .dependencies import (EnhancedCollectiveDeps, print_dependency_report,
+                           validate_dependencies)
+from .metrics import EnhancedMetricsCollector
+from .variants import (AdaptiveOrchestrator, FaultTolerantOrchestrator,
+                       ParallelOrchestrator)
 
 logger = logging.getLogger(__name__)
 
@@ -291,7 +285,8 @@ class ProductionDeployment:
 
         # --- Load Multimodal Reasoner ---
         try:
-            from vulcan.reasoning.multimodal_reasoning import MultimodalReasoner
+            from vulcan.reasoning.multimodal_reasoning import \
+                MultimodalReasoner
 
             components["multimodal_reasoner"] = MultimodalReasoner()
             logger.info("MultimodalReasoner loaded")
@@ -300,7 +295,8 @@ class ProductionDeployment:
 
         # --- Load Probabilistic Reasoner ---
         try:
-            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
+            from vulcan.reasoning.probabilistic_reasoning import \
+                ProbabilisticReasoner
 
             components["probabilistic"] = ProbabilisticReasoner()
             logger.info("ProbabilisticReasoner loaded")
@@ -310,7 +306,8 @@ class ProductionDeployment:
         # --- Load Causal Reasoner ---
         try:
             # Assuming path based on project structure
-            from vulcan.reasoning.causal_reasoning import EnhancedCausalReasoning
+            from vulcan.reasoning.causal_reasoning import \
+                EnhancedCausalReasoning
 
             components["causal"] = EnhancedCausalReasoning()
             logger.info("EnhancedCausalReasoning loaded")
@@ -320,7 +317,8 @@ class ProductionDeployment:
         # --- Load Analogical (Abstract) Reasoner ---
         # FIXED: Import from analogical_reasoning not analogical
         try:
-            from vulcan.reasoning.analogical_reasoning import AnalogicalReasoner
+            from vulcan.reasoning.analogical_reasoning import \
+                AnalogicalReasoner
 
             components["abstract"] = AnalogicalReasoner()
             logger.info("AnalogicalReasoner loaded")
@@ -329,7 +327,8 @@ class ProductionDeployment:
 
         # --- Load Cross-Modal Reasoner ---
         try:
-            from vulcan.reasoning.multimodal_reasoning import CrossModalReasoner
+            from vulcan.reasoning.multimodal_reasoning import \
+                CrossModalReasoner
 
             # FIXED: Use correct key 'multimodal' not 'multimodal_processor'
             multimodal_processor = components.get("multimodal")
@@ -513,11 +512,9 @@ class ProductionDeployment:
 
         # Planning - FIXED: Import from vulcan.planning
         try:
-            from vulcan.planning import (
-                HierarchicalGoalSystem,
-                ResourceAwareCompute,
-                DistributedCoordinator,
-            )
+            from vulcan.planning import (DistributedCoordinator,
+                                         HierarchicalGoalSystem,
+                                         ResourceAwareCompute)
 
             components["goal_system"] = HierarchicalGoalSystem()
             components["resource_compute"] = ResourceAwareCompute()
@@ -542,12 +539,10 @@ class ProductionDeployment:
 
         # Safety - FIXED: Pass None instead of self.config to avoid AgentConfig.to_dict() error
         try:
+            from vulcan.safety.safety_types import (ExplainabilityNode,
+                                                    GovernanceOrchestrator,
+                                                    NSOAligner)
             from vulcan.safety.safety_validator import EnhancedSafetyValidator
-            from vulcan.safety.safety_types import (
-                GovernanceOrchestrator,
-                NSOAligner,
-                ExplainabilityNode,
-            )
 
             # Pass None to use default SafetyConfig - avoids AgentConfig.to_dict() error
             # EnhancedSafetyValidator will create its own SafetyConfig with defaults
@@ -579,13 +574,8 @@ class ProductionDeployment:
 
         # Memory - Import from parent directory (vulcan/) with proper config handling
         try:
-            from ..memory import (
-                HierarchicalMemory,
-                EpisodicMemory,
-                MemoryPersistence,
-                MemoryIndex,
-                MemorySearch,
-            )
+            from ..memory import (EpisodicMemory, HierarchicalMemory,
+                                  MemoryIndex, MemoryPersistence, MemorySearch)
 
             # Create memory config with safe attribute access
             try:
@@ -641,7 +631,8 @@ class ProductionDeployment:
 
         # Curiosity Engine (Experiment Generator)
         try:
-            from vulcan.curiosity_engine.experiment_generator import ExperimentGenerator
+            from vulcan.curiosity_engine.experiment_generator import \
+                ExperimentGenerator
 
             components["experiment_generator"] = ExperimentGenerator()
             logger.info("ExperimentGenerator loaded successfully")
@@ -654,7 +645,8 @@ class ProductionDeployment:
 
         # Problem Decomposer (Problem Executor)
         try:
-            from vulcan.problem_decomposer.problem_executor import ProblemExecutor
+            from vulcan.problem_decomposer.problem_executor import \
+                ProblemExecutor
 
             components["problem_executor"] = ProblemExecutor()
             logger.info("ProblemExecutor loaded successfully")

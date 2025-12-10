@@ -6,30 +6,21 @@ Provides unified interface for AI providers and services
 from __future__ import annotations
 
 import asyncio
-import json
-import time
 import hashlib
-import os
-from typing import (
-    Dict,
-    Any,
-    Optional,
-    List,
-    Union,
-    Callable,
-    Awaitable,
-    Tuple,
-    TYPE_CHECKING,
-)
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from abc import ABC, abstractmethod
+import json
 import logging
-from datetime import datetime, timedelta
+import os
 import random
-from collections import defaultdict, deque
 import threading
+import time
+from abc import ABC, abstractmethod
+from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
+                    Optional, Tuple, Union)
 
 # TYPE_CHECKING import for type annotations without runtime import
 # This allows using aiohttp types in annotations even when aiohttp is not installed
@@ -925,9 +916,8 @@ class LocalGPTAIProvider(AIProvider):
         self.artifacts_dir = artifacts_dir
         # Defer import to avoid hard dependency if artifacts are not used
         try:
-            from src.local_llm.provider.local_gpt_provider import (
-                build_provider_from_artifacts,
-            )
+            from src.local_llm.provider.local_gpt_provider import \
+                build_provider_from_artifacts
         except Exception as e:
             raise ImportError(
                 f"LocalGPTProvider import failed. Ensure files are added to src/local_llm. Error: {e}"

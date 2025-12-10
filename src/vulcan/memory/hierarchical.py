@@ -1,37 +1,27 @@
 """Hierarchical memory implementation with multiple levels and tool selection history"""
 
 from __future__ import annotations
-import numpy as np
-import time
-import logging
-from typing import Any, Dict, List, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import deque, defaultdict
-import threading
+
 import hashlib
 import json
+import logging
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 # Persistent memory imports
-from persistant_memory_v46 import (
-    PackfileStore,
-    MerkleLSM,
-    GraphRAG,
-    UnlearningEngine,
-    ZKProver,
-)
+from persistant_memory_v46 import (GraphRAG, MerkleLSM, PackfileStore,
+                                   UnlearningEngine, ZKProver)
 
-from .base import (
-    Memory,
-    MemoryType,
-    MemoryConfig,
-    MemoryQuery,
-    RetrievalResult,
-    MemoryStats,
-    BaseMemorySystem,
-    MemoryCapacityException,
-)
-from .retrieval import MemorySearch, AttentionMechanism
+from .base import (BaseMemorySystem, Memory, MemoryCapacityException,
+                   MemoryConfig, MemoryQuery, MemoryStats, MemoryType,
+                   RetrievalResult)
 from .consolidation import MemoryConsolidator
+from .retrieval import AttentionMechanism, MemorySearch
 
 # Enhanced embedding support
 try:

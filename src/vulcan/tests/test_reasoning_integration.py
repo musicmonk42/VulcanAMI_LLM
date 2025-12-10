@@ -4,26 +4,21 @@ Integration Test for VULCAN Unified Reasoning System
 Tests the complete reasoning pipeline end-to-end using the actual UnifiedReasoner API.
 """
 
-import pytest
-import numpy as np
-import time
 import json
-from pathlib import Path
-import tempfile
 import shutil
-from typing import Dict, Any, List
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List
 
-# CORRECT IMPORTS based on actual unified_reasoning.py
-from vulcan.reasoning.unified_reasoning import (
-    UnifiedReasoner,
-    ReasoningStrategy,
-)
+import numpy as np
+import pytest
 
 # Import from reasoning_types module
-from vulcan.reasoning.reasoning_types import (
-    ReasoningType,
-    ReasoningResult,
-)
+from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
+# CORRECT IMPORTS based on actual unified_reasoning.py
+from vulcan.reasoning.unified_reasoning import (ReasoningStrategy,
+                                                UnifiedReasoner)
 
 
 class TestUnifiedReasoningIntegration:

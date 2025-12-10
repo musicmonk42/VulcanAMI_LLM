@@ -3,19 +3,20 @@ LLVM Backend for Graphix IR
 Compiles graph nodes to native machine code via LLVM IR
 """
 
-import llvmlite.ir as ir
-import llvmlite.binding as llvm
-from typing import Dict, Any, Optional, Tuple, List
-import numpy as np
+import ctypes
 import hashlib
-import pickle
 import json
+import os
+import pickle
 import struct
 import tempfile
-import os
-import ctypes
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
+import llvmlite.binding as llvm
+import llvmlite.ir as ir
+import numpy as np
 
 
 # Initialize LLVM

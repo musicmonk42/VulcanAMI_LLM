@@ -6,19 +6,21 @@ Models execution costs (time, energy, memory) with uncertainty quantification,
 health-aware adjustments, and predictive capabilities.
 """
 
-import numpy as np
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
-import logging
-import time
-from scipy import stats
-from scipy.optimize import minimize
 import json
-from pathlib import Path
+import logging
 import pickle
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
+from scipy import stats
+from scipy.optimize import minimize
+
 from .security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)

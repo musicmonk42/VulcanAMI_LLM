@@ -2,51 +2,39 @@
 Comprehensive test suite for registry_api_server.py
 """
 
-import pytest
-import json
 import hashlib
-import tempfile
+import json
 import sqlite3
+import tempfile
 import threading
 import time
-import uuid # Added for generating unique IDs in tests
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, call
+import uuid  # Added for generating unique IDs in tests
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, call, patch
+
+import pytest
 
 # Assuming registry_api_server.py is in src/governance/
 # Adjust the import path if your structure is different
+from src.governance.registry_api_server import \
+    DB_POOL_SIZE  # <--- FIXED: Added missing import
+from src.governance.registry_api_server import HAS_GRPC  # FIX: Import HAS_GRPC
+from src.governance.registry_api_server import \
+    StatusCode  # Import mocked StatusCode
+from src.governance.registry_api_server import \
+    Timestamp  # Import mocked Timestamp
 from src.governance.registry_api_server import (
-    Node,
-    AuditLogEntry,
-    RegisterGraphProposalRequest,
-    RegisterGraphProposalResponse,
-    SubmitLanguageEvolutionProposalRequest,
-    SubmitLanguageEvolutionProposalResponse,
-    RecordVoteRequest,
-    RecordVoteResponse,
-    RecordValidationRequest,
-    RecordValidationResponse,
-    DeployGrammarVersionRequest,
-    DeployGrammarVersionResponse,
-    QueryProposalsRequest,
-    QueryProposalsResponse,
-    GetFullAuditLogRequest,
-    GetFullAuditLogResponse,
-    VerifyAuditLogIntegrityRequest,
-    VerifyAuditLogIntegrityResponse,
-    DatabaseConnectionPool,
-    DatabaseManager,
-    DB_POOL_SIZE, # <--- FIXED: Added missing import
-    RegistryAPI,
-    LanguageEvolutionRegistry,
-    AgentRegistry,
-    SecurityAuditEngine,
-    RegistryServicer,
-    StatusCode, # Import mocked StatusCode
-    Timestamp, # Import mocked Timestamp
-    HAS_GRPC # FIX: Import HAS_GRPC
-)
+    AgentRegistry, AuditLogEntry, DatabaseConnectionPool, DatabaseManager,
+    DeployGrammarVersionRequest, DeployGrammarVersionResponse,
+    GetFullAuditLogRequest, GetFullAuditLogResponse, LanguageEvolutionRegistry,
+    Node, QueryProposalsRequest, QueryProposalsResponse,
+    RecordValidationRequest, RecordValidationResponse, RecordVoteRequest,
+    RecordVoteResponse, RegisterGraphProposalRequest,
+    RegisterGraphProposalResponse, RegistryAPI, RegistryServicer,
+    SecurityAuditEngine, SubmitLanguageEvolutionProposalRequest,
+    SubmitLanguageEvolutionProposalResponse, VerifyAuditLogIntegrityRequest,
+    VerifyAuditLogIntegrityResponse)
 
 
 @pytest.fixture

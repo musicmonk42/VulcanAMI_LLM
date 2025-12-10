@@ -9,9 +9,9 @@
 # META-REASONING INTEGRATION: Added imports from meta_reasoning directory
 # ============================================================
 
-from dataclasses import dataclass, field, fields
-from typing import Any, Optional, Dict, List, Set, ClassVar
 import logging
+from dataclasses import dataclass, field, fields
+from typing import Any, ClassVar, Dict, List, Optional, Set
 
 from .metrics import EnhancedMetricsCollector
 
@@ -30,9 +30,8 @@ meta_reasoning_deps = {}
 
 # Meta-Reasoning Component Imports
 try:
-    from vulcan.world_model.meta_reasoning.self_improvement_drive import (
-        SelfImprovementDrive,
-    )
+    from vulcan.world_model.meta_reasoning.self_improvement_drive import \
+        SelfImprovementDrive
 
     meta_reasoning_deps["self_improvement_drive"] = True
 except ImportError as e:
@@ -42,9 +41,8 @@ except ImportError as e:
     meta_reasoning_deps["self_improvement_drive"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.motivational_introspection import (
-        MotivationalIntrospection,
-    )
+    from vulcan.world_model.meta_reasoning.motivational_introspection import \
+        MotivationalIntrospection
 
     meta_reasoning_deps["motivational_introspection"] = True
 except ImportError as e:
@@ -52,7 +50,8 @@ except ImportError as e:
     meta_reasoning_deps["motivational_introspection"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.objective_hierarchy import ObjectiveHierarchy
+    from vulcan.world_model.meta_reasoning.objective_hierarchy import \
+        ObjectiveHierarchy
 
     meta_reasoning_deps["objective_hierarchy"] = True
 except ImportError as e:
@@ -60,9 +59,8 @@ except ImportError as e:
     meta_reasoning_deps["objective_hierarchy"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.objective_negotiator import (
-        ObjectiveNegotiator,
-    )
+    from vulcan.world_model.meta_reasoning.objective_negotiator import \
+        ObjectiveNegotiator
 
     meta_reasoning_deps["objective_negotiator"] = True
 except ImportError as e:
@@ -70,9 +68,8 @@ except ImportError as e:
     meta_reasoning_deps["objective_negotiator"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.goal_conflict_detector import (
-        GoalConflictDetector,
-    )
+    from vulcan.world_model.meta_reasoning.goal_conflict_detector import \
+        GoalConflictDetector
 
     meta_reasoning_deps["goal_conflict_detector"] = True
 except ImportError as e:
@@ -80,7 +77,8 @@ except ImportError as e:
     meta_reasoning_deps["goal_conflict_detector"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.preference_learner import PreferenceLearner
+    from vulcan.world_model.meta_reasoning.preference_learner import \
+        PreferenceLearner
 
     meta_reasoning_deps["preference_learner"] = True
 except ImportError as e:
@@ -88,9 +86,8 @@ except ImportError as e:
     meta_reasoning_deps["preference_learner"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.value_evolution_tracker import (
-        ValueEvolutionTracker,
-    )
+    from vulcan.world_model.meta_reasoning.value_evolution_tracker import \
+        ValueEvolutionTracker
 
     meta_reasoning_deps["value_evolution_tracker"] = True
 except ImportError as e:
@@ -98,9 +95,8 @@ except ImportError as e:
     meta_reasoning_deps["value_evolution_tracker"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
-        EthicalBoundaryMonitor,
-    )
+    from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import \
+        EthicalBoundaryMonitor
 
     meta_reasoning_deps["ethical_boundary_monitor"] = True
 except ImportError as e:
@@ -108,9 +104,8 @@ except ImportError as e:
     meta_reasoning_deps["ethical_boundary_monitor"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
-        CuriosityRewardShaper,
-    )
+    from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import \
+        CuriosityRewardShaper
 
     meta_reasoning_deps["curiosity_reward_shaper"] = True
 except ImportError as e:
@@ -118,7 +113,8 @@ except ImportError as e:
     meta_reasoning_deps["curiosity_reward_shaper"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
+    from vulcan.world_model.meta_reasoning.internal_critic import \
+        InternalCritic
 
     meta_reasoning_deps["internal_critic"] = True
 except ImportError as e:
@@ -129,9 +125,8 @@ except ImportError as e:
 try:
     # Assuming 'auto_apply_policy' refers to a component responsible for this
     # Adjust the import path and class name as needed
-    from vulcan.world_model.meta_reasoning.policy_manager import (
-        AutoApplyPolicy,
-    )  # Placeholder
+    from vulcan.world_model.meta_reasoning.policy_manager import \
+        AutoApplyPolicy  # Placeholder
 
     meta_reasoning_deps["auto_apply_policy"] = True
 except ImportError as e:
@@ -141,9 +136,8 @@ except ImportError as e:
 try:
     # Assuming 'validation_tracker' refers to a component
     # Adjust the import path and class name as needed
-    from vulcan.world_model.meta_reasoning.validation_tracker import (
-        ValidationTracker,
-    )  # Placeholder
+    from vulcan.world_model.meta_reasoning.validation_tracker import \
+        ValidationTracker  # Placeholder
 
     meta_reasoning_deps["validation_tracker"] = True
 except ImportError as e:
@@ -153,9 +147,8 @@ except ImportError as e:
 try:
     # Assuming 'transparency_interface' refers to a component
     # Adjust the import path and class name as needed
-    from vulcan.world_model.meta_reasoning.transparency_interface import (
-        TransparencyInterface,
-    )  # Placeholder
+    from vulcan.world_model.meta_reasoning.transparency_interface import \
+        TransparencyInterface  # Placeholder
 
     meta_reasoning_deps["transparency_interface"] = True
 except ImportError as e:
@@ -165,9 +158,8 @@ except ImportError as e:
 try:
     # Assuming 'counterfactual_objectives' refers to a component
     # Adjust the import path and class name as needed
-    from vulcan.world_model.meta_reasoning.counterfactual_objectives import (
-        CounterfactualObjectives,
-    )  # Placeholder
+    from vulcan.world_model.meta_reasoning.counterfactual_objectives import \
+        CounterfactualObjectives  # Placeholder
 
     meta_reasoning_deps["counterfactual_objectives"] = True
 except ImportError as e:
@@ -767,7 +759,8 @@ def create_self_improving_deps(
         if deps.experiment_generator is None:
             try:
                 # Import here to potentially avoid import loops if called early
-                from ..curiosity_engine.experiment_generator import ExperimentGenerator
+                from ..curiosity_engine.experiment_generator import \
+                    ExperimentGenerator
 
                 deps.experiment_generator = ExperimentGenerator(
                     default_timeout=getattr(config, "exp_gen_timeout", 30.0),
@@ -786,7 +779,8 @@ def create_self_improving_deps(
         if deps.problem_executor is None:
             try:
                 # Import here
-                from ..problem_decomposer.problem_executor import ProblemExecutor
+                from ..problem_decomposer.problem_executor import \
+                    ProblemExecutor
 
                 # ProblemExecutor likely needs other dependencies like validator, bridge
                 semantic_bridge = kwargs.get(
@@ -843,9 +837,8 @@ def create_self_improving_deps(
             "motivational_introspection", False
         ):
             try:
-                from vulcan.world_model.meta_reasoning.motivational_introspection import (
-                    MotivationalIntrospection,
-                )
+                from vulcan.world_model.meta_reasoning.motivational_introspection import \
+                    MotivationalIntrospection
 
                 if deps.world_model:  # Assuming it needs world_model
                     deps.motivational_introspection = MotivationalIntrospection(

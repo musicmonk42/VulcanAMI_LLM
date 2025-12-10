@@ -3,18 +3,19 @@ fallback_chain.py - Fallback chain management for problem decomposition
 Part of the VULCAN-AGI system
 """
 
-import numpy as np
-import logging
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-import traceback
-from enum import Enum
 import copy
 import hashlib
+import json
+import logging
+import threading
+import time
+import traceback
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

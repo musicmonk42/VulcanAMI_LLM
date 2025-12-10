@@ -46,17 +46,16 @@ All components are production-ready with comprehensive implementations.
 
 from __future__ import annotations
 
-
-from typing import List, Dict, Set, Tuple, Optional, Any, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
 import copy
 import logging
 import re
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 # This import is now local to the submodule, assuming a 'core.py' exists.
-from .core import Term, Variable, Constant, Function, Literal, Clause
+from .core import Clause, Constant, Function, Literal, Term, Variable
 
 logger = logging.getLogger(__name__)
 

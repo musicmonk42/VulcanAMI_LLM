@@ -5,17 +5,18 @@ Part of the VULCAN-AGI system
 Follows EXAMINE → SELECT → APPLY → REMEMBER pattern for method selection
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-import time
-import threading
-from enum import Enum
-from pathlib import Path
 import hashlib
 import json
+import logging
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

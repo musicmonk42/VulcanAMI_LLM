@@ -3,26 +3,27 @@ Graph Compiler for Graphix IR
 Compiles JSON graph representations to optimized native machine code
 """
 
-import json
-import hashlib
-import tempfile
-import subprocess
-import os
-import struct
 import ctypes
+import hashlib
+import json
+import logging
+import os
 import pickle
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Set
+import struct
+import subprocess
+import tempfile
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-import networkx as nx
-import numpy as np
-import logging
-from collections import defaultdict, deque
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
 import llvmlite.binding as llvm
 import llvmlite.ir as ir
+import networkx as nx
+import numpy as np
 
-from src.compiler.llvm_backend import LLVMBackend, DataType, CompiledFunction
+from src.compiler.llvm_backend import CompiledFunction, DataType, LLVMBackend
 
 
 class CompilationError(Exception):
@@ -678,7 +679,9 @@ class GraphCompiler:
 
         try:
             # Link to shared library
-            so_file = tempfile.mktemp(suffix=".so")
+            with tempfile.NamedTemporaryFile(suffix=".so", delete=False) as so_f:
+                so_file = so_f.name
+            
             subprocess.run(
                 ["gcc", "-shared", "-fPIC", obj_file, "-o", so_file],
                 check=True,

@@ -8,12 +8,12 @@ import struct
 import time
 import zlib
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 

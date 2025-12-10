@@ -1,5 +1,8 @@
-import argparse, torch, sys
+import argparse
+import sys
 from pathlib import Path
+
+import torch
 
 """
 Inspect a .pt file to see if it is:

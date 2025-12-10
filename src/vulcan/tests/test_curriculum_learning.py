@@ -9,24 +9,22 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for curriculum_learning tests"
 )
 
-import numpy as np
-from pathlib import Path
-import tempfile
-import shutil
-import time
-from unittest.mock import Mock, patch, MagicMock
 import json
+import shutil
+import tempfile
+import time
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.learning.curriculum_learning import (
-    CurriculumLearner,
-    PacingStrategy,
-    DifficultyMetric,
-    StageInfo,
-    CurriculumMetrics,
-    DifficultyEstimator,
-    CompositeDifficultyEstimator,
-    LearnedDifficultyEstimator,
-)
+import numpy as np
+
+from vulcan.learning.curriculum_learning import (CompositeDifficultyEstimator,
+                                                 CurriculumLearner,
+                                                 CurriculumMetrics,
+                                                 DifficultyEstimator,
+                                                 DifficultyMetric,
+                                                 LearnedDifficultyEstimator,
+                                                 PacingStrategy, StageInfo)
 from vulcan.learning.learning_types import LearningConfig
 
 

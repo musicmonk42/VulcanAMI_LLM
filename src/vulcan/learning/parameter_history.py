@@ -4,26 +4,27 @@ FIXED: Proper cross-platform path handling using Path objects exclusively
 FIXED: Handle both nn.Module and dict types in async_checkpoint
 """
 
-import torch
-import torch.nn as nn
-import numpy as np
-from typing import Any, Dict, Optional, List, Union
+import copy
+import hashlib
+import json
+import logging
+import pickle
+import queue
+import threading
+import time
 from collections import deque
 from dataclasses import asdict
-import logging
-import time
-import copy
-import threading
-import pickle
-import hashlib
-from pathlib import Path
-import queue
-from queue import Empty as QueueEmpty
-import json
 from datetime import datetime
+from pathlib import Path
+from queue import Empty as QueueEmpty
+from typing import Any, Dict, List, Optional, Union
 
-from .learning_types import LearningConfig, LearningTrajectory
+import numpy as np
+import torch
+import torch.nn as nn
+
 from ..security_fixes import safe_pickle_load
+from .learning_types import LearningConfig, LearningTrajectory
 
 logger = logging.getLogger(__name__)
 

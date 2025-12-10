@@ -1,35 +1,25 @@
 """Test suite for distributed.py - Distributed memory implementation"""
 
-import pytest
-import numpy as np
-import time
-import threading
-import socket
 import hashlib
 import json
+import os
 import pickle
 import queue
-from unittest.mock import Mock, patch, MagicMock, call
+import socket
+import threading
+import time
 from concurrent.futures import Future
-import os
+from unittest.mock import MagicMock, Mock, call, patch
 
+import numpy as np
+import pytest
+
+from vulcan.memory.base import (ConsistencyLevel, Memory, MemoryConfig,
+                                MemoryQuery, MemoryType, RetrievalResult)
 # Import the module to test
-from vulcan.memory.distributed import (
-    RPCMessage,
-    RPCClient,
-    RPCServer,
-    MemoryNode,
-    MemoryFederation,
-    DistributedMemory,
-)
-from vulcan.memory.base import (
-    Memory,
-    MemoryConfig,
-    MemoryQuery,
-    RetrievalResult,
-    ConsistencyLevel,
-    MemoryType,
-)
+from vulcan.memory.distributed import (DistributedMemory, MemoryFederation,
+                                       MemoryNode, RPCClient, RPCMessage,
+                                       RPCServer)
 
 # Try importing optional dependencies
 try:

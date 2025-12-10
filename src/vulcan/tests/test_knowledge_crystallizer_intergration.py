@@ -5,55 +5,33 @@ Tests the full pipeline: Extract → Validate → Store → Apply → Track
 Run with: pytest src/vulcan/tests/test_knowledge_crystallizer_integration.py -v
 """
 
-import pytest
 import time
-import numpy as np
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
+import numpy as np
+import pytest
+
+from src.vulcan.knowledge_crystallizer.contraindication_tracker import (
+    CascadeAnalyzer, Contraindication, ContraindicationDatabase,
+    ContraindicationGraph, FailureMode, Severity)
+from src.vulcan.knowledge_crystallizer.crystallization_selector import (
+    CrystallizationMethod, CrystallizationSelector, TraceCharacteristics)
+from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
+    ApplicationMode, CrystallizationMode)
+from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
+    ExecutionTrace as CoreExecutionTrace
+from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
+    KnowledgeCrystallizer
+from src.vulcan.knowledge_crystallizer.knowledge_storage import (
+    CompressionType, KnowledgeIndex, KnowledgePruner, StorageBackend,
+    VersionedKnowledgeBase)
 # Import all components with correct paths
 from src.vulcan.knowledge_crystallizer.principle_extractor import (
-    PrincipleExtractor,
-    ExecutionTrace,
-    Metric,
-    MetricType,
-    Pattern,
-    PatternType,
-    ExtractionStrategy,
-)
+    ExecutionTrace, ExtractionStrategy, Metric, MetricType, Pattern,
+    PatternType, PrincipleExtractor)
 from src.vulcan.knowledge_crystallizer.validation_engine import (
-    KnowledgeValidator,
-    Principle,
-    ValidationLevel,
-    DomainTestCase,
-)
-from src.vulcan.knowledge_crystallizer.contraindication_tracker import (
-    ContraindicationDatabase,
-    ContraindicationGraph,
-    CascadeAnalyzer,
-    Contraindication,
-    FailureMode,
-    Severity,
-)
-from src.vulcan.knowledge_crystallizer.knowledge_storage import (
-    VersionedKnowledgeBase,
-    KnowledgeIndex,
-    KnowledgePruner,
-    StorageBackend,
-    CompressionType,
-)
-from src.vulcan.knowledge_crystallizer.crystallization_selector import (
-    CrystallizationSelector,
-    CrystallizationMethod,
-    TraceCharacteristics,
-)
-from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
-    KnowledgeCrystallizer,
-    ExecutionTrace as CoreExecutionTrace,
-    CrystallizationMode,
-    ApplicationMode,
-)
-
+    DomainTestCase, KnowledgeValidator, Principle, ValidationLevel)
 
 # ============================================================================
 # MODULE-LEVEL FUNCTION (REQUIRED FOR PICKLING)

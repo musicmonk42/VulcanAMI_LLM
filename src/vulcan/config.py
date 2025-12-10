@@ -12,29 +12,30 @@
 # FIXED: Added initialize_config function to resolve startup NameError
 # ============================================================
 
-import os
-import json
-import yaml
-import logging
-import hashlib
-import threading
 import asyncio
+import atexit
+import copy
+import hashlib
+import importlib.util
+import json
+import logging
+import os
+import re
+import sys
+import threading
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple, Union, Callable, Type
-from dataclasses import dataclass, field, asdict, is_dataclass
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field, is_dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from datetime import datetime
-import re
-from collections import defaultdict, deque
-import copy
-import importlib.util
-import sys
-import atexit
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
+
+import yaml
 
 # Try to import validation libraries
 try:
-    from pydantic import BaseModel, Field, validator, ValidationError
+    from pydantic import BaseModel, Field, ValidationError, validator
 
     PYDANTIC_AVAILABLE = True
 except ImportError:
@@ -62,8 +63,8 @@ except ImportError:
     NETWORKX_AVAILABLE = False
 
 try:
+    from watchdog.events import FileModifiedEvent, FileSystemEventHandler
     from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler, FileModifiedEvent
 
     WATCHDOG_AVAILABLE = True
 except ImportError:

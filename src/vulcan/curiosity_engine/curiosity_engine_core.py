@@ -5,32 +5,30 @@ Part of the VULCAN-AGI system
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from queue import PriorityQueue, Empty
-import time
-import json
-from pathlib import Path
-import tempfile
-import sys
-import io
-import multiprocessing
-from functools import partial
 import copy
+import io
+import json
+import logging
+import multiprocessing
+import sys
+import tempfile
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from functools import partial
+from pathlib import Path
+from queue import Empty, PriorityQueue
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
+import numpy as np
+
+from .dependency_graph import CycleAwareDependencyGraph, DependencyAnalyzer
+from .experiment_generator import (Experiment, ExperimentGenerator,
+                                   IterativeExperimentDesigner)
+from .exploration_budget import DynamicBudget, ResourceMonitor
 # Import other curiosity_engine components
 from .gap_analyzer import GapAnalyzer, KnowledgeGap, LatentGap
-from .dependency_graph import CycleAwareDependencyGraph, DependencyAnalyzer
-from .experiment_generator import (
-    ExperimentGenerator,
-    Experiment,
-    IterativeExperimentDesigner,
-)
-from .exploration_budget import DynamicBudget, ResourceMonitor
 
 logger = logging.getLogger(__name__)
 

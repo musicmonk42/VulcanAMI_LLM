@@ -48,15 +48,14 @@ Thread-safe with comprehensive evaluation history.
 """
 
 import logging
-
-# import time # Original import
-# import numpy as np # Original import
-from typing import Dict, List, Any, Optional, Tuple, Set, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-from enum import Enum
 import threading
 import time  # Moved import
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+# import time # Original import
+# import numpy as np # Original import
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 # --- START FIX: Add numpy fallback ---
 # logger = logging.getLogger(__name__) # Original logger placement

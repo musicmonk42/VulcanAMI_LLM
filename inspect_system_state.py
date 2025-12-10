@@ -1,5 +1,11 @@
-import argparse, pickle, torch, json, sys
+import argparse
+import json
+import pickle
+import sys
 from pathlib import Path
+
+import torch
+
 
 def load(p):
     try:

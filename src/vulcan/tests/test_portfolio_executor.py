@@ -5,27 +5,25 @@ Tests all execution strategies, timeout handling, resource management,
 and proper future cleanup.
 """
 
-import pytest
-import time
-import threading
-from typing import Dict, Any, List
-from unittest.mock import Mock, MagicMock, patch
-from dataclasses import dataclass
-
 # Import the module to test
 import sys
+import threading
+import time
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from vulcan.reasoning.selection.portfolio_executor import (
-    ExecutionStrategy,
-    ExecutionStatus,
-    ToolExecution,
-    PortfolioResult,
-    ExecutionMonitor,
-    PortfolioExecutor,
-)
+from vulcan.reasoning.selection.portfolio_executor import (ExecutionMonitor,
+                                                           ExecutionStatus,
+                                                           ExecutionStrategy,
+                                                           PortfolioExecutor,
+                                                           PortfolioResult,
+                                                           ToolExecution)
 
 
 # Mock tool classes for testing

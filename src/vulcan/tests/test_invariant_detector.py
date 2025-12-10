@@ -3,16 +3,16 @@ test_invariant_detector.py - PURE MOCK VERSION
 Tests invariant detector functionality without spawning threads.
 """
 
-import pytest
-import numpy as np
-import time
 import threading
-from typing import Dict, Any, List, Set, Optional
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set
 from unittest.mock import Mock
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums and Classes

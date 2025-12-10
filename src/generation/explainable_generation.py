@@ -35,13 +35,13 @@ Key features:
 - Tracks feature importance and attention patterns
 """
 
+import json
 import math
 import time
-import json
-from collections import defaultdict, Counter
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Set
+from collections import Counter, defaultdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 Token = Union[int, str]
 Tokens = List[Token]

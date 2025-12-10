@@ -2,21 +2,16 @@
 Comprehensive test suite for drift_detector.py
 """
 
-import pytest
-import numpy as np
 import threading
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from drift_detector import (
-    DriftDetector,
-    DriftMetrics,
-    MIN_DRIFT_THRESHOLD,
-    MAX_DRIFT_THRESHOLD,
-    MIN_HISTORY_SIZE,
-    MAX_HISTORY_SIZE,
-    MAX_EMBEDDINGS,
-    REALIGNMENT_METHODS,
-)
+import numpy as np
+import pytest
+
+from drift_detector import (MAX_DRIFT_THRESHOLD, MAX_EMBEDDINGS,
+                            MAX_HISTORY_SIZE, MIN_DRIFT_THRESHOLD,
+                            MIN_HISTORY_SIZE, REALIGNMENT_METHODS,
+                            DriftDetector, DriftMetrics)
 
 
 @pytest.fixture

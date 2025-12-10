@@ -5,18 +5,19 @@ Version: 2.0.0 - All issues fixed, realignment implemented
 Tracks embedding drift, detects anomalies, and performs automatic realignment.
 """
 
-import numpy as np
-import faiss
-import threading
 import logging
-from typing import List, Dict, Optional, Tuple, Callable, Any
+import threading
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from collections import deque
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import faiss
+import numpy as np
 
 # Optional Prometheus metrics
 try:
-    from prometheus_client import Gauge, Counter, Histogram
+    from prometheus_client import Counter, Gauge, Histogram
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:

@@ -1,25 +1,15 @@
 from __future__ import annotations
 
-import time
+import asyncio
 import math
 import random
 import threading
+import time
 import traceback
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Callable,
-    Sequence,
-    Union,
-    Tuple,
-    Iterable,
-    AsyncGenerator,
-)
+from typing import (Any, AsyncGenerator, Callable, Dict, Iterable, List,
+                    Optional, Sequence, Tuple, Union)
 
 Token = Union[int, str]
 Tokens = List[Token]

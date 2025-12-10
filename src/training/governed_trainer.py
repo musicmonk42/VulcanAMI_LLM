@@ -34,20 +34,19 @@ Revisions / Fixes applied in this version:
 6. Added inline comments clarifying decisions around update scaling and accumulation.
 """
 
-import math
-import time
-import random
-import json
 import copy
-from typing import Any, Dict, Optional, Callable, List, Tuple, Set
-from collections import defaultdict, deque
+import json
 import logging
+import math
+import random
+import time
+from collections import defaultdict, deque
 from types import SimpleNamespace
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
-from dataclasses import dataclass, asdict, field
-
+from dataclasses import asdict, dataclass, field
 
 # ============================= CONSTANTS ============================= #
 
@@ -101,10 +100,8 @@ except ImportError:
 
 # ============================= FALLBACK MODEL ============================= #
 try:
-    from src.llm_core.graphix_transformer import (
-        GraphixTransformer,
-        GraphixTransformerConfig,
-    )
+    from src.llm_core.graphix_transformer import (GraphixTransformer,
+                                                  GraphixTransformerConfig)
 except ImportError:
 
     class GraphixTransformerConfig:

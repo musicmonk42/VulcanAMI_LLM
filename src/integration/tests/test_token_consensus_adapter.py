@@ -2,17 +2,15 @@
 Tests for token_consensus_adapter.py
 """
 
-import pytest
 import asyncio
 import sys
 
+import pytest
+
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from token_consensus_adapter import (
-    TokenConsensusAdapter,
-    ConsensusAdapterConfig,
-    ConsensusProposal,
-)
+from token_consensus_adapter import (ConsensusAdapterConfig, ConsensusProposal,
+                                     TokenConsensusAdapter)
 
 
 class MockEngine:

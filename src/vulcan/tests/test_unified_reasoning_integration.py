@@ -30,10 +30,11 @@ FIXES APPLIED (corrected version):
    the test process from hanging after completion.
 """
 
-import pytest
-import numpy as np
 import sys
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 # --- Robust Path Setup ---
 # Ensures the 'src' directory is on the Python path for correct imports
@@ -43,17 +44,11 @@ sys.path.insert(0, str(SRC_PATH))
 # --- Top-Level Integration Imports ---
 # This is the first test: can we import everything from the main package?
 try:
-    from vulcan.reasoning import (
-        UnifiedReasoner,
-        ReasoningType,
-        ReasoningStrategy,
-        ProbabilisticReasoner,
-        SymbolicReasoner,
-        EnhancedCausalReasoning,
-        AnalogicalReasoner,
-        MultiModalReasoningEngine,
-    )
-
+    from vulcan.reasoning import (AnalogicalReasoner, EnhancedCausalReasoning,
+                                  MultiModalReasoningEngine,
+                                  ProbabilisticReasoner, ReasoningStrategy,
+                                  ReasoningType, SymbolicReasoner,
+                                  UnifiedReasoner)
     # ModalityType is defined inside multimodal_reasoning, which is fine
     from vulcan.reasoning.multimodal_reasoning import ModalityType
 

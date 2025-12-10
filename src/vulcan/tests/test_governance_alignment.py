@@ -10,30 +10,30 @@ NOTE: Before running these tests, ensure governance_alignment.py has the correct
     )
 """
 
-import pytest
-import time
-import tempfile
 import shutil
-import numpy as np
+import tempfile
+import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.safety.governance_alignment import (
-    GovernanceManager,
-    ValueAlignmentSystem,
-    HumanOversightInterface,
-    GovernanceLevel,
-    StakeholderType,
-    AlignmentMetric,
-    GovernancePolicy,
-    AlignmentConstraint,
-    HumanFeedback,
-    ValueSystem,
-)
+import numpy as np
+import pytest
+
+from vulcan.safety.governance_alignment import (AlignmentConstraint,
+                                                AlignmentMetric,
+                                                GovernanceLevel,
+                                                GovernanceManager,
+                                                GovernancePolicy,
+                                                HumanFeedback,
+                                                HumanOversightInterface,
+                                                StakeholderType,
+                                                ValueAlignmentSystem,
+                                                ValueSystem)
 
 # Import from safety_types (with fallback)
 try:
-    from vulcan.safety.safety_types import SafetyReport, SafetyViolationType, ActionType
+    from vulcan.safety.safety_types import (ActionType, SafetyReport,
+                                            SafetyViolationType)
 except ImportError:
     # Mock if not available
     from enum import Enum

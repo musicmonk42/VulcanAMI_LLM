@@ -9,16 +9,17 @@ FULLY IMPLEMENTED VERSION with:
 - Automatic relevance determination (ARD)
 """
 
-import numpy as np
-from typing import Any, Dict, List, Tuple, Optional, Union, Callable
-from collections import deque, defaultdict
-import logging
-import uuid
-import pickle
-from pathlib import Path
-import json
-import time
 import hashlib
+import json
+import logging
+import pickle
+import time
+import uuid
+from collections import defaultdict, deque
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -33,20 +34,17 @@ except ImportError:
     logger.warning("PyTorch not available, neural features disabled")
 
 try:
-    from sklearn.gaussian_process import GaussianProcessRegressor
-    from sklearn.gaussian_process.kernels import (
-        RBF,
-        WhiteKernel,
-        Matern,
-        RationalQuadratic,
-        ExpSineSquared,
-        ConstantKernel as C,
-    )
     from scipy import stats
-    from scipy.optimize import minimize, differential_evolution
-    from sklearn.preprocessing import StandardScaler, RobustScaler
+    from scipy.optimize import differential_evolution, minimize
     from sklearn.decomposition import PCA, FastICA
     from sklearn.feature_selection import mutual_info_regression
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    from sklearn.gaussian_process.kernels import RBF
+    from sklearn.gaussian_process.kernels import ConstantKernel as C
+    from sklearn.gaussian_process.kernels import (ExpSineSquared, Matern,
+                                                  RationalQuadratic,
+                                                  WhiteKernel)
+    from sklearn.preprocessing import RobustScaler, StandardScaler
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -55,8 +53,8 @@ except ImportError:
     raise
 
 try:
-    from scipy.stats import norm, multivariate_normal
-    from scipy.special import logsumexp, kv, gamma
+    from scipy.special import gamma, kv, logsumexp
+    from scipy.stats import multivariate_normal, norm
 
     SCIPY_AVAILABLE = True
     from scipy.spatial.distance import cdist
@@ -64,8 +62,8 @@ except ImportError:
     SCIPY_AVAILABLE = False
     logger.warning("scipy not available, some features limited")
 
-from .reasoning_types import ReasoningStep, ReasoningType, ReasoningResult
 from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+from .reasoning_types import ReasoningResult, ReasoningStep, ReasoningType
 
 
 class FeatureExtractor:

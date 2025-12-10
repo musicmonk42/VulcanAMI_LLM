@@ -4,45 +4,29 @@
 # FIXED VERSION - Added missing types (SystemState, Episode, ProvRecord, SA_Latents, HealthSnapshot)
 # ============================================================
 
-from dataclasses import dataclass, field, asdict, is_dataclass
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    TypeVar,
-    Generic,
-    Union,
-    Callable,
-    Protocol,
-    Type,
-    ClassVar,
-    Final,
-    Literal,
-    TypedDict,
-    get_args,
-    get_origin,
-)
-from enum import Enum, IntEnum, auto
-from abc import ABC, abstractmethod
-import time
-import json
-import hashlib
-from datetime import datetime, timedelta
 import asyncio
-from collections import deque, defaultdict
-import logging
-import numpy as np
-import uuid
-from pathlib import Path
+import hashlib
 import inspect
+import json
+import logging
 import re
+import time
+import uuid
+from abc import ABC, abstractmethod
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field, is_dataclass
+from datetime import datetime, timedelta
+from enum import Enum, IntEnum, auto
+from pathlib import Path
+from typing import (Any, Callable, ClassVar, Dict, Final, Generic, List,
+                    Literal, Optional, Protocol, Set, Tuple, Type, TypedDict,
+                    TypeVar, Union, get_args, get_origin)
+
+import numpy as np
 
 # Type validation libraries
 try:
-    from pydantic import BaseModel, Field, validator, root_validator
+    from pydantic import BaseModel, Field, root_validator, validator
 
     PYDANTIC_AVAILABLE = True
 except ImportError:
@@ -56,7 +40,7 @@ try:
 except ImportError:
     JSONSCHEMA_AVAILABLE = False
 
-from vulcan.config import ModalityType, SafetyLevel, ActionType, GoalType
+from vulcan.config import ActionType, GoalType, ModalityType, SafetyLevel
 
 logger = logging.getLogger(__name__)
 

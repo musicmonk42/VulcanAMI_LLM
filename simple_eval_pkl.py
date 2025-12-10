@@ -1,9 +1,10 @@
-import math
 import argparse
+import math
+import sys
+from pathlib import Path
+
 import torch
 import torch.nn.functional as F
-from pathlib import Path
-import sys
 
 """
 Evaluate a pickled checkpoint (.pkl) IF:

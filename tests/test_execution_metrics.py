@@ -9,15 +9,15 @@ Covers:
 - Prometheus export helpers
 """
 
-import time
 import math
-from unittest.mock import patch, MagicMock
+import time
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 # Adjust this import if needed depending on how you run tests, e.g.:
 # import execution_metrics as em
 import unified_runtime.execution_metrics as em
-
 
 # -----------------------------------------------------------------------------
 # Helpers

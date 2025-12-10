@@ -6,29 +6,29 @@ Version: 2.0.0 - All issues fixed
 Realistic analog/photonic operation emulation with proper physics simulation.
 """
 
-import numpy as np
-import torch
-import torch.nn as nn
-from typing import Any, Optional, Callable, Union, Dict, List, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
-import logging
-import json
-import time
-import threading
-from pathlib import Path
-from collections import defaultdict
-import warnings
 import hashlib
-import tempfile
+import json
+import logging
 import os
 import shutil
+import tempfile
+import threading
+import time
+import warnings
+from collections import defaultdict
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import numpy as np
+import scipy.constants as const
+import torch
+import torch.nn as nn
 # Scientific computing
 from scipy import linalg, signal
-from scipy.special import jv, hermite
-import scipy.constants as const
+from scipy.special import hermite, jv
 
 # Optional imports for hardware backends
 try:

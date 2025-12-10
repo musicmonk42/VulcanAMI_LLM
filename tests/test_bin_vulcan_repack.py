@@ -3,14 +3,14 @@ Tests for vulcan-repack Python script
 
 This version includes Windows compatibility fixes.
 """
-import subprocess
-import pytest
+import json
 import os
+import platform
+import subprocess
 import sys
 import tempfile
-import json
-import platform
 
+import pytest
 
 BIN_DIR = os.path.join(os.path.dirname(__file__), '..', 'bin')
 VULCAN_REPACK = os.path.join(BIN_DIR, 'vulcan-repack')
@@ -19,7 +19,7 @@ VULCAN_REPACK = os.path.join(BIN_DIR, 'vulcan-repack')
 def run_vulcan_repack(args, **kwargs):
     """
     Helper function to run vulcan-repack with proper platform-specific handling.
-    
+
     On Windows, Python scripts can't be executed directly - they need to be
     run with the Python interpreter.
     """
@@ -27,10 +27,10 @@ def run_vulcan_repack(args, **kwargs):
         command = [sys.executable, VULCAN_REPACK] + args
     else:
         command = [VULCAN_REPACK] + args
-    
+
     kwargs.setdefault('capture_output', True)
     kwargs.setdefault('text', True)
-    
+
     return subprocess.run(command, **kwargs)
 
 
@@ -114,15 +114,15 @@ class TestVulcanRepack:
         """Test JSON output"""
         with tempfile.TemporaryDirectory() as tmpdir:
             json_output = os.path.join(tmpdir, 'repack.json')
-            
+
             result = run_vulcan_repack(
                 ['test-pack', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
-            
+
             # Verify JSON structure
             with open(json_output, 'r') as f:
                 data = json.load(f)
@@ -133,7 +133,7 @@ class TestVulcanRepack:
     def test_repack_displays_summary(self):
         """Test that repack displays summary"""
         result = run_vulcan_repack(['test-pack'], timeout=30)
-        
+
         output = result.stdout + result.stderr
         assert 'Pack' in output or 'Summary' in output or 'Size' in output
 
@@ -152,13 +152,13 @@ class TestVulcanRepack:
         with tempfile.TemporaryDirectory() as tmpdir:
             output = os.path.join(tmpdir, 'out.pack')
             json_output = os.path.join(tmpdir, 'stats.json')
-            
+
             result = run_vulcan_repack(
                 ['test-pack', '--strategy', 'aggressive', '--compression', '9',
                  '--output', output, '--verbose', '--json', json_output],
                 timeout=30
             )
-            
+
             assert result.returncode == 0
             assert os.path.exists(json_output)
 

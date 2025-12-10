@@ -9,21 +9,22 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for parameter_history tests"
 )
 
-import torch.nn as nn
-import numpy as np
-import time
-from pathlib import Path
-import tempfile
-import shutil
 import json
 import pickle
-import threading
-from unittest.mock import Mock, patch, MagicMock
 import queue
+import shutil
+import tempfile
+import threading
+import time
 from collections import deque
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.learning.parameter_history import ParameterHistoryManager
+import numpy as np
+import torch.nn as nn
+
 from vulcan.learning.learning_types import LearningConfig, LearningTrajectory
+from vulcan.learning.parameter_history import ParameterHistoryManager
 
 
 class SimpleModel(nn.Module):

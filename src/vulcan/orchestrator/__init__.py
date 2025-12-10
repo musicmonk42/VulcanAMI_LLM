@@ -167,73 +167,35 @@ def get_bullet_symbol() -> str:
 
 try:
     # Agent lifecycle components
-    from .agent_lifecycle import (
-        AgentState,
-        AgentCapability,
-        AgentMetadata,
-        JobProvenance,
-        StateTransitionRules,
-        create_agent_metadata,
-        create_job_provenance,
-        validate_state_machine,
-    )
-
-    # Task queue implementations
-    from .task_queues import (
-        TaskQueueInterface,
-        RayTaskQueue,
-        CeleryTaskQueue,
-        CustomTaskQueue,
-        TaskStatus,
-        TaskMetadata,
-        QueueType,
-        create_task_queue,
-        RAY_AVAILABLE,
-        CELERY_AVAILABLE,
-        ZMQ_AVAILABLE,
-    )
-
+    from .agent_lifecycle import (AgentCapability, AgentMetadata, AgentState,
+                                  JobProvenance, StateTransitionRules,
+                                  create_agent_metadata, create_job_provenance,
+                                  validate_state_machine)
     # Agent pool management
     from .agent_pool import AgentPoolManager, AutoScaler, RecoveryManager
-
-    # Metrics collection
-    from .metrics import (
-        EnhancedMetricsCollector,
-        MetricType,
-        AggregationType,
-        create_metrics_collector,
-        compute_percentile,
-        compute_moving_average,
-        compute_rate,
-    )
-
-    # Dependencies container
-    from .dependencies import (
-        EnhancedCollectiveDeps,
-        DependencyCategory,
-        create_minimal_deps,
-        create_full_deps,
-        validate_dependencies,
-        print_dependency_report,
-    )
-
     # Main orchestrator
-    from .collective import VULCANAGICollective, ModalityType, ActionType
-
-    # Orchestrator variants
-    from .variants import (
-        ParallelOrchestrator,
-        FaultTolerantOrchestrator,
-        AdaptiveOrchestrator,
-        PerformanceMonitor,
-        StrategySelector,
-        PerceptionError,
-        ReasoningError,
-        ExecutionError,
-    )
-
+    from .collective import ActionType, ModalityType, VULCANAGICollective
+    # Dependencies container
+    from .dependencies import (DependencyCategory, EnhancedCollectiveDeps,
+                               create_full_deps, create_minimal_deps,
+                               print_dependency_report, validate_dependencies)
     # Production deployment
     from .deployment import ProductionDeployment
+    # Metrics collection
+    from .metrics import (AggregationType, EnhancedMetricsCollector,
+                          MetricType, compute_moving_average,
+                          compute_percentile, compute_rate,
+                          create_metrics_collector)
+    # Task queue implementations
+    from .task_queues import (CELERY_AVAILABLE, RAY_AVAILABLE, ZMQ_AVAILABLE,
+                              CeleryTaskQueue, CustomTaskQueue, QueueType,
+                              RayTaskQueue, TaskMetadata, TaskQueueInterface,
+                              TaskStatus, create_task_queue)
+    # Orchestrator variants
+    from .variants import (AdaptiveOrchestrator, ExecutionError,
+                           FaultTolerantOrchestrator, ParallelOrchestrator,
+                           PerceptionError, PerformanceMonitor, ReasoningError,
+                           StrategySelector)
 
     _imports_successful = True
 
@@ -253,12 +215,10 @@ PROBLEM_EXECUTOR_AVAILABLE = False
 
 try:
     # Import experiment generation components
-    from ..curiosity_engine.experiment_generator import (
-        ExperimentGenerator,
-        ExperimentType,
-        Experiment,
-        KnowledgeGap,
-    )
+    from ..curiosity_engine.experiment_generator import (Experiment,
+                                                         ExperimentGenerator,
+                                                         ExperimentType,
+                                                         KnowledgeGap)
 
     EXPERIMENT_GENERATOR_AVAILABLE = True
     logger.info("ExperimentGenerator components loaded successfully")
@@ -274,11 +234,9 @@ except ImportError as e:
 
 try:
     # Import problem execution components
-    from ..problem_decomposer.problem_executor import (
-        ProblemExecutor,
-        SolutionType,
-        ExecutionStrategy,
-    )
+    from ..problem_decomposer.problem_executor import (ExecutionStrategy,
+                                                       ProblemExecutor,
+                                                       SolutionType)
 
     PROBLEM_EXECUTOR_AVAILABLE = True
     logger.info("ProblemExecutor components loaded successfully")

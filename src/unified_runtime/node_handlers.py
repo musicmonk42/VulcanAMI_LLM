@@ -4,18 +4,19 @@ Implements all node executor functions for graph execution
 """
 
 import asyncio
+import hashlib
 import json
+import logging
+import math  # Import math
+import os
 import random
 import time
-import os
-import hashlib
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple, Callable
+import traceback
 from dataclasses import dataclass
 from enum import Enum
-import logging
-import traceback
-import math  # Import math
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 # Hardware and AI imports with graceful fallback
 try:
@@ -356,7 +357,7 @@ async def embed_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
     if runtime and hasattr(runtime, "ai_runtime"):
         try:
             # Fix: Use relative import
-            from .ai_runtime_integration import AITask, AIContract
+            from .ai_runtime_integration import AIContract, AITask
 
             # <<< --- START Dimension Logic Fix --- >>>
             # Pass the 'dim' parameter from the node's params into the task payload

@@ -25,14 +25,15 @@ Input/Output shapes:
 Returns same shape with validated tokens.
 """
 
-import re
-import time
 import hashlib
 import json
+import re
+import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Set, Deque
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from typing import (Any, Callable, Deque, Dict, List, Optional, Set, Tuple,
+                    Union)
 
 Token = Union[int, str]
 Candidate = Union[Token, Dict[str, Any]]
@@ -72,14 +73,12 @@ class ValidationCategory(Enum):
 
 try:
     # Prefer repository-provided LLM validators if available
-    from src.vulcan.safety.llm_validators import (
-        ToxicityValidator,
-        HallucinationValidator,
-        PromptInjectionValidator,
-        EnhancedSafetyValidator,
-        PIIValidator,
-        BiasValidator,
-    )
+    from src.vulcan.safety.llm_validators import (BiasValidator,
+                                                  EnhancedSafetyValidator,
+                                                  HallucinationValidator,
+                                                  PIIValidator,
+                                                  PromptInjectionValidator,
+                                                  ToxicityValidator)
 except Exception:
     # Comprehensive heuristic validators with enhanced detection
 

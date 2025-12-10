@@ -6,20 +6,19 @@ FIXED: Proper async/await handling for coroutine shutdown methods
 """
 
 import asyncio
-import json
-import logging
-import time
-import os
-import inspect
-from pathlib import Path
-from typing import Dict, Any, Optional, List, AsyncIterator, Callable, Set
-from dataclasses import dataclass, field, asdict
-from collections import defaultdict, deque
-import threading
-import queue
-from datetime import datetime
 import hashlib
 import inspect
+import json
+import logging
+import os
+import queue
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set
 
 # Import all modules (FIXED: relative imports)
 # NOTE: Assuming sibling imports from sibling modules within the 'src.unified_runtime' package
@@ -31,7 +30,7 @@ except ImportError:
     MetricsAggregator = None
 
 try:
-    from .node_handlers import get_node_handlers, AI_ERRORS
+    from .node_handlers import AI_ERRORS, get_node_handlers
 except ImportError:
     # Fallback/Mock for testing when dependencies aren't fully installed
     def get_node_handlers():
@@ -45,26 +44,23 @@ except ImportError:
     HardwareDispatcherIntegration = None
 
 try:
-    from .graph_validator import GraphValidator, ResourceLimits, ValidationResult
+    from .graph_validator import (GraphValidator, ResourceLimits,
+                                  ValidationResult)
 except ImportError:
     GraphValidator = None
     ResourceLimits = None
     ValidationResult = None
 
 try:
-    from .ai_runtime_integration import AIRuntime, AITask, AIContract
+    from .ai_runtime_integration import AIContract, AIRuntime, AITask
 except ImportError:
     AIRuntime = None
     AITask = None
     AIContract = None
 
 try:
-    from .execution_engine import (
-        ExecutionEngine,
-        ExecutionContext,
-        ExecutionMode,
-        ExecutionStatus,
-    )
+    from .execution_engine import (ExecutionContext, ExecutionEngine,
+                                   ExecutionMode, ExecutionStatus)
 except ImportError:
     ExecutionEngine = None
     ExecutionContext = None
@@ -455,8 +451,9 @@ class UnifiedRuntime:
         Enable VULCAN integration for this runtime
         """
         try:
-            from .vulcan_integration import enable_vulcan_integration as enable_vulcan
             from .vulcan_integration import VulcanIntegrationConfig
+            from .vulcan_integration import \
+                enable_vulcan_integration as enable_vulcan
 
             self.vulcan_bridge = enable_vulcan(self, config)
             logger.info("VULCAN integration enabled")

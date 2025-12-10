@@ -11,24 +11,22 @@ Tests cover:
 - Thread safety and edge cases
 """
 
-import pytest
-import numpy as np
-import time
 import threading
+import time
 from collections import Counter
 
-# Import modules to test
-from vulcan.problem_decomposer.adaptive_thresholds import (
-    AdaptiveThresholds,
-    PerformanceTracker,
-    StrategyProfiler,
-    ThresholdType,
-    ThresholdConfig,
-    PerformanceRecord,
-    StrategyProfile,
-    StrategyStatus,
-)
+import numpy as np
+import pytest
 
+# Import modules to test
+from vulcan.problem_decomposer.adaptive_thresholds import (AdaptiveThresholds,
+                                                           PerformanceRecord,
+                                                           PerformanceTracker,
+                                                           StrategyProfile,
+                                                           StrategyProfiler,
+                                                           StrategyStatus,
+                                                           ThresholdConfig,
+                                                           ThresholdType)
 
 # ============================================================
 # FIXTURES

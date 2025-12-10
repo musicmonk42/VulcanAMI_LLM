@@ -3,24 +3,24 @@ test_main.py - PURE MOCK VERSION
 Tests main entry point without spawning threads.
 """
 
-import pytest
-import os
-import sys
-import json
-import time
 import asyncio
-import tempfile
-import shutil
-import threading
 import concurrent.futures
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from typing import Dict, Any, List, Optional
+import json
+import os
+import shutil
+import sys
+import tempfile
+import threading
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
-import numpy as np
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums and Classes

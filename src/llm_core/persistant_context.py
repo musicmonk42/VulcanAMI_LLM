@@ -16,14 +16,14 @@ Fully functional context management with:
 - ✅ Cache management
 """
 
-import time
-import math
 import hashlib
-from typing import Any, Dict, List, Optional, Tuple, Set, Callable
+import logging
+import math
+import time
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict, deque
-import logging
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 

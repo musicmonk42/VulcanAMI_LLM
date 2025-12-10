@@ -7,18 +7,19 @@ Integrated with comprehensive safety validation.
 FIXED: API compatibility, circular import prevention, thread safety, complete NetworkX integration
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set, Union, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, OrderedDict
-import time
-import json
-from pathlib import Path as FilePath
-from enum import Enum
 import copy
-import threading
 import heapq
+import json
+import logging
+import threading
+import time
+from collections import OrderedDict, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path as FilePath
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # Lazy import safety validator to prevent circular dependency
 # DO NOT import at module level - import inside __init__ instead
@@ -37,8 +38,8 @@ def _lazy_import_safety_validator():
         return  # Already imported
 
     try:
-        from ..safety.safety_validator import EnhancedSafetyValidator as ESV
         from ..safety.safety_types import SafetyConfig as SC
+        from ..safety.safety_validator import EnhancedSafetyValidator as ESV
 
         EnhancedSafetyValidator = ESV
         SafetyConfig = SC

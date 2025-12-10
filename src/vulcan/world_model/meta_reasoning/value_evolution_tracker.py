@@ -36,17 +36,16 @@ FIX (2025-10-22):
 - Improved threshold calculation to consider data range and time span
 """
 
-import logging
-import time
-
-# import numpy as np # Original import
-from typing import Dict, List, Any, Optional, Tuple, Set, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
-import threading
 import json
+import logging
 import math  # Import math for fallback functions
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+# import numpy as np # Original import
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
 
 # --- START FIX: Add numpy fallback ---

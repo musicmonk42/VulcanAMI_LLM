@@ -5,25 +5,23 @@ Tests Gaussian Processes, uncertainty quantification, active learning,
 kernel selection, and numerical stability fixes.
 """
 
-import pytest
-import numpy as np
-import tempfile
-import shutil
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import logging
+import shutil
+import tempfile
 import warnings
-from typing import Dict, Any
+from pathlib import Path
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Filter warnings during tests
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 from vulcan.reasoning.probabilistic_reasoning import (
-    EnhancedProbabilisticReasoner,
-    ProbabilisticReasoner,
-    TORCH_AVAILABLE,
-)
+    TORCH_AVAILABLE, EnhancedProbabilisticReasoner, ProbabilisticReasoner)
 
 
 # Fixtures

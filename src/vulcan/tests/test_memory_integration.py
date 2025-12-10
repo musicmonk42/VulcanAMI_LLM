@@ -15,15 +15,16 @@ Run with: python test_memory_system.py
 
 from __future__ import annotations
 
-import sys
-import os
-import time
-import tempfile
-import shutil
-import numpy as np
 import logging
+import os
+import shutil
+import sys
+import tempfile
+import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
+import numpy as np
 
 # Setup logging
 logging.basicConfig(
@@ -35,31 +36,15 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
-    from vulcan.memory import (
-        Memory,
-        MemoryType,
-        MemoryConfig,
-        MemoryQuery,
-        MemoryStats,
-        HierarchicalMemory,
-        DistributedMemory,
-        MemoryFederation,
-        MemoryPersistence,
-        MemoryVersionControl,
-        CompressionType,
-        MemoryIndex,
-        MemorySearch,
-        AttentionMechanism,
-        MemoryConsolidator,
-        ConsolidationStrategy,
-        EpisodicMemory,
-        SemanticMemory,
-        ProceduralMemory,
-        WorkingMemory,
-        Episode,
-        Concept,
-        Skill,
-    )
+    from vulcan.memory import (AttentionMechanism, CompressionType, Concept,
+                               ConsolidationStrategy, DistributedMemory,
+                               Episode, EpisodicMemory, HierarchicalMemory,
+                               Memory, MemoryConfig, MemoryConsolidator,
+                               MemoryFederation, MemoryIndex,
+                               MemoryPersistence, MemoryQuery, MemorySearch,
+                               MemoryStats, MemoryType, MemoryVersionControl,
+                               ProceduralMemory, SemanticMemory, Skill,
+                               WorkingMemory)
 
     MEMORY_MODULE_AVAILABLE = True
 except ImportError as e:

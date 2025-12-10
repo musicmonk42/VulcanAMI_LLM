@@ -16,15 +16,16 @@ Complete fixed version with all edge cases and platform compatibility.
 FIXED: test_granger_causality now provides sufficient data points.
 """
 
-import pytest
-import numpy as np
-import time
+import os
+import sys
 import threading
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-import sys
-import os
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -44,18 +45,13 @@ try:
 except ImportError:
     NETWORKX_AVAILABLE = False
 
-from vulcan.reasoning.causal_reasoning import (
-    CausalReasoningEngine,
-    EnhancedCausalReasoning,
-    CausalReasoner,
-    CounterfactualReasoner,
-    CausalEdge,
-    InterventionResult,
-    CounterfactualResult,
-)
-
+from vulcan.reasoning.causal_reasoning import (CausalEdge, CausalReasoner,
+                                               CausalReasoningEngine,
+                                               CounterfactualReasoner,
+                                               CounterfactualResult,
+                                               EnhancedCausalReasoning,
+                                               InterventionResult)
 from vulcan.reasoning.reasoning_types import ReasoningType
-
 
 # ============================================================================
 # Fixtures

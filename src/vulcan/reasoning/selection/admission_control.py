@@ -7,19 +7,20 @@ to ensure system stability and predictable performance.
 Fixed version with proper thread safety, error recovery, and interruptible threads.
 """
 
-import time
-import threading
-from typing import Dict, Any, Optional, Tuple, List, Callable
-from dataclasses import dataclass, field
-from collections import deque, defaultdict
-from enum import Enum
-import psutil
-import numpy as np
-import logging
-from datetime import datetime, timedelta
-import json
-from pathlib import Path
 import heapq
+import json
+import logging
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
+import psutil
 
 logger = logging.getLogger(__name__)
 

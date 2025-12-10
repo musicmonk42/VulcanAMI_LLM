@@ -7,34 +7,26 @@ including stub implementations for cost models, feature extraction, and learning
 FIXED VERSION - All tests passing
 """
 
-import pytest
-import numpy as np
-import time
-import threading
-import tempfile
 import json
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, call
+import tempfile
+import threading
+import time
 from collections import defaultdict
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, call, patch
 
-# Import the tool selector module
-from vulcan.reasoning.selection.tool_selector import (
-    ToolSelector,
-    SelectionRequest,
-    SelectionResult,
-    SelectionMode,
-    StochasticCostModel,
-    MultiTierFeatureExtractor,
-    CalibratedDecisionMaker,
-    ValueOfInformationGate,
-    DistributionMonitor,
-    ToolSelectionBandit,
-    create_tool_selector,
-)
+import numpy as np
+import pytest
 
 from vulcan.reasoning.selection.admission_control import RequestPriority
 from vulcan.reasoning.selection.portfolio_executor import ExecutionStrategy
 from vulcan.reasoning.selection.safety_governor import SafetyLevel
+# Import the tool selector module
+from vulcan.reasoning.selection.tool_selector import (
+    CalibratedDecisionMaker, DistributionMonitor, MultiTierFeatureExtractor,
+    SelectionMode, SelectionRequest, SelectionResult, StochasticCostModel,
+    ToolSelectionBandit, ToolSelector, ValueOfInformationGate,
+    create_tool_selector)
 
 
 class TestStochasticCostModel:

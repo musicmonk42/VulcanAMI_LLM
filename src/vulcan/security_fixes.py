@@ -26,11 +26,11 @@ Apply these fixes systematically across the codebase.
 # FIX 2: Safe Pickle Loading
 # ============================================================================
 
-import pickle
 import io
 import logging
-from typing import Any, Set, Type, Union, BinaryIO
 import os
+import pickle
+from typing import Any, BinaryIO, Set, Type, Union
 
 logger = logging.getLogger(__name__)
 
@@ -234,9 +234,9 @@ def safe_pickle_load(file_or_path: Union[str, os.PathLike, BinaryIO]) -> Any:
 # FIX 3: Safe Subprocess Execution
 # ============================================================================
 
-import subprocess
-import shlex
 import re
+import shlex
+import subprocess
 from pathlib import Path
 
 
@@ -343,9 +343,9 @@ def safe_git_commit(message: str, repo_root: str = ".") -> subprocess.CompletedP
 # FIX 4: Enhanced Error Handling Pattern
 # ============================================================================
 
-from functools import wraps
-from typing import Callable, TypeVar, Optional
 import traceback
+from functools import wraps
+from typing import Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
