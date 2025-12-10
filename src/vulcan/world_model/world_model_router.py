@@ -1020,7 +1020,7 @@ class WorldModelRouter:
             if csiu_exec_before and csiu_exec_after:
                 exec_results["_internal_csiu"] = {
                     "before": csiu_exec_before,
-                    "after": ciu_exec_after,
+                    "after": csiu_exec_after,
                     "note": "Internal tracking only, not for UX",
                 }
 
