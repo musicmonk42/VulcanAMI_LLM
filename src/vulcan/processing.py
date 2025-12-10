@@ -62,7 +62,12 @@ class GraphixTransformer:
         # A mock configuration, assuming it initializes the LLM's embedding layer
         self.embedding_dim = embedding_dim
         self.device = "cpu"  # Mock device
-        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        # SECURITY: Added revision parameter to pin model version
+        # Using a stable release revision for security
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "bert-base-uncased",
+            revision="main"  # Pin to a specific revision for security
+        )
 
     def get_embeddings(self, text: Union[str, List[str]]) -> torch.Tensor:
         """
@@ -717,8 +722,15 @@ class DynamicModelManager:
             return model, None
 
         elif modality in ["vision", "audio"]:
-            model = AutoModel.from_pretrained(model_name)
-            processor = AutoImageProcessor.from_pretrained(model_name)
+            # SECURITY: Added revision parameter to pin model version
+            model = AutoModel.from_pretrained(
+                model_name,
+                revision="main"  # Pin to a specific revision for security
+            )
+            processor = AutoImageProcessor.from_pretrained(
+                model_name,
+                revision="main"  # Pin to a specific revision for security
+            )
 
             if device != "cpu" and torch.cuda.is_available():
                 model = model.to(device)

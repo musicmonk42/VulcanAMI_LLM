@@ -508,11 +508,12 @@ class RequestHandler(BaseHTTPRequestHandler):
 class GraphixListener:
     """
     Main listener server with graceful shutdown support and thread safety.
+    SECURITY: Changed default host from 0.0.0.0 to 127.0.0.1
     """
 
     def __init__(
         self,
-        host: str = "0.0.0.0",
+        host: str = "127.0.0.1",
         port: int = 8181,
         use_mock: bool = False,
         max_requests_per_minute: int = MAX_REQUESTS_PER_MINUTE,
@@ -521,7 +522,7 @@ class GraphixListener:
         Initialize listener server.
 
         Args:
-            host: Host to bind to (default: all interfaces)
+            host: Host to bind to (default: 127.0.0.1 for security, use 0.0.0.0 to bind to all interfaces)
             port: Port to listen on
             use_mock: Use mock implementations if True
             max_requests_per_minute: Rate limit per client
@@ -638,20 +639,24 @@ class GraphixListener:
 
 
 def run_listener(
-    host: str = "0.0.0.0",
+    host: str = "127.0.0.1",
     port: int = 8181,
     use_mock: bool = False,
     max_requests_per_minute: int = MAX_REQUESTS_PER_MINUTE,
 ):
     """
     Run the listener server.
+    SECURITY: Changed default host from 0.0.0.0 to 127.0.0.1
 
     Args:
-        host: Host to bind to
+        host: Host to bind to (default: 127.0.0.1 for security)
         port: Port to listen on
         use_mock: Use mock implementations for testing
         max_requests_per_minute: Rate limit per client
     """
+    if host == "0.0.0.0":
+        logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
+    
     listener = GraphixListener(
         host=host,
         port=port,
@@ -668,7 +673,7 @@ if __name__ == "__main__":
         description="Graphix IR Listener - Secure HTTP server for graph submission"
     )
     parser.add_argument(
-        "--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)"
+        "--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1, use 0.0.0.0 for all interfaces)"
     )
     parser.add_argument(
         "--port", type=int, default=8181, help="Port to listen on (default: 8181)"
