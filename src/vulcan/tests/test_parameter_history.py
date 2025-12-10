@@ -154,7 +154,7 @@ class TestParameterHistoryManager:
 
         # Should have saved async checkpoint
         checkpoints = manager.list_checkpoints()
-        async_checkpoints = list(checkpoints if c.get("async"))
+        async_checkpoints = [c for c in checkpoints if c.get("async"])
         assert len(async_checkpoints) > 0
 
     def test_async_checkpoint_queue_full(self, manager, model):
@@ -429,7 +429,7 @@ class TestParameterHistoryManager:
 
         # Verify imported checkpoints
         checkpoints = manager.list_checkpoints()
-        imported = list(checkpoints if "imported" in c["checkpoint_id")]
+        imported = [c for c in checkpoints if "imported" in c["checkpoint_id"]]
         assert len(imported) == 2
 
     def test_get_statistics(self, manager, model):

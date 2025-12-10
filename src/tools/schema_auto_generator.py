@@ -375,7 +375,7 @@ def build_schema_from_expr(
     elif etype == "sequence":
         # FIXED: Filter out None items and validate structure
         items = expr.get("items", [])
-        items = list(items if item is not None and isinstance(item, dict))
+        items = [item for item in items if item is not None and isinstance(item, dict])
 
         if not items:
             return {"type": "object"}
@@ -430,7 +430,7 @@ def build_schema_from_expr(
     elif etype == "alternation":
         # FIXED: Filter out None items
         items = expr.get("items", [])
-        items = list(items if item is not None)
+        items = [item for item in items if item is not None]
         if items:
             schemas = [
                 build_schema_from_expr(item, strict, multilingual_generator)

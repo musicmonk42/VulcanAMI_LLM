@@ -640,7 +640,7 @@ class TestPredictionAnalyzer:
 
         assert len(gaps) > 0
         # Should create causal gap
-        causal_gaps = list(gaps if g.type == "causal")
+        causal_gaps = [g for g in gaps if g.type == "causal"]
         assert len(causal_gaps) > 0
 
     def test_analyze_systematic_errors(self):
@@ -679,7 +679,7 @@ class TestTransferAnalyzer:
 
         assert len(gaps) > 0
         # Should create transfer gap
-        transfer_gaps = list(gaps if g.type == "transfer")
+        transfer_gaps = [g for g in gaps if g.type == "transfer"]
         assert len(transfer_gaps) > 0
 
 

@@ -337,7 +337,7 @@ class SafetyValidator:
         """Add token to blacklist."""
         self.blacklist.add(token)
 
-    def set_whitelist(self, tokens: Set[TokenID]):
+    def set_white[self, tokens: Set[TokenID]):
         """Set whitelist (None means no whitelist)."""
         self.whitelist = tokens
 
@@ -528,7 +528,7 @@ class LayerExecutor:
             layer.get("edges", [])
 
             # Find attention heads
-            attention_heads = list(nodes if n.get("type") == "attention_head")
+            attention_heads = [n for n in nodes if n.get("type"] == "attention_head")
 
             if not attention_heads:
                 # No attention heads, return input (passthrough layer)

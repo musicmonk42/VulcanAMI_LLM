@@ -524,7 +524,7 @@ class TamperEvidentLogger:
                             if self.config.alert_callback:
                                 self.config.alert_callback(f"Batch write failed: {e}")
 
-                        critical_entries = list(batch if e.get("critical"))
+                        critical_entries = [e for e in batch if e.get("critical")]
                         if critical_entries and self.config.dlt_enabled:
                             dlt_results = await self._anchor_to_dlt(critical_entries)
                             for entry, dlt_result in zip(critical_entries, dlt_results):

@@ -342,7 +342,7 @@ class TestValidationTracker:
 
         insights = tracker.get_learning_insights()
 
-        trend_insights = list(insights if i.insight_type == "temporal_trend")
+        trend_insights = [i for i in insights if i.insight_type == "temporal_trend"]
         assert len(trend_insights) > 0
 
     def test_objective_specific_insights(self, tracker):

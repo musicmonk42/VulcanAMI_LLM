@@ -1142,7 +1142,7 @@ class ValueEvolutionTracker:
                     except ValueError:
                         logger.warning(f"Invalid severity filter: {severity}")
                         return []
-                alerts_snapshot = list(alerts_snapshot if a.severity == severity)
+                alerts_snapshot = [a for a in alerts_snapshot if a.severity == severity]
 
             # Sort by timestamp (most recent first)
             alerts_snapshot.sort(key=lambda a: a.timestamp, reverse=True)

@@ -353,7 +353,7 @@ except ImportError:
                     in_degree[v] += 1
 
             # Initialize queue with nodes of in-degree 0
-            queue = deque(list(graph.nodes_dict if in_degree[n) == 0])
+            queue = deque([n for n in graph.nodes_dict if in_degree[n] == 0])
             topo_order = []
 
             # Topological sort
@@ -391,7 +391,7 @@ except ImportError:
                 for v in graph.edges_dict[u]:
                     in_degree[v] += 1
 
-            queue = deque(list(graph.nodes_dict if in_degree[n) == 0])
+            queue = deque([n for n in graph.nodes_dict if in_degree[n] == 0])
             result = []
 
             while queue:
@@ -1077,16 +1077,16 @@ class CycleDetector:
                     sccs = list(
                         nx.strongly_connected_components(self.structure.nx_graph)
                     )
-                    return list(sccs if len(scc) > 1)
+                    return [scc for scc in sccs if len(scc) > 1]
                 except Exception as e:
                     logger.warning(f"NetworkX SCC failed: {e}, using fallback")
                     sccs = self._tarjan_scc()
-                    return list(sccs if len(scc) > 1)
+                    return [scc for scc in sccs if len(scc) > 1]
             else:
                 sccs = list(
                     MockNX.strongly_connected_components(self.structure.nx_graph)
                 )
-                return list(sccs if len(scc) > 1)
+                return [scc for scc in sccs if len(scc) > 1]
 
     def _tarjan_scc(self) -> List[Set[str]]:
         """
@@ -1703,7 +1703,7 @@ class TopologicalSorter:
             for child in self.structure.adjacency_list.get(node, []):
                 in_degree[child] += 1
 
-        queue = deque(list(self.structure.nodes if in_degree[n) == 0])
+        queue = deque([n for n in self.structure.nodes if in_degree[n] == 0])
         result = []
 
         while queue:

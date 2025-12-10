@@ -634,7 +634,7 @@ class ToolSafetyGovernor:
             for t in expired:
                 del self.quarantine_list[t]
 
-            available_tools = list(tools if t not in self.quarantine_list)
+            available_tools = [t for t in tools if t not in self.quarantine_list]
 
             allowed, report = self.manager.veto_tool_selection(available_tools, request)
 

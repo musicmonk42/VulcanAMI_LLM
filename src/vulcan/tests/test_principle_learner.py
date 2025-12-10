@@ -178,7 +178,7 @@ class MockKnowledgePruner:
         return []
 
     def identify_low_quality(self, principles, threshold=0.5):
-        return list(principles if getattr(p, "confidence", 1.0) < threshold)
+        return [p for p in principles if getattr(p, "confidence", 1.0] < threshold)
 
     def identify_outdated(self, knowledge_base, max_age_days=30):
         """Identify outdated principles"""
@@ -187,7 +187,7 @@ class MockKnowledgePruner:
 
     def identify_low_confidence(self, principles, threshold=0.5):
         """Identify low confidence principles"""
-        return list(principles if getattr(p, "confidence", 1.0) < threshold)
+        return [p for p in principles if getattr(p, "confidence", 1.0] < threshold)
 
     def execute_pruning(self, candidates, knowledge_base, threshold=0.7):
         """Execute pruning on candidates"""

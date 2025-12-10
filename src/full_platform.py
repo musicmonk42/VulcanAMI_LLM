@@ -216,7 +216,7 @@ class UnifiedPlatformSettings(BaseSettings):
                 o.strip() for o in self.cors_origins if isinstance(o, str) and o.strip()
             ]
             # Remove '*' from defaults to enforce explicit allowlist unless user sets it intentionally
-            self.cors_origins = list(self.cors_origins if o != "*")
+            self.cors_origins = [o for o in self.cors_origins if o != "*"]
 
         # Auto-select auth method if not explicitly set: prefer JWT if configured, else API key, else NONE
         if self.auth_method == AuthMethod.NONE:
@@ -591,7 +591,7 @@ async def import_service_async(
         )
 
     # Remove None entries
-    import_strategies = list(import_strategies if s)
+    import_strategies = [s for s in import_strategies if s]
 
     for strategy in import_strategies:
         try:

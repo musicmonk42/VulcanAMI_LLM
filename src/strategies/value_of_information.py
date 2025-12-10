@@ -807,7 +807,7 @@ class ValueOfInformationGate:
             "value_distribution": {
                 "positive_value_rate": sum(1 for v in net_values if v > 0)
                 / len(net_values),
-                "mean_positive_value": np.mean(list(net_values if v > 0))
+                "mean_positive_value": np.mean([v for v in net_values if v > 0])
                 if any(v > 0 for v in net_values)
                 else 0,
             },

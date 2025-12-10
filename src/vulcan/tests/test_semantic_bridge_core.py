@@ -250,7 +250,7 @@ class MockDomainRegistry:
         return 0.5
 
     def get_similar_domains(self, domain_id: str, threshold: float = 0.5) -> List[str]:
-        return list(self.domains if d != domain_id)
+        return [d for d in self.domains if d != domain_id]
 
     def get_related_domains(self, domain_id: str) -> List[str]:
         return list(self.domains.keys())

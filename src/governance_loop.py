@@ -906,7 +906,7 @@ class GovernanceLoop:
                         continue
 
                     required_fields = ["name", "type", "priority", "rules"]
-                    missing_fields = list(required_fields if f not in data)
+                    missing_fields = [f for f in required_fields if f not in data]
                     if missing_fields:
                         errors.append(
                             f"Policy {policy_id}: Missing fields {missing_fields}"

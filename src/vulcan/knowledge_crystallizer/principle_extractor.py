@@ -1324,7 +1324,7 @@ class PrincipleExtractor:
                 return 1.0
 
             # Filter valid traces
-            valid_evidence = list(evidence if e)
+            valid_evidence = [e for e in evidence if e]
             if len(valid_evidence) < 2:
                 return 1.0
 
@@ -2306,7 +2306,7 @@ class AbstractionEngine:
                         descriptions.append(f"Uses {', '.join(pattern_types)} patterns")
 
             # Add success correlation if significant
-            high_correlation = list(factors if f and f.correlation > 0.7)
+            high_correlation = [f for f in factors if f and f.correlation > 0.7]
             if high_correlation:
                 descriptions.append(
                     f"Strongly correlated with success ({len(high_correlation)} factors)"
@@ -2325,7 +2325,7 @@ class AbstractionEngine:
         """Create abstracted pattern from factors"""
         try:
             # Determine pattern type based on factors
-            pattern_factors = list(factors if f and "pattern" in f.factor_type)
+            pattern_factors = [f for f in factors if f and "pattern" in f.factor_type]
 
             if pattern_factors:
                 # Use most important pattern
@@ -2452,7 +2452,7 @@ class AbstractionEngine:
             if not factors:
                 return 0.0
 
-            valid_factors = list(factors if f)
+            valid_factors = [f for f in factors if f]
             if not valid_factors:
                 return 0.0
 
@@ -2499,7 +2499,7 @@ class AbstractionEngine:
                         tags.add(metric.metric_type.value)
 
             # Add importance level
-            valid_factors = list(factors if f)
+            valid_factors = [f for f in factors if f]
             if valid_factors:
                 avg_importance = np.mean([f.importance for f in valid_factors])
                 if avg_importance > 0.8:
@@ -2510,7 +2510,7 @@ class AbstractionEngine:
                     tags.add("supporting")
 
             # Add pattern tags
-            pattern_factors = list(factors if f and "pattern" in f.factor_type)
+            pattern_factors = [f for f in factors if f and "pattern" in f.factor_type]
             for pf in pattern_factors:
                 pattern_type = pf.factor_type.replace("pattern_", "")
                 tags.add(f"{pattern_type}_pattern")

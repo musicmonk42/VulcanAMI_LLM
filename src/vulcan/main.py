@@ -699,7 +699,7 @@ async def rate_limiting(request: Request, call_next):
     with rate_limit_lock:
         bucket = rate_limit_storage.setdefault(client_id, [])
         # Evict old timestamps
-        rate_limit_storage[client_id] = list(bucket if t > window_start)
+        rate_limit_storage[client_id] = [t for t in bucket if t > window_start]
 
         if len(rate_limit_storage[client_id]) >= settings.rate_limit_requests:
             logger.warning(f"Rate limit exceeded for {client_id}")
@@ -1568,7 +1568,7 @@ def test_safety_systems(deployment: ProductionDeployment) -> bool:
     if "action" in result:
         action_type = result["action"].get("type")
     elif "output" in result and result["output"]:
-        output_keys = list(result["output"].keys())
+        output_keys = [result["output"].keys())
         if output_keys:
             action_type = result["output"][output_keys[0]].get("action", {}).get("type")
 
@@ -1836,7 +1836,7 @@ class IntegrationTestSuite:
             if has_action and isinstance(result.get("action"), dict):
                 action_type = result["action"].get("type", "unknown")
             elif has_output and isinstance(result.get("output"), dict):
-                output_keys = list(result["output"].keys())
+                output_keys = [result["output"].keys())
                 if output_keys:
                     first_output = result["output"][output_keys[0]]
                     if isinstance(first_output, dict) and "action" in first_output:
@@ -2268,7 +2268,7 @@ class PerformanceBenchmark:
             if len(throughputs) > 1:
                 scalability_factor = throughputs[-1] / throughputs[0]
                 ideal_factor = int(
-                    list(self.results["scalability"].keys())[-1].split("_")[1]
+                    [self.results["scalability"].keys())[-1].split("_")[1]
                 )
                 analysis["scalability_efficiency"] = scalability_factor / ideal_factor
 

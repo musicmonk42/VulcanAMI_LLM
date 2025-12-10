@@ -728,7 +728,7 @@ class TestPatternDetector:
 
         assert isinstance(patterns, list)
         # Should detect at least sequential pattern
-        sequential = list(patterns if p.pattern_type == PatternType.SEQUENTIAL)
+        sequential = [p for p in patterns if p.pattern_type == PatternType.SEQUENTIAL]
         assert len(sequential) > 0
 
     def test_detect_iterative_patterns(self, detector):
@@ -750,7 +750,7 @@ class TestPatternDetector:
         patterns = detector.detect_patterns(trace)
 
         # Should detect iterative pattern
-        iterative = list(patterns if p.pattern_type == PatternType.ITERATIVE)
+        iterative = [p for p in patterns if p.pattern_type == PatternType.ITERATIVE]
         assert len(iterative) > 0
 
     def test_detect_conditional_patterns(self, detector):
@@ -1069,7 +1069,7 @@ class TestIntegration:
             # Later extractions should have more confidence
             if i >= 2 and principles:
                 # Check if any high-confidence principles emerged
-                list(principles if p.confidence > 0.6)
+                [p for p in principles if p.confidence > 0.6]
                 # May or may not have high confidence depending on patterns
 
 

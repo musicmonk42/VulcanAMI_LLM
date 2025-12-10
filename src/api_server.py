@@ -1920,10 +1920,10 @@ class GraphAPIServer:
         with self.locks["proposals"]:
             total_proposals = len(self.proposals)
             open_proposals = len(
-                list(self.proposals.values() if p.status == "open")
+                [p for p in self.proposals.values() if p.status == "open"]
             )
             approved_proposals = len(
-                list(self.proposals.values() if p.status == "approved")
+                [p for p in self.proposals.values() if p.status == "approved"]
             )
         with self.locks["agents"]:
             total_agents = len(self.agents)

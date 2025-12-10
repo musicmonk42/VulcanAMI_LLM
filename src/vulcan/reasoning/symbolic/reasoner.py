@@ -634,7 +634,7 @@ class ProbabilisticReasoner:
         """
         for var_name in self.variables:
             # Find rules concluding this variable
-            relevant_rules = list(self.rules if r["conclusion") == var_name]
+            relevant_rules = [r for r in self.rules if r["conclusion"] == var_name]
 
             if not relevant_rules:
                 # No rules - use prior
@@ -737,7 +737,7 @@ class ProbabilisticReasoner:
 
         # Binary variables
         values = [True, False]
-        return list(product(*[values for _ in parents]))
+        return [product(*[values for _ in parents]))
 
     def _rule_satisfied(
         self, rule: Dict[str, Any], parent_values: Tuple, parent_names: List[str]

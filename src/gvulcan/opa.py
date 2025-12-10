@@ -417,7 +417,7 @@ class OPAClient:
         log = self.audit_log
 
         if policy_name:
-            log = list(log if e.policy_name == policy_name)
+            log = [e for e in log if e.policy_name == policy_name]
 
         if limit:
             log = log[-limit:]

@@ -383,9 +383,9 @@ class ServiceRegistry:
             endpoints = self.services.get(name, [])
 
             if version:
-                endpoints = list(endpoints if e.version == version)
+                endpoints = [e for e in endpoints if e.version == version]
 
-            healthy_endpoints = list(endpoints if e.is_healthy)
+            healthy_endpoints = [e for e in endpoints if e.is_healthy]
 
             if not healthy_endpoints:
                 return None

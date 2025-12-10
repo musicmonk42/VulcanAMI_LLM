@@ -652,8 +652,8 @@ class HybridCompaction:
         tasks = []
 
         # Separate packs by strategy
-        tier_packs = list(packs if p.level in self.tier_levels)
-        leveled_packs = list(packs if p.level in self.leveled_levels)
+        tier_packs = [p for p in packs if p.level in self.tier_levels]
+        leveled_packs = [p for p in packs if p.level in self.leveled_levels]
 
         # Apply tiered compaction to lower levels
         if tier_packs:

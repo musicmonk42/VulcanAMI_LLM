@@ -448,7 +448,7 @@ class ExecutionScheduler:
             for dependent in self.dependents.get(node_id, []):
                 in_degree[dependent] += 1
 
-        queue = deque(list(self.node_map if in_degree[n) == 0])
+        queue = deque([n for n in self.node_map if in_degree[n] == 0])
         result = []
 
         while queue:

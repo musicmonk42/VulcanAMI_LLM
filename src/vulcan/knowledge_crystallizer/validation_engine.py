@@ -1020,7 +1020,7 @@ class KnowledgeValidator:
 
         # Remove duplicates while preserving order
         seen = set()
-        levels = list(levels if not (l in seen or seen.add(l)))
+        levels = [l for l in levels if not (l in seen or seen.add(l]))
 
         logger.debug(
             "Selected validation levels for principle (confidence=%.2f, criticality=%.2f): %s",

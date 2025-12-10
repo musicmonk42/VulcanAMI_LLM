@@ -1068,7 +1068,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             X_cols = [treatment] + list(covariates)
 
             # Remove columns that don't exist
-            X_cols = list(X_cols if col in data.columns)
+            X_cols = [item for item in X_cols if col in data.columns]
 
             if treatment not in data.columns or outcome not in data.columns:
                 return 0.0

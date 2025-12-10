@@ -975,7 +975,7 @@ class NSOAligner:
             mitigations.append("Validate all network endpoints")
 
         # Check for file operations
-        if any(x in code for x in ["open(", "write(", "file", "path"], encoding="utf-8"):
+        if any(x in code for x in ["open(", "write(", "file", "path"]):
             risks.append("file_operations")
             risk_level = max(risk_level, RISK_LEVELS[SafetyLevel.LOW_RISK])
             mitigations.append("Restrict file system access")
@@ -1833,7 +1833,7 @@ class AdversarialTester:
             else:
                 # Random restart if stuck
                 population = [self._random_mutation(current_proposal) for _ in range(5)]
-                population = list(population if p is not None)
+                population = [p for p in population if p is not None]
 
                 if not population:
                     break
@@ -2075,9 +2075,9 @@ class AdversarialTester:
 
         # Generate summary
         total_tests = len(
-            list(results["tests").keys() if not k.endswith("_error")]
+            [k for k in results["tests"].keys() if not k.endswith("_error")]
         )
-        failures = len(list(results["tests").keys() if k.endswith("_error")])
+        failures = len([k for k in results["tests"].keys() if k.endswith("_error")])
         divergences = [
             v
             for k, v in results["tests"].items()

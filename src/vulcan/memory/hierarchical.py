@@ -1280,22 +1280,22 @@ class HierarchicalMemory(BaseMemorySystem):
         # Time range filter
         if query.time_range:
             start, end = query.time_range
-            filtered = list(filtered if start <= m.timestamp <= end)
+            filtered = [m for m in filtered if start <= m.timestamp <= end]
 
         # Type filter
         if "type" in query.filters:
             memory_type = query.filters["type"]
-            filtered = list(filtered if m.type == memory_type)
+            filtered = [m for m in filtered if m.type == memory_type]
 
         # Importance filter
         if "min_importance" in query.filters:
             min_imp = query.filters["min_importance"]
-            filtered = list(filtered if m.importance >= min_imp)
+            filtered = [m for m in filtered if m.importance >= min_imp]
 
         # Content-based filter
         if "content_contains" in query.filters:
             search_text = query.filters["content_contains"].lower()
-            filtered = list(filtered if search_text in str(m.content).lower())
+            filtered = [m for m in filtered if search_text in str(m.content].lower())
 
         # Metadata filter
         if "metadata" in query.filters:
