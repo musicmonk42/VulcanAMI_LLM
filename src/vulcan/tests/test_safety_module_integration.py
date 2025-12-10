@@ -964,7 +964,7 @@ class HumanOversightInterface:
             "automation_level": self.automation_level,
             "emergency_stop_enabled": self.emergency_stop_enabled,
             "active_alerts": len(
-                list(self.alerts.values() if not a.get("acknowledged"))
+                [a for a in self.alerts.values() if not a.get("acknowledged")]
             ),
         }
 

@@ -1417,7 +1417,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(method_to_call)
-            params = list(sig.parameters.keys() if p != "self")
+            params = [p for p in sig.parameters.keys() if p != "self"]
 
             # Check for specific parameter names
             if "observation" in params:
@@ -1473,7 +1473,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(tracker.update)
-            params = list(sig.parameters.keys() if p != "self")
+            params = [p for p in sig.parameters.keys() if p != "self"]
 
             # Check for specific parameter names
             if "observation" in params:
@@ -1503,7 +1503,7 @@ class WorldModelRouter:
             try:
                 # FIXED: Defensive parameter inference
                 sig = inspect.signature(dynamics.update)
-                params = list(sig.parameters.keys() if p != "self")
+                params = [p for p in sig.parameters.keys() if p != "self"]
 
                 # Check for specific parameter names
                 if "observation" in params:
@@ -1554,7 +1554,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(detector.check)
-            params = list(sig.parameters.keys() if p != "self")
+            params = [p for p in sig.parameters.keys() if p != "self"]
 
             # Check for specific parameter names
             if "observations" in params:
@@ -1596,7 +1596,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(tracker.update)
-            params = list(sig.parameters.keys() if p != "self")
+            params = [p for p in sig.parameters.keys() if p != "self"]
 
             # Check for specific parameter names
             if "observation" in params and "prediction" in params:
@@ -1650,7 +1650,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(method_to_call)
-            params = list(sig.parameters.keys() if p != "self")
+            params = [p for p in sig.parameters.keys() if p != "self"]
 
             # Check for specific parameter names
             if "observation" in params:
@@ -1691,7 +1691,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(method_to_call)
-            params = list(sig.parameters.keys() if p != "self")
+            params = [p for p in sig.parameters.keys() if p != "self"]
 
             # Check for specific parameter names
             if "observation" in params:

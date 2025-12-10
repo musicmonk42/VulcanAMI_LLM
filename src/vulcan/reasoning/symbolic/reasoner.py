@@ -737,7 +737,7 @@ class ProbabilisticReasoner:
 
         # Binary variables
         values = [True, False]
-        return [product(*[values for _ in parents]))
+        return list(product(*[values for _ in parents]))
 
     def _rule_satisfied(
         self, rule: Dict[str, Any], parent_values: Tuple, parent_names: List[str]

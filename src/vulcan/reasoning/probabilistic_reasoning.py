@@ -193,7 +193,7 @@ class FeatureExtractor:
             except Exception:
                 return self._extract_fallback(data)
         elif isinstance(data, dict):
-            values = list(data.values() if isinstance(v, (int, float)))
+            values = [v for v in data.values() if isinstance(v, (int, float))]
             if values:
                 return np.array(values).reshape(1, -1)
 
@@ -1644,18 +1644,16 @@ class EnhancedProbabilisticReasoner:
 
         if self.diagnostics["mse_history"]:
             diagnostics["recent_mse"] = float(
-                np.mean([self.diagnostics["mse_history"])[-10:])
+                np.mean(self.diagnostics["mse_history"][-10:])
             )
 
         if self.diagnostics["likelihood_history"]:
             diagnostics["recent_likelihood"] = float(
-                np.mean([self.diagnostics["likelihood_history"])[-10:])
+                np.mean(self.diagnostics["likelihood_history"][-10:])
             )
 
         if self.diagnostics["optimization_history"]:
-            diagnostics["recent_optimizations"] = [
-                self.diagnostics["optimization_history"]
-            )[-5:]
+            diagnostics["recent_optimizations"] = self.diagnostics["optimization_history"][-5:]
 
         return diagnostics
 

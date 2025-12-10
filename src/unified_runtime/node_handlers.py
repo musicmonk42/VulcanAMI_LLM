@@ -1933,7 +1933,7 @@ async def consensus_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
     """
     votes_input = inputs.get("votes", [])
     # Ensure votes is a list of dicts
-    votes = [v for v in votes_input if isinstance(v, dict])
+    votes = [v for v in votes_input if isinstance(v, dict)]
 
     threshold = node.get("params", {}).get("threshold", 0.5)
     # Ensure threshold is valid
@@ -2213,7 +2213,7 @@ async def normalize_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
                 return {"output": []}  # Handle empty list
             try:
                 # Filter out non-numeric types before min/max
-                numeric_data = [x for x in data if isinstance(x, (int, float]))
+                numeric_data = [x for x in data if isinstance(x, (int, float))]
                 if not numeric_data:
                     return {"output": data}  # Return original if no numerics
 

@@ -1129,7 +1129,7 @@ class StructuralDecomposition(DecompositionStrategy):
                 parallel_groups[key].append(node)
 
         # Find groups with multiple nodes
-        parallel_sets = list(parallel_groups.values() if len(nodes) > 1)
+        parallel_sets = [nodes for nodes in parallel_groups.values() if len(nodes) > 1]
 
         if parallel_sets:
             total_parallel = sum(len(s) for s in parallel_sets)
@@ -1545,7 +1545,7 @@ class AnalogicalDecomposition(DecompositionStrategy):
 
                     # Check if hierarchical
                     if nx.is_directed_acyclic_graph(G):
-                        roots = list(G.nodes() if G.in_degree(n) == 0)
+                        roots = [n for n in G.nodes() if G.in_degree(n) == 0]
                         features["is_hierarchical"] = len(roots) <= 2
 
         return features

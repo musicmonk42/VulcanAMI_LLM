@@ -2010,7 +2010,7 @@ class KnowledgeIndex:
                 "between",
             }
 
-            keywords = [w for w in words if w not in stop_words and len(w] > 3)
+            keywords = [w for w in words if w not in stop_words and len(w) > 3]
 
             # Extract bigrams
             bigrams = []

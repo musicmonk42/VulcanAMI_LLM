@@ -197,10 +197,10 @@ class MockInterventionManager:
         return {
             "total_interventions": len(self.interventions),
             "pending": len(
-                list(self.interventions.values() if i.status == "pending")
+                [i for i in self.interventions.values() if i.status == "pending"]
             ),
             "executed": len(
-                list(self.interventions.values() if i.status == "executed")
+                [i for i in self.interventions.values() if i.status == "executed"]
             ),
         }
 

@@ -1660,7 +1660,7 @@ class ProblemExecutor:
         elif transform_type == "filter":
             # Filter data
             if "data" in current_data and isinstance(current_data["data"], list):
-                filtered = [current_data["data"] if x > 0]
+                filtered = [x for x in current_data["data"] if x > 0]
                 return {"data": filtered}
             return current_data
         elif transform_type == "aggregate":

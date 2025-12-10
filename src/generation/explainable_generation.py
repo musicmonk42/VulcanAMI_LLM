@@ -1459,7 +1459,7 @@ class ExplainableGeneration:
                 )
 
         # Safety
-        safety_factors = [f for f in factors if f.get("type"] == "safety")
+        safety_factors = [f for f in factors if f.get("type") == "safety"]
         if safety_factors:
             parts.append(f"\n4. Safety Validation:")
             parts.append(

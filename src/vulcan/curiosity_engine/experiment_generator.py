@@ -1799,7 +1799,7 @@ class IterativeExperimentDesigner:
                     and self.successful_adjustments[key]
                 ):
                     # Get most recent successful adjustment
-                    recent_adjustments = [self.successful_adjustments[key])[-5:]
+                    recent_adjustments = self.successful_adjustments[key][-5:]
 
                     # Apply successful patterns
                     for adj in recent_adjustments:

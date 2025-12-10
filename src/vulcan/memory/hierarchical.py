@@ -1295,7 +1295,7 @@ class HierarchicalMemory(BaseMemorySystem):
         # Content-based filter
         if "content_contains" in query.filters:
             search_text = query.filters["content_contains"].lower()
-            filtered = [m for m in filtered if search_text in str(m.content].lower())
+            filtered = [m for m in filtered if search_text in str(m.content).lower()]
 
         # Metadata filter
         if "metadata" in query.filters:

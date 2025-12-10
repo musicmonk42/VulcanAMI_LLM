@@ -1179,7 +1179,7 @@ class CausalContext:
             )
 
         # Causal path explanations
-        paths_found = [item for item in scored_items if item.get("causal_path"])
+        paths_found = [item for item in scored_items if item.get("causal_path")]
         if paths_found:
             path_ex = paths_found[0]
             path = path_ex["causal_path"]
@@ -1234,7 +1234,7 @@ class CausalContext:
         """Simple tokenization"""
         if not text:
             return []
-        return list(re.findall(r"[A-Za-z0-9_)+", text.lower()) if t]
+        return [t for t in re.findall(r"[A-Za-z0-9_]+", text.lower()) if t]
 
     def _overlap(self, a: List[str], b: List[str]) -> float:
         """Compute overlap score"""
@@ -1282,7 +1282,7 @@ class CausalContext:
             except Exception:
                 pass
         # Fallback: use tokenized terms
-        return [t for t in qterms if len(t] > 2)[:50]
+        return [t for t in qterms if len(t) > 2][:50]
 
     def _wm_relatedness(
         self, wm: Any, concepts: List[str], other_terms: List[str]

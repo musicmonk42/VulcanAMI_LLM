@@ -1571,7 +1571,7 @@ class MultiModalReasoningEngine:
             return weighted_votes.most_common(1)[0][0]
 
         # Weighted average for numerical conclusions (float)
-        numeric_conclusions = [c for c in conclusions if isinstance(c, float])
+        numeric_conclusions = [c for c in conclusions if isinstance(c, float)]
         numeric_weights = [
             w for c, w in zip(conclusions, weights) if isinstance(c, float)
         ]

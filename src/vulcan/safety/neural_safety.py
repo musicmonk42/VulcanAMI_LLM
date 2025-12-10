@@ -908,7 +908,7 @@ class NeuralSafetyValidator:
             if ModelType.CLASSIFIER in self.models:
                 tasks = []
                 with self.lock:
-                    classifier_models = [self.models[ModelType.CLASSIFIER].items())
+                    classifier_models = list(self.models[ModelType.CLASSIFIER].items())
 
                 for model_name, model in classifier_models:
 
@@ -921,7 +921,7 @@ class NeuralSafetyValidator:
                 try:
                     results = await asyncio.gather(*tasks, return_exceptions=True)
                     # Filter out exceptions
-                    valid_results = [r for r in results if not isinstance(r, Exception])
+                    valid_results = [r for r in results if not isinstance(r, Exception)]
 
                     if valid_results:
                         predictions["classifier_ensemble"] = {
@@ -1012,7 +1012,7 @@ class NeuralSafetyValidator:
         # Use first classifier if available
         if ModelType.CLASSIFIER in self.models:
             with self.lock:
-                model = [self.models[ModelType.CLASSIFIER].values())[0]
+                model = list(self.models[ModelType.CLASSIFIER].values())[0]
             model.eval()
 
             with torch.no_grad():
@@ -1744,7 +1744,7 @@ class NeuralSafetyValidator:
                 if metrics["inference_time"]:
                     stats["performance"][model_type.value] = {
                         "avg_inference_time_ms": np.mean(
-                            [metrics["inference_time"])
+                            metrics["inference_time"]
                         )
                     }
 

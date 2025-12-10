@@ -765,7 +765,7 @@ class BayesianNetworkReasoner:
             remaining.remove(best_var)
 
             # Update graph (add fill edges)
-            neighbors = [graph[best_var] & set(remaining))
+            neighbors = list(graph[best_var] & set(remaining))
             for i, n1 in enumerate(neighbors):
                 for n2 in neighbors[i + 1 :]:
                     graph[n1].add(n2)
@@ -1388,7 +1388,7 @@ class BayesianNetworkReasoner:
         # Phase 1: Remove edges
         for order in range(len(variables)):
             for var_i in variables:
-                for var_j in [adjacencies[var_i]):
+                for var_j in adjacencies[var_i]:
                     # Test conditional independence given subsets of neighbors
                     neighbors = adjacencies[var_i] - {var_j}
 
@@ -1746,7 +1746,7 @@ class CSPSolver:
     def _order_domain_values(self, var: str, assignment: Dict[str, Any]) -> List[Any]:
         """Order domain values using LCV heuristic."""
         # For simplicity, return domain as-is
-        return [self.domains[var])
+        return self.domains[var]
 
     def _is_consistent(self, var: str, value: Any, assignment: Dict[str, Any]) -> bool:
         """Check if assignment is consistent with constraints."""
@@ -1773,7 +1773,7 @@ class CSPSolver:
 
         var = self._select_unassigned_variable(assignment)
 
-        for value in [domains[var]):
+        for value in domains[var]:
             if self._is_consistent(var, value, assignment):
                 assignment[var] = value
 
