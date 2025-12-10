@@ -32,11 +32,9 @@ HELM_DIR = REPO_ROOT / "helm"
 
 
 def _docker_available_with_network() -> bool:
-    """Check if Docker is available and can access PyPI from within a build."""
+    """Check if Docker is available and can access the daemon."""
     try:
-        import tempfile
-        
-        # First check if docker command exists
+        # Check if docker command exists
         result = subprocess.run(
             ["docker", "--version"],
             capture_output=True,
@@ -46,24 +44,16 @@ def _docker_available_with_network() -> bool:
         if result.returncode != 0:
             return False
         
-        # Test Docker's ability to pip install from PyPI during build
-        # This is the actual operation that fails in the tests
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a minimal Dockerfile that tests pip install
-            dockerfile_content = '''FROM python:3.10.11-slim
-RUN pip install --no-cache-dir requests==2.32.3
-'''
-            dockerfile_path = Path(tmpdir) / "Dockerfile"
-            dockerfile_path.write_text(dockerfile_content, encoding='utf-8')
-            
-            result = subprocess.run(
-                ["docker", "build", "-t", "network-test:latest", tmpdir],
-                capture_output=True,
-                text=True,
-                timeout=120
-            )
-            return result.returncode == 0
-    except Exception:
+        # Check if Docker daemon is accessible by trying to list images
+        # This is a lightweight check that doesn't require network access or builds
+        result = subprocess.run(
+            ["docker", "images", "--format", "{{.Repository}}"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, Exception):
         return False
 
 
@@ -296,7 +286,8 @@ class TestKubernetesConfigs:
         if not K8S_DIR.exists():
             pytest.skip("k8s directory not found")
         
-        yaml_files = list(K8S_DIR.glob("*.yaml")) + list(K8S_DIR.glob("*.yml"))
+        # Search recursively for YAML files in k8s directory and subdirectories
+        yaml_files = list(K8S_DIR.rglob("*.yaml")) + list(K8S_DIR.rglob("*.yml"))
         
         if len(yaml_files) == 0:
             pytest.skip("No Kubernetes YAML files found")
@@ -616,6 +607,7 @@ class TestEndToEnd:
     """End-to-end integration tests"""
     
     @pytest.mark.slow
+    @pytest.mark.timeout(600)  # 10 minutes timeout for Docker build
     def test_docker_build_succeeds(self):
         """Test that Docker image builds successfully"""
         if not docker_available_with_network():
@@ -631,13 +623,15 @@ class TestEndToEnd:
             ],
             capture_output=True,
             text=True,
-            cwd=REPO_ROOT
+            cwd=REPO_ROOT,
+            timeout=600  # 10 minutes timeout for Docker build
         )
         
         assert result.returncode == 0, \
             f"Docker build failed: {result.stderr}"
     
     @pytest.mark.slow
+    @pytest.mark.timeout(600)  # 10 minutes timeout for Docker build and run
     def test_docker_image_runs(self):
         """Test that Docker image can run"""
         if not docker_available_with_network():
@@ -654,7 +648,8 @@ class TestEndToEnd:
             ],
             capture_output=True,
             text=True,
-            cwd=REPO_ROOT
+            cwd=REPO_ROOT,
+            timeout=600  # 10 minutes timeout for Docker build
         )
         
         if build_result.returncode != 0:
