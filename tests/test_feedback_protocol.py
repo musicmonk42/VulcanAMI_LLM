@@ -2,31 +2,23 @@
 Comprehensive test suite for feedback_protocol.py
 """
 
-import pytest
-import numpy as np
+import os
 import sqlite3
 import tempfile
-import os
-import time
 import threading
-from unittest.mock import Mock, MagicMock, patch
+import time
 from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from feedback_protocol import (
-    FeedbackProtocol,
-    FeedbackValidator,
-    FeedbackRateLimiter,
-    FeedbackQueryNode,
-    RateLimitEntry,
-    dispatch_feedback_protocol,
-    MIN_SCORE,
-    MAX_SCORE,
-    MAX_RATIONALE_LENGTH,
-    MAX_PROPOSAL_ID_LENGTH,
-    MAX_TENSOR_SIZE,
-    RATE_LIMIT_WINDOW,
-    RATE_LIMIT_MAX_REQUESTS,
-)
+import numpy as np
+import pytest
+
+from feedback_protocol import (MAX_PROPOSAL_ID_LENGTH, MAX_RATIONALE_LENGTH,
+                               MAX_SCORE, MAX_TENSOR_SIZE, MIN_SCORE,
+                               RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW,
+                               FeedbackProtocol, FeedbackQueryNode,
+                               FeedbackRateLimiter, FeedbackValidator,
+                               RateLimitEntry, dispatch_feedback_protocol)
 
 
 @pytest.fixture
@@ -314,7 +306,7 @@ class TestFeedbackRateLimiter:
     def test_check_rate_limit_window_reset(self, rate_limiter):
         """Test window reset."""
         import time
-        
+
         # Use up limit
         for i in range(10):
             rate_limiter.check_rate_limit("test_id")
@@ -329,7 +321,7 @@ class TestFeedbackRateLimiter:
     def test_cleanup_old_entries(self, rate_limiter):
         """Test cleanup of old entries."""
         import time
-        
+
         # Add entries
         rate_limiter.check_rate_limit("id1")
         rate_limiter.check_rate_limit("id2")

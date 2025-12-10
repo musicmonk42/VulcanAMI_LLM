@@ -11,30 +11,28 @@ Tests cover:
 - Performance
 """
 
-import pytest
-import time
 import threading
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+import time
 from collections import defaultdict, deque
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.curiosity_engine.exploration_budget import (
-    ResourceType,
-    ResourceSnapshot,
-    CostHistory,
-    BudgetTracker,
-    BudgetRecovery,
-    LoadAdjuster,
-    EfficiencyTracker,
-    DynamicBudget,
-    ResourceSampler,
-    ResourcePredictor,
-    ResourceAdvisor,
-    ResourceMonitor,
-    CostCalibrator,
-    CostEstimator,
-)
+import numpy as np
+import pytest
 
+from vulcan.curiosity_engine.exploration_budget import (BudgetRecovery,
+                                                        BudgetTracker,
+                                                        CostCalibrator,
+                                                        CostEstimator,
+                                                        CostHistory,
+                                                        DynamicBudget,
+                                                        EfficiencyTracker,
+                                                        LoadAdjuster,
+                                                        ResourceAdvisor,
+                                                        ResourceMonitor,
+                                                        ResourcePredictor,
+                                                        ResourceSampler,
+                                                        ResourceSnapshot,
+                                                        ResourceType)
 
 # ============================================================================
 # Fixtures

@@ -2,25 +2,17 @@
 Comprehensive test suite for tool_monitor.py
 """
 
-import pytest
-import numpy as np
 import tempfile
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-import time
 import threading
+import time
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from tool_monitor import (
-    MetricType,
-    AlertSeverity,
-    HealthStatus,
-    ToolMetrics,
-    SystemMetrics,
-    Alert,
-    TimeSeriesBuffer,
-    AnomalyDetector,
-    ToolMonitor,
-)
+import numpy as np
+import pytest
+from tool_monitor import (Alert, AlertSeverity, AnomalyDetector, HealthStatus,
+                          MetricType, SystemMetrics, TimeSeriesBuffer,
+                          ToolMetrics, ToolMonitor)
 
 
 @pytest.fixture

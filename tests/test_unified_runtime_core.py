@@ -4,16 +4,17 @@
 Comprehensive pytest suite for unified_runtime_core.py
 """
 
-import pytest
 import asyncio
-import json
-import tempfile
-import shutil
-from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
-from typing import Dict, Any, List, Optional
 import inspect
+import json
+import shutil
+import tempfile
 from dataclasses import fields as dataclass_fields
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 
 # Import the module to test
 # Assuming unified_runtime_core.py is in src/unified_runtime/
@@ -21,9 +22,11 @@ from dataclasses import fields as dataclass_fields
 try:
     from src.unified_runtime import unified_runtime_core as urc
     from src.unified_runtime.unified_runtime_core import UnifiedRuntime
+
     # Try importing real classes, fall back to mocks if they fail
     try:
-        from src.unified_runtime.unified_runtime_core import RuntimeConfig as RealRuntimeConfig
+        from src.unified_runtime.unified_runtime_core import \
+            RuntimeConfig as RealRuntimeConfig
     except ImportError:
         # Define a fallback mock if the real one isn't available
         class RealRuntimeConfig(object):
@@ -72,13 +75,16 @@ try:
         GraphValidator_class = getattr(urc, 'GraphValidator', None)
         if GraphValidator_class is None:
             # Try importing directly if not found in urc (might indicate structure issues)
-            from src.unified_runtime.graph_validator import GraphValidator as GraphValidator_class # type: ignore
-            from src.unified_runtime.graph_validator import ValidationResult # type: ignore
+            from src.unified_runtime.graph_validator import \
+                GraphValidator as GraphValidator_class  # type: ignore
+            from src.unified_runtime.graph_validator import \
+                ValidationResult  # type: ignore
         else:
              # Need ValidationResult from the same place
              ValidationResult = getattr(urc, 'ValidationResult', None) # type: ignore
              if ValidationResult is None:
-                  from src.unified_runtime.graph_validator import ValidationResult # type: ignore
+                  from src.unified_runtime.graph_validator import \
+                      ValidationResult  # type: ignore
 
 
     except ImportError:

@@ -14,16 +14,10 @@ logger = logging.getLogger(__name__)
 # Core Types - Always available
 # ============================================================================
 try:
-    from .reasoning_types import (
-        ReasoningType,
-        ReasoningStep,
-        ReasoningChain,
-        ReasoningResult,
-        ModalityType,
-        SelectionMode,
-        PortfolioStrategy,
-        UtilityContext,
-    )
+    from .reasoning_types import (ModalityType, PortfolioStrategy,
+                                  ReasoningChain, ReasoningResult,
+                                  ReasoningStep, ReasoningType, SelectionMode,
+                                  UtilityContext)
 
     TYPES_AVAILABLE = True
 except ImportError as e:
@@ -79,7 +73,8 @@ except ImportError as e:
 # Causal Reasoning - Core component
 # ============================================================================
 try:
-    from .causal_reasoning import CausalReasoner, EnhancedCausalReasoning, CausalEdge
+    from .causal_reasoning import (CausalEdge, CausalReasoner,
+                                   EnhancedCausalReasoning)
 
     CAUSAL_AVAILABLE = True
 except ImportError as e:
@@ -163,12 +158,9 @@ except Exception as e:
 # Analogical Reasoning - Core component
 # ============================================================================
 try:
-    from .analogical_reasoning import (
-        AnalogicalReasoningEngine,
-        AnalogicalReasoner,
-        Entity,
-        Relation,
-    )
+    from .analogical_reasoning import (AnalogicalReasoner,
+                                       AnalogicalReasoningEngine, Entity,
+                                       Relation)
 
     ANALOGICAL_AVAILABLE = True
 except ImportError as e:
@@ -183,7 +175,8 @@ except ImportError as e:
 # Multimodal Reasoning - Core component
 # ============================================================================
 try:
-    from .multimodal_reasoning import MultiModalReasoningEngine, MultimodalReasoner
+    from .multimodal_reasoning import (MultimodalReasoner,
+                                       MultiModalReasoningEngine)
 
     MULTIMODAL_AVAILABLE = True
 except ImportError as e:
@@ -221,11 +214,10 @@ except ImportError as e:
 # Tool Selection Components - Optional but recommended
 # ============================================================================
 try:
-    from .selection.tool_selector import ToolSelector, SelectionRequest, SelectionResult
-    from .selection.admission_control import (
-        AdmissionControlIntegration,
-        RequestPriority,
-    )
+    from .selection.admission_control import (AdmissionControlIntegration,
+                                              RequestPriority)
+    from .selection.tool_selector import (SelectionRequest, SelectionResult,
+                                          ToolSelector)
 
     SELECTION_AVAILABLE = True
 except ImportError as e:
@@ -241,12 +233,8 @@ except ImportError as e:
 # Contextual Bandit - Advanced feature
 # ============================================================================
 try:
-    from .contextual_bandit import (
-        AdaptiveBanditOrchestrator,
-        BanditContext,
-        BanditFeedback,
-        BanditAction,
-    )
+    from .contextual_bandit import (AdaptiveBanditOrchestrator, BanditAction,
+                                    BanditContext, BanditFeedback)
 
     BANDIT_AVAILABLE = True
 except ImportError as e:

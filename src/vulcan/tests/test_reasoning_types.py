@@ -5,28 +5,20 @@ Tests all dataclasses with comprehensive validation, edge cases,
 and error handling.
 """
 
-import pytest
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 
-from vulcan.reasoning.reasoning_types import (
-    ReasoningType,
-    SelectionMode,
-    PortfolioStrategy,
-    UtilityContext,
-    ModalityType,
-    ReasoningStep,
-    ReasoningChain,
-    ReasoningResult,
-    SelectionResult,
-    PortfolioResult,
-    CostEstimate,
-    SafetyAssessment,
-    CalibrationData,
-    MonitoringData,
-    ValueOfInformation,
-    DistributionShift,
-)
+import pytest
+
+from vulcan.reasoning.reasoning_types import (CalibrationData, CostEstimate,
+                                              DistributionShift, ModalityType,
+                                              MonitoringData, PortfolioResult,
+                                              PortfolioStrategy,
+                                              ReasoningChain, ReasoningResult,
+                                              ReasoningStep, ReasoningType,
+                                              SafetyAssessment, SelectionMode,
+                                              SelectionResult, UtilityContext,
+                                              ValueOfInformation)
 
 
 # Enum Tests

@@ -2,30 +2,20 @@
 Comprehensive test suite for graphix_arena.py
 """
 
-import pytest
-import json
 import asyncio
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+import json
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from graphix_arena import (
-    GraphixArena,
-    app,
-    GraphSpec,
-    GraphixIRGraph,
-    Node,
-    Edge,
-    rebert_prune,
-    MAX_PAYLOAD_SIZE,
-    MAX_FEEDBACK_LOG_SIZE,
-    MAX_AGENT_ID_LENGTH,
-    MAX_GRAPH_ID_LENGTH,
-    MAX_REBERT_THRESHOLD,
-    MIN_REBERT_THRESHOLD,
-    AgentNotFoundException,
-    BiasDetectedException,
-)
+from graphix_arena import (MAX_AGENT_ID_LENGTH, MAX_FEEDBACK_LOG_SIZE,
+                           MAX_GRAPH_ID_LENGTH, MAX_PAYLOAD_SIZE,
+                           MAX_REBERT_THRESHOLD, MIN_REBERT_THRESHOLD,
+                           AgentNotFoundException, BiasDetectedException, Edge,
+                           GraphixArena, GraphixIRGraph, GraphSpec, Node, app,
+                           rebert_prune)
 
 
 @pytest.fixture
@@ -401,7 +391,7 @@ class TestGraphixArena:
     def test_llm_client_init_exception_logging(self):
         """Test that LLM client initialization exceptions are logged with traceback."""
         import logging
-        
+
         # Capture log records
         log_records = []
         

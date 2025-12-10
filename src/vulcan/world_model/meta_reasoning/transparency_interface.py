@@ -26,19 +26,18 @@ FIX (2025-10-22):
 - Ensured consistent use of safe float conversion.
 """
 
-import logging
-import time
-import json
 import hashlib
-
-# import numpy as np # Original import
-from typing import Dict, List, Any, Optional, Set
-from dataclasses import dataclass, asdict, is_dataclass
-from collections import defaultdict, deque
-from enum import Enum
-from typing import Dict, List, Any, Optional, Set, Callable, Union  # Add Union here
-from unittest.mock import MagicMock  # ADDED for fallback
+import json
+import logging
 import threading  # ADDED for RLock
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, is_dataclass
+from enum import Enum
+# import numpy as np # Original import
+from typing import (Any, Callable, Dict, List, Optional, Set,  # Add Union here
+                    Union)
+from unittest.mock import MagicMock  # ADDED for fallback
 
 # --- START FIX: Add numpy fallback ---
 # logger = logging.getLogger(__name__) # Original logger placement
@@ -93,11 +92,9 @@ except ImportError:
 # Import necessary types for type checking if possible, handle gracefully if not
 try:
     # Use real imports if available
-    from .motivational_introspection import (
-        ProposalValidation,
-        ObjectiveAnalysis,
-        ObjectiveStatus,
-    )
+    from .motivational_introspection import (ObjectiveAnalysis,
+                                             ObjectiveStatus,
+                                             ProposalValidation)
 
     MOTIVATIONAL_INTROSPECTION_AVAILABLE = True
 except ImportError:

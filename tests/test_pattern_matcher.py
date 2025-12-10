@@ -2,24 +2,17 @@
 Comprehensive test suite for pattern_matcher.py
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from pattern_matcher import (
-    PatternMatcher,
-    GraphValidationResult,
-    MatchingStats,
-    PatternMatcherError,
-    GraphValidationError,
-    MatchingTimeoutError,
-    GraphSizeLimitError,
-    MAX_GRAPH_NODES,
-    MAX_GRAPH_EDGES,
-    MAX_PATTERN_NODES,
-    DEFAULT_MATCH_TIMEOUT,
-    MAX_MATCHES_TO_PROCESS,
-)
+import pytest
+
+from pattern_matcher import (DEFAULT_MATCH_TIMEOUT, MAX_GRAPH_EDGES,
+                             MAX_GRAPH_NODES, MAX_MATCHES_TO_PROCESS,
+                             MAX_PATTERN_NODES, GraphSizeLimitError,
+                             GraphValidationError, GraphValidationResult,
+                             MatchingStats, MatchingTimeoutError,
+                             PatternMatcher, PatternMatcherError)
 
 
 @pytest.fixture

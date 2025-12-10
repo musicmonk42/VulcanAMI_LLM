@@ -8,14 +8,14 @@ Run with:
     pytest test_ontology_validation.py -v --cov=ontology_validator --cov-report=html
 """
 
-import pytest
 import json
-from pathlib import Path
-from typing import Dict, Any, List, Set, Optional, Tuple
+import re
 from dataclasses import dataclass
 from enum import Enum
-import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+import pytest
 
 # ============================================================================
 # Ontology-Based Validator Implementation

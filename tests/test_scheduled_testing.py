@@ -8,13 +8,14 @@ Tests the scheduled testing wrapper in scripts/scheduled_adversarial_testing.py:
 - Alert generation
 """
 
-import pytest
 import json
-import tempfile
 import os
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Add scripts directory to path for testing
 scripts_dir = Path(__file__).parent.parent / 'scripts'

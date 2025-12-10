@@ -3,13 +3,14 @@ test_problem_decomposer_integration.py - PURE MOCK VERSION
 Integration tests for problem decomposer without spawning threads.
 """
 
-import pytest
-import time
 import logging
-from typing import Dict, List, Any, Optional
+import time
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict, List, Optional
 from unittest.mock import Mock
+
+import pytest
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

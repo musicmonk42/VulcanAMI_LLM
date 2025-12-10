@@ -43,56 +43,42 @@ Notes:
 
 from __future__ import annotations
 
-import os
-import sys
+import argparse
+import copy
 import json
 import math
-import time
-import copy
+import os
 import random
-import argparse
-from typing import Dict, Any, List, Optional, Tuple
+import sys
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
+import torch.optim as optim
 
 HERE = os.path.dirname(__file__)
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from gpt_model import GPTModel, GPTConfig
 from data_loader import CorpusDataLoader
-
+from gpt_model import GPTConfig, GPTModel
+from self_awareness import (awareness_summary, build_extended_awareness,
+                            calculate_adaptive_ece, calculate_distinct_n,
+                            calculate_ece, calculate_mce, summarize_entropies)
 from self_improving_training import SelfImprovingTraining
-from self_awareness import (
-    summarize_entropies,
-    calculate_ece,
-    calculate_mce,
-    calculate_adaptive_ece,
-    calculate_distinct_n,
-    build_extended_awareness,
-    awareness_summary,
-)
 
 # Prefer absolute import; fallback if run directly
 try:
-    from src.training.metrics import (
-        compute_loss_metrics_train,
-        compute_loss_metrics_eval,
-        LossMetrics,
-        random_label_sanity,
-        uniform_logits_sanity,
-    )
+    from src.training.metrics import (LossMetrics, compute_loss_metrics_eval,
+                                      compute_loss_metrics_train,
+                                      random_label_sanity,
+                                      uniform_logits_sanity)
 except Exception:
-    from metrics import (
-        compute_loss_metrics_train,
-        compute_loss_metrics_eval,
-        LossMetrics,
-        random_label_sanity,
-        uniform_logits_sanity,
-    )
+    from metrics import (LossMetrics, compute_loss_metrics_eval,
+                         compute_loss_metrics_train, random_label_sanity,
+                         uniform_logits_sanity)
 
 TRAINER_VERSION = "v2-normalized-2025-11-18"
 

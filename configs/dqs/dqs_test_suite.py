@@ -219,8 +219,9 @@ class TestPerformance(unittest.TestCase):
     
     def test_memory_usage(self):
         """Test memory usage during classification"""
-        import psutil
         import os
+
+        import psutil
         
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB

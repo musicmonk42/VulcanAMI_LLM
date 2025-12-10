@@ -1,23 +1,24 @@
 """Memory consolidation and optimization"""
 
-import numpy as np
-import time
+import copy
+import hashlib
+import heapq
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Set, Callable
+import pickle
+import threading
+import time
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-import threading
-import hashlib
-import pickle
-from collections import defaultdict, Counter
-import heapq
-import copy
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 from .base import Memory, MemoryType
 
 # Try to import optional dependencies
 try:
-    from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+    from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans
     from sklearn.decomposition import PCA
     from sklearn.metrics import silhouette_score
 

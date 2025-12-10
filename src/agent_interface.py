@@ -7,30 +7,31 @@ authentication, monitoring, caching, and resilience features.
 Version: 2.0.2 - ThreadPoolExecutor import fixed
 """
 
-import json
-import hashlib
-import time
-import logging
-import threading
-import queue
-import uuid
-import os
-import gzip
-import tempfile
 import copy
-import sys  # FIXED: Added for Python version check
-from typing import Dict, Any, List, Optional, Callable, Tuple, Union
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from pathlib import Path
-from collections import defaultdict, deque
-import urllib.request
-import urllib.parse
-import urllib.error
+import gzip
+import hashlib
+import json
+import logging
+import os
+import queue
 import socket
 import ssl
-from concurrent.futures import ThreadPoolExecutor  # FIX: Import from correct module
+import sys  # FIXED: Added for Python version check
+import tempfile
+import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from collections import defaultdict, deque
+from concurrent.futures import \
+    ThreadPoolExecutor  # FIX: Import from correct module
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 try:
     import websocket

@@ -2,24 +2,23 @@
 Comprehensive test suite for confidence_calibration.py
 """
 
-import pytest
-import numpy as np
+import json
+import pickle
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-import pickle
-import json
+from unittest.mock import MagicMock, Mock, patch
 
-from src.conformal.confidence_calibration import (
-    CalibrationData,
-    CalibrationMetrics,
-    TemperatureScaling,
-    IsotonicCalibration,
-    PlattScaling,
-    BetaCalibration,
-    ConformalPredictor,
-    CalibratedDecisionMaker,
-)
+import numpy as np
+import pytest
+
+from src.conformal.confidence_calibration import (BetaCalibration,
+                                                  CalibratedDecisionMaker,
+                                                  CalibrationData,
+                                                  CalibrationMetrics,
+                                                  ConformalPredictor,
+                                                  IsotonicCalibration,
+                                                  PlattScaling,
+                                                  TemperatureScaling)
 
 
 @pytest.fixture

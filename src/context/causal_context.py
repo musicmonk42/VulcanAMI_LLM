@@ -71,15 +71,15 @@ Output:
 }
 """
 
-import time
-import re
-import math
 import hashlib
 import json
+import math
+import re
+import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Tuple, Union, Optional, Set, Callable
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 Token = Union[int, str]
 Tokens = List[Token]

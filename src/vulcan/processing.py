@@ -7,38 +7,40 @@
 # FIXED: All 13 test failures resolved - inference tensors, dimension mismatch, attention fusion, log rotation, caching
 # ============================================================
 
+import asyncio
+import gc
+import hashlib
+import heapq
+import json
+import logging
+import pickle
+import queue
+import shutil
+import threading
+import time
+import uuid
+import weakref
+from collections import OrderedDict, deque
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple,
+                    Union)
+
 import numpy as np
+import PIL.Image
+import psutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Any, Dict, List, Optional, Tuple, Union, AsyncGenerator, Callable
-import logging
-import hashlib
-from dataclasses import dataclass, field, asdict
-import asyncio
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import time
-from collections import deque, OrderedDict
-from enum import Enum
-import json
-import uuid
-import pickle
-import threading
-from pathlib import Path
-import psutil
-import queue
-import heapq
-from datetime import datetime, timedelta
-import weakref
-import gc
-import shutil
-
 # REMOVED: sentence_transformers import - will use internal LLM-based encoder
-from transformers import AutoModel, AutoTokenizer, AutoImageProcessor
-import PIL.Image
+from transformers import AutoImageProcessor, AutoModel, AutoTokenizer
 
 # FIXED: Import from src.vulcan.config instead of config
-from src.vulcan.config import ModalityType, EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM
+from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
+                               ModalityType)
 
 # --- Graphix Module Imports ---
 try:

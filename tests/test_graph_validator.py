@@ -2,11 +2,12 @@
 Comprehensive pytest suite for graph_validator.py
 """
 
-import pytest
 import json
-import tempfile
 import os
-from unittest.mock import Mock, patch, MagicMock # Added patch
+import tempfile
+from unittest.mock import MagicMock, Mock, patch  # Added patch
+
+import pytest
 
 # Import the module to test - use full path since short aliasing is disabled
 from unified_runtime import graph_validator as gv

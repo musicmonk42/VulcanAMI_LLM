@@ -4,29 +4,23 @@ Comprehensive tests for rollback_audit.py module.
 Tests rollback management, audit logging, and integrity verification.
 """
 
-import pytest
-import time
 import json
-import tempfile
 import shutil
 import sqlite3
+import tempfile
 import threading
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any, List
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.safety.rollback_audit import (
-    MemoryBoundedDeque,
-    RollbackManager,
-    AuditLogger,
-)
-from vulcan.safety.safety_types import (
-    RollbackSnapshot,
-    SafetyReport,
-    SafetyViolationType,
-)
+import pytest
 
+from vulcan.safety.rollback_audit import (AuditLogger, MemoryBoundedDeque,
+                                          RollbackManager)
+from vulcan.safety.safety_types import (RollbackSnapshot, SafetyReport,
+                                        SafetyViolationType)
 
 # ============================================================
 # FIXTURES

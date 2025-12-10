@@ -2,21 +2,18 @@
 Comprehensive test suite for hybrid_executor.py
 """
 
-import pytest
 import asyncio
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from src.compiler.hybrid_executor import (
-    HybridExecutor,
-    ExecutionMode,
-    OptimizationLevel,
-    ExecutionMetrics,
-    GraphProfile,
-    CompiledBinaryCache,
-)
+import pytest
+
+from src.compiler.hybrid_executor import (CompiledBinaryCache,
+                                          ExecutionMetrics, ExecutionMode,
+                                          GraphProfile, HybridExecutor,
+                                          OptimizationLevel)
 
 
 @pytest.fixture

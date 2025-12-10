@@ -11,21 +11,22 @@ Follows EXAMINE → SELECT → APPLY → REMEMBER pattern.
 
 from __future__ import annotations  # Add this at the top
 
+import importlib  # ADDED as per fix steps
 # Existing imports remain (including from .validation_tracker)
 # The cycle is broken because validation_tracker no longer imports back at module level.
 import json
 import logging
-import importlib  # ADDED as per fix steps
-import time
-import numpy as np
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field, asdict, is_dataclass
-from collections import defaultdict, deque
-import threading
-from enum import Enum
-from unittest.mock import MagicMock  # FIXED: Added import
 import math  # ADDED for float checks
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field, is_dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+from unittest.mock import MagicMock  # FIXED: Added import
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -2550,7 +2551,8 @@ class MotivationalIntrospection:
                 # Create prediction context
                 # Need to import ModelContext
                 try:
-                    from vulcan.world_model.world_model_core import ModelContext
+                    from vulcan.world_model.world_model_core import \
+                        ModelContext
                 except ImportError:
                     # Fallback context dict if ModelContext dataclass not found
                     ModelContext = dict

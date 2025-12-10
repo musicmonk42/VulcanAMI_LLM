@@ -6,15 +6,16 @@ Run with:
     pytest test_crew_config.py -v --cov=crew_config --cov-report=html
 """
 
-import pytest
-import yaml
 import json
 import re
-from pathlib import Path
-from typing import Dict, Any, List, Set
 from datetime import datetime
-from jsonschema import validate, ValidationError, Draft7Validator
+from pathlib import Path
+from typing import Any, Dict, List, Set
 from urllib.parse import urlparse
+
+import pytest
+import yaml
+from jsonschema import Draft7Validator, ValidationError, validate
 
 
 # Test Fixtures

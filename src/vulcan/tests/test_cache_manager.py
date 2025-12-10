@@ -13,17 +13,15 @@ Tests cover:
 - Optimization features
 """
 
-import pytest
-import sys
-import time
-import threading
-from collections import OrderedDict
-from typing import Dict, Any
-
-
 # Add parent directory to path for imports
 import sys
+import threading
+import time
+from collections import OrderedDict
 from pathlib import Path
+from typing import Any, Dict
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

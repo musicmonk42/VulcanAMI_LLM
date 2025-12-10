@@ -4,12 +4,12 @@ VulcanAMI System Validation Script
 Validates all core components are working as designed
 """
 
-import sys
-import os
 import importlib
 import logging
+import os
+import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
 
 # Setup logging
 logging.basicConfig(

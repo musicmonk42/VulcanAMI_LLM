@@ -5,23 +5,24 @@ Part of the VULCAN-AGI system
 Integrated with comprehensive safety validation.
 """
 
-import numpy as np
-import logging
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-import time
-import json
-from pathlib import Path
-from enum import Enum
 import copy
 import hashlib
+import json
+import logging
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 # Import safety validator
 try:
-    from ..safety.safety_validator import EnhancedSafetyValidator
     from ..safety.safety_types import SafetyConfig
+    from ..safety.safety_validator import EnhancedSafetyValidator
 
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
@@ -135,10 +136,10 @@ except ImportError:
 
 # Import from other module files with error handling
 try:
-    from .decomposition_library import StratifiedDecompositionLibrary
     from .adaptive_thresholds import AdaptiveThresholds
-    from .fallback_chain import FallbackChain
+    from .decomposition_library import StratifiedDecompositionLibrary
     from .decomposition_strategies import DecompositionStrategy
+    from .fallback_chain import FallbackChain
     from .problem_executor import ProblemExecutor
 except ImportError as e:
     logging.warning(f"Failed to import module components: {e}")

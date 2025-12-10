@@ -4,23 +4,22 @@ VulcanAMI Data Quality System - Rescore Orchestrator
 Handles scheduled rescoring operations with distributed execution
 """
 
+import argparse
 import json
 import logging
-import time
-import argparse
-from typing import Dict, List, Any, Optional, Iterator
-from datetime import datetime, timedelta
-from dataclasses import dataclass
 import signal
 import sys
+import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Dict, Iterator, List, Optional
 
 import psycopg2
-from psycopg2.extras import RealDictCursor
 import redis
-from prometheus_client import start_http_server, Counter, Gauge, Histogram, push_to_gateway
-
 from dqs_classifier import DataQualityClassifier, QualityScore
-
+from prometheus_client import (Counter, Gauge, Histogram, push_to_gateway,
+                               start_http_server)
+from psycopg2.extras import RealDictCursor
 
 # Prometheus metrics
 ITEMS_PROCESSED = Counter('dqs_rescore_items_processed', 'Items processed', ['schedule', 'action'])

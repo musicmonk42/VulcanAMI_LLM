@@ -4,19 +4,21 @@ Self Optimizer for Graphix IR
 Autonomous performance optimization and resource management
 """
 
-import time
-import psutil
-import numpy as np
-import logging
-import json
-import os
-import threading
 import asyncio
+import json
+import logging
+import os
 import pickle
-from typing import Dict, Any, List, Optional, Callable, Tuple
-from dataclasses import dataclass, field, asdict
-from collections import deque, defaultdict
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import threading
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
+import psutil
+
 from .security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)

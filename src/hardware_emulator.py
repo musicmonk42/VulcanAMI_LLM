@@ -6,9 +6,10 @@ Version: 2.0.0 - All issues fixed, validated, production-ready
 Modular emulator for analog, memristor, and photonic compute-in-memory (CIM) operations.
 """
 
-import numpy as np
 import logging
-from typing import Any, Callable, Dict, Optional, Sequence, Union, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+
+import numpy as np
 
 # Configure logging
 logging.basicConfig(

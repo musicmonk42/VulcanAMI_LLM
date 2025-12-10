@@ -1,31 +1,22 @@
 """Test suite for base.py - Memory system base classes and core types"""
 
-import pytest
-import numpy as np
-import time
-import threading
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import FrozenInstanceError
 import logging
+import threading
+import time
+from dataclasses import FrozenInstanceError
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Import the module to test
-from vulcan.memory.base import (
-    MemoryType,
-    CompressionType,
-    ConsistencyLevel,
-    Memory,
-    MemoryConfig,
-    MemoryQuery,
-    RetrievalResult,
-    MemoryStats,
-    MemoryException,
-    MemoryCapacityException,
-    MemoryRetrievalException,
-    MemoryCorruptionException,
-    MemoryLockException,
-    BaseMemorySystem,
-)
-
+from vulcan.memory.base import (BaseMemorySystem, CompressionType,
+                                ConsistencyLevel, Memory,
+                                MemoryCapacityException, MemoryConfig,
+                                MemoryCorruptionException, MemoryException,
+                                MemoryLockException, MemoryQuery,
+                                MemoryRetrievalException, MemoryStats,
+                                MemoryType, RetrievalResult)
 
 # ============================================================
 # FIXTURES

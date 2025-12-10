@@ -2,34 +2,28 @@
 Comprehensive test suite for generate_transparency_report.py
 """
 
-import pytest
 import json
-import tempfile
 import os
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+import tempfile
 from collections import deque
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from generate_transparency_report import (
-    TransparencyReportValidator,
-    MetricHistory,
-    FileLock,
-    ensure_archive,
-    cleanup_old_archives,
-    get_previous_report_metrics,
-    fetch_interpretability_metrics,
-    fetch_audit_metrics,
-    fetch_bias_taxonomy,
-    generate_interpretability_table,
-    generate_audit_table,
-    check_for_anomalies,
-    append_report,
-    REPORT_PATH,
-    ARCHIVE_PATH,
-    MAX_REPORT_SIZE,
-    MAX_ARCHIVE_COUNT,
-    ANOMALY_THRESHOLD_STDDEV,
-)
+import pytest
+
+from generate_transparency_report import (ANOMALY_THRESHOLD_STDDEV,
+                                          ARCHIVE_PATH, MAX_ARCHIVE_COUNT,
+                                          MAX_REPORT_SIZE, REPORT_PATH,
+                                          FileLock, MetricHistory,
+                                          TransparencyReportValidator,
+                                          append_report, check_for_anomalies,
+                                          cleanup_old_archives, ensure_archive,
+                                          fetch_audit_metrics,
+                                          fetch_bias_taxonomy,
+                                          fetch_interpretability_metrics,
+                                          generate_audit_table,
+                                          generate_interpretability_table,
+                                          get_previous_report_metrics)
 
 
 @pytest.fixture
@@ -334,7 +328,7 @@ class TestAnomalyDetection:
     def test_check_for_anomalies_statistical(self):
         """Test statistical anomaly detection."""
         import datetime
-        
+
         # Build up history
         history = {'metric1': MetricHistory()}
         

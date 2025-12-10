@@ -10,11 +10,11 @@ Used by FAISS and other performance-critical components to determine
 optimal instruction set usage and provide detailed diagnostics.
 """
 
-import platform
 import logging
+import platform
 import threading
-from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 

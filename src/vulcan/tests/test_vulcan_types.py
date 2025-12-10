@@ -4,67 +4,28 @@
 # Run: pytest src/vulcan/tests/test_vulcan_types.py -v --tb=short --cov=src.vulcan.vulcan_types
 # ============================================================
 
-import pytest
 import json
+import tempfile
 import time
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
-import numpy as np
 from pathlib import Path
-import tempfile
+from typing import Any, Dict, List
 
-# Import types to test
-from src.vulcan.vulcan_types import (
-    # Version management
-    SchemaVersion,
-    # IR types
-    IRNodeType,
-    IREdgeType,
-    IRNode,
-    IREdge,
-    IRGraph,
-    # Agent types
-    AgentRole,
-    AgentCapability,
-    AgentProfile,
-    # Action types
-    ActionCategory,
-    ActionSpecification,
-    ActionResult,
-    # Event types
-    EventPriority,
-    EventCategory,
-    EventMetadata,
-    Event,
-    # System state types
-    ComponentHealth,
-    SystemHealth,
-    KnowledgeState,
-    CommunicationState,
-    SecurityState,
-    CompleteSystemState,
-    # Orchestrator-specific types
-    SystemState,
-    Episode,
-    ProvRecord,
-    SA_Latents,
-    HealthSnapshot,
-    # Validation
-    TypeValidator,
-    enforce_types,
-    # Schemas
-    IRSchemas,
-    SchemaMigrator,
-    # Registry
-    TypeRegistry,
-    # Serialization
-    EnhancedJSONEncoder,
-    EnhancedJSONDecoder,
-)
+import numpy as np
+import pytest
 
 # Import config types
-from src.vulcan.config import ModalityType, SafetyLevel, ActionType, GoalType
+from src.vulcan.config import ActionType, GoalType, ModalityType, SafetyLevel
+# Import types to test
+from src.vulcan.vulcan_types import (  # Version management; IR types; Agent types; Action types; Event types; System state types; Orchestrator-specific types; Validation; Schemas; Registry; Serialization
+    ActionCategory, ActionResult, ActionSpecification, AgentCapability,
+    AgentProfile, AgentRole, CommunicationState, CompleteSystemState,
+    ComponentHealth, EnhancedJSONDecoder, EnhancedJSONEncoder, Episode, Event,
+    EventCategory, EventMetadata, EventPriority, HealthSnapshot, IREdge,
+    IREdgeType, IRGraph, IRNode, IRNodeType, IRSchemas, KnowledgeState,
+    ProvRecord, SA_Latents, SchemaMigrator, SchemaVersion, SecurityState,
+    SystemHealth, SystemState, TypeRegistry, TypeValidator, enforce_types)
 
 # ============================================================
 # FIXTURES

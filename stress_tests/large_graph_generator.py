@@ -5,22 +5,23 @@ Comprehensive generator for large-scale Graphix IR graphs with multiple topologi
 optimizations, and validation capabilities.
 """
 
-import json
-import random
-import os
-import time
-import math
-import hashlib
 import gzip
+import hashlib
+import itertools
+import json
+import math
+import os
 import pickle
+import random
 import sys
+import time
 import xml.sax.saxutils as saxutils
-from typing import Dict, Any, List, Tuple, Optional, Set, Union, Callable, Iterator
-from enum import Enum
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from collections import defaultdict, deque
-import itertools
+from enum import Enum
+from typing import (Any, Callable, Dict, Iterator, List, Optional, Set, Tuple,
+                    Union)
 
 # Constants
 DEFAULT_PROBABILITY = 0.05

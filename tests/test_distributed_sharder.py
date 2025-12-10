@@ -2,20 +2,16 @@
 Comprehensive test suite for distributed_sharder.py
 """
 
-import pytest
-import numpy as np
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
 
-from distributed_sharder import (
-    DistributedSharder,
-    ShardMetadata,
-    CompressionType,
-    PruningStrategy,
-    create_sharder,
-    MAX_SHARD_SIZE_MB,
-)
+import numpy as np
+import pytest
+
+from distributed_sharder import (MAX_SHARD_SIZE_MB, CompressionType,
+                                 DistributedSharder, PruningStrategy,
+                                 ShardMetadata, create_sharder)
 
 
 @pytest.fixture

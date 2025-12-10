@@ -2,20 +2,14 @@
 Comprehensive test suite for data_augmentor.py
 """
 
-import pytest
 import random
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
-from data_augmentor import (
-    DataAugmentor,
-    GraphValidator,
-    SemanticMutator,
-    AugmentationMetrics,
-    MAX_COMPLEXITY,
-    MAX_NODES,
-    MAX_EDGES,
-    MAX_BATCH_SIZE,
-)
+import pytest
+
+from data_augmentor import (MAX_BATCH_SIZE, MAX_COMPLEXITY, MAX_EDGES,
+                            MAX_NODES, AugmentationMetrics, DataAugmentor,
+                            GraphValidator, SemanticMutator)
 
 
 @pytest.fixture

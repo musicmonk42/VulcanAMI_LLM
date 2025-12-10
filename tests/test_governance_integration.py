@@ -3,45 +3,47 @@ Integration test suite for the governance module
 Tests that registry_api.py and registry_api_server.py work together properly
 """
 
-import pytest
-import json
 import hashlib
-import tempfile
+import json
 import sqlite3
+import tempfile
 import time
-from pathlib import Path
-from unittest.mock import MagicMock
 from datetime import datetime
-from typing import Dict, Any, Optional, List # Ensure Dict is imported
+from pathlib import Path
+from typing import Any, Dict, List, Optional  # Ensure Dict is imported
+from unittest.mock import MagicMock
+
+import pytest
 
 # Import from registry_api
-from src.governance.registry_api import (
-    InMemoryBackend,
-    SimpleKMS,
-    CryptoHandler,
-    SecurityEngine,
-    AgentRegistry as APIAgentRegistry,
-    RegistryAPI as APIRegistryAPI,
-)
-
+from src.governance.registry_api import AgentRegistry as APIAgentRegistry
+from src.governance.registry_api import CryptoHandler, InMemoryBackend
+from src.governance.registry_api import RegistryAPI as APIRegistryAPI
+from src.governance.registry_api import SecurityEngine, SimpleKMS
 # Import from registry_api_server
+from src.governance.registry_api_server import \
+    AgentRegistry as ServerAgentRegistry
+from src.governance.registry_api_server import (AuditLogEntry, DatabaseManager,
+                                                DeployGrammarVersionRequest,
+                                                DeployGrammarVersionResponse,
+                                                GetFullAuditLogRequest,
+                                                GetFullAuditLogResponse,
+                                                LanguageEvolutionRegistry,
+                                                Node, QueryProposalsRequest,
+                                                QueryProposalsResponse,
+                                                RecordValidationRequest,
+                                                RecordValidationResponse,
+                                                RecordVoteRequest,
+                                                RecordVoteResponse,
+                                                RegisterGraphProposalRequest,
+                                                RegisterGraphProposalResponse)
+from src.governance.registry_api_server import \
+    RegistryAPI as ServerRegistryAPI  # <--- Added StatusCode import
 from src.governance.registry_api_server import (
-    Node, AuditLogEntry, StatusCode, # <--- Added StatusCode import
-    RegisterGraphProposalRequest, RegisterGraphProposalResponse,
-    SubmitLanguageEvolutionProposalRequest, SubmitLanguageEvolutionProposalResponse,
-    RecordVoteRequest, RecordVoteResponse,
-    RecordValidationRequest, RecordValidationResponse,
-    DeployGrammarVersionRequest, DeployGrammarVersionResponse,
-    QueryProposalsRequest, QueryProposalsResponse,
-    GetFullAuditLogRequest, GetFullAuditLogResponse,
-    VerifyAuditLogIntegrityRequest, VerifyAuditLogIntegrityResponse,
-    DatabaseManager,
-    RegistryAPI as ServerRegistryAPI,
-    LanguageEvolutionRegistry,
-    AgentRegistry as ServerAgentRegistry,
-    SecurityAuditEngine,
-    RegistryServicer,
-)
+    RegistryServicer, SecurityAuditEngine, StatusCode,
+    SubmitLanguageEvolutionProposalRequest,
+    SubmitLanguageEvolutionProposalResponse, VerifyAuditLogIntegrityRequest,
+    VerifyAuditLogIntegrityResponse)
 
 
 @pytest.fixture

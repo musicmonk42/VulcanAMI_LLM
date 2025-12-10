@@ -10,19 +10,20 @@ IMPLEMENTED: Full symbolic expression system with sympy integration and safety c
 FIXED: Circular import with safety_validator using lazy loading
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set, Callable, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-from pathlib import Path
-from enum import Enum
-import threading
 import ast
+import json
+import logging
 import operator
 import re
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # DO NOT import safety validator at module level - use lazy loading
 # This prevents circular import: invariant_detector -> safety_validator -> domain_validators -> invariant_detector
@@ -37,8 +38,9 @@ def _lazy_load_safety_validator():
 
     if EnhancedSafetyValidator is None:
         try:
-            from ..safety.safety_validator import EnhancedSafetyValidator as _ESV
             from ..safety.safety_types import SafetyConfig as _SC
+            from ..safety.safety_validator import \
+                EnhancedSafetyValidator as _ESV
 
             EnhancedSafetyValidator = _ESV
             SafetyConfig = _SC
@@ -52,12 +54,10 @@ def _lazy_load_safety_validator():
 # Protected imports with fallbacks
 try:
     import sympy as sp
-    from sympy.parsing.sympy_parser import (
-        parse_expr,
-        standard_transformations,
-        implicit_multiplication_application,
-    )
     from sympy.core.sympify import SympifyError
+    from sympy.parsing.sympy_parser import (
+        implicit_multiplication_application, parse_expr,
+        standard_transformations)
 
     SYMPY_AVAILABLE = True
 except ImportError:

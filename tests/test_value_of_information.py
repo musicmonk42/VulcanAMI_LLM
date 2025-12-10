@@ -2,24 +2,17 @@
 Comprehensive test suite for value_of_information.py
 """
 
-import pytest
-import numpy as np
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
-from value_of_information import (
-    InformationSource,
-    VOIAction,
-    InformationCost,
-    InformationValue,
-    DecisionState,
-    UncertaintyEstimator,
-    InformationGainCalculator,
-    CostEstimator,
-    ValueCalculator,
-    ValueOfInformationGate,
-)
+import numpy as np
+import pytest
+from value_of_information import (CostEstimator, DecisionState,
+                                  InformationCost, InformationGainCalculator,
+                                  InformationSource, InformationValue,
+                                  UncertaintyEstimator, ValueCalculator,
+                                  ValueOfInformationGate, VOIAction)
 
 
 @pytest.fixture

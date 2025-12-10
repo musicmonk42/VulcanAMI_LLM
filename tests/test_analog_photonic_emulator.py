@@ -2,31 +2,25 @@
 Comprehensive test suite for analog_photonic_emulator.py
 """
 
-import pytest
-import numpy as np
-import tempfile
 import shutil
+import tempfile
 import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import numpy as np
+import pytest
+
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for analog photonic emulator tests")
 
-from analog_photonic_emulator import (
-    AnalogPhotonicEmulator,
-    PhotonicParameters,
-    PhotonicNoise,
-    WaveguideSimulator,
-    MemristorEmulator,
-    QuantumPhotonicProcessor,
-    HardwareAccelerator,
-    PhotonicBackend,
-    MultiplexingMode,
-    NoiseModel,
-    CalibrationData,
-    MAX_TENSOR_SIZE,
-)
+from analog_photonic_emulator import (MAX_TENSOR_SIZE, AnalogPhotonicEmulator,
+                                      CalibrationData, HardwareAccelerator,
+                                      MemristorEmulator, MultiplexingMode,
+                                      NoiseModel, PhotonicBackend,
+                                      PhotonicNoise, PhotonicParameters,
+                                      QuantumPhotonicProcessor,
+                                      WaveguideSimulator)
 
 
 @pytest.fixture

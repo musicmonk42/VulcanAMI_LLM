@@ -10,22 +10,21 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for compliance_bias tests"
 )
 
-import numpy as np
-import time
 import tempfile
 import threading
+import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.safety.compliance_bias import ComplianceMapper, BiasDetector, LRUCache
+import numpy as np
+
+from vulcan.safety.compliance_bias import (BiasDetector, ComplianceMapper,
+                                           LRUCache)
 
 # Import from safety_types (with fallback)
 try:
-    from vulcan.safety.safety_types import (
-        ComplianceStandard,
-        SafetyViolationType,
-        SafetyReport,
-    )
+    from vulcan.safety.safety_types import (ComplianceStandard, SafetyReport,
+                                            SafetyViolationType)
 except ImportError:
     # Mock if not available
     from enum import Enum

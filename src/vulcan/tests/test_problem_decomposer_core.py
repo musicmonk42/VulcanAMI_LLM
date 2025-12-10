@@ -3,17 +3,17 @@ test_problem_decomposer_core.py - PURE MOCK VERSION
 Tests problem decomposer core functionality without spawning threads.
 """
 
-import pytest
-import numpy as np
-import time
 import hashlib
 import threading
-from unittest.mock import Mock, MagicMock, patch
-from typing import Dict, List, Any, Optional, Set
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set
+from unittest.mock import MagicMock, Mock, patch
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums and Classes

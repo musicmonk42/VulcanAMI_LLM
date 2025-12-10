@@ -6,11 +6,12 @@ This version properly mocks the runtime's get_node_executor method
 to return actual executors that the ExecutionEngine can use.
 """
 
-import pytest
 import asyncio
 import time
-from typing import Dict, Any, List
-from unittest.mock import MagicMock, AsyncMock
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 # Import the module to test
 from src.unified_runtime import execution_engine as ee

@@ -2,17 +2,17 @@
 Comprehensive pytest suite for ai_runtime_integration.py
 """
 
-import pytest
 import asyncio
 import time
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 # Import the module to test
 # Assuming the file is in the same directory or accessible via path
 # If it's part of a package, adjust the import accordingly.
 # For example: from src.unified_runtime import ai_runtime_integration as ai
 import ai_runtime_integration as ai
+import pytest
 
 
 class TestAIErrors:

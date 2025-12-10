@@ -3,17 +3,17 @@ test_transparency_interface.py - PURE MOCK VERSION
 Tests transparency interface without spawning threads.
 """
 
-import pytest
-import json
-import time
 import hashlib
+import json
 import threading
-from unittest.mock import Mock, MagicMock
+import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock, Mock
 
+import pytest
 
 # ============================================================================
 # Mock Enums and Classes

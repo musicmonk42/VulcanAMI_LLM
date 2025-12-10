@@ -9,9 +9,10 @@ Usage:
     python scripts/clear_cache.py
 """
 
-import sys
 import shutil
+import sys
 from pathlib import Path
+
 
 def main():
     """Clear all bytecode cache"""

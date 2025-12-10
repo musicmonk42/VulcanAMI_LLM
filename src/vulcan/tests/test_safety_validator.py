@@ -21,30 +21,23 @@ FIXES APPLIED (corrected version):
    not {'safe': True, 'variable': ..., 'value': ...}
 """
 
-import pytest
-import time
-import json
 import asyncio
-import numpy as np
-from typing import Dict, Any
-from unittest.mock import Mock, patch, MagicMock
+import json
+import time
 from collections import deque
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.safety.safety_validator import (
-    ConstraintManager,
-    EnhancedExplainabilityNode,
-    ExplanationQualityScorer,
-    EnhancedSafetyValidator,
-)
-from vulcan.safety.safety_types import (
-    SafetyReport,
-    SafetyConstraint,
-    SafetyViolationType,
-    ComplianceStandard,
-    SafetyConfig,
-    ActionType,
-)
+import numpy as np
+import pytest
 
+from vulcan.safety.safety_types import (ActionType, ComplianceStandard,
+                                        SafetyConfig, SafetyConstraint,
+                                        SafetyReport, SafetyViolationType)
+from vulcan.safety.safety_validator import (ConstraintManager,
+                                            EnhancedExplainabilityNode,
+                                            EnhancedSafetyValidator,
+                                            ExplanationQualityScorer)
 
 # ============================================================
 # FIXTURES - OPTIMIZED WITH MODULE SCOPE

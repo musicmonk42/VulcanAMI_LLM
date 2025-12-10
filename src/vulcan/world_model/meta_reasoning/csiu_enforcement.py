@@ -18,14 +18,14 @@ IMPORTANT: All CSIU logging uses DEBUG level or internal-only logs.
            User-facing logs never mention CSIU.
 """
 
-import logging
-import time
 import json
-from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from collections import deque
+import logging
 import threading
+import time
+from collections import deque
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

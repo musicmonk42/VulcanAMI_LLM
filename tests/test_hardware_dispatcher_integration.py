@@ -2,15 +2,15 @@
 Comprehensive pytest suite for hardware_dispatcher_integration.py
 """
 
-import pytest
 import asyncio
 import json
 import tempfile
-import numpy as np
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 # Import the module to test
 import hardware_dispatcher_integration as hdi
+import numpy as np
+import pytest
 
 # Check if emulator is available (requires torch via analog_photonic_emulator)
 EMULATOR_AVAILABLE = hdi.EMULATOR_AVAILABLE

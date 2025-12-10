@@ -8,14 +8,14 @@ Tests cover:
 - Full Groth16 proof system
 """
 
-import pytest
 import sys
-from src.gvulcan.zk.field import FieldElement, CURVE_ORDER
+
+import pytest
+
+from src.gvulcan.zk.field import CURVE_ORDER, FieldElement
 from src.gvulcan.zk.polynomial import Polynomial
-from src.gvulcan.zk.qap import r1cs_to_qap, compute_h_polynomial
-from src.gvulcan.zk.snark import (
-    Circuit, R1CSConstraint, Groth16Prover
-)
+from src.gvulcan.zk.qap import compute_h_polynomial, r1cs_to_qap
+from src.gvulcan.zk.snark import Circuit, Groth16Prover, R1CSConstraint
 
 
 class TestFieldArithmetic:

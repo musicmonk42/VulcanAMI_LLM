@@ -6,17 +6,19 @@ compression, chunking, indexing, integrity verification, and bloom filters.
 """
 
 from __future__ import annotations
-from typing import List, Tuple, Optional, Dict, Iterator
+
+import logging
+import struct
 from dataclasses import dataclass
 from pathlib import Path
-import struct
-import zstandard as zstd
-import logging
+from typing import Dict, Iterator, List, Optional, Tuple
 
-from .header import PackHeaderV2, HEADER_SIZE, create_header, HeaderFlags
-from ..crc32c import crc32c, crc32c_detailed, CRC32CResult
-from ..merkle import merkle_root, MerkleTree, MerkleProof
+import zstandard as zstd
+
 from ..bloom import BloomFilter
+from ..crc32c import CRC32CResult, crc32c, crc32c_detailed
+from ..merkle import MerkleProof, MerkleTree, merkle_root
+from .header import HEADER_SIZE, HeaderFlags, PackHeaderV2, create_header
 
 logger = logging.getLogger(__name__)
 

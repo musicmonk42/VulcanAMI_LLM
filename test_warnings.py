@@ -2,8 +2,8 @@
 """
 Test script to verify that system capability warnings are displayed correctly.
 """
-import sys
 import logging
+import sys
 
 # Configure logging to display warnings
 logging.basicConfig(

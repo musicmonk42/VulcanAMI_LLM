@@ -11,30 +11,23 @@ Tests:
 - Strategy-specific features
 """
 
-import pytest
-import numpy as np
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
+import numpy as np
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
 from problem_decomposer.decomposition_strategies import (
-    DecompositionStrategy,
-    ExactDecomposition,
-    SemanticDecomposition,
-    StructuralDecomposition,
-    SyntheticBridging,
-    AnalogicalDecomposition,
-    BruteForceSearch,
-    DecompositionResult,
-    PatternMatch,
-    StrategyType,
-)
-
+    AnalogicalDecomposition, BruteForceSearch, DecompositionResult,
+    DecompositionStrategy, ExactDecomposition, PatternMatch,
+    SemanticDecomposition, StrategyType, StructuralDecomposition,
+    SyntheticBridging)
 from problem_decomposer.problem_decomposer_core import ProblemGraph
 
 # Configure logging

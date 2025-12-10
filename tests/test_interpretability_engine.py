@@ -2,30 +2,25 @@
 Comprehensive test suite for interpretability_engine.py
 """
 
-import pytest
-import numpy as np
 import os
-import tempfile
 import shutil
 import sys
-from unittest.mock import Mock, MagicMock, patch
+import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for interpretability engine tests")
 
 # FIX: Import the module to access the internal _SingletonMeta
-import interpretability_engine as ie 
-from interpretability_engine import (
-    InterpretabilityEngine,
-    cosine_similarity,
-    MAX_TENSOR_SIZE,
-    MAX_PERTURBATION,
-    MIN_PERTURBATION,
-    MAX_EPSILON,
-    MIN_THRESHOLD,
-    MAX_THRESHOLD,
-)
+import interpretability_engine as ie
+from interpretability_engine import (MAX_EPSILON, MAX_PERTURBATION,
+                                     MAX_TENSOR_SIZE, MAX_THRESHOLD,
+                                     MIN_PERTURBATION, MIN_THRESHOLD,
+                                     InterpretabilityEngine, cosine_similarity)
 
 
 @pytest.fixture(autouse=True)

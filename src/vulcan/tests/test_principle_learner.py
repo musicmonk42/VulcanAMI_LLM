@@ -23,18 +23,19 @@ FIXES APPLIED (corrected version):
 2. Patched these mocks into the principle_learner module before tests run.
 """
 
-import pytest
-import numpy as np
 import logging
-import sys
-import time
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from unittest.mock import Mock, MagicMock, patch
-import tempfile
 import shutil
-from enum import Enum
+import sys
+import tempfile
+import time
 from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -231,23 +232,16 @@ if principle_learner_module.KnowledgePruner is None:
     principle_learner_module.KnowledgePruner = MockKnowledgePruner
 
 
+from problem_decomposer.decomposition_library import \
+    StratifiedDecompositionLibrary
 # Import components to test (after patching)
 from problem_decomposer.principle_learner import (
-    DecompositionToTraceConverter,
-    PromotionCandidate,
-    PrinciplePromoter,
-    PrincipleLearner,
-    integrate_principle_learning,
-)
-
-from problem_decomposer.problem_decomposer_core import (
-    ProblemGraph,
-    DecompositionPlan,
-    ExecutionOutcome,
-    DecompositionStep,
-)
-
-from problem_decomposer.decomposition_library import StratifiedDecompositionLibrary
+    DecompositionToTraceConverter, PrincipleLearner, PrinciplePromoter,
+    PromotionCandidate, integrate_principle_learning)
+from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
+                                                        DecompositionStep,
+                                                        ExecutionOutcome,
+                                                        ProblemGraph)
 
 # Configure logging
 logging.basicConfig(

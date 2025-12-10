@@ -14,18 +14,19 @@ These systems handle:
 - Knowledge extraction from proofs (learning)
 """
 
-from typing import Dict, List, Any, Callable, Optional, Set, Tuple, Union
+import copy
+import heapq
+import logging
+import os
+import sys
+import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-import copy
-import time
-import logging
-import heapq
-import sys
-import os
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .core import Term, Variable, Constant, Function, Literal, Clause, ProofNode
+from .core import (Clause, Constant, Function, Literal, ProofNode, Term,
+                   Variable)
 
 logger = logging.getLogger(__name__)
 

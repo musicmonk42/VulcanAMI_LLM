@@ -9,29 +9,25 @@ Tests the integration of the CSIU enforcement module with the self-improvement d
 - Kill switch functionality
 """
 
-import pytest
 import os
-import time
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
 
 # Import the enforcement module
 try:
     from src.vulcan.world_model.meta_reasoning.csiu_enforcement import (
-        CSIUEnforcement,
-        CSIUEnforcementConfig,
-        CSIUInfluenceRecord,
-        get_csiu_enforcer,
-        reset_csiu_enforcer
-    )
+        CSIUEnforcement, CSIUEnforcementConfig, CSIUInfluenceRecord,
+        get_csiu_enforcer, reset_csiu_enforcer)
     ENFORCEMENT_AVAILABLE = True
 except ImportError:
     ENFORCEMENT_AVAILABLE = False
 
-from src.vulcan.world_model.meta_reasoning.self_improvement_drive import (
+from src.vulcan.world_model.meta_reasoning.self_improvement_drive import \
     SelfImprovementDrive
-)
 
 
 @pytest.fixture(autouse=True)

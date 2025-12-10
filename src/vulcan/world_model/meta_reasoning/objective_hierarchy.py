@@ -11,14 +11,13 @@ Tracks dependencies, conflicts, and priority ordering.
 """
 
 import logging
-import time
-
-# import numpy as np # Original import
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
 from enum import Enum
+# import numpy as np # Original import
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # --- START FIX: Add numpy fallback ---
 # logger = logging.getLogger(__name__) # Original logger placement

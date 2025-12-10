@@ -3,16 +3,17 @@
 # while your actual source stays organized under src/ with packages.
 # INCLUDES DOTENV LOADING for environment variables.
 
-import sys
+import importlib
 import os
 import pathlib
-import importlib
-import traceback
+import sys
 import time
+import traceback
 import uuid
-import pytest
 from unittest.mock import MagicMock
-from dotenv import load_dotenv # <<< --- ADDED DOTENV --- >>>
+
+import pytest
+from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
 
 # CRITICAL FIX: Ensure cryptography and other critical packages are never mocked
 # This must happen BEFORE any imports that might use these packages
@@ -278,7 +279,7 @@ def reset_pytorch_state():
     """
     try:
         import torch
-        
+
         # CRITICAL: Explicitly enable gradients before each test
         # This prevents "element 0 of tensors does not require grad" errors
         # when tests run together (test pollution from previous tests)
@@ -335,8 +336,8 @@ def pytest_sessionfinish(session, exitstatus):
     4. This is safe because pytest has its own cleanup mechanism
     """
     import atexit as atexit_module
-    import threading
     import multiprocessing
+    import threading
     
     print("[conftest] Test session finishing - cleaning up atexit handlers...")
     

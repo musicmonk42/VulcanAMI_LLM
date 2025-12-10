@@ -2,26 +2,20 @@
 Comprehensive test suite for governance_loop.py
 """
 
-import pytest
-import time
-import json
-import tempfile
-import os
 import copy
+import json
+import os
+import tempfile
 import threading
+import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from governance_loop import (
-    GovernanceLoop,
-    Policy,
-    PolicyType,
-    PolicyPriority,
-    PolicyViolation,
-    MAX_POLICIES,
-    MAX_POLICY_ID_LENGTH,
-    MAX_POLICY_NAME_LENGTH,
-)
+import pytest
+
+from governance_loop import (MAX_POLICIES, MAX_POLICY_ID_LENGTH,
+                             MAX_POLICY_NAME_LENGTH, GovernanceLoop, Policy,
+                             PolicyPriority, PolicyType, PolicyViolation)
 
 
 @pytest.fixture

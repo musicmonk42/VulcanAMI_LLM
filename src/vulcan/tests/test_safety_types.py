@@ -4,38 +4,21 @@ Comprehensive tests for safety_types.py module.
 Tests all enums, dataclasses, conditions, and utility classes.
 """
 
-import pytest
-import time
-import json
 import hashlib
-from typing import Dict, Any
+import json
+import time
 from datetime import datetime
+from typing import Any, Dict
 from unittest.mock import Mock, patch
 
-from vulcan.safety.safety_types import (
-    # Enums
-    SafetyViolationType,
-    ComplianceStandard,
-    ToolSafetyLevel,
-    SafetyLevel,
-    ActionType,
-    # Dataclasses
-    Condition,
-    SafetyReport,
-    SafetyConstraint,
-    RollbackSnapshot,
-    ToolSafetyContract,
-    SafetyConfig,
-    # Base Classes
-    SafetyValidator,
-    GovernanceOrchestrator,
-    NSOAligner,
-    ExplainabilityNode,
-    # Utility Classes
-    SafetyMetrics,
-    SafetyException,
-)
+import pytest
 
+from vulcan.safety.safety_types import (  # Enums; Dataclasses; Base Classes; Utility Classes
+    ActionType, ComplianceStandard, Condition, ExplainabilityNode,
+    GovernanceOrchestrator, NSOAligner, RollbackSnapshot, SafetyConfig,
+    SafetyConstraint, SafetyException, SafetyLevel, SafetyMetrics,
+    SafetyReport, SafetyValidator, SafetyViolationType, ToolSafetyContract,
+    ToolSafetyLevel)
 
 # ============================================================
 # ENUM TESTS

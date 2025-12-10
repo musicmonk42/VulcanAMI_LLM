@@ -29,16 +29,15 @@ FIX (2025-10-22):
 """
 
 import logging
-import time
-
-# import numpy as np # Original import
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-from enum import Enum
-import threading
 import math  # Import math for log2, sqrt
 import random  # Import random if needed by FakeNumpy
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+# import numpy as np # Original import
+from typing import Any, Dict, List, Optional, Set, Tuple
 from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
 
 # --- START FIX: Add numpy fallback ---
@@ -106,7 +105,7 @@ except ImportError:
 
 # Assuming ProposalValidation is available from motivational_introspection
 try:
-    from .motivational_introspection import ProposalValidation, ObjectiveStatus
+    from .motivational_introspection import ObjectiveStatus, ProposalValidation
 
     MOTIVATIONAL_INTROSPECTION_AVAILABLE = True
 except ImportError:
@@ -2018,6 +2017,5 @@ class ValidationTracker:
 
 # Need math for float checks in _make_serializable
 import math
-
 # Need asdict, is_dataclass if using dataclasses and not handled by to_dict
 from dataclasses import asdict, is_dataclass

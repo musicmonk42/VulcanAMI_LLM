@@ -8,20 +8,20 @@ FIXES APPLIED (corrected version):
    This fixes test_multiple_outcomes and test_concurrent_learning.
 """
 
-import pytest
-import numpy as np
-import time
-import threading
 import itertools
-import tempfile
 import shutil
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Set
+import tempfile
+import threading
+import time
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 from unittest.mock import Mock
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums

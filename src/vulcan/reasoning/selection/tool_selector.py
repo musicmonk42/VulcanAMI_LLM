@@ -10,19 +10,20 @@ stubbed components, providing a complete, functional system.
 Fixed with interruptible background threads.
 """
 
-import time
+import json
 import logging
-import numpy as np
+import pickle
 import sys
-from typing import Dict, List, Any, Optional, Tuple, Callable
+import threading
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict, deque
 from pathlib import Path
-import json
-import pickle
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 # CRITICAL FIX: Define logger BEFORE any imports that might fail
 logger = logging.getLogger(__name__)
@@ -71,15 +72,12 @@ try:
     # Use relative imports within the selection package
     from .admission_control import AdmissionControlIntegration, RequestPriority
     from .memory_prior import BayesianMemoryPrior, PriorType
-    from .portfolio_executor import (
-        PortfolioExecutor,
-        ExecutionStrategy,
-        ExecutionMonitor,
-    )
-    from .safety_governor import SafetyGovernor, SafetyContext, SafetyLevel
+    from .portfolio_executor import (ExecutionMonitor, ExecutionStrategy,
+                                     PortfolioExecutor)
+    from .safety_governor import SafetyContext, SafetyGovernor, SafetyLevel
     from .selection_cache import SelectionCache
-    from .warm_pool import WarmStartPool
     from .utility_model import UtilityModel
+    from .warm_pool import WarmStartPool
 
     IMPORTS_SUCCESSFUL = True
     SELECTION_IMPORTS_SUCCESSFUL = True
@@ -105,12 +103,8 @@ except ImportError as e:
 
 # CRITICAL FIX: Bandit import is separate - it might not exist
 try:
-    from ..contextual_bandit import (
-        AdaptiveBanditOrchestrator,
-        BanditContext,
-        BanditFeedback,
-        BanditAction,
-    )
+    from ..contextual_bandit import (AdaptiveBanditOrchestrator, BanditAction,
+                                     BanditContext, BanditFeedback)
 
     BANDIT_AVAILABLE = True
     logger.info("Contextual bandit imported successfully")

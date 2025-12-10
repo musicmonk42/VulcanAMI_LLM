@@ -4,33 +4,29 @@ Rollback management and audit logging for VULCAN-AGI Safety Module.
 Provides snapshot-based rollback capabilities and comprehensive audit trail management.
 """
 
-import os
-import sys
+import atexit
+import copy
+import hashlib
 import json
 import logging
-import time
-import hashlib
-import uuid
-import copy
-import re
-import threading
-import sqlite3
+import os
 import pickle
+import re
+import sqlite3
+import sys
+import threading
+import time
+import uuid
 import zlib
-import atexit
-from typing import Any, Dict, List, Optional, Tuple, Union
 from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
-from pathlib import Path
-from dataclasses import dataclass, field, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from .safety_types import (
-    RollbackSnapshot,
-    SafetyReport,
-    SafetyViolationType,
-    ActionType,
-)
+from .safety_types import (ActionType, RollbackSnapshot, SafetyReport,
+                           SafetyViolationType)
 
 logger = logging.getLogger(__name__)
 

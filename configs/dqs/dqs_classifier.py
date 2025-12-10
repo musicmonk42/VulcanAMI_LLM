@@ -4,23 +4,25 @@ VulcanAMI Data Quality System - Main Scoring Engine
 Comprehensive multi-dimensional data quality classification and scoring
 """
 
+import hashlib
 import json
 import logging
-import hashlib
 import time
-from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
-import redis
 import psycopg2
+import redis
 from psycopg2.extras import RealDictCursor
 
 # ML/NLP imports
 try:
     import spacy
-    from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification
     from sentence_transformers import SentenceTransformer
+    from transformers import (AutoModelForTokenClassification, AutoTokenizer,
+                              pipeline)
     HAS_ML = True
 except ImportError:
     HAS_ML = False

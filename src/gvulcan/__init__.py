@@ -14,5 +14,4 @@ def _read_semver() -> str:
 __version__ = _read_semver()
 
 # Expose ZK module for easy access
-from . import zk
-from . import merkle
+from . import merkle, zk

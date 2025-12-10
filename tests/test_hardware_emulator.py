@@ -2,21 +2,15 @@
 Comprehensive test suite for hardware_emulator.py
 """
 
-import pytest
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from hardware_emulator import (
-    HardwareEmulator,
-    emulate_memristor,
-    batch_emulate_memristor,
-    emulate_rdkit_analog,
-    emulate_pyscf_analog,
-    MAX_NOISE_STD,
-    MIN_NOISE_STD,
-    DEFAULT_MAX_NORM,
-    MAX_BATCH_SIZE,
-)
+import numpy as np
+import pytest
+
+from hardware_emulator import (DEFAULT_MAX_NORM, MAX_BATCH_SIZE, MAX_NOISE_STD,
+                               MIN_NOISE_STD, HardwareEmulator,
+                               batch_emulate_memristor, emulate_memristor,
+                               emulate_pyscf_analog, emulate_rdkit_analog)
 
 
 @pytest.fixture

@@ -9,16 +9,17 @@ COMPLETE: All placeholder implementations replaced with production-ready code
 CIRCULAR IMPORT FIX: Lazy loading of safety validator to prevent circular dependencies
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, OrderedDict
-import time
 import json
-from pathlib import Path
+import logging
 import threading
+import time
 import warnings
+from collections import OrderedDict, defaultdict, deque
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 # DO NOT import safety modules at module level - prevents circular import
 # These will be lazily imported when needed in class methods
@@ -845,8 +846,8 @@ class ConfidenceCalibrator:
         if not self._safety_validator_initialized:
             try:
                 # LAZY IMPORT - prevents circular dependency
-                from ..safety.safety_validator import EnhancedSafetyValidator
                 from ..safety.safety_types import SafetyConfig
+                from ..safety.safety_validator import EnhancedSafetyValidator
 
                 if isinstance(self._safety_config, dict) and self._safety_config:
                     self._safety_validator_instance = EnhancedSafetyValidator(
@@ -1423,8 +1424,8 @@ class ModelConfidenceTracker:
         if not self._safety_validator_initialized:
             try:
                 # LAZY IMPORT - prevents circular dependency
-                from ..safety.safety_validator import EnhancedSafetyValidator
                 from ..safety.safety_types import SafetyConfig
+                from ..safety.safety_validator import EnhancedSafetyValidator
 
                 if isinstance(self._safety_config, dict) and self._safety_config:
                     self._safety_validator_instance = EnhancedSafetyValidator(

@@ -1,14 +1,15 @@
 """Base classes and core types for memory system"""
 
-import numpy as np
-import time
 import hashlib
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Set, Union
+import threading
+import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from abc import ABC, abstractmethod
-import threading
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

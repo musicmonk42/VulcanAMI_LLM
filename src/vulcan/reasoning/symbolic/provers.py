@@ -34,23 +34,16 @@ Different methods have different performance characteristics:
 - Natural deduction: Close to human reasoning, NOW COMPLETE with all standard rules
 """
 
-from typing import List, Tuple, Optional, Dict, Set, Any, Callable
-from collections import deque, defaultdict
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-import time
 import copy
 import logging
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from .core import (
-    Term,
-    Variable,
-    Constant,
-    Function,
-    Literal,
-    Clause,
-    Unifier,
-    ProofNode,
-)
+from .core import (Clause, Constant, Function, Literal, ProofNode, Term,
+                   Unifier, Variable)
 
 logger = logging.getLogger(__name__)
 

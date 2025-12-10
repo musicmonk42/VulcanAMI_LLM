@@ -6,15 +6,16 @@ service level indicators with support for SLOs, alerting, trending, and reportin
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Tuple, Any, Callable
-from datetime import datetime, timedelta
-from collections import deque, defaultdict
-from enum import Enum
-import statistics
+
 import json
 import logging
+import statistics
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

@@ -7,23 +7,20 @@ import pytest
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for meta_learning tests")
 
-import torch.nn as nn
-import numpy as np
+import pickle
+import shutil
+import tempfile
 import time
 from pathlib import Path
-import tempfile
-import shutil
-from unittest.mock import Mock, patch, MagicMock
-import pickle
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.learning.meta_learning import (
-    MetaLearningAlgorithm,
-    TaskStatistics,
-    TaskDetector,
-    MetaLearner,
-)
+import numpy as np
+import torch.nn as nn
+
+from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, ModalityType
 from vulcan.learning.learning_types import LearningConfig
-from vulcan.config import ModalityType, EMBEDDING_DIM, HIDDEN_DIM
+from vulcan.learning.meta_learning import (MetaLearner, MetaLearningAlgorithm,
+                                           TaskDetector, TaskStatistics)
 
 
 class SimpleModel(nn.Module):

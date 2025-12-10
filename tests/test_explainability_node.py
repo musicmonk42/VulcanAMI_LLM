@@ -2,21 +2,16 @@
 Comprehensive test suite for explainability_node.py
 """
 
-import pytest
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from explainability_node import (
-    ExplainabilityNode,
-    CounterfactualNode,
-    ExplanationResult,
-    ExplainabilityValidator,
-    dispatch_explainability_node,
-    ALLOWED_METHODS,
-    MAX_TENSOR_SIZE,
-    MIN_TENSOR_DIM,
-    MAX_TENSOR_DIM,
-)
+import numpy as np
+import pytest
+
+from explainability_node import (ALLOWED_METHODS, MAX_TENSOR_DIM,
+                                 MAX_TENSOR_SIZE, MIN_TENSOR_DIM,
+                                 CounterfactualNode, ExplainabilityNode,
+                                 ExplainabilityValidator, ExplanationResult,
+                                 dispatch_explainability_node)
 
 
 @pytest.fixture

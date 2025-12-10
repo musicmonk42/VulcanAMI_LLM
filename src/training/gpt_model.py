@@ -88,14 +88,14 @@ Usage Example:
 """
 
 from __future__ import annotations
+
 import math
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, List, Union, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 
 # ======================================
 # GPT Configuration Dataclass

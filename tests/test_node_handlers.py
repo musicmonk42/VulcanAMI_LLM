@@ -2,12 +2,13 @@
 Comprehensive pytest suite for node_handlers.py
 """
 
-import pytest
 import asyncio
-import numpy as np
 import time
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
-from typing import Any, Dict, Optional, Callable  # <<< --- FIX: Added imports
+from typing import Any, Callable, Dict, Optional  # <<< --- FIX: Added imports
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Import the module to test
 try:
@@ -15,8 +16,8 @@ try:
     from unified_runtime.node_handlers import AI_ERRORS, NodeContext
 except ImportError:
     # Handle path issues if running directly
-    import sys
     import os
+    import sys
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src', 'unified_runtime')))
     import node_handlers as nh
     from node_handlers import AI_ERRORS, NodeContext

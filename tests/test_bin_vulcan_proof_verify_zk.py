@@ -3,14 +3,14 @@ Tests for vulcan-proof-verify-zk Python script
 
 This version includes Windows compatibility fixes.
 """
-import subprocess
-import pytest
+import json
 import os
+import platform
+import subprocess
 import sys
 import tempfile
-import json
-import platform
 
+import pytest
 
 BIN_DIR = os.path.join(os.path.dirname(__file__), '..', 'bin')
 VULCAN_PROOF_VERIFY = os.path.join(BIN_DIR, 'vulcan-proof-verify-zk')

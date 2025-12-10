@@ -3,19 +3,17 @@ test_confidence_calibrator.py - Comprehensive tests for ConfidenceCalibrator
 Tests all calibration methods, safety features, and edge cases
 """
 
-import pytest
-import numpy as np
 import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Import the module to test
 try:
     from vulcan.world_model.confidence_calibrator import (
-        ConfidenceCalibrator,
-        ModelConfidenceTracker,
-        CalibrationBin,
-        PredictionRecord,
-    )
+        CalibrationBin, ConfidenceCalibrator, ModelConfidenceTracker,
+        PredictionRecord)
 
     CALIBRATOR_AVAILABLE = True
 except ImportError:
@@ -618,8 +616,8 @@ class TestModelConfidenceTracker:
 
     def test_save_and_load_state(self):
         """Test saving and loading tracker state"""
-        import tempfile
         import os
+        import tempfile
 
         tracker = ModelConfidenceTracker()
 

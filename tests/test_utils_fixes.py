@@ -2,21 +2,19 @@
 Test bug fixes for cpu_capabilities.py and performance_metrics.py
 """
 
-import pytest
 import threading
 import time
-from unittest.mock import patch, MagicMock
-from src.utils.cpu_capabilities import (
-    CPUCapabilities,
-    detect_cpu_capabilities,
-    get_cpu_capabilities,
-    _detect_macos_capabilities,
-)
-from src.utils.performance_metrics import (
-    PerformanceTracker,
-    PerformanceTimer,
-    get_performance_tracker,
-)
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from src.utils.cpu_capabilities import (CPUCapabilities,
+                                        _detect_macos_capabilities,
+                                        detect_cpu_capabilities,
+                                        get_cpu_capabilities)
+from src.utils.performance_metrics import (PerformanceTimer,
+                                           PerformanceTracker,
+                                           get_performance_tracker)
 
 
 class TestCPUCapabilitiesFixes:

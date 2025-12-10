@@ -5,14 +5,14 @@ Generates comprehensive set of malicious/invalid Graphix IR graphs for stress te
 Security-hardened version with obfuscated patterns and proper error handling.
 """
 
+import base64
 import json
+import os
 import random
 import string
-import os
-import base64
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
 from collections import defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 # Configuration constants
 DEFAULT_OVERSIZED_NODES = 1000

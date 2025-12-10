@@ -3,17 +3,17 @@ test_conflict_resolver.py
 Tests conflict resolver functionality without spawning threads.
 """
 
-import pytest
-import numpy as np
-import time
-import threading
 import copy
+import threading
+import time
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Set
-from collections import deque, defaultdict
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set
 from unittest.mock import Mock
 
+import numpy as np
+import pytest
 
 # ============================================================
 # MOCK ENUMS

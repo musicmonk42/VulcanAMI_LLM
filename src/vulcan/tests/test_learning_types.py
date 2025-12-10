@@ -7,18 +7,15 @@ import pytest
 # Skip entire module if torch is not available (learning_types module requires torch)
 torch = pytest.importorskip("torch", reason="PyTorch required for learning_types tests")
 
-import numpy as np
 import time
 from dataclasses import asdict, fields
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from vulcan.learning.learning_types import (
-    LearningMode,
-    LearningConfig,
-    TaskInfo,
-    FeedbackData,
-    LearningTrajectory,
-)
+import numpy as np
+
+from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
+                                            LearningMode, LearningTrajectory,
+                                            TaskInfo)
 
 
 class TestLearningMode:

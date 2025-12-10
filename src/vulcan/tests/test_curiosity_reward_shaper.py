@@ -19,19 +19,15 @@
 # - We shorten scale_update_interval on an instance to trigger adaptive scaling deterministically.
 
 import math
+import threading
 import time
 import types
-import threading
 
 import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
-    CuriosityRewardShaper,
-    CuriosityMethod,
-    NoveltyLevel,
-    CuriosityStatistics,
-)
+    CuriosityMethod, CuriosityRewardShaper, CuriosityStatistics, NoveltyLevel)
 
 # ---------------------------
 # Lightweight stubs for integrations

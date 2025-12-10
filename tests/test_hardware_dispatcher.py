@@ -2,27 +2,21 @@
 Comprehensive test suite for hardware_dispatcher.py
 """
 
-import pytest
-import numpy as np
 import os
 import time
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
-from datetime import datetime, timedelta
 from collections import deque
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from hardware_dispatcher import (
-    HardwareDispatcher,
-    HardwareBackend,
-    HardwareCapabilities,
-    OperationMetrics,
-    CircuitBreaker,
-    AI_ERRORS,
-    MAX_TENSOR_SIZE,
-    MAX_MATRIX_DIMENSION,
-    MIN_NOISE_STD,
-    MAX_NOISE_STD,
-    MAX_PHOTONIC_NOISE_STD,
-)
+import numpy as np
+import pytest
+
+from hardware_dispatcher import (AI_ERRORS, MAX_MATRIX_DIMENSION,
+                                 MAX_NOISE_STD, MAX_PHOTONIC_NOISE_STD,
+                                 MAX_TENSOR_SIZE, MIN_NOISE_STD,
+                                 CircuitBreaker, HardwareBackend,
+                                 HardwareCapabilities, HardwareDispatcher,
+                                 OperationMetrics)
 
 
 @pytest.fixture

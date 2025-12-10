@@ -12,8 +12,8 @@ Or from anywhere:
     python -m scripts.check_self_healing
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add src to path for imports
@@ -121,9 +121,7 @@ def run_module_diagnostics():
     
     try:
         from vulcan.world_model.world_model_core import (
-            print_diagnostics,
-            print_self_healing_diagnostics
-        )
+            print_diagnostics, print_self_healing_diagnostics)
         
         print_diagnostics()
         print_self_healing_diagnostics()

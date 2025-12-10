@@ -24,38 +24,34 @@ Tests the complete flow:
 Ensures end-to-end functionality, including new components.
 """
 
-import pytest
 import json
-import time
 import tempfile
-import numpy as np
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Union
-from unittest.mock import Mock, patch
+import time
 from collections import deque
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+from unittest.mock import Mock, patch
+
+import numpy as np
+import pytest
 
 # Import components to test
-from vulcan.world_model.meta_reasoning import (
-    MotivationalIntrospection,
-    ObjectiveHierarchy,
-    Objective,
-    ObjectiveType,
-    CounterfactualObjectiveReasoner,
-    GoalConflictDetector,
-    ConflictType,
-    ConflictSeverity,
-    ObjectiveNegotiator,
-    ValidationTracker,
-    TransparencyInterface,
-    SelfImprovementDrive,
-    InternalCritic,
-    CuriosityRewardShaper,
-    EthicalBoundaryMonitor,
-    PreferenceLearner,
-    ValueEvolutionTracker,
-    ObjectiveStatus,
-    ValidationOutcome,
-)
+from vulcan.world_model.meta_reasoning import (ConflictSeverity, ConflictType,
+                                               CounterfactualObjectiveReasoner,
+                                               CuriosityRewardShaper,
+                                               EthicalBoundaryMonitor,
+                                               GoalConflictDetector,
+                                               InternalCritic,
+                                               MotivationalIntrospection,
+                                               Objective, ObjectiveHierarchy,
+                                               ObjectiveNegotiator,
+                                               ObjectiveStatus, ObjectiveType,
+                                               PreferenceLearner,
+                                               SelfImprovementDrive,
+                                               TransparencyInterface,
+                                               ValidationOutcome,
+                                               ValidationTracker,
+                                               ValueEvolutionTracker)
 
 
 # Mock world_model for integration testing

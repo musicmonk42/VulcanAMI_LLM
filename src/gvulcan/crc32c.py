@@ -6,11 +6,13 @@ streaming data, batch processing, validation, and performance optimization.
 """
 
 from __future__ import annotations
-import google_crc32c
-from typing import Iterable, List, Optional, Union, BinaryIO, Dict
+
+import logging
 from dataclasses import dataclass
 from pathlib import Path
-import logging
+from typing import BinaryIO, Dict, Iterable, List, Optional, Union
+
+import google_crc32c
 
 logger = logging.getLogger(__name__)
 

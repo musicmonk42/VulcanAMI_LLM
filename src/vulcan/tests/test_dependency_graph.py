@@ -11,29 +11,19 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import pytest
-import time
 import threading
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+import time
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 from vulcan.curiosity_engine.dependency_graph import (
-    DependencyType,
-    DependencyEdge,
-    GraphStorage,
-    PathFinder,
-    CycleDetector,
-    TopologicalSorter,
-    CacheManager,
-    EvictionManager,
-    CycleAwareDependencyGraph,
-    DependencyAnalyzer,
-    ROICalculator,
-)
-
+    CacheManager, CycleAwareDependencyGraph, CycleDetector, DependencyAnalyzer,
+    DependencyEdge, DependencyType, EvictionManager, GraphStorage, PathFinder,
+    ROICalculator, TopologicalSorter)
 from vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
-
 
 # ============================================================================
 # Fixtures

@@ -2,27 +2,20 @@
 Comprehensive test suite for distribution_monitor.py
 """
 
-import pytest
-import numpy as np
 import tempfile
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
 import time
 from collections import deque
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from distribution_monitor import (
-    DriftType,
-    DetectionMethod,
-    DriftSeverity,
-    DriftDetection,
-    DistributionSnapshot,
-    WindowedDistribution,
-    KolmogorovSmirnovDetector,
-    WassersteinDetector,
-    MMDDetector,
-    PageHinkleyDetector,
-    DistributionMonitor,
-)
+import numpy as np
+import pytest
+from distribution_monitor import (DetectionMethod, DistributionMonitor,
+                                  DistributionSnapshot, DriftDetection,
+                                  DriftSeverity, DriftType,
+                                  KolmogorovSmirnovDetector, MMDDetector,
+                                  PageHinkleyDetector, WassersteinDetector,
+                                  WindowedDistribution)
 
 
 @pytest.fixture

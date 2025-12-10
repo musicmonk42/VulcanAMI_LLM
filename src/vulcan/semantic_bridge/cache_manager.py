@@ -6,12 +6,12 @@ Provides centralized cache management with memory limits, priority-based evictio
 and performance tracking across all caches in the system.
 """
 
-import sys
 import logging
-from typing import Dict, Any, Optional, Callable, List, Tuple
-from collections import OrderedDict
+import sys
 import threading
 import time
+from collections import OrderedDict
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

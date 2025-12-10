@@ -3,20 +3,21 @@ principle_extractor.py - Principle extraction from execution traces for Knowledg
 Part of the VULCAN-AGI system
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field, asdict
-from collections import defaultdict, deque, Counter
-import time
-import json
-import hashlib
-from enum import Enum
-import re
 import copy
+import hashlib
+import json
+import logging
+import re
 import threading
+import time
 from abc import ABC, abstractmethod
+from collections import Counter, defaultdict, deque
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # Optional imports with fallbacks
 try:

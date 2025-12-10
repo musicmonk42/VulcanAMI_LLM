@@ -6,33 +6,35 @@ Run with:
     pytest test_graphix_client.py -v --cov=graphix_client --cov-report=html --cov-report=term
 """
 
-import pytest
-import pytest_asyncio  # Add this import
 import asyncio
-import json
 import base64
-import tempfile
+import json
 import os
-from unittest.mock import Mock, AsyncMock, patch, MagicMock, mock_open
-from datetime import datetime, timedelta
-from pathlib import Path
-import aiohttp
-from aiohttp import web
-import jsonschema
-
 # Import the client (adjust import path as needed)
 import sys
+import tempfile
+from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, Mock, mock_open, patch
+
+import aiohttp
+import jsonschema
+import pytest
+import pytest_asyncio  # Add this import
+from aiohttp import web
+
 # Add the parent directory to sys.path to import from client_sdk
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from client_sdk.graphix_client import GraphixClient, GraphixClientError, RetryConfig
+from client_sdk.graphix_client import (GraphixClient, GraphixClientError,
+                                       RetryConfig)
 
 
 # Test fixtures
 @pytest.fixture
 def mock_private_key():
     """Generate a mock RSA private key."""
-    from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives.asymmetric import rsa
     return rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,

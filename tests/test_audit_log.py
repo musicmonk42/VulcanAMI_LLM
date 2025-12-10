@@ -6,22 +6,23 @@ Run with:
     pytest test_audit_log.py -v --cov=audit_log --cov-report=html --cov-report=term-missing
 """
 
-import pytest
 import asyncio
-import json
-import tempfile
-import os
-import time
-import gzip
 import base64
+import gzip
+import json
+import os
 import secrets
-from pathlib import Path
-from datetime import datetime, timedelta
-from unittest.mock import Mock, AsyncMock, patch, MagicMock, call
-from concurrent.futures import ThreadPoolExecutor
-
 # Import the module under test
 import sys
+import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 

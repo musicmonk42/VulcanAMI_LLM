@@ -46,137 +46,58 @@ logger = logging.getLogger(__name__)
 __version__ = "1.0.0"
 __author__ = "VULCAN-AMI Team"
 
-# Core components
-from .motivational_introspection import (
-    MotivationalIntrospection,
-    ObjectiveStatus,
-    ObjectiveAnalysis,
-    ProposalValidation,
-)
-
-from .objective_hierarchy import (
-    ObjectiveHierarchy,
-    Objective,
-    ObjectiveType,
-    ConflictType as HierarchyConflictType,
-)
-
-from .counterfactual_objectives import (
-    CounterfactualObjectiveReasoner,
-    CounterfactualOutcome,
-    ObjectiveComparison,
-    ParetoPoint,
-)
-
-from .goal_conflict_detector import (
-    GoalConflictDetector,
-    Conflict,
-    ConflictSeverity,
-    ConflictType,
-    MultiObjectiveTension,
-)
-
-from .objective_negotiator import (
-    ObjectiveNegotiator,
-    AgentProposal,
-    NegotiationResult,
-    NegotiationStrategy,
-    NegotiationOutcome,
-    ConflictResolution,
-)
-
-from .validation_tracker import (
-    ValidationTracker,
-    ValidationRecord,
-    ValidationPattern,
-    LearningInsight,
-    PatternType,
-    ValidationOutcome,
-    ObjectiveBlocker,
-)
-
-from .transparency_interface import (
-    TransparencyInterface,
-    SerializationFormat,
-    TransparencyMetadata,
-)
-
-from .self_improvement_drive import (
-    SelfImprovementDrive,
-    TriggerType,
-    FailureType,
-    ImprovementObjective,
-    SelfImprovementState,
-)
-
+from .counterfactual_objectives import (CounterfactualObjectiveReasoner,
+                                        CounterfactualOutcome,
+                                        ObjectiveComparison, ParetoPoint)
+from .curiosity_reward_shaper import (CuriosityMethod, CuriosityRewardShaper,
+                                      CuriosityStatistics, EpisodicMemory,
+                                      NoveltyEstimate, NoveltyLevel)
+from .ethical_boundary_monitor import (BoundaryCategory, BoundaryType,
+                                       EnforcementAction, EnforcementLevel,
+                                       EthicalBoundary, EthicalBoundaryMonitor,
+                                       EthicalViolation, ViolationSeverity)
+from .goal_conflict_detector import (Conflict, ConflictSeverity, ConflictType,
+                                     GoalConflictDetector,
+                                     MultiObjectiveTension)
 # Added import for InternalCritic and related items
-from .internal_critic import (
-    InternalCritic,
-    Critique,
-    Evaluation,
-    Risk,
-    ComparisonResult,
-    PerspectiveScore,
-    CritiqueLevel,
-    EvaluationPerspective,
-    RiskCategory,
-    RiskSeverity,
-)
-
-from .curiosity_reward_shaper import (
-    CuriosityRewardShaper,
-    NoveltyEstimate,
-    EpisodicMemory,
-    CuriosityStatistics,
-    CuriosityMethod,
-    NoveltyLevel,
-)
-
-from .ethical_boundary_monitor import (
-    EthicalBoundaryMonitor,
-    EthicalBoundary,
-    EthicalViolation,
-    EnforcementAction,
-    BoundaryCategory,
-    ViolationSeverity,
-    EnforcementLevel,
-    BoundaryType,
-)
-
-from .preference_learner import (
-    PreferenceLearner,
-    Preference,
-    PreferenceSignal,
-    PreferencePrediction,
-    PreferenceSignalType,
-    PreferenceStrength,
-    BanditArm,
-)
-
-from .value_evolution_tracker import (
-    ValueEvolutionTracker,
-    ValueState,
-    ValueTrajectory,
-    DriftAlert,
-    ValueEvolutionAnalysis,
-    DriftSeverity,
-    TrendDirection,
-    ValueChangeType,
-)
+from .internal_critic import (ComparisonResult, Critique, CritiqueLevel,
+                              Evaluation, EvaluationPerspective,
+                              InternalCritic, PerspectiveScore, Risk,
+                              RiskCategory, RiskSeverity)
+# Core components
+from .motivational_introspection import (MotivationalIntrospection,
+                                         ObjectiveAnalysis, ObjectiveStatus,
+                                         ProposalValidation)
+from .objective_hierarchy import ConflictType as HierarchyConflictType
+from .objective_hierarchy import Objective, ObjectiveHierarchy, ObjectiveType
+from .objective_negotiator import (AgentProposal, ConflictResolution,
+                                   NegotiationOutcome, NegotiationResult,
+                                   NegotiationStrategy, ObjectiveNegotiator)
+from .preference_learner import (BanditArm, Preference, PreferenceLearner,
+                                 PreferencePrediction, PreferenceSignal,
+                                 PreferenceSignalType, PreferenceStrength)
+from .self_improvement_drive import (FailureType, ImprovementObjective,
+                                     SelfImprovementDrive,
+                                     SelfImprovementState, TriggerType)
+from .transparency_interface import (SerializationFormat,
+                                     TransparencyInterface,
+                                     TransparencyMetadata)
+from .validation_tracker import (LearningInsight, ObjectiveBlocker,
+                                 PatternType, ValidationOutcome,
+                                 ValidationPattern, ValidationRecord,
+                                 ValidationTracker)
+from .value_evolution_tracker import (DriftAlert, DriftSeverity,
+                                      TrendDirection, ValueChangeType,
+                                      ValueEvolutionAnalysis,
+                                      ValueEvolutionTracker, ValueState,
+                                      ValueTrajectory)
 
 # Import auto_apply_policy with fallback
 try:
-    from .auto_apply_policy import (
-        load_policy,
-        check_files_against_policy,
-        run_gates,
-        Policy,
-        PolicyError,
-        GateFailure,
-        GateSpec,
-        FileCheckResult,
-        GatesReport,
-    )
+    from .auto_apply_policy import (FileCheckResult, GateFailure, GateSpec,
+                                    GatesReport, Policy, PolicyError,
+                                    check_files_against_policy, load_policy,
+                                    run_gates)
 
     _auto_apply_available = True
 except ImportError:
@@ -845,7 +766,8 @@ _initialize_module()
 try:
     MetaReasoner  # type: ignore[name-defined]
 except NameError:
-    from .motivational_introspection import MotivationalIntrospection as MetaReasoner
+    from .motivational_introspection import \
+        MotivationalIntrospection as MetaReasoner
 
 try:
     __all__

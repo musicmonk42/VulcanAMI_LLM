@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 # Apply safe env defaults for CPU-only, low-memory, thread-limited loading
 # This MUST be at the top, before other imports (especially torch/transformers)
@@ -32,33 +32,34 @@ except Exception as e:
     _init_logger.debug(f"Could not limit torch threads: {e}")
 
 import ast
-import astor
-import logging
+import copy
 import difflib
-import json
-import torch
-import torch.optim as optim
-import torch.nn.utils
-import re
-import time
-import threading
 import hashlib
-import uuid
+import importlib.util  # Added for lazy loading check
+import json
+import logging
 import os
+import re
 import sqlite3
+import tempfile  # Added for __main__ block
+import threading
+import time
 import traceback
 import unicodedata
-import importlib.util  # Added for lazy loading check
-from typing import Dict, Any, Optional, Callable, List, Tuple, Set
-from collections import Counter, deque, OrderedDict
+import uuid
+from collections import Counter, OrderedDict, deque
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timedelta
-from dataclasses import dataclass, field, asdict, is_dataclass
 from enum import Enum
 from pathlib import Path
-import copy
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
-import tempfile  # Added for __main__ block
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+import astor
+import torch
+import torch.nn.utils
+import torch.optim as optim
 
 # --- ML Model Integration for Bias Detection ---
 # Check if transformers is available without importing it at the top level
@@ -299,12 +300,10 @@ class NSOAligner:
 
             try:
                 # --- Heavy imports moved here ---
-                from transformers import (
-                    pipeline,
-                    logging as hf_logging,
-                    AutoModelForSequenceClassification,
-                    AutoTokenizer,
-                )
+                from transformers import (AutoModelForSequenceClassification,
+                                          AutoTokenizer)
+                from transformers import logging as hf_logging
+                from transformers import pipeline
 
                 hf_logging.set_verbosity_error()
                 # --- End heavy imports ---

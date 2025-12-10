@@ -11,17 +11,17 @@ This test suite validates:
 6. Dependencies and package integrity
 """
 
-import os
-import sys
-import json
-import yaml
-import subprocess
 import hashlib
+import json
+import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-import pytest
+from typing import Dict, List, Optional, Tuple
 
+import pytest
+import yaml
 
 # Get repository root
 REPO_ROOT = Path(__file__).parent.parent

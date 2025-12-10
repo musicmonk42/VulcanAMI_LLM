@@ -5,25 +5,19 @@ Tests explanation generation, safety checks, input/output validation,
 and comprehensive error handling.
 """
 
-import pytest
-import time
-from unittest.mock import Mock, patch, MagicMock
 import logging
 import re
-from typing import Dict, Any
+import time
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.reasoning.reasoning_explainer import (
-    ReasoningExplainer,
-    SafetyAwareReasoning,
-    SAFETY_VALIDATOR_AVAILABLE,
-)
+import pytest
 
-from vulcan.reasoning.reasoning_types import (
-    ReasoningType,
-    ReasoningStep,
-    ReasoningChain,
-    ReasoningResult,
-)
+from vulcan.reasoning.reasoning_explainer import (SAFETY_VALIDATOR_AVAILABLE,
+                                                  ReasoningExplainer,
+                                                  SafetyAwareReasoning)
+from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
+                                              ReasoningStep, ReasoningType)
 
 
 # Fixtures

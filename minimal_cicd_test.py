@@ -4,12 +4,13 @@ Minimal CI/CD Test Runner
 Runs basic validation tests without requiring full dependencies
 """
 
-import os
-import sys
-import subprocess
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
+
 
 class Color:
     """ANSI color codes"""

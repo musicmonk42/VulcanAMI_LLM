@@ -6,8 +6,8 @@ Test script for new requirements:
 3. Runtime performance metrics
 """
 
-import sys
 import logging
+import sys
 
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
@@ -19,7 +19,8 @@ print("=" * 80)
 print("\n1. CPU Capabilities Detection (ARM NEON, AVX, etc.)")
 print("-" * 80)
 try:
-    from src.utils.cpu_capabilities import get_cpu_capabilities, get_capability_summary
+    from src.utils.cpu_capabilities import (get_capability_summary,
+                                            get_cpu_capabilities)
     
     caps = get_cpu_capabilities()
     print(get_capability_summary())
@@ -78,8 +79,8 @@ except Exception as e:
 print("\n\n3. Runtime Performance Metrics")
 print("-" * 80)
 try:
-    from src.utils.performance_metrics import get_performance_tracker
     from src.persistant_memory_v46.zk import ZKProver
+    from src.utils.performance_metrics import get_performance_tracker
     
     tracker = get_performance_tracker()
     

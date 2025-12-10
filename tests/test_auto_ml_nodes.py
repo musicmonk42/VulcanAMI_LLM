@@ -2,20 +2,14 @@
 Comprehensive test suite for auto_ml_nodes.py
 """
 
-import pytest
-import numpy as np
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-from auto_ml_nodes import (
-    RandomNode,
-    HyperParamNode,
-    SearchNode,
-    dispatch_auto_ml_node,
-    MAX_TENSOR_SIZE,
-    MAX_KERNEL_LENGTH,
-    MAX_SPACE_DIMENSIONS,
-    OPTUNA_AVAILABLE,
-)
+import numpy as np
+import pytest
+
+from auto_ml_nodes import (MAX_KERNEL_LENGTH, MAX_SPACE_DIMENSIONS,
+                           MAX_TENSOR_SIZE, OPTUNA_AVAILABLE, HyperParamNode,
+                           RandomNode, SearchNode, dispatch_auto_ml_node)
 
 
 @pytest.fixture

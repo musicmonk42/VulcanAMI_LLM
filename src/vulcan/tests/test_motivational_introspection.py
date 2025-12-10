@@ -2,18 +2,16 @@
 test_motivational_introspection.py - Unit tests for MotivationalIntrospection
 """
 
-import pytest
-import numpy as np
 import time
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
 from collections import defaultdict, deque
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
+
+import numpy as np
+import pytest
 
 from vulcan.world_model.meta_reasoning.motivational_introspection import (
-    MotivationalIntrospection,
-    ObjectiveAnalysis,
-    ObjectiveStatus,
-    ProposalValidation,
-)
+    MotivationalIntrospection, ObjectiveAnalysis, ObjectiveStatus,
+    ProposalValidation)
 
 
 @pytest.fixture

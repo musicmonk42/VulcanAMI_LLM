@@ -9,40 +9,32 @@ import pytest
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for processing tests")
 
-import time
 import asyncio
-import threading
-import numpy as np
-import PIL.Image
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any, List
-import tempfile
-import shutil
 import gc
 import json
+import shutil
+import tempfile
+import threading
+import time
+from pathlib import Path
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import PIL.Image
 
 # FIXED: Import from src.vulcan.config instead of config
-from src.vulcan.config import ModalityType, EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM
-
+from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
+                               ModalityType)
 # Import processing module components
-from src.vulcan.processing import (
-    ProcessingQuality,
-    ProcessingPriority,
-    SLOConfig,
-    VersionedDataLogger,
-    DynamicModelManager,
-    WorkloadManager,
-    EmbeddingCache,
-    EnhancedEmbeddingCache,
-    ModelManager,
-    ProcessingResult,
-    CrossModalAttention,
-    ModalityFusion,
-    AdaptiveMultimodalProcessor,
-    StreamingProcessor,
-    MultimodalProcessor,
-)
+from src.vulcan.processing import (AdaptiveMultimodalProcessor,
+                                   CrossModalAttention, DynamicModelManager,
+                                   EmbeddingCache, EnhancedEmbeddingCache,
+                                   ModalityFusion, ModelManager,
+                                   MultimodalProcessor, ProcessingPriority,
+                                   ProcessingQuality, ProcessingResult,
+                                   SLOConfig, StreamingProcessor,
+                                   VersionedDataLogger, WorkloadManager)
 
 # ============================================================
 # FIXTURES

@@ -15,19 +15,19 @@ BREAKING CHANGES FROM v3.1.0:
 - Idempotency built-in for all operations
 """
 
-import json
 import hashlib
-import os
-import time
+import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple, Set
+import os
+import re
 import threading
+import time
+from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from copy import deepcopy
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-import re
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # External dependencies (required for production)
 try:
@@ -37,7 +37,8 @@ try:
     
     # Detect FAISS CPU capabilities with enhanced diagnostics
     try:
-        from src.utils.cpu_capabilities import get_cpu_capabilities, format_capability_warning
+        from src.utils.cpu_capabilities import (format_capability_warning,
+                                                get_cpu_capabilities)
         
         caps = get_cpu_capabilities()
         best_instr = caps.get_best_vector_instruction_set()
@@ -98,12 +99,10 @@ except ImportError:
     raise ImportError("FAISS and numpy are required for production use")
 
 try:
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import padding
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.hazmat.primitives import serialization
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
     HAS_CRYPTOGRAPHY = True
 except ImportError:
     HAS_CRYPTOGRAPHY = False
@@ -111,8 +110,8 @@ except ImportError:
     raise ImportError("cryptography library is required for production use")
 
 try:
-    from jsonschema import validate, ValidationError
     import networkx as nx
+    from jsonschema import ValidationError, validate
     HAS_VALIDATION_LIBS = True
 except ImportError:
     HAS_VALIDATION_LIBS = False

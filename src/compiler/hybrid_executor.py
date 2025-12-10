@@ -5,25 +5,27 @@ with profiling, caching, and automatic optimization selection
 """
 
 import asyncio
-import time
-import json
-import hashlib
-import pickle
-import ctypes
-import tempfile
-import subprocess
-import os
-import threading
 import atexit
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Union
-from dataclasses import dataclass, asdict, field
-from enum import Enum
-from collections import defaultdict, deque
-import numpy as np
+import ctypes
+import hashlib
+import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import os
+import pickle
 import struct
+import subprocess
+import tempfile
+import threading
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+
 from .security_fixes import safe_pickle_load
 
 # Performance tracking

@@ -9,21 +9,16 @@ Tests all functionality including:
 - Learning insights generation
 """
 
-import pytest
 import time
-import numpy as np
-from unittest.mock import Mock, MagicMock
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock
+
+import numpy as np
+import pytest
 
 from vulcan.world_model.meta_reasoning.validation_tracker import (
-    ValidationTracker,
-    ValidationRecord,
-    ValidationOutcome,
-    ValidationPattern,
-    PatternType,
-    LearningInsight,
-    ObjectiveBlocker,
-)
+    LearningInsight, ObjectiveBlocker, PatternType, ValidationOutcome,
+    ValidationPattern, ValidationRecord, ValidationTracker)
 
 
 class TestValidationRecord:

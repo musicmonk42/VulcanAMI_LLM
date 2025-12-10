@@ -5,18 +5,17 @@
 # Instead, it tests the deployment patterns using a MockDeployment class.
 # ============================================================
 
-import unittest
-import sys
-import time
-import pickle
 import json
-import tempfile
-import shutil
 import os
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+import pickle
+import shutil
+import sys
+import tempfile
+import time
+import unittest
 from datetime import datetime
-
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 # ============================================================
 # MOCK OBJECTS

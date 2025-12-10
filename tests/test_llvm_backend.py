@@ -2,17 +2,14 @@
 Comprehensive test suite for llvm_backend.py
 """
 
-import pytest
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
-import llvmlite.ir as ir
-import llvmlite.binding as llvm
+from unittest.mock import MagicMock, Mock, patch
 
-from src.compiler.llvm_backend import (
-    LLVMBackend,
-    DataType,
-    CompiledFunction,
-)
+import llvmlite.binding as llvm
+import llvmlite.ir as ir
+import numpy as np
+import pytest
+
+from src.compiler.llvm_backend import CompiledFunction, DataType, LLVMBackend
 
 
 @pytest.fixture
@@ -305,7 +302,7 @@ class TestCompilationOutput:
     def test_compile_to_object(self, backend):
         """Test compiling to object file."""
         import tempfile
-        
+
         # Compile a node
         backend.compile_node("ADD", {})
         

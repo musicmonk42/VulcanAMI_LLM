@@ -3,19 +3,22 @@ Integration test suite for the compiler module
 Tests that graph_compiler, hybrid_executor, and llvm_backend work together correctly
 """
 
-import pytest
 import asyncio
-import tempfile
 import json
+import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 import numpy as np
+import pytest
 
 # Import all compiler components - FIX: Use correct import paths
-from src.compiler.graph_compiler import GraphCompiler, GraphOptimizer, NodeType, CompilationError
-from src.compiler.hybrid_executor import HybridExecutor, ExecutionMode, OptimizationLevel
-from src.compiler.llvm_backend import LLVMBackend, DataType, CompiledFunction
+from src.compiler.graph_compiler import (CompilationError, GraphCompiler,
+                                         GraphOptimizer, NodeType)
+from src.compiler.hybrid_executor import (ExecutionMode, HybridExecutor,
+                                          OptimizationLevel)
+from src.compiler.llvm_backend import CompiledFunction, DataType, LLVMBackend
 
 
 @pytest.fixture

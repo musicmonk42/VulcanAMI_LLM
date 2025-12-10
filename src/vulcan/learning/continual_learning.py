@@ -2,28 +2,29 @@
 Continual learning implementations with EWC and experience replay
 """
 
+import copy
+import hashlib
+import json
+import logging
+import pickle
+import threading  # <-- threading is imported here
+import time
+from collections import deque
+from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple, Union
-from collections import deque
-from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
-import logging
-import time
-import hashlib
-import threading  # <-- threading is imported here
-from dataclasses import dataclass
-from pathlib import Path
-import json
-import pickle
-import copy
-from enum import Enum
+import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 
 try:
-    from safety.safety_validator import EnhancedSafetyValidator
     from safety.safety_types import SafetyConfig
+    from safety.safety_validator import EnhancedSafetyValidator
 except ImportError:
     EnhancedSafetyValidator = None
 
@@ -37,11 +38,11 @@ except ImportError:
     HierarchicalMemory = None
 
 from ..config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM, ModalityType
-from .learning_types import LearningConfig, TaskInfo, FeedbackData
-from .parameter_history import ParameterHistoryManager
-from .meta_learning import TaskDetector, MetaLearner
-from .rlhf_feedback import RLHFManager, LiveFeedbackProcessor
 from ..security_fixes import safe_pickle_load
+from .learning_types import FeedbackData, LearningConfig, TaskInfo
+from .meta_learning import MetaLearner, TaskDetector
+from .parameter_history import ParameterHistoryManager
+from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
 
 logger = logging.getLogger(__name__)
 

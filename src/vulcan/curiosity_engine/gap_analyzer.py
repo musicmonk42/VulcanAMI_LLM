@@ -5,18 +5,19 @@ Part of the VULCAN-AGI system
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-from pathlib import Path
-from enum import Enum
 import hashlib
+import json
+import logging
 import threading
+import time
 import warnings
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # Optional imports with fallbacks
 try:
@@ -28,8 +29,8 @@ except ImportError:
     warnings.warn("scipy not available, some statistical features disabled")
 
 try:
-    from sklearn.preprocessing import StandardScaler
     from sklearn.ensemble import IsolationForest
+    from sklearn.preprocessing import StandardScaler
 
     SKLEARN_AVAILABLE = True
 except ImportError:

@@ -4,32 +4,34 @@ Neural network-based safety validation for VULCAN-AGI Safety Module.
 Implements multi-model consensus, uncertainty quantification, and real-time safety assessment.
 """
 
-import logging
-import time
+import asyncio
+import atexit
+import gc
+import hashlib
 import json
+import logging
 import os
+import pickle
+import sys
+import threading
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset, TensorDataset
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable
-from collections import defaultdict, deque
-from datetime import datetime
-from pathlib import Path
-import hashlib
-import pickle
-from enum import Enum
-from dataclasses import dataclass, field
-import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-import asyncio
-import sys
-import atexit
-import gc
 
-from .safety_types import SafetyReport, SafetyViolationType, ActionType
+from .safety_types import ActionType, SafetyReport, SafetyViolationType
 
 logger = logging.getLogger(__name__)
 

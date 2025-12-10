@@ -4,8 +4,8 @@ Simple verification script to ensure warning messages are displayed correctly.
 This script can be run independently without pytest infrastructure.
 """
 
-import sys
 import logging
+import sys
 
 # Capture warnings
 captured_warnings = []

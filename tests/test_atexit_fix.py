@@ -7,8 +7,8 @@ This test verifies that:
 3. The test session completes without hanging
 """
 
-import os
 import atexit
+import os
 import threading
 import time
 

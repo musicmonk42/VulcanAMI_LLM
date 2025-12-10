@@ -2,9 +2,10 @@
 Test fixes for BridgeConfig validation and timeout handling.
 Tests the improvements made during the deep code audit.
 """
-import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 # Skip entire module if torch is not available (graphix_vulcan_bridge requires torch)
 torch = pytest.importorskip("torch", reason="PyTorch required for bridge config tests")
@@ -13,7 +14,7 @@ torch = pytest.importorskip("torch", reason="PyTorch required for bridge config 
 def test_bridge_config_validation_positive():
     """Test that valid configurations pass validation."""
     from src.integration.graphix_vulcan_bridge import BridgeConfig
-    
+
     # Should not raise any errors
     config = BridgeConfig(
         async_timeout=2.0,
@@ -33,7 +34,7 @@ def test_bridge_config_validation_positive():
 def test_bridge_config_validation_zero_allowed():
     """Test that fields that allow zero work correctly."""
     from src.integration.graphix_vulcan_bridge import BridgeConfig
-    
+
     # kl_guard_threshold can be zero
     config = BridgeConfig(kl_guard_threshold=0.0)
     assert config.kl_guard_threshold == 0.0
@@ -54,7 +55,7 @@ def test_bridge_config_validation_negative_timeout():
 def test_bridge_config_validation_zero_timeout():
     """Test that zero timeout raises ValueError (must be positive)."""
     from src.integration.graphix_vulcan_bridge import BridgeConfig
-    
+
     # Zero is non-negative but not positive, so it should raise
     with pytest.raises(ValueError, match="async_timeout must be positive"):
         BridgeConfig(async_timeout=0.0)
@@ -79,8 +80,9 @@ def test_bridge_config_validation_negative_kl_threshold():
 @pytest.mark.asyncio
 async def test_safe_call_async_uses_custom_timeout():
     """Test that custom timeout parameter is respected."""
-    from src.integration.graphix_vulcan_bridge import GraphixVulcanBridge, BridgeConfig
-    
+    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
+                                                       GraphixVulcanBridge)
+
     # Create bridge with default timeout of 2.0 seconds
     config = BridgeConfig(async_timeout=2.0)
     bridge = GraphixVulcanBridge(config=config)
@@ -110,8 +112,9 @@ async def test_safe_call_async_uses_custom_timeout():
 @pytest.mark.asyncio
 async def test_safe_call_async_uses_config_default_timeout():
     """Test that config default timeout is used when no custom timeout provided."""
-    from src.integration.graphix_vulcan_bridge import GraphixVulcanBridge, BridgeConfig
-    
+    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
+                                                       GraphixVulcanBridge)
+
     # Reset singleton to ensure fresh instance
     GraphixVulcanBridge._instance = None
     
@@ -143,7 +146,8 @@ async def test_safe_call_async_uses_config_default_timeout():
 @pytest.mark.asyncio
 async def test_safe_call_async_respects_custom_max_retries():
     """Test that custom max_retries parameter is respected."""
-    from src.integration.graphix_vulcan_bridge import GraphixVulcanBridge, BridgeConfig
+    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
+                                                       GraphixVulcanBridge)
     
     config = BridgeConfig(max_retries=5)  # Default is 5
     bridge = GraphixVulcanBridge(config=config)
@@ -177,8 +181,9 @@ async def test_safe_call_async_respects_custom_max_retries():
 @pytest.mark.asyncio
 async def test_consensus_timeout_uses_config_value():
     """Test that consensus_approve_token uses configured consensus timeout."""
-    from src.integration.graphix_vulcan_bridge import GraphixVulcanBridge, BridgeConfig
-    
+    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
+                                                       GraphixVulcanBridge)
+
     # Create bridge with custom consensus timeout
     config = BridgeConfig(consensus_timeout_seconds=5.0)
     bridge = GraphixVulcanBridge(config=config)
@@ -199,7 +204,7 @@ async def test_consensus_timeout_uses_config_value():
 def test_validation_refactoring_maintains_behavior():
     """Test that refactored validation maintains original behavior."""
     from src.integration.graphix_vulcan_bridge import BridgeConfig
-    
+
     # All positive values should work
     config = BridgeConfig(
         async_timeout=1.0,

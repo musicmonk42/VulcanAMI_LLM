@@ -2,24 +2,19 @@
 Comprehensive test suite for feature_extraction.py
 """
 
-import pytest
-import numpy as np
+import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-import json
+from unittest.mock import MagicMock, Mock, patch
 
-from feature_extraction import (
-    FeatureTier,
-    ExtractionResult,
-    ProblemStructure,
-    FeatureExtractor,
-    SyntacticFeatureExtractor,
-    StructuralFeatureExtractor,
-    SemanticFeatureExtractor,
-    MultimodalFeatureExtractor,
-    MultiTierFeatureExtractor,
-)
+import numpy as np
+import pytest
+from feature_extraction import (ExtractionResult, FeatureExtractor,
+                                FeatureTier, MultimodalFeatureExtractor,
+                                MultiTierFeatureExtractor, ProblemStructure,
+                                SemanticFeatureExtractor,
+                                StructuralFeatureExtractor,
+                                SyntacticFeatureExtractor)
 
 
 @pytest.fixture

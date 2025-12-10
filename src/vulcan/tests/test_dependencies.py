@@ -4,12 +4,12 @@
 # FIXED: Corrected test_complex_dependency_setup to match actual shutdown behavior
 # ============================================================
 
-import unittest
-import sys
 import io
 import logging
+import sys
+import unittest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent
@@ -17,17 +17,14 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.dependencies import (
-    EnhancedCollectiveDeps,
-    DependencyCategory,
-    create_minimal_deps,
-    create_full_deps,
-    validate_dependencies,
-    print_dependency_report,
-    safe_print,
-    get_status_symbol,
-)
-
+from vulcan.orchestrator.dependencies import (DependencyCategory,
+                                              EnhancedCollectiveDeps,
+                                              create_full_deps,
+                                              create_minimal_deps,
+                                              get_status_symbol,
+                                              print_dependency_report,
+                                              safe_print,
+                                              validate_dependencies)
 
 # ============================================================
 # MOCK COMPONENTS

@@ -6,8 +6,8 @@ This script demonstrates the usage of the GovernedTrainer class for training
 neural network models with built-in safety mechanisms and governance features.
 """
 
-import sys
 import os
+import sys
 
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))

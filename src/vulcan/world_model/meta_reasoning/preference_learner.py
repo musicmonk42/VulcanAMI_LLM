@@ -27,20 +27,18 @@ Integration:
 - Integrates with SelfImprovementDrive for adaptive learning
 """
 
-import logging
-import time
-
-# import numpy as np # Original import
-from typing import Dict, List, Any, Optional, Tuple, Set, Callable, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-from enum import Enum
-import threading
-import json
 import hashlib
+import json
+import logging
 import math  # Import math for log, sqrt
 import random  # Import random for choices, random, normal
-
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+# import numpy as np # Original import
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 # --- START FIX: Add numpy fallback ---
 # logger = logging.getLogger(__name__) # Original logger placement

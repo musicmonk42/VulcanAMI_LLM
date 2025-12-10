@@ -2,34 +2,23 @@
 Comprehensive test suite for ai_providers.py
 """
 
-import pytest
-import os
-import tempfile
-import shutil
-import time
 import json
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+import os
+import shutil
+import tempfile
+import time
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from ai_providers import (
-    AIRuntime,
-    AITask,
-    AIContract,
-    AIResult,
-    AICache,
-    RateLimiter,
-    ProviderType,
-    OperationType,
-    NoiseModel,
-    DatabaseConnectionPool,
-    HTTPConnectionPool,
-    OpenAIClient,
-    AnthropicClient,
-    CohereClient,
-    LocalModelClient,
-    create_runtime,
-)
+import pytest
+
+from ai_providers import (AICache, AIContract, AIResult, AIRuntime, AITask,
+                          AnthropicClient, CohereClient,
+                          DatabaseConnectionPool, HTTPConnectionPool,
+                          LocalModelClient, NoiseModel, OpenAIClient,
+                          OperationType, ProviderType, RateLimiter,
+                          create_runtime)
 
 
 @pytest.fixture
@@ -412,7 +401,7 @@ class TestConvenienceFunctions:
         )
         
         from ai_providers import quick_generate
-        
+
         # This will fail without real API, so we mock
         # In actual test: result = quick_generate("Test prompt")
 

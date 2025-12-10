@@ -2,21 +2,19 @@
 Comprehensive test suite for security_audit_engine.py
 """
 
-import pytest
 import json
 import tempfile
 import threading
 import time
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from security_audit_engine import (
-    SecurityAuditEngine,
-    ConnectionPool,
-    AuditEngineError,
-    DatabaseCorruptionError,
-)
+import pytest
+
+from security_audit_engine import (AuditEngineError, ConnectionPool,
+                                   DatabaseCorruptionError,
+                                   SecurityAuditEngine)
 
 
 @pytest.fixture

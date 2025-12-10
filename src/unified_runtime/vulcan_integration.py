@@ -14,19 +14,19 @@ Integration capabilities:
 5. Hardware-aware execution with VULCAN guidance
 """
 
-from unittest.mock import MagicMock
 import asyncio
-import logging
-import time
-from typing import Dict, Any, Optional, List, Set
-from dataclasses import dataclass, asdict, field
-from pathlib import Path
-from collections import deque, defaultdict
-from functools import wraps
-import sys
-import os
-import threading  # Added for new __init__
 import inspect  # Added for shutdown checks
+import logging
+import os
+import sys
+import threading  # Added for new __init__
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from functools import wraps
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+from unittest.mock import MagicMock
 
 # Define logger early
 logger = logging.getLogger(__name__)
@@ -34,10 +34,9 @@ logger = logging.getLogger(__name__)
 # Import VULCAN components
 try:
     # WorldModel is now lazy-loaded to prevent circular imports
-    from vulcan.world_model.meta_reasoning.motivational_introspection import (
-        MotivationalIntrospection,
-    )
     from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+    from vulcan.world_model.meta_reasoning.motivational_introspection import \
+        MotivationalIntrospection
 
     VULCAN_AVAILABLE = True
 except ImportError as e:
@@ -51,9 +50,11 @@ WorldModel = None
 
 # Import Graphix components (relative imports within package)
 try:
-    from .execution_engine import ExecutionContext, ExecutionMode, GraphExecutionResult
+    from .execution_engine import (ExecutionContext, ExecutionMode,
+                                   GraphExecutionResult)
+    from .execution_metrics import \
+        ExecutionMetrics  # Needed for on_run_complete
     from .graph_validator import ValidationResult
-    from .execution_metrics import ExecutionMetrics  # Needed for on_run_complete
 except ImportError as e:
     # Fallback for potential direct script execution or testing issues
     logger.warning(
@@ -238,7 +239,8 @@ class VulcanGraphixBridge:
         global WorldModel  # Use global to cache the import
         if WorldModel is None:
             try:
-                from vulcan.world_model.world_model_core import WorldModel as WM
+                from vulcan.world_model.world_model_core import \
+                    WorldModel as WM
 
                 WorldModel = WM  # Assign to global
                 logger.info("WorldModel lazy loaded successfully")

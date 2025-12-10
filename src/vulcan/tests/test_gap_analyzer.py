@@ -3,30 +3,25 @@ test_gap_analyzer.py - Comprehensive tests for gap_analyzer module
 Part of the VULCAN-AGI system test suite
 """
 
-import pytest
-import numpy as np
-import time
 import threading
+import time
 from collections import deque
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 # Fix import path for the project structure
-from vulcan.curiosity_engine.gap_analyzer import (
-    GapAnalyzer,
-    KnowledgeGap,
-    LatentGap,
-    Pattern,
-    GapType,
-    FailureTracker,
-    PatternTracker,
-    GapRegistry,
-    DecompositionAnalyzer,
-    PredictionAnalyzer,
-    TransferAnalyzer,
-    AnomalyAnalyzer,
-    LatentGapDetector,
-    SimpleAnomalyDetector,
-)
+from vulcan.curiosity_engine.gap_analyzer import (AnomalyAnalyzer,
+                                                  DecompositionAnalyzer,
+                                                  FailureTracker, GapAnalyzer,
+                                                  GapRegistry, GapType,
+                                                  KnowledgeGap, LatentGap,
+                                                  LatentGapDetector, Pattern,
+                                                  PatternTracker,
+                                                  PredictionAnalyzer,
+                                                  SimpleAnomalyDetector,
+                                                  TransferAnalyzer)
 
 
 class TestPattern:

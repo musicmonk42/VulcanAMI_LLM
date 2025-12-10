@@ -4,8 +4,13 @@
 # Version: 4.6.0
 ################################################################################
 
-import sys, os, argparse, json, logging, time
-from typing import Dict, Any, List
+import argparse
+import json
+import logging
+import os
+import sys
+import time
+from typing import Any, Dict, List
 
 VERSION = "4.6.0"
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')

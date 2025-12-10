@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from typing import Any, List, Tuple, Optional, Dict, Callable
-from dataclasses import dataclass, field
 import asyncio
 import logging
 import math
 import random  # Needed for random token choice on low entropy fallback
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 # Use the appropriate device
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

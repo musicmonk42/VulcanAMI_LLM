@@ -3,33 +3,24 @@
 # FIXED: Test scope issues causing test failures
 # Run: pytest src/vulcan/tests/test_planning.py -v --tb=short --cov=src.vulcan.planning --cov-report=html
 
-import pytest
-import time
 import asyncio
-import threading
-import numpy as np
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-from typing import Dict, Any, List
 import copy
 import gc
+import threading
+import time
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from src.vulcan.planning import (
-    PlanningMethod,
-    PlanStep,
-    Plan,
-    MCTSNode,
-    MonteCarloTreeSearch,
-    EnhancedHierarchicalPlanner,
-    PlanningState,
-    PlanLibrary,
-    PlanMonitor,
-    PlanRepairer,
-    ResourceAwareCompute,
-    ResourceAllocator,
-    DistributedCoordinator,
-    ConsensusProtocol,
-)
-from src.vulcan.config import ActionType, GoalType, AgentConfig
+import numpy as np
+import pytest
+
+from src.vulcan.config import ActionType, AgentConfig, GoalType
+from src.vulcan.planning import (ConsensusProtocol, DistributedCoordinator,
+                                 EnhancedHierarchicalPlanner, MCTSNode,
+                                 MonteCarloTreeSearch, Plan, PlanLibrary,
+                                 PlanMonitor, PlanningMethod, PlanningState,
+                                 PlanRepairer, PlanStep, ResourceAllocator,
+                                 ResourceAwareCompute)
 
 # ============================================================
 # FIXTURES

@@ -5,30 +5,27 @@ Tests Bayesian priors, similarity search, memory indexing, cache management,
 and all prior computation strategies.
 """
 
-import pytest
-import time
-import numpy as np
-import threading
-from typing import Dict, Any, List
-from unittest.mock import Mock, MagicMock, patch
-from pathlib import Path
-import tempfile
 import shutil
-
 # Import the module to test
 import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from vulcan.reasoning.selection.memory_prior import (
-    SimilarityMetric,
-    PriorType,
-    MemoryEntry,
-    PriorDistribution,
-    MemoryIndex,
-    BayesianMemoryPrior,
-    AdaptivePriorSelector,
-)
+from vulcan.reasoning.selection.memory_prior import (AdaptivePriorSelector,
+                                                     BayesianMemoryPrior,
+                                                     MemoryEntry, MemoryIndex,
+                                                     PriorDistribution,
+                                                     PriorType,
+                                                     SimilarityMetric)
 
 
 class TestEnums:

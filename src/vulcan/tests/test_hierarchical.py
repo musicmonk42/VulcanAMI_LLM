@@ -12,27 +12,22 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import pytest
-import numpy as np
-import time
-import threading
-from pathlib import Path
-import tempfile
 import shutil
-
 # Import the module under test
 import sys
+import tempfile
+import threading
+import time
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.hierarchical import (
-    HierarchicalMemory,
-    MemoryLevel,
-    ToolSelectionRecord,
-    ProblemPattern,
-)
-from vulcan.memory.base import MemoryConfig, MemoryQuery, MemoryType, Memory
-
+from vulcan.memory.base import Memory, MemoryConfig, MemoryQuery, MemoryType
+from vulcan.memory.hierarchical import (HierarchicalMemory, MemoryLevel,
+                                        ProblemPattern, ToolSelectionRecord)
 
 # ============================================================
 # FIXTURES

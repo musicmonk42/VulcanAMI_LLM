@@ -14,28 +14,21 @@ Tests cover:
 - Performance benchmarks
 """
 
-import unittest
-import time
 import json
-import threading
-from unittest.mock import Mock, patch
-from pathlib import Path
 import sys
+import threading
+import time
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 # Import the module to test
 sys.path.insert(0, "/home/claude")
-from hierarchical_context import (
-    HierarchicalContext,
-    EpisodicItem,
-    SemanticEntry,
-    ProceduralPattern,
-    MemoryTier,
-    MemoryStatistics,
-    ConsolidationStrategy,
-    PruningStrategy,
-    RetrievalStrategy,
-    create_default_memory,
-)
+from hierarchical_context import (ConsolidationStrategy, EpisodicItem,
+                                  HierarchicalContext, MemoryStatistics,
+                                  MemoryTier, ProceduralPattern,
+                                  PruningStrategy, RetrievalStrategy,
+                                  SemanticEntry, create_default_memory)
 
 
 class TestHierarchicalContextBasics(unittest.TestCase):

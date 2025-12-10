@@ -9,30 +9,26 @@ import pytest
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for neural_safety tests")
 
-import torch.nn as nn
-import numpy as np
 import asyncio
-import time
-import tempfile
 import shutil
+import tempfile
+import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.safety.neural_safety import (
-    MemoryBoundedDeque,
-    ModelType,
-    ModelConfig,
-    SafetyClassifier,
-    AnomalyDetector,
-    BayesianSafetyNet,
-    TransformerSafetyModel,
-    GraphSafetyNetwork,
-    VariationalSafetyAutoencoder,
-    NeuralSafetyValidator,
-)
-from vulcan.safety.safety_types import SafetyReport, SafetyViolationType, ActionType
+import numpy as np
+import torch.nn as nn
 
+from vulcan.safety.neural_safety import (AnomalyDetector, BayesianSafetyNet,
+                                         GraphSafetyNetwork,
+                                         MemoryBoundedDeque, ModelConfig,
+                                         ModelType, NeuralSafetyValidator,
+                                         SafetyClassifier,
+                                         TransformerSafetyModel,
+                                         VariationalSafetyAutoencoder)
+from vulcan.safety.safety_types import (ActionType, SafetyReport,
+                                        SafetyViolationType)
 
 # ============================================================
 # FIXTURES

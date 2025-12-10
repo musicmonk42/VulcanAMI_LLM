@@ -2,20 +2,18 @@
 Tests for speculative_helpers.py
 """
 
+import sys
+
 import pytest
 import torch
 import torch.nn as nn
-import sys
 
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from speculative_helpers import (
-    SpeculativeStats,
-    LowRankDraftTransformer,
-    speculative_sampling_and_verify,
-    speculative_sampling_and_verify_async,
-    KL_THRESHOLD,
-)
+from speculative_helpers import (KL_THRESHOLD, LowRankDraftTransformer,
+                                 SpeculativeStats,
+                                 speculative_sampling_and_verify,
+                                 speculative_sampling_and_verify_async)
 
 
 class MockTransformer(nn.Module):

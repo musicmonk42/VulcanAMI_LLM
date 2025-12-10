@@ -4,21 +4,18 @@ Comprehensive tests for tool_safety.py module.
 Tests token bucket rate limiting, tool safety management, and governance.
 """
 
-import pytest
-import time
 import threading
-from typing import Dict, Any
-from unittest.mock import Mock, patch, MagicMock
+import time
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.safety.tool_safety import TokenBucket, ToolSafetyManager, ToolSafetyGovernor
-from vulcan.safety.safety_types import (
-    ToolSafetyLevel,
-    ToolSafetyContract,
-    SafetyViolationType,
-    SafetyReport,
-    Condition,
-)
+import pytest
 
+from vulcan.safety.safety_types import (Condition, SafetyReport,
+                                        SafetyViolationType,
+                                        ToolSafetyContract, ToolSafetyLevel)
+from vulcan.safety.tool_safety import (TokenBucket, ToolSafetyGovernor,
+                                       ToolSafetyManager)
 
 # ============================================================
 # FIXTURES

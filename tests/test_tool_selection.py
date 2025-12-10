@@ -6,10 +6,11 @@ Run with:
     pytest test_tool_selection.py -v
 """
 
+from pathlib import Path
+from typing import Any, Dict, List, Set
+
 import pytest
 import yaml
-from pathlib import Path
-from typing import Dict, Any, List, Set
 
 
 # Test Fixtures

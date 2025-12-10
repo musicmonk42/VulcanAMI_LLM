@@ -2,21 +2,17 @@
 Comprehensive test suite for graph_compiler.py
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-import networkx as nx
+from unittest.mock import MagicMock, Mock, patch
 
-from src.compiler.graph_compiler import (
-    GraphCompiler,
-    GraphOptimizer,
-    CompilationError,
-    NodeType,
-    CompiledNode,
-    DataFlow,
-)
+import networkx as nx
+import pytest
+
+from src.compiler.graph_compiler import (CompilationError, CompiledNode,
+                                         DataFlow, GraphCompiler,
+                                         GraphOptimizer, NodeType)
 
 
 @pytest.fixture

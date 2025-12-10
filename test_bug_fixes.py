@@ -6,10 +6,11 @@ Validation tests for bug fixes in:
 - src/vulcan/planning.py
 """
 
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
+
 
 def test_shell_script_syntax():
     """Test that the shell script has valid syntax."""

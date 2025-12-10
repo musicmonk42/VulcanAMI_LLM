@@ -13,30 +13,26 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import pytest
-import numpy as np
-import time
-import threading
-import tempfile
-import shutil
-import pickle
 import os
+import pickle
+import shutil
+# Import the module under test
+import sys
+import tempfile
+import threading
+import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-# Import the module under test
-import sys
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from vulcan.memory.persistence import (
-    MemoryPersistence,
-    MemoryVersionControl,
-    MemoryCompressor,
-    NeuralCompressor,
-    SemanticCompressor,
-)
-from vulcan.memory.base import Memory, MemoryType, CompressionType
+from vulcan.memory.base import CompressionType, Memory, MemoryType
+from vulcan.memory.persistence import (MemoryCompressor, MemoryPersistence,
+                                       MemoryVersionControl, NeuralCompressor,
+                                       SemanticCompressor)
 
 # Check if optional dependencies are available
 try:

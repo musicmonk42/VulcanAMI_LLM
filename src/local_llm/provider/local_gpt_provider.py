@@ -1,22 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
-import math
 import logging
+import math
+import os
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, List, Iterable, Tuple, Generator, Union
+from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple, Union
 
 import torch
 
+from src.local_llm.tokenizer.simple_tokenizer import (BOS_ID, EOS_ID, UNK_ID,
+                                                      SimpleTokenizer)
 # Reuse your training model
-from src.training.gpt_model import GPTModel, GPTConfig
-from src.local_llm.tokenizer.simple_tokenizer import (
-    SimpleTokenizer,
-    BOS_ID,
-    EOS_ID,
-    UNK_ID,
-)
+from src.training.gpt_model import GPTConfig, GPTModel
 
 log = logging.getLogger("local_gpt_provider")
 

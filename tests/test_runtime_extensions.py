@@ -2,15 +2,16 @@
 Test suite for Runtime Extensions
 """
 
-import pytest
 import asyncio
 import json
 import shutil
 import tempfile
 import time
-from pathlib import Path
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, AsyncMock, patch
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 try:
     import numpy as np

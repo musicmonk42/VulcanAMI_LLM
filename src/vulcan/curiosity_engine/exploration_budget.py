@@ -5,19 +5,20 @@ Part of the VULCAN-AGI system
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import psutil
 import json
-from pathlib import Path
+import logging
+import threading
+import time
+import warnings
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
-import threading
-import warnings
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import psutil
 
 logger = logging.getLogger(__name__)
 

@@ -7,18 +7,19 @@ to ensure safe and reliable tool selection and execution.
 Fixed version with ReDoS protection and bounded storage.
 """
 
-import time
+import hashlib
+import json
 import logging
-from typing import Dict, List, Any, Optional, Tuple, Callable, Set
+import re
+import threading
+import time
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import defaultdict, deque
-import numpy as np
-import json
-import hashlib
 from pathlib import Path
-import threading
-import re
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

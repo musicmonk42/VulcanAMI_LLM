@@ -2,18 +2,15 @@
 Comprehensive test suite for scheduler_node.py
 """
 
-import pytest
 import asyncio
 import time
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from scheduler_node import (
-    TaskManager,
-    SchedulerNode,
-    dispatch_scheduler_node,
-    async_dispatch_scheduler_node,
-    _check_async_context,
-)
+import pytest
+
+from scheduler_node import (SchedulerNode, TaskManager, _check_async_context,
+                            async_dispatch_scheduler_node,
+                            dispatch_scheduler_node)
 
 
 @pytest.fixture

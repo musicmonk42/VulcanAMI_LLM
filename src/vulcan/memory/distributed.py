@@ -1,20 +1,21 @@
 """Distributed memory implementation with federation support"""
 
-import numpy as np
-import time
 import asyncio
-import logging
-from typing import Any, Dict, List, Optional, Tuple, Set
-from dataclasses import dataclass, field, asdict
-import threading
 import hashlib
 import json
+import logging
+import os
 import pickle
+import queue
 import socket
 import struct
-from concurrent.futures import ThreadPoolExecutor, Future
-import queue
-import os
+import threading
+import time
+from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 # Network communication
 try:
@@ -45,15 +46,8 @@ except ImportError:
 
 
 # Import missing MemoryType
-from .base import (
-    Memory,
-    MemoryConfig,
-    MemoryQuery,
-    RetrievalResult,
-    ConsistencyLevel,
-    BaseMemorySystem,
-    MemoryType,
-)
+from .base import (BaseMemorySystem, ConsistencyLevel, Memory, MemoryConfig,
+                   MemoryQuery, MemoryType, RetrievalResult)
 
 logger = logging.getLogger(__name__)
 

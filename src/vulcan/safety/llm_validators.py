@@ -42,11 +42,11 @@ Public API:
 - EnhancedSafetyValidator.assess(token, context) -> (safe_token, SafetyEvent|None)
 """
 
-import re
-import time
 import asyncio
 import inspect
-from dataclasses import dataclass, asdict, field
+import re
+import time
+from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 Token = Union[int, str]

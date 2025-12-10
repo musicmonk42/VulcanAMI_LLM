@@ -3,31 +3,26 @@ test_problem_executor.py - Comprehensive tests for problem_executor module
 Tests execution of decomposition plans with safety validation
 """
 
-import pytest
-import numpy as np
 import time
-from unittest.mock import Mock, MagicMock, patch
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.problem_decomposer.problem_executor import (
-    ProblemExecutor,
-    SolutionType,
-    ExecutionStrategy,
-    SolutionResult,
-)
+import numpy as np
+import pytest
 
 from vulcan.problem_decomposer.problem_decomposer_core import (
-    ProblemGraph,
-    DecompositionPlan,
-    ExecutionOutcome,
-)
+    DecompositionPlan, ExecutionOutcome, ProblemGraph)
+from vulcan.problem_decomposer.problem_executor import (ExecutionStrategy,
+                                                        ProblemExecutor,
+                                                        SolutionResult,
+                                                        SolutionType)
 
 # Import or define Principle
 try:
-    from vulcan.validation.validation_engine import Principle, DomainTestCase
+    from vulcan.validation.validation_engine import DomainTestCase, Principle
 except ImportError:
     from dataclasses import dataclass, field
-    from typing import Callable, Optional, Any
+    from typing import Any, Callable, Optional
 
     @dataclass
     class Principle:

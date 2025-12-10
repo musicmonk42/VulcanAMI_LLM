@@ -2,23 +2,19 @@
 Comprehensive test suite for observability_manager.py
 """
 
-import pytest
-import numpy as np
-import tempfile
 import shutil
+import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from observability_manager import (
-    ObservabilityManager,
-    MAX_LOG_DIR_SIZE_MB,
-    MAX_DASHBOARD_AGE_DAYS,
-    MAX_PLOT_AGE_DAYS,
-    MIN_FREE_DISK_MB,
-    MAX_TENSOR_SIZE,
-    MAX_TENSOR_ELEMENTS,
-)
+import numpy as np
+import pytest
+
+from observability_manager import (MAX_DASHBOARD_AGE_DAYS, MAX_LOG_DIR_SIZE_MB,
+                                   MAX_PLOT_AGE_DAYS, MAX_TENSOR_ELEMENTS,
+                                   MAX_TENSOR_SIZE, MIN_FREE_DISK_MB,
+                                   ObservabilityManager)
 
 
 @pytest.fixture

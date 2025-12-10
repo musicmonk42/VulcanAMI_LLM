@@ -36,20 +36,20 @@ ENCODING FIX (2025-10-19):
 - Robust UTF-8 config loading with BOM handling and fallback strategies for Windows compatibility
 """
 
-import json
-import logging
-import time
-import shutil
-import os
-import math
-import threading
-import subprocess
 import ast
 import difflib
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple, Callable
+import json
+import logging
+import math
+import os
+import shutil
+import subprocess
+import threading
+import time
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Initialize logger early - before it's used in import blocks
 logger = logging.getLogger(__name__)
@@ -59,15 +59,11 @@ logger = logging.getLogger(__name__)
 
 import os
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 try:
-    from .auto_apply_policy import (
-        load_policy,
-        check_files_against_policy,
-        run_gates,
-        Policy,
-    )
+    from .auto_apply_policy import (Policy, check_files_against_policy,
+                                    load_policy, run_gates)
 except Exception:
     # Fallback: disable auto-apply if policy module isn't present
     def load_policy(_):
@@ -86,7 +82,7 @@ except Exception:
 
 
 try:
-    from .csiu_enforcement import get_csiu_enforcer, CSIUEnforcementConfig
+    from .csiu_enforcement import CSIUEnforcementConfig, get_csiu_enforcer
 
     CSIU_ENFORCEMENT_AVAILABLE = True
 except ImportError:

@@ -2,23 +2,19 @@
 Comprehensive test suite for evolution_engine.py
 """
 
-import pytest
-import numpy as np
-import json
-import tempfile
-import os
 import asyncio
 import copy
+import json
+import os
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
-from evolution_engine import (
-    EvolutionEngine,
-    Individual,
-    LRUCache,
-    CacheStatistics,
-    MAX_CACHE_SIZE,
-)
+import numpy as np
+import pytest
+
+from evolution_engine import (MAX_CACHE_SIZE, CacheStatistics, EvolutionEngine,
+                              Individual, LRUCache)
 
 
 @pytest.fixture

@@ -1,6 +1,5 @@
-from __future__ import (
-    annotations,
-)  # FIX: Added to break circular import cycle via string-based type hints
+from __future__ import \
+    annotations  # FIX: Added to break circular import cycle via string-based type hints
 
 """
 problem_executor.py - Executes decomposition plans to solve problems
@@ -12,23 +11,24 @@ and runs them to produce actual solutions.
 Integrated with comprehensive safety validation.
 """
 
-import numpy as np
-import logging
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-import time
-import json
 import copy
 import hashlib
+import json
+import logging
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
+
+import numpy as np
 
 # Import safety validator
 try:
-    from ..safety.safety_validator import EnhancedSafetyValidator
     from ..safety.safety_types import SafetyConfig
+    from ..safety.safety_validator import EnhancedSafetyValidator
 
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
@@ -41,7 +41,7 @@ except ImportError:
 
 # Import validation components
 try:
-    from ..validation.validation_engine import Principle, DomainTestCase
+    from ..validation.validation_engine import DomainTestCase, Principle
 except ImportError:
     # Fallback if import fails
     from dataclasses import dataclass
@@ -288,11 +288,9 @@ class ProblemExecutor:
 
         # FIX: Defer import to break circular dependency
         try:
-            from .problem_decomposer_core import (
-                ExecutionOutcome,
-                ProblemGraph,
-                DecompositionPlan,
-            )
+            from .problem_decomposer_core import (DecompositionPlan,
+                                                  ExecutionOutcome,
+                                                  ProblemGraph)
 
             self.ExecutionOutcome = ExecutionOutcome
             self.ProblemGraph = ProblemGraph

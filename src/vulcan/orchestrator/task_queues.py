@@ -8,13 +8,13 @@
 
 import logging
 import threading
-import uuid
 import time
 import traceback
-from typing import Any, Dict, Optional, List, Callable
-from enum import Enum
-from dataclasses import dataclass, field
+import uuid
 from collections import defaultdict
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 # Distributed computing imports
 try:
@@ -27,7 +27,7 @@ except ImportError:
 
 try:
     import celery
-    from celery import Celery, group, chord
+    from celery import Celery, chord, group
     from celery.result import AsyncResult
 
     CELERY_AVAILABLE = True

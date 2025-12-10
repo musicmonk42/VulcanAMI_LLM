@@ -2,25 +2,17 @@
 Comprehensive test suite for consensus_engine.py
 """
 
-import pytest
 import time
 from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
-from consensus_engine import (
-    ConsensusEngine,
-    Agent,
-    Vote,
-    Proposal,
-    ProposalStatus,
-    VoteType,
-    DEFAULT_QUORUM,
-    DEFAULT_APPROVAL_THRESHOLD,
-    MIN_TRUST_LEVEL,
-    MAX_TRUST_LEVEL,
-    MAX_PROPOSAL_SIZE,
-    MAX_RATIONALE_LENGTH,
-)
+import pytest
+
+from consensus_engine import (DEFAULT_APPROVAL_THRESHOLD, DEFAULT_QUORUM,
+                              MAX_PROPOSAL_SIZE, MAX_RATIONALE_LENGTH,
+                              MAX_TRUST_LEVEL, MIN_TRUST_LEVEL, Agent,
+                              ConsensusEngine, Proposal, ProposalStatus, Vote,
+                              VoteType)
 
 
 @pytest.fixture

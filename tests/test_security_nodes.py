@@ -2,27 +2,22 @@
 Comprehensive test suite for security_nodes.py
 """
 
-import pytest
-import json
 import base64
-from unittest.mock import Mock, MagicMock, patch
+import json
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 # Skip entire module if torch is not available (security_nodes imports nso_aligner which requires torch)
 torch = pytest.importorskip("torch", reason="PyTorch required for security_nodes tests (via nso_aligner)")
 
-from security_nodes import (
-    EncryptNode,
-    PolicyNode,
-    dispatch_security_node,
-    SecurityNodeError,
-    MAX_DATA_SIZE,
-    MAX_TENSOR_ELEMENTS,
-    MAX_STRING_LENGTH,
-)
+from security_nodes import (MAX_DATA_SIZE, MAX_STRING_LENGTH,
+                            MAX_TENSOR_ELEMENTS, EncryptNode, PolicyNode,
+                            SecurityNodeError, dispatch_security_node)
 
 
 @pytest.fixture

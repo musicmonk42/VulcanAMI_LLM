@@ -6,13 +6,14 @@ set operations, persistence, statistics, and optimized false positive rates.
 """
 
 from __future__ import annotations
+
 import hashlib
-import math
 import json
-from typing import Iterable, Optional, List, Set, Tuple
+import logging
+import math
 from dataclasses import dataclass
 from pathlib import Path
-import logging
+from typing import Iterable, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 

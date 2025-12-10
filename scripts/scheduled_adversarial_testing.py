@@ -27,16 +27,16 @@ Cron Example:
     0 */6 * * * cd /path/to/VulcanAMI_LLM && python scripts/scheduled_adversarial_testing.py
 """
 
-import sys
-import os
-import json
 import argparse
+import json
 import logging
+import os
+import platform
+import sys
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-import time
-import platform
+from typing import Any, Dict, List, Optional
 
 # Import signal only on Unix-like systems
 if platform.system() != 'Windows':
@@ -50,10 +50,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 try:
-    from src.vulcan.safety.adversarial_formal import (
-        AdversarialValidator,
-        initialize_adversarial
-    )
+    from src.vulcan.safety.adversarial_formal import (AdversarialValidator,
+                                                      initialize_adversarial)
     ADVERSARIAL_AVAILABLE = True
 except ImportError as e:
     logging.warning(f"AdversarialValidator not available: {e}")

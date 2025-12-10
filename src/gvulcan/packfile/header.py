@@ -6,10 +6,11 @@ with support for metadata, integrity checks, bloom filters, and version manageme
 """
 
 from __future__ import annotations
-import struct
-from typing import Optional
-from dataclasses import dataclass
+
 import logging
+import struct
+from dataclasses import dataclass
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 

@@ -12,27 +12,24 @@ Tests cover:
 FIXED VERSION - All platform compatibility issues resolved
 """
 
-import pytest
-import numpy as np
-import time
+import os
+import sys
 import threading
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-import sys
-import os
+
+import numpy as np
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from vulcan.reasoning.analogical_reasoning import (
-    AnalogicalReasoner,
-    AnalogicalReasoningEngine,
-    Entity,
-    Relation,
-    AnalogicalMapping,
-    MappingType,
-)
-
+from vulcan.reasoning.analogical_reasoning import (AnalogicalMapping,
+                                                   AnalogicalReasoner,
+                                                   AnalogicalReasoningEngine,
+                                                   Entity, MappingType,
+                                                   Relation)
 
 # ============================================================================
 # Fixtures

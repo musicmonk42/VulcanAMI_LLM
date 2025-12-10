@@ -17,15 +17,12 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.gvulcan.zk import (
-    Circuit,
-    R1CSConstraint,
-    Groth16Prover,
-    generate_proof_for_unlearning,
-    verify_unlearning_proof,
-)
-from src.gvulcan.merkle import MerkleTree
 import hashlib
+
+from src.gvulcan.merkle import MerkleTree
+from src.gvulcan.zk import (Circuit, Groth16Prover, R1CSConstraint,
+                            generate_proof_for_unlearning,
+                            verify_unlearning_proof)
 
 
 def create_model_commitment(weights: list) -> bytes:

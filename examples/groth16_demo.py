@@ -17,11 +17,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.gvulcan.zk import (
-    Circuit,
-    R1CSConstraint,
-    Groth16Prover,
-)
+from src.gvulcan.zk import Circuit, Groth16Prover, R1CSConstraint
 
 
 def main():

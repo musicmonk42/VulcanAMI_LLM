@@ -8,11 +8,11 @@ counterfactual tracing, semantic logging, and adversarial explainability.
 """
 
 import json
-import os
 import logging
-from datetime import datetime
-from typing import Any, Dict, Optional, Callable, List, Union
+import os
 import threading
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, Union
 
 # NumPy is required
 try:

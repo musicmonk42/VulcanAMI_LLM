@@ -12,22 +12,19 @@ Tests the intrinsic drive for continuous self-improvement including:
 - Action planning
 """
 
-import pytest
 import json
-import time
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+import time
 from collections import defaultdict
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from vulcan.world_model.meta_reasoning.self_improvement_drive import (
-    SelfImprovementDrive,
-    SelfImprovementState,
-    ImprovementObjective,
-    TriggerType,
-    FailureType,
-)
+    FailureType, ImprovementObjective, SelfImprovementDrive,
+    SelfImprovementState, TriggerType)
 
 
 @pytest.fixture

@@ -7,20 +7,16 @@ Tests the enhanced functionality in src/vulcan/planning.py:
 - Power management with battery detection and emergency shutdown
 """
 
-import pytest
 import time
-from unittest.mock import Mock, patch, MagicMock
 from collections import deque
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Import the classes we're testing
-from src.vulcan.planning import (
-    SurvivalProtocol,
-    PowerManager,
-    EnhancedResourceMonitor,
-    OperationalMode,
-    ConnectivityLevel,
-    SystemState
-)
+from src.vulcan.planning import (ConnectivityLevel, EnhancedResourceMonitor,
+                                 OperationalMode, PowerManager,
+                                 SurvivalProtocol, SystemState)
 
 
 class TestNetworkFailureDetection:

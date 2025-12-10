@@ -3,11 +3,11 @@ Test that startup logging sequence works correctly.
 Verifies that all expected INFO logs appear during module import.
 """
 
-import sys
+import importlib
 import logging
+import sys
 from io import StringIO
 from pathlib import Path
-import importlib
 
 # Add src to path
 src_path = Path(__file__).parent.parent / "src"
@@ -38,9 +38,9 @@ def test_startup_logging_sequence():
     try:
         # Import modules - they may already be imported by conftest
         import persistant_memory_v46
-        from vulcan.memory import retrieval
         from vulcan import orchestrator
-        
+        from vulcan.memory import retrieval
+
         # Verify modules are accessible and have expected attributes
         assert hasattr(persistant_memory_v46, '__version__') or hasattr(persistant_memory_v46, '__name__'), \
             "persistant_memory_v46 module not properly loaded"

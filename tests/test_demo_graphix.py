@@ -8,16 +8,17 @@ Run with:
     pytest test_demo_graphix.py -v --cov=demo_graphix --cov-report=html
 """
 
-import pytest
 import asyncio
 import json
-import tempfile
 import pickle
 import sys
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch, MagicMock, call
+import tempfile
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
+
 import numpy as np
+import pytest
 
 # Add demo directory to path for imports
 test_dir = Path(__file__).parent
@@ -65,14 +66,8 @@ for mod_name in _MODULES_TO_MOCK:
 
 # Import the module under test
 import demo_graphix
-from demo_graphix import (
-    EnhancedGraphixDemo,
-    DemoConfig,
-    StepResult,
-    DemoPhase,
-    PersistentResultCache,
-    setup_logging
-)
+from demo_graphix import (DemoConfig, DemoPhase, EnhancedGraphixDemo,
+                          PersistentResultCache, StepResult, setup_logging)
 
 # IMMEDIATELY restore original modules after import to prevent pollution
 _restore_modules(_temp_mocks)

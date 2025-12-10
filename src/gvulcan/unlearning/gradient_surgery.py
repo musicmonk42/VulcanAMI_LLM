@@ -6,13 +6,15 @@ selective forgetting, lineage tracking, ZK proof generation, and audit trails.
 """
 
 from __future__ import annotations
-from typing import List, Dict, Any, Optional, Set, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
-import numpy as np
+
+import hashlib
 import logging
 import time
-import hashlib
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

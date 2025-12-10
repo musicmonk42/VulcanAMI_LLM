@@ -5,20 +5,22 @@ Implements various calibration methods to ensure confidence scores are well-cali
 including temperature scaling, isotonic regression, and conformal prediction.
 """
 
-import numpy as np
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
+import json
 import logging
+import pickle
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import beta, norm
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
-import matplotlib.pyplot as plt
-from pathlib import Path
-import json
-import pickle
-import time
+
 from .security_fixes import safe_pickle_load
 
 # Make seaborn optional since it's not actually used in the code

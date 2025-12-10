@@ -22,34 +22,27 @@ FIXES APPLIED (corrected version):
    checking the mitigation_outcomes dict directly
 """
 
-import pytest
-import numpy as np
-import time
+import sys
 import threading
-from typing import Dict, List, Any, Optional, Set
+import time
 from dataclasses import dataclass, field
 from enum import Enum
-
-import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from semantic_bridge.transfer_engine import (
-    TransferEngine,
-    TransferType,
-    EffectType,
-    MitigationType,
-    ConstraintType,
-    ConceptEffect,
-    Mitigation,
-    Constraint,
-    TransferDecision,
-    DomainCharacteristics,
-    PartialTransferEngine,
-    MitigationLearner,
-)
-
+from semantic_bridge.transfer_engine import (ConceptEffect, Constraint,
+                                             ConstraintType,
+                                             DomainCharacteristics, EffectType,
+                                             Mitigation, MitigationLearner,
+                                             MitigationType,
+                                             PartialTransferEngine,
+                                             TransferDecision, TransferEngine,
+                                             TransferType)
 
 # ============================================================
 # MOCK CLASSES

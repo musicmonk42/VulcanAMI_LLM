@@ -5,11 +5,11 @@ import hashlib
 import logging
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 

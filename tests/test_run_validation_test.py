@@ -2,19 +2,16 @@
 Comprehensive test suite for run_validation_test.py
 """
 
-import pytest
+import asyncio
 import json
 import tempfile
-import asyncio
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
-from run_validation_test import (
-    ValidationTestSuite,
-    FileCache,
-    discover_golden_files,
-    _check_async_context,
-)
+import pytest
+
+from run_validation_test import (FileCache, ValidationTestSuite,
+                                 _check_async_context, discover_golden_files)
 
 
 @pytest.fixture

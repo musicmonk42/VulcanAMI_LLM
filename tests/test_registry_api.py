@@ -2,28 +2,19 @@
 Comprehensive test suite for registry_api.py
 """
 
-import pytest
-import json
 import hashlib
+import json
 import tempfile
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from registry_api import (
-    hash_data,
-    build_merkle_tree,
-    get_merkle_root,
-    AbstractBackend,
-    InMemoryBackend,
-    AbstractKMS,
-    SimpleKMS,
-    CryptoHandler,
-    SecurityEngine,
-    AgentRegistry,
-    RegistryAPI,
-    DEFAULT_GRAMMAR_VERSION,
-)
+import pytest
+from registry_api import (DEFAULT_GRAMMAR_VERSION, AbstractBackend,
+                          AbstractKMS, AgentRegistry, CryptoHandler,
+                          InMemoryBackend, RegistryAPI, SecurityEngine,
+                          SimpleKMS, build_merkle_tree, get_merkle_root,
+                          hash_data)
 
 
 @pytest.fixture

@@ -1,30 +1,24 @@
 """Specialized memory types: Episodic, Semantic, Procedural, Working"""
 
-import numpy as np
-import time
-import logging
+import ast
+import copy
 import hashlib
 import json
-import pickle
-from typing import Any, Dict, List, Optional, Tuple, Set, Callable, Union
-from dataclasses import dataclass, field, asdict
-from collections import deque, defaultdict, Counter
-from datetime import datetime, timedelta
-import threading
-import re
-import ast
+import logging
 import operator
-import copy
+import pickle
+import re
+import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .base import (
-    Memory,
-    MemoryType,
-    MemoryConfig,
-    BaseMemorySystem,
-    MemoryQuery,
-    RetrievalResult,
-    MemoryStats,
-)
+import numpy as np
+
+from .base import (BaseMemorySystem, Memory, MemoryConfig, MemoryQuery,
+                   MemoryStats, MemoryType, RetrievalResult)
 from .hierarchical import HierarchicalMemory
 
 # Try to import optional dependencies
@@ -2125,6 +2119,7 @@ class Skill:
                 
                 try:
                     import ast
+
                     # Parse the condition
                     tree = ast.parse(condition, mode='eval')
                     

@@ -2,30 +2,22 @@
 Comprehensive test suite for agent_interface.py
 """
 
-import pytest
 import json
-import tempfile
 import shutil
-import time
+import tempfile
 import threading
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+import time
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from agent_interface import (
-    AgentInterface,
-    ConnectionConfig,
-    CommunicationMode,
-    ExecutionState,
-    GraphPriority,
-    GraphSubmission,
-    ResultCache,
-    TelemetryCollector,
-    HTTPCommunicator,
-    DEFAULT_TIMEOUT,
-    MAX_BATCH_SIZE,
-    MAX_GRAPH_DEPTH,
-)
+import pytest
+
+from agent_interface import (DEFAULT_TIMEOUT, MAX_BATCH_SIZE, MAX_GRAPH_DEPTH,
+                             AgentInterface, CommunicationMode,
+                             ConnectionConfig, ExecutionState, GraphPriority,
+                             GraphSubmission, HTTPCommunicator, ResultCache,
+                             TelemetryCollector)
 
 
 @pytest.fixture

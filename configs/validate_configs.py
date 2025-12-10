@@ -17,10 +17,11 @@ Options:
 import argparse
 import json
 import sys
-import yaml
-from pathlib import Path
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import yaml
 
 
 @dataclass

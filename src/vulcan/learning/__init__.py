@@ -3,40 +3,29 @@ VULCAN-AGI Learning Module - Unified Integration
 Coordinates: Continual + Curriculum + Meta + RLHF + World Model + Metacognition
 """
 
-import logging
 import asyncio
+import concurrent.futures
+import logging
 import threading
 import time
-import concurrent.futures
-from typing import Any, Dict, List, Optional, Union, Tuple
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
 
-from .learning_types import (
-    LearningConfig,
-    TaskInfo,
-    FeedbackData,
-    LearningMode,
-    LearningTrajectory,
-)
-from .continual_learning import EnhancedContinualLearner, ContinualLearner
-from .curriculum_learning import (
-    CurriculumLearner,
-    PacingStrategy,
-    LearnedDifficultyEstimator,
-)
-from .meta_learning import TaskDetector, MetaLearner, MetaLearningAlgorithm
-from .metacognition import (
-    MetaCognitiveMonitor,
-    CompositionalUnderstanding,
-    ConfidenceEstimator,
-)
+from .continual_learning import ContinualLearner, EnhancedContinualLearner
+from .curriculum_learning import (CurriculumLearner,
+                                  LearnedDifficultyEstimator, PacingStrategy)
+from .learning_types import (FeedbackData, LearningConfig, LearningMode,
+                             LearningTrajectory, TaskInfo)
+from .meta_learning import MetaLearner, MetaLearningAlgorithm, TaskDetector
+from .metacognition import (CompositionalUnderstanding, ConfidenceEstimator,
+                            MetaCognitiveMonitor)
 from .parameter_history import ParameterHistoryManager
-from .rlhf_feedback import RLHFManager, LiveFeedbackProcessor
-from .world_model import UnifiedWorldModel, PlanningAlgorithm
+from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
+from .world_model import PlanningAlgorithm, UnifiedWorldModel
 
 logger = logging.getLogger(__name__)
 

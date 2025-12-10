@@ -2,29 +2,21 @@
 Comprehensive test suite for persistence.py
 """
 
-import pytest
 import json
-import time
-import tempfile
 import shutil
 import sqlite3
+import tempfile
+import time
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from src.persistence import (
-    PersistenceLayer,
-    WorkingMemory,
-    KeyManager,
-    ConnectionPool,
-    CacheEntry,
-    PersistenceError,
-    IntegrityError,
-    KeyManagementError,
-    DEFAULT_MAX_CONNECTIONS,
-    DEFAULT_CACHE_SIZE,
-    DEFAULT_CACHE_TTL,
-    MAX_BACKUP_COUNT,
-)
+import pytest
+
+from src.persistence import (DEFAULT_CACHE_SIZE, DEFAULT_CACHE_TTL,
+                             DEFAULT_MAX_CONNECTIONS, MAX_BACKUP_COUNT,
+                             CacheEntry, ConnectionPool, IntegrityError,
+                             KeyManagementError, KeyManager, PersistenceError,
+                             PersistenceLayer, WorkingMemory)
 
 
 @pytest.fixture

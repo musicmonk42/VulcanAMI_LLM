@@ -2,29 +2,22 @@
 Comprehensive test suite for listener.py
 """
 
-import pytest
 import json
-import time
+import socket
 import threading
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+import time
 from datetime import datetime, timedelta
 from http.client import HTTPConnection
 from io import BytesIO
-import socket
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from listener import (
-    RateLimiter,
-    RequestHandler,
-    GraphixListener,
-    MockAgentRegistry,
-    MockUnifiedRuntime,
-    MAX_CONTENT_LENGTH,
-    MIN_CONTENT_LENGTH,
-    MAX_REQUESTS_PER_MINUTE,
-    RATE_LIMIT_WINDOW,
-    MAX_AGENT_ID_LENGTH,
-    MAX_SIGNATURE_LENGTH,
-)
+import pytest
+
+from listener import (MAX_AGENT_ID_LENGTH, MAX_CONTENT_LENGTH,
+                      MAX_REQUESTS_PER_MINUTE, MAX_SIGNATURE_LENGTH,
+                      MIN_CONTENT_LENGTH, RATE_LIMIT_WINDOW, GraphixListener,
+                      MockAgentRegistry, MockUnifiedRuntime, RateLimiter,
+                      RequestHandler)
 
 
 @pytest.fixture

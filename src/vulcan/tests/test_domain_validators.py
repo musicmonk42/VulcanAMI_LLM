@@ -3,23 +3,21 @@ Comprehensive test suite for domain-specific safety validators.
 Tests validators for causal, prediction, optimization, data processing, and model inference domains.
 """
 
-import pytest
-import numpy as np
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 
-from vulcan.safety.domain_validators import (
-    ValidationResult,
-    DomainValidator,
-    CausalSafetyValidator,
-    PredictionSafetyValidator,
-    OptimizationSafetyValidator,
-    DataProcessingSafetyValidator,
-    ModelInferenceSafetyValidator,
-    DomainValidatorRegistry,
-    validator_registry,
-)
+import numpy as np
+import pytest
 
+from vulcan.safety.domain_validators import (CausalSafetyValidator,
+                                             DataProcessingSafetyValidator,
+                                             DomainValidator,
+                                             DomainValidatorRegistry,
+                                             ModelInferenceSafetyValidator,
+                                             OptimizationSafetyValidator,
+                                             PredictionSafetyValidator,
+                                             ValidationResult,
+                                             validator_registry)
 
 # ============================================================================
 # FIXTURES

@@ -8,33 +8,25 @@ import pytest
 torch = pytest.importorskip("torch", reason="PyTorch required for api_gateway tests")
 
 import asyncio
+import hashlib
 import json
 import time
-import jwt
-import hashlib
 import uuid
-from unittest.mock import Mock, AsyncMock, MagicMock, patch, PropertyMock
-from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
-import numpy as np
-import msgpack
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
+
+import jwt
+import msgpack
+import numpy as np
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
-from src.vulcan.api_gateway import (
-    ServiceRegistry,
-    ServiceEndpoint,
-    AuthManager,
-    RateLimiter,
-    CircuitBreaker,
-    CacheManager,
-    RequestTransformer,
-    APIRequest,
-    APIResponse,
-    APIGateway,
-)
-
+from src.vulcan.api_gateway import (APIGateway, APIRequest, APIResponse,
+                                    AuthManager, CacheManager, CircuitBreaker,
+                                    RateLimiter, RequestTransformer,
+                                    ServiceEndpoint, ServiceRegistry)
 # Import mocks for dependencies
 from src.vulcan.config import AgentConfig
 

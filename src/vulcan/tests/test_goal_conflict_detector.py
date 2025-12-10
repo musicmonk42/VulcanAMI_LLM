@@ -4,19 +4,16 @@ test_goal_conflict_detector.py - Unit tests for GoalConflictDetector
 FIXED: test_statistics_updated uses .get() to handle missing keys safely
 """
 
-import pytest
-import numpy as np
 import time
-from unittest.mock import Mock, MagicMock, patch
 from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 from vulcan.world_model.meta_reasoning.goal_conflict_detector import (
-    GoalConflictDetector,
-    Conflict,
-    ConflictSeverity,
-    ConflictType,
-    MultiObjectiveTension,
-)
+    Conflict, ConflictSeverity, ConflictType, GoalConflictDetector,
+    MultiObjectiveTension)
 
 
 @pytest.fixture

@@ -5,21 +5,19 @@
 # Python 3.8+ compatible
 # ============================================================
 
+import asyncio
 import logging
+import sys
 import threading
 import time
-import asyncio
-import sys
-import numpy as np
-from typing import Any, Dict, List, Optional
 from collections import deque
-from concurrent.futures import (
-    ProcessPoolExecutor,
-    ThreadPoolExecutor,
-    TimeoutError as FuturesTimeoutError,
-)
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
+from typing import Any, Dict, List, Optional
 
-from .collective import VULCANAGICollective, ModalityType
+import numpy as np
+
+from .collective import ModalityType, VULCANAGICollective
 from .dependencies import EnhancedCollectiveDeps
 
 logger = logging.getLogger(__name__)

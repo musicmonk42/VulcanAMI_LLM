@@ -3,30 +3,20 @@ test_principle_extractor.py - Comprehensive tests for principle_extractor module
 Part of the VULCAN-AGI system
 """
 
-import pytest
-import numpy as np
 import tempfile
 import time
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Import the module under test
 from vulcan.knowledge_crystallizer.principle_extractor import (
-    PatternType,
-    MetricType,
-    ExtractionStrategy,
-    Pattern,
-    Metric,
-    ExecutionTrace,
-    SuccessFactor,
-    PrincipleCandidate,
-    CrystallizedPrinciple,
-    Principle,
-    PrincipleExtractor,
-    PatternDetector,
-    SuccessAnalyzer,
-    AbstractionEngine,
-)
+    AbstractionEngine, CrystallizedPrinciple, ExecutionTrace,
+    ExtractionStrategy, Metric, MetricType, Pattern, PatternDetector,
+    PatternType, Principle, PrincipleCandidate, PrincipleExtractor,
+    SuccessAnalyzer, SuccessFactor)
 
 
 class TestPattern:

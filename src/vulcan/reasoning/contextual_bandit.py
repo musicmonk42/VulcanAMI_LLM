@@ -10,31 +10,33 @@ FULLY IMPLEMENTED VERSION with:
 - Proper handling of continuous and categorical features
 """
 
+import json
+import logging
+import pickle
+import threading
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import json
-import pickle
-import time
-import logging
-from pathlib import Path
-from enum import Enum
-import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 logger = logging.getLogger(__name__)
 
 # Advanced ML imports
 try:
-    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+    from sklearn.ensemble import (GradientBoostingRegressor,
+                                  RandomForestRegressor)
+    from sklearn.linear_model import Lasso, Ridge
+    from sklearn.model_selection import KFold, cross_val_score
     from sklearn.neural_network import MLPRegressor
-    from sklearn.preprocessing import StandardScaler, PolynomialFeatures
-    from sklearn.model_selection import cross_val_score, KFold
-    from sklearn.linear_model import Ridge, Lasso
+    from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 
     SKLEARN_AVAILABLE = True
 except ImportError:

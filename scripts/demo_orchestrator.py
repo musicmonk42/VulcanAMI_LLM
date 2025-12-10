@@ -32,7 +32,7 @@ import os
 import random
 import sys
 import time
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 try:

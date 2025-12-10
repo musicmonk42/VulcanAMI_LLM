@@ -5,9 +5,9 @@ Version: 2.0.0 - All issues fixed, validated, production-ready
 Utilities for generating large graphs for testing scalability and load testing.
 """
 
-import random
 import logging
-from typing import Dict, List, Any, Optional
+import random
+from typing import Any, Dict, List, Optional
 
 # Configure logging
 logging.basicConfig(

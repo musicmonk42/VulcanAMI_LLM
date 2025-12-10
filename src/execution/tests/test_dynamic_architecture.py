@@ -13,31 +13,24 @@ Tests all major functionality including:
 - Error handling
 """
 
-import sys
-import unittest
-import tempfile
 import json
-import time
+import sys
+import tempfile
 import threading
+import time
+import unittest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 # Add the uploads directory to path
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from dynamic_architecture import (
-    DynamicArchitecture,
-    ArchChangeResult,
-    Constraints,
-    DynamicArchConfig,
-    ChangeType,
-    SnapshotPolicy,
-    ValidationLevel,
-    ArchitectureStats,
-    ValidationResult,
-    create_default_controller,
-    create_strict_controller,
-)
+from dynamic_architecture import (ArchChangeResult, ArchitectureStats,
+                                  ChangeType, Constraints, DynamicArchConfig,
+                                  DynamicArchitecture, SnapshotPolicy,
+                                  ValidationLevel, ValidationResult,
+                                  create_default_controller,
+                                  create_strict_controller)
 
 
 class TestDynamicArchitectureBasics(unittest.TestCase):

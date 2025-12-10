@@ -10,32 +10,23 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import pytest
-import time
 import threading
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+import time
 from collections import defaultdict
 from queue import Empty
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 from vulcan.curiosity_engine.curiosity_engine_core import (
-    CuriosityEngine,
-    LearningPriority,
-    ExperimentResult,
-    KnowledgeRegion,
-    RegionManager,
-    ExplorationValueEstimator,
-    ExplorationFrontier,
-    SafeExperimentExecutor,
-    StrategySelector,
-    GapPrioritizer,
-    ExperimentManager,
-    KnowledgeIntegrator,
-)
-
+    CuriosityEngine, ExperimentManager, ExperimentResult, ExplorationFrontier,
+    ExplorationValueEstimator, GapPrioritizer, KnowledgeIntegrator,
+    KnowledgeRegion, LearningPriority, RegionManager, SafeExperimentExecutor,
+    StrategySelector)
+from vulcan.curiosity_engine.experiment_generator import (Experiment,
+                                                          ExperimentType)
 from vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
-from vulcan.curiosity_engine.experiment_generator import Experiment, ExperimentType
-
 
 # ============================================================================
 # Fixtures

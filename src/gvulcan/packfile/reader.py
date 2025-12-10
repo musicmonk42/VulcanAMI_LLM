@@ -6,10 +6,11 @@ prefetching strategies, and optimization for different artifact types and access
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Optional, Tuple, List, Dict, Any
-from enum import Enum
+
 import logging
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

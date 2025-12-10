@@ -4,19 +4,15 @@ Reasoning explanation and safety validation
 Fixed version with comprehensive validation, error handling, and safety checks.
 """
 
-from collections import deque
-from typing import Any, Dict, List, Tuple, Optional
 import json
-import time
 import logging
 import re
+import time
+from collections import deque
+from typing import Any, Dict, List, Optional, Tuple
 
-from .reasoning_types import (
-    ReasoningStep,
-    ReasoningChain,
-    ReasoningResult,
-    ReasoningType,
-)
+from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
+                              ReasoningType)
 
 logger = logging.getLogger(__name__)
 

@@ -5,23 +5,24 @@ Version: 2.0.0 - All issues fixed, stubs implemented
 Tournament-based evolution of computation graphs with genetic algorithms.
 """
 
-import numpy as np
-import json
-import time
-import random
-import hashlib
-import logging
-import re
 import asyncio
-import threading
-import os
 import copy
-from typing import Dict, List, Any, Optional, Tuple, Callable, Set
+import hashlib
+import json
+import logging
+import os
+import random
+import re
+import threading
+import time
+from collections import OrderedDict, defaultdict, deque
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from collections import defaultdict, deque, OrderedDict
-from pathlib import Path
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 try:
     from unified_runtime_core import get_runtime

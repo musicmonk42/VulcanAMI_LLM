@@ -6,42 +6,26 @@ Tests the complete system working together:
 - GapAnalyzer -> DependencyGraph -> ExperimentGenerator -> CuriosityEngine
 """
 
-import pytest
-import numpy as np
-import time
 import threading
-from unittest.mock import Mock, MagicMock, patch
+import time
+from unittest.mock import MagicMock, Mock, patch
 
-from vulcan.curiosity_engine.gap_analyzer import (
-    GapAnalyzer,
-    KnowledgeGap,
-    LatentGap,
-    Pattern,
-)
-from vulcan.curiosity_engine.dependency_graph import (
-    CycleAwareDependencyGraph,
-    DependencyAnalyzer,
-    DependencyType,
-    ROICalculator,
-)
-from vulcan.curiosity_engine.experiment_generator import (
-    ExperimentGenerator,
-    Experiment,
-    IterativeExperimentDesigner,
-    Constraint,
-    FailureType,
-    ExperimentType,
-)
-from vulcan.curiosity_engine.exploration_budget import (
-    DynamicBudget,
-    ResourceMonitor,
-    CostEstimator,
-)
+import numpy as np
+import pytest
+
 from vulcan.curiosity_engine.curiosity_engine_core import (
-    CuriosityEngine,
-    ExplorationFrontier,
-    SafeExperimentExecutor,
-)
+    CuriosityEngine, ExplorationFrontier, SafeExperimentExecutor)
+from vulcan.curiosity_engine.dependency_graph import (
+    CycleAwareDependencyGraph, DependencyAnalyzer, DependencyType,
+    ROICalculator)
+from vulcan.curiosity_engine.experiment_generator import (
+    Constraint, Experiment, ExperimentGenerator, ExperimentType, FailureType,
+    IterativeExperimentDesigner)
+from vulcan.curiosity_engine.exploration_budget import (CostEstimator,
+                                                        DynamicBudget,
+                                                        ResourceMonitor)
+from vulcan.curiosity_engine.gap_analyzer import (GapAnalyzer, KnowledgeGap,
+                                                  LatentGap, Pattern)
 
 
 class TestGapAnalyzerToGraph:

@@ -2,28 +2,23 @@
 Comprehensive test suite for nso_aligner.py
 """
 
-import pytest
+import hashlib  # FIX: Added missing import for cache test
 import json
-import time
 import tempfile
-import uuid # Added for generating audit_id in test
-import hashlib # FIX: Added missing import for cache test
-from unittest.mock import Mock, MagicMock, patch
+import time
+import uuid  # Added for generating audit_id in test
 from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Skip entire module if torch is not available (nso_aligner requires torch)
 torch = pytest.importorskip("torch", reason="PyTorch required for nso_aligner tests")
 
 # Assuming nso_aligner.py is in the same directory or accessible via PYTHONPATH
 # If it's in a 'src' directory, adjust import accordingly (e.g., from src.nso_aligner import ...)
-from nso_aligner import (
-    NSOAligner,
-    ComplianceStandard,
-    ComplianceCheck,
-    ComplianceMapper,
-    RollbackSnapshot,
-    QuarantineEntry,
-)
+from nso_aligner import (ComplianceCheck, ComplianceMapper, ComplianceStandard,
+                         NSOAligner, QuarantineEntry, RollbackSnapshot)
 
 
 @pytest.fixture

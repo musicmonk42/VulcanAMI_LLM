@@ -30,16 +30,12 @@ def test_config_manager_integration():
     print("-" * 80)
     
     try:
-        from vulcan.config import (
-            ConfigurationManager,
-            ProfileType,
-            get_config,
-            load_profile,
-            get_intrinsic_drives_config,
-            get_tool_selection_config,
-            load_intrinsic_drives_from_file
-        )
-        
+        from vulcan.config import (ConfigurationManager, ProfileType,
+                                   get_config, get_intrinsic_drives_config,
+                                   get_tool_selection_config,
+                                   load_intrinsic_drives_from_file,
+                                   load_profile)
+
         # Test basic config manager
         print("  ✓ Config module imports successfully")
         

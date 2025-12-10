@@ -6,21 +6,22 @@
 #              compression, encryption, and comprehensive quality controls
 ################################################################################
 
-import sys
-import os
 import argparse
-import json
 import hashlib
-import struct
-import time
+import json
 import logging
-from pathlib import Path
-from typing import List, Dict, Any, Optional, BinaryIO
-from dataclasses import dataclass, asdict
-from datetime import datetime
-import zstandard as zstd
-import requests
+import os
+import struct
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, BinaryIO, Dict, List, Optional
+
+import requests
+import zstandard as zstd
 
 # Version
 VERSION = "4.6.0"

@@ -4,13 +4,13 @@ Tests for vulcan-cli bash script
 This version explicitly uses Git Bash on Windows, avoiding broken WSL installations.
 Fixed: Handles None values in stdout/stderr concatenation.
 """
-import subprocess
-import pytest
 import os
-import sys
 import platform
 import shutil
+import subprocess
+import sys
 
+import pytest
 
 BIN_DIR = os.path.join(os.path.dirname(__file__), '..', 'bin')
 VULCAN_CLI = os.path.join(BIN_DIR, 'vulcan-cli')

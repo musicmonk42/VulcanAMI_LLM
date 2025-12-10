@@ -2,27 +2,20 @@
 Comprehensive test suite for large_graph_generator.py
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from large_graph_generator import (
-    generate_large_graph,
-    generate_stress_test_graphs,
-    generate_specific_topology,
-    validate_graph_structure,
-    get_graph_statistics,
-    MIN_NODES,
-    MAX_NODES,
-    MIN_DENSITY,
-    MAX_DENSITY,
-    MIN_GRAPH_COUNT,
-    MAX_GRAPH_COUNT,
-    VALID_NODE_TYPES,
-    VALID_EDGE_TYPES,
-    VALID_TOPOLOGIES,
-    DEFAULT_MAX_MESH_NODES,
-    MAX_MESH_NODES_LIMIT,
-)
+import pytest
+
+from large_graph_generator import (DEFAULT_MAX_MESH_NODES, MAX_DENSITY,
+                                   MAX_GRAPH_COUNT, MAX_MESH_NODES_LIMIT,
+                                   MAX_NODES, MIN_DENSITY, MIN_GRAPH_COUNT,
+                                   MIN_NODES, VALID_EDGE_TYPES,
+                                   VALID_NODE_TYPES, VALID_TOPOLOGIES,
+                                   generate_large_graph,
+                                   generate_specific_topology,
+                                   generate_stress_test_graphs,
+                                   get_graph_statistics,
+                                   validate_graph_structure)
 
 
 @pytest.fixture

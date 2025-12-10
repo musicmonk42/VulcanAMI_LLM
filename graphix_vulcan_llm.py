@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """
 GraphixVulcanLLM - COMPLETE FIXED VERSION (Async Generator Handling)
 
@@ -9,18 +10,19 @@ User: musicmonk42
 CRITICAL FIX: Properly handle async generator from CognitiveLoop.generate()
 """
 
-import json
-import time
-import os
-import math
-import threading
-import logging
 import asyncio
 import inspect
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Callable, Sequence, Union, Iterator, AsyncIterator
+import json
+import logging
+import math
+import os
+import threading
+import time
 from collections import deque
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
+from typing import (Any, AsyncIterator, Callable, Dict, Iterator, List,
+                    Optional, Sequence, Union)
 
 # Configure logging
 logging.basicConfig(
@@ -35,7 +37,8 @@ logger = logging.getLogger(__name__)
 
 # Transformer Core
 try:
-    from src.llm_core.graphix_transformer import GraphixTransformer, GraphixTransformerConfig
+    from src.llm_core.graphix_transformer import (GraphixTransformer,
+                                                  GraphixTransformerConfig)
     logger.info("✓ GraphixTransformer loaded successfully")
 except Exception as e:
     logger.warning(f"GraphixTransformer import failed: {e}, using fallback")
@@ -238,7 +241,9 @@ except Exception as e:
 
 # Cognitive Loop
 try:
-    from src.integration.cognitive_loop import CognitiveLoop, LoopSamplingConfig, LoopRuntimeConfig
+    from src.integration.cognitive_loop import (CognitiveLoop,
+                                                LoopRuntimeConfig,
+                                                LoopSamplingConfig)
     logger.info("✓ CognitiveLoop loaded successfully")
 except Exception as e:
     logger.warning(f"CognitiveLoop import failed: {e}, using ENHANCED fallback")
@@ -373,7 +378,8 @@ except Exception as e:
 
 # Language Reasoning
 try:
-    from src.vulcan.reasoning.language_reasoning import LanguageReasoning, LanguageReasoningConfig
+    from src.vulcan.reasoning.language_reasoning import (
+        LanguageReasoning, LanguageReasoningConfig)
     logger.info("✓ LanguageReasoning loaded successfully")
 except Exception as e:
     logger.warning(f"LanguageReasoning import failed: {e}, using fallback")

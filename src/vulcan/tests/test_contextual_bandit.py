@@ -12,25 +12,23 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for contextual_bandit tests"
 )
 
-import numpy as np
-import tempfile
+import logging
 import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
-import logging
 
-from vulcan.reasoning.contextual_bandit import (
-    ExplorationStrategy,
-    BanditContext,
-    BanditAction,
-    BanditFeedback,
-    ContextualBandit,
-    LinUCBBandit,
-    NeuralContextualBandit,
-    OffPolicyEvaluator,
-    AdaptiveBanditOrchestrator,
-    ToolSelectionBandit,
-)
+import numpy as np
+
+from vulcan.reasoning.contextual_bandit import (AdaptiveBanditOrchestrator,
+                                                BanditAction, BanditContext,
+                                                BanditFeedback,
+                                                ContextualBandit,
+                                                ExplorationStrategy,
+                                                LinUCBBandit,
+                                                NeuralContextualBandit,
+                                                OffPolicyEvaluator,
+                                                ToolSelectionBandit)
 
 
 # Fixtures

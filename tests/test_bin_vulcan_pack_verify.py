@@ -3,15 +3,15 @@ Tests for vulcan-pack-verify Python script
 
 This version includes Windows compatibility fixes.
 """
-import subprocess
-import pytest
+import json
 import os
+import platform
+import struct
+import subprocess
 import sys
 import tempfile
-import json
-import struct
-import platform
 
+import pytest
 
 BIN_DIR = os.path.join(os.path.dirname(__file__), '..', 'bin')
 VULCAN_PACK = os.path.join(BIN_DIR, 'vulcan-pack')

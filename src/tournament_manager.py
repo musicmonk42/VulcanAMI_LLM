@@ -15,13 +15,14 @@ FIXES APPLIED:
 - Comprehensive error handling throughout
 """
 
-import numpy as np
-from typing import List, Dict, Any, Callable, Optional, Union
-from prometheus_client import Histogram, Counter, Gauge
-import logging
-import uuid
-import time
 import json
+import logging
+import time
+import uuid
+from typing import Any, Callable, Dict, List, Optional, Union
+
+import numpy as np
+from prometheus_client import Counter, Gauge, Histogram
 
 # --- Distributed Scaling Integration ---
 try:

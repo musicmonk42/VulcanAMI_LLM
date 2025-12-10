@@ -15,24 +15,18 @@ Tests cover:
 - Performance benchmarks
 """
 
-import unittest
-import time
 import json
-from unittest.mock import Mock, MagicMock, patch
-from collections import defaultdict
 import sys
+import time
+import unittest
+from collections import defaultdict
+from unittest.mock import MagicMock, Mock, patch
 
 # Import the module to test
 sys.path.insert(0, "/home/claude")
-from causal_context import (
-    CausalContext,
-    CausalPath,
-    CausalIntervention,
-    CounterfactualScenario,
-    CausalStatistics,
-    CausalStrengthType,
-    TemporalDecayFunction,
-)
+from causal_context import (CausalContext, CausalIntervention, CausalPath,
+                            CausalStatistics, CausalStrengthType,
+                            CounterfactualScenario, TemporalDecayFunction)
 
 
 class MockWorldModel:

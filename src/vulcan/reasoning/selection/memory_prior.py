@@ -7,19 +7,20 @@ stored in the memory system, using similarity-weighted Bayesian inference.
 Fixed version with proper resource management and cache eviction.
 """
 
-import numpy as np
-from typing import Dict, List, Any, Optional, Tuple, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
+import json
 import logging
 import pickle
-from pathlib import Path
-from enum import Enum
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 from scipy.spatial.distance import cosine, euclidean
 from scipy.stats import beta, dirichlet
-import json
 
 logger = logging.getLogger(__name__)
 

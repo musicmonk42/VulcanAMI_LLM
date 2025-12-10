@@ -8,13 +8,13 @@ Run with:
     pytest test_graph_validation.py -v --cov=graph_validator --cov-report=html
 """
 
-import pytest
 import json
-from pathlib import Path
-from typing import Dict, Any, List, Set, Optional
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
+import pytest
 
 # ============================================================================
 # Graph Validator Implementation

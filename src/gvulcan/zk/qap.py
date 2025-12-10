@@ -7,8 +7,10 @@ step in creating zk-SNARKs.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import List
+
 from .field import FieldElement
 from .polynomial import Polynomial
 

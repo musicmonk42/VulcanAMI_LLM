@@ -3,16 +3,16 @@ test_correlation_tracker.py -
 Tests correlation tracker functionality without spawning real threads.
 """
 
-import pytest
-import numpy as np
-import time
 import threading
+import time
 from collections import defaultdict
-from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass, field
 from enum import Enum
-from unittest.mock import Mock, MagicMock
+from typing import Any, Dict, List, Optional, Tuple
+from unittest.mock import MagicMock, Mock
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums and Classes

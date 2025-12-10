@@ -17,26 +17,22 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import pytest
-import numpy as np
-import time
 import threading
-from typing import Dict, Any, List, Tuple
+import time
+from typing import Any, Dict, List, Tuple
+
+import numpy as np
+import pytest
 
 # Import from prediction_engine
-from vulcan.world_model.prediction_engine import (
-    CombinationMethod,
-    Path,
-    PathCluster,
-    Prediction,
-    PathAnalyzer,
-    PathEffectCalculator,
-    PathTracer,
-    PathClusterer,
-    MonteCarloSampler,
-    PredictionCombiner,
-    EnsemblePredictor,
-)
+from vulcan.world_model.prediction_engine import (CombinationMethod,
+                                                  EnsemblePredictor,
+                                                  MonteCarloSampler, Path,
+                                                  PathAnalyzer, PathCluster,
+                                                  PathClusterer,
+                                                  PathEffectCalculator,
+                                                  PathTracer, Prediction,
+                                                  PredictionCombiner)
 
 # Test constants
 TEST_RANDOM_SEED = 42  # Fixed seed for reproducible randomness tests

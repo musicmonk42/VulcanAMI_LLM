@@ -17,8 +17,9 @@ Performance considerations:
 """
 
 from __future__ import annotations
-from typing import Union
+
 import secrets
+from typing import Union
 
 # Import curve order from py_ecc
 from py_ecc.bn128 import curve_order as CURVE_ORDER

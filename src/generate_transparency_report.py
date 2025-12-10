@@ -5,18 +5,18 @@ Version: 2.0.0 - All issues fixed, production-ready
 Generates comprehensive transparency reports with metrics, audits, and anomaly detection.
 """
 
-import os
+import datetime
 import json
 import logging
-import datetime
-import threading
-import tempfile
-import sys
-from pathlib import Path
-from typing import Dict, Any, Tuple, Optional, List, Union
-from dataclasses import dataclass, field
-from collections import deque
+import os
 import statistics
+import sys
+import tempfile
+import threading
+from collections import deque
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Platform-specific file locking
 try:
@@ -56,13 +56,9 @@ except ImportError:
 
 # Optional observability_manager
 try:
-    from observability_manager import (
-        get_prometheus_metrics,
-        notify_error,
-        notify_success,
-        send_metric_event,
-        notify_anomaly,
-    )
+    from observability_manager import (get_prometheus_metrics, notify_anomaly,
+                                       notify_error, notify_success,
+                                       send_metric_event)
 
     OBSERVABILITY_AVAILABLE = True
 except ImportError:
@@ -100,12 +96,8 @@ except ImportError:
 
 # Optional nso_aligner
 try:
-    from nso_aligner import (
-        get_bias_taxonomy,
-        get_bias_trends,
-        get_bias_examples,
-        get_bias_taxonomy_schema,
-    )
+    from nso_aligner import (get_bias_examples, get_bias_taxonomy,
+                             get_bias_taxonomy_schema, get_bias_trends)
 
     NSO_ALIGNER_AVAILABLE = True
 except ImportError:

@@ -2,36 +2,25 @@
 Comprehensive test suite for api_server.py
 """
 
-import pytest
 import json
-import time
-import threading
-import tempfile
 import shutil
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+import socket
+import tempfile
+import threading
+import time
+import urllib.request
 from datetime import datetime, timedelta
 from http.client import HTTPConnection
-import urllib.request
-import socket
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from api_server import (
-    GraphAPIServer,
-    DatabaseManager,
-    DatabaseConnectionPool,
-    RateLimiter,
-    InputValidator,
-    ExecutionEngine,
-    CacheManager,
-    GraphSubmission,
-    Proposal,
-    Agent,
-    ExecutionStatus,
-    APIEndpoint,
-    MAX_REQUEST_SIZE,
-    MAX_GRAPH_NODES,
-    MAX_GRAPH_EDGES,
-)
+import pytest
+
+from api_server import (MAX_GRAPH_EDGES, MAX_GRAPH_NODES, MAX_REQUEST_SIZE,
+                        Agent, APIEndpoint, CacheManager,
+                        DatabaseConnectionPool, DatabaseManager,
+                        ExecutionEngine, ExecutionStatus, GraphAPIServer,
+                        GraphSubmission, InputValidator, Proposal, RateLimiter)
 
 
 @pytest.fixture

@@ -5,6 +5,7 @@
 # ====================================================================
 import sys
 from pathlib import Path
+
 # Get the directory of the current script (scripts/) and go up one level to the project root (D:\Graphix)
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
@@ -22,6 +23,7 @@ Version: 2.0.0 - Production-ready with all bug fixes
 import argparse
 import asyncio
 import copy
+import hashlib
 import json
 import logging
 import os
@@ -31,9 +33,9 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional, Set
-import hashlib
+from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
+
 
 # =========================
 # Configuration
@@ -91,10 +93,7 @@ log = logging.getLogger(__name__)
 # =========================
 try:
     from specs.formal_grammar.language_evolution_registry import (
-        LanguageEvolutionRegistry,
-        InMemoryBackend,
-        DevelopmentKMS
-    )
+        DevelopmentKMS, InMemoryBackend, LanguageEvolutionRegistry)
     HAS_REGISTRY = True
 except ImportError:
     HAS_REGISTRY = False

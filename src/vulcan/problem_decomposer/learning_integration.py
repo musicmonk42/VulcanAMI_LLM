@@ -8,42 +8,34 @@ meta-learning, RLHF feedback systems, and knowledge crystallization to create a 
 COMPLETE IMPLEMENTATION - All learning systems integrated including principle extraction and promotion
 """
 
+import hashlib
+import json
+import logging
+import pickle
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import torch
 import torch.nn as nn
-import logging
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Callable, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-from pathlib import Path
-import json
-import pickle
-import hashlib
 
 # Import decomposer components
 try:
-    from .problem_decomposer_core import (
-        ProblemDecomposer,
-        ProblemGraph,
-        DecompositionPlan,
-        ExecutionOutcome,
-        ProblemSignature,
-        LearningGap,
-    )
     from .decomposition_library import StratifiedDecompositionLibrary
+    from .problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
+                                          LearningGap, ProblemDecomposer,
+                                          ProblemGraph, ProblemSignature)
 except ImportError:
     try:
-        from problem_decomposer_core import (
-            ProblemDecomposer,
-            ProblemGraph,
-            DecompositionPlan,
-            ExecutionOutcome,
-            ProblemSignature,
-            LearningGap,
-        )
         from decomposition_library import StratifiedDecompositionLibrary
+        from problem_decomposer_core import (DecompositionPlan,
+                                             ExecutionOutcome, LearningGap,
+                                             ProblemDecomposer, ProblemGraph,
+                                             ProblemSignature)
     except ImportError:
         logging.warning("Could not import ProblemDecomposer components")
         StratifiedDecompositionLibrary = None
@@ -51,19 +43,21 @@ except ImportError:
 # Import learning components - FIXED: Changed .learning to ..learning
 try:
     from ..learning.continual_learning import EnhancedContinualLearner
-    from ..learning.curriculum_learning import CurriculumLearner, DifficultyEstimator
+    from ..learning.curriculum_learning import (CurriculumLearner,
+                                                DifficultyEstimator)
+    from ..learning.learning_types import (FeedbackData, LearningConfig,
+                                           TaskInfo)
     from ..learning.meta_learning import MetaLearner, TaskDetector
     from ..learning.metacognition import MetaCognitiveMonitor
-    from ..learning.learning_types import LearningConfig, TaskInfo, FeedbackData
     from ..learning.parameter_history import ParameterHistoryManager
     from ..learning.rlhf_feedback import RLHFManager
 except ImportError:
     try:
         from continual_learning import EnhancedContinualLearner
         from curriculum_learning import CurriculumLearner, DifficultyEstimator
+        from learning_types import FeedbackData, LearningConfig, TaskInfo
         from meta_learning import MetaLearner, TaskDetector
         from metacognition import MetaCognitiveMonitor
-        from learning_types import LearningConfig, TaskInfo, FeedbackData
         from parameter_history import ParameterHistoryManager
         from rlhf_feedback import RLHFManager
     except ImportError:

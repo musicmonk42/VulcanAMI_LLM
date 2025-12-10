@@ -2,24 +2,16 @@
 Comprehensive test suite for minimal_executor.py
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from minimal_executor import (
-    MinimalExecutor,
-    ThreadSafeContext,
-    AuditLogger,
-    GraphValidator,
-    ExecutionError,
-    CycleDetectedError,
-    TimeoutError,
-    ValidationError,
-    DEFAULT_NODE_TIMEOUT,
-    DEFAULT_GRAPH_TIMEOUT,
-    MAX_GRAPH_SIZE,
-    MAX_EDGE_COUNT,
-)
+import pytest
+
+from minimal_executor import (DEFAULT_GRAPH_TIMEOUT, DEFAULT_NODE_TIMEOUT,
+                              MAX_EDGE_COUNT, MAX_GRAPH_SIZE, AuditLogger,
+                              CycleDetectedError, ExecutionError,
+                              GraphValidator, MinimalExecutor,
+                              ThreadSafeContext, TimeoutError, ValidationError)
 
 
 @pytest.fixture

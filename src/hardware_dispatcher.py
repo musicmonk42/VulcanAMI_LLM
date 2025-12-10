@@ -6,16 +6,16 @@ Version: 2.0.0 - All issues fixed, thread-safe, validated
 Enhanced hardware dispatcher with real hardware integration, discovery, metrics, and fallback.
 """
 
-import os
 import json
 import logging
-import time
+import os
 import threading
-from typing import Any, Union, Dict, Optional, List, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
+import time
 from collections import deque
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Optional imports with graceful degradation
 try:
@@ -45,8 +45,9 @@ except ImportError:
     REQUESTS_AVAILABLE = False
 
 try:
-    import grpc
     from concurrent import futures
+
+    import grpc
 
     GRPC_AVAILABLE = True
 except ImportError:

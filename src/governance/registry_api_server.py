@@ -13,30 +13,29 @@ Key Features:
 - Audit logging and integrity verification
 """
 
+import hashlib
 import json
 import logging
-from typing import Dict, Any, Optional, List
-from concurrent import futures
-import time
-import hashlib
-import threading  # Added for locking
-from datetime import datetime
-from abc import ABC, abstractmethod
-from copy import deepcopy
-import sqlite3
-from contextlib import contextmanager
-from pathlib import Path  # Added for unlink in temp_db fixture
 import os  # Added for serve function environment variables
+import sqlite3
+import threading  # Added for locking
+import time
+from abc import ABC, abstractmethod
+from concurrent import futures
+from contextlib import contextmanager
+from copy import deepcopy
+from datetime import datetime
+from pathlib import Path  # Added for unlink in temp_db fixture
+from typing import Any, Dict, List, Optional
 
 # --- gRPC Imports (Optional) ---
 try:
     import grpc
-    from grpc import StatusCode
-
     # Import specific protobuf types if available
     from google.protobuf import timestamp_pb2
-    from google.protobuf.json_format import ParseDict, MessageToDict
+    from google.protobuf.json_format import MessageToDict, ParseDict
     from google.protobuf.timestamp_pb2 import Timestamp
+    from grpc import StatusCode
 
     HAS_GRPC = True
 except ImportError:
@@ -1663,7 +1662,8 @@ def serve(port: int = 50051, db_path: str = DB_PATH):
         # e.g., from src.governance import registry_pb2_grpc
         # Adjust relative import based on actual file structure
         # For this example, let's assume it's in the same package 'src.governance'
-        from . import registry_pb2_grpc  # Requires __init__.py and compiled protos
+        from . import \
+            registry_pb2_grpc  # Requires __init__.py and compiled protos
 
         registry_pb2_grpc.add_RegistryServiceServicer_to_server(
             RegistryServicer(

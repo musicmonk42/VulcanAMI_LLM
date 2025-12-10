@@ -6,12 +6,13 @@ Run with:
     pytest test_hardware_profiles.py -v --cov-report=term-missing
 """
 
-import pytest
 import json
-from pathlib import Path
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Set
 import math
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Set
+
+import pytest
 
 
 # Test Fixtures

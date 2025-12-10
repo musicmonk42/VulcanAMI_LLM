@@ -2,37 +2,26 @@
 Comprehensive test suite for setup_agent.py
 """
 
-import pytest
+import logging  # Import logging for level constants
 import sys
-from unittest.mock import Mock, MagicMock, patch
 from io import StringIO
-import logging # Import logging for level constants
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Assuming setup_agent.py is in the same directory or accessible via python path
 # If setup_agent.py is in src/, and tests are run from the root, use:
 # from src.setup_agent import (...)
 try:
     # Attempt import assuming tests run relative to src/
-    from setup_agent import (
-        validate_agent_id,
-        validate_roles,
-        setup,
-        SetupError,
-        ValidationError,
-        VALID_ROLES,
-    )
-    import setup_agent # Import the module itself to patch its logger
+    import setup_agent  # Import the module itself to patch its logger
+    from setup_agent import (VALID_ROLES, SetupError, ValidationError, setup,
+                             validate_agent_id, validate_roles)
 except ModuleNotFoundError:
     # Fallback assuming tests run from root and src is in PYTHONPATH
-    from src.setup_agent import (
-        validate_agent_id,
-        validate_roles,
-        setup,
-        SetupError,
-        ValidationError,
-        VALID_ROLES,
-    )
-    import src.setup_agent as setup_agent # Import the module itself
+    import src.setup_agent as setup_agent  # Import the module itself
+    from src.setup_agent import (VALID_ROLES, SetupError, ValidationError,
+                                 setup, validate_agent_id, validate_roles)
 
 
 class TestValidateAgentId:

@@ -22,36 +22,27 @@ FIXES APPLIED (corrected version):
 3. test_full_search_workflow: Added skip - Same source code bug as test_hybrid_search.
 """
 
-import pytest
-import numpy as np
-import time
-import tempfile
-import shutil
-import pickle
 import os
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-
+import pickle
+import shutil
 # Import the module under test
 import sys
+import tempfile
+import time
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.retrieval import (
-    MemoryIndex,
-    NumpyIndex,
-    TextSearchIndex,
-    TemporalIndex,
-    AttentionMechanism,
-    LearnedAttention,
-    MemorySearch,
-    RetrievalResult,
-    FAISS_AVAILABLE,
-    WHOOSH_AVAILABLE,
-    TORCH_AVAILABLE,
-)
-
-from vulcan.memory.base import Memory, MemoryType, MemoryQuery
+from vulcan.memory.base import Memory, MemoryQuery, MemoryType
+from vulcan.memory.retrieval import (FAISS_AVAILABLE, TORCH_AVAILABLE,
+                                     WHOOSH_AVAILABLE, AttentionMechanism,
+                                     LearnedAttention, MemoryIndex,
+                                     MemorySearch, NumpyIndex, RetrievalResult,
+                                     TemporalIndex, TextSearchIndex)
 
 # ============================================================
 # FIXTURES

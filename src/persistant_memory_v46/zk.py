@@ -59,13 +59,9 @@ except ImportError:
 
 # Import industry-standard SNARK implementation
 try:
-    from gvulcan.zk.snark import (
-        Groth16Prover,
-        Groth16Proof,
-        VerificationKey,
-        create_unlearning_circuit,
-        generate_proof_for_unlearning,
-    )
+    from gvulcan.zk.snark import (Groth16Proof, Groth16Prover, VerificationKey,
+                                  create_unlearning_circuit,
+                                  generate_proof_for_unlearning)
 
     SNARK_AVAILABLE = True
 except ImportError:

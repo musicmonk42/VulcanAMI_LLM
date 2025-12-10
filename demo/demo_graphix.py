@@ -24,22 +24,23 @@ Usage:
 
 import argparse
 import asyncio
+import hashlib
 import json
 import logging
-import numpy as np
-import time
-import hashlib
-import sys
 import pickle
 import ssl
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, asdict, field
-from enum import Enum
+import sys
+import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
+
+import numpy as np
 
 # Core imports with graceful fallback
 try:
@@ -68,7 +69,7 @@ except ImportError:
     ObservabilityManager = None
     
 try:
-    from src.stdio_policy import safe_print, json_print
+    from src.stdio_policy import json_print, safe_print
 except ImportError:
     # Fallback implementations without emojis
     def safe_print(msg, effect=None):

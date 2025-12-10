@@ -6,19 +6,19 @@ thread safety, and performance optimizations.
 All critical bugs from the original implementation have been fixed.
 """
 
-import json
-import os
 import hashlib
+import json
+import logging
+import os
 import pickle
 import sqlite3
 import threading
 import time
-import logging
-from typing import Dict, List, Any, Optional, Tuple
+from collections import OrderedDict, defaultdict, deque
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from contextlib import contextmanager
-from collections import defaultdict, deque, OrderedDict
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import networkx as nx
@@ -28,10 +28,10 @@ except ImportError:
     NETWORKX_AVAILABLE = False
     nx = None
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.backends import default_backend
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # Configure logging

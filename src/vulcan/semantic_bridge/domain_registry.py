@@ -7,18 +7,19 @@ ENHANCED: Adaptive cache sizing, externalized risk adjuster configuration
 PRODUCTION-READY: All unbounded data structures fixed with proper limits and eviction
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque, Counter
-import time
-import json
 import hashlib
-from enum import Enum
-from pathlib import Path
+import json
+import logging
 import pickle
 import threading
+import time
+from collections import Counter, defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 # Import safety validator with multiple fallback paths
 SAFETY_VALIDATOR_AVAILABLE = False
@@ -27,8 +28,8 @@ SafetyConfig = None
 
 # Try relative import first (when used as part of vulcan package)
 try:
-    from ..safety.safety_validator import EnhancedSafetyValidator
     from ..safety.safety_types import SafetyConfig
+    from ..safety.safety_validator import EnhancedSafetyValidator
 
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
@@ -37,8 +38,8 @@ except ImportError:
 # Fallback: Try absolute import (when vulcan is in sys.path)
 if not SAFETY_VALIDATOR_AVAILABLE:
     try:
-        from vulcan.safety.safety_validator import EnhancedSafetyValidator
         from vulcan.safety.safety_types import SafetyConfig
+        from vulcan.safety.safety_validator import EnhancedSafetyValidator
 
         SAFETY_VALIDATOR_AVAILABLE = True
     except ImportError:
@@ -47,8 +48,8 @@ if not SAFETY_VALIDATOR_AVAILABLE:
 # Fallback: Try src-prefixed import (when src is in sys.path)
 if not SAFETY_VALIDATOR_AVAILABLE:
     try:
-        from src.vulcan.safety.safety_validator import EnhancedSafetyValidator
         from src.vulcan.safety.safety_types import SafetyConfig
+        from src.vulcan.safety.safety_validator import EnhancedSafetyValidator
 
         SAFETY_VALIDATOR_AVAILABLE = True
     except ImportError:

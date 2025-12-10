@@ -16,33 +16,33 @@
 
 import argparse
 import asyncio
+import hmac
+import importlib
+import json  # For Arena API endpoints
 import logging
 import os
 import sys
-import hmac
-from contextlib import asynccontextmanager
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Union
-from datetime import datetime, timedelta
 from collections import deque
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fastapi import FastAPI, Depends, HTTPException, Request, status, Security
+from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response, HTMLResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.api_key import APIKeyHeader
-from starlette.middleware.wsgi import WSGIMiddleware
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from starlette.middleware.wsgi import WSGIMiddleware
 
 # NOTE: The encoding fix and .env loader have been MOVED
 # into the lifespan function to ensure they run in the
 # Uvicorn worker process.
 
-import json  # For Arena API endpoints
-import importlib
 
 # Optional dependencies with graceful degradation
 try:
@@ -54,13 +54,8 @@ except ImportError:
     print("⚠️  httpx not available - health checks will be limited")
 
 try:
-    from prometheus_client import (
-        Counter,
-        Histogram,
-        Gauge,
-        generate_latest,
-        CONTENT_TYPE_LATEST,
-    )
+    from prometheus_client import (CONTENT_TYPE_LATEST, Counter, Gauge,
+                                   Histogram, generate_latest)
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
@@ -69,7 +64,7 @@ except ImportError:
     print("⚠️  prometheus-client not available - metrics disabled")
 
 try:
-    from jose import jwt, JWTError
+    from jose import JWTError, jwt
 
     JWT_AVAILABLE = True
 except ImportError:
@@ -111,8 +106,9 @@ class SecretsManager:
 
         # Try AWS Secrets Manager (if boto3 available)
         try:
-            import boto3
             import json
+
+            import boto3
 
             secrets_client = boto3.client("secretsmanager")
             secret_value = secrets_client.get_secret_value(SecretId=key)
@@ -1007,7 +1003,7 @@ async def lifespan(app: FastAPI):
             # ================================================================
             try:
                 logger.info("Initializing VULCAN deployment...")
-                from vulcan.config import get_config, AgentConfig
+                from vulcan.config import AgentConfig, get_config
                 from vulcan.orchestrator import ProductionDeployment
 
                 # Load configuration profile
@@ -1522,7 +1518,8 @@ def get_arena_instance():
     _arena_instance_initialized = True
 
     try:
-        from src.graphix_arena import GraphixArena, _ARENA_INSTANCE, register_routes
+        from src.graphix_arena import (_ARENA_INSTANCE, GraphixArena,
+                                       register_routes)
 
         if _ARENA_INSTANCE is not None:
             logger.info("✅ Using existing Arena instance from src.graphix_arena")
@@ -1609,7 +1606,8 @@ async def arena_feedback_dispatch(
         raise HTTPException(status_code=503, detail="Arena not available")
 
     try:
-        from src.graphix_arena import dispatch_feedback_protocol, MAX_PAYLOAD_SIZE
+        from src.graphix_arena import (MAX_PAYLOAD_SIZE,
+                                       dispatch_feedback_protocol)
 
         data = await request.json()
 

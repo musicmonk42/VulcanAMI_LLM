@@ -13,15 +13,14 @@ Enables autonomous agent consensus on trade-offs without human intervention.
 """
 
 import logging
+import threading
 import time
-
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
 # import numpy as np # Original import
 # FIXED: Added Union to the import
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-from enum import Enum
-import threading
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from unittest.mock import MagicMock, Mock  # FIXED: Import Mock
 
 # --- START FIX: Add numpy fallback ---
@@ -79,10 +78,11 @@ except ImportError:
 # Assuming ObjectiveHierarchy and Objective are importable from sibling modules
 try:
     # Use real imports if available
-    from .objective_hierarchy import ObjectiveHierarchy as RealObjectiveHierarchy
-    from .objective_hierarchy import Objective as RealObjective
-    from .objective_hierarchy import ObjectiveType as RealObjectiveType
     from .objective_hierarchy import ConflictType as RealHierarchyConflictType
+    from .objective_hierarchy import Objective as RealObjective
+    from .objective_hierarchy import \
+        ObjectiveHierarchy as RealObjectiveHierarchy
+    from .objective_hierarchy import ObjectiveType as RealObjectiveType
 
     ObjectiveHierarchy = RealObjectiveHierarchy
     Objective = RealObjective

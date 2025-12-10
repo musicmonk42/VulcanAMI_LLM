@@ -12,23 +12,23 @@ Each component is pluggable and can be monkeypatched in tests.
 from __future__ import annotations
 
 import asyncio
+import copy
+import importlib.util
 import json
 import logging
+import os
+import re
+import sys
+import threading
 import time
 import traceback
-import copy
-import re
 import uuid
-import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional, Callable, List, Tuple, Union
-import importlib.util
-import sys
-import os
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pytest
 
@@ -566,7 +566,7 @@ class PRCreator:
             
             import hashlib
             import random
-            
+
             # Generate PR details
             pr_id = random.randint(1000, 9999)
             spec_hash = hashlib.md5(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:8]

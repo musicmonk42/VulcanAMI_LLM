@@ -42,14 +42,15 @@ and verification caching.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, Callable
-from enum import Enum
-from pathlib import Path
+
 import hashlib
 import json
-import time
 import logging
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

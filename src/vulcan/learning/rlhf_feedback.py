@@ -2,27 +2,28 @@
 RLHF (Reinforcement Learning from Human Feedback) and live feedback processing
 """
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-import torch.distributions as dist
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple, Union
-from collections import deque, defaultdict
-from concurrent.futures import ThreadPoolExecutor
-import logging
-import time
-import threading
 import asyncio
-import aiohttp
 import json
+import logging
+import queue
+import threading
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import datetime
-import queue
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import aiohttp
+import numpy as np
+import torch
+import torch.distributions as dist
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 
 from ..config import EMBEDDING_DIM, HIDDEN_DIM
-from .learning_types import LearningConfig, FeedbackData
+from .learning_types import FeedbackData, LearningConfig
 
 logger = logging.getLogger(__name__)
 
@@ -1018,8 +1019,9 @@ class LiveFeedbackProcessor:
 
     async def _collect_metrics(self) -> Dict[str, float]:
         """Collect current performance metrics"""
-        import psutil
         import gc
+
+        import psutil
 
         try:
             # Get process info

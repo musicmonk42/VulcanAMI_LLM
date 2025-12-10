@@ -2,16 +2,13 @@
 Comprehensive test suite for tournament_manager.py
 """
 
-import pytest
-import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from tournament_manager import (
-    TournamentManager,
-    TournamentError,
-    ValidationError,
-    trace_id,
-)
+import numpy as np
+import pytest
+
+from tournament_manager import (TournamentError, TournamentManager,
+                                ValidationError, trace_id)
 
 
 @pytest.fixture

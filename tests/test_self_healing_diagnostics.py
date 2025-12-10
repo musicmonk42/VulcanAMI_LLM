@@ -56,12 +56,9 @@ def test_validate_self_healing_setup():
 def test_diagnostic_functions_callable():
     """Test that diagnostic functions are callable"""
     from vulcan.world_model.world_model_core import (
-        validate_self_healing_setup,
-        print_self_healing_diagnostics,
-        validate_component_installation,
-        print_diagnostics
-    )
-    
+        print_diagnostics, print_self_healing_diagnostics,
+        validate_component_installation, validate_self_healing_setup)
+
     # Test validate_self_healing_setup
     is_working, issues = validate_self_healing_setup()
     assert isinstance(is_working, bool)
@@ -92,8 +89,9 @@ def test_diagnostic_functions_callable():
 def test_method_signatures():
     """Test that required methods have correct signatures"""
     import inspect
+
     from vulcan.world_model.world_model_core import WorldModel
-    
+
     # Test _handle_improvement_alert signature
     method = getattr(WorldModel, '_handle_improvement_alert')
     sig = inspect.signature(method)

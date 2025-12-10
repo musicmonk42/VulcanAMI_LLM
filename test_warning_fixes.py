@@ -4,8 +4,8 @@ Simple test to verify the warning fixes work correctly.
 Run this after installing dependencies with: pip install -r requirements.txt
 """
 
-import sys
 import logging
+import sys
 
 # Set up logging to capture warnings
 logging.basicConfig(
@@ -17,14 +17,12 @@ def test_llm_validators():
     """Test that LLM validators are available without warnings"""
     print("Testing LLM Validators...")
     try:
-        from src.vulcan.safety.llm_validators import (
-            StructuralValidator,
-            EthicalValidator,
-            ToxicityValidator,
-            HallucinationValidator,
-            PromptInjectionValidator
-        )
-        
+        from src.vulcan.safety.llm_validators import (EthicalValidator,
+                                                      HallucinationValidator,
+                                                      PromptInjectionValidator,
+                                                      StructuralValidator,
+                                                      ToxicityValidator)
+
         # Instantiate to verify they work
         validators = [
             StructuralValidator(),

@@ -5,11 +5,12 @@ Version: 2.0.0 - All logic bugs fixed
 AutoML nodes with hardware acceleration, compression, and audit support.
 """
 
-import logging
-import numpy as np
-from typing import Dict, Any, Optional, List
-from datetime import datetime
 import hashlib
+import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 
 # Optional dependencies with graceful fallback
 try:

@@ -3,20 +3,20 @@ Graph Validator Module for Graphix IR
 Comprehensive validation, sanitization, and safety checks for graph execution
 """
 
-import re
-import json
 import hashlib
-import os
-import time  # Added for cache TTL
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple, Set, Union
-from dataclasses import dataclass, field
-from enum import Enum
-from collections import defaultdict, deque
+import json
 import logging
-import traceback
+import os
+import re
 import sys  # Import sys for size estimation
 import threading  # Added threading for Lock
+import time  # Added for cache TTL
+import traceback
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 try:
     import networkx as nx

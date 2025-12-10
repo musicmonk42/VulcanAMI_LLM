@@ -14,20 +14,22 @@ Revision / Fix Notes (Applied):
 """
 
 from __future__ import annotations
-import os
-import json
-import logging
-import time
-import numpy as np
+
 import asyncio
 import atexit
-import threading
 import importlib
-from typing import Any, Dict, List, Optional, Tuple, Callable
+import json
+import logging
+import os
+import threading
+import time
 from collections import defaultdict, deque
 from datetime import datetime
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
@@ -50,20 +52,10 @@ def safe_log(log_func, message):
         pass
 
 
-from .safety_types import (
-    SafetyReport,
-    SafetyConstraint,
-    SafetyViolationType,
-    ComplianceStandard,
-    SafetyConfig,
-    SafetyMetrics,
-    SafetyException,
-    SafetyValidator,
-    GovernanceOrchestrator,
-    NSOAligner,
-    ExplainabilityNode,
-    ActionType,
-)
+from .safety_types import (ActionType, ComplianceStandard, ExplainabilityNode,
+                           GovernanceOrchestrator, NSOAligner, SafetyConfig,
+                           SafetyConstraint, SafetyException, SafetyMetrics,
+                           SafetyReport, SafetyValidator, SafetyViolationType)
 
 try:
     from ..config import SafetyLevel
@@ -75,11 +67,8 @@ except ImportError:
 
 # Lazy-load modules to avoid circular imports
 try:
-    from .tool_safety import (
-        ToolSafetyManager,
-        ToolSafetyGovernor,
-        initialize_tool_safety,
-    )
+    from .tool_safety import (ToolSafetyGovernor, ToolSafetyManager,
+                              initialize_tool_safety)
 except ImportError:
     ToolSafetyManager = None
     ToolSafetyGovernor = None
@@ -87,25 +76,22 @@ except ImportError:
     logger.warning("Tool safety modules not available")
 
 try:
-    from .compliance_bias import ComplianceMapper, BiasDetector
+    from .compliance_bias import BiasDetector, ComplianceMapper
 except ImportError:
     ComplianceMapper = None
     BiasDetector = None
     logger.warning("Compliance and bias detection modules not available")
 
 try:
-    from .rollback_audit import RollbackManager, AuditLogger
+    from .rollback_audit import AuditLogger, RollbackManager
 except ImportError:
     RollbackManager = None
     AuditLogger = None
     logger.warning("Rollback and audit modules not available")
 
 try:
-    from .adversarial_formal import (
-        AdversarialValidator,
-        FormalVerifier,
-        initialize_adversarial,
-    )
+    from .adversarial_formal import (AdversarialValidator, FormalVerifier,
+                                     initialize_adversarial)
 except ImportError:
     AdversarialValidator = None
     FormalVerifier = None
@@ -113,18 +99,15 @@ except ImportError:
     logger.warning("Adversarial and formal verification modules not available")
 
 try:
-    import torch
     import scipy
     import statsmodels
+    import torch
 
     logger.info(
         f"Neural dependencies checked: torch v{torch.__version__}, scipy v{scipy.__version__}, statsmodels v{statsmodels.__version__}"
     )
-    from .neural_safety import (
-        SafetyPredictor,
-        FeatureExtractor,
-        initialize_neural_safety,
-    )
+    from .neural_safety import (FeatureExtractor, SafetyPredictor,
+                                initialize_neural_safety)
 
     logger.info(
         "Neural safety modules (SafetyPredictor, FeatureExtractor, initialize_neural_safety) loaded."
@@ -139,13 +122,9 @@ except Exception as e:
 
 # --- LLM Safety Validators (Mocked Fallback) ---
 try:
-    from .llm_validators import (
-        ToxicityValidator,
-        HallucinationValidator,
-        PromptInjectionValidator,
-        StructuralValidator,
-        EthicalValidator,
-    )
+    from .llm_validators import (EthicalValidator, HallucinationValidator,
+                                 PromptInjectionValidator, StructuralValidator,
+                                 ToxicityValidator)
 
     LLM_VALIDATORS_AVAILABLE = True
     logger.info("LLM safety validator modules loaded.")
@@ -1365,13 +1344,11 @@ class EnhancedSafetyValidator(SafetyValidator):
 
     def _initialize_domain_validators(self):
         try:
-            from .domain_validators import (
-                CausalSafetyValidator,
-                PredictionSafetyValidator,
-                OptimizationSafetyValidator,
-                DataProcessingSafetyValidator,
-                validator_registry,
-            )
+            from .domain_validators import (CausalSafetyValidator,
+                                            DataProcessingSafetyValidator,
+                                            OptimizationSafetyValidator,
+                                            PredictionSafetyValidator,
+                                            validator_registry)
 
             self.causal_validator = CausalSafetyValidator(self.safe_regions)
             self.prediction_validator = PredictionSafetyValidator(self.safe_regions)

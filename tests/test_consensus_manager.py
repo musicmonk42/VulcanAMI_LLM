@@ -2,22 +2,16 @@
 Comprehensive test suite for consensus_manager.py
 """
 
-import pytest
-import time
 import threading
-from unittest.mock import Mock, patch, MagicMock
+import time
+from unittest.mock import MagicMock, Mock, patch
 
-from consensus_manager import (
-    ConsensusManager,
-    LeaderElector,
-    LeaderState,
-    ServerState,
-    _simulate_vote,
-    _seed_for,
-    DEFAULT_QUORUM_RATIO,
-    MIN_QUORUM_RATIO,
-    MAX_QUORUM_RATIO,
-)
+import pytest
+
+from consensus_manager import (DEFAULT_QUORUM_RATIO, MAX_QUORUM_RATIO,
+                               MIN_QUORUM_RATIO, ConsensusManager,
+                               LeaderElector, LeaderState, ServerState,
+                               _seed_for, _simulate_vote)
 
 
 @pytest.fixture

@@ -8,22 +8,22 @@ FIXED: Consistent return format for _granger_causality_test method.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Set, Optional, Callable, Tuple, Union
-import numpy as np
-import logging
-import time
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import pickle
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import json
+import logging
+import pickle
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
+import numpy as np
 from scipy import stats
 from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import StandardScaler
 
 try:
     import networkx as nx
@@ -68,8 +68,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 try:
-    from causallearn.search.ScoreBased import GES as ges
     from causallearn.search.ConstraintBased import FCI as fci
+    from causallearn.search.ScoreBased import GES as ges
     from causallearn.utils import GraphUtils
 
     CAUSALLEARN_AVAILABLE = True
@@ -89,13 +89,9 @@ except ImportError:
     )
 
 
-from .reasoning_types import (
-    ReasoningStep,
-    ReasoningChain,
-    ReasoningType,
-    ReasoningResult,
-)
 from .reasoning_explainer import ReasoningExplainer
+from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
+                              ReasoningType)
 
 logger = logging.getLogger(__name__)
 

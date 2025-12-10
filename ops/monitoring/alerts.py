@@ -16,40 +16,45 @@ Integrates with project modules for real-world testing.
 from __future__ import annotations
 
 import asyncio
+import copy
+import importlib.util
 import json
 import logging
-import time
-import traceback
-import copy
+import os
 import random
 import re
-import uuid
+import sys
 import threading
+import time
+import traceback
+import uuid
+from asyncio import \
+    TaskGroup  # Structured concurrency for better error handling
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+# Configure logging with rotation for production
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Dict, Optional, Callable, List, Tuple, Union
-import importlib.util
-import sys
-import os
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pytest
 import pytest_asyncio
-from asyncio import TaskGroup  # Structured concurrency for better error handling
-
-# Project imports - assuming relative paths or proper sys.path setup
-from graphix.stress_tests.large_graph_generator import GraphGenerator, GraphTopology
-from graphix.stress_tests.malicious_ir_generator import IRGenerator
-from graphix.specs.formal_grammar.graphix_core_ontology import graphix_core_ontology  # Assuming loaded as dict
-from graphix.specs.formal_grammar.language_evolution_registry import LanguageEvolutionRegistry, InMemoryBackend, DevelopmentKMS
-from graphix.src.unified_runtime.graph_validator import GraphValidator, ResourceLimits
-from graphix.src.unified_runtime.unified_runtime_core import UnifiedRuntime, RuntimeConfig
+from graphix.specs.formal_grammar.graphix_core_ontology import \
+    graphix_core_ontology  # Assuming loaded as dict
+from graphix.specs.formal_grammar.language_evolution_registry import (
+    DevelopmentKMS, InMemoryBackend, LanguageEvolutionRegistry)
 from graphix.src.unified_runtime.execution_engine import ExecutionMode
+from graphix.src.unified_runtime.graph_validator import (GraphValidator,
+                                                         ResourceLimits)
+from graphix.src.unified_runtime.unified_runtime_core import (RuntimeConfig,
+                                                              UnifiedRuntime)
+# Project imports - assuming relative paths or proper sys.path setup
+from graphix.stress_tests.large_graph_generator import (GraphGenerator,
+                                                        GraphTopology)
+from graphix.stress_tests.malicious_ir_generator import IRGenerator
 
-# Configure logging with rotation for production
-from logging.handlers import RotatingFileHandler
 handler = RotatingFileHandler('stress_test.log', maxBytes=10*1024*1024, backupCount=5)
 logging.basicConfig(
     level=logging.INFO,

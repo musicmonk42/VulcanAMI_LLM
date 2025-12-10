@@ -8,9 +8,10 @@
 import logging
 import threading
 import time
-from typing import Any, Dict, List, Tuple, Optional
 from collections import defaultdict, deque
 from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
 logger = logging.getLogger(__name__)

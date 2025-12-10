@@ -19,35 +19,29 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for learning_integration tests"
 )
 
-import numpy as np
 import logging
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Any
-from unittest.mock import Mock, MagicMock, patch
-import tempfile
-import shutil
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
 from problem_decomposer.learning_integration import (
-    ProblemToExperienceConverter,
-    DecompositionDifficultyEstimator,
-    RLHFFeedbackRouter,
-    IntegratedLearningCoordinator,
-    UnifiedDecomposerLearner,
-    create_unified_decomposer,
-)
-
-from problem_decomposer.problem_decomposer_core import (
-    ProblemGraph,
-    DecompositionPlan,
-    ExecutionOutcome,
-    DecompositionStep,
-)
+    DecompositionDifficultyEstimator, IntegratedLearningCoordinator,
+    ProblemToExperienceConverter, RLHFFeedbackRouter, UnifiedDecomposerLearner,
+    create_unified_decomposer)
+from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
+                                                        DecompositionStep,
+                                                        ExecutionOutcome,
+                                                        ProblemGraph)
 
 # Configure logging
 logging.basicConfig(

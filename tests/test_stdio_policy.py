@@ -2,27 +2,20 @@
 Comprehensive test suite for stdio_policy.py
 """
 
-import pytest
+import json
 import os
 import sys
-import json
 import tempfile
 import threading
 from io import StringIO
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, mock_open
+from unittest.mock import MagicMock, Mock, mock_open, patch
 
-from stdio_policy import (
-    StdIOConfig,
-    StdIOHandle,
-    safe_print,
-    json_print,
-    install,
-    self_test,
-    _is_windows,
-    _should_disable_color,
-    _normalize_text,
-)
+import pytest
+
+from stdio_policy import (StdIOConfig, StdIOHandle, _is_windows,
+                          _normalize_text, _should_disable_color, install,
+                          json_print, safe_print, self_test)
 
 
 @pytest.fixture

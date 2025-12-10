@@ -3,23 +3,23 @@ test_safety_module_integration.py - PURE MOCK VERSION
 Comprehensive integration tests for VULCAN-AGI Safety Module without thread spawning.
 """
 
-import pytest
 import asyncio
-import time
-import json
-import tempfile
-import shutil
-import numpy as np
 import hashlib
-import threading
+import json
 import re
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple, Callable
+import shutil
+import tempfile
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from collections import deque
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from unittest.mock import Mock
 
+import numpy as np
+import pytest
 
 # ============================================================================
 # Mock Enums

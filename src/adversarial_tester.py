@@ -3,37 +3,37 @@ Production Adversarial Testing System for Graphix
 Version: 2.0.4 - All test failures fixed with numeric risk level comparison
 """
 
-import numpy as np
-import logging
-import json
-import os
-import copy
-import time
-import hashlib
-import threading
-import pickle
-import gzip
-import re
 import base64
 import codecs
-import uuid
-import tempfile  # FIXED: Added missing import for temp file operations
-from pathlib import Path
-from typing import Any, List, Tuple, Callable, Dict, Optional, Union
-from dataclasses import dataclass, field
-from enum import Enum
-from collections import defaultdict, deque
-from datetime import datetime, timedelta
-import warnings
+import copy
+import gzip
+import hashlib
+import json
+import logging
+import os
+import pickle
+import re
 import sqlite3
+import tempfile  # FIXED: Added missing import for temp file operations
+import threading
+import time
+import uuid
+import warnings
+from collections import defaultdict, deque
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 # Scientific computing imports
 import scipy.stats as stats
 from scipy.optimize import minimize
 from scipy.special import softmax
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import IsolationForest
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # SHAP for interpretability

@@ -45,8 +45,7 @@ This module is dependency-light and uses pure Python numerics.
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Callable, Sequence, Tuple
-
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 # --------------------------- Configuration --------------------------- #
 

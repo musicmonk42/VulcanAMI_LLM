@@ -4,23 +4,24 @@ Compliance checking and bias detection for VULCAN-AGI Safety Module.
 Implements regulatory compliance validation and multi-model bias detection.
 """
 
-import logging
-import time
+import hashlib
 import json
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from typing import Any, Dict, List, Optional, Tuple, Callable
+import logging
+import re
+import threading
+import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from pathlib import Path
-import re
-import hashlib
-import threading
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from .safety_types import ComplianceStandard, SafetyViolationType, SafetyReport
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+
+from .safety_types import ComplianceStandard, SafetyReport, SafetyViolationType
 
 logger = logging.getLogger(__name__)
 

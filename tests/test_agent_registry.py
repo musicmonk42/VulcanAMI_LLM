@@ -2,34 +2,23 @@
 Comprehensive test suite for agent_registry.py
 """
 
-import pytest
-import tempfile
-import shutil
-import time
 import json
+import shutil
+import tempfile
 import threading
-from pathlib import Path
+import time
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
-from agent_registry import (
-    AgentRegistry,
-    KeyManager,
-    CertificateAuthority,
-    AuditLogger,
-    RateLimiter,
-    DatabaseConnectionPool,
-    AgentProfile,
-    AgentKey,
-    AgentCertificate,
-    KeyAlgorithm,
-    AgentRole,
-    RegistryEvent,
-    CalibrationData,
-    AGENT_ID_MAX_LENGTH,
-    MAX_FAILED_ATTEMPTS,
-    LOCKOUT_DURATION,
-)
+import pytest
+
+from agent_registry import (AGENT_ID_MAX_LENGTH, LOCKOUT_DURATION,
+                            MAX_FAILED_ATTEMPTS, AgentCertificate, AgentKey,
+                            AgentProfile, AgentRegistry, AgentRole,
+                            AuditLogger, CalibrationData, CertificateAuthority,
+                            DatabaseConnectionPool, KeyAlgorithm, KeyManager,
+                            RateLimiter, RegistryEvent)
 
 
 @pytest.fixture

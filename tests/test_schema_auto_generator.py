@@ -2,13 +2,13 @@
 Comprehensive pytest suite for schema_auto_generator.py
 """
 
-import pytest
-import json
 import hashlib
-import tempfile
+import json
 import os
+import tempfile
 from pathlib import Path
 
+import pytest
 # Import the module to test
 import schema_auto_generator as sag
 

@@ -2,18 +2,15 @@
 Comprehensive test suite for superoptimizer.py
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
-from superoptimizer import (
-    Superoptimizer,
-    SuperoptimizerError,
-    KernelGenerationError,
-    ValidationError,
-)
+import pytest
+
+from superoptimizer import (KernelGenerationError, Superoptimizer,
+                            SuperoptimizerError, ValidationError)
 
 
 @pytest.fixture

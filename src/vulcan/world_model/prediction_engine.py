@@ -15,25 +15,26 @@ FIXED (2025-10-22): Prediction confidence calculations to be less pessimistic
     - Increased minimum confidence thresholds to avoid false rejections
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Union, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
 import json
-from pathlib import Path as FilePath
-from enum import Enum
+import logging
 import threading
+import time
 import warnings
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path as FilePath
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # Import safety validator - REMOVED to fix circular import. Moved to EnsemblePredictor.__init__
 
 # Protected imports with fallbacks
 try:
     from scipy import stats
+    from scipy.sparse import csr_matrix, issparse
     from scipy.spatial.distance import cosine, pdist, squareform
-    from scipy.sparse import issparse, csr_matrix
 
     SCIPY_AVAILABLE = True
 except ImportError:
@@ -41,10 +42,11 @@ except ImportError:
     logging.warning("scipy not available, using fallback implementations")
 
 try:
-    from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans, OPTICS
-    from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
-    from sklearn.metrics import silhouette_score, calinski_harabasz_score
+    from sklearn.cluster import DBSCAN, OPTICS, AgglomerativeClustering, KMeans
     from sklearn.decomposition import PCA
+    from sklearn.metrics import calinski_harabasz_score, silhouette_score
+    from sklearn.preprocessing import (MinMaxScaler, RobustScaler,
+                                       StandardScaler)
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -1811,8 +1813,8 @@ class EnsemblePredictor:
         # Lazy-load safety validator here
         self.safety_validator = None
         try:
-            from ..safety.safety_validator import EnhancedSafetyValidator
             from ..safety.safety_types import SafetyConfig
+            from ..safety.safety_validator import EnhancedSafetyValidator
 
             # Use original logic for config handling
             if isinstance(safety_config, dict) and safety_config:

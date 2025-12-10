@@ -60,48 +60,48 @@ except Exception:
 # ====================================================================
 
 import argparse
-import time
+import asyncio
+import concurrent.futures
+import hashlib
+import hmac
 import json
 import logging
-
 # import os (already imported above)
 import socket  # <-- ADDED
-from typing import Dict, Any, List, Optional
-import numpy as np
-import asyncio
-import uvicorn
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Response, Request
-from fastapi.responses import StreamingResponse, JSONResponse
+from threading import Lock, Thread
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock
+
+import msgpack
+import numpy as np
+import uvicorn
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
-import concurrent.futures
+from fastapi.responses import JSONResponse, StreamingResponse
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings
-from threading import Lock, Thread
-from collections import defaultdict
-import msgpack
-from unittest.mock import MagicMock
-from unittest.mock import MagicMock
-import hmac
-import hashlib
+
+import vulcan.memory
+import vulcan.safety
+import vulcan.semantic_bridge
+# Level 1: Pre-load core modules BEFORE orchestrator
+# This prevents circular import issues during orchestrator initialization
+import vulcan.world_model
+# Level 0: Config (no dependencies)
+from vulcan.config import AgentConfig, ProfileType, get_config, load_profile
+# Level 2: Now safe to import orchestrator (uses already-loaded modules)
+from vulcan.orchestrator import ProductionDeployment
 
 # ============================================================
 # IMPORTS - Ordered to prevent circular dependencies
 # ============================================================
 
-# Level 0: Config (no dependencies)
-from vulcan.config import AgentConfig, load_profile, ProfileType, get_config
 
-# Level 1: Pre-load core modules BEFORE orchestrator
-# This prevents circular import issues during orchestrator initialization
-import vulcan.world_model
-import vulcan.safety
-import vulcan.semantic_bridge
-import vulcan.memory
 
-# Level 2: Now safe to import orchestrator (uses already-loaded modules)
-from vulcan.orchestrator import ProductionDeployment
 
 try:
     from unified_runtime import UnifiedRuntime
@@ -454,9 +454,8 @@ async def lifespan(app: FastAPI):
 
                 # ADDED: Initialize meta-reasoning introspection (MODERN MODE - FIXED)
                 if world_model:
-                    from vulcan.world_model.meta_reasoning import (
-                        MotivationalIntrospection,
-                    )
+                    from vulcan.world_model.meta_reasoning import \
+                        MotivationalIntrospection
 
                     # Modern approach: get config path from AgentConfig
                     world_model_config = (
@@ -2113,8 +2112,9 @@ class PerformanceBenchmark:
 
     def _benchmark_memory(self, iterations: int) -> Dict:
         """Measure memory usage patterns."""
-        import psutil
         import gc
+
+        import psutil
 
         process = psutil.Process()
         memory_samples = []
@@ -2760,9 +2760,8 @@ def main():
     if config.enable_self_improvement:
         try:
             logger.info("Initializing meta-reasoning self-improvement drive...")
-            from vulcan.world_model.meta_reasoning.self_improvement_drive import (
-                SelfImprovementDrive,
-            )
+            from vulcan.world_model.meta_reasoning.self_improvement_drive import \
+                SelfImprovementDrive
 
             # Ensure config and data directories exist
             Path("configs").mkdir(parents=True, exist_ok=True)

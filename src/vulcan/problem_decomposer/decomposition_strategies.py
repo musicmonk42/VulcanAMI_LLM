@@ -3,18 +3,19 @@ decomposition_strategies.py - Decomposition strategies for problem decomposer
 Part of the VULCAN-AGI system
 """
 
-import numpy as np
-import logging
-import threading
-from typing import Dict, List, Any, Optional, Tuple, Set
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-from abc import ABC, abstractmethod
 import copy
 import hashlib
+import json
+import logging
+import threading
+import time
+from abc import ABC, abstractmethod
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import numpy as np
 
 # Optional imports with fallbacks
 try:

@@ -1,7 +1,7 @@
 import os
+import socket
 import sys
 import time
-import socket
 import urllib.request
 
 HOST = os.getenv("ARENA_HOST", "127.0.0.1")

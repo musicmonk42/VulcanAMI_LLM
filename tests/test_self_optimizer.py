@@ -2,20 +2,17 @@
 Comprehensive test suite for self_optimizer.py
 """
 
-import pytest
 import asyncio
-import tempfile
 import pickle
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
-import numpy as np
+import tempfile
 import time
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from self_optimizer import (
-    PerformanceMetrics,
-    OptimizationStrategy,
-    SelfOptimizer,
-)
+import numpy as np
+import pytest
+from self_optimizer import (OptimizationStrategy, PerformanceMetrics,
+                            SelfOptimizer)
 
 
 @pytest.fixture

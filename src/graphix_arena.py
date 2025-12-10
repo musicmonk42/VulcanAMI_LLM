@@ -17,8 +17,9 @@ if str(src_root) not in sys.path:
 # LOAD ENVIRONMENT VARIABLES
 # ====================================================================
 try:
-    from dotenv import load_dotenv
     import os
+
+    from dotenv import load_dotenv
 
     # Load .env file from project root
     env_path = Path(__file__).parent.parent / ".env"
@@ -107,27 +108,25 @@ Advanced distributed environment for AI agent collaboration and graph evolution.
 import asyncio
 import json
 import logging
-import subprocess
-import sys
 import os
 import re
+import subprocess
+import sys
 import threading
+from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Union, Optional, Literal
-from collections import deque
+from typing import Any, Dict, List, Literal, Optional, Union
 
-from fastapi import FastAPI, Request, HTTPException, Depends, Security
-from fastapi.security import APIKeyHeader
-from starlette.responses import JSONResponse, Response
-
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
 # Production Readiness Imports
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field, field_validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from starlette.responses import JSONResponse, Response
 
 # YAML for tool selection config
 try:
@@ -245,7 +244,7 @@ except ImportError:
 
 # Import registry backends for initialization (needed for v4.0.0+ API)
 try:
-    from language_evolution_registry import InMemoryBackend, DevelopmentKMS
+    from language_evolution_registry import DevelopmentKMS, InMemoryBackend
 
     REGISTRY_BACKENDS_AVAILABLE = True
 except ImportError:
@@ -282,7 +281,7 @@ except ImportError:
 
 # Prometheus metrics
 try:
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter
+    from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:

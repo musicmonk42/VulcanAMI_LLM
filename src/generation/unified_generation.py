@@ -41,14 +41,14 @@ Additional keys in `reasoning_modules`:
 - "diversity_penalty": float to encourage diverse candidates
 """
 
-import math
-import time
 import hashlib
 import json
+import math
+import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Set
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 Token = Union[int, str]
 

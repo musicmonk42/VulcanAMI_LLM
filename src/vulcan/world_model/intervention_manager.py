@@ -8,19 +8,20 @@ FIXED: API compatibility, safety_config propagation, proper initialization, sche
 IMPLEMENTED: Real-world intervention execution with external system interface
 """
 
-import numpy as np
-import logging
-from typing import Dict, List, Any, Optional, Tuple, Union, Set, Callable
-from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import time
-import json
-from pathlib import Path
-from enum import Enum
-from queue import PriorityQueue
-import threading
 import asyncio
+import json
+import logging
+import threading
+import time
 from abc import ABC, abstractmethod
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from enum import Enum
+from pathlib import Path
+from queue import PriorityQueue
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+
+import numpy as np
 
 # Import safety validator - REMOVED to fix circular import. Moved to InterventionExecutor.__init__
 
@@ -1065,14 +1066,13 @@ class InterventionExecutor:
         if safety_check_required:
             try:
                 # Local import to prevent circular dependency
-                from ..safety.safety_validator import EnhancedSafetyValidator
                 from ..safety.safety_types import SafetyConfig
+                from ..safety.safety_validator import EnhancedSafetyValidator
 
                 # *** START FIX ***
                 # The logic here was flawed. self.safety_initialization_successful
                 # was being set to True even if no config was provided,
                 # which allowed the real-mode check to pass.
-
                 # Use SafetyConfig.from_dict() or default constructor
                 if isinstance(safety_config, dict) and safety_config:
                     # Attempt to create SafetyConfig from dictionary

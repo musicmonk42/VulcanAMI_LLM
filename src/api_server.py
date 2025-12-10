@@ -23,36 +23,36 @@ Enhancements since 2.1.0:
 - Added validation for password hashing iteration threshold (warn if < recommended)
 """
 
-import json
+import base64
+import gzip
 import hashlib
 import hmac
-import uuid
-import os
-import time
-import threading
-import sqlite3
-import gzip
-import secrets
-import base64
-from typing import Dict, Any, Optional, List, Tuple, Union, Callable
-from datetime import datetime, timedelta
-from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from collections import defaultdict, deque
+import json
 import logging
-import traceback
-from concurrent.futures import ThreadPoolExecutor, Future
-import signal
-import sys
-import re
-from contextlib import contextmanager
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from socketserver import ThreadingMixIn
-import urllib.parse
-import socket
-import ssl
+import os
 import random
+import re
+import secrets
+import signal
+import socket
+import sqlite3
+import ssl
+import sys
+import threading
+import time
+import traceback
+import urllib.parse
+import uuid
+from collections import defaultdict, deque
+from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from socketserver import ThreadingMixIn
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 # Use cryptographically secure random for security-relevant operations (timing jitter, etc.)
 secure_random = secrets.SystemRandom()
@@ -96,14 +96,8 @@ except ImportError:
 
 # GraphQL support (placeholder)
 try:
-    from graphql import (
-        GraphQLSchema,
-        GraphQLObjectType,
-        GraphQLField,
-        GraphQLString,
-        GraphQLList,
-        GraphQLFloat,
-    )
+    from graphql import (GraphQLField, GraphQLFloat, GraphQLList,
+                         GraphQLObjectType, GraphQLSchema, GraphQLString)
 
     GRAPHQL_AVAILABLE = True
 except ImportError:

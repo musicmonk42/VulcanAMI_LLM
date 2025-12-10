@@ -23,17 +23,17 @@ Usage:
     python demo_evolution.py --grammar-version 3.4.0 --skip-validation
 """
 
+import argparse
 import asyncio
 import json
 import logging
-import argparse
-import sys
 import re
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Set
-from datetime import datetime
-from dataclasses import dataclass, asdict
+import sys
 from contextlib import asynccontextmanager
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
 # Import with graceful fallback
 try:
