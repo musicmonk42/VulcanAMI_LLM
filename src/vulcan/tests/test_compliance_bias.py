@@ -6,7 +6,6 @@ Tests regulatory compliance validation and multi-model bias detection.
 from vulcan.safety.compliance_bias import (BiasDetector, ComplianceMapper,
                                            LRUCache)
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
 from pathlib import Path
 import time
 import threading
@@ -21,8 +20,7 @@ torch = pytest.importorskip(
 
 # Import from safety_types (with fallback)
 try:
-    from vulcan.safety.safety_types import (ComplianceStandard, SafetyReport,
-                                            SafetyViolationType)
+    from vulcan.safety.safety_types import ComplianceStandard
 except ImportError:
     # Mock if not available
     from enum import Enum

@@ -16,9 +16,7 @@ Complete fixed version with all edge cases and platform compatibility.
 FIXED: test_granger_causality now provides sufficient data points.
 """
 
-from vulcan.reasoning.reasoning_types import ReasoningType
-from vulcan.reasoning.causal_reasoning import (CausalEdge, CausalReasoner,
-                                               CausalReasoningEngine,
+from vulcan.reasoning.causal_reasoning import (CausalReasoner, CausalReasoningEngine,
                                                CounterfactualReasoner,
                                                CounterfactualResult,
                                                EnhancedCausalReasoning,
@@ -27,9 +25,7 @@ import os
 import sys
 import threading
 import time
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -1182,7 +1178,7 @@ class TestPerformance:
 
         start = time.perf_counter()
 
-        paths = engine._identify_causal_paths("var_0")
+        engine._identify_causal_paths("var_0")
 
         elapsed = time.perf_counter() - start
 

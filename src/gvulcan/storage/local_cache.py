@@ -7,16 +7,14 @@ size limits, TTL, statistics, and concurrent access.
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import os
 import shutil
 import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

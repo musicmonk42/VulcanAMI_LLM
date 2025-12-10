@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 import random  # Needed for random token choice on low entropy fallback
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import torch
 import torch.nn as nn

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 import torch
-import torch.nn.functional as F
 
 
 @dataclass

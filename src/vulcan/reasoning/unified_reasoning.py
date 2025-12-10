@@ -11,7 +11,6 @@ ULTIMATE FIX: Monkey-patch applied at import time, shutdown waits for threads pr
 PRODUCTION FIX: Skips heavy UnifiedRuntime initialization during tests to prevent segfaults.
 """
 
-import json
 import logging
 import os
 import pickle
@@ -19,12 +18,12 @@ import threading
 import time
 import uuid
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -375,7 +374,7 @@ class UnifiedReasoner:
                     "LanguageReasoner"
                 ]()
             if "AbstractReasoner" in reasoning_components:
-                AbstractReasoner = reasoning_components["AbstractReasoner"]
+                reasoning_components["AbstractReasoner"]
                 # self.reasoners[ReasoningType.ABSTRACT] = AbstractReasoner() # This is an abstract class
         except Exception as e:
             logger.error(f"Error initializing core reasoners: {e}")

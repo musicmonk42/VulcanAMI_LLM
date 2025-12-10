@@ -13,18 +13,15 @@ Tests the intrinsic drive for continuous self-improvement including:
 """
 
 import json
-import os
 import tempfile
 import time
-from collections import defaultdict
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
 from vulcan.world_model.meta_reasoning.self_improvement_drive import (
-    FailureType, ImprovementObjective, SelfImprovementDrive,
-    SelfImprovementState, TriggerType)
+    FailureType, SelfImprovementDrive, SelfImprovementState)
 
 
 @pytest.fixture
@@ -1532,7 +1529,7 @@ class TestIntegration:
 
         # 1. Trigger and execute
         context = {"is_startup": True, "other_drives_total_priority": 999.0}
-        action = drive.step(context)
+        drive.step(context)
 
         # 2. Get objective type
         obj_type = drive.state.current_objective

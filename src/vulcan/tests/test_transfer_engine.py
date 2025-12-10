@@ -24,21 +24,15 @@ FIXES APPLIED (corrected version):
 
 from semantic_bridge.transfer_engine import (ConceptEffect, Constraint,
                                              ConstraintType,
-                                             DomainCharacteristics, EffectType,
-                                             Mitigation, MitigationLearner,
-                                             MitigationType,
+                                             EffectType, Mitigation,
+                                             MitigationLearner, MitigationType,
                                              PartialTransferEngine,
-                                             TransferDecision, TransferEngine,
-                                             TransferType)
+                                             TransferDecision,
+                                             TransferEngine, TransferType)
 import sys
 import threading
-import time
-from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
 
-import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))

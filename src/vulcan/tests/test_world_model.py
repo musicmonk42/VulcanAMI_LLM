@@ -7,12 +7,9 @@ from vulcan.learning.world_model import (AttentionBlock, CuriosityModule,
                                          PlanningAlgorithm, StateAbstractor,
                                          UnifiedWorldModel, WorldState)
 from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
-import torch.nn as nn
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 from pathlib import Path
-from collections import deque
-import time
 import tempfile
 import shutil
 import pytest

@@ -7,7 +7,6 @@ import logging
 import os
 import secrets
 import socket
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -15,8 +14,7 @@ from datetime import datetime
 from enum import Enum
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from typing import (Any, Awaitable, Callable, Dict, Iterator, List, Optional,
-                    Tuple)
+from typing import (Any, Callable, Dict, Iterator, List, Optional, Tuple)
 
 import aiohttp
 
@@ -649,7 +647,7 @@ class TamperEvidentLogger:
                 f"Invalid event_type: {event_type}. Must be one of {self.config.valid_event_types}"
             )
 
-        now = datetime.utcnow().isoformat() + "Z"
+        datetime.utcnow().isoformat() + "Z"
         trace_id, span_id = self._get_trace_ids()
 
         try:

@@ -18,8 +18,6 @@ FIXED: SafetyConfig parameters, safety test expectations, removed references to 
 """
 
 import threading
-import time
-from typing import Any, Dict, List
 
 import numpy as np
 import pytest

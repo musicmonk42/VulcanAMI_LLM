@@ -13,11 +13,10 @@ Integrated with comprehensive safety validation.
 
 import copy
 import hashlib
-import json
 import logging
 import threading
 import time
-from collections import Counter, defaultdict, deque
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -934,7 +933,7 @@ class ProblemExecutor:
     ) -> Callable:
         """Create generic fallback solver"""
         step_type = _get_step_value(step, "type", "unknown")
-        component = _get_step_value(step, "component", {})
+        _get_step_value(step, "component", {})
 
         def solve(inputs: Dict[str, Any]) -> Dict[str, Any]:
             """Execute generic solving logic"""
@@ -1305,7 +1304,7 @@ class ProblemExecutor:
         # Simple heuristic: process nodes in order
         results = []
         for node in nodes:
-            node_data = problem_graph.nodes.get(node, {})
+            problem_graph.nodes.get(node, {})
             results.append({"node": node, "processed": True})
 
         return {"heuristic": True, "results": results}

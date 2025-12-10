@@ -13,15 +13,12 @@ Tests cover:
 - Performance metrics
 """
 
-from unified_generation import (CandidateMetadata, FusionStrategy,
-                                NormalizationMethod, UnifiedGenConfig,
-                                UnifiedGeneration)
+from unified_generation import (FusionStrategy, NormalizationMethod,
+                                UnifiedGenConfig, UnifiedGeneration)
 import math
-import os
 import sys
 import unittest
-from collections import deque
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")

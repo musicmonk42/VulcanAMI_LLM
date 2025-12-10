@@ -49,10 +49,9 @@ from __future__ import annotations
 import copy
 import logging
 import re
-from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 # This import is now local to the submodule, assuming a 'core.py' exists.
 from .core import Clause, Constant, Function, Literal, Term, Variable

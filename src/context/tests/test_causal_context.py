@@ -15,15 +15,10 @@ Tests cover:
 - Performance benchmarks
 """
 
-from causal_context import (CausalContext, CausalIntervention, CausalPath,
-                            CausalStatistics, CausalStrengthType,
-                            CounterfactualScenario, TemporalDecayFunction)
-import json
+from causal_context import (CausalContext, CounterfactualScenario, TemporalDecayFunction)
 import sys
 import time
 import unittest
-from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
 
 # Import the module to test
 sys.path.insert(0, "/home/claude")
@@ -476,11 +471,11 @@ class TestCaching(unittest.TestCase):
         world_model = MockWorldModel()
 
         # First call - cache miss
-        result1 = ctx.select(world_model, "test query")
+        ctx.select(world_model, "test query")
         cache_size_1 = len(ctx._cache)
 
         # Second call - should hit cache
-        result2 = ctx.select(world_model, "test query")
+        ctx.select(world_model, "test query")
 
         self.assertEqual(len(ctx._cache), cache_size_1)
 

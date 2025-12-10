@@ -7,19 +7,14 @@ and ensure fast tool execution when needed.
 Fixed version with proper error handling, thread safety, and interruptible threads.
 """
 
-import json
 import logging
-import pickle
 import queue
 import threading
 import time
-import weakref
 from collections import defaultdict, deque
-from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
 import psutil
@@ -646,7 +641,7 @@ class WarmStartPool:
                         # Default: try no-arg constructor or use instance as singleton
                         try:
                             # Try creating with no args to test
-                            test = tool_class()
+                            tool_class()
                             def factory(cls=tool_class): return cls()
                         except Exception:
                             # Can't instantiate - use as singleton (not ideal but safe)

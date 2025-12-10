@@ -2,9 +2,6 @@
 test_objective_hierarchy.py - Unit tests for ObjectiveHierarchy
 """
 
-import time
-from collections import defaultdict
-from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest

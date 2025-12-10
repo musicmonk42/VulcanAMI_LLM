@@ -3,9 +3,8 @@ test_problem_executor.py - Comprehensive tests for problem_executor module
 Tests execution of decomposition plans with safety validation
 """
 
-import time
 from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -13,9 +12,7 @@ import pytest
 from vulcan.problem_decomposer.problem_decomposer_core import (
     DecompositionPlan, ExecutionOutcome, ProblemGraph)
 from vulcan.problem_decomposer.problem_executor import (ExecutionStrategy,
-                                                        ProblemExecutor,
-                                                        SolutionResult,
-                                                        SolutionType)
+                                                        ProblemExecutor)
 
 # Import or define Principle
 try:
@@ -306,7 +303,7 @@ def test_execute_plan_simple_success(basic_executor, simple_problem_graph, simpl
 def test_execute_plan_caching(basic_executor, simple_problem_graph, simple_plan):
     """Test that solutions are cached"""
     # First execution
-    outcome1 = basic_executor.execute_plan(simple_problem_graph, simple_plan)
+    basic_executor.execute_plan(simple_problem_graph, simple_plan)
 
     # Second execution should use cache
     outcome2 = basic_executor.execute_plan(simple_problem_graph, simple_plan)

@@ -9,7 +9,7 @@ import copy
 import logging
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 class Term(ABC):
     """Base class for terms in first-order logic"""
 
-    pass
 
 
 @dataclass

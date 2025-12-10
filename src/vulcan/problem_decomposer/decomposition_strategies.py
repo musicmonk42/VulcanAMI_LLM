@@ -5,15 +5,14 @@ Part of the VULCAN-AGI system
 
 import copy
 import hashlib
-import json
 import logging
 import threading
 import time
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -273,7 +272,6 @@ class DecompositionStrategy(ABC):
         Returns:
             Decomposition result
         """
-        pass
 
     def decompose(self, problem_graph) -> List[Dict[str, Any]]:
         """

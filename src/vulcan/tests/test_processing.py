@@ -12,19 +12,13 @@ from src.vulcan.processing import (AdaptiveMultimodalProcessor,
                                    ProcessingQuality, ProcessingResult,
                                    SLOConfig, StreamingProcessor,
                                    VersionedDataLogger, WorkloadManager)
-from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
-                               ModalityType)
+from src.vulcan.config import (EMBEDDING_DIM, ModalityType)
 import PIL.Image
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
-from typing import Any, Dict, List
-from pathlib import Path
 import time
 import threading
 import tempfile
 import shutil
-import json
-import gc
 import asyncio
 import pytest
 

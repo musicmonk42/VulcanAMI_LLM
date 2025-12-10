@@ -2,14 +2,14 @@ import torch.optim as optim
 import torch.nn.utils
 import torch
 import astor
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from pathlib import Path
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime
 from dataclasses import asdict, dataclass, field, is_dataclass
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
-from collections import Counter, OrderedDict, deque
+from collections import OrderedDict, deque
 import uuid
 import unicodedata
 import traceback
@@ -921,7 +921,7 @@ class NSOAligner:
         # Log to database
         try:
             # FIX: Ensure compliance_checks are converted to dicts for simple DB logging
-            compliance_dicts = [asdict(c) for c in compliance_checks]
+            [asdict(c) for c in compliance_checks]
 
             self._log_to_db(
                 "rollback_history",
@@ -2242,7 +2242,7 @@ class NSOAligner:
         if not isinstance(text_content, str):
             text_content = json.dumps(text_content)  # Fallback for complex types
 
-        text_lower = text_content.lower()
+        text_content.lower()
 
         # Enhanced PII detection
         pii_patterns = [

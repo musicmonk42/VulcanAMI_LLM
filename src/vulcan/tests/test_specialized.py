@@ -10,24 +10,19 @@ Tests cover:
 - Edge cases and error handling
 """
 
-from vulcan.memory.specialized import (NETWORKX_AVAILABLE, Concept, Episode,
-                                       EpisodicMemory, ProceduralMemory,
-                                       SemanticMemory, Skill,
-                                       ToolPerformanceConcept, WorkingMemory,
-                                       WorkingMemoryBuffer)
+from vulcan.memory.specialized import (Concept, Episode, EpisodicMemory,
+                                       ProceduralMemory, SemanticMemory,
+                                       Skill, ToolPerformanceConcept,
+                                       WorkingMemory)
 from vulcan.memory.base import (Memory, MemoryConfig, MemoryQuery, MemoryType,
                                 RetrievalResult)
-import os
 import shutil
 # Import the module under test
 import sys
 import tempfile
 import time
-from collections import deque
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
-import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -885,7 +880,7 @@ class TestProceduralMemory:
         for _ in range(15):
             skill.update_performance(success=False, execution_time=1.0)
 
-        initial_count = len(pm.skills)
+        len(pm.skills)
         consolidated = pm.consolidate()
 
         # Should remove low-performing skills

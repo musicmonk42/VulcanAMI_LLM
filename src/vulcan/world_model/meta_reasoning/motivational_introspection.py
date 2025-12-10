@@ -24,7 +24,7 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 from unittest.mock import MagicMock  # FIXED: Added import
 
 import numpy as np
@@ -2053,7 +2053,7 @@ class MotivationalIntrospection:
 
     def _check_goal_drift(self, proposal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Check if proposal represents goal drift"""
-        proposal_obj = proposal.get("objective")
+        proposal.get("objective")
 
         # Check if proposal is trying to change core objectives
         if proposal.get("modifies_objectives"):

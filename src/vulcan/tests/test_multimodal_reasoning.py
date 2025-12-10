@@ -14,13 +14,10 @@ from vulcan.reasoning.multimodal_reasoning import (TORCH_AVAILABLE,
                                                    ModalityData, ModalityType,
                                                    MultiModalReasoningEngine)
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
-from typing import Any, Dict
-from pathlib import Path
+from unittest.mock import Mock
 import warnings
 import tempfile
 import shutil
-import logging
 import pytest
 
 # Skip entire module if torch is not available (multimodal_reasoning uses torch internally)
@@ -551,7 +548,7 @@ class TestNeuralModules:
         assert not torch.isnan(output).any()
 
     def test_attention_fusion_empty_features(self):
-        import torch
+        pass
 
         module = AttentionFusion(input_dim=256)
 
@@ -589,7 +586,7 @@ class TestNeuralModules:
         assert torch.all(torch.isfinite(output))
 
     def test_gated_fusion_empty_features(self):
-        import torch
+        pass
 
         module = GatedFusion([256], 256)
 

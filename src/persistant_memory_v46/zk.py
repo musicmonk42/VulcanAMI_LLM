@@ -35,7 +35,6 @@ and implementations from Ethereum, Zcash, and Filecoin.
 """
 
 import hashlib
-import hmac
 import json
 import logging
 import secrets
@@ -59,9 +58,7 @@ except ImportError:
 
 # Import industry-standard SNARK implementation
 try:
-    from gvulcan.zk.snark import (Groth16Proof, Groth16Prover, VerificationKey,
-                                  create_unlearning_circuit,
-                                  generate_proof_for_unlearning)
+    from gvulcan.zk.snark import generate_proof_for_unlearning
 
     SNARK_AVAILABLE = True
 except ImportError:

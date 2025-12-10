@@ -15,11 +15,8 @@ from vulcan.reasoning.contextual_bandit import (AdaptiveBanditOrchestrator,
                                                 OffPolicyEvaluator,
                                                 ToolSelectionBandit)
 import numpy as np
-from unittest.mock import Mock, patch
-from pathlib import Path
 import tempfile
 import shutil
-import logging
 import pytest
 
 # Skip entire module if torch is not available

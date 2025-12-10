@@ -203,7 +203,7 @@ class TestTokenConsensusAdapter:
             "chosen_index": -1,  # Invalid negative index
         }
 
-        result = await adapter.approve(proposal)
+        await adapter.approve(proposal)
         # Should fail validation
         assert adapter._calls == 1
 

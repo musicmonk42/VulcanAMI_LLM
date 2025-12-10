@@ -9,15 +9,15 @@ import json
 import logging
 import pickle
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import minimize
-from scipy.stats import beta, norm
+from scipy.stats import beta
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 

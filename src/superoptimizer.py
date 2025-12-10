@@ -33,7 +33,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 # Optional dependencies with graceful fallback
 try:
@@ -72,19 +72,16 @@ logger = logging.getLogger("Superoptimizer")
 class SuperoptimizerError(Exception):
     """Base exception for superoptimizer errors."""
 
-    pass
 
 
 class KernelGenerationError(SuperoptimizerError):
     """Raised when kernel generation fails."""
 
-    pass
 
 
 class ValidationError(SuperoptimizerError):
     """Raised when kernel validation fails."""
 
-    pass
 
 
 class Superoptimizer:

@@ -8,24 +8,20 @@ Tests the complete system working together:
 
 import threading
 import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 from vulcan.curiosity_engine.curiosity_engine_core import (
-    CuriosityEngine, ExplorationFrontier, SafeExperimentExecutor)
+    CuriosityEngine, ExplorationFrontier)
 from vulcan.curiosity_engine.dependency_graph import (
-    CycleAwareDependencyGraph, DependencyAnalyzer, DependencyType,
-    ROICalculator)
+    CycleAwareDependencyGraph, DependencyAnalyzer, ROICalculator)
 from vulcan.curiosity_engine.experiment_generator import (
-    Constraint, Experiment, ExperimentGenerator, ExperimentType, FailureType,
-    IterativeExperimentDesigner)
+    Experiment, ExperimentGenerator, ExperimentType, FailureType, IterativeExperimentDesigner)
 from vulcan.curiosity_engine.exploration_budget import (CostEstimator,
                                                         DynamicBudget,
                                                         ResourceMonitor)
-from vulcan.curiosity_engine.gap_analyzer import (GapAnalyzer, KnowledgeGap,
-                                                  LatentGap, Pattern)
+from vulcan.curiosity_engine.gap_analyzer import (GapAnalyzer, KnowledgeGap)
 
 
 class TestGapAnalyzerToGraph:
@@ -466,8 +462,8 @@ class TestExplorationFrontier:
         region1 = frontier.add_explored_region(
             "planning", {"hierarchical", "goal_oriented"}
         )
-        region2 = frontier.add_explored_region("planning", {"temporal", "scheduling"})
-        region3 = frontier.add_explored_region("physics", {"causal", "predictive"})
+        frontier.add_explored_region("planning", {"temporal", "scheduling"})
+        frontier.add_explored_region("physics", {"causal", "predictive"})
 
         # Get frontier regions
         frontier_regions = frontier.get_unexplored_neighbors()

@@ -15,7 +15,6 @@ FIXED (2025-10-22): Prediction confidence calculations to be less pessimistic
     - Increased minimum confidence thresholds to avoid false rejections
 """
 
-import json
 import logging
 import threading
 import time
@@ -23,8 +22,7 @@ import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path as FilePath
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -32,7 +30,6 @@ import numpy as np
 
 # Protected imports with fallbacks
 try:
-    from scipy import stats
     from scipy.sparse import csr_matrix, issparse
     from scipy.spatial.distance import cosine, pdist, squareform
 
@@ -221,7 +218,7 @@ class SimpleAgglomerativeClustering:
 
         # Initialize each point as its own cluster
         clusters = [[i] for i in range(n_samples)]
-        labels = np.arange(n_samples)
+        np.arange(n_samples)
 
         # Distance matrix
         if self.metric == "precomputed":

@@ -23,11 +23,10 @@ import os
 import sqlite3
 import threading
 import time
-from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 # --- Alerting Integration ---
 # Gracefully handle missing slack_sdk library
@@ -49,13 +48,11 @@ logging.basicConfig(
 class AuditEngineError(Exception):
     """Base exception for audit engine errors."""
 
-    pass
 
 
 class DatabaseCorruptionError(AuditEngineError):
     """Raised when database corruption is detected."""
 
-    pass
 
 
 class ConnectionPool:
@@ -390,7 +387,7 @@ class SecurityAuditEngine:
             self.pool.close_all()
 
             # Try to dump and restore
-            dump_path = self.db_path.with_suffix(".db.dump")
+            self.db_path.with_suffix(".db.dump")
 
             # Recreate database
             if self.db_path.exists():

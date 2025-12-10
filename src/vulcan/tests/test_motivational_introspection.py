@@ -2,11 +2,9 @@
 test_motivational_introspection.py - Unit tests for MotivationalIntrospection
 """
 
-import time
-from collections import defaultdict, deque
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from collections import defaultdict
+from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.motivational_introspection import (

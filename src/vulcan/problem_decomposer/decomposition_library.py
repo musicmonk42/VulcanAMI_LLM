@@ -4,13 +4,12 @@ Part of the VULCAN-AGI system
 """
 
 import hashlib
-import heapq
 import json
 import logging
 import pickle
 import threading
 import time
-from collections import Counter, defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -1054,14 +1053,12 @@ class StratifiedDecompositionLibrary(DecompositionLibrary):
         # This would return actual strategy objects in full implementation
         # For now, return a mock strategy
         try:
-            from .decomposition_strategies import (DecompositionStrategy,
-                                                   ExactDecomposition,
+            from .decomposition_strategies import (ExactDecomposition,
                                                    SemanticDecomposition,
                                                    StructuralDecomposition)
         except ImportError:
             try:
-                from decomposition_strategies import (DecompositionStrategy,
-                                                      ExactDecomposition,
+                from decomposition_strategies import (ExactDecomposition,
                                                       SemanticDecomposition,
                                                       StructuralDecomposition)
             except ImportError:

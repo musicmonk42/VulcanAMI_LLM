@@ -34,7 +34,6 @@ import random
 import re
 import secrets
 import signal
-import socket
 import sqlite3
 import ssl
 import sys
@@ -50,9 +49,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
 from socketserver import ThreadingMixIn
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Use cryptographically secure random for security-relevant operations (timing jitter, etc.)
 secure_random = secrets.SystemRandom()
@@ -96,8 +94,7 @@ except ImportError:
 
 # GraphQL support (placeholder)
 try:
-    from graphql import (GraphQLField, GraphQLFloat, GraphQLList,
-                         GraphQLObjectType, GraphQLSchema, GraphQLString)
+    pass
 
     GRAPHQL_AVAILABLE = True
 except ImportError:

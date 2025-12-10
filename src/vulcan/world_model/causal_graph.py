@@ -17,7 +17,7 @@ from collections import OrderedDict, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path as FilePath
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
@@ -55,7 +55,7 @@ def _lazy_import_safety_validator():
 
 # Protected imports with fallbacks
 try:
-    from scipy import stats
+    pass
 
     SCIPY_AVAILABLE = True
 except ImportError:

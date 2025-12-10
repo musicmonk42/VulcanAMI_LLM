@@ -13,7 +13,6 @@ import hashlib
 import json
 import logging
 import os
-import queue
 import socket
 import ssl
 import sys  # FIXED: Added for Python version check
@@ -31,7 +30,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 try:
     import websocket
@@ -396,7 +395,7 @@ class HTTPCommunicator:
         except urllib.error.HTTPError as e:
             try:
                 error_body = e.read().decode("utf-8")
-            except Exception as e:
+            except Exception:
                 error_body = "Unable to read error body"
             raise RuntimeError(
                 f"HTTP {e.code}: {error_body} (Request ID: {request_id})"
@@ -718,7 +717,7 @@ class WebSocketCommunicator:
 
                 try:
                     self._send_message({"type": "heartbeat"})
-                except Exception as e:
+                except Exception:
                     break
 
                 time.sleep(HEARTBEAT_INTERVAL)

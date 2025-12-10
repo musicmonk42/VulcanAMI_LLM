@@ -7,7 +7,6 @@ stored in the memory system, using similarity-weighted Bayesian inference.
 Fixed version with proper resource management and cache eviction.
 """
 
-import json
 import logging
 import pickle
 import threading
@@ -16,11 +15,9 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from scipy.spatial.distance import cosine, euclidean
-from scipy.stats import beta, dirichlet
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +84,7 @@ class MemoryIndex:
 
         # Try to import faiss for fast similarity search
         try:
-            import faiss
+            pass
 
             self.use_faiss = True
             self.faiss_index = None

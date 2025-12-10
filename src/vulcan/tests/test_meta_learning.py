@@ -8,12 +8,9 @@ from vulcan.learning.learning_types import LearningConfig
 from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, ModalityType
 import torch.nn as nn
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
-from pathlib import Path
 import time
 import tempfile
 import shutil
-import pickle
 import pytest
 
 # Skip entire module if torch is not available
@@ -175,7 +172,7 @@ class TestTaskDetector:
 
         task1 = detector.detect_task(exp1)
         task2 = detector.detect_task(exp2)
-        task1_again = detector.detect_task(exp1)
+        detector.detect_task(exp1)
 
         # Check transitions recorded
         assert detector.transition_matrix[task2][task1] > 0
@@ -206,10 +203,9 @@ class TestTaskDetector:
         exp2 = {"embedding": np.ones(EMBEDDING_DIM) * -1}  # Very different
 
         # Establish pattern: task1 -> task2 repeatedly
-        task1 = None
         task2 = None
         for _ in range(3):
-            task1 = detector.detect_task(exp1)
+            detector.detect_task(exp1)
             task2 = detector.detect_task(exp2)
 
         # Complete one more cycle to ensure transitions are recorded

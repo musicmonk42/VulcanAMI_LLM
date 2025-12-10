@@ -6,12 +6,10 @@ Version: 2.0.4 - All test failures fixed with numeric risk level comparison
 import base64
 import codecs
 import copy
-import gzip
 import hashlib
 import json
 import logging
 import os
-import pickle
 import re
 import sqlite3
 import tempfile  # FIXED: Added missing import for temp file operations
@@ -22,19 +20,16 @@ import warnings
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 # Scientific computing imports
 import scipy.stats as stats
-from scipy.optimize import minimize
 from scipy.special import softmax
 from sklearn.ensemble import IsolationForest
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 # SHAP for interpretability
 try:
@@ -1378,7 +1373,7 @@ class AdversarialTester:
             )
 
             # Combined loss
-            loss = l2_dist + c * target_loss
+            l2_dist + c * target_loss
 
             # Update best
             if target_loss < best_dist:

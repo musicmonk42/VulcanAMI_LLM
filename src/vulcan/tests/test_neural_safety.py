@@ -4,8 +4,7 @@ Comprehensive tests for neural_safety.py module.
 Tests neural network models, validators, and safety assessment functionality.
 """
 
-from vulcan.safety.safety_types import (ActionType, SafetyReport,
-                                        SafetyViolationType)
+from vulcan.safety.safety_types import (ActionType, SafetyReport)
 from vulcan.safety.neural_safety import (AnomalyDetector, BayesianSafetyNet,
                                          GraphSafetyNetwork,
                                          MemoryBoundedDeque, ModelConfig,
@@ -15,10 +14,7 @@ from vulcan.safety.neural_safety import (AnomalyDetector, BayesianSafetyNet,
                                          VariationalSafetyAutoencoder)
 import torch.nn as nn
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
-from typing import Any, Dict, List
 from pathlib import Path
-import time
 import tempfile
 import shutil
 import asyncio
@@ -725,7 +721,7 @@ class TestNeuralSafetyValidator:
     def test_update_thresholds(self, neural_validator):
         """Test updating consensus and uncertainty thresholds."""
         initial_consensus = neural_validator.consensus_threshold
-        initial_uncertainty = neural_validator.uncertainty_threshold
+        neural_validator.uncertainty_threshold
 
         neural_validator.update_consensus_threshold(0.7)
         neural_validator.update_uncertainty_threshold(0.2)

@@ -5,17 +5,13 @@ Part of the VULCAN-AGI system
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
-import copy
-import json
 import logging
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import networkx as nx
 import numpy as np

@@ -6,17 +6,14 @@ Follows EXAMINE → SELECT → APPLY → REMEMBER pattern for method selection
 """
 
 import hashlib
-import json
 import logging
 import threading
 import time
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

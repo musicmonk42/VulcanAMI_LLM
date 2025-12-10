@@ -3,17 +3,16 @@ contraindication_tracker.py - Contraindication tracking for Knowledge Crystalliz
 Part of the VULCAN-AGI system
 """
 
-import hashlib
 import json
 import logging
 import pickle
 import threading
 import time
 from collections import Counter, defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -928,7 +927,7 @@ class ContraindicationGraph:
                 else:
                     descendants = self.graph.descendants(principle_id)
                 return set(descendants)
-            except Exception as e:
+            except Exception:
                 return set()
 
     def get_upstream_principles(self, principle_id: str) -> Set[str]:
@@ -952,7 +951,7 @@ class ContraindicationGraph:
                 else:
                     ancestors = self.graph.ancestors(principle_id)
                 return set(ancestors)
-            except Exception as e:
+            except Exception:
                 return set()
 
     def get_impact_path(
@@ -986,7 +985,7 @@ class ContraindicationGraph:
                     total_impact *= impact
 
                 return path, total_impact
-            except Exception as e:
+            except Exception:
                 return [], 0.0
 
     def find_critical_nodes(self, threshold: float = 0.7) -> List[str]:
@@ -1146,7 +1145,7 @@ class CascadeAnalyzer:
             impact.cascade_depth = max_depth
 
             # Get principle ID
-            principle_id = getattr(candidate, "id", str(candidate))
+            getattr(candidate, "id", str(candidate))
 
             # Find dependent principles
             dependents = self.find_dependent_principles(candidate)

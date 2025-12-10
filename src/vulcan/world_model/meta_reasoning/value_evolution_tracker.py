@@ -36,7 +36,6 @@ FIX (2025-10-22):
 - Improved threshold calculation to consider data range and time span
 """
 
-import json
 import logging
 import math  # Import math for fallback functions
 import threading
@@ -45,7 +44,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 # import numpy as np # Original import
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
 
 # --- START FIX: Add numpy fallback ---
@@ -1511,7 +1510,7 @@ class ValueEvolutionTracker:
 
     def _detect_trend_drift(self, value_name: str, threshold: float) -> Dict[str, Any]:
         """Detect drift based on significant linear trend"""
-        _np = self._np
+        self._np
         trajectory = self.trajectories.get(value_name)
         if not trajectory or len(trajectory.values) < 5:  # Need a few points for trend
             return {"detected": False, "score": 0.0, "slope": 0.0}
@@ -1690,7 +1689,6 @@ class ValueEvolutionTracker:
 
         # Prepare aligned data for correlation calculation
         aligned_data = defaultdict(list)
-        timestamps_set = set()
 
         # Gather all timestamps within the window first
         min_ts = window_start_time if window_start_time is not None else -float("inf")

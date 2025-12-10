@@ -13,10 +13,9 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -2471,7 +2470,7 @@ class TestStress:
 
         action = {"value": 50}
         start = time.time()
-        report = manager.check_constraints(action, {})
+        manager.check_constraints(action, {})
         elapsed = time.time() - start
 
         print(f"\nConstraint check time (50 constraints): {elapsed * 1000:.2f}ms")

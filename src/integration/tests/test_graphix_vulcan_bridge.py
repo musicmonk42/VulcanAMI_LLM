@@ -2,12 +2,9 @@
 Comprehensive tests for graphix_vulcan_bridge.py
 """
 
-from graphix_vulcan_bridge import (BridgeConfig, BridgeContext,
-                                   GraphixVulcanBridge, HierarchicalMemory,
-                                   UnifiedReasoning, WorldModelCore)
-import asyncio
+from graphix_vulcan_bridge import (BridgeConfig, GraphixVulcanBridge,
+                                   HierarchicalMemory, WorldModelCore)
 import sys
-from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 import torch

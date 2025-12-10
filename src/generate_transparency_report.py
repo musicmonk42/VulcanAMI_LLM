@@ -11,12 +11,10 @@ import logging
 import os
 import statistics
 import sys
-import tempfile
-import threading
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 # Platform-specific file locking
 try:

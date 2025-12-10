@@ -13,11 +13,10 @@ from vulcan.orchestrator.dependencies import (DependencyCategory,
                                               safe_print,
                                               validate_dependencies)
 import io
-import logging
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent

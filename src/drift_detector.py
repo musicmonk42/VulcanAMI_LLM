@@ -8,9 +8,9 @@ Tracks embedding drift, detects anomalies, and performs automatic realignment.
 import logging
 import threading
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import faiss
 import numpy as np

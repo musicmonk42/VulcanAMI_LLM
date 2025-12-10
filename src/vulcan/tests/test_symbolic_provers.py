@@ -13,7 +13,6 @@ All tests validate the FIXED implementations.
 """
 
 import time
-from typing import List
 
 import pytest
 
@@ -21,8 +20,7 @@ import pytest
 from src.vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
                                                 Literal, ProofNode, Variable)
 # Import the classes we're testing
-from src.vulcan.reasoning.symbolic.provers import (BaseProver,
-                                                   ConnectionMethodProver,
+from src.vulcan.reasoning.symbolic.provers import (ConnectionMethodProver,
                                                    ModelEliminationProver,
                                                    NaturalDeductionProver,
                                                    ParallelProver,

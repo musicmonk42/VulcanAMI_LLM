@@ -16,16 +16,13 @@ Tests cover:
 
 from hierarchical_context import (ConsolidationStrategy, EpisodicItem,
                                   HierarchicalContext, MemoryStatistics,
-                                  MemoryTier, ProceduralPattern,
-                                  PruningStrategy, RetrievalStrategy,
-                                  SemanticEntry, create_default_memory)
-import json
+                                  ProceduralPattern, PruningStrategy,
+                                  RetrievalStrategy, SemanticEntry,
+                                  create_default_memory)
 import sys
 import threading
 import time
 import unittest
-from pathlib import Path
-from unittest.mock import Mock, patch
 
 # Import the module to test
 sys.path.insert(0, "/home/claude")
@@ -128,7 +125,7 @@ class TestMemoryConsolidation(unittest.TestCase):
     def test_consolidate_from_episodic_to_semantic(self):
         """Test consolidation moves episodic to semantic"""
         # Get baseline before any stores
-        initial_semantic = len(self.memory.semantic_index)
+        len(self.memory.semantic_index)
 
         # Store repeated concepts
         for i in range(10):
@@ -208,7 +205,7 @@ class TestMemoryPruning(unittest.TestCase):
             self.memory.episodic[i].access_count += 5
             self.memory.episodic[i].last_accessed = time.time()
 
-        initial_count = len(self.memory.episodic)
+        len(self.memory.episodic)
         self.memory.prune_memory(strategy=PruningStrategy.LRU, target_size=20)
 
         self.assertLessEqual(len(self.memory.episodic), 20)
@@ -307,7 +304,7 @@ class TestCaching(unittest.TestCase):
         memory.store("initial", "data", {})
         result1 = memory.retrieve("initial", max_items=5)
 
-        cache_size_before = len(memory._cache)
+        len(memory._cache)
 
         # Store more data - should invalidate cache
         memory.store("new data", "value", {})

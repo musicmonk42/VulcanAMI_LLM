@@ -5,16 +5,12 @@ Part of the VULCAN-AGI system
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
-import json
 import logging
 import threading
 import time
-import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -757,7 +753,7 @@ class ResourcePredictor:
                 return 0.0
 
             x = np.arange(len(values))
-            n = len(x)
+            len(x)
             x_mean = np.mean(x)
             y_mean = np.mean(values)
 

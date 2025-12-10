@@ -2,16 +2,15 @@
 Meta-cognitive monitoring and compositional understanding
 """
 
-import json
 import logging
 import pickle
 import threading
 import time
-from collections import Counter, deque
-from dataclasses import asdict, dataclass
+from collections import deque
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import networkx as nx
 import numpy as np
@@ -689,7 +688,7 @@ class MetaCognitiveMonitor:
             dropout_modified = 0
             for module in self.model_ref.modules():
                 if isinstance(module, nn.Dropout):
-                    old_p = module.p
+                    module.p
                     module.p = min(0.5, module.p * 1.2)
                     dropout_modified += 1
 

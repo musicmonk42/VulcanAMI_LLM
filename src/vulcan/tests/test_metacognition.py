@@ -11,9 +11,7 @@ from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
 import torch.optim as optim
 import torch.nn as nn
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
 from pathlib import Path
-from collections import deque
 import time
 import tempfile
 import shutil
@@ -306,11 +304,11 @@ class TestMetaCognitiveMonitor:
         old_calibration = monitor.self_model["confidence_calibration"]
 
         # Test calibration reduction (for overconfidence)
-        result = monitor._strategy_calibrate_confidence()
+        monitor._strategy_calibrate_confidence()
         assert monitor.self_model["confidence_calibration"] < old_calibration
 
         # Test confidence boost (for underconfidence)
-        result = monitor._strategy_boost_confidence()
+        monitor._strategy_boost_confidence()
         assert monitor.self_model["confidence_calibration"] > 0
 
     def test_causal_graph_updates(self, monitor):

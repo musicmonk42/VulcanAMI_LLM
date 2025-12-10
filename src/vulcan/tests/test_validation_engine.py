@@ -4,12 +4,11 @@ test_validation_engine.py - Tests for validation_engine.py
 
 from validation_engine import (DomainCategory, DomainTestCase, DomainValidator,
                                FailureAnalysis, KnowledgeValidator, Principle,
-                               TestResult, ValidationLevel, ValidationResult,
-                               ValidationResults)
+                               ValidationLevel, ValidationResult, ValidationResults)
 import sys
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 

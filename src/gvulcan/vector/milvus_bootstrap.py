@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import yaml
 from pymilvus import (Collection, CollectionSchema, DataType, FieldSchema,
@@ -22,19 +22,16 @@ logger = logging.getLogger(__name__)
 class BootstrapError(Exception):
     """Base exception for bootstrap errors"""
 
-    pass
 
 
 class ConfigurationError(BootstrapError):
     """Raised when configuration is invalid"""
 
-    pass
 
 
 class CollectionCreationError(BootstrapError):
     """Raised when collection creation fails"""
 
-    pass
 
 
 def _field(name: str, dtype: DataType, **kwargs) -> FieldSchema:

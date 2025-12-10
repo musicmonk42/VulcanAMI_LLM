@@ -3,7 +3,6 @@ test_semantic_bridge_core.py - PURE MOCK VERSION
 Tests semantic bridge core functionality without spawning threads.
 """
 
-import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -514,7 +513,7 @@ class TestConceptOperations:
 
     def test_update_usage(self):
         concept = Concept(pattern_signature="test")
-        initial_rate = concept.success_rate
+        concept.success_rate
         concept.update_usage(True)
         assert concept.usage_count == 1
 

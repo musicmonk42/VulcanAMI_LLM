@@ -13,9 +13,7 @@ from vulcan.orchestrator.agent_lifecycle import (AgentCapability,
 import sys
 import time
 import unittest
-from collections import defaultdict
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent

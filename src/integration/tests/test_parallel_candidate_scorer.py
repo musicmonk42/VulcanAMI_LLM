@@ -12,7 +12,6 @@ from parallel_candidate_scorer import (CacheConfig, DeviceConfig, DeviceType,
 import sys
 
 import pytest
-import torch
 
 sys.path.insert(0, "/mnt/user-data/uploads")
 

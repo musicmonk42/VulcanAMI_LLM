@@ -4,7 +4,6 @@ Intelligently routes between compiled and interpreted execution paths
 with profiling, caching, and automatic optimization selection
 """
 
-import asyncio
 import atexit
 import ctypes
 import hashlib
@@ -12,17 +11,15 @@ import json
 import logging
 import os
 import pickle
-import struct
-import subprocess
 import tempfile
 import threading
 import time
 from collections import defaultdict, deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 

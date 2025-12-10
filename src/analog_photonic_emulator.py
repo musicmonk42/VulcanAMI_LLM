@@ -10,16 +10,11 @@ import hashlib
 import json
 import logging
 import os
-import shutil
-import tempfile
 import threading
 import time
-import warnings
 from collections import defaultdict
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -27,8 +22,7 @@ import scipy.constants as const
 import torch
 import torch.nn as nn
 # Scientific computing
-from scipy import linalg, signal
-from scipy.special import hermite, jv
+from scipy.special import hermite
 
 # Optional imports for hardware backends
 try:
@@ -311,8 +305,8 @@ class WaveguideSimulator:
 
     def mode_profile(self, x: np.ndarray, mode_number: int = 0) -> np.ndarray:
         """Calculate waveguide mode profile."""
-        n_eff = self.params.refractive_index
-        k0 = 2 * np.pi / self.params.wavelength
+        self.params.refractive_index
+        2 * np.pi / self.params.wavelength
 
         if mode_number == 0:
             # Fundamental mode (Gaussian)

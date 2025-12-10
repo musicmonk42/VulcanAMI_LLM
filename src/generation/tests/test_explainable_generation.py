@@ -13,15 +13,10 @@ Tests cover:
 - Edge cases and error handling
 """
 
-from explainable_generation import (AltCandidate, AttributionMethod,
-                                    CausalEvent, ContextContribution,
-                                    CounterfactualAnalysis, DecisionSummary,
-                                    ExplainableGeneration, ExplanationLevel,
-                                    FeatureAttribution)
-import math
+from explainable_generation import (ExplainableGeneration, ExplanationLevel)
 import sys
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")

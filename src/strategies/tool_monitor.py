@@ -7,18 +7,13 @@ health, and resource usage with real-time tracking and trend analysis.
 
 import json
 import logging
-import pickle
-import queue
 import threading
 import time
-import traceback
-import warnings
-from collections import Counter, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import psutil
@@ -590,7 +585,7 @@ class ToolMonitor:
             self.time_series["cpu_usage"].add(cpu_percent)
 
             # Memory usage
-            memory_info = self.process.memory_info()
+            self.process.memory_info()
             memory_percent = self.process.memory_percent()
             self.system_metrics.memory_usage_percent = memory_percent
             self.time_series["memory_usage"].add(memory_percent)

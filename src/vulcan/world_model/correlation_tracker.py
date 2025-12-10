@@ -12,13 +12,12 @@ import json
 import logging
 import threading
 import time
-import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from math import erf, exp, log, sqrt
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -71,7 +70,6 @@ def _lazy_import_world_model():
 # Protected imports with fallbacks
 try:
     from scipy import stats
-    from scipy.special import betainc
     from scipy.stats import kendalltau, pearsonr, spearmanr
     from scipy.stats import t as t_dist
 

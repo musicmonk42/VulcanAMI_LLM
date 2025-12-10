@@ -6,22 +6,20 @@ Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
 import hashlib
-import json
 import logging
 import threading
 import time
 import warnings
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 # Optional imports with fallbacks
 try:
-    from scipy import stats
+    pass
 
     SCIPY_AVAILABLE = True
 except ImportError:

@@ -16,11 +16,10 @@ from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
                                                         ProblemGraph)
 from problem_decomposer.fallback_chain import FallbackChain
 from problem_decomposer.decomposition_strategies import (
-    AnalogicalDecomposition, BruteForceSearch, DecompositionStrategy,
-    ExactDecomposition, SemanticDecomposition, StructuralDecomposition,
-    SyntheticBridging)
+    AnalogicalDecomposition, BruteForceSearch, ExactDecomposition,
+    SemanticDecomposition, StructuralDecomposition, SyntheticBridging)
 from problem_decomposer.decomposition_library import (
-    Context, DecompositionPrinciple, Pattern, StratifiedDecompositionLibrary)
+    StratifiedDecompositionLibrary)
 from problem_decomposer.decomposer_bootstrap import (DecomposerBootstrap,
                                                      create_decomposer,
                                                      create_test_problem,
@@ -32,7 +31,6 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pytest
 
@@ -204,7 +202,7 @@ class TestDecomposerBootstrap:
 
     def test_populate_fallback_chain(self, bootstrap):
         """Test fallback chain population"""
-        strategies = bootstrap.create_strategy_instances()
+        bootstrap.create_strategy_instances()
         fallback_chain = FallbackChain()
 
         bootstrap.populate_fallback_chain(fallback_chain, bootstrap.strategy_instances)

@@ -5,12 +5,10 @@ Tests all utility functions, weight management, context handling,
 and the complete UtilityModel API including caching and learning.
 """
 
-import json
 import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -24,7 +22,6 @@ from vulcan.reasoning.selection.utility_model import (ContextMode,
                                                       ThresholdUtility,
                                                       UtilityComponents,
                                                       UtilityContext,
-                                                      UtilityFunction,
                                                       UtilityModel,
                                                       UtilityWeights)
 
@@ -575,14 +572,14 @@ class TestUtilityModel:
         utility1 = model.compute_utility(
             quality=0.8, time=1000, energy=100, risk=0.2, context=context
         )
-        time1 = time.time() - start
+        time.time() - start
 
         # Second computation (should hit cache)
         start = time.time()
         utility2 = model.compute_utility(
             quality=0.8, time=1000, energy=100, risk=0.2, context=context
         )
-        time2 = time.time() - start
+        time.time() - start
 
         # Results should be identical
         assert utility1 == utility2

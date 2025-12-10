@@ -13,11 +13,10 @@ import json
 import logging
 import threading
 import time
-import warnings
-from collections import OrderedDict, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -642,7 +641,7 @@ class BetaCalibrator:
         """Fit using method of moments"""
 
         # Calculate moments
-        mean_prob = np.mean(probabilities)
+        np.mean(probabilities)
         var_prob = np.var(probabilities)
         mean_outcome = np.mean(outcomes)
 

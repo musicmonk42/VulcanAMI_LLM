@@ -12,11 +12,10 @@ from pydantic import BaseModel, Field, field_validator
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional
 from datetime import datetime
 from collections import deque
 import threading
-import subprocess
 import re
 import logging
 import json

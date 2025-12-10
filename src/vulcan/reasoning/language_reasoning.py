@@ -44,7 +44,7 @@ This module is dependency-light and uses pure Python numerics.
 
 import math
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 # --------------------------- Configuration --------------------------- #
@@ -402,7 +402,7 @@ class LanguageReasoning:
         return best["token_id"], beam_info, candidate_list
 
     def _validate_token(self, token_id: int, context: Dict[str, Any]) -> int:
-        original = token_id
+        pass
         # Safety validator
         if self.safety and hasattr(self.safety, "validate_generation"):
             try:

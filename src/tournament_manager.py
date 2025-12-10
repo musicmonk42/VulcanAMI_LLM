@@ -19,7 +19,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 from prometheus_client import Counter, Gauge, Histogram
@@ -140,13 +140,11 @@ def trace_id() -> str:
 class TournamentError(Exception):
     """Base exception for tournament errors."""
 
-    pass
 
 
 class ValidationError(TournamentError):
     """Raised when input validation fails."""
 
-    pass
 
 
 class TournamentManager:

@@ -5,9 +5,8 @@ Part of the VULCAN-AGI system test suite
 
 import time
 from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
 
 from vulcan.knowledge_crystallizer.contraindication_tracker import \
@@ -485,7 +484,7 @@ class TestKnowledgeCrystallizer:
             context={},
             iteration=1,
         )
-        result1 = crystallizer._crystallize_incremental(trace1, params)
+        crystallizer._crystallize_incremental(trace1, params)
 
         # Second iteration with same signature
         trace2 = ExecutionTrace(
@@ -629,9 +628,8 @@ class TestKnowledgeCrystallizer:
         # OR we can just test that a valid call succeeds
 
         # Let's test with a Principle-like object instead
-        mock_principle_value = Mock()
+        Mock()
         # Make isinstance check pass by actually making it the right type
-        from vulcan.knowledge_crystallizer.principle_extractor import Principle
 
         # Just test that calling store with a key/value tries to store
         # and that the knowledge base store method gets called
@@ -933,7 +931,7 @@ class TestIntegration:
         mock_principle.confidence = 0.8
 
         # Crystallize
-        cryst_result = crystallizer.crystallize(simple_trace)
+        crystallizer.crystallize(simple_trace)
 
         # Setup for application
         crystallizer.applicator.find_applicable_principles = Mock(

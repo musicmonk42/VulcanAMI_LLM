@@ -4,9 +4,6 @@ Part of the VULCAN-AGI system test suite
 """
 
 import threading
-import time
-from collections import deque
-from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
@@ -15,10 +12,9 @@ import pytest
 from vulcan.curiosity_engine.gap_analyzer import (AnomalyAnalyzer,
                                                   DecompositionAnalyzer,
                                                   FailureTracker, GapAnalyzer,
-                                                  GapRegistry, GapType,
-                                                  KnowledgeGap, LatentGap,
-                                                  LatentGapDetector, Pattern,
-                                                  PatternTracker,
+                                                  GapRegistry, KnowledgeGap,
+                                                  LatentGap, LatentGapDetector,
+                                                  Pattern, PatternTracker,
                                                   PredictionAnalyzer,
                                                   SimpleAnomalyDetector,
                                                   TransferAnalyzer)

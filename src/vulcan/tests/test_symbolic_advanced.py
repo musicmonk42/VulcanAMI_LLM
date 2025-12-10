@@ -11,25 +11,18 @@ All tests are designed to validate the FIXED implementations.
 """
 
 import time
-from collections import defaultdict
-from typing import Any, Dict
 
 import pytest
 
 # Import the classes we're testing
-from src.vulcan.reasoning.symbolic.advanced import (EventHierarchy,
-                                                    FuzzyLogicReasoner,
-                                                    FuzzySetMetadata,
-                                                    MetaReasoner, ProofLearner,
-                                                    ProofPattern,
-                                                    RecurringEvent,
-                                                    ResourceMetrics,
-                                                    TemporalReasoner,
+from src.vulcan.reasoning.symbolic.advanced import (FuzzyLogicReasoner,
+                                                    MetaReasoner,
+                                                    ProofLearner,
+                                                    ProofPattern, TemporalReasoner,
                                                     TimeInterval)
 # Import core types needed for testing
 from src.vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
-                                                Literal, ProofNode, Term,
-                                                Variable)
+                                                Literal, ProofNode, Variable)
 
 # ============================================================================
 # FUZZY LOGIC REASONER TESTS

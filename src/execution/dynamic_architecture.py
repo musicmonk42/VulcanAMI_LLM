@@ -33,7 +33,6 @@ License: MIT
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 import logging
 import threading
@@ -44,7 +43,7 @@ from collections import OrderedDict, defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -495,7 +494,7 @@ class DynamicArchitecture:
                         self._performance_metrics["total_changes"] += 1
                         self._performance_metrics["successful_changes"] += 1
                     return True
-                except Exception as e:
+                except Exception:
                     logger.exception(
                         "add_head: model.add_attention_head failed, falling back to IR"
                     )
@@ -543,7 +542,7 @@ class DynamicArchitecture:
                         self._performance_metrics["total_changes"] += 1
                         self._performance_metrics["successful_changes"] += 1
                     return True
-                except Exception as e:
+                except Exception:
                     logger.exception("remove_head: model method failed")
 
             # IR-level update
@@ -1141,7 +1140,7 @@ class DynamicArchitecture:
             elif isinstance(end, tuple) and len(end) == 2:
                 try:
                     return int(end[0]), str(end[1])
-                except Exception as e:
+                except Exception:
                     return None, None
             return None, None
 
@@ -1273,7 +1272,7 @@ class DynamicArchitecture:
         if state.get("mode") == "model" and self._get_layers() is not None:
             try:
                 self.model.layers = copy.deepcopy(state["layers"])
-            except Exception as e:
+            except Exception:
                 cur = self._get_layers()
                 if isinstance(cur, list):
                     cur.clear()
@@ -1430,7 +1429,7 @@ class DynamicArchitecture:
         if self._get_layers() is not None:
             try:
                 self.model.layers = layers
-            except Exception as e:
+            except Exception:
                 cur = self._get_layers()
                 if isinstance(cur, list):
                     cur.clear()

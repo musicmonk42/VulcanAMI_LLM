@@ -24,14 +24,13 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import \
     Path as FilePath  # <-- FIX: Use alias 'FilePath' to avoid name conflict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -326,7 +325,6 @@ def check_component_availability():
 class ComponentIntegrationError(Exception):
     """Raised when critical component integration fails"""
 
-    pass
 
 
 @dataclass
@@ -2843,7 +2841,7 @@ class WorldModel:
 
         with self.lock:
             try:
-                negotiator = self.motivational_introspection.objective_hierarchy
+                self.motivational_introspection.objective_hierarchy
 
                 return {
                     "status": "success",
@@ -3184,7 +3182,7 @@ class WorldModel:
         if self.safety_validator and (load_path / "safety_state.json").exists():
             try:
                 with open(load_path / "safety_state.json", "r") as f:
-                    safety_state = json.load(f)
+                    json.load(f)
                 logger.info("Safety validator state loaded")
             except Exception as e:
                 logger.error("Error loading safety state: %s", e)
@@ -3196,7 +3194,7 @@ class WorldModel:
         ):
             try:
                 with open(load_path / "meta_reasoning_state.json", "r") as f:
-                    meta_reasoning_state = json.load(f)
+                    json.load(f)
                 logger.info("Meta-reasoning state loaded")
             except Exception as e:
                 logger.error("Error loading meta-reasoning state: %s", e)

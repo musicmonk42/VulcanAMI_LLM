@@ -3,18 +3,15 @@ Test suite for parameter history management module
 """
 
 from vulcan.learning.parameter_history import ParameterHistoryManager
-from vulcan.learning.learning_types import LearningConfig, LearningTrajectory
+from vulcan.learning.learning_types import LearningConfig
 import torch.nn as nn
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 from pathlib import Path
-from collections import deque
 import time
 import threading
 import tempfile
 import shutil
-import queue
-import pickle
 import json
 import pytest
 
@@ -81,7 +78,7 @@ class TestParameterHistoryManager:
         """Test context manager functionality"""
         with ParameterHistoryManager(base_path=temp_dir) as manager:
             # Start trajectory
-            trajectory_id = manager.start_trajectory("task_1", "agent_1")
+            manager.start_trajectory("task_1", "agent_1")
             assert manager.current_trajectory is not None
 
             # Manager should save trajectory on exit

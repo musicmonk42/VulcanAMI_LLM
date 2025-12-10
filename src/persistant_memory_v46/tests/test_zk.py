@@ -11,10 +11,7 @@ Tests cover:
 """
 
 from zk import GrothProof, MerkleTree, ZKCircuit, ZKProver
-import hashlib
 import sys
-from typing import Any, Dict, List
-from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest

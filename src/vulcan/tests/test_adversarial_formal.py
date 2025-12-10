@@ -8,12 +8,9 @@ from vulcan.safety.safety_types import (ActionType, SafetyReport,
                                         SafetyViolationType)
 from vulcan.safety.adversarial_formal import (AdversarialValidator,
                                               AttackConfig, AttackType,
-                                              FormalProperty, FormalVerifier,
-                                              PropertyType, timeout)
+                                              FormalVerifier, timeout)
 import copy
 import time
-from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest

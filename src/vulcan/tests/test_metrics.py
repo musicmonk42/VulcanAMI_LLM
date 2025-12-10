@@ -14,9 +14,7 @@ import sys
 import threading
 import time
 import unittest
-from collections import deque
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent

@@ -10,15 +10,12 @@ FIXED: Pattern priority and temporal extrapolation for accurate predictions
 """
 
 import importlib  # Added for lazy loading
-import json
 import logging
 import threading
 import time
-import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np

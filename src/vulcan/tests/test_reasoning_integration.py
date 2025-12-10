@@ -4,14 +4,10 @@ Integration Test for VULCAN Unified Reasoning System
 Tests the complete reasoning pipeline end-to-end using the actual UnifiedReasoner API.
 """
 
-import json
 import shutil
 import tempfile
-import time
 from pathlib import Path
-from typing import Any, Dict, List
 
-import numpy as np
 import pytest
 
 # Import from reasoning_types module

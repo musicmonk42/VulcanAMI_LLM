@@ -46,9 +46,9 @@ import json
 import math
 import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 Token = Union[int, str]
 
@@ -652,7 +652,7 @@ class UnifiedGeneration:
 
         for mod_name, proposals in per_module.items():
             w = float(weights.get(mod_name, 1.0))
-            mod_conf = module_confidences.get(mod_name, 1.0)
+            module_confidences.get(mod_name, 1.0)
 
             for p in proposals:
                 tok = p.get("token")

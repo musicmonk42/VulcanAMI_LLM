@@ -31,12 +31,9 @@ import secrets
 from typing import Dict, List
 from typing import Callable, Optional, TypeVar
 from functools import wraps
-import traceback
 from pathlib import Path
 import subprocess
-import shlex
 import re
-import io
 import logging
 import os
 import pickle
@@ -168,7 +165,7 @@ class RestrictedUnpickler(pickle.Unpickler):
 
                 mod = importlib.import_module(module)
                 return getattr(mod, name)
-            except (ImportError, AttributeError) as e:
+            except (ImportError, AttributeError):
                 # If we can't import it, fall through to the whitelist check
                 pass
 
@@ -232,7 +229,7 @@ def safe_pickle_load(file_or_path: Union[str, os.PathLike, BinaryIO]) -> Any:
         except pickle.UnpicklingError as e:
             logger.error(f"Unsafe pickle load attempt from {file_or_path}: {e}")
             raise
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             logger.error(f"Pickle file not found: {file_or_path}")
             raise
         except Exception as e:
@@ -408,7 +405,6 @@ def safe_execute(
 class ConfigurationError(Exception):
     """Raised when required configuration is missing or invalid."""
 
-    pass
 
 
 def validate_production_config() -> None:

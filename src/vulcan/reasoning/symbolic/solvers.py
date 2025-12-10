@@ -42,11 +42,10 @@ import random
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 from scipy import stats
-from scipy.linalg import cho_factor, cho_solve
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +145,7 @@ class Factor:
     def _marginalize_gaussian(self, var: str) -> "Factor":
         """Marginalize Gaussian factor."""
         # For linear Gaussian models, marginalization is analytical
-        var_idx = self.variables.index(var)
+        self.variables.index(var)
         new_vars = [v for v in self.variables if v != var]
 
         if self.mean_params is None or self.covariance is None:

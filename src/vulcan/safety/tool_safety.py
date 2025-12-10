@@ -11,18 +11,15 @@ Revision / Fix Notes (Applied):
 """
 
 import atexit
-import json
 import logging
 import os
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from .safety_types import (ActionType, Condition, SafetyReport,
-                           SafetyViolationType, ToolSafetyContract,
-                           ToolSafetyLevel)
+from .safety_types import (Condition, SafetyReport, SafetyViolationType,
+                           ToolSafetyContract, ToolSafetyLevel)
 
 logger = logging.getLogger(__name__)
 

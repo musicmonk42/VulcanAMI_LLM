@@ -18,17 +18,14 @@ import sys
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-import numpy as np
 
 # Add the 'src' directory to the Python path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 try:
     from vulcan.reasoning.selection.admission_control import (
-        AdmissionControlIntegration, AdmissionDecision, Request,
-        RequestPriority)
+        AdmissionControlIntegration, Request, RequestPriority)
     from vulcan.reasoning.selection.portfolio_executor import (
         ExecutionStrategy, PortfolioExecutor, PortfolioResult)
     from vulcan.reasoning.selection.utility_model import (ContextMode,

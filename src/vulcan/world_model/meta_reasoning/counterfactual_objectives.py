@@ -15,10 +15,9 @@ Learns from validation history to improve predictions.
 import logging
 import threading
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
-from itertools import combinations
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock  # ADDED as per fix steps
 
 import numpy as np
@@ -162,7 +161,7 @@ class CounterfactualObjectiveReasoner:
             # EXAMINE: Analyze what optimizing for this objective would mean
 
             # Get current state
-            current_state = context.get("current_state", {})
+            context.get("current_state", {})
 
             # Identify relevant variables for this objective
             relevant_vars = self._identify_relevant_variables(
@@ -974,7 +973,7 @@ class CounterfactualObjectiveReasoner:
         """Identify Pareto-optimal points from evaluated candidates"""
 
         pareto_points = []
-        n_points = len(evaluated_points)
+        len(evaluated_points)
 
         for i, point in enumerate(evaluated_points):
             outcomes = point["outcomes"]

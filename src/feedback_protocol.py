@@ -5,16 +5,13 @@ Version: 2.0.0 - All issues fixed, validation implemented
 Feedback submission for self-improving loops with RLHF optimization.
 """
 
-import hashlib
 import logging
 import re
-import sqlite3
 import threading
 import time
-from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -696,7 +693,7 @@ class FeedbackQueryNode:
     ) -> Dict[str, Any]:
         """Query feedback history."""
         proposal_id = params.get("proposal_id")
-        limit = params.get("limit", 10)
+        params.get("limit", 10)
 
         # Validate proposal_id
         if proposal_id:

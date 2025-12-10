@@ -64,7 +64,6 @@ from __future__ import annotations
 import builtins as _builtins
 
 import atexit
-import io
 import json
 import logging
 import os

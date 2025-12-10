@@ -10,8 +10,7 @@ import shutil
 import sqlite3
 import threading
 import time
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -433,7 +432,7 @@ class MemoryCompressor:
             try:
                 decompressed = lz4.frame.decompress(data)
                 return pickle.loads(decompressed)
-            except Exception as e:
+            except Exception:
                 return None
 
         try:
@@ -461,7 +460,7 @@ class MemoryCompressor:
                 bytes_array = (reconstructed_array * 255).astype(np.uint8).tobytes()
                 try:
                     result = bytes_array.decode("utf-8").rstrip("\0")
-                except Exception as e:
+                except Exception:
                     result = f"[Neural reconstruction - metadata: {compressed_data['memory_metadata']}]"
 
             elif compressed_data["original_type"] == "ndarray":
@@ -498,7 +497,7 @@ class MemoryCompressor:
             metadata = result["memory_metadata"]
 
             # Reconstruct based on compression type
-            compressor = SemanticCompressor()
+            SemanticCompressor()
 
             if compressed["type"] == "summary":
                 # Summary is directly usable
@@ -528,7 +527,7 @@ class MemoryCompressor:
                 # Try LZ4 fallback
                 decompressed = lz4.frame.decompress(data)
                 return pickle.loads(decompressed)
-            except Exception as e:
+            except Exception:
                 return None
 
     @staticmethod

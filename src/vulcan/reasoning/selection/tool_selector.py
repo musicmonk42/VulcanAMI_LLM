@@ -13,11 +13,10 @@ Fixed with interruptible background threads.
 import json
 import logging
 import pickle
-import sys
 import threading
 import time
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -458,7 +457,7 @@ class ValueOfInformationGate:
         try:
             # 1. Estimate current utility and its uncertainty
             # This is a simplification. A real implementation would use a proper utility predictor.
-            current_utility = np.mean(features)
+            np.mean(features)
             utility_variance = np.var(features)
 
             best_probe_action = None

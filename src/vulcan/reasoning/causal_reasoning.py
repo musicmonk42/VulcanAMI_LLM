@@ -7,8 +7,6 @@ FIXED: Consistent return format for _granger_causality_test method.
 """
 
 from __future__ import annotations
-from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
-                              ReasoningType)
 from .reasoning_explainer import ReasoningExplainer
 
 import json
@@ -16,17 +14,15 @@ import logging
 import pickle
 import time
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 import numpy as np
 from scipy import stats
-from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import StandardScaler
 
 try:
     import networkx as nx
@@ -47,7 +43,7 @@ except ImportError:
     logging.getLogger(__name__).warning("Pandas not available, some features disabled")
 
 try:
-    from dowhy import CausalModel
+    pass
 
     DOWHY_AVAILABLE = True
 except ImportError:
@@ -73,7 +69,6 @@ logger = logging.getLogger(__name__)
 try:
     from causallearn.search.ConstraintBased import FCI as fci
     from causallearn.search.ScoreBased import GES as ges
-    from causallearn.utils import GraphUtils
 
     CAUSALLEARN_AVAILABLE = True
     logger.info("causallearn loaded, using GES/FCI algorithms")

@@ -6,13 +6,12 @@ import json
 import logging
 import os
 import pickle
-import queue
 import socket
 import struct
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
@@ -284,7 +283,7 @@ class RPCServer:
             # Always close socket properly
             try:
                 conn.shutdown(socket.SHUT_RDWR)
-            except Exception as e:
+            except Exception:
                 pass  # Socket might already be closed
             try:
                 conn.close()

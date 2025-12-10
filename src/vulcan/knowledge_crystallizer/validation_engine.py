@@ -28,7 +28,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -44,7 +44,7 @@ except ImportError:
     )
 
 try:
-    import signal
+    pass
 
     SIGNAL_AVAILABLE = True
 except ImportError:
@@ -1186,7 +1186,7 @@ class KnowledgeValidator:
                     return "unknown_error"
 
             return None
-        except Exception as e:
+        except Exception:
             return "analysis_error"
 
     def _suggest_fixes(self, test_result: Dict[str, Any], domain: str) -> List[str]:
@@ -1697,7 +1697,7 @@ class DomainValidator:
 
             try:
                 shutil.rmtree(sandbox_dir, ignore_errors=True)
-            except Exception as e:
+            except Exception:
                 pass  # Best effort cleanup
 
     def _create_test_script(

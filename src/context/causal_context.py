@@ -72,14 +72,12 @@ Output:
 """
 
 import hashlib
-import json
-import math
 import re
 import time
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 Token = Union[int, str]
 Tokens = List[Token]

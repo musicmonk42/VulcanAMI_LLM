@@ -9,7 +9,6 @@ import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from unittest.mock import Mock
@@ -575,7 +574,7 @@ class TestObservationProcessor:
                 "vector": [1, 2, 3],
             },
         )
-        variables = observation_processor.extract_variables(obs)
+        observation_processor.extract_variables(obs)
         assert observation_processor.variable_types["numeric"] == "numeric"
         assert observation_processor.variable_types["boolean"] == "boolean"
         assert observation_processor.variable_types["categorical"] == "categorical"
@@ -607,7 +606,7 @@ class TestObservationProcessor:
         self, observation_processor, observation_sequence
     ):
         for obs in observation_sequence:
-            patterns = observation_processor.extract_temporal_patterns(obs)
+            observation_processor.extract_temporal_patterns(obs)
 
         final_patterns = observation_processor.extract_temporal_patterns(
             observation_sequence[-1]

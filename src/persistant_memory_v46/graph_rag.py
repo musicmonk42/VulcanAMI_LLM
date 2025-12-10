@@ -5,7 +5,6 @@ Implements core enhancement categories with proper error handling and fallbacks.
 """
 
 import asyncio
-import hashlib
 import json
 import logging
 import os

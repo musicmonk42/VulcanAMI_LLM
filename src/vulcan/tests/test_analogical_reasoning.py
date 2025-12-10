@@ -21,7 +21,6 @@ import os
 import sys
 import threading
 import time
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -580,7 +579,7 @@ class TestLearning:
         """Test weight adaptation based on success"""
         reasoner = AnalogicalReasoner(enable_learning=True)
 
-        initial_weight = reasoner.learned_weights["structural"]
+        reasoner.learned_weights["structural"]
 
         # Simulate successful mappings
         for _ in range(10):
@@ -744,7 +743,7 @@ class TestPerformance:
     def test_memory_usage_bounded(self, basic_reasoner):
         """Test that memory usage stays bounded"""
         # Get initial cache size
-        initial_cache_size = len(basic_reasoner.analogy_cache)
+        len(basic_reasoner.analogy_cache)
 
         # Perform many operations
         for i in range(1000):
@@ -908,7 +907,7 @@ class TestRegressions:
         signal.alarm(5)
 
         try:
-            result = basic_reasoner.find_structural_analogy("test", domain)
+            basic_reasoner.find_structural_analogy("test", domain)
             signal.alarm(0)  # Cancel alarm
             assert True  # Completed successfully
         except TimeoutError:

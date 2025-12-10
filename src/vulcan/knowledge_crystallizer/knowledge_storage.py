@@ -14,12 +14,12 @@ import shutil
 import sqlite3
 import threading
 import time
-from collections import Counter, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -106,15 +106,14 @@ class PrincipleVersion:
         )
 
         # Apply unified diff
-        reconstructed_lines = []
-        base_lines = base_str.splitlines()
+        base_str.splitlines()
 
         # Simple diff application (would need more sophisticated logic for production)
         # For now, return base if diff application fails
         try:
             # This is a simplified reconstruction - proper implementation would use difflib.patch
             return base_principle
-        except Exception as e:
+        except Exception:
             return base_principle
 
 
@@ -1028,7 +1027,7 @@ class VersionedKnowledgeBase:
                     # Determine format from decompressed content
                     try:
                         data = json.loads(content)
-                    except Exception as e:
+                    except Exception:
                         data = pickle.loads(content)
                 else:
                     # Load based on extension
@@ -1596,7 +1595,7 @@ class VersionedKnowledgeBase:
                 if parts1[i] != parts2[i]:
                     return False
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def _get_most_accessed(self, n: int) -> List[Tuple[str, int]]:
@@ -1606,7 +1605,7 @@ class VersionedKnowledgeBase:
                 self.access_counts.items(), key=lambda x: x[1], reverse=True
             )
             return sorted_access[:n]
-        except Exception as e:
+        except Exception:
             return []
 
     def __del__(self):
@@ -2087,7 +2086,7 @@ class KnowledgeIndex:
 
             # Check for common parts
             return len(set(parts1) & set(parts2)) > 0
-        except Exception as e:
+        except Exception:
             return False
 
     def _get_embedding(self, obj: Any) -> np.ndarray:

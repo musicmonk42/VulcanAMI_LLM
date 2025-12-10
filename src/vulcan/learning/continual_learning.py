@@ -2,25 +2,21 @@
 Continual learning implementations with EWC and experience replay
 """
 
-import copy
-import hashlib
-import json
 import logging
 import pickle
 import threading  # <-- threading is imported here
 import time
 from collections import deque
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 try:
     from safety.safety_types import SafetyConfig
@@ -37,7 +33,7 @@ except ImportError:
     HIERARCHICAL_AVAILABLE = False
     HierarchicalMemory = None
 
-from ..config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM, ModalityType
+from ..config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM
 from ..security_fixes import safe_pickle_load
 from .learning_types import FeedbackData, LearningConfig, TaskInfo
 from .meta_learning import MetaLearner, TaskDetector
@@ -99,10 +95,10 @@ class ContinualLearner:
         try:
             # Extract components
             features = experience.get("features")
-            result = experience.get("result")
-            success = experience.get("success", True)
+            experience.get("result")
+            experience.get("success", True)
             tool_used = experience.get("tool_used")
-            context = experience.get("context", {})
+            experience.get("context", {})
 
             # This is a simplified learner; we'll just store the experience
             self.experience_buffer.append(experience)
@@ -645,7 +641,7 @@ class EnhancedContinualLearner(nn.Module):
                                         try:
                                             pickle.dumps(v)
                                             clean_item[k] = v
-                                        except Exception as e:
+                                        except Exception:
                                             if isinstance(v, torch.Tensor):
                                                 clean_item[k] = v.detach().cpu().numpy()
                                             elif isinstance(v, np.ndarray):
@@ -662,7 +658,7 @@ class EnhancedContinualLearner(nn.Module):
                                     try:
                                         pickle.dumps(item)
                                         sanitized.append(item)
-                                    except Exception as e:
+                                    except Exception:
                                         sanitized.append(str(item))
                             return sanitized
 
@@ -1313,14 +1309,14 @@ class EnhancedContinualLearner(nn.Module):
                                     else:
                                         try:
                                             clean_item[k] = str(v)
-                                        except Exception as e:
+                                        except Exception:
                                             clean_item[k] = None
                             sanitized.append(clean_item)
                         else:
                             try:
                                 pickle.dumps(item)
                                 sanitized.append(item)
-                            except Exception as e:
+                            except Exception:
                                 sanitized.append(str(item))
                     return sanitized
 

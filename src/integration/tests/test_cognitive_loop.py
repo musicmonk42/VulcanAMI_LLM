@@ -49,9 +49,9 @@ class MockTransformer:
 
     def __call__(self, tokens):
         # Return mock logits
-        import torch
+        pass
 
-        batch_size = 1 if isinstance(tokens, list) else len(tokens)
+        1 if isinstance(tokens, list) else len(tokens)
         seq_len = len(tokens) if isinstance(tokens, list) else 1
         return type(
             "obj",

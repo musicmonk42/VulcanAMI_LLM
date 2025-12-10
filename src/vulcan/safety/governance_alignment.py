@@ -4,26 +4,23 @@ Governance and value alignment systems for VULCAN-AGI Safety Module.
 Implements human oversight, value alignment verification, and multi-stakeholder governance.
 """
 
-import atexit
-import hashlib
 import json
 import logging
-import pickle
 import sqlite3
 import threading
 import time
 import uuid
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .safety_types import ActionType, SafetyReport, SafetyViolationType
+from .safety_types import ActionType
 
 logger = logging.getLogger(__name__)
 
@@ -975,7 +972,7 @@ class GovernanceManager:
             human_policy = self.policies.get("safety_critical")
 
         if human_policy:
-            result = self._process_human_controlled(decision_id, action, human_policy)
+            self._process_human_controlled(decision_id, action, human_policy)
 
             with self.lock:
                 if decision_id in self.active_decisions:

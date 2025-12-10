@@ -12,7 +12,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # ============================================================
 # ENUMERATIONS
@@ -144,7 +144,7 @@ class Condition:
                 return self.value not in actual
             else:
                 raise ValueError(f"Unknown operator: {self.operator}")
-        except (TypeError, ValueError) as e:
+        except (TypeError, ValueError):
             # Handle comparison errors gracefully
             return False
 
@@ -314,7 +314,7 @@ class SafetyConstraint:
                 return result
             else:
                 return False, 0.0
-        except Exception as e:
+        except Exception:
             # Log error and return failure
             return False, 0.0
 

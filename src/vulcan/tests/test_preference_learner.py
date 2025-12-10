@@ -11,13 +11,11 @@ Notes:
 
 from __future__ import annotations
 
-import json
 import time
 from collections import defaultdict, deque
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List
 from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
 
 # Import the module under test.

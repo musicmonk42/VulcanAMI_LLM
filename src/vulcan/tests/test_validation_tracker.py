@@ -9,11 +9,8 @@ Tests all functionality including:
 - Learning insights generation
 """
 
-import time
-from collections import defaultdict
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.validation_tracker import (
@@ -440,7 +437,7 @@ class TestValidationTracker:
         """Test that comprehensive relearn is triggered periodically"""
         tracker.relearn_interval = 10
 
-        initial_pattern_count = len(tracker.patterns)
+        len(tracker.patterns)
 
         # Record validations to trigger relearn
         for i in range(15):
@@ -500,7 +497,7 @@ class TestValidationTracker:
         initial_patterns = tracker.identify_success_patterns()
 
         if len(initial_patterns) > 0:
-            initial_confidence = initial_patterns[0].confidence
+            initial_patterns[0].confidence
 
             # Add conflicting validation
             proposal = {"objective": "test_obj", "domain": "consistent"}

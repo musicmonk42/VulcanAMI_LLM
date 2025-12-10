@@ -14,13 +14,10 @@ import shutil
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
-import numpy as np
 import pytest
 
 from vulcan.safety.governance_alignment import (AlignmentConstraint,
-                                                AlignmentMetric,
                                                 GovernanceLevel,
                                                 GovernanceManager,
                                                 GovernancePolicy,
@@ -903,7 +900,7 @@ class TestEdgeCases:
         # Should not crash
         try:
             manager._record_decision("test_id", "action_id", "policy_id", {})
-        except Exception as e:
+        except Exception:
             # Should log error but not crash
             pass
 

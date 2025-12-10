@@ -51,19 +51,16 @@ WAL_MODE_ENABLED = True
 class PersistenceError(Exception):
     """Base exception for persistence layer errors."""
 
-    pass
 
 
 class IntegrityError(PersistenceError):
     """Raised when data integrity check fails."""
 
-    pass
 
 
 class KeyManagementError(PersistenceError):
     """Raised when key management operations fail."""
 
-    pass
 
 
 class CacheEntry:

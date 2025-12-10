@@ -10,15 +10,14 @@ IMPLEMENTATION COMPLETE - All components functional and integrated
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import threading
 import time
-from collections import Counter, defaultdict, deque
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -26,11 +25,11 @@ import numpy as np
 try:
     from .decomposition_library import StratifiedDecompositionLibrary
     from .problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
-                                          ProblemGraph, ProblemSignature)
+                                          ProblemGraph)
 except ImportError:
     from decomposition_library import StratifiedDecompositionLibrary
     from problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
-                                         ProblemGraph, ProblemSignature)
+                                         ProblemGraph)
 
 # Import knowledge crystallizer components
 try:

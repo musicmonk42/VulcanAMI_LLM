@@ -15,10 +15,8 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
-import psutil
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

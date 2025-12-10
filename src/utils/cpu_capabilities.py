@@ -14,7 +14,7 @@ import logging
 import platform
 import threading
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 

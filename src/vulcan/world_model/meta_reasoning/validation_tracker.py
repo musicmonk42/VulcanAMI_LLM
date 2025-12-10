@@ -39,7 +39,7 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 # import numpy as np # Original import
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
 
 # --- START FIX: Add numpy fallback ---
@@ -856,7 +856,7 @@ class ValidationTracker:
 
     def analyze_failure_patterns(self) -> Dict[str, Any]:
         """Analyze patterns in validation failures"""
-        _np = self._np
+        self._np
         with self.lock:
             history_list = list(self.validation_records)  # Snapshot
             rejected = [

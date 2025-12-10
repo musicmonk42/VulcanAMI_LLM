@@ -16,7 +16,7 @@ import time
 import unittest
 from collections import defaultdict
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent
@@ -410,7 +410,6 @@ class TestRayTaskQueue(unittest.TestCase):
 
     def tearDown(self):
         """Clean up after tests"""
-        pass
 
     @patch("vulcan.orchestrator.task_queues.ray")
     def test_initialization(self, mock_ray):

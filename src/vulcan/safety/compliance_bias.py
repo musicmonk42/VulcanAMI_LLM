@@ -7,21 +7,16 @@ Implements regulatory compliance validation and multi-model bias detection.
 import hashlib
 import json
 import logging
-import re
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 
-from .safety_types import ComplianceStandard, SafetyReport, SafetyViolationType
+from .safety_types import ComplianceStandard
 
 logger = logging.getLogger(__name__)
 
@@ -2397,7 +2392,7 @@ class BiasDetector:
 
         # Factor in score magnitude
         max_score = max(scores)
-        min_score = min(scores)
+        min(scores)
 
         if max_score > 0.5:
             # High bias detected with confidence

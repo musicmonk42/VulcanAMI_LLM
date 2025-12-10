@@ -7,15 +7,11 @@ from vulcan.learning.curriculum_learning import (CompositeDifficultyEstimator,
                                                  CurriculumLearner,
                                                  CurriculumMetrics,
                                                  DifficultyEstimator,
-                                                 DifficultyMetric,
                                                  LearnedDifficultyEstimator,
-                                                 PacingStrategy, StageInfo)
+                                                 PacingStrategy)
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 from pathlib import Path
-import time
-import tempfile
-import shutil
 import json
 import pytest
 
@@ -283,7 +279,7 @@ class TestCurriculumLearner:
             assert learner.current_stage > initial_stage
 
             # Second stage requires more samples
-            second_stage = learner.current_stage
+            learner.current_stage
             for i in range(10):  # min_samples * 2^1 = 10
                 learner.get_next_batch(performance=0.8, batch_size=1)
 

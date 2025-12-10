@@ -9,14 +9,12 @@ FULLY IMPLEMENTED VERSION with:
 - Automatic relevance determination (ARD)
 """
 
-from .reasoning_types import ReasoningResult, ReasoningStep, ReasoningType
+from .reasoning_types import ReasoningResult, ReasoningType
 from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
 import hashlib
-import json
 import logging
 import pickle
 import time
-import uuid
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -26,9 +24,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
+    pass
 
     TORCH_AVAILABLE = True
 except ImportError:
@@ -38,11 +34,10 @@ except ImportError:
 try:
     from scipy import stats
     from scipy.optimize import differential_evolution, minimize
-    from sklearn.decomposition import PCA, FastICA
+    from sklearn.decomposition import PCA
     from sklearn.feature_selection import mutual_info_regression
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import RBF
-    from sklearn.gaussian_process.kernels import ConstantKernel as C
     from sklearn.gaussian_process.kernels import (ExpSineSquared, Matern,
                                                   RationalQuadratic,
                                                   WhiteKernel)
@@ -55,8 +50,7 @@ except ImportError:
     raise
 
 try:
-    from scipy.special import gamma, kv, logsumexp
-    from scipy.stats import multivariate_normal, norm
+    from scipy.special import gamma, kv
 
     SCIPY_AVAILABLE = True
     from scipy.spatial.distance import cdist

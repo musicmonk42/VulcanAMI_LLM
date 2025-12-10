@@ -27,17 +27,13 @@ from vulcan.reasoning.unified_reasoning import (ReasoningPlan,
 from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
                                               ReasoningStep, ReasoningType)
 import gc
-import shutil
 # CRITICAL: Mock problematic components BEFORE any imports that might load them
 import sys
-import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
-import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

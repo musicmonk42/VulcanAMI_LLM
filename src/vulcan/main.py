@@ -12,25 +12,20 @@
 # PATH + SAFETY SETUP - MUST BE FIRST
 # ====================================================================
 from vulcan.orchestrator import ProductionDeployment
-from vulcan.config import AgentConfig, ProfileType, get_config, load_profile
-import vulcan.world_model
-import vulcan.semantic_bridge
-import vulcan.safety
-import vulcan.memory
+from vulcan.config import AgentConfig, get_config
 from pydantic_settings import BaseSettings
 from pydantic import BaseModel, ConfigDict, Field
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 import uvicorn
 import numpy as np
 import msgpack
 from unittest.mock import MagicMock
 from typing import Any, Dict, List, Optional
-from threading import Lock, Thread
+from threading import Thread
 from contextlib import asynccontextmanager
-from collections import defaultdict
 import time
 import socket  # <-- ADDED
 import logging
@@ -1625,7 +1620,7 @@ def test_resource_limits(deployment: ProductionDeployment) -> bool:
     }
 
     try:
-        result = deployment.step_with_monitoring([], large_context)
+        deployment.step_with_monitoring([], large_context)
 
         status = deployment.get_status()
         memory_usage = status["health"]["memory_usage_mb"]
@@ -1993,7 +1988,7 @@ def benchmark_system(config: AgentConfig, iterations: int = 100) -> Dict[str, An
             "raw_observation": f"Benchmark iteration {i}",
         }
 
-        result = deployment.step_with_monitoring([], context)
+        deployment.step_with_monitoring([], context)
 
         latencies.append((time.time() - iter_start) * 1000)
 

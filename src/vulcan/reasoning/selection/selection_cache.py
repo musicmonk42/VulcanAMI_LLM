@@ -9,20 +9,18 @@ PATCH 5: Interruptible cleanup loop with Event-based shutdown.
 """
 
 import hashlib
-import heapq
 import json
 import logging
 import pickle
 import sys
 import threading
 import time
-import weakref
 import zlib
 from collections import OrderedDict, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -35,7 +33,7 @@ def sizeof(obj: Any) -> int:
     try:
         # Try sys.getsizeof first
         return sys.getsizeof(obj)
-    except Exception as e:
+    except Exception:
         # Fallback: use pickle size
         try:
             return len(pickle.dumps(obj))

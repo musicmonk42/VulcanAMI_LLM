@@ -7,8 +7,6 @@ demand prediction, and resource monitoring.
 
 import threading
 import time
-from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -47,7 +45,6 @@ class MockTool:
 
     def shutdown(self):
         """Mock shutdown"""
-        pass
 
 
 class TestPoolInstance:
@@ -578,7 +575,7 @@ class TestDemandPredictor:
         predictor = DemandPredictor()
 
         # Record multiple requests
-        current_time = time.time()
+        time.time()
         for i in range(10):
             predictor.record_request("tool1")
             time.sleep(0.01)

@@ -4,10 +4,9 @@ import asyncio
 import hashlib
 import logging
 import time
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 
@@ -160,7 +159,6 @@ class GradientSurgeryUnlearner:
     def _apply_gradients(self, gradients: np.ndarray, learning_rate: float) -> None:
         """Apply gradients to model parameters."""
         # Placeholder - in production update actual model parameters
-        pass
 
     def _compute_loss(self, data: List[bytes]) -> float:
         """Compute loss for a dataset."""
@@ -306,10 +304,10 @@ class UnlearningEngine:
             Unlearning result
         """
         # Extract data from packfile matching pattern
-        forget_data = self._extract_pattern_from_packfile(packfile, pattern)
+        self._extract_pattern_from_packfile(packfile, pattern)
 
         # Get retain data (everything else in packfile)
-        retain_data = self._extract_non_pattern_from_packfile(packfile, pattern)
+        self._extract_non_pattern_from_packfile(packfile, pattern)
 
         # Convert to bytes
         forget = [pattern.encode()]

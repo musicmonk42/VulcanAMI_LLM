@@ -38,12 +38,10 @@ class AbstractReasoner(ABC):
         self, problem: Any, context: Optional["ReasoningContext"] = None
     ) -> "ReasoningResult":
         """Execute reasoning on the given problem"""
-        pass
 
     @abstractmethod
     def get_capabilities(self) -> Dict[str, Any]:
         """Return reasoner capabilities"""
-        pass
 
     def validate_input(self, problem: Any) -> bool:
         """Validate input problem (optional override)"""
@@ -51,11 +49,9 @@ class AbstractReasoner(ABC):
 
     def warm_up(self):
         """Warm up reasoner (optional override)"""
-        pass
 
     def shutdown(self):
         """Clean shutdown (optional override)"""
-        pass
 
 
 class ReasoningType(Enum):

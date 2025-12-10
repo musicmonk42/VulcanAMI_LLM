@@ -14,13 +14,10 @@ Tests cover:
 """
 
 from safe_generation import (HallucinationValidator, PromptInjectionValidator,
-                             RiskAssessment, RiskLevel, SafeGeneration,
-                             SafetyEvent, SafetyMetrics, ToxicityValidator,
-                             ValidationCategory)
+                             RiskLevel, SafeGeneration, SafetyMetrics,
+                             ToxicityValidator)
 import sys
 import unittest
-from collections import deque
-from unittest.mock import MagicMock, Mock, patch
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")

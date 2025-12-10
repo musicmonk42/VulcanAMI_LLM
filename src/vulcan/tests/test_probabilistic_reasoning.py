@@ -6,14 +6,12 @@ kernel selection, and numerical stability fixes.
 """
 
 from vulcan.reasoning.probabilistic_reasoning import (
-    TORCH_AVAILABLE, EnhancedProbabilisticReasoner, ProbabilisticReasoner)
-import logging
+    EnhancedProbabilisticReasoner, ProbabilisticReasoner)
 import shutil
 import tempfile
 import warnings
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -847,7 +845,7 @@ class TestEdgeCases:
         # Should handle NaN gracefully
         try:
             basic_reasoner.update_beliefs_batch(observations)
-        except Exception as e:
+        except Exception:
             # Expected to fail, but shouldn't crash
             pass
 

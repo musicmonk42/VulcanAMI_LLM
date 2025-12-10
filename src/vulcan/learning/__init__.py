@@ -9,20 +9,18 @@ import logging
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-import torch.nn as nn
 
-from .continual_learning import ContinualLearner, EnhancedContinualLearner
+from .continual_learning import EnhancedContinualLearner
 from .curriculum_learning import (CurriculumLearner,
                                   LearnedDifficultyEstimator, PacingStrategy)
 from .learning_types import (FeedbackData, LearningConfig, LearningMode,
-                             LearningTrajectory, TaskInfo)
+                             TaskInfo)
 from .meta_learning import MetaLearner, MetaLearningAlgorithm, TaskDetector
-from .metacognition import (CompositionalUnderstanding, ConfidenceEstimator,
-                            MetaCognitiveMonitor)
+from .metacognition import (CompositionalUnderstanding, MetaCognitiveMonitor)
 from .parameter_history import ParameterHistoryManager
 from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
 from .world_model import PlanningAlgorithm, UnifiedWorldModel
@@ -284,7 +282,7 @@ class UnifiedLearningSystem:
                     # Try to convert to tensor
                     try:
                         embedding = torch.tensor(embedding, dtype=torch.float32)
-                    except Exception as e:
+                    except Exception:
                         embedding = None
 
                 if embedding is not None:

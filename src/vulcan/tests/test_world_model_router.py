@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -322,7 +322,7 @@ class MockWorldModelRouter:
         required = self._determine_required_updates(signature)
 
         # Apply constraints
-        budget = constraints.get("time_budget_ms", self.time_budget_ms)
+        constraints.get("time_budget_ms", self.time_budget_ms)
         filtered = self._apply_constraints(required, constraints, signature)
 
         # Create plan

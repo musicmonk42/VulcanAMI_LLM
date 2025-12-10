@@ -132,7 +132,7 @@ Notes
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict
 
 # Import core causal graph components
 from .causal_graph import (CausalDAG, CausalEdge, CausalPath, CycleDetector,
@@ -328,7 +328,7 @@ def check_dependencies() -> Dict[str, bool]:
 
     # Check scipy
     try:
-        import scipy
+        pass
 
         dependencies["scipy"] = True
     except ImportError:
@@ -336,7 +336,7 @@ def check_dependencies() -> Dict[str, bool]:
 
     # Check sklearn
     try:
-        import sklearn
+        pass
 
         dependencies["sklearn"] = True
     except ImportError:
@@ -344,7 +344,7 @@ def check_dependencies() -> Dict[str, bool]:
 
     # Check pandas
     try:
-        import pandas
+        pass
 
         dependencies["pandas"] = True
     except ImportError:
@@ -352,7 +352,7 @@ def check_dependencies() -> Dict[str, bool]:
 
     # Check networkx
     try:
-        import networkx
+        pass
 
         dependencies["networkx"] = True
     except ImportError:
@@ -360,7 +360,7 @@ def check_dependencies() -> Dict[str, bool]:
 
     # Check statsmodels
     try:
-        import statsmodels
+        pass
 
         dependencies["statsmodels"] = True
     except ImportError:
@@ -374,7 +374,7 @@ def check_dependencies() -> Dict[str, bool]:
         spec = importlib.util.find_spec("vulcan.safety.safety_validator")
         if spec is not None:
             # Module exists, try to import to verify it's usable
-            from ..safety.safety_validator import EnhancedSafetyValidator
+            pass
 
             dependencies["safety_validator"] = True
         else:

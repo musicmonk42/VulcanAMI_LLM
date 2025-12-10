@@ -12,21 +12,13 @@ Tests cover:
 """
 
 import threading
-import time
-from collections import Counter
 
-import numpy as np
 import pytest
 
 # Import modules to test
 from vulcan.problem_decomposer.adaptive_thresholds import (AdaptiveThresholds,
-                                                           PerformanceRecord,
                                                            PerformanceTracker,
-                                                           StrategyProfile,
-                                                           StrategyProfiler,
-                                                           StrategyStatus,
-                                                           ThresholdConfig,
-                                                           ThresholdType)
+                                                           StrategyProfiler)
 
 # ============================================================
 # FIXTURES

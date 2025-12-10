@@ -3,19 +3,17 @@ principle_extractor.py - Principle extraction from execution traces for Knowledg
 Part of the VULCAN-AGI system
 """
 
-import copy
 import hashlib
 import json
 import logging
 import re
 import threading
 import time
-from abc import ABC, abstractmethod
 from collections import Counter, defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -101,7 +99,7 @@ class Pattern:
                 elif hasattr(c, "to_dict"):
                     try:
                         serializable_components.append(("dict", c.to_dict()))
-                    except Exception as e:
+                    except Exception:
                         serializable_components.append(("str", str(c)))
                 elif isinstance(c, (list, tuple)):
                     serializable_components.append(("list", [str(item) for item in c]))
@@ -306,7 +304,7 @@ class ExecutionTrace:
             return [
                 a.get("type", "unknown") for a in self.actions if isinstance(a, dict)
             ]
-        except Exception as e:
+        except Exception:
             return []
 
     def __eq__(self, other):
@@ -593,7 +591,7 @@ class CrystallizedPrinciple:
         try:
             total = self.success_count + self.failure_count
             return self.success_count / total if total > 0 else 0.5
-        except Exception as e:
+        except Exception:
             return 0.5
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1688,7 +1686,7 @@ class PatternDetector:
             indicators = ["condition", "if", "when", "check", "test", "evaluate"]
             action_str = str(action).lower()
             return any(ind in action_str for ind in indicators)
-        except Exception as e:
+        except Exception:
             return False
 
     def _is_start_marker(self, action: Any) -> bool:
@@ -1697,7 +1695,7 @@ class PatternDetector:
             indicators = ["start", "begin", "open", "enter", "{"]
             action_str = str(action).lower()
             return any(ind in action_str for ind in indicators)
-        except Exception as e:
+        except Exception:
             return False
 
     def _is_end_marker(self, action: Any) -> bool:
@@ -1706,7 +1704,7 @@ class PatternDetector:
             indicators = ["end", "finish", "close", "exit", "}"]
             action_str = str(action).lower()
             return any(ind in action_str for ind in indicators)
-        except Exception as e:
+        except Exception:
             return False
 
     def _extract_branches(self, actions: List[Any], condition_idx: int) -> List[str]:
@@ -1745,7 +1743,7 @@ class PatternDetector:
                 return False
 
             return True
-        except Exception as e:
+        except Exception:
             return False
 
 

@@ -7,13 +7,11 @@ including stub implementations for cost models, feature extraction, and learning
 FIXED VERSION - All tests passing
 """
 
-import json
 import tempfile
 import threading
 import time
-from collections import defaultdict
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -327,12 +325,10 @@ class TestDistributionMonitor:
             monitor.detect_shift(features)
 
         # Add significantly shifted features
-        shift_detected = False
         for i in range(30):
             shifted = base_features + 100 + np.random.randn(128) * 0.01  # Large shift
             shift = monitor.detect_shift(shifted)
             if shift:
-                shift_detected = True
                 break
 
         # Should detect shift (or at least the mechanism works)

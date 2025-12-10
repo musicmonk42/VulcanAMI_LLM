@@ -6,7 +6,6 @@ from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
                                             LearningMode, LearningTrajectory,
                                             TaskInfo)
 import numpy as np
-from unittest.mock import MagicMock, patch
 from dataclasses import asdict, fields
 import time
 import pytest

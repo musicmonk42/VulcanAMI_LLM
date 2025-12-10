@@ -4,29 +4,24 @@
 # FIXED VERSION - Added missing types (SystemState, Episode, ProvRecord, SA_Latents, HealthSnapshot)
 # ============================================================
 
-import asyncio
-import hashlib
 import inspect
 import json
 import logging
 import re
 import time
 import uuid
-from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field, is_dataclass
-from datetime import datetime, timedelta
-from enum import Enum, IntEnum, auto
-from pathlib import Path
-from typing import (Any, Callable, ClassVar, Dict, Final, Generic, List,
-                    Literal, Optional, Protocol, Set, Tuple, Type, TypedDict,
-                    TypeVar, Union, get_args, get_origin)
+from datetime import datetime
+from enum import Enum, IntEnum
+from typing import (Any, Callable, Dict, List, Optional, Set, Tuple,
+                    Type, TypeVar)
 
 import numpy as np
 
 # Type validation libraries
 try:
-    from pydantic import BaseModel, Field, root_validator, validator
+    from pydantic import BaseModel
 
     PYDANTIC_AVAILABLE = True
 except ImportError:
@@ -40,7 +35,7 @@ try:
 except ImportError:
     JSONSCHEMA_AVAILABLE = False
 
-from vulcan.config import ActionType, GoalType, ModalityType, SafetyLevel
+from vulcan.config import ActionType, ModalityType, SafetyLevel
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@
 # ============================================================
 
 import logging
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set
 
 from .metrics import EnhancedMetricsCollector
@@ -30,8 +30,7 @@ meta_reasoning_deps = {}
 
 # Meta-Reasoning Component Imports
 try:
-    from vulcan.world_model.meta_reasoning.self_improvement_drive import \
-        SelfImprovementDrive
+    pass
 
     meta_reasoning_deps["self_improvement_drive"] = True
 except ImportError as e:
@@ -41,8 +40,7 @@ except ImportError as e:
     meta_reasoning_deps["self_improvement_drive"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.motivational_introspection import \
-        MotivationalIntrospection
+    pass
 
     meta_reasoning_deps["motivational_introspection"] = True
 except ImportError as e:
@@ -50,8 +48,7 @@ except ImportError as e:
     meta_reasoning_deps["motivational_introspection"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.objective_hierarchy import \
-        ObjectiveHierarchy
+    pass
 
     meta_reasoning_deps["objective_hierarchy"] = True
 except ImportError as e:
@@ -59,8 +56,7 @@ except ImportError as e:
     meta_reasoning_deps["objective_hierarchy"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.objective_negotiator import \
-        ObjectiveNegotiator
+    pass
 
     meta_reasoning_deps["objective_negotiator"] = True
 except ImportError as e:
@@ -68,8 +64,7 @@ except ImportError as e:
     meta_reasoning_deps["objective_negotiator"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.goal_conflict_detector import \
-        GoalConflictDetector
+    pass
 
     meta_reasoning_deps["goal_conflict_detector"] = True
 except ImportError as e:
@@ -77,8 +72,7 @@ except ImportError as e:
     meta_reasoning_deps["goal_conflict_detector"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.preference_learner import \
-        PreferenceLearner
+    pass
 
     meta_reasoning_deps["preference_learner"] = True
 except ImportError as e:
@@ -86,8 +80,7 @@ except ImportError as e:
     meta_reasoning_deps["preference_learner"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.value_evolution_tracker import \
-        ValueEvolutionTracker
+    pass
 
     meta_reasoning_deps["value_evolution_tracker"] = True
 except ImportError as e:
@@ -95,8 +88,7 @@ except ImportError as e:
     meta_reasoning_deps["value_evolution_tracker"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import \
-        EthicalBoundaryMonitor
+    pass
 
     meta_reasoning_deps["ethical_boundary_monitor"] = True
 except ImportError as e:
@@ -104,8 +96,7 @@ except ImportError as e:
     meta_reasoning_deps["ethical_boundary_monitor"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import \
-        CuriosityRewardShaper
+    pass
 
     meta_reasoning_deps["curiosity_reward_shaper"] = True
 except ImportError as e:
@@ -113,8 +104,7 @@ except ImportError as e:
     meta_reasoning_deps["curiosity_reward_shaper"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.internal_critic import \
-        InternalCritic
+    pass
 
     meta_reasoning_deps["internal_critic"] = True
 except ImportError as e:
@@ -664,7 +654,7 @@ class EnhancedCollectiveDeps:
         try:
             if not self._shutdown:
                 self.shutdown_all()
-        except Exception as e:
+        except Exception:
             # Avoid errors during interpreter shutdown
             pass  # logger might already be gone
 

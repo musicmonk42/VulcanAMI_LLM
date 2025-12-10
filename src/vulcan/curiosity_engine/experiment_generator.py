@@ -7,7 +7,6 @@ Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 
 import copy
 import hashlib
-import json
 import logging
 import threading
 import time
@@ -16,8 +15,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -1781,7 +1779,7 @@ class IterativeExperimentDesigner:
                     if value == int(value):
                         value = int(value)
                     return key, value, "set"
-                except Exception as e:
+                except Exception:
                     return key, value_str, "set"
 
         except Exception as e:

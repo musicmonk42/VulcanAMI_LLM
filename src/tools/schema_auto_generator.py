@@ -28,7 +28,7 @@ import hashlib
 import json
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from ecdsa import NIST256p, SigningKey, VerifyingKey
@@ -90,7 +90,6 @@ PRIMITIVE_TYPES = set(TYPE_MAP.keys())
 class ParsingError(Exception):
     """Custom exception for EBNF parsing errors."""
 
-    pass
 
 
 class MultilingualSchemaGenerator:

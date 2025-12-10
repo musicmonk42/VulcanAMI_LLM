@@ -4,7 +4,7 @@ Provides monitoring and demo capabilities for safety initialization state
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 
@@ -27,8 +27,7 @@ async def get_safety_status() -> Dict[str, Any]:
         from .domain_validators import (_DOMAIN_VALIDATORS_INIT_DONE,
                                         validator_registry)
         from .safety_validator import (_SAFETY_SINGLETON_BUNDLE,
-                                       _SAFETY_SINGLETON_READY,
-                                       initialize_all_safety_components)
+                                       _SAFETY_SINGLETON_READY)
 
         # Get singleton validator
         validator = _SAFETY_SINGLETON_BUNDLE

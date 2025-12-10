@@ -5,12 +5,11 @@ import logging
 import math
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple
 
 import torch
 
-from src.local_llm.tokenizer.simple_tokenizer import (BOS_ID, EOS_ID, UNK_ID,
-                                                      SimpleTokenizer)
+from src.local_llm.tokenizer.simple_tokenizer import SimpleTokenizer
 # Reuse your training model
 from src.training.gpt_model import GPTConfig, GPTModel
 

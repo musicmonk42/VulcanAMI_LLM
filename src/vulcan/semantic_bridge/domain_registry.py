@@ -13,7 +13,7 @@ import logging
 import pickle
 import threading
 import time
-from collections import Counter, defaultdict, deque
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path

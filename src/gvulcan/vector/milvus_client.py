@@ -342,7 +342,7 @@ class MilvusIndex:
             raise RuntimeError("Not connected to Milvus. Call connect() first.")
 
         search_tier = tier or self.default_tier
-        start_time = time.time()
+        time.time()
 
         # Try primary tier
         try:

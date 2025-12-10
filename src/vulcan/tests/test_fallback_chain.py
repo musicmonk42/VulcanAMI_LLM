@@ -15,16 +15,14 @@ from problem_decomposer.problem_decomposer_core import ProblemGraph
 from problem_decomposer.fallback_chain import (ComponentType,
                                                DecompositionComponent,
                                                DecompositionFailure,
-                                               ExecutionPlan, FailureType,
-                                               FallbackChain, StrategyStatus)
+                                               ExecutionPlan, FallbackChain,
+                                               StrategyStatus)
 import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 # Add parent directory to path for imports
@@ -568,7 +566,7 @@ class TestFallbackChain:
         chain = FallbackChain()
 
         exception = Exception("timeout error")
-        reason = chain.handle_strategy_failure(mock_strategy_failure, exception)
+        chain.handle_strategy_failure(mock_strategy_failure, exception)
 
         assert "FailureStrategy" in chain.recovery_strategies
 

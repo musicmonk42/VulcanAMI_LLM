@@ -10,17 +10,15 @@ FULLY IMPLEMENTED VERSION with:
 - Proper handling of continuous and categorical features
 """
 
-import json
 import logging
 import pickle
 import threading
-import time
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -33,7 +31,7 @@ logger = logging.getLogger(__name__)
 try:
     from sklearn.ensemble import (GradientBoostingRegressor,
                                   RandomForestRegressor)
-    from sklearn.linear_model import Lasso, Ridge
+    from sklearn.linear_model import Ridge
     from sklearn.model_selection import KFold, cross_val_score
     from sklearn.neural_network import MLPRegressor
     from sklearn.preprocessing import PolynomialFeatures, StandardScaler
@@ -822,7 +820,7 @@ class LinUCBBandit:
                     exploration_bonus = min(exploration_bonus, 10.0)
 
                     ucb_values[a] = predicted_reward + exploration_bonus
-                except Exception as e:
+                except Exception:
                     ucb_values[a] = 0.0
 
             action_id = np.argmax(ucb_values)

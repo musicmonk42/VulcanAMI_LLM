@@ -6,19 +6,15 @@ FIXED: Proper async/await handling for coroutine shutdown methods
 """
 
 import asyncio
-import hashlib
 import inspect
 import json
 import logging
-import os
-import queue
 import threading
-import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 # Import all modules (FIXED: relative imports)
 # NOTE: Assuming sibling imports from sibling modules within the 'src.unified_runtime' package
@@ -451,7 +447,6 @@ class UnifiedRuntime:
         Enable VULCAN integration for this runtime
         """
         try:
-            from .vulcan_integration import VulcanIntegrationConfig
             from .vulcan_integration import \
                 enable_vulcan_integration as enable_vulcan
 

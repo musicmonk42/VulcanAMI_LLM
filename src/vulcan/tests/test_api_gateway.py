@@ -8,18 +8,14 @@ from src.vulcan.api_gateway import (APIGateway, APIRequest, APIResponse,
                                     RateLimiter, RequestTransformer,
                                     ServiceEndpoint, ServiceRegistry)
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
-from aiohttp import web
 import numpy as np
 import msgpack
 import jwt
-from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
-import uuid
 import time
 import json
-import hashlib
 import asyncio
 import pytest
 

@@ -44,7 +44,6 @@ A comprehensive executor for Graphix IR graphs with enterprise features:
 - Numerical stability checks
 """
 
-import hashlib
 import json
 import logging
 import math
@@ -53,8 +52,7 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ import logging
 import os
 import threading
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 # NumPy is required
 try:
@@ -169,7 +169,7 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
         # Create log directory
         try:
             os.makedirs(self.log_dir, exist_ok=True)
-        except Exception as e:
+        except Exception:
             # FIX: Retained original logic, as the failure was due to skipped __init__
             # If a genuine IOError occurs during creation, it's suppressed here,
             # but the test logic expects os.path.exists(log_dir) to be true if __init__ is called.

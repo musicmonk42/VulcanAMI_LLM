@@ -41,10 +41,9 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock, patch
+from typing import Any, Dict, List
+from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
 
 # Add parent directory to path for imports
@@ -978,7 +977,7 @@ class TestPrincipleLearningIntegration:
 
         # Get initial stats
         initial_stats = learner.get_learning_statistics()
-        initial_extraction = initial_stats["extraction"]["total_extractions"]
+        initial_stats["extraction"]["total_extractions"]
 
         # Attempt learning (may not work if components unavailable)
         try:

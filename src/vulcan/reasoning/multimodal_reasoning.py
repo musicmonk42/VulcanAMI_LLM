@@ -7,17 +7,15 @@ FULLY IMPLEMENTED VERSION with real feature extraction.
 
 import json
 import logging
-import pickle
 import threading
 import time
 import uuid
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple,
-                    Union)
+from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple)
 
 import numpy as np
 
@@ -27,7 +25,6 @@ if TYPE_CHECKING:
 try:
     import torch
     import torch.nn as nn
-    import torch.nn.functional as F
 
     TORCH_AVAILABLE = True
 except ImportError:
@@ -42,8 +39,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import optional dependencies
 try:
-    from sklearn.decomposition import PCA
-    from sklearn.preprocessing import StandardScaler
+    pass
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -1310,7 +1306,7 @@ class MultiModalReasoningEngine:
 
             # Detect clustering tendency
             if len(features) > 5:
-                centered = features - np.mean(features)
+                features - np.mean(features)
                 variance = np.var(features)
                 patterns["clustering_score"] = float(variance)
                 patterns["is_clustered"] = variance < 0.5
@@ -1844,7 +1840,7 @@ class MultiModalReasoningEngine:
         """Simple text embedding using TF-IDF style approach"""
         try:
             words = text.lower().split()
-            vocab_size = min(len(set(words)), self.embed_dim)
+            min(len(set(words)), self.embed_dim)
 
             # Simple word frequency encoding
             word_freq = {}

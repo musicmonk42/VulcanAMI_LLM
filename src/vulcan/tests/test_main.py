@@ -16,8 +16,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Dict, List, Optional
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -395,7 +395,6 @@ def cleanup_rate_limits():
 def run_production_server(config, host="0.0.0.0", port=8080):
     """Mock production server runner"""
     # In real implementation, this would call uvicorn.run
-    pass
 
 
 def benchmark_system(config, iterations=100) -> Dict:

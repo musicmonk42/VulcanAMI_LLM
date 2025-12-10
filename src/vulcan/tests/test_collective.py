@@ -10,8 +10,7 @@ Tests individual components and their integration
 import torch.nn as nn
 import psutil  # ADDED for memory test
 import numpy as np
-from unittest.mock import MagicMock, Mock, patch
-from typing import Any, Dict, List
+from unittest.mock import MagicMock
 from pathlib import Path
 from enum import Enum
 import unittest  # ADDED for self.fail
@@ -20,7 +19,6 @@ import threading
 import tempfile
 import shutil
 import gc  # ADDED for cleanup
-import asyncio
 import pytest
 import os
 
@@ -67,7 +65,6 @@ try:
                                      PacingStrategy, ParameterHistoryManager,
                                      PlanningAlgorithm, RLHFManager, TaskInfo,
                                      UnifiedLearningSystem, UnifiedWorldModel)
-    from src.vulcan.learning.learning_types import LearningTrajectory
 except ImportError:
     # Fallback for environment where src is not in path
     print("Warning: Could not import from src.vulcan.learning. Check PYTHONPATH.")
@@ -234,7 +231,7 @@ class TestContinualLearning:
         # Process experiences with different patterns
         for i, exp in enumerate(test_experiences[:10]):
             exp["task_hint"] = "task_a" if i < 5 else "task_b"
-            result = learner.process_experience(exp)
+            learner.process_experience(exp)
 
         # Should have detected at least one task
         assert len(learner.task_models) >= 1
@@ -621,7 +618,7 @@ class TestRLHF:
         try:
             loss = rlhf.ppo_update()
             assert loss is not None
-        except Exception as e:
+        except Exception:
             # PPO update might fail if not enough data, that's ok for this test
             pass
 
@@ -739,7 +736,7 @@ class TestWorldModel:
             next_state, reward = model.predict(state, action)
             assert next_state.shape == (TEST_EMBEDDING_DIM,)
             assert isinstance(reward, (int, float, torch.Tensor))
-        except Exception as e:
+        except Exception:
             # Model might not be trained yet, that's ok
             pass
 
@@ -903,7 +900,7 @@ class TestUnifiedSystem(unittest.TestCase):
                 "reward": 1.0 - difficulty,  # Harder tasks get lower reward
                 "metadata": {"complexity": difficulty},
             }
-            result = self._system.process_experience(exp)
+            self._system.process_experience(exp)
 
         # Check components are coordinating
         stats = self._system.get_unified_stats()
@@ -1208,7 +1205,7 @@ class TestPerformance:
                 "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
                 "reward": np.random.random(),
             }
-            result = system.process_experience(exp)
+            system.process_experience(exp)
 
             if i % 20 == 0:
                 stats = system.get_unified_stats()

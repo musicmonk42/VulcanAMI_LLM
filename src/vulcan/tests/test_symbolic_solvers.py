@@ -11,8 +11,6 @@ Tests cover:
 All tests validate the FIXED implementations.
 """
 
-import math
-from typing import Any, Dict, List
 
 import numpy as np
 import pytest
@@ -20,8 +18,7 @@ import pytest
 # Import the classes we're testing
 from src.vulcan.reasoning.symbolic.solvers import (CPT,
                                                    BayesianNetworkReasoner,
-                                                   Constraint, CSPSolver,
-                                                   CSPVariable, Factor,
+                                                   CSPSolver, Factor,
                                                    GaussianCPD, RandomVariable,
                                                    VariableType)
 

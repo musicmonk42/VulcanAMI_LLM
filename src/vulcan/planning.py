@@ -14,17 +14,15 @@ import logging
 import os
 import platform
 import socket
-import subprocess
 import threading
 import time
 import weakref
 from collections import defaultdict, deque
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
-from queue import PriorityQueue, Queue
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from queue import Queue
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -1596,7 +1594,7 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
         current_state = initial_state
 
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             return asyncio.run(self._create_mcts_plan_async(goal, context))
         except RuntimeError:
             pass
@@ -2334,7 +2332,7 @@ class ResourceAwareCompute:
 
             return plan
 
-        except Exception as e:
+        except Exception:
             # Remove failed computation marker
             with self._lock:
                 if cache_key in self.cache:

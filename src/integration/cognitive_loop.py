@@ -8,8 +8,8 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import (Any, AsyncGenerator, Callable, Dict, Iterable, List,
-                    Optional, Sequence, Tuple, Union)
+from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional,
+                    Sequence, Tuple, Union)
 
 Token = Union[int, str]
 Tokens = List[Token]

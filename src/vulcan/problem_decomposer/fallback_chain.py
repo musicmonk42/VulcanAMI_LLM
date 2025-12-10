@@ -3,9 +3,6 @@ fallback_chain.py - Fallback chain management for problem decomposition
 Part of the VULCAN-AGI system
 """
 
-import copy
-import hashlib
-import json
 import logging
 import threading
 import time
@@ -13,7 +10,7 @@ import traceback
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 

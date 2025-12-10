@@ -2,7 +2,6 @@
 Unified world model with dynamics and reward prediction
 """
 
-import concurrent.futures
 import io
 import logging
 import math
@@ -13,11 +12,11 @@ import random
 import tempfile
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -1218,7 +1217,7 @@ class AttentionBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """FIXED: Robustly handle dimensions"""
-        original_shape = x.shape
+        x.shape
 
         # Ensure 3D: [batch, seq, dim]
         if len(x.shape) == 1:

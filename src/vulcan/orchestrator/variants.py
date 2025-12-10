@@ -12,7 +12,6 @@ import threading
 import time
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -42,19 +41,16 @@ if not SUPPORTS_EXECUTOR_TIMEOUT:
 class PerceptionError(Exception):
     """Raised when perception phase fails"""
 
-    pass
 
 
 class ReasoningError(Exception):
     """Raised when reasoning phase fails"""
 
-    pass
 
 
 class ExecutionError(Exception):
     """Raised when execution phase fails"""
 
-    pass
 
 
 # ============================================================

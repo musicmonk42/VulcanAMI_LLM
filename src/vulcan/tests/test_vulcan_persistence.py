@@ -14,8 +14,7 @@ Tests cover:
 """
 
 from vulcan.memory.persistence import (MemoryCompressor, MemoryPersistence,
-                                       MemoryVersionControl, NeuralCompressor,
-                                       SemanticCompressor)
+                                       MemoryVersionControl, SemanticCompressor)
 from vulcan.memory.base import CompressionType, Memory, MemoryType
 import os
 import pickle
@@ -26,7 +25,6 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
@@ -43,14 +41,14 @@ except ImportError:
     ENCRYPTION_AVAILABLE = False
 
 try:
-    import torch
+    pass
 
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
 
 try:
-    import lz4.frame
+    pass
 
     LZ4_AVAILABLE = True
 except ImportError:
@@ -803,7 +801,7 @@ class TestEdgeCases:
         # Try to load - should handle gracefully
         # Depending on implementation, might return None or raise
         try:
-            loaded = persistence.load_memory(sample_memory.id)
+            persistence.load_memory(sample_memory.id)
             # If it loads, that's fine too
         except Exception:
             # Expected to fail gracefully

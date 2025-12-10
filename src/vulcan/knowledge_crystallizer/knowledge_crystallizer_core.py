@@ -12,8 +12,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -21,8 +20,7 @@ from .contraindication_tracker import (CascadeAnalyzer, Contraindication,
                                        ContraindicationDatabase,
                                        ContraindicationGraph)
 from .crystallization_selector import (CrystallizationMethod,
-                                       CrystallizationSelector,
-                                       MethodSelection)
+                                       CrystallizationSelector)
 from .knowledge_storage import VersionedKnowledgeBase
 # Import other components
 from .principle_extractor import Principle, PrincipleExtractor
@@ -497,7 +495,7 @@ class KnowledgeCrystallizer:
 
         for principle in result.principles:
             # Analyze cascade impact
-            cascade_impact = self.cascade_analyzer.analyze_cascade_impact(principle)
+            self.cascade_analyzer.analyze_cascade_impact(principle)
 
             # Check cascade risk
             cascade_risk = self.contraindication_graph.calculate_cascade_risk(
@@ -645,12 +643,11 @@ class KnowledgeCrystallizer:
             Crystallization result
         """
         batch_size = parameters.get("batch_size", len(traces))
-        parallel_processing = parameters.get("parallel_processing", False)
+        parameters.get("parallel_processing", False)
         aggregation_method = parameters.get("aggregation_method", "voting")
 
         # Process each trace
         all_principles = []
-        all_validations = []
 
         for trace in traces[:batch_size]:
             trace_principles = self.extractor.extract_from_trace(trace)

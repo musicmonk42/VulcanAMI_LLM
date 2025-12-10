@@ -17,10 +17,10 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, Tuple, Union)
+from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Tuple,
+                    Union)
 
 # TYPE_CHECKING import for type annotations without runtime import
 # This allows using aiohttp types in annotations even when aiohttp is not installed
@@ -270,17 +270,14 @@ class AIProvider(ABC):
     @abstractmethod
     async def execute(self, task: AITask, contract: AIContract) -> AIResult:
         """Execute AI task with contract constraints (must be async)"""
-        pass
 
     @abstractmethod
     def supports_operation(self, operation: str) -> bool:
         """Check if provider supports operation"""
-        pass
 
     @abstractmethod
     def get_models(self) -> List[str]:
         """Get list of available models"""
-        pass
 
     async def validate_credentials(self) -> bool:
         """Validate API credentials"""

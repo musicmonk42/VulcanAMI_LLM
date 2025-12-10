@@ -4,7 +4,7 @@ Tests all calibration methods, safety features, and edge cases
 """
 
 import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -823,14 +823,14 @@ class TestSafetyFeatures:
 
         # Access the property to trigger lazy loading
         # This may return None if safety modules aren't available, which is fine
-        validator = calibrator.safety_validator
+        calibrator.safety_validator
 
         # Test passes if no exception is raised during initialization or property access
         assert True
 
         # Also test with empty dict
         calibrator2 = ConfidenceCalibrator(safety_config={})
-        validator2 = calibrator2.safety_validator
+        calibrator2.safety_validator
         assert True
 
     def test_safety_corrections_tracking(self):

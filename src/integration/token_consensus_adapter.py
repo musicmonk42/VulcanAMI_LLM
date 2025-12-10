@@ -366,7 +366,6 @@ class TokenConsensusAdapter:
 
     def _noop_obs(self, event: str, payload: Dict[str, Any]) -> None:
         """No-op observability function."""
-        pass
 
 
 # ------------------------ Test and Demo helper functions ------------------------ #

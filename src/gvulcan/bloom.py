@@ -13,7 +13,7 @@ import logging
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Set, Tuple
+from typing import Iterable, List, Set, Tuple
 
 logger = logging.getLogger(__name__)
 

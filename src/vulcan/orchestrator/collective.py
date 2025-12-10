@@ -11,7 +11,7 @@ import threading
 import time
 from collections import deque
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -462,8 +462,8 @@ class VULCANAGICollective:
 
         try:
             # Convert experiment to problem graph and plan
-            problem_graph = self._experiment_to_problem_graph(experiment)
-            plan = self._experiment_to_plan(experiment)
+            self._experiment_to_problem_graph(experiment)
+            self._experiment_to_plan(experiment)
 
             # Execute via problem executor
             # --- START REPLACEMENT ---
@@ -979,7 +979,7 @@ class VULCANAGICollective:
         goal = context.get("high_level_goal", "explore")
 
         # Decompose goal into subgoals
-        subgoals = self.deps.goal_system.decompose_goal(goal, context)
+        self.deps.goal_system.decompose_goal(goal, context)
 
         # Update world model
         self.deps.world_model.update_state(

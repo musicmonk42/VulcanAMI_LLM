@@ -1,13 +1,12 @@
 """Base classes and core types for memory system"""
 
-import hashlib
 import logging
 import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -423,31 +422,26 @@ class MemoryStats:
 class MemoryException(Exception):
     """Base exception for memory operations."""
 
-    pass
 
 
 class MemoryCapacityException(MemoryException):
     """Raised when memory capacity is exceeded."""
 
-    pass
 
 
 class MemoryRetrievalException(MemoryException):
     """Raised when memory retrieval fails."""
 
-    pass
 
 
 class MemoryCorruptionException(MemoryException):
     """Raised when memory data is corrupted."""
 
-    pass
 
 
 class MemoryLockException(MemoryException):
     """Raised when memory lock cannot be acquired."""
 
-    pass
 
 
 # ============================================================
@@ -467,22 +461,18 @@ class BaseMemorySystem(ABC):
     @abstractmethod
     def store(self, content: Any, **kwargs) -> Memory:
         """Store content in memory."""
-        pass
 
     @abstractmethod
     def retrieve(self, query: MemoryQuery) -> RetrievalResult:
         """Retrieve memories matching query."""
-        pass
 
     @abstractmethod
     def forget(self, memory_id: str) -> bool:
         """Remove memory by ID."""
-        pass
 
     @abstractmethod
     def consolidate(self) -> int:
         """Consolidate memories."""
-        pass
 
     def get_stats(self) -> MemoryStats:
         """Get memory statistics."""

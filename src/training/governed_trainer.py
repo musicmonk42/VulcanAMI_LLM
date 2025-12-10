@@ -41,9 +41,9 @@ import logging
 import math
 import random
 import time
-from collections import defaultdict, deque
+from collections import deque
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

@@ -34,12 +34,11 @@ Revision (robust tiny-corpus handling):
 
 from __future__ import annotations
 
-import math
 import os
 import random
 import re
 from collections import Counter
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 SPECIAL_TOKENS = ["<PAD>", "<BOS>", "<EOS>", "<UNK>"]
 PAD_ID = 0

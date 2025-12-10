@@ -12,30 +12,26 @@
 # FIXED: Added initialize_config function to resolve startup NameError
 # ============================================================
 
-import asyncio
 import atexit
 import copy
-import hashlib
-import importlib.util
 import json
 import logging
 import os
 import re
-import sys
 import threading
 import time
-from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field, is_dataclass
+from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import yaml
 
 # Try to import validation libraries
 try:
-    from pydantic import BaseModel, Field, ValidationError, validator
+    pass
 
     PYDANTIC_AVAILABLE = True
 except ImportError:
@@ -49,21 +45,21 @@ except ImportError:
     CERBERUS_AVAILABLE = False
 
 try:
-    import scipy
+    pass
 
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
 
 try:
-    import networkx
+    pass
 
     NETWORKX_AVAILABLE = True
 except ImportError:
     NETWORKX_AVAILABLE = False
 
 try:
-    from watchdog.events import FileModifiedEvent, FileSystemEventHandler
+    from watchdog.events import FileSystemEventHandler
     from watchdog.observers import Observer
 
     WATCHDOG_AVAILABLE = True

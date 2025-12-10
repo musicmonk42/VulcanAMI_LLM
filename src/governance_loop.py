@@ -6,7 +6,6 @@ Version: 2.0.0 - All issues fixed, thread-safe, validated
 Autonomous policy management and compliance monitoring
 """
 
-import asyncio
 import copy
 import hashlib
 import json
@@ -18,7 +17,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Configure logging
 logging.basicConfig(

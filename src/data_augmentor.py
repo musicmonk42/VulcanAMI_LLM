@@ -11,8 +11,7 @@ import json
 import logging
 import random
 import threading
-from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
@@ -603,7 +602,7 @@ class DataAugmentor:
         proposal = copy.deepcopy(base_graph)
         nodes = proposal.get("nodes", [])
         edges = proposal.get("edges", [])
-        counter = self._get_counter()
+        self._get_counter()
 
         # Semantic negation of nodes
         if nodes:

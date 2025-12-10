@@ -11,7 +11,6 @@ from vulcan.orchestrator.variants import (PYTHON_VERSION,
                                           PerceptionError, PerformanceMonitor,
                                           ReasoningError, StrategySelector,
                                           shutdown_executor_with_timeout)
-import asyncio
 import sys
 import threading
 import time
@@ -19,9 +18,8 @@ import unittest
 from collections import deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import Mock, patch
 
-import numpy as np
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent

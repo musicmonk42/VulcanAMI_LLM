@@ -15,8 +15,7 @@ Revision / Fix Notes (Applied):
 
 from __future__ import annotations
 from .safety_types import (ActionType, ComplianceStandard, ExplainabilityNode,
-                           GovernanceOrchestrator, NSOAligner, SafetyConfig,
-                           SafetyConstraint, SafetyException, SafetyMetrics,
+                           SafetyConfig, SafetyConstraint, SafetyMetrics,
                            SafetyReport, SafetyValidator, SafetyViolationType)
 
 import asyncio
@@ -1346,8 +1345,7 @@ class EnhancedSafetyValidator(SafetyValidator):
             from .domain_validators import (CausalSafetyValidator,
                                             DataProcessingSafetyValidator,
                                             OptimizationSafetyValidator,
-                                            PredictionSafetyValidator,
-                                            validator_registry)
+                                            PredictionSafetyValidator)
 
             self.causal_validator = CausalSafetyValidator(self.safe_regions)
             self.prediction_validator = PredictionSafetyValidator(self.safe_regions)
@@ -2805,7 +2803,6 @@ class MemoryQualityValidator:
 
     def _quarantine_for_review(self, item) -> None:
         logger.warning(f"Memory item quarantined for quality review: {item}")
-        pass
 
 
 class MemorySafetyValidator:

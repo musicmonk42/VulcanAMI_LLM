@@ -18,16 +18,11 @@
 # - We keep assertions tolerant to internal randomness (RND) by checking ranges and invariants.
 # - We shorten scale_update_interval on an instance to trigger adaptive scaling deterministically.
 
-import math
 import threading
-import time
-import types
 
-import numpy as np
-import pytest
 
 from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
-    CuriosityMethod, CuriosityRewardShaper, CuriosityStatistics, NoveltyLevel)
+    CuriosityMethod, CuriosityRewardShaper, NoveltyLevel)
 
 # ---------------------------
 # Lightweight stubs for integrations

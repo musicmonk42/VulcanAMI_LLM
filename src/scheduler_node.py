@@ -2,7 +2,7 @@ import asyncio
 import logging
 import weakref
 from datetime import datetime
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Optional
 
 # 2025: Photonic/LLM/energy integration, EU ethical_label, ITU F.748.53 compliance
 try:

@@ -13,16 +13,13 @@
 #
 # Coverage target: >85% on value_evolution_tracker.py
 
-import json
-import math
 import time
-import types
 
 import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.value_evolution_tracker import (
-    DriftSeverity, TrendDirection, ValueChangeType, ValueEvolutionTracker)
+    DriftSeverity, TrendDirection, ValueEvolutionTracker)
 
 # ---------------------------------------------------------------------------
 # Helpers
