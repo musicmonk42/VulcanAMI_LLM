@@ -2,26 +2,20 @@
 Test suite for unified world model
 """
 
-import pytest
-
-# Skip entire module if torch is not available
-torch = pytest.importorskip("torch", reason="PyTorch required for world_model tests")
-
-import shutil
-import tempfile
-import time
-from collections import deque
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-
-from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
 from vulcan.learning.world_model import (AttentionBlock, CuriosityModule,
                                          MCTSNode, MultiHeadAttention,
                                          PlanningAlgorithm, StateAbstractor,
                                          UnifiedWorldModel, WorldState)
+from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
+import numpy as np
+from unittest.mock import patch
+from pathlib import Path
+import tempfile
+import shutil
+import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for world_model tests")
 
 
 class TestWorldModelTypes:

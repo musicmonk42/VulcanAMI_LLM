@@ -1,17 +1,17 @@
 """Memory retrieval, search, and indexing"""
 
-import heapq
-import json
+from .base import Memory, MemoryQuery
+from ..security_fixes import safe_pickle_load
 import logging
 import math
 import pickle
 import re
 import threading
 import time
-from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -35,8 +35,7 @@ FAISS_AVAILABLE = HAS_FAISS
 
 # Additional indexing libraries
 try:
-    import whoosh
-    from whoosh.fields import DATETIME, ID, NUMERIC, TEXT, Schema
+    from whoosh.fields import ID, NUMERIC, TEXT, Schema
     from whoosh.index import create_in, open_dir
     from whoosh.qparser import QueryParser
     from whoosh.writing import AsyncWriter
@@ -55,8 +54,6 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
 
-from ..security_fixes import safe_pickle_load
-from .base import Memory, MemoryQuery
 
 logger = logging.getLogger(__name__)
 
@@ -391,9 +388,6 @@ class MemoryIndex:
         logger.info(f"Rebuilding index (removed {len(self.deleted_indices)} items)")
 
         # Collect valid embeddings
-        valid_embeddings = []
-        new_id_map = []
-        new_reverse_map = {}
 
         for i, memory_id in enumerate(self.id_map):
             if i not in self.deleted_indices and memory_id is not None:
@@ -464,7 +458,7 @@ class MemoryIndex:
                     self.reverse_map = data["reverse_map"]
                     self.deleted_indices = data.get("deleted_indices", set())
                     self.dimension = data.get("dimension", 512)
-                    was_faiss = data.get("is_faiss", False)
+                    data.get("is_faiss", False)
 
             # FIXED: Check both FAISS_AVAILABLE and faiss before loading FAISS index
             if (

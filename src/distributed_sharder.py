@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from security_fixes import safe_pickle_load
@@ -276,7 +276,7 @@ class DistributedSharder:
         sizes = [(base + 1 if i < rem else base) for i in range(num_nodes)]
 
         # Filter out zero-size shards
-        sizes = [s for s in sizes if s > 0]
+        sizes = list(sizes if s > 0)
         if len(sizes) < num_nodes:
             logger.warning(f"Created only {len(sizes)} non-empty shards")
             num_nodes = len(sizes)

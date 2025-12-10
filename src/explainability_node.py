@@ -9,7 +9,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 

@@ -754,7 +754,7 @@ class ObjectiveNegotiator:
 
             self.stats["dynamic_weightings"] += 1
             logger.debug(
-                f"Dynamic weighting complete. Final weights: { {k: round(v, 4) for k, v in final_weights.items()} }"
+                f"Dynamic weighting complete. Final weights: {{k: round(v, 4) for k, v in final_weights.items()} }"
             )
 
             return final_weights
@@ -1264,7 +1264,7 @@ class ObjectiveNegotiator:
         ]
         # Add any proposal objectives not in the hierarchy order at the end (lower priority)
         ordered_objectives.extend(
-            [obj for obj in objectives_in_proposals if obj not in priority_order]
+            list(objectives_in_proposals if obj not in priority_order)
         )
 
         if not ordered_objectives:

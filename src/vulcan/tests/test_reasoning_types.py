@@ -6,7 +6,6 @@ and error handling.
 """
 
 import time
-from typing import Any, Dict
 
 import pytest
 

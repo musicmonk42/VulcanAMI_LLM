@@ -23,8 +23,7 @@ Revision Notes (Fixes Applied):
 import logging
 import math
 import random
-from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -104,13 +103,13 @@ class CausalLossComputer:
             Tuple of (total_loss, gradients_dict)
         """
         # Extract batch components
-        tokens = batch.get("tokens", [])
+        batch.get("tokens", [])
         logits = batch.get("logits", [])
         targets = batch.get("targets", [])
         hidden_states = batch.get("hidden_states", None)
-        attention_weights = batch.get("attention_weights", None)
+        batch.get("attention_weights", None)
         memory_keys = batch.get("memory_keys", None)
-        metadata = batch.get("metadata", {})
+        batch.get("metadata", {})
 
         # Validate inputs
         if not logits or not targets:

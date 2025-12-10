@@ -3,20 +3,15 @@ test_principle_extractor.py - Comprehensive tests for principle_extractor module
 Part of the VULCAN-AGI system
 """
 
-import tempfile
-import time
-from dataclasses import dataclass
-from pathlib import Path
 
-import numpy as np
 import pytest
 
 # Import the module under test
 from vulcan.knowledge_crystallizer.principle_extractor import (
     AbstractionEngine, CrystallizedPrinciple, ExecutionTrace,
     ExtractionStrategy, Metric, MetricType, Pattern, PatternDetector,
-    PatternType, Principle, PrincipleCandidate, PrincipleExtractor,
-    SuccessAnalyzer, SuccessFactor)
+    PatternType, PrincipleCandidate, PrincipleExtractor, SuccessAnalyzer,
+    SuccessFactor)
 
 
 class TestPattern:
@@ -733,7 +728,7 @@ class TestPatternDetector:
 
         assert isinstance(patterns, list)
         # Should detect at least sequential pattern
-        sequential = [p for p in patterns if p.pattern_type == PatternType.SEQUENTIAL]
+        sequential = list(patterns if p.pattern_type == PatternType.SEQUENTIAL)
         assert len(sequential) > 0
 
     def test_detect_iterative_patterns(self, detector):
@@ -755,7 +750,7 @@ class TestPatternDetector:
         patterns = detector.detect_patterns(trace)
 
         # Should detect iterative pattern
-        iterative = [p for p in patterns if p.pattern_type == PatternType.ITERATIVE]
+        iterative = list(patterns if p.pattern_type == PatternType.ITERATIVE)
         assert len(iterative) > 0
 
     def test_detect_conditional_patterns(self, detector):
@@ -1074,7 +1069,7 @@ class TestIntegration:
             # Later extractions should have more confidence
             if i >= 2 and principles:
                 # Check if any high-confidence principles emerged
-                high_conf = [p for p in principles if p.confidence > 0.6]
+                list(principles if p.confidence > 0.6)
                 # May or may not have high confidence depending on patterns
 
 

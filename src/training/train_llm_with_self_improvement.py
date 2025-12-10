@@ -42,6 +42,12 @@ Notes:
 """
 
 from __future__ import annotations
+from self_improving_training import SelfImprovingTraining
+from self_awareness import (awareness_summary, calculate_adaptive_ece,
+                            calculate_distinct_n, calculate_ece,
+                            calculate_mce, summarize_entropies)
+from gpt_model import GPTConfig, GPTModel
+from data_loader import CorpusDataLoader
 
 import argparse
 import copy
@@ -55,30 +61,20 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 
 HERE = os.path.dirname(__file__)
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
-from data_loader import CorpusDataLoader
-from gpt_model import GPTConfig, GPTModel
-from self_awareness import (awareness_summary, build_extended_awareness,
-                            calculate_adaptive_ece, calculate_distinct_n,
-                            calculate_ece, calculate_mce, summarize_entropies)
-from self_improving_training import SelfImprovingTraining
 
 # Prefer absolute import; fallback if run directly
 try:
     from src.training.metrics import (LossMetrics, compute_loss_metrics_eval,
-                                      compute_loss_metrics_train,
-                                      random_label_sanity,
-                                      uniform_logits_sanity)
+                                      compute_loss_metrics_train)
 except Exception:
     from metrics import (LossMetrics, compute_loss_metrics_eval,
-                         compute_loss_metrics_train, random_label_sanity,
-                         uniform_logits_sanity)
+                         compute_loss_metrics_train)
 
 TRAINER_VERSION = "v2-normalized-2025-11-18"
 
@@ -569,9 +565,9 @@ def run(args: argparse.Namespace) -> None:
         "total_steps": max(args.steps, args.val_interval * 2),
     }
 
-    gate = ConsensusGate()
+    ConsensusGate()
 
-    safe_types = [s.strip() for s in args.meta_safe_types.split(",") if s.strip()]
+    [s.strip() for s in args.meta_safe_types.split(",") if s.strip()]
     orchestrator = SelfImprovingTraining(
         random_seed=args.seed,
         experiment_selection_strategy=args.meta_strategy,
@@ -583,19 +579,18 @@ def run(args: argparse.Namespace) -> None:
     meta_state_path = args.meta_state_path or os.path.join(
         args.out_dir, "llm_meta_state.json"
     )
-    meta_log_path = os.path.join(args.out_dir, args.meta_log_file)
+    os.path.join(args.out_dir, args.meta_log_file)
     training_log_path = os.path.join(args.out_dir, args.train_log_file)
-    awareness_log_path = os.path.join(args.out_dir, "awareness_metrics.jsonl")
+    os.path.join(args.out_dir, "awareness_metrics.jsonl")
 
     best_val = float("inf")
     best_step = -1
-    patience_counter = 0
     applied_updates = 0
     grad_clip = args.max_grad_norm
     start_time = time.time()
     drift_window: List[Dict[str, Any]] = []
-    best_model_sd = copy.deepcopy(model.state_dict())
-    best_optim_sd = copy.deepcopy(optimizer.state_dict())
+    copy.deepcopy(model.state_dict())
+    copy.deepcopy(optimizer.state_dict())
 
     print(
         f"[TRAIN] steps={args.steps} device={device} seq_len={args.seq_len} batch={args.batch_size} lr={args.learning_rate}"
@@ -715,7 +710,7 @@ def run(args: argparse.Namespace) -> None:
                 top_p=args.top_p,
                 rep_penalty=args.rep_penalty,
             )
-            summary = awareness_summary(awareness)
+            awareness_summary(awareness)
             drift_window.append({"awareness": awareness, "step": step})
             if len(drift_window) > args.drift_window:
                 drift_window.pop(0)

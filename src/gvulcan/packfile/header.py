@@ -40,25 +40,21 @@ HEADER_FIXED_SIZE = struct.calcsize(HEADER_FMT)
 class PackHeaderError(Exception):
     """Base exception for pack header errors"""
 
-    pass
 
 
 class InvalidMagicError(PackHeaderError):
     """Raised when header magic bytes are invalid"""
 
-    pass
 
 
 class UnsupportedVersionError(PackHeaderError):
     """Raised when header version is not supported"""
 
-    pass
 
 
 class HeaderValidationError(PackHeaderError):
     """Raised when header validation fails"""
 
-    pass
 
 
 @dataclass

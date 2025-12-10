@@ -97,7 +97,6 @@ REQUIREMENTS:
 
 import logging
 import sys
-from typing import List
 
 # Setup logging
 logger = logging.getLogger(__name__)

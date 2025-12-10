@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List
 
 # Keep regex fully consistent with src/training/data_loader.py
 TOKEN_PATTERN = re.compile(r"\w+|\S", re.UNICODE)

@@ -7,19 +7,14 @@ and ensure fast tool execution when needed.
 Fixed version with proper error handling, thread safety, and interruptible threads.
 """
 
-import json
 import logging
-import pickle
 import queue
 import threading
 import time
-import weakref
 from collections import defaultdict, deque
-from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
 import psutil
@@ -634,25 +629,26 @@ class WarmStartPool:
                             )
                         else:
                             # Just name
-                            factory = lambda n=tool_name_arg, cls=tool_class: cls(n)
+                            def factory(n=tool_name_arg, cls=tool_class): return cls(n)
                     elif hasattr(tool_instance, "config"):
                         # Config-based tool without name attribute
                         config = getattr(tool_instance, "config", {})
-                        factory = lambda n=tool_name, c=config, cls=tool_class: cls(
+
+                        def factory(n=tool_name, c=config, cls=tool_class): return cls(
                             n, c
                         )
                     else:
                         # Default: try no-arg constructor or use instance as singleton
                         try:
                             # Try creating with no args to test
-                            test = tool_class()
-                            factory = lambda cls=tool_class: cls()
+                            tool_class()
+                            def factory(cls=tool_class): return cls()
                         except Exception:
                             # Can't instantiate - use as singleton (not ideal but safe)
                             logger.warning(
                                 f"Using {tool_name} as singleton - factory creation failed"
                             )
-                            factory = lambda inst=tool_instance: inst
+                            def factory(inst=tool_instance): return inst
 
                 # Create pool
                 pool = ToolPool(

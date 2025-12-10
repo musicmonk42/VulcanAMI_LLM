@@ -10,16 +10,14 @@ import logging
 import pickle
 import threading
 import time
-import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from scipy import stats
-from scipy.spatial.distance import jensenshannon
 from scipy.stats import wasserstein_distance
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -682,7 +680,7 @@ class DistributionMonitor:
 
             # Save statistics
             stats = self.get_statistics()
-            with open(save_path / "statistics.json", "w") as f:
+            with open(save_path / "statistics.json", "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2)
 
             # Save detection history

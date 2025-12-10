@@ -11,12 +11,10 @@ import logging
 import os
 import statistics
 import sys
-import tempfile
-import threading
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 # Platform-specific file locking
 try:
@@ -183,7 +181,7 @@ class FileLock:
     def __enter__(self):
         """Acquire lock (platform-specific)."""
         try:
-            self.lock_file = open(self.lock_path, "w")
+            self.lock_file = open(self.lock_path, "w", encoding="utf-8")
 
             if FCNTL_AVAILABLE:
                 # Unix/Linux file locking
@@ -315,7 +313,7 @@ def get_current_commit_hash() -> Optional[str]:
         if not git_head.exists():
             return None
 
-        with open(git_head, "r") as f:
+        with open(git_head, "r", encoding="utf-8") as f:
             ref = f.readline().strip()
             if ref.startswith("ref:"):
                 ref_path = Path(".git") / ref.split(" ")[-1]

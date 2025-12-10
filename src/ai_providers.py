@@ -19,14 +19,13 @@ import sqlite3
 import ssl
 import threading
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
-from urllib import error, parse, request
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from urllib import error, request
 from urllib.request import HTTPSHandler, build_opener
 
 # Pydantic for declarative structures
@@ -318,9 +317,9 @@ class ProviderClient:
             try:
                 if self.connection_pool:
                     opener = self.connection_pool.get_opener()
-                    response = opener.open(req, timeout=timeout)
+                    response = opener.open(req, timeout=timeout, encoding="utf-8")
                 else:
-                    response = request.urlopen(req, timeout=timeout)
+                    response = request.urlopen(req, timeout=timeout, encoding="utf-8")
 
                 response_data = response.read().decode("utf-8")
                 return json.loads(response_data)
@@ -330,7 +329,7 @@ class ProviderClient:
                 try:
                     error_json = json.loads(error_body)
                     error_msg = error_json.get("error", {}).get("message", error_body)
-                except Exception as e:
+                except Exception:
                     error_msg = error_body
 
                 # Don't retry client errors (4xx)
@@ -680,7 +679,7 @@ class LocalModelClient(ProviderClient):
                 "load_duration": response.get("load_duration", 0),
                 "eval_count": response.get("eval_count", 0),
             }
-        except Exception as e:
+        except Exception:
             raise ConnectionError(
                 f"Failed to connect to local model at {self.endpoint}"
             )

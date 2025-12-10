@@ -3,15 +3,13 @@ adaptive_thresholds.py - Adaptive threshold management for problem decomposer
 Part of the VULCAN-AGI system
 """
 
-import json
 import logging
 import threading
 import time
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 

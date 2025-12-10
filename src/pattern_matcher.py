@@ -6,8 +6,7 @@ import re
 import sys
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Set
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
 # --- Performance Optimization Import ---
 try:
@@ -101,25 +100,21 @@ class MatchingStats:
 class PatternMatcherError(Exception):
     """Base exception for PatternMatcher errors."""
 
-    pass
 
 
 class GraphValidationError(PatternMatcherError):
     """Raised when graph validation fails."""
 
-    pass
 
 
 class MatchingTimeoutError(PatternMatcherError):
     """Raised when matching operation times out."""
 
-    pass
 
 
 class GraphSizeLimitError(PatternMatcherError):
     """Raised when graph exceeds size limits."""
 
-    pass
 
 
 class PatternMatcher:

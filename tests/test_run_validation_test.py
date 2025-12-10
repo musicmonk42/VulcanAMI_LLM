@@ -173,7 +173,7 @@ class TestMetricRegistration:
 class TestValidationMethods:
     """Test validation methods."""
 
-    @patch('builtins.open', mock_open(read_data='{"test": "data"}'))
+    @patch('builtins.open', mock_open(read_data='{"test": "data"}', encoding="utf-8"))
     def test_load_manifest(self):
         """Test loading manifest."""
         suite = ValidationTestSuite()
@@ -185,7 +185,7 @@ class TestValidationMethods:
 
         suite.shutdown()
 
-    @patch('builtins.open', mock_open(read_data='{"id": "test", "nodes": [], "edges": []}'))
+    @patch('builtins.open', mock_open(read_data='{"id": "test", "nodes": [], "edges": []}', encoding="utf-8"))
     def test_load_golden_file(self):
         """Test loading golden file."""
         suite = ValidationTestSuite()

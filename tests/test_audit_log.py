@@ -597,7 +597,7 @@ class TestFileOperations:
 
         actual_path = logger._get_actual_log_path()
         assert actual_path.exists()
-        with open(actual_path, 'r') as f:
+        with open(actual_path, 'r', encoding="utf-8") as f:
             lines = f.readlines()
             assert len(lines) >= 2
         await logger.shutdown()
@@ -629,7 +629,7 @@ class TestIntegrityVerification:
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write empty file
-        with open(actual_path, 'w') as f:
+        with open(actual_path, 'w', encoding="utf-8") as f:
             pass
 
         is_valid, line, file = await logger.verify_log_integrity()
@@ -692,7 +692,7 @@ class TestIntegrityVerification:
         # Set WRONG hash instead of computing correct one
         entry2["current_hash"] = "wrong_hash_intentionally_corrupted"
 
-        with open(actual_path, 'w') as f:
+        with open(actual_path, 'w', encoding="utf-8") as f:
             f.write(json.dumps(entry1) + "\n")
             f.write(json.dumps(entry2) + "\n")
 
@@ -717,7 +717,7 @@ class TestIntegrityVerification:
         entry["previous_hash"] = None
         entry["current_hash"] = logger._hash_entry(None, entry_data)
 
-        with open(rotated_path, 'w') as f:
+        with open(rotated_path, 'w', encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
 
         is_valid, line, file = await logger.verify_log_integrity()
@@ -748,7 +748,7 @@ class TestAuditTrailLoading:
         actual_path = logger._get_actual_log_path()
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(actual_path, 'w') as f:
+        with open(actual_path, 'w', encoding="utf-8") as f:
             entry1 = {"event_type": "login", "timestamp": datetime.now().isoformat(), "details": {}}
             entry2 = {"event_type": "logout", "timestamp": datetime.now().isoformat(), "details": {}}
             f.write(json.dumps(entry1) + "\n")
@@ -767,7 +767,7 @@ class TestAuditTrailLoading:
         actual_path = logger._get_actual_log_path()
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(actual_path, 'w') as f:
+        with open(actual_path, 'w', encoding="utf-8") as f:
             entry1 = {"event_type": "test", "user_id": "user1", "timestamp": datetime.now().isoformat(), "details": {}}
             entry2 = {"event_type": "test", "user_id": "user2", "timestamp": datetime.now().isoformat(), "details": {}}
             f.write(json.dumps(entry1) + "\n")
@@ -790,7 +790,7 @@ class TestAuditTrailLoading:
         past = now - timedelta(hours=2)
         future = now + timedelta(hours=2)
 
-        with open(actual_path, 'w') as f:
+        with open(actual_path, 'w', encoding="utf-8") as f:
             entry1 = {"event_type": "test", "timestamp": past.isoformat(), "details": {}}
             entry2 = {"event_type": "test", "timestamp": now.isoformat(), "details": {}}
             f.write(json.dumps(entry1) + "\n")
@@ -808,7 +808,7 @@ class TestAuditTrailLoading:
         logger = TamperEvidentLogger(config)
 
         entry = {"event_type": "test", "timestamp": datetime.now().isoformat(), "details": {}}
-        with gzip.open(log_path, 'wt') as f:
+        with gzip.open(log_path, 'wt', encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
 
         entries = list(logger.load_audit_trail())
@@ -844,7 +844,7 @@ class TestFileRotation:
             compression_type=CompressionType.NONE
         )
 
-        with open(log_file, 'w') as f:
+        with open(log_file, 'w', encoding="utf-8") as f:
             f.write("x" * 150)
 
         record = MagicMock()
@@ -957,7 +957,7 @@ class TestErrorHandling:
         actual_path = logger._get_actual_log_path()
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(actual_path, 'w') as f:
+        with open(actual_path, 'w', encoding="utf-8") as f:
             f.write("not valid json\n")
             f.write('{"valid": "json"}\n')
 
@@ -1184,7 +1184,7 @@ class TestShutdown:
 
         actual_path = logger._get_actual_log_path()
         if actual_path.exists():
-            with open(actual_path, 'r') as f:
+            with open(actual_path, 'r', encoding="utf-8") as f:
                 lines = f.readlines()
                 assert len(lines) >= 1
 

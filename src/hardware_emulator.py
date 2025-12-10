@@ -7,7 +7,7 @@ Modular emulator for analog, memristor, and photonic compute-in-memory (CIM) ope
 """
 
 import logging
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 
 import numpy as np
 

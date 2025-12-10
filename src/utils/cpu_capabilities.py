@@ -14,7 +14,7 @@ import logging
 import platform
 import threading
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,7 @@ def detect_cpu_capabilities() -> CPUCapabilities:
 def _detect_linux_capabilities(caps: CPUCapabilities) -> None:
     """Detect capabilities on Linux by reading /proc/cpuinfo"""
     try:
-        with open("/proc/cpuinfo", "r") as f:
+        with open("/proc/cpuinfo", "r", encoding="utf-8") as f:
             cpuinfo = f.read().lower()
 
         # Extract CPU flags

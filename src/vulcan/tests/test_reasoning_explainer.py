@@ -5,16 +5,11 @@ Tests explanation generation, safety checks, input/output validation,
 and comprehensive error handling.
 """
 
-import logging
-import re
-import time
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from vulcan.reasoning.reasoning_explainer import (SAFETY_VALIDATOR_AVAILABLE,
-                                                  ReasoningExplainer,
+from vulcan.reasoning.reasoning_explainer import (ReasoningExplainer,
                                                   SafetyAwareReasoning)
 from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
                                               ReasoningStep, ReasoningType)
@@ -663,7 +658,7 @@ class TestHistoryAndStatistics:
         result = safety_wrapper.reason_safely("test input")
 
         if not result["safe"]:
-            violations = safety_wrapper.get_safety_violations()
+            safety_wrapper.get_safety_violations()
             # May have violations depending on validation
 
     def test_get_statistics_empty(self, safety_wrapper):

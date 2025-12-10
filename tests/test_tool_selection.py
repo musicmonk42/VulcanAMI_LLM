@@ -21,7 +21,7 @@ def tool_selection_config():
     if not config_path.exists():
         config_path = Path(__file__).parent / ".." / "configs" / "tool_selection.yaml"
 
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -644,7 +644,7 @@ class TestDocumentation:
         if not config_path.exists():
             config_path = Path(__file__).parent / ".." / "configs" / "tool_selection.yaml"
 
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding="utf-8") as f:
             content = f.read()
 
         # Should have some comments explaining configuration

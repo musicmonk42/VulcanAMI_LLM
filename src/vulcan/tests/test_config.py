@@ -19,16 +19,13 @@ compatible with Cerberus top-level document validation which expects direct fiel
 This is a SOURCE CODE bug, not a test bug, but tests are modified to work around it.
 """
 
-import asyncio
 import json
 import os
 import shutil
 import tempfile
 import threading
-import time
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 import yaml
@@ -38,16 +35,16 @@ from src.vulcan.config import (BATCH_SIZE, EMBEDDING_DIM, GAMMA, HIDDEN_DIM,
                                AgentConfig, ConfigLayer, ConfigSchema,
                                ConfigurationAPI, ConfigurationManager,
                                ConfigValidationLevel, ConfigValidator,
-                               ExecutionStrategy, GoalType,
-                               HierarchicalGoalSystem, LearningConfig,
-                               ModalityType, ProfileType, ResourceLimits,
-                               SafetyLevel, SafetyPolicies, SelectionMode,
-                               ToolSelectionConfig, _get_config_manager,
-                               export_config, get_config,
-                               get_portfolio_strategy,
-                               get_tool_selection_config, get_utility_weights,
-                               initialize_config, load_profile, set_config,
-                               validate_all_dependencies, validate_config)
+                               ExecutionStrategy, HierarchicalGoalSystem,
+                               LearningConfig, ModalityType,
+                               ProfileType, ResourceLimits, SafetyLevel,
+                               SafetyPolicies, SelectionMode, ToolSelectionConfig,
+                               _get_config_manager, export_config,
+                               get_config, get_portfolio_strategy,
+                               get_tool_selection_config,
+                               get_utility_weights, initialize_config,
+                               load_profile, set_config, validate_all_dependencies,
+                               validate_config)
 
 # ============================================================
 # FIXTURES
@@ -109,7 +106,7 @@ def sample_config():
 def sample_config_file(temp_config_dir, sample_config):
     """Create sample configuration file."""
     config_file = temp_config_dir / "test_config.json"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         json.dump(sample_config, f)
     return config_file
 
@@ -118,7 +115,7 @@ def sample_config_file(temp_config_dir, sample_config):
 def sample_yaml_config_file(temp_config_dir, sample_config):
     """Create sample YAML configuration file."""
     config_file = temp_config_dir / "test_config.yaml"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         yaml.dump(sample_config, f)
     return config_file
 
@@ -512,7 +509,7 @@ class TestConfigurationManager:
         assert success == True
         assert export_file.exists()
 
-        with open(export_file, "r") as f:
+        with open(export_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         assert "configuration" in data
@@ -1193,11 +1190,11 @@ class TestIntegration:
         manager = ConfigurationManager(config_dir=str(temp_config_dir))
 
         # Default
-        default_value = manager.get("agent_config.agent_id")
+        manager.get("agent_config.agent_id")
 
         # File layer
         config_file = temp_config_dir / "test.json"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump({"agent_config": {"agent_id": "file-agent"}}, f)
         manager.load_from_file(config_file)
         assert manager.get("agent_config.agent_id") == "file-agent"

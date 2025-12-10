@@ -11,18 +11,13 @@ Tests cover:
 - Edge cases
 """
 
-import asyncio
-import hashlib
+from store import PackfileStore, S3Store
 import sys
-import time
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from store import PackfileStore, S3Store
 
 
 class TestS3Store:
@@ -166,7 +161,7 @@ class TestPackfileStore:
         """Test initialization with zstd compression."""
         with patch("store.S3Store"):
             try:
-                import zstandard
+                pass
 
                 store = PackfileStore(s3_bucket="test-bucket", compression="zstd")
                 assert store.compression == "zstd"
@@ -177,7 +172,7 @@ class TestPackfileStore:
         """Test initialization with lz4 compression."""
         with patch("store.S3Store"):
             try:
-                import lz4.frame
+                pass
 
                 store = PackfileStore(s3_bucket="test-bucket", compression="lz4")
                 assert store.compression == "lz4"
@@ -210,7 +205,7 @@ class TestPackfileStore:
         store = PackfileStore(s3_bucket="test-bucket", compression="zlib")
 
         pack_bytes = b"a" * 1000  # Compressible data
-        path = store.upload(pack_bytes)
+        store.upload(pack_bytes)
 
         # Verify compression was applied
         call_args = mock_s3_instance.put_object.call_args

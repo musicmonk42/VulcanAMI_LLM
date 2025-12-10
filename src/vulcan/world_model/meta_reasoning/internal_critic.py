@@ -240,7 +240,7 @@ class Evaluation:
 
     def get_critical_issues(self) -> List[Critique]:
         """Get critical-level critiques"""
-        return [c for c in self.critiques if c.level == CritiqueLevel.CRITICAL]
+        return list(self.critiques if c.level == CritiqueLevel.CRITICAL)
 
     def get_high_risks(self) -> List[Risk]:
         """Get high or critical severity risks"""
@@ -419,7 +419,7 @@ class InternalCritic:
             f"  Strict mode: {strict_mode}, Adaptive weights: {self.adaptive_weights}"
         )
         logger.info(
-            f"  Perspective weights: { {p.value: w for p, w in self.perspective_weights.items()} }"
+            f"  Perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
         )
 
     def evaluate_proposal(
@@ -526,10 +526,10 @@ class InternalCritic:
             # In strict mode, lower scores for any critiques
             if self.strict_mode and all_critiques:
                 critical_penalty = 0.2 * len(
-                    [c for c in all_critiques if c.level == CritiqueLevel.CRITICAL]
+                    list(all_critiques if c.level == CritiqueLevel.CRITICAL)
                 )
                 major_penalty = 0.1 * len(
-                    [c for c in all_critiques if c.level == CritiqueLevel.MAJOR]
+                    list(all_critiques if c.level == CritiqueLevel.MAJOR)
                 )
                 overall_score = max(
                     0.0, overall_score - critical_penalty - major_penalty
@@ -929,7 +929,7 @@ class InternalCritic:
                 )
 
             # Ensure all items in proposals list are dicts
-            valid_proposals = [p for p in proposals if isinstance(p, dict)]
+            valid_proposals = list(proposals if isinstance(p, dict))
             if len(valid_proposals) != len(proposals):
                 logger.warning(
                     f"Some items in proposals list were not dicts ({len(proposals) - len(valid_proposals)} ignored)."
@@ -1332,7 +1332,7 @@ class InternalCritic:
 
         # Check for missing required fields (Example)
         required_fields = ["description", "goal"]  # Adjust as needed
-        missing = [f for f in required_fields if f not in proposal]
+        missing = list(required_fields if f not in proposal)
         if missing:
             score -= 0.1 * len(missing)
             critiques.append(
@@ -1609,7 +1609,7 @@ class InternalCritic:
 
         # Placeholder: Check for key sections
         expected = ["description", "steps", "validation"]
-        missing = [k for k in expected if not proposal.get(k)]
+        missing = list(expected if not proposal.get(k))
         if missing:
             score -= 0.2 * len(missing)
             critiques.append(
@@ -2061,7 +2061,7 @@ class InternalCritic:
                     }
 
                 logger.debug(
-                    f"New perspective weights: { {p.value: w for p, w in self.perspective_weights.items()} }"
+                    f"New perspective weights: {{p.value: w for p, w in self.perspective_weights.items()} }"
                 )
 
         # Optional: Slightly decrease weights of perspectives that gave high scores to a failed proposal? (More complex logic)

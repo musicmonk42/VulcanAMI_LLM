@@ -46,9 +46,9 @@ import json
 import math
 import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 Token = Union[int, str]
 
@@ -652,7 +652,7 @@ class UnifiedGeneration:
 
         for mod_name, proposals in per_module.items():
             w = float(weights.get(mod_name, 1.0))
-            mod_conf = module_confidences.get(mod_name, 1.0)
+            module_confidences.get(mod_name, 1.0)
 
             for p in proposals:
                 tok = p.get("token")
@@ -969,7 +969,7 @@ class UnifiedGeneration:
                     continue
 
                 # Count how many other modules also proposed this
-                other_modules = [m for m in all_tokens[tok] if m != mod_name]
+                other_modules = list(all_tokens[tok) if m != mod_name]
                 if len(other_modules) > 0:
                     # Boost module_prob based on agreement
                     boost = 1.0 + 0.1 * len(other_modules)

@@ -5,11 +5,10 @@ Learning types, configurations, and data structures for VULCAN-AGI
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from ..config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM, ModalityType
 
 # ============================================================
 # LEARNING TYPES AND CONFIGS

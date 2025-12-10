@@ -21,7 +21,6 @@ CSIU: Records routing outcomes for learning better tie-breaks over time
 """
 
 import inspect
-import json
 import logging
 import pickle
 import threading
@@ -30,9 +29,11 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
+
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,6 @@ _safety_imports_checked = False
 
 def _get_safety_validator():
     """Lazy import of EnhancedSafetyValidator to avoid circular imports."""
-    global _safety_validator_class, _safety_imports_checked
     if not _safety_imports_checked:
         _check_safety_imports()
     return _safety_validator_class
@@ -53,7 +53,6 @@ def _get_safety_validator():
 
 def _get_safety_config():
     """Lazy import of SafetyConfig to avoid circular imports."""
-    global _safety_config_class, _safety_imports_checked
     if not _safety_imports_checked:
         _check_safety_imports()
     return _safety_config_class
@@ -694,7 +693,10 @@ class WorldModelRouter:
                                 parallel_groups=[],
                                 estimated_time_ms=0,
                                 confidence=0.0,
-                                reasoning=f"Observation blocked by safety validator: {obs_safety.get('reason', 'unknown')}",
+                                reasoning=(
+                                    f"Observation blocked by safety validator: "
+                                    f"{obs_safety.get('reason', 'unknown')}"
+                                ),
                                 metadata={"safety_blocked": True},
                             )
                 except Exception as e:
@@ -1415,7 +1417,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(method_to_call)
-            params = [p for p in sig.parameters.keys() if p != "self"]
+            params = list(sig.parameters.keys() if p != "self")
 
             # Check for specific parameter names
             if "observation" in params:
@@ -1471,7 +1473,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(tracker.update)
-            params = [p for p in sig.parameters.keys() if p != "self"]
+            params = list(sig.parameters.keys() if p != "self")
 
             # Check for specific parameter names
             if "observation" in params:
@@ -1501,7 +1503,7 @@ class WorldModelRouter:
             try:
                 # FIXED: Defensive parameter inference
                 sig = inspect.signature(dynamics.update)
-                params = [p for p in sig.parameters.keys() if p != "self"]
+                params = list(sig.parameters.keys() if p != "self")
 
                 # Check for specific parameter names
                 if "observation" in params:
@@ -1552,7 +1554,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(detector.check)
-            params = [p for p in sig.parameters.keys() if p != "self"]
+            params = list(sig.parameters.keys() if p != "self")
 
             # Check for specific parameter names
             if "observations" in params:
@@ -1594,7 +1596,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(tracker.update)
-            params = [p for p in sig.parameters.keys() if p != "self"]
+            params = list(sig.parameters.keys() if p != "self")
 
             # Check for specific parameter names
             if "observation" in params and "prediction" in params:
@@ -1648,7 +1650,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(method_to_call)
-            params = [p for p in sig.parameters.keys() if p != "self"]
+            params = list(sig.parameters.keys() if p != "self")
 
             # Check for specific parameter names
             if "observation" in params:
@@ -1689,7 +1691,7 @@ class WorldModelRouter:
         try:
             # FIXED: Defensive parameter inference
             sig = inspect.signature(method_to_call)
-            params = [p for p in sig.parameters.keys() if p != "self"]
+            params = list(sig.parameters.keys() if p != "self")
 
             # Check for specific parameter names
             if "observation" in params:
@@ -2031,10 +2033,10 @@ class WorldModelRouter:
                 "enabled": True,
                 "routing_records": len(self.csiu_routing_history),
                 "execution_records": len(
-                    [r for r in self.execution_history if "csiu_before" in r]
+                    list(self.execution_history if "csiu_before" in r)
                 ),
                 "outcome_records": len(
-                    [r for r in self.csiu_routing_history if "success" in r]
+                    list(self.csiu_routing_history if "success" in r)
                 ),
                 "note": "Internal tracking only, not for UX",
             }
@@ -2065,15 +2067,16 @@ class WorldModelRouter:
         logger.info(f"Router state saved to {save_path}")
 
     def load_state(self, path: str):
-        """Load router state - FIXED: Merge with defaults and use Path not FilePath"""
+        """Load router state - FIXED: Merge with defaults and use Path not FilePath
+        SECURITY: Use safe_pickle_load to prevent deserialization attacks"""
         load_path = Path(path) / "router_state.pkl"
 
         if not load_path.exists():
             logger.warning(f"No saved state at {load_path}")
             return
 
-        with open(load_path, "rb") as f:
-            state = pickle.load(f)
+        # SECURITY FIX: Use safe_pickle_load instead of pickle.load
+        state = safe_pickle_load(load_path)
 
         self.metrics = defaultdict(int, state["metrics"])
         self.pattern_learner.rules = state["pattern_rules"]

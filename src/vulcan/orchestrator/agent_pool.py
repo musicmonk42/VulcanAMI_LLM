@@ -8,18 +8,15 @@
 # FIXED: Converted long time.sleep calls to interruptible self._shutdown_event.wait().
 # ============================================================
 
-import hashlib
 import json
 import logging
 import multiprocessing
 import threading
 import time
-import traceback
 import uuid
 from collections import defaultdict
-from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 # Import psutil with fallback for missing or broken installations
 try:
@@ -37,10 +34,8 @@ except ImportError:
     )
 
 from .agent_lifecycle import (AgentCapability, AgentMetadata, AgentState,
-                              JobProvenance, StateTransitionRules,
                               create_agent_metadata, create_job_provenance)
-from .task_queues import (CeleryTaskQueue, CustomTaskQueue, RayTaskQueue,
-                          TaskQueueInterface, TaskStatus, create_task_queue)
+from .task_queues import (TaskQueueInterface, create_task_queue)
 
 # ============================================================
 # CONSTANTS
@@ -993,7 +988,7 @@ class AgentPoolManager:
                     # Archive oldest 1000 records
                     records_to_archive = list(self.provenance_records.items())[:1000]
 
-                    with open(archive_file, "w") as f:
+                    with open(archive_file, "w", encoding="utf-8") as f:
                         for job_id, prov in records_to_archive:
                             try:
                                 f.write(json.dumps(prov.to_dict(), default=str) + "\n")

@@ -5,15 +5,14 @@ Part of the VULCAN-AGI system
 
 import copy
 import hashlib
-import json
 import logging
 import threading
 import time
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -273,7 +272,6 @@ class DecompositionStrategy(ABC):
         Returns:
             Decomposition result
         """
-        pass
 
     def decompose(self, problem_graph) -> List[Dict[str, Any]]:
         """
@@ -1131,7 +1129,7 @@ class StructuralDecomposition(DecompositionStrategy):
                 parallel_groups[key].append(node)
 
         # Find groups with multiple nodes
-        parallel_sets = [nodes for nodes in parallel_groups.values() if len(nodes) > 1]
+        parallel_sets = list(parallel_groups.values() if len(nodes) > 1)
 
         if parallel_sets:
             total_parallel = sum(len(s) for s in parallel_sets)
@@ -1547,7 +1545,7 @@ class AnalogicalDecomposition(DecompositionStrategy):
 
                     # Check if hierarchical
                     if nx.is_directed_acyclic_graph(G):
-                        roots = [n for n in G.nodes() if G.in_degree(n) == 0]
+                        roots = list(G.nodes() if G.in_degree(n) == 0)
                         features["is_hierarchical"] = len(roots) <= 2
 
         return features

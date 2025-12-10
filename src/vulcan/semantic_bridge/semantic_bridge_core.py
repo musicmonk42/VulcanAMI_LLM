@@ -19,7 +19,7 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 
@@ -842,7 +842,7 @@ class SemanticBridge:
             history_file = storage_path / "operation_history.jsonl"
 
             # Append new entries
-            with open(history_file, "a") as f:
+            with open(history_file, "a", encoding="utf-8") as f:
                 for entry in list(self.operation_history):
                     # Convert to JSON-serializable format
                     serialized = {
@@ -881,7 +881,7 @@ class SemanticBridge:
             if not history_file.exists():
                 return
 
-            with open(history_file, "r") as f:
+            with open(history_file, "r", encoding="utf-8") as f:
                 for line in f:
                     try:
                         entry = json.loads(line.strip())
@@ -1754,8 +1754,8 @@ class SemanticBridge:
 
     def _determine_conflict_type(self, concept1: Concept, concept2: Concept) -> str:
         """Determine type of conflict"""
-        c1_id = getattr(concept1, "concept_id", "")
-        c2_id = getattr(concept2, "concept_id", "")
+        getattr(concept1, "concept_id", "")
+        getattr(concept2, "concept_id", "")
 
         if hasattr(concept1, "name") and hasattr(concept2, "name"):
             if concept1.name == concept2.name:

@@ -19,16 +19,13 @@ import math
 import pickle
 import threading
 import time
-import warnings
-from collections import OrderedDict, defaultdict, deque
+from collections import OrderedDict, defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from enum import Enum, auto
-from functools import lru_cache, wraps
 from pathlib import Path
-from typing import (Any, Callable, Dict, Generic, List, NamedTuple, Optional,
-                    Protocol, Sequence, Set, Tuple, TypeVar, Union)
+from typing import (Any, Dict, List, Optional, Protocol, Sequence, Set,
+                    Tuple, TypeVar, Union)
 
 import numpy as np
 import torch
@@ -353,14 +350,14 @@ class VulcanScorerConfig:
 
     def save(self, path: str):
         """Save configuration to file."""
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(asdict(self), f, indent=2, default=str)
         log.info(f"Configuration saved to {path}")
 
     @classmethod
     def load(cls, path: str) -> "VulcanScorerConfig":
         """Load configuration from file."""
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         # Reconstruct nested dataclasses
         config = cls(
@@ -1839,7 +1836,7 @@ def main():
         print(f"\nBenchmarking {num_candidates} candidates...")
         start_time = time.time()
 
-        results = scorer.score_candidates_batch(None, candidates, context)
+        scorer.score_candidates_batch(None, candidates, context)
 
         elapsed = time.time() - start_time
         print(f"Total time: {elapsed:.2f}s")

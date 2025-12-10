@@ -289,7 +289,10 @@ class ParameterHistoryManager:
     def load_checkpoint(
         self, checkpoint_path: str, model: nn.Module, strict: bool = True
     ) -> Dict[str, Any]:
-        """Load checkpoint into model with validation"""
+        """Load checkpoint into model with validation
+        SECURITY NOTE: weights_only is set to False to support full checkpoint loading
+        including metadata and optimizer state. For production use with untrusted sources,
+        consider using weights_only=True and loading metadata separately."""
         # FIXED: Convert to Path object and resolve
         path = Path(checkpoint_path).resolve()
 
@@ -303,9 +306,13 @@ class ParameterHistoryManager:
                 import gzip
 
                 with gzip.open(path, "rb") as f:
-                    checkpoint = torch.load(f, map_location="cpu")
+                    # NOTE: weights_only=False allows loading metadata but increases risk
+                    # TODO: Consider separating weight loading from metadata loading
+                    checkpoint = torch.load(f, map_location="cpu", weights_only=False)
             else:
-                checkpoint = torch.load(path, map_location="cpu")
+                # NOTE: weights_only=False allows loading metadata but increases risk
+                # TODO: Consider separating weight loading from metadata loading
+                checkpoint = torch.load(path, map_location="cpu", weights_only=False)
 
             # Validate checksum
             if "checksum" in checkpoint:
@@ -332,7 +339,10 @@ class ParameterHistoryManager:
             raise
 
     def validate_checkpoint(self, checkpoint_path: str) -> bool:
-        """Validate checkpoint integrity using checksum"""
+        """Validate checkpoint integrity using checksum
+        SECURITY NOTE: weights_only is set to False to support full checkpoint validation
+        including metadata. For production use with untrusted sources, consider using
+        weights_only=True and validating metadata separately."""
         try:
             # FIXED: Convert to Path object and resolve
             path = Path(checkpoint_path).resolve()
@@ -343,9 +353,13 @@ class ParameterHistoryManager:
                 import gzip
 
                 with gzip.open(path, "rb") as f:
-                    checkpoint = torch.load(f, map_location="cpu")
+                    # NOTE: weights_only=False allows loading metadata but increases risk
+                    # TODO: Consider separating weight loading from metadata loading
+                    checkpoint = torch.load(f, map_location="cpu", weights_only=False)
             else:
-                checkpoint = torch.load(path, map_location="cpu")
+                # NOTE: weights_only=False allows loading metadata but increases risk
+                # TODO: Consider separating weight loading from metadata loading
+                checkpoint = torch.load(path, map_location="cpu", weights_only=False)
 
             # Verify checksum
             if "checksum" not in checkpoint:
@@ -635,7 +649,7 @@ class ParameterHistoryManager:
 
         try:
             # FIXED: Use Path.open() for consistency
-            with path.open("w") as f:
+            with path.open("w", encoding="utf-8") as f:
                 json.dump(export_data, f, indent=2, default=str)
             logger.info(f"Exported checkpoint history to: {export_path}")
         except Exception as e:
@@ -650,7 +664,7 @@ class ParameterHistoryManager:
             raise FileNotFoundError(f"Import file not found: {import_path}")
 
         # FIXED: Use Path.open() for consistency
-        with path.open("r") as f:
+        with path.open("r", encoding="utf-8") as f:
             import_data = json.load(f)
 
         with self._lock:
@@ -750,7 +764,7 @@ class ParameterHistoryManager:
                 history_data = list(self.parameter_history)
 
             # FIXED: Use Path.open() for consistency
-            with history_file.open("w") as f:
+            with history_file.open("w", encoding="utf-8") as f:
                 json.dump(history_data, f, indent=2, default=str)
 
         except Exception as e:
@@ -769,7 +783,7 @@ class ParameterHistoryManager:
         if history_file.exists():
             try:
                 # FIXED: Use Path.open() for consistency
-                with history_file.open("r") as f:
+                with history_file.open("r", encoding="utf-8") as f:
                     history = json.load(f)
 
                 with self._lock:
@@ -788,5 +802,5 @@ class ParameterHistoryManager:
         if hasattr(self, "_running") and self._running:
             try:
                 self.shutdown()
-            except Exception as e:
+            except Exception:
                 pass  # Suppress errors in destructor

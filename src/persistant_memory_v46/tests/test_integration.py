@@ -8,12 +8,13 @@ Tests the interaction between all modules:
 - Complete end-to-end workflows
 """
 
-import asyncio
+from zk import ZKProver
+from unlearning import UnlearningEngine
+from store import PackfileStore
+from lsm import MerkleLSM
 import sys
-from typing import Any, Dict, List
 from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
@@ -25,11 +26,6 @@ try:
     INIT_AVAILABLE = True
 except ImportError:
     INIT_AVAILABLE = False
-
-from lsm import BloomFilter, MerkleLSM
-from store import PackfileStore
-from unlearning import GradientSurgeryUnlearner, UnlearningEngine
-from zk import MerkleTree, ZKProver
 
 
 class TestMemorySystemCreation:
@@ -262,7 +258,7 @@ class TestEndToEndWorkflows:
             lsm.put(f"user_{i}", {"email": f"user{i}@example.com"})
 
         # 2. Create snapshot
-        snapshot_id = lsm.create_snapshot()
+        lsm.create_snapshot()
 
         # 3. Flush and upload packfiles
         lsm.flush_memtable()
@@ -322,7 +318,7 @@ class TestEndToEndWorkflows:
         # Async store operations
         data = b"test data"
         path = await store.upload_async(data)
-        downloaded = await store.download_async(path)
+        await store.download_async(path)
 
         # Async unlearning
         forget = [b"item1"]

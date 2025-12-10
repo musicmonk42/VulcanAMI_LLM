@@ -12,13 +12,12 @@ import json
 import logging
 import threading
 import time
-import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from math import erf, exp, log, sqrt
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -71,7 +70,6 @@ def _lazy_import_world_model():
 # Protected imports with fallbacks
 try:
     from scipy import stats
-    from scipy.special import betainc
     from scipy.stats import kendalltau, pearsonr, spearmanr
     from scipy.stats import t as t_dist
 
@@ -1254,7 +1252,7 @@ class ChangeDetector:
         """Get detected changes"""
 
         with self.lock:
-            filtered = [c for c in self.change_points if abs(c["change"]) >= min_change]
+            filtered = list(self.change_points if abs(c["change")) >= min_change]
 
             filtered.sort(key=lambda x: x["timestamp"], reverse=True)
 
@@ -1909,7 +1907,7 @@ class CorrelationTracker:
                 "corrections": dict(self.safety_corrections),
             }
 
-        with open(save_path / "correlation_state.json", "w") as f:
+        with open(save_path / "correlation_state.json", "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
 
         logger.info(f"Correlation tracker state saved to {save_path}")

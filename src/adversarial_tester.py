@@ -6,12 +6,10 @@ Version: 2.0.4 - All test failures fixed with numeric risk level comparison
 import base64
 import codecs
 import copy
-import gzip
 import hashlib
 import json
 import logging
 import os
-import pickle
 import re
 import sqlite3
 import tempfile  # FIXED: Added missing import for temp file operations
@@ -22,19 +20,16 @@ import warnings
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 # Scientific computing imports
 import scipy.stats as stats
-from scipy.optimize import minimize
 from scipy.special import softmax
 from sklearn.ensemble import IsolationForest
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 # SHAP for interpretability
 try:
@@ -980,7 +975,7 @@ class NSOAligner:
             mitigations.append("Validate all network endpoints")
 
         # Check for file operations
-        if any(x in code for x in ["open(", "write(", "file", "path"]):
+        if any(x in code for x in ["open(", "write(", "file", "path"], encoding="utf-8"):
             risks.append("file_operations")
             risk_level = max(risk_level, RISK_LEVELS[SafetyLevel.LOW_RISK])
             mitigations.append("Restrict file system access")
@@ -1378,7 +1373,7 @@ class AdversarialTester:
             )
 
             # Combined loss
-            loss = l2_dist + c * target_loss
+            l2_dist + c * target_loss
 
             # Update best
             if target_loss < best_dist:
@@ -1838,7 +1833,7 @@ class AdversarialTester:
             else:
                 # Random restart if stuck
                 population = [self._random_mutation(current_proposal) for _ in range(5)]
-                population = [p for p in population if p is not None]
+                population = list(population if p is not None)
 
                 if not population:
                     break
@@ -2080,9 +2075,9 @@ class AdversarialTester:
 
         # Generate summary
         total_tests = len(
-            [k for k in results["tests"].keys() if not k.endswith("_error")]
+            list(results["tests").keys() if not k.endswith("_error")]
         )
-        failures = len([k for k in results["tests"].keys() if k.endswith("_error")])
+        failures = len(list(results["tests").keys() if k.endswith("_error")])
         divergences = [
             v
             for k, v in results["tests"].items()

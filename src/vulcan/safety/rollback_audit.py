@@ -4,7 +4,6 @@ Rollback management and audit logging for VULCAN-AGI Safety Module.
 Provides snapshot-based rollback capabilities and comprehensive audit trail management.
 """
 
-import atexit
 import copy
 import hashlib
 import json
@@ -19,11 +18,10 @@ import time
 import uuid
 import zlib
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 from .safety_types import (ActionType, RollbackSnapshot, SafetyReport,
                            SafetyViolationType)
@@ -1034,7 +1032,7 @@ class RollbackManager:
                     "checksum": snapshot.checksum,
                 }
 
-                with open(export_path, "w") as f:
+                with open(export_path, "w", encoding="utf-8") as f:
                     json.dump(export_data, f, indent=2, default=str)
 
                 logger.info(f"Exported snapshot {snapshot_id} to {export_path}")
@@ -1055,7 +1053,7 @@ class RollbackManager:
             Snapshot ID if successful, None otherwise
         """
         try:
-            with open(import_path, "r") as f:
+            with open(import_path, "r", encoding="utf-8") as f:
                 import_data = json.load(f)
 
             # Create new snapshot from imported data
@@ -1264,7 +1262,7 @@ class AuditLogger:
         """Get the last hash from existing log for chain continuity."""
         if self.current_log_file.exists():
             try:
-                with open(self.current_log_file, "r") as f:
+                with open(self.current_log_file, "r", encoding="utf-8") as f:
                     # Read last line
                     last_line = None
                     for line in f:
@@ -1393,7 +1391,7 @@ class AuditLogger:
 
         # Write all entries at once
         try:
-            with open(self.current_log_file, "a") as f:
+            with open(self.current_log_file, "a", encoding="utf-8") as f:
                 for entry in entries_to_write:
                     f.write(json.dumps(entry, default=str) + "\n")
 
@@ -1529,13 +1527,13 @@ class AuditLogger:
         try:
             # Get current file size
             if self.current_log_file.exists():
-                with open(self.current_log_file, "r") as f:
+                with open(self.current_log_file, "r", encoding="utf-8") as f:
                     line_number = sum(1 for _ in f)
             else:
                 line_number = 0
 
             # Write entry
-            with open(self.current_log_file, "a") as f:
+            with open(self.current_log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, default=str) + "\n")
 
             return line_number
@@ -1804,7 +1802,7 @@ class AuditLogger:
                 try:
                     file_path = Path(file_path)
                     if file_path.exists():
-                        with open(file_path, "r") as f:
+                        with open(file_path, "r", encoding="utf-8") as f:
                             for i, line in enumerate(f):
                                 if i == line_number or line_number == -1:
                                     # Try to find by entry_id if line_number is -1
@@ -1955,14 +1953,14 @@ class AuditLogger:
             entries = all_entries
 
             if format == "json":
-                with open(export_path, "w") as f:
+                with open(export_path, "w", encoding="utf-8") as f:
                     json.dump(entries, f, indent=2, default=str)
 
             elif format == "csv":
                 import csv
 
                 if entries:
-                    with open(export_path, "w", newline="") as f:
+                    with open(export_path, "w", newline="", encoding="utf-8") as f:
                         # Use first entry to get field names
                         fieldnames = list(entries[0].keys())
                         writer = csv.DictWriter(f, fieldnames=fieldnames)

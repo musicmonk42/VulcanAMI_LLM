@@ -13,7 +13,6 @@ import hashlib
 import json
 import logging
 import os
-import queue
 import socket
 import ssl
 import sys  # FIXED: Added for Python version check
@@ -31,7 +30,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 try:
     import websocket
@@ -273,7 +272,7 @@ class TelemetryCollector:
                 },
             )
 
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5, encoding="utf-8") as response:
                 if response.status == 200:
                     logger.debug("Telemetry reported successfully")
 
@@ -371,9 +370,9 @@ class HTTPCommunicator:
             if self.ssl_context:
                 response = urllib.request.urlopen(
                     req, timeout=self.config.timeout, context=self.ssl_context
-                )
+                , encoding="utf-8")
             else:
-                response = urllib.request.urlopen(req, timeout=self.config.timeout)
+                response = urllib.request.urlopen(req, timeout=self.config.timeout, encoding="utf-8")
 
             response_data = response.read()
 
@@ -396,7 +395,7 @@ class HTTPCommunicator:
         except urllib.error.HTTPError as e:
             try:
                 error_body = e.read().decode("utf-8")
-            except Exception as e:
+            except Exception:
                 error_body = "Unable to read error body"
             raise RuntimeError(
                 f"HTTP {e.code}: {error_body} (Request ID: {request_id})"
@@ -602,7 +601,7 @@ class WebSocketCommunicator:
             logger.error(f"WebSocket connection failed: {e}")
             return False
 
-    def _on_open(self, ws):
+    def _on_open(self, ws, encoding="utf-8"):
         """Handle WebSocket open event."""
         with self.connected_lock:
             self.connected = True
@@ -718,7 +717,7 @@ class WebSocketCommunicator:
 
                 try:
                     self._send_message({"type": "heartbeat"})
-                except Exception as e:
+                except Exception:
                     break
 
                 time.sleep(HEARTBEAT_INTERVAL)
@@ -1681,7 +1680,7 @@ class AgentInterface:
 
     def load_state(self, filepath: str):
         """Load interface state from file."""
-        with open(filepath, "r") as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         # Restore history

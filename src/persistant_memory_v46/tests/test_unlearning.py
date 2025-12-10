@@ -9,20 +9,15 @@ Tests cover:
 - Async operations
 """
 
-import asyncio
-import hashlib
+from unlearning import GradientSurgeryUnlearner, UnlearningEngine
 # Import the modules to test
 import sys
-import time
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from unlearning import GradientSurgeryUnlearner, UnlearningEngine
 
 
 class TestGradientSurgeryUnlearner:

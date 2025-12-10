@@ -294,7 +294,7 @@ class TestUnifiedRuntime:
     def manifest_file(self, temp_dir):
         manifest = {"version": "1.0.0-test"}
         manifest_path = temp_dir / "type_system_manifest.json"
-        with open(manifest_path, 'w') as f: json.dump(manifest, f)
+        with open(manifest_path, 'w', encoding="utf-8") as f: json.dump(manifest, f)
         return manifest_path
 
     @pytest.fixture

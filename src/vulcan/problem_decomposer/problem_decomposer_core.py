@@ -5,7 +5,6 @@ Part of the VULCAN-AGI system
 Integrated with comprehensive safety validation.
 """
 
-import copy
 import hashlib
 import json
 import logging
@@ -14,8 +13,7 @@ import time
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 

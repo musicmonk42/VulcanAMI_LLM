@@ -7,23 +7,22 @@ FIXED: Consistent return format for _granger_causality_test method.
 """
 
 from __future__ import annotations
+from .reasoning_explainer import ReasoningExplainer
 
 import json
 import logging
 import pickle
 import time
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 import numpy as np
 from scipy import stats
-from scipy.optimize import minimize
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import StandardScaler
 
 try:
     import networkx as nx
@@ -44,7 +43,7 @@ except ImportError:
     logging.getLogger(__name__).warning("Pandas not available, some features disabled")
 
 try:
-    from dowhy import CausalModel
+    pass
 
     DOWHY_AVAILABLE = True
 except ImportError:
@@ -70,7 +69,6 @@ logger = logging.getLogger(__name__)
 try:
     from causallearn.search.ConstraintBased import FCI as fci
     from causallearn.search.ScoreBased import GES as ges
-    from causallearn.utils import GraphUtils
 
     CAUSALLEARN_AVAILABLE = True
     logger.info("causallearn loaded, using GES/FCI algorithms")
@@ -88,10 +86,6 @@ except ImportError:
         "lingam not available. LiNGAM algorithm will fall back to PC."
     )
 
-
-from .reasoning_explainer import ReasoningExplainer
-from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
-                              ReasoningType)
 
 logger = logging.getLogger(__name__)
 
@@ -1074,7 +1068,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             X_cols = [treatment] + list(covariates)
 
             # Remove columns that don't exist
-            X_cols = [col for col in X_cols if col in data.columns]
+            X_cols = list(X_cols if col in data.columns)
 
             if treatment not in data.columns or outcome not in data.columns:
                 return 0.0
@@ -1410,7 +1404,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             try:
                 graph_file = self.model_path / f"{name}_graph.json"
                 graph_data = nx.node_link_data(self.causal_dag, edges="edges")
-                with open(graph_file, "w") as f:
+                with open(graph_file, "w", encoding="utf-8") as f:
                     json.dump(graph_data, f)
             except Exception as e:
                 logger.error(f"Failed to save graph: {e}")
@@ -1444,7 +1438,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             if NETWORKX_AVAILABLE:
                 graph_file = self.model_path / f"{name}_graph.json"
                 if graph_file.exists():
-                    with open(graph_file, "r") as f:
+                    with open(graph_file, "r", encoding="utf-8") as f:
                         graph_data = json.load(f)
                     self.causal_dag = nx.node_link_graph(graph_data, edges="edges")
 

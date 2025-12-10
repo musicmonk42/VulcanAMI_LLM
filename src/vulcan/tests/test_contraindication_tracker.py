@@ -3,20 +3,18 @@ test_contraindication_tracker.py - Comprehensive tests for contraindication trac
 Part of the VULCAN-AGI system test suite
 """
 
-import json
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
 # Import the module components to test
 from vulcan.knowledge_crystallizer.contraindication_tracker import (
-    NETWORKX_AVAILABLE, CascadeAnalyzer, CascadeImpact, Contraindication,
-    ContraindicationDatabase, ContraindicationGraph, FailureMode, Severity,
-    SimpleGraph)
+    CascadeAnalyzer, CascadeImpact, Contraindication, ContraindicationDatabase,
+    ContraindicationGraph, FailureMode, Severity, SimpleGraph)
 
 # ============================================================================
 # TEST HELPER CLASSES
@@ -1133,7 +1131,7 @@ class TestIntegration:
         cascades = graph.find_cascades(principles[0].id, max_depth=3)
 
         # Calculate risks
-        risk = graph.calculate_cascade_risk(principles[0].id)
+        graph.calculate_cascade_risk(principles[0].id)
 
         # Get statistics
         stats = graph.get_statistics()

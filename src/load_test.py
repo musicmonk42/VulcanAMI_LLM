@@ -7,7 +7,6 @@ error handling, and observability integration.
 """
 
 import csv
-import json
 import logging
 import os
 import platform
@@ -321,7 +320,7 @@ def get_env_metadata() -> Dict[str, Any]:
 
     # Find CI environment variable
     ci_env = "none"
-    ci_vars = [k for k in os.environ.keys() if k.lower().endswith("ci")]
+    ci_vars = list(os.environ.keys() if k.lower().endswith("ci"))
     if ci_vars:
         ci_env = ci_vars[0]
 
@@ -419,7 +418,7 @@ def write_prometheus_metrics() -> bool:
             f.write("\n# TYPE load_test_response_time_ms summary\n")
             for endpoint, times in response_times.items():
                 if times:
-                    avg_time = sum(times) / len(times)
+                    sum(times) / len(times)
                     f.write(
                         f'load_test_response_time_ms{{endpoint="{endpoint}",'
                         f'quantile="0.5"}} {sorted(times)[len(times) // 2]}\n'
@@ -641,7 +640,7 @@ class GraphixArenaUser(HttpUser):
     @task(2)
     def join_tournament(self) -> None:
         """Join a tournament."""
-        faker = _get_faker()
+        _get_faker()
         try:
             response = self.client.post(
                 API_TOURNAMENT,

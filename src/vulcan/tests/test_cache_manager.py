@@ -14,18 +14,15 @@ Tests cover:
 """
 
 # Add parent directory to path for imports
+from semantic_bridge.cache_manager import CacheManager
 import sys
 import threading
 import time
-from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from semantic_bridge.cache_manager import CacheManager
 
 
 class TestCacheManagerBasics:
@@ -177,7 +174,7 @@ class TestMemoryManagement:
             # Verify eviction order (lowest priority first)
             evicted_priorities = []
             for eviction in result["evicted"]:
-                cache_name = eviction["cache"]
+                eviction["cache"]
                 evicted_priorities.append(eviction["priority"])
 
             # Priorities should be in ascending order
@@ -699,7 +696,7 @@ class TestIntegration:
             else:
                 manager.record_miss("metadata")
 
-        stats = manager.get_statistics()
+        manager.get_statistics()
 
         # Pattern cache should have best hit rate
         pattern_info = manager.get_cache_info("patterns")

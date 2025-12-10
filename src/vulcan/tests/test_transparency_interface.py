@@ -10,8 +10,8 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock
+from typing import Dict, List
+from unittest.mock import Mock
 
 import pytest
 
@@ -81,7 +81,7 @@ class MockTransparencyInterface:
             overall_status = validation.get("overall_status", "unknown")
             confidence = validation.get("confidence", 0.0)
             reasoning = validation.get("reasoning", "")
-            timestamp = validation.get("timestamp", time.time())
+            validation.get("timestamp", time.time())
             objectives = validation.get("objective_analyses", [])
             conflicts = validation.get("conflicts_detected", [])
         else:
@@ -92,7 +92,7 @@ class MockTransparencyInterface:
                 overall_status = overall_status.value
             confidence = getattr(validation, "confidence", 0.0)
             reasoning = getattr(validation, "reasoning", "")
-            timestamp = getattr(validation, "timestamp", time.time())
+            getattr(validation, "timestamp", time.time())
             objectives = getattr(validation, "objective_analyses", [])
             conflicts = getattr(validation, "conflicts_detected", [])
 

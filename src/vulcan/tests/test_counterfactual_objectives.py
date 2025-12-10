@@ -2,11 +2,9 @@
 test_counterfactual_objectives.py - Unit tests for CounterfactualObjectiveReasoner
 """
 
-import time
 from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.counterfactual_objectives import (
@@ -145,8 +143,8 @@ class TestPredictUnderObjective:
             "vulcan.world_model.meta_reasoning.counterfactual_objectives.np.random.normal",
             return_value=0.0,
         ):
-            outcome1 = reasoner.predict_under_objective("prediction_accuracy", context1)
-            outcome2 = reasoner.predict_under_objective("prediction_accuracy", context2)
+            reasoner.predict_under_objective("prediction_accuracy", context1)
+            reasoner.predict_under_objective("prediction_accuracy", context2)
 
         assert reasoner._get_cache_key(
             "prediction_accuracy", context1

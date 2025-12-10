@@ -485,7 +485,7 @@ class TestSecurityConfiguration:
         tracked_files = result.stdout.strip().split('\n') if result.stdout.strip() else []
 
         # Filter to only files named exactly .env (not .env.example or other variants)
-        env_files = [f for f in tracked_files if f.endswith('/.env') or f == '.env']
+        env_files = list(tracked_files if f.endswith('/.env') or f == '.env')
 
         assert len(env_files) == 0, \
             f"Found committed .env files in git: {env_files}"

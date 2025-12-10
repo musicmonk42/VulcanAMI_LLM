@@ -10,17 +10,13 @@ Tests cover:
 - Edge cases
 """
 
-import hashlib
+from zk import GrothProof, MerkleTree, ZKCircuit, ZKProver
 import sys
-from typing import Any, Dict, List
-from unittest.mock import Mock, patch
 
 import numpy as np
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from zk import GrothProof, MerkleTree, ZKCircuit, ZKProver
 
 
 class TestMerkleTree:

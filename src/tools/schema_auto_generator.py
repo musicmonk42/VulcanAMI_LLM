@@ -28,7 +28,7 @@ import hashlib
 import json
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from ecdsa import NIST256p, SigningKey, VerifyingKey
@@ -90,7 +90,6 @@ PRIMITIVE_TYPES = set(TYPE_MAP.keys())
 class ParsingError(Exception):
     """Custom exception for EBNF parsing errors."""
 
-    pass
 
 
 class MultilingualSchemaGenerator:
@@ -376,7 +375,7 @@ def build_schema_from_expr(
     elif etype == "sequence":
         # FIXED: Filter out None items and validate structure
         items = expr.get("items", [])
-        items = [item for item in items if item is not None and isinstance(item, dict)]
+        items = list(items if item is not None and isinstance(item, dict))
 
         if not items:
             return {"type": "object"}
@@ -431,7 +430,7 @@ def build_schema_from_expr(
     elif etype == "alternation":
         # FIXED: Filter out None items
         items = expr.get("items", [])
-        items = [item for item in items if item is not None]
+        items = list(items if item is not None)
         if items:
             schemas = [
                 build_schema_from_expr(item, strict, multilingual_generator)
@@ -470,7 +469,7 @@ def sign_schema(schema: Dict[str, Any], private_key_path: str) -> str:
     """Sign the schema JSON with ECDSA (NIST256p) and return hex signature."""
     if not ECDSA_AVAILABLE:
         raise RuntimeError("ECDSA library not available for signing.")
-    with open(private_key_path, "r") as f:
+    with open(private_key_path, "r", encoding="utf-8") as f:
         sk = SigningKey.from_pem(f.read(), curve=NIST256p)
     data = json.dumps(schema, sort_keys=True, indent=2).encode("utf-8")
     signature = sk.sign(data)

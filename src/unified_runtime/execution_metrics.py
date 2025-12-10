@@ -15,8 +15,8 @@ import os
 import threading
 import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Deque, Dict, List, Optional
 
 # psutil is optional. We degrade gracefully if not installed.
 try:

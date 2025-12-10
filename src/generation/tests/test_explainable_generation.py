@@ -13,19 +13,13 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import math
+from explainable_generation import (ExplainableGeneration, ExplanationLevel)
 import sys
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from explainable_generation import (AltCandidate, AttributionMethod,
-                                    CausalEvent, ContextContribution,
-                                    CounterfactualAnalysis, DecisionSummary,
-                                    ExplainableGeneration, ExplanationLevel,
-                                    FeatureAttribution)
 
 
 class MockBridge:
@@ -253,7 +247,7 @@ class TestFactors(unittest.TestCase):
         explanation = self.explainer.explain(token=1, chain=chain)
 
         factors = explanation.get("factors", [])
-        strategy_factors = [f for f in factors if f.get("type") == "strategy"]
+        strategy_factors = list(factors if f.get("type") == "strategy")
 
         # Should have strategy factor
         if strategy_factors:
@@ -301,7 +295,7 @@ class TestFactors(unittest.TestCase):
         explanation = self.explainer.explain(token=1, chain=chain)
 
         factors = explanation.get("factors", [])
-        consensus_factors = [f for f in factors if f.get("type") == "consensus"]
+        consensus_factors = list(factors if f.get("type") == "consensus")
 
         if consensus_factors:
             self.assertIn("agreement", consensus_factors[0])

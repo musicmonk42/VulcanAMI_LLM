@@ -14,6 +14,9 @@ Revision / Fix Notes (Applied):
 """
 
 from __future__ import annotations
+from .safety_types import (ActionType, ComplianceStandard, ExplainabilityNode,
+                           SafetyConfig, SafetyConstraint, SafetyMetrics,
+                           SafetyReport, SafetyValidator, SafetyViolationType)
 
 import asyncio
 import atexit
@@ -51,11 +54,6 @@ def safe_log(log_func, message):
     except (ValueError, AttributeError, OSError, RuntimeError):
         pass
 
-
-from .safety_types import (ActionType, ComplianceStandard, ExplainabilityNode,
-                           GovernanceOrchestrator, NSOAligner, SafetyConfig,
-                           SafetyConstraint, SafetyException, SafetyMetrics,
-                           SafetyReport, SafetyValidator, SafetyViolationType)
 
 try:
     from ..config import SafetyLevel
@@ -200,7 +198,7 @@ GRAPH_SCHEMA = None
 try:
     schema_path = Path("schemas/graph_v1_3_1.json")
     if schema_path.exists():
-        with open(schema_path, "r") as f:
+        with open(schema_path, "r", encoding="utf-8") as f:
             GRAPH_SCHEMA = json.load(f)
 except Exception as e:
     logger.warning(f"Could not load graph schema: {e}")
@@ -272,7 +270,7 @@ class ConstraintManager:
 
         with self.lock:
             sorted_constraints = sorted(
-                [c for c in self.constraints if c.active],
+                list(self.constraints if c.active),
                 key=lambda x: x.priority,
                 reverse=True,
             )
@@ -1347,8 +1345,7 @@ class EnhancedSafetyValidator(SafetyValidator):
             from .domain_validators import (CausalSafetyValidator,
                                             DataProcessingSafetyValidator,
                                             OptimizationSafetyValidator,
-                                            PredictionSafetyValidator,
-                                            validator_registry)
+                                            PredictionSafetyValidator)
 
             self.causal_validator = CausalSafetyValidator(self.safe_regions)
             self.prediction_validator = PredictionSafetyValidator(self.safe_regions)
@@ -2806,7 +2803,6 @@ class MemoryQualityValidator:
 
     def _quarantine_for_review(self, item) -> None:
         logger.warning(f"Memory item quarantined for quality review: {item}")
-        pass
 
 
 class MemorySafetyValidator:

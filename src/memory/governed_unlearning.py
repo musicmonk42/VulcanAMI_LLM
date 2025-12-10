@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
 import threading
 import time
 from collections import defaultdict, deque
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -247,7 +246,7 @@ class UnlearningAuditLogger:
             # Also write to file if specified
             if self.log_file:
                 try:
-                    with open(self.log_file, "a") as f:
+                    with open(self.log_file, "a", encoding="utf-8") as f:
                         f.write(json.dumps(entry) + "\n")
                 except Exception as e:
                     logger.error(f"Failed to write audit log to file: {e}")
@@ -791,7 +790,7 @@ class GovernedUnlearning:
 
                 if task:
                     # Execute task in thread pool
-                    future = self.executor.submit(self._execute_unlearning_task, task)
+                    self.executor.submit(self._execute_unlearning_task, task)
                 else:
                     # No tasks, sleep briefly
                     time.sleep(0.1)

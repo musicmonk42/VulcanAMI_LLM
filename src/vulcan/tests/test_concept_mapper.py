@@ -17,22 +17,19 @@ Tests cover:
 """
 
 # Add parent directory to path for imports
+from semantic_bridge.concept_mapper import (Concept, ConceptMapper, EffectType,
+                                            MeasurableEffect, PatternOutcome)
 import sys
 import threading
 import time
-from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict
 
 import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from semantic_bridge.concept_mapper import (Concept, ConceptMapper, EffectType,
-                                            GroundingStatus, MeasurableEffect,
-                                            PatternOutcome)
 
 
 # Mock classes for testing
@@ -421,7 +418,7 @@ class TestEvidenceTracking:
 
     def test_update_concept_with_outcomes(self):
         """Test updating concept with new outcomes"""
-        mapper = ConceptMapper()
+        ConceptMapper()
 
         concept = Concept(
             pattern_signature="update_test", grounded_effects=[], confidence=0.5
@@ -451,7 +448,7 @@ class TestEvidenceTracking:
 
     def test_update_usage(self):
         """Test updating concept usage statistics"""
-        mapper = ConceptMapper()
+        ConceptMapper()
 
         concept = Concept(
             pattern_signature="usage_test", grounded_effects=[], confidence=0.5
@@ -469,7 +466,7 @@ class TestEvidenceTracking:
 
     def test_grounding_status_progression(self):
         """Test grounding status progresses with evidence"""
-        mapper = ConceptMapper()
+        ConceptMapper()
 
         concept = Concept(
             pattern_signature="grounding_test",
@@ -485,7 +482,7 @@ class TestEvidenceTracking:
             confidence=0.5,
         )
 
-        initial_status = concept.grounding_status
+        concept.grounding_status
 
         # Add many successful outcomes
         outcomes = [
@@ -751,7 +748,7 @@ class TestWorldModelIntegration:
             expected_effects={"accuracy": 0.95},
         )
 
-        concept = mapper.map_pattern_to_concept(pattern)
+        mapper.map_pattern_to_concept(pattern)
 
         # Should have added nodes to world model
         assert len(world_model.causal_graph.nodes) > 0

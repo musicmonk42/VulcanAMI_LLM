@@ -44,7 +44,6 @@ A comprehensive executor for Graphix IR graphs with enterprise features:
 - Numerical stability checks
 """
 
-import hashlib
 import json
 import logging
 import math
@@ -53,8 +52,7 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -446,7 +444,7 @@ class AuditLogger:
         # Write to file if configured
         if self.log_file:
             try:
-                with open(self.log_file, "a") as f:
+                with open(self.log_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(entry) + "\n")
             except Exception as e:
                 logger.warning(f"Failed to write audit log: {e}")
@@ -1153,7 +1151,7 @@ class GraphixExecutor:
             "metrics": self.metrics.to_dict(),
         }
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
 
         logger.info(f"Executor state saved to {path}")
@@ -1161,7 +1159,7 @@ class GraphixExecutor:
     @classmethod
     def load_state(cls, path: str) -> "GraphixExecutor":
         """Load executor state."""
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         config_data = state["config"]

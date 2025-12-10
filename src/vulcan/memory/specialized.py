@@ -1,24 +1,20 @@
 """Specialized memory types: Episodic, Semantic, Procedural, Working"""
 
-import ast
 import copy
 import hashlib
 import json
 import logging
-import operator
-import pickle
-import re
 import threading
 import time
-from collections import Counter, defaultdict, deque
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
 from .base import (BaseMemorySystem, Memory, MemoryConfig, MemoryQuery,
-                   MemoryStats, MemoryType, RetrievalResult)
+                   MemoryType, RetrievalResult)
 from .hierarchical import HierarchicalMemory
 
 # Try to import optional dependencies
@@ -2305,7 +2301,7 @@ class ProceduralMemory(BaseMemorySystem):
 
         # Add skill
         skill_id = self.add_skill(name, steps, preconditions, postconditions)
-        skill = self.skills[skill_id]
+        self.skills[skill_id]
 
         # Create memory
         memory = Memory(
@@ -2434,7 +2430,7 @@ class ProceduralMemory(BaseMemorySystem):
     def compose_skills(self, skill_names: List[str], new_name: str) -> str:
         """Compose multiple skills into new skill."""
         skills = [self.find_skill(name) for name in skill_names]
-        skills = [s for s in skills if s is not None]
+        skills = list(skills if s is not None)
 
         if not skills:
             raise ValueError("No valid skills found")

@@ -2,15 +2,13 @@
 
 import copy
 import hashlib
-import heapq
 import logging
 import pickle
 import threading
 import time
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -19,7 +17,6 @@ from .base import Memory, MemoryType
 # Try to import optional dependencies
 try:
     from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans
-    from sklearn.decomposition import PCA
     from sklearn.metrics import silhouette_score
 
     SKLEARN_AVAILABLE = True
@@ -28,7 +25,7 @@ except ImportError:
     logging.warning("scikit-learn not available, using fallback clustering")
 
 try:
-    import networkx as nx
+    pass
 
     NETWORKX_AVAILABLE = True
 except ImportError:
@@ -535,7 +532,7 @@ class MemoryConsolidator:
         if len(cluster_embeddings) > 0:
             centroid = np.mean(cluster_embeddings, axis=0)
             distances = [np.linalg.norm(emb - centroid) for emb in cluster_embeddings]
-            medoid_idx = np.argmin(distances)
+            np.argmin(distances)
 
             # Weight by importance and centrality
             scores = []

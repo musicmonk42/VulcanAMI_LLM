@@ -15,7 +15,6 @@ Features:
 Production-grade implementation matching VULCAN's quality standards.
 """
 
-import json
 import logging
 import math
 import pickle
@@ -25,7 +24,7 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -41,7 +40,6 @@ except ImportError:
     logger.warning("LightGBM not available. Using EWMA fallback for cost model.")
 
 try:
-    from sklearn.calibration import CalibratedClassifierCV
     from sklearn.isotonic import IsotonicRegression
 
     SKLEARN_AVAILABLE = True
@@ -50,7 +48,7 @@ except ImportError:
     logger.warning("scikit-learn not available. Calibration disabled.")
 
 try:
-    from scipy.stats import beta, norm
+    pass
 
     SCIPY_AVAILABLE = True
 except ImportError:

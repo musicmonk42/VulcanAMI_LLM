@@ -18,8 +18,6 @@ Tests cover:
 """
 
 import threading
-import time
-from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pytest

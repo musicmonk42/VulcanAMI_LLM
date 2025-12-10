@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from unittest.mock import Mock
 
 import numpy as np
@@ -160,7 +160,7 @@ class MockInvariantIndexer:
         for var in variables:
             for inv in self.by_variable.get(var, []):
                 result.add(inv.id)
-        return [i for i in self.all_invariants if i.id in result]
+        return list(self.all_invariants if i.id in result)
 
 
 class MockInvariantRegistry:
@@ -579,7 +579,7 @@ class TestConservationLawDetector:
                 {"x": np.random.uniform(0, 10), "y": np.random.uniform(0, 10)}
             )
 
-        inv = conservation_detector.detect(["x", "y"])
+        conservation_detector.detect(["x", "y"])
         # May or may not detect depending on random data
 
 

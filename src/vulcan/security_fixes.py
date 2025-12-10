@@ -26,7 +26,14 @@ Apply these fixes systematically across the codebase.
 # FIX 2: Safe Pickle Loading
 # ============================================================================
 
-import io
+import string
+import secrets
+from typing import Dict, List
+from typing import Callable, Optional, TypeVar
+from functools import wraps
+from pathlib import Path
+import subprocess
+import re
 import logging
 import os
 import pickle
@@ -158,7 +165,7 @@ class RestrictedUnpickler(pickle.Unpickler):
 
                 mod = importlib.import_module(module)
                 return getattr(mod, name)
-            except (ImportError, AttributeError) as e:
+            except (ImportError, AttributeError):
                 # If we can't import it, fall through to the whitelist check
                 pass
 
@@ -222,7 +229,7 @@ def safe_pickle_load(file_or_path: Union[str, os.PathLike, BinaryIO]) -> Any:
         except pickle.UnpicklingError as e:
             logger.error(f"Unsafe pickle load attempt from {file_or_path}: {e}")
             raise
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             logger.error(f"Pickle file not found: {file_or_path}")
             raise
         except Exception as e:
@@ -233,11 +240,6 @@ def safe_pickle_load(file_or_path: Union[str, os.PathLike, BinaryIO]) -> Any:
 # ============================================================================
 # FIX 3: Safe Subprocess Execution
 # ============================================================================
-
-import re
-import shlex
-import subprocess
-from pathlib import Path
 
 
 def validate_file_path(file_path: str, allowed_base: str = None) -> Path:
@@ -343,9 +345,6 @@ def safe_git_commit(message: str, repo_root: str = ".") -> subprocess.CompletedP
 # FIX 4: Enhanced Error Handling Pattern
 # ============================================================================
 
-import traceback
-from functools import wraps
-from typing import Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -402,13 +401,10 @@ def safe_execute(
 # FIX 5: Production Configuration Validation
 # ============================================================================
 
-from typing import Dict, List
-
 
 class ConfigurationError(Exception):
     """Raised when required configuration is missing or invalid."""
 
-    pass
 
 
 def validate_production_config() -> None:
@@ -467,9 +463,6 @@ def validate_production_config() -> None:
 # ============================================================================
 # FIX 6: Secure Random Token Generation
 # ============================================================================
-
-import secrets
-import string
 
 
 def generate_secure_token(length: int = 32) -> str:

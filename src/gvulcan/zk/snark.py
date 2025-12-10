@@ -13,21 +13,18 @@ Based on "On the Size of Pairing-based Non-interactive Arguments" (Groth 2016)
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import secrets
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 # Elliptic curve cryptography for pairings
-from py_ecc.bn128 import FQ, FQ2, FQ12, G1, G2, Z1, Z2, add
+from py_ecc.bn128 import FQ, FQ2, FQ12, G1, G2, Z1, add
 from py_ecc.bn128 import curve_order as CURVE_ORDER
-from py_ecc.bn128 import multiply, neg, pairing
+from py_ecc.bn128 import multiply, pairing
 
 # Import QAP components
 from .field import FieldElement
-from .polynomial import Polynomial
 from .qap import QAP, compute_h_polynomial, r1cs_to_qap
 
 logger = logging.getLogger(__name__)

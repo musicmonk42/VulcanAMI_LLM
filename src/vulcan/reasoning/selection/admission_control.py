@@ -8,16 +8,13 @@ Fixed version with proper thread safety, error recovery, and interruptible threa
 """
 
 import heapq
-import json
 import logging
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
 import psutil

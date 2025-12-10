@@ -15,9 +15,8 @@ from __future__ import annotations
 import json
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
-import pytest
 
 # Import the module under test. These names must match the public API.
 from src.vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
@@ -263,7 +262,7 @@ def test_detect_violations_no_enforcement_and_filters():
     assert len(all_found) == 2
 
     # Manual filter by boundary name
-    limited = [v for v in all_found if v.boundary_violated == "warn_debug_mark"]
+    limited = list(all_found if v.boundary_violated == "warn_debug_mark")
     assert len(limited) == 1
     assert limited[0].boundary_violated == "warn_debug_mark"
 

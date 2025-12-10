@@ -13,19 +13,15 @@ Tests cover:
 - Performance metrics
 """
 
+from unified_generation import (FusionStrategy, NormalizationMethod,
+                                UnifiedGenConfig, UnifiedGeneration)
 import math
-import os
 import sys
 import unittest
-from collections import deque
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 # Add the parent directory to the path to import the module
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from unified_generation import (CandidateMetadata, FusionStrategy,
-                                NormalizationMethod, UnifiedGenConfig,
-                                UnifiedGeneration)
 
 
 class MockModule:
@@ -485,7 +481,7 @@ class TestProvenance(unittest.TestCase):
         )
 
         # Find token 1 which should have provenance from both modules
-        token_1_candidates = [c for c in candidates if c["token"] == 1]
+        token_1_candidates = list(candidates if c["token") == 1]
         if token_1_candidates:
             c = token_1_candidates[0]
             module_names = [p["module"] for p in c["provenance"]]

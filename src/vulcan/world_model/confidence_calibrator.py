@@ -13,11 +13,10 @@ import json
 import logging
 import threading
 import time
-import warnings
-from collections import OrderedDict, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -642,7 +641,7 @@ class BetaCalibrator:
         """Fit using method of moments"""
 
         # Calculate moments
-        mean_prob = np.mean(probabilities)
+        np.mean(probabilities)
         var_prob = np.var(probabilities)
         mean_outcome = np.mean(outcomes)
 
@@ -1822,7 +1821,7 @@ class ModelConfidenceTracker:
                 "successful_updates": self.successful_updates,
             }
 
-        with open(save_path / "confidence_state.json", "w") as f:
+        with open(save_path / "confidence_state.json", "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
 
         logger.info(f"Confidence tracker state saved to {save_path}")
@@ -1835,7 +1834,7 @@ class ModelConfidenceTracker:
             logger.warning(f"No saved state found at {load_path}")
             return
 
-        with open(load_path / "confidence_state.json", "r") as f:
+        with open(load_path / "confidence_state.json", "r", encoding="utf-8") as f:
             state = json.load(f)
 
         with self.lock:

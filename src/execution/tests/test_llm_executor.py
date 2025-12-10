@@ -13,6 +13,11 @@ Tests all major functionality including:
 - Error handling and recovery
 """
 
+from llm_executor import (NUMPY_AVAILABLE, TORCH_AVAILABLE,
+                          AttentionHeadResult, ExecutionCache, ExecutionMode,
+                          ExecutorConfig, LayerExecutionContext, LayerExecutor,
+                          LLMExecutor, SafetyLevel, SafetyValidationResult,
+                          SafetyValidator, create_default_executor, create_parallel_executor)
 import json
 import sys
 import tempfile
@@ -20,17 +25,10 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 # Add the uploads directory to path
 sys.path.insert(0, "/mnt/user-data/uploads")
 
-from llm_executor import (NUMPY_AVAILABLE, TORCH_AVAILABLE,
-                          AttentionHeadResult, CacheStrategy, ExecutionCache,
-                          ExecutionMode, ExecutionResult, ExecutorConfig,
-                          LayerExecutionContext, LayerExecutor, LLMExecutor,
-                          SafetyLevel, SafetyValidationResult, SafetyValidator,
-                          create_default_executor, create_parallel_executor)
 
 # Try to import torch/numpy for tests
 if TORCH_AVAILABLE:
@@ -457,10 +455,10 @@ class TestExecutorCaching(unittest.TestCase):
         inputs = {"hidden_states": self.test_hidden, "attention_mask": None}
 
         # First execution
-        result1 = self.executor.execute(self.test_graph, inputs)
+        self.executor.execute(self.test_graph, inputs)
 
         # Second execution (should use cache)
-        result2 = self.executor.execute(self.test_graph, inputs)
+        self.executor.execute(self.test_graph, inputs)
 
         stats = self.executor.cache.get_stats()
         # May or may not have cache hits depending on implementation
@@ -500,7 +498,7 @@ class TestStatePersistence(unittest.TestCase):
         # Verify file exists and is valid JSON
         self.assertTrue(Path(self.temp_path).exists())
 
-        with open(self.temp_path, "r") as f:
+        with open(self.temp_path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         self.assertIn("config", state)

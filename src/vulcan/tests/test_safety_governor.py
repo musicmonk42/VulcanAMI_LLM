@@ -6,19 +6,6 @@ rate limiting, and bounded storage.
 """
 
 # Import the module to test
-import sys
-import tempfile
-import threading
-import time
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock
-
-import numpy as np
-import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from vulcan.reasoning.selection.safety_governor import (ConsistencyChecker,
                                                         SafetyAction,
                                                         SafetyContext,
@@ -28,6 +15,15 @@ from vulcan.reasoning.selection.safety_governor import (ConsistencyChecker,
                                                         SafetyViolation,
                                                         ToolContract,
                                                         VetoReason)
+import sys
+import threading
+import time
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 class TestEnums:

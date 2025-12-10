@@ -4,26 +4,23 @@ Governance and value alignment systems for VULCAN-AGI Safety Module.
 Implements human oversight, value alignment verification, and multi-stakeholder governance.
 """
 
-import atexit
-import hashlib
 import json
 import logging
-import pickle
 import sqlite3
 import threading
 import time
 import uuid
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .safety_types import ActionType, SafetyReport, SafetyViolationType
+from .safety_types import ActionType
 
 logger = logging.getLogger(__name__)
 
@@ -975,7 +972,7 @@ class GovernanceManager:
             human_policy = self.policies.get("safety_critical")
 
         if human_policy:
-            result = self._process_human_controlled(decision_id, action, human_policy)
+            self._process_human_controlled(decision_id, action, human_policy)
 
             with self.lock:
                 if decision_id in self.active_decisions:
@@ -1618,7 +1615,7 @@ class ValueAlignmentSystem:
         recommendations = []
 
         # Address critical violations first
-        critical_violations = [v for v in violations if v.get("severity") == "critical"]
+        critical_violations = list(violations if v.get("severity") == "critical")
         if critical_violations:
             recommendations.append(
                 "CRITICAL: Address safety and harm prevention issues immediately"
@@ -2007,7 +2004,7 @@ class HumanOversightInterface:
             emergency_enabled = self.emergency_stop_enabled
             recent_interventions = len(self.interventions)
             active_alerts_count = len(
-                [a for a in self.alerts if not a.get("acknowledged")]
+                list(self.alerts if not a.get("acknowledged"))
             )
 
         with self.governance.lock:
@@ -2069,7 +2066,7 @@ class HumanOversightInterface:
     def get_monitoring_dashboard(self) -> Dict[str, Any]:
         """Get monitoring dashboard data."""
         with self.lock:
-            active_alerts = [a for a in self.alerts if not a["acknowledged"]]
+            active_alerts = list(self.alerts if not a["acknowledged")]
             recent_feedback = list(self.collected_feedback)[-5:]
             automation_level = self.automation_level
 
@@ -2110,7 +2107,7 @@ class HumanOversightInterface:
 
         # Alert health (fewer alerts = better)
         with self.lock:
-            active_alerts = len([a for a in self.alerts if not a["acknowledged"]])
+            active_alerts = len(list(self.alerts if not a["acknowledged")])
 
         alert_health = max(0.0, 1.0 - (active_alerts / 10.0))  # 10+ alerts = 0 health
         health_factors.append(alert_health)
@@ -2142,6 +2139,7 @@ class EnhancedNSOAligner:
     """Shim: present for compatibility; extend later if needed."""
 
     def __init__(self, *_, **__): ...
+
     def align(self, *_, **__):
         return {"aligned": True, "reason": "shim"}
 
@@ -2150,5 +2148,6 @@ class SymbolicSafetyChecker:
     """Shim: present for compatibility; extend later if needed."""
 
     def __init__(self, *_, **__): ...
+
     def check(self, *_, **__):
         return {"safe": True, "reason": "shim"}

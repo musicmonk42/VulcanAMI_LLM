@@ -17,10 +17,10 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, List,
-                    Optional, Tuple, Union)
+from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Tuple,
+                    Union)
 
 # TYPE_CHECKING import for type annotations without runtime import
 # This allows using aiohttp types in annotations even when aiohttp is not installed
@@ -135,7 +135,8 @@ class AITask:
         if not self.trace_id:
             # Generate trace ID for tracking (non-cryptographic use)
             trace_data = f"{self.operation}_{self.provider}_{self.model}_{time.time()}_{random.random()}"
-            self.trace_id = hashlib.md5(trace_data.encode(), usedforsecurity=False).hexdigest()[:16]  # nosec B324 - used for trace ID generation, not security
+            self.trace_id = hashlib.md5(trace_data.encode(), usedforsecurity=False).hexdigest()[
+                :16]  # nosec B324 - used for trace ID generation, not security
 
     def is_expired(self) -> bool:
         """Check if task has passed deadline"""
@@ -269,17 +270,14 @@ class AIProvider(ABC):
     @abstractmethod
     async def execute(self, task: AITask, contract: AIContract) -> AIResult:
         """Execute AI task with contract constraints (must be async)"""
-        pass
 
     @abstractmethod
     def supports_operation(self, operation: str) -> bool:
         """Check if provider supports operation"""
-        pass
 
     @abstractmethod
     def get_models(self) -> List[str]:
         """Get list of available models"""
-        pass
 
     async def validate_credentials(self) -> bool:
         """Validate API credentials"""
@@ -1058,7 +1056,8 @@ class ResultCache:
                 {k: v for k, v in key_data.items() if k != "payload"}, sort_keys=True
             )
 
-        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()  # nosec B324 - used for cache key generation, not security
+        # nosec B324 - used for cache key generation, not security
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
     def get(self, task: AITask, contract: AIContract) -> Optional[AIResult]:
         """Get cached result if available and valid"""

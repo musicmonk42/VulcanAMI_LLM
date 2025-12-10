@@ -4,18 +4,15 @@ Comprehensive integration tests without vulcan imports (no thread spawning)
 """
 
 import asyncio
-import gc
-import hashlib
-import json
 import pickle
 import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pytest

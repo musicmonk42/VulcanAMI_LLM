@@ -5,27 +5,22 @@ Tests Bayesian priors, similarity search, memory indexing, cache management,
 and all prior computation strategies.
 """
 
-import shutil
-# Import the module to test
-import sys
-import tempfile
-import threading
-import time
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from vulcan.reasoning.selection.memory_prior import (AdaptivePriorSelector,
                                                      BayesianMemoryPrior,
                                                      MemoryEntry, MemoryIndex,
                                                      PriorDistribution,
                                                      PriorType,
                                                      SimilarityMetric)
+# Import the module to test
+import sys
+import threading
+import time
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 class TestEnums:
@@ -388,11 +383,11 @@ class TestBayesianMemoryPrior:
         tools = ["tool_a", "tool_b"]
 
         # First call
-        dist1 = prior.compute_prior(features, tools)
+        prior.compute_prior(features, tools)
         cache_size_1 = len(prior.prior_cache)
 
         # Second call with same inputs
-        dist2 = prior.compute_prior(features, tools)
+        prior.compute_prior(features, tools)
         cache_size_2 = len(prior.prior_cache)
 
         # Should use cache (size doesn't increase)
@@ -693,7 +688,7 @@ class TestEdgeCases:
 
         # Should not crash
         try:
-            dist = prior.compute_prior(features, tools)
+            prior.compute_prior(features, tools)
             # May get uniform or error, but shouldn't crash
             assert True
         except Exception:

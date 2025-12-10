@@ -10,8 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import pickle
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -512,7 +511,7 @@ class MerkleLSMDAG:
             "checkpoints": [(count, root.hex()) for count, root in self.checkpoints],
         }
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
 
         logger.info(f"Saved MerkleLSMDAG state to {path}")
@@ -528,7 +527,7 @@ class MerkleLSMDAG:
         Returns:
             Restored MerkleLSMDAG instance
         """
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         algorithm = HashAlgorithm(state["algorithm"])

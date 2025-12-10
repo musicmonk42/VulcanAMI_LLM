@@ -2,24 +2,20 @@
 Test suite for RLHF feedback module
 """
 
+from vulcan.learning.rlhf_feedback import LiveFeedbackProcessor, RLHFManager
+from vulcan.learning.learning_types import FeedbackData, LearningConfig
+from vulcan.config import EMBEDDING_DIM
+import torch.nn as nn
+import numpy as np
+import aiohttp
+from unittest.mock import AsyncMock, MagicMock, patch
+import time
+import threading
+import asyncio
 import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for rlhf_feedback tests")
-
-import asyncio
-import threading
-import time
-from collections import deque
-from unittest.mock import AsyncMock, MagicMock, Mock, create_autospec, patch
-
-import aiohttp
-import numpy as np
-import torch.nn as nn
-
-from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
-from vulcan.learning.learning_types import FeedbackData, LearningConfig
-from vulcan.learning.rlhf_feedback import LiveFeedbackProcessor, RLHFManager
 
 
 class SimpleModel(nn.Module):
@@ -71,7 +67,7 @@ class TestRLHFManager:
             manager._buffer_lock = threading.RLock()
 
         # Mock the shutdown method to avoid ThreadPoolExecutor issues
-        original_shutdown = manager.shutdown
+        manager.shutdown
 
         def mock_shutdown():
             manager._is_shutdown = True

@@ -35,13 +35,11 @@ Key features:
 - Tracks feature importance and attention patterns
 """
 
-import json
 import math
 import time
-from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 Token = Union[int, str]
 Tokens = List[Token]
@@ -1461,7 +1459,7 @@ class ExplainableGeneration:
                 )
 
         # Safety
-        safety_factors = [f for f in factors if f.get("type") == "safety"]
+        safety_factors = list(factors if f.get("type") == "safety")
         if safety_factors:
             parts.append(f"\n4. Safety Validation:")
             parts.append(
@@ -1535,7 +1533,7 @@ class ExplainableGeneration:
     def _answer_factors(self, explanation: Dict[str, Any]) -> Dict[str, Any]:
         """Answer about influencing factors"""
         factors = explanation.get("factors", [])
-        attributions = explanation.get("attributions", [])
+        explanation.get("attributions", [])
 
         top_factors = []
         for f in factors:

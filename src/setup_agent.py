@@ -18,8 +18,7 @@ FIXES APPLIED:
 import argparse
 import logging
 import sys
-from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 # FIXED: Import from within src directory (no "src." prefix needed)
 try:
@@ -51,13 +50,11 @@ VALID_ROLES = {
 class SetupError(Exception):
     """Base exception for setup errors."""
 
-    pass
 
 
 class ValidationError(SetupError):
     """Raised when input validation fails."""
 
-    pass
 
 
 def validate_agent_id(agent_id: str) -> None:

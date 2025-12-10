@@ -7,8 +7,6 @@ Implements multi-model consensus, uncertainty quantification, and real-time safe
 import asyncio
 import atexit
 import gc
-import hashlib
-import json
 import logging
 import os
 import pickle
@@ -17,19 +15,17 @@ import threading
 import time
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 
 from .safety_types import ActionType, SafetyReport, SafetyViolationType
 
@@ -905,7 +901,7 @@ class NeuralSafetyValidator:
                     model_dict.eval()
 
         # Run in thread pool to avoid blocking
-        loop = asyncio.get_event_loop()
+        asyncio.get_event_loop()
 
         with torch.no_grad():
             # Classifier ensemble - run in parallel
@@ -925,7 +921,7 @@ class NeuralSafetyValidator:
                 try:
                     results = await asyncio.gather(*tasks, return_exceptions=True)
                     # Filter out exceptions
-                    valid_results = [r for r in results if not isinstance(r, Exception)]
+                    valid_results = list(results if not isinstance(r, Exception))
 
                     if valid_results:
                         predictions["classifier_ensemble"] = {

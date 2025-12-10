@@ -11,7 +11,6 @@ FIXED: Circular import with safety_validator using lazy loading
 """
 
 import ast
-import json
 import logging
 import operator
 import re
@@ -20,8 +19,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
@@ -79,13 +77,11 @@ logger = logging.getLogger(__name__)
 class ExpressionComplexityError(Exception):
     """Raised when expression complexity exceeds limits"""
 
-    pass
 
 
 class ExpressionSafetyError(Exception):
     """Raised when expression contains unsafe operations"""
 
-    pass
 
 
 class SymbolicExpressionSystem:
@@ -2025,7 +2021,7 @@ class InvariantDetector:
 
         for var, values in variables.items():
             # Filter non-finite values
-            safe_values = [v for v in values if np.isfinite(v)]
+            safe_values = list(values if np.isfinite(v))
 
             if len(safe_values) != len(values):
                 self.safety_corrections["non_finite_values"] += len(values) - len(

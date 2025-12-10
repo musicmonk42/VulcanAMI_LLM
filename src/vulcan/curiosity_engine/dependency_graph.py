@@ -5,17 +5,13 @@ Part of the VULCAN-AGI system
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
-import copy
-import json
 import logging
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import networkx as nx
 import numpy as np
@@ -483,7 +479,7 @@ class CycleDetector:
         with self.lock:
             try:
                 sccs = list(nx.strongly_connected_components(self.storage.nx_graph))
-                return [scc for scc in sccs if len(scc) > 1]
+                return list(sccs if len(scc) > 1)
             except Exception as e:
                 return self._find_sccs_tarjan()
 
@@ -595,7 +591,7 @@ class TopologicalSorter:
                 in_degree[child] += 1
 
         # Find nodes with no incoming edges
-        queue = deque([n for n in all_nodes if in_degree[n] == 0])
+        queue = deque(list(all_nodes if in_degree[n) == 0])
         result = []
 
         while queue:

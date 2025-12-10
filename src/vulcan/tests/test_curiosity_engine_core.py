@@ -12,18 +12,15 @@ Tests cover:
 
 import threading
 import time
-from collections import defaultdict
 from queue import Empty
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 from vulcan.curiosity_engine.curiosity_engine_core import (
     CuriosityEngine, ExperimentManager, ExperimentResult, ExplorationFrontier,
     ExplorationValueEstimator, GapPrioritizer, KnowledgeIntegrator,
-    KnowledgeRegion, LearningPriority, RegionManager, SafeExperimentExecutor,
-    StrategySelector)
+    KnowledgeRegion, RegionManager, SafeExperimentExecutor, StrategySelector)
 from vulcan.curiosity_engine.experiment_generator import (Experiment,
                                                           ExperimentType)
 from vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
@@ -351,8 +348,8 @@ class TestExplorationFrontier:
     def test_get_unexplored_neighbors(self, exploration_frontier):
         """Test getting unexplored neighbors"""
         # Add some regions
-        region_id1 = exploration_frontier.add_explored_region("test", {"a", "b"})
-        region_id2 = exploration_frontier.add_explored_region("test", {"b", "c"})
+        exploration_frontier.add_explored_region("test", {"a", "b"})
+        exploration_frontier.add_explored_region("test", {"b", "c"})
 
         # Get neighbors
         neighbors = exploration_frontier.get_unexplored_neighbors()
@@ -657,7 +654,7 @@ class TestCuriosityEngine:
 
     def test_budget_consumption(self, curiosity_engine):
         """Test budget consumption during learning"""
-        initial_budget = curiosity_engine.exploration_budget.get_available()
+        curiosity_engine.exploration_budget.get_available()
 
         curiosity_engine.run_learning_cycle(max_experiments=3)
 

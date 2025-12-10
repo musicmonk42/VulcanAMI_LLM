@@ -23,7 +23,7 @@ def hardware_profiles():
     if not config_path.exists():
         config_path = Path(__file__).parent / ".." / "configs" / "hardware_profiles.json"
 
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -142,7 +142,7 @@ class TestPhysicalConstraints:
 
         # Top throughput devices should generally have lower latency than CPU
         cpu_latency = hardware_profiles["cpu"]["latency_ms"]
-        high_throughput = [p for p in profiles_sorted[:3]]
+        high_throughput = list(profiles_sorted[:3)]
 
         for hw_type, profile in high_throughput:
             if hw_type != "cpu":

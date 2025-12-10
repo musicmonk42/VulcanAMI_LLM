@@ -2,7 +2,6 @@
 Meta-learning implementation with task detection
 """
 
-import json
 import logging
 import pickle
 import threading
@@ -11,7 +10,7 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -119,7 +118,7 @@ class TaskDetector:
                 signature, dtype=torch.float32, device=self.device
             )
             with torch.no_grad():
-                task_embedding = self.task_encoder(signature_tensor)
+                self.task_encoder(signature_tensor)
 
             # Compare with known tasks
             best_match = None
@@ -831,7 +830,7 @@ class MetaLearner:
     def _meta_update_reptile(self, tasks: List[Dict[str, Any]]):
         """FIXED: Reptile meta-update with proper parameter handling"""
         # Store original parameters
-        original_params = [p.clone().detach() for p in self.base_model.parameters()]
+        [p.clone().detach() for p in self.base_model.parameters()]
 
         trajectory_id = self.param_history.start_trajectory(
             task_id=f"reptile_batch_{time.time()}", agent_id="meta_learner"

@@ -13,6 +13,10 @@ Tests all major functionality including:
 - Error handling
 """
 
+from dynamic_architecture import (ArchChangeResult, ArchitectureStats,
+                                  Constraints, DynamicArchConfig, DynamicArchitecture,
+                                  ValidationResult, create_default_controller,
+                                  create_strict_controller)
 import json
 import sys
 import tempfile
@@ -20,17 +24,10 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 # Add the uploads directory to path
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from dynamic_architecture import (ArchChangeResult, ArchitectureStats,
-                                  ChangeType, Constraints, DynamicArchConfig,
-                                  DynamicArchitecture, SnapshotPolicy,
-                                  ValidationLevel, ValidationResult,
-                                  create_default_controller,
-                                  create_strict_controller)
 
 
 class TestDynamicArchitectureBasics(unittest.TestCase):
@@ -261,7 +258,7 @@ class TestSnapshotManagement(unittest.TestCase):
     def test_rollback_to_snapshot(self):
         """Test rolling back to a snapshot."""
         # Get initial state
-        initial_heads = len(self.arch.list_heads(0))
+        len(self.arch.list_heads(0))
 
         # Make a change
         self.arch.add_head(0, {"d_k": 64})
@@ -485,7 +482,7 @@ class TestStatePersistence(unittest.TestCase):
         # Verify file exists and is valid JSON
         self.assertTrue(Path(self.temp_path).exists())
 
-        with open(self.temp_path, "r") as f:
+        with open(self.temp_path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         self.assertIn("layers", state)
@@ -587,7 +584,7 @@ class TestSnapshotDiff(unittest.TestCase):
 
         # Create first snapshot
         arch.add_head(0, {"d_k": 64})
-        snapshots1 = arch.list_snapshots()
+        arch.list_snapshots()
 
         # Create second snapshot
         arch.add_head(0, {"d_k": 128})

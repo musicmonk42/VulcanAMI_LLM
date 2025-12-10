@@ -7,14 +7,10 @@ A comprehensive registry for managing agent identities with proper cryptographic
 signatures, key management, certificate support, and enterprise security features.
 """
 
-import hashlib
-import hmac
 import json
 import logging
 import os
-import secrets
 import sqlite3
-import tempfile
 import threading
 import time
 from collections import defaultdict, deque
@@ -29,11 +25,10 @@ from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 # Cryptographic imports
-from cryptography.hazmat.primitives import constant_time, hashes, serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.x509 import Certificate, load_pem_x509_certificate
 from cryptography.x509.oid import NameOID
 
 try:
@@ -105,7 +100,6 @@ class RegistryEvent(Enum):
 class CalibrationData:
     """Placeholder for calibration data (for test compatibility)."""
 
-    pass
 
 
 @dataclass
@@ -1614,7 +1608,7 @@ class AgentRegistry:
                     with self.agents_lock:
                         # Clean expired keys
                         for agent in self.agents.values():
-                            expired_keys = [k for k in agent.keys if k.is_expired()]
+                            expired_keys = list(agent.keys if k.is_expired())
                             for key in expired_keys:
                                 key.is_active = False
                                 with self.revoked_keys_lock:

@@ -12,7 +12,7 @@ import sys  # Import sys for size estimation
 import threading  # Added threading for Lock
 import time  # Added for cache TTL
 import traceback
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -26,7 +26,6 @@ except ImportError:
     nx = None
     NETWORKX_AVAILABLE = False
 
-import jsonschema
 
 JSONSCHEMA_AVAILABLE = True
 
@@ -566,7 +565,6 @@ class GraphValidator:
     ):
         """Validate edges, set result.is_valid=False on errors."""
         for i, edge in enumerate(edges):
-            edge_initially_valid = True
             if not isinstance(edge, dict):
                 result.errors.append(f"Edge at index {i} is not a dictionary object.")
                 result.is_valid = False
@@ -578,14 +576,12 @@ class GraphValidator:
             if from_ref is None:
                 result.errors.append(f"Edge at index {i} is missing 'from'.")
                 result.is_valid = False
-                edge_initially_valid = False
 
             if to_ref is None:
                 result.errors.append(
                     f"Edge at index {i} is missing required 'to' field."
                 )
                 result.is_valid = False
-                edge_initially_valid = False
 
             if from_ref is not None and to_ref is not None:
                 from_node = self._extract_node_reference(from_ref)

@@ -14,14 +14,13 @@ import hashlib
 import json
 import logging
 import pickle
-import re
 import time
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -39,7 +38,6 @@ except ImportError:
 try:
     from sklearn.cluster import KMeans
     from sklearn.feature_extraction.text import TfidfVectorizer
-    from sklearn.metrics.pairwise import cosine_similarity
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -90,7 +88,7 @@ except ImportError:
     )
 
 try:
-    import torch
+    pass
 
     TORCH_AVAILABLE = True
 except ImportError:
@@ -1279,8 +1277,6 @@ class AnalogicalReasoner(AbstractReasoner):
     def _structural_mapping(self, source: Dict, target: Dict) -> AnalogicalMapping:
         """Advanced structural mapping with semantic awareness"""
 
-        entity_mappings = {}
-        relation_mappings = []
 
         # Find entity candidates using semantic similarity
         entity_candidates = self._find_entity_candidates_semantic(

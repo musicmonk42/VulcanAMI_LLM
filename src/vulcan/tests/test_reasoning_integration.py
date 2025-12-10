@@ -4,14 +4,10 @@ Integration Test for VULCAN Unified Reasoning System
 Tests the complete reasoning pipeline end-to-end using the actual UnifiedReasoner API.
 """
 
-import json
 import shutil
 import tempfile
-import time
 from pathlib import Path
-from typing import Any, Dict, List
 
-import numpy as np
 import pytest
 
 # Import from reasoning_types module
@@ -155,7 +151,7 @@ class TestUnifiedReasoningIntegration:
                 )
 
         # Verify at least some types worked
-        successful = [r for r in results if r["success"]]
+        successful = list(results if r["success")]
         print(f"\n✅ Successful: {len(successful)}/{len(results)}")
         assert len(successful) > 0, "At least one reasoning type should work"
 

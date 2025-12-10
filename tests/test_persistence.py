@@ -655,7 +655,7 @@ class TestAuditLogging:
         """Test audit log content."""
         persistence._audit_log("test_event", {"detail": "test"})
 
-        with open(persistence.audit_log_path) as f:
+        with open(persistence.audit_log_path, encoding="utf-8") as f:
             line = f.readline()
             entry = json.loads(line)
 

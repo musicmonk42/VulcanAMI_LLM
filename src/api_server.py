@@ -34,7 +34,6 @@ import random
 import re
 import secrets
 import signal
-import socket
 import sqlite3
 import ssl
 import sys
@@ -50,9 +49,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
 from socketserver import ThreadingMixIn
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 # Use cryptographically secure random for security-relevant operations (timing jitter, etc.)
 secure_random = secrets.SystemRandom()
@@ -96,8 +94,7 @@ except ImportError:
 
 # GraphQL support (placeholder)
 try:
-    from graphql import (GraphQLField, GraphQLFloat, GraphQLList,
-                         GraphQLObjectType, GraphQLSchema, GraphQLString)
+    pass
 
     GRAPHQL_AVAILABLE = True
 except ImportError:
@@ -1780,7 +1777,7 @@ class GraphAPIServer:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=10, encoding="utf-8") as response:
                 if response.status >= 300:
                     self.logger.error(
                         f"Callback to {url} failed with status {response.status}"
@@ -1923,10 +1920,10 @@ class GraphAPIServer:
         with self.locks["proposals"]:
             total_proposals = len(self.proposals)
             open_proposals = len(
-                [p for p in self.proposals.values() if p.status == "open"]
+                list(self.proposals.values() if p.status == "open")
             )
             approved_proposals = len(
-                [p for p in self.proposals.values() if p.status == "approved"]
+                list(self.proposals.values() if p.status == "approved")
             )
         with self.locks["agents"]:
             total_agents = len(self.agents)

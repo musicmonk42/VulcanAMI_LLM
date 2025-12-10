@@ -2,13 +2,6 @@
 Tests for parallel_candidate_scorer.py
 """
 
-import sys
-
-import pytest
-import torch
-
-sys.path.insert(0, "/mnt/user-data/uploads")
-
 from parallel_candidate_scorer import (CacheConfig, DeviceConfig, DeviceType,
                                        EmbeddingArchitecture, EmbeddingConfig,
                                        PenaltyConfig, PerformanceConfig,
@@ -16,6 +9,11 @@ from parallel_candidate_scorer import (CacheConfig, DeviceConfig, DeviceType,
                                        VulcanCandidateScorer,
                                        VulcanScorerConfig, get_global_scorer,
                                        score_candidate_sync)
+import sys
+
+import pytest
+
+sys.path.insert(0, "/mnt/user-data/uploads")
 
 
 class TestDeviceConfig:

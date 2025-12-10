@@ -13,10 +13,7 @@ Tests cover:
 
 import threading
 import time
-from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
 
-import numpy as np
 import pytest
 
 from vulcan.curiosity_engine.experiment_generator import (

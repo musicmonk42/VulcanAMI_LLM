@@ -22,7 +22,7 @@ def helm_chart():
     if not config_path.exists():
         config_path = Path(__file__).parent / ".." / "configs" / "helm_chart.yaml"
 
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding="utf-8") as f:
         # Load all documents (YAML with --- separators)
         return list(yaml.safe_load_all(f))
 
@@ -392,7 +392,7 @@ class TestEnvironmentVariables:
         container = deployment['spec']['template']['spec']['containers'][0]
         env_vars = container.get('env', [])
 
-        secret_vars = [e for e in env_vars if 'valueFrom' in e and 'secretKeyRef' in e.get('valueFrom', {})]
+        secret_vars = list(env_vars if 'valueFrom' in e and 'secretKeyRef' in e.get('valueFrom', {}))
 
         # Should have at least one secret reference (API key)
         assert len(secret_vars) > 0, \
@@ -687,7 +687,7 @@ class TestConfigurationIssues:
         if secret_names:
             # Check if the secrets are defined in the helm chart
             defined_secrets = [doc['metadata']['name'] for doc in helm_chart if doc.get('kind') == 'Secret']
-            undefined_secrets = [s for s in secret_names if s not in defined_secrets]
+            undefined_secrets = list(secret_names if s not in defined_secrets)
 
             if undefined_secrets:
                 pytest.skip(
@@ -771,7 +771,7 @@ class TestDocumentation:
         if not config_path.exists():
             config_path = Path(__file__).parent / ".." / "configs" / "helm_chart.yaml"
 
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding="utf-8") as f:
             content = f.read()
 
         # Should have at least some comments

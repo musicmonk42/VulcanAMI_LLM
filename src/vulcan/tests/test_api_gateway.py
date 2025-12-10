@@ -2,33 +2,28 @@
 # Production-grade test suite for VULCAN-AGI API Gateway
 # Run: pytest src/vulcan/tests/test_api_gateway.py -v --tb=short --cov=src.vulcan.api_gateway --cov-report=html
 
+from src.vulcan.config import AgentConfig
+from src.vulcan.api_gateway import (APIGateway, APIRequest, APIResponse,
+                                    AuthManager, CacheManager, CircuitBreaker,
+                                    RateLimiter, RequestTransformer,
+                                    ServiceEndpoint, ServiceRegistry)
+from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
+import numpy as np
+import msgpack
+import jwt
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from datetime import datetime, timedelta
+from collections import defaultdict
+import time
+import json
+import asyncio
 import pytest
 
 # Skip entire module if torch is not available (api_gateway imports vulcan modules that require torch)
 torch = pytest.importorskip("torch", reason="PyTorch required for api_gateway tests")
 
-import asyncio
-import hashlib
-import json
-import time
-import uuid
-from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
 
-import jwt
-import msgpack
-import numpy as np
-from aiohttp import web
-from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
-
-from src.vulcan.api_gateway import (APIGateway, APIRequest, APIResponse,
-                                    AuthManager, CacheManager, CircuitBreaker,
-                                    RateLimiter, RequestTransformer,
-                                    ServiceEndpoint, ServiceRegistry)
 # Import mocks for dependencies
-from src.vulcan.config import AgentConfig
 
 # ============================================================
 # EVENT LOOP FIXTURE - Removed, pytest-asyncio handles this
@@ -581,7 +576,7 @@ class TestCircuitBreaker:
         assert circuit_breaker.state[service] == "closed"
 
     @pytest.mark.asyncio
-    async def test_half_open_fails_back_to_open(self, circuit_breaker):
+    async def test_half_open_fails_back_to_open(self, circuit_breaker, encoding="utf-8"):
         """Test half-open returns to open on failure."""
         service = "unstable_service"
 

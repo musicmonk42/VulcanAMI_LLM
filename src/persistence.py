@@ -10,13 +10,12 @@ import hashlib
 import json
 import logging
 import os
-import pickle
 import sqlite3
 import threading
 import time
-from collections import OrderedDict, defaultdict, deque
+from collections import OrderedDict
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -32,7 +31,6 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # Configure logging
 logging.basicConfig(
@@ -53,19 +51,16 @@ WAL_MODE_ENABLED = True
 class PersistenceError(Exception):
     """Base exception for persistence layer errors."""
 
-    pass
 
 
 class IntegrityError(PersistenceError):
     """Raised when data integrity check fails."""
 
-    pass
 
 
 class KeyManagementError(PersistenceError):
     """Raised when key management operations fail."""
 
-    pass
 
 
 class CacheEntry:
@@ -600,7 +595,7 @@ class PersistenceLayer:
 
             db_signature = self._sign_data(db_bytes)
 
-            with open(backup_db_path.with_suffix(".sig"), "w") as f:
+            with open(backup_db_path.with_suffix(".sig", encoding="utf-8"), "w") as f:
                 f.write(db_signature)
 
             logger.info(f"Created signed backup at {backup_db_path}")
@@ -619,7 +614,7 @@ class PersistenceLayer:
         """Remove old backups, keeping only MAX_BACKUP_COUNT most recent."""
         try:
             backups = sorted(
-                [f for f in self.backup_path.glob("backup_*.db")],
+                list(self.backup_path.glob("backup_*.db")),
                 key=lambda x: x.stat().st_mtime,
                 reverse=True,
             )
@@ -655,7 +650,7 @@ class PersistenceLayer:
             with open(backup_file, "rb") as f:
                 db_bytes = f.read()
 
-            with open(sig_file, "r") as f:
+            with open(sig_file, "r", encoding="utf-8") as f:
                 signature = f.read().strip()
 
             if not self._verify_signature(db_bytes, signature, use_cache=False):
@@ -732,7 +727,7 @@ class PersistenceLayer:
                     logger.info(f"Rotated audit log to {rotated_path}")
 
             # Append to log
-            with open(self.audit_log_path, "a") as f:
+            with open(self.audit_log_path, "a", encoding="utf-8") as f:
                 f.write(log_line + "\n")
 
     def _extract_features(self, graph: Dict) -> Dict:
@@ -1107,8 +1102,10 @@ class PersistenceLayer:
                 cursor = conn.cursor()
 
                 # Count records in each table
-                # nosec B608: table names from hardcoded list
-                for table in ["graphs", "evolutions", "knowledge", "sessions"]:
+                # SECURITY: Use whitelist of allowed table names to prevent SQL injection
+                allowed_tables = {"graphs", "evolutions", "knowledge", "sessions"}
+                for table in allowed_tables:
+                    # Safe to use f-string here because table name is from hardcoded whitelist
                     cursor.execute(f"SELECT COUNT(*) FROM {table}")  # nosec B608
                     stats[f"{table}_count"] = cursor.fetchone()[0]
 
@@ -1256,8 +1253,6 @@ if __name__ == "__main__":
     print(
         f"✓ Stored in cache: {persistence.working_memory.recall('test_key') is not None}"
     )
-
-    import time
 
     time.sleep(1.1)
     print(

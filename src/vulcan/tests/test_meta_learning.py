@@ -2,25 +2,19 @@
 Test suite for meta-learning module
 """
 
+from vulcan.learning.meta_learning import (MetaLearner, MetaLearningAlgorithm,
+                                           TaskDetector, TaskStatistics)
+from vulcan.learning.learning_types import LearningConfig
+from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, ModalityType
+import torch.nn as nn
+import numpy as np
+import time
+import tempfile
+import shutil
 import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip("torch", reason="PyTorch required for meta_learning tests")
-
-import pickle
-import shutil
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-
-from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, ModalityType
-from vulcan.learning.learning_types import LearningConfig
-from vulcan.learning.meta_learning import (MetaLearner, MetaLearningAlgorithm,
-                                           TaskDetector, TaskStatistics)
 
 
 class SimpleModel(nn.Module):
@@ -178,7 +172,7 @@ class TestTaskDetector:
 
         task1 = detector.detect_task(exp1)
         task2 = detector.detect_task(exp2)
-        task1_again = detector.detect_task(exp1)
+        detector.detect_task(exp1)
 
         # Check transitions recorded
         assert detector.transition_matrix[task2][task1] > 0
@@ -209,10 +203,9 @@ class TestTaskDetector:
         exp2 = {"embedding": np.ones(EMBEDDING_DIM) * -1}  # Very different
 
         # Establish pattern: task1 -> task2 repeatedly
-        task1 = None
         task2 = None
         for _ in range(3):
-            task1 = detector.detect_task(exp1)
+            detector.detect_task(exp1)
             task2 = detector.detect_task(exp2)
 
         # Complete one more cycle to ensure transitions are recorded

@@ -14,19 +14,15 @@ These systems handle:
 - Knowledge extraction from proofs (learning)
 """
 
-import copy
 import heapq
 import logging
 import os
-import sys
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .core import (Clause, Constant, Function, Literal, ProofNode, Term,
-                   Variable)
+from .core import (Clause, Constant, Function, ProofNode, Term, Variable)
 
 logger = logging.getLogger(__name__)
 
@@ -1784,7 +1780,7 @@ class TemporalReasoner:
                 in_degree[rel["event2"]] += 1
 
         # Initialize queue with events that have no predecessors
-        queue = deque([e for e in all_events if in_degree[e] == 0])
+        queue = deque(list(all_events if in_degree[e) == 0])
         sequence = []
 
         while queue:

@@ -170,8 +170,8 @@ async def test_zzz_final_cleanup_verification():
         logger.info(f"  - {t.name}: daemon={t.daemon}, alive={t.is_alive()}")
 
     # Count non-daemon threads (these are the problematic ones)
-    non_daemon_threads = [t for t in thread_list if not t.daemon and t.name != 'MainThread']
-    daemon_threads = [t for t in thread_list if t.daemon]
+    non_daemon_threads = list(thread_list if not t.daemon and t.name != 'MainThread')
+    daemon_threads = list(thread_list if t.daemon)
 
     # Expected threads that are acceptable:
     # - MainThread (always present)

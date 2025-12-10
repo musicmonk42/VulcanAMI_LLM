@@ -2,15 +2,14 @@
 Tests for token_consensus_adapter.py
 """
 
+from token_consensus_adapter import (ConsensusAdapterConfig, ConsensusProposal,
+                                     TokenConsensusAdapter)
 import asyncio
 import sys
 
 import pytest
 
 sys.path.insert(0, "/mnt/user-data/uploads")
-
-from token_consensus_adapter import (ConsensusAdapterConfig, ConsensusProposal,
-                                     TokenConsensusAdapter)
 
 
 class MockEngine:
@@ -101,7 +100,7 @@ class TestTokenConsensusAdapter:
         assert adapter._successes == 0
 
     @pytest.mark.asyncio
-    async def test_approve_no_engine_fail_open(self):
+    async def test_approve_no_engine_fail_open(self, encoding="utf-8"):
         adapter = TokenConsensusAdapter(
             engine=None, config=ConsensusAdapterConfig(fail_closed=False)
         )
@@ -204,7 +203,7 @@ class TestTokenConsensusAdapter:
             "chosen_index": -1,  # Invalid negative index
         }
 
-        result = await adapter.approve(proposal)
+        await adapter.approve(proposal)
         # Should fail validation
         assert adapter._calls == 1
 

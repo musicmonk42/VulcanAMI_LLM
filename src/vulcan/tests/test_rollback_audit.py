@@ -6,21 +6,16 @@ Tests rollback management, audit logging, and integrity verification.
 
 import json
 import shutil
-import sqlite3
 import tempfile
 import threading
 import time
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from vulcan.safety.rollback_audit import (AuditLogger, MemoryBoundedDeque,
                                           RollbackManager)
-from vulcan.safety.safety_types import (RollbackSnapshot, SafetyReport,
-                                        SafetyViolationType)
+from vulcan.safety.safety_types import (SafetyReport, SafetyViolationType)
 
 # ============================================================
 # FIXTURES
@@ -488,7 +483,7 @@ class TestRollbackManager:
         assert export_path.exists()
 
         # Verify export content
-        with open(export_path, "r") as f:
+        with open(export_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["snapshot_id"] == snapshot_id
@@ -817,7 +812,7 @@ class TestAuditLogger:
         assert export_path.exists()
 
         # Verify content
-        with open(export_path, "r") as f:
+        with open(export_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         assert isinstance(data, list)

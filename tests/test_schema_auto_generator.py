@@ -367,7 +367,7 @@ class TestIntegration:
 
         try:
             # Read and process
-            with open(temp_md, 'r') as f:
+            with open(temp_md, 'r', encoding="utf-8") as f:
                 md_text = f.read()
 
             ebnf_text = sag.extract_grammar_sections(md_text)
@@ -375,11 +375,11 @@ class TestIntegration:
             schema = sag.build_json_schema_from_productions(productions)
 
             # Write output
-            with open(temp_json, 'w') as f:
+            with open(temp_json, 'w', encoding="utf-8") as f:
                 json.dump(schema, f, indent=2)
 
             # Verify output
-            with open(temp_json, 'r') as f:
+            with open(temp_json, 'r', encoding="utf-8") as f:
                 loaded_schema = json.load(f)
 
             assert 'TestType' in loaded_schema['definitions']

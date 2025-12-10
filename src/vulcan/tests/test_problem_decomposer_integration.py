@@ -6,7 +6,6 @@ Integration tests for problem decomposer without spawning threads.
 import logging
 import time
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Dict, List, Optional
 from unittest.mock import Mock
 
@@ -215,12 +214,14 @@ ProblemExecutor = MockProblemExecutor
 ExecutionPlan = DecompositionPlan
 
 # Strategy aliases
-ExactDecomposition = lambda: MockStrategy("exact")
-SemanticDecomposition = lambda: MockStrategy("semantic")
-StructuralDecomposition = lambda: MockStrategy("structural")
-SyntheticBridging = lambda: MockStrategy("synthetic")
-AnalogicalDecomposition = lambda: MockStrategy("analogical")
-BruteForceSearch = lambda: MockStrategy("brute_force")
+
+
+def ExactDecomposition(): return MockStrategy("exact")
+def SemanticDecomposition(): return MockStrategy("semantic")
+def StructuralDecomposition(): return MockStrategy("structural")
+def SyntheticBridging(): return MockStrategy("synthetic")
+def AnalogicalDecomposition(): return MockStrategy("analogical")
+def BruteForceSearch(): return MockStrategy("brute_force")
 
 
 # ============================================================================
@@ -270,10 +271,10 @@ class TestProblemDecomposerIntegration:
             thresholds = AdaptiveThresholds()
             assert len(thresholds.thresholds) > 0
 
-            tracker = PerformanceTracker()
-            library = StratifiedDecompositionLibrary()
+            PerformanceTracker()
+            StratifiedDecompositionLibrary()
             chain = FallbackChain()
-            executor = ProblemExecutor()
+            ProblemExecutor()
 
             result.passed = True
             result.details = {
@@ -491,11 +492,11 @@ class TestProblemDecomposerIntegration:
             )
 
             t1 = time.time()
-            plan1 = decomposer.decompose_novel_problem(problem)
+            decomposer.decompose_novel_problem(problem)
             time1 = time.time() - t1
 
             t2 = time.time()
-            plan2 = decomposer.decompose_novel_problem(problem)
+            decomposer.decompose_novel_problem(problem)
             time2 = time.time() - t2
 
             cache_size = len(decomposer.decomposition_cache)
@@ -522,7 +523,7 @@ class TestProblemDecomposerIntegration:
 
             # Empty problem
             empty = ProblemGraph(nodes={}, edges=[], metadata={})
-            plan1 = decomposer.decompose_novel_problem(empty)
+            decomposer.decompose_novel_problem(empty)
 
             # Large problem
             large = ProblemGraph(
@@ -530,7 +531,7 @@ class TestProblemDecomposerIntegration:
                 edges=[(f"n{i}", f"n{i + 1}", {}) for i in range(99)],
                 metadata={"domain": "test"},
             )
-            plan2 = decomposer.decompose_novel_problem(large)
+            decomposer.decompose_novel_problem(large)
 
             result.passed = True
             result.details = {"edge_cases_handled": 2}

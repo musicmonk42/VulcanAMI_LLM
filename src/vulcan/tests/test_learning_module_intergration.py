@@ -3,28 +3,25 @@ Comprehensive test suite for the unified learning system
 Tests individual components and their integration
 """
 
+import torch.nn as nn
+import psutil  # ADDED for memory test
+import numpy as np
+from unittest.mock import MagicMock
+from pathlib import Path
+from enum import Enum
+import unittest  # ADDED for self.fail
+import time
+import threading
+import tempfile
+import shutil
+import os  # ADDED for psutil
+import asyncio
 import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip(
     "torch", reason="PyTorch required for learning_module tests"
 )
-
-import asyncio
-import os  # ADDED for psutil
-import shutil
-import tempfile
-import threading
-import time
-import unittest  # ADDED for self.fail
-from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import psutil  # ADDED for memory test
-import torch.nn as nn
 
 
 # Define MetaLearningAlgorithm enum for tests if not available
@@ -48,7 +45,6 @@ try:
                                      PacingStrategy, ParameterHistoryManager,
                                      PlanningAlgorithm, RLHFManager, TaskInfo,
                                      UnifiedLearningSystem, UnifiedWorldModel)
-    from src.vulcan.learning.learning_types import LearningTrajectory
 except ImportError:
     # Fallback for environment where src is not in path
     print("Warning: Could not import from src.vulcan.learning. Check PYTHONPATH.")
@@ -214,7 +210,7 @@ class TestContinualLearning:
         # Process experiences with different patterns
         for i, exp in enumerate(test_experiences[:10]):
             exp["task_hint"] = "task_a" if i < 5 else "task_b"
-            result = learner.process_experience(exp)
+            learner.process_experience(exp)
 
         # Should have detected at least one task
         assert len(learner.task_models) >= 1
@@ -997,7 +993,7 @@ class TestPerformance:
                 "embedding": np.random.randn(TEST_EMBEDDING_DIM).astype(np.float32),
                 "reward": np.random.random(),
             }
-            result = system.process_experience(exp)
+            system.process_experience(exp)
 
             if i % 20 == 0:
                 stats = system.get_unified_stats()

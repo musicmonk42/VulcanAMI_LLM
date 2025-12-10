@@ -10,16 +10,11 @@ import hashlib
 import json
 import logging
 import os
-import shutil
-import tempfile
 import threading
 import time
-import warnings
 from collections import defaultdict
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -27,8 +22,7 @@ import scipy.constants as const
 import torch
 import torch.nn as nn
 # Scientific computing
-from scipy import linalg, signal
-from scipy.special import hermite, jv
+from scipy.special import hermite
 
 # Optional imports for hardware backends
 try:
@@ -311,8 +305,8 @@ class WaveguideSimulator:
 
     def mode_profile(self, x: np.ndarray, mode_number: int = 0) -> np.ndarray:
         """Calculate waveguide mode profile."""
-        n_eff = self.params.refractive_index
-        k0 = 2 * np.pi / self.params.wavelength
+        self.params.refractive_index
+        2 * np.pi / self.params.wavelength
 
         if mode_number == 0:
             # Fundamental mode (Gaussian)
@@ -462,14 +456,14 @@ class MemristorEmulator:
                 "rows": self.rows,
                 "cols": self.cols,
             }
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(state, f)
         logger.info(f"Memristor state saved to {filepath}")
 
     def load_state(self, filepath: str):
         """Load memristor state."""
         with self.lock:
-            with open(filepath, "r") as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 state = json.load(f)
 
             if state["rows"] != self.rows or state["cols"] != self.cols:
@@ -1248,7 +1242,7 @@ class AnalogPhotonicEmulator:
                 )
 
             calib_path = os.path.join(directory, "calibration.json")
-            with open(calib_path, "w") as f:
+            with open(calib_path, "w", encoding="utf-8") as f:
                 json.dump(calib_data, f)
 
         logger.info(f"State saved to {directory}")
@@ -1265,7 +1259,7 @@ class AnalogPhotonicEmulator:
         # Load calibration
         calib_path = os.path.join(directory, "calibration.json")
         if os.path.exists(calib_path):
-            with open(calib_path, "r") as f:
+            with open(calib_path, "r", encoding="utf-8") as f:
                 calib_data = json.load(f)
 
             with self.calibration_lock:

@@ -227,7 +227,7 @@ class TestHardwareProfileManager:
         }
 
         profiles_file = tmp_path / "profiles.json"
-        with open(profiles_file, 'w') as f:
+        with open(profiles_file, 'w', encoding="utf-8") as f:
             json.dump(profiles_data, f)
 
         manager = hdi.HardwareProfileManager(str(profiles_file))

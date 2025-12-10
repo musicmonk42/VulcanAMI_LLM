@@ -12,6 +12,8 @@ Tests cover:
 - Edge cases and error handling
 """
 
+from vulcan.memory.hierarchical import HierarchicalMemory
+from vulcan.memory.base import MemoryConfig, MemoryQuery, MemoryType
 import shutil
 # Import the module under test
 import sys
@@ -25,9 +27,6 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.base import Memory, MemoryConfig, MemoryQuery, MemoryType
-from vulcan.memory.hierarchical import (HierarchicalMemory, MemoryLevel,
-                                        ProblemPattern, ToolSelectionRecord)
 
 # ============================================================
 # FIXTURES
@@ -145,8 +144,8 @@ class TestBasicMemoryOperations:
         """Test retrieving memories by embedding similarity."""
         # Store memories
         mem1 = hierarchical_memory.store("Machine learning classification")
-        mem2 = hierarchical_memory.store("Deep neural networks")
-        mem3 = hierarchical_memory.store("Cooking recipes")
+        hierarchical_memory.store("Deep neural networks")
+        hierarchical_memory.store("Cooking recipes")
 
         # FIX: Use the actual embedding dimension from the memory system
         # Query with embedding similar to ML content
@@ -189,10 +188,10 @@ class TestBasicMemoryOperations:
 
     def test_retrieve_with_time_range(self, hierarchical_memory):
         """Test retrieval with time range filter."""
-        start_time = time.time()
+        time.time()
 
         # Store memory
-        mem1 = hierarchical_memory.store("Old memory")
+        hierarchical_memory.store("Old memory")
         time.sleep(0.1)
 
         mid_time = time.time()
@@ -566,8 +565,8 @@ class TestMemoryConsolidation:
                 mem.access()
 
         # Get initial counts
-        initial_sensory = len(hierarchical_memory.levels["sensory"].memories)
-        initial_working = len(hierarchical_memory.levels["working"].memories)
+        len(hierarchical_memory.levels["sensory"].memories)
+        len(hierarchical_memory.levels["working"].memories)
 
         # Perform consolidation
         consolidated = hierarchical_memory.consolidate()
@@ -582,8 +581,8 @@ class TestMemoryConsolidation:
         assert total_memories > 0
 
         # Check if any promotion occurred (sensory decreased OR working increased)
-        final_sensory = len(hierarchical_memory.levels["sensory"].memories)
-        final_working = len(hierarchical_memory.levels["working"].memories)
+        len(hierarchical_memory.levels["sensory"].memories)
+        len(hierarchical_memory.levels["working"].memories)
 
         # Either memories were promoted OR they remained (both are valid depending on salience)
         # The key is that we didn't lose all memories
@@ -591,7 +590,7 @@ class TestMemoryConsolidation:
 
     def test_consolidation_removes_low_salience(self, hierarchical_memory):
         """Test that low-salience memories are not promoted."""
-        initial_count = len(hierarchical_memory.levels["sensory"].memories)
+        len(hierarchical_memory.levels["sensory"].memories)
 
         # Add low importance memories
         for i in range(5):

@@ -15,11 +15,10 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy import stats
-from scipy.optimize import minimize
 
 from .security_fixes import safe_pickle_load
 
@@ -626,7 +625,7 @@ class StochasticCostModel:
                     comp.value: dist.to_dict() for comp, dist in components.items()
                 }
 
-            with open(save_path / "distributions.json", "w") as f:
+            with open(save_path / "distributions.json", "w", encoding="utf-8") as f:
                 json.dump(dist_data, f, indent=2)
 
             # Save observations
@@ -653,7 +652,7 @@ class StochasticCostModel:
                 for tool, health in self.health_metrics.items()
             }
 
-            with open(save_path / "health.json", "w") as f:
+            with open(save_path / "health.json", "w", encoding="utf-8") as f:
                 json.dump(health_data, f, indent=2)
 
         logger.info(f"Cost model saved to {save_path}")
@@ -671,7 +670,7 @@ class StochasticCostModel:
             # Load distributions
             dist_file = load_path / "distributions.json"
             if dist_file.exists():
-                with open(dist_file, "r") as f:
+                with open(dist_file, "r", encoding="utf-8") as f:
                     dist_data = json.load(f)
 
                 for tool, components in dist_data.items():
@@ -712,7 +711,7 @@ class StochasticCostModel:
             # Load health metrics (skip computed properties like health_score)
             health_file = load_path / "health.json"
             if health_file.exists():
-                with open(health_file, "r") as f:
+                with open(health_file, "r", encoding="utf-8") as f:
                     health_data = json.load(f)
 
                 for tool, metrics in health_data.items():

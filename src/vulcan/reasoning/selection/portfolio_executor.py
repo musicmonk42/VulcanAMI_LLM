@@ -7,20 +7,14 @@ parallelism, sequential refinement, committee consensus, and adaptive mixing.
 Fixed version with proper resource management and timeout handling.
 """
 
-import asyncio
-import json
 import logging
-import queue
-import signal
 import threading
 import time
 from collections import defaultdict, deque
-from concurrent.futures import (Future, ThreadPoolExecutor, TimeoutError,
-                                as_completed)
+from concurrent.futures import (Future, ThreadPoolExecutor, TimeoutError)
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -218,7 +212,7 @@ class PortfolioExecutor:
                 )
 
             # Validate tools exist
-            valid_tools = [t for t in tool_names if t in self.tools]
+            valid_tools = list(tool_names if t in self.tools)
             if not valid_tools:
                 raise ValueError(f"No valid tools found in {tool_names}")
 

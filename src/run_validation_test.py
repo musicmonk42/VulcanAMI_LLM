@@ -31,7 +31,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import pytest
 
@@ -257,7 +257,7 @@ class ValidationTestSuite:
                 return cached
 
         try:
-            with open(MANIFEST_PATH, "r") as f:
+            with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
                 if self.enable_caching:
                     file_cache.set(MANIFEST_PATH, manifest)
@@ -276,7 +276,7 @@ class ValidationTestSuite:
                 return cached
 
         try:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 content = json.load(f)
                 if self.enable_caching:
                     file_cache.set(path, content)
@@ -866,7 +866,7 @@ def test_caching_functionality():
 
     with ValidationTestSuite(enable_caching=False) as suite_no_cache:
         start = time.perf_counter()
-        graph1 = suite_no_cache._load_golden_file(GOLDEN_FILES[0])
+        suite_no_cache._load_golden_file(GOLDEN_FILES[0])
         no_cache_time = time.perf_counter() - start
 
     file_cache.clear()

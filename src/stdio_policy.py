@@ -61,9 +61,9 @@ License: MIT (or your project's license)
 """
 
 from __future__ import annotations
+import builtins as _builtins
 
 import atexit
-import io
 import json
 import logging
 import os
@@ -77,7 +77,6 @@ from typing import Any, Callable, Dict, Optional, TextIO
 _logger = logging.getLogger("stdio_policy")
 
 # Import builtins once at module level to avoid duplicate imports
-import builtins as _builtins
 
 # ---------- Configuration & State ----------
 

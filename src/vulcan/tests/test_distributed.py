@@ -1,15 +1,8 @@
 """Test suite for distributed.py - Distributed memory implementation"""
 
-import hashlib
-import json
-import os
 import pickle
-import queue
-import socket
-import threading
 import time
-from concurrent.futures import Future
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
@@ -23,7 +16,7 @@ from vulcan.memory.distributed import (DistributedMemory, MemoryFederation,
 
 # Try importing optional dependencies
 try:
-    import zmq
+    pass
 
     ZMQ_AVAILABLE = True
 except ImportError:
@@ -37,7 +30,7 @@ except ImportError:
     ENCRYPTION_AVAILABLE = False
 
 try:
-    import redis
+    pass
 
     REDIS_AVAILABLE = True
 except ImportError:

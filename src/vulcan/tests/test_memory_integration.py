@@ -16,13 +16,11 @@ Run with: python test_memory_system.py
 from __future__ import annotations
 
 import logging
-import os
 import shutil
 import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 import numpy as np
 
@@ -36,15 +34,13 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
-    from vulcan.memory import (AttentionMechanism, CompressionType, Concept,
-                               ConsolidationStrategy, DistributedMemory,
-                               Episode, EpisodicMemory, HierarchicalMemory,
-                               Memory, MemoryConfig, MemoryConsolidator,
-                               MemoryFederation, MemoryIndex,
-                               MemoryPersistence, MemoryQuery, MemorySearch,
-                               MemoryStats, MemoryType, MemoryVersionControl,
-                               ProceduralMemory, SemanticMemory, Skill,
-                               WorkingMemory)
+    from vulcan.memory import (AttentionMechanism, CompressionType, ConsolidationStrategy,
+                               DistributedMemory, EpisodicMemory,
+                               HierarchicalMemory, Memory, MemoryConfig,
+                               MemoryConsolidator, MemoryFederation, MemoryIndex,
+                               MemoryPersistence, MemoryQuery,
+                               MemoryType, MemoryVersionControl, ProceduralMemory,
+                               SemanticMemory, WorkingMemory)
 
     MEMORY_MODULE_AVAILABLE = True
 except ImportError as e:
@@ -312,7 +308,7 @@ def test_memory_consolidation():
         for i in range(20):
             hmem.store(f"Memory {i}", importance=0.5 + (i * 0.02))
 
-        initial_count = sum(len(level.memories) for level in hmem.levels.values())
+        sum(len(level.memories) for level in hmem.levels.values())
 
         # Manually trigger consolidation
         consolidated = hmem.consolidate()
@@ -700,7 +696,7 @@ def test_procedural_memory():
 
         # Execute skill
         context = {"step1_done": False, "step2_done": False}
-        result = pmem.execute_skill("test_skill", context)
+        pmem.execute_skill("test_skill", context)
 
         # Note: Preconditions use eval which may fail, but skill should still be stored
         assert_true(skill_id in pmem.skills, "Skill should be stored")

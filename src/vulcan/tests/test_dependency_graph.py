@@ -13,16 +13,13 @@ Tests cover:
 
 import threading
 import time
-from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
 
-import numpy as np
 import pytest
 
 from vulcan.curiosity_engine.dependency_graph import (
     CacheManager, CycleAwareDependencyGraph, CycleDetector, DependencyAnalyzer,
-    DependencyEdge, DependencyType, EvictionManager, GraphStorage, PathFinder,
-    ROICalculator, TopologicalSorter)
+    DependencyEdge, DependencyType, GraphStorage, PathFinder, ROICalculator,
+    TopologicalSorter)
 from vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
 
 # ============================================================================

@@ -20,22 +20,19 @@ License: MIT
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
-import pickle
 import threading
 import time
 import traceback
-from collections import OrderedDict, defaultdict
-from concurrent.futures import (ProcessPoolExecutor, ThreadPoolExecutor,
-                                as_completed)
+from collections import OrderedDict
+from concurrent.futures import (ProcessPoolExecutor, ThreadPoolExecutor)
 from dataclasses import asdict, dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import (Any, Callable, Dict, Generic, List, NamedTuple, Optional,
-                    Sequence, Set, Tuple, TypeVar, Union)
+from typing import (Any, Callable, Dict, List, Optional, Set, Tuple,
+                    TypeVar, Union)
 
 try:
     import torch
@@ -445,7 +442,7 @@ class AttentionHeadExecutor:
             # Extract head parameters
             params = head_node.get("params", {})
             d_k = params.get("d_k", 64)
-            d_v = params.get("d_v", 64)
+            params.get("d_v", 64)
             dropout = params.get("dropout", 0.0)
 
             # Simple attention computation (placeholder - would be actual attention in production)
@@ -528,10 +525,10 @@ class LayerExecutor:
         try:
             # Extract layer components
             nodes = layer.get("nodes", [])
-            edges = layer.get("edges", [])
+            layer.get("edges", [])
 
             # Find attention heads
-            attention_heads = [n for n in nodes if n.get("type") == "attention_head"]
+            attention_heads = list(nodes if n.get("type") == "attention_head")
 
             if not attention_heads:
                 # No attention heads, return input (passthrough layer)
@@ -662,7 +659,7 @@ class LayerExecutor:
 
         if TORCH_AVAILABLE and isinstance(hidden_state, torch.Tensor):
             # Simple 2-layer FFN
-            hidden_dim = params.get("hidden_dim", hidden_state.shape[-1] * 4)
+            params.get("hidden_dim", hidden_state.shape[-1] * 4)
 
             # Would use actual linear layers in production
             # This is a simplified version
@@ -682,7 +679,7 @@ class LayerExecutor:
         if TORCH_AVAILABLE and isinstance(output, torch.Tensor):
             try:
                 return output + residual
-            except Exception as e:
+            except Exception:
                 return output
         else:
             return output
@@ -1096,14 +1093,14 @@ class LLMExecutor:
         }
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, default=str)
 
         log.info(f"Executor state saved to {path}")
 
     def load_state(self, path: str):
         """Load executor state."""
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
 
         self.metrics = state.get("metrics", {})
@@ -1217,7 +1214,6 @@ def main():
     if args.benchmark:
         print("Running benchmarks...")
         # Benchmark code here
-        pass
 
 
 if __name__ == "__main__":

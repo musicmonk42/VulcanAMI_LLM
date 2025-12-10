@@ -44,12 +44,10 @@ and verification caching.
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)

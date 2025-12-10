@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 import hmac
 import logging
@@ -9,8 +8,7 @@ import time
 import zlib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode, urlparse
 

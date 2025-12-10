@@ -7,7 +7,6 @@ so that `from vulcan.xxx import yyy` style imports work correctly.
 
 import asyncio
 import gc
-import os
 import pathlib
 import sys
 import threading
@@ -353,7 +352,6 @@ def cleanup_session_resources():
         # Suppress torch.distributed deprecation warnings during cleanup
         import warnings
 
-        from vulcan import planning
 
         with warnings.catch_warnings():
             warnings.filterwarnings(

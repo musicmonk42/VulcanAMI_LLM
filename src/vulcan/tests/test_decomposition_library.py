@@ -11,22 +11,20 @@ Tests:
 - Cross-domain patterns
 """
 
+from problem_decomposer.decomposition_library import (
+    Context, DecompositionLibrary, DecompositionPrinciple, Pattern,
+    PatternPerformance, PatternStatus, StratifiedDecompositionLibrary)
 import logging
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
 
-import numpy as np
 import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
-from problem_decomposer.decomposition_library import (
-    Context, DecompositionLibrary, DecompositionPrinciple, DomainCategory,
-    Pattern, PatternPerformance, PatternStatus, StratifiedDecompositionLibrary)
 
 # Configure logging
 logging.basicConfig(
@@ -462,7 +460,7 @@ class TestSimilaritySearch:
         )
 
         similar1 = library.find_similar(query_pattern, top_k=3)
-        cache_size_before = len(library.similarity_cache)
+        len(library.similarity_cache)
 
         similar2 = library.find_similar(query_pattern, top_k=3)
         cache_size_after = len(library.similarity_cache)

@@ -2,30 +2,23 @@
 Test suite for curriculum learning module
 """
 
+from vulcan.learning.learning_types import LearningConfig
+from vulcan.learning.curriculum_learning import (CompositeDifficultyEstimator,
+                                                 CurriculumLearner,
+                                                 CurriculumMetrics,
+                                                 DifficultyEstimator,
+                                                 LearnedDifficultyEstimator,
+                                                 PacingStrategy)
+import numpy as np
+from unittest.mock import Mock
+from pathlib import Path
+import json
 import pytest
 
 # Skip entire module if torch is not available (curriculum_learning imports learning modules that require torch)
 torch = pytest.importorskip(
     "torch", reason="PyTorch required for curriculum_learning tests"
 )
-
-import json
-import shutil
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-
-from vulcan.learning.curriculum_learning import (CompositeDifficultyEstimator,
-                                                 CurriculumLearner,
-                                                 CurriculumMetrics,
-                                                 DifficultyEstimator,
-                                                 DifficultyMetric,
-                                                 LearnedDifficultyEstimator,
-                                                 PacingStrategy, StageInfo)
-from vulcan.learning.learning_types import LearningConfig
 
 
 class TestDifficultyEstimators:
@@ -286,7 +279,7 @@ class TestCurriculumLearner:
             assert learner.current_stage > initial_stage
 
             # Second stage requires more samples
-            second_stage = learner.current_stage
+            learner.current_stage
             for i in range(10):  # min_samples * 2^1 = 10
                 learner.get_next_batch(performance=0.8, batch_size=1)
 
@@ -433,7 +426,7 @@ class TestCurriculumLearner:
         structure_file = tmp_path / "curriculum_structure.json"
         assert structure_file.exists()
 
-        with open(structure_file, "r") as f:
+        with open(structure_file, "r", encoding="utf-8") as f:
             structure = json.load(f)
 
         assert "num_stages" in structure

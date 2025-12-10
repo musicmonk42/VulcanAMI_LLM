@@ -5,7 +5,6 @@ Autonomous performance optimization and resource management
 """
 
 import asyncio
-import json
 import logging
 import os
 import pickle
@@ -13,8 +12,8 @@ import threading
 import time
 from collections import defaultdict, deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import psutil
@@ -341,7 +340,7 @@ class SelfOptimizer:
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             util = pynvml.nvmlDeviceGetUtilizationRates(handle)
             return float(util.gpu)
-        except Exception as e:
+        except Exception:
             return 0.0
 
     def _should_optimize(self, metrics: PerformanceMetrics) -> bool:

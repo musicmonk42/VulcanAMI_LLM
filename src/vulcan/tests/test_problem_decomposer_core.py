@@ -9,10 +9,9 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
-from unittest.mock import MagicMock, Mock, patch
+from typing import Any, Dict, List, Optional
+from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 # ============================================================================

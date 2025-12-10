@@ -11,10 +11,14 @@ Tests:
 - Strategy-specific features
 """
 
+from problem_decomposer.problem_decomposer_core import ProblemGraph
+from problem_decomposer.decomposition_strategies import (
+    AnalogicalDecomposition, BruteForceSearch, DecompositionResult,
+    ExactDecomposition, SemanticDecomposition, StrategyType,
+    StructuralDecomposition, SyntheticBridging)
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
 
 import numpy as np
 import pytest
@@ -23,12 +27,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import components to test
-from problem_decomposer.decomposition_strategies import (
-    AnalogicalDecomposition, BruteForceSearch, DecompositionResult,
-    DecompositionStrategy, ExactDecomposition, PatternMatch,
-    SemanticDecomposition, StrategyType, StructuralDecomposition,
-    SyntheticBridging)
-from problem_decomposer.problem_decomposer_core import ProblemGraph
 
 # Configure logging
 logging.basicConfig(
@@ -357,7 +355,7 @@ class TestSemanticDecomposition:
         test_graph = MockGraph(strategy.max_cache_size + 100)
 
         # Process through normal API which has cache limiting
-        embeddings = strategy._get_node_embeddings(test_graph)
+        strategy._get_node_embeddings(test_graph)
 
         # Cache should be strictly limited now with the while loop
         assert len(strategy.embedding_cache) <= strategy.max_cache_size

@@ -10,36 +10,34 @@ Tests:
 - Integration validation
 """
 
-import logging
-import sys
-import time
-from pathlib import Path
-from typing import Any, Dict, List
-
-import pytest
-
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from problem_decomposer.adaptive_thresholds import AdaptiveThresholds
-# Import components to test
+from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
+                                                        ExecutionOutcome,
+                                                        ProblemDecomposer,
+                                                        ProblemGraph)
+from problem_decomposer.fallback_chain import FallbackChain
+from problem_decomposer.decomposition_strategies import (
+    AnalogicalDecomposition, BruteForceSearch, ExactDecomposition,
+    SemanticDecomposition, StructuralDecomposition, SyntheticBridging)
+from problem_decomposer.decomposition_library import (
+    StratifiedDecompositionLibrary)
 from problem_decomposer.decomposer_bootstrap import (DecomposerBootstrap,
                                                      create_decomposer,
                                                      create_test_problem,
                                                      get_bootstrap,
                                                      run_bootstrap_test,
                                                      validate_decomposer_setup)
-from problem_decomposer.decomposition_library import (
-    Context, DecompositionPrinciple, Pattern, StratifiedDecompositionLibrary)
-from problem_decomposer.decomposition_strategies import (
-    AnalogicalDecomposition, BruteForceSearch, DecompositionStrategy,
-    ExactDecomposition, SemanticDecomposition, StructuralDecomposition,
-    SyntheticBridging)
-from problem_decomposer.fallback_chain import FallbackChain
-from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
-                                                        ExecutionOutcome,
-                                                        ProblemDecomposer,
-                                                        ProblemGraph)
+from problem_decomposer.adaptive_thresholds import AdaptiveThresholds
+import logging
+import sys
+import time
+from pathlib import Path
+
+import pytest
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Import components to test
 
 # Configure logging
 logging.basicConfig(
@@ -204,7 +202,7 @@ class TestDecomposerBootstrap:
 
     def test_populate_fallback_chain(self, bootstrap):
         """Test fallback chain population"""
-        strategies = bootstrap.create_strategy_instances()
+        bootstrap.create_strategy_instances()
         fallback_chain = FallbackChain()
 
         bootstrap.populate_fallback_chain(fallback_chain, bootstrap.strategy_instances)

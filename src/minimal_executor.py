@@ -9,7 +9,6 @@ proper cycle detection, timeout handling, and comprehensive error recovery.
 import asyncio
 import json
 import logging
-import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -55,25 +54,21 @@ MAX_EDGE_COUNT = 100000  # Maximum edges
 class ExecutionError(Exception):
     """Base exception for execution errors."""
 
-    pass
 
 
 class CycleDetectedError(ExecutionError):
     """Raised when a cycle is detected in the graph."""
 
-    pass
 
 
 class TimeoutError(ExecutionError):
     """Raised when execution times out."""
 
-    pass
 
 
 class ValidationError(ExecutionError):
     """Raised when graph validation fails."""
 
-    pass
 
 
 class ThreadSafeContext:
@@ -252,7 +247,6 @@ class GraphValidator:
 
         # Track visit states: 0=unvisited, 1=visiting, 2=visited
         state = {node_id: 0 for node_id in nodes.keys()}
-        parent = {}
 
         def dfs(node: str, path: List[str]) -> Optional[List[str]]:
             """DFS to detect cycles."""

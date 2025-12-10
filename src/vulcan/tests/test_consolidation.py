@@ -1,34 +1,30 @@
 """Test suite for consolidation.py - Memory consolidation and optimization"""
 
-import copy
-import hashlib
-import pickle
 import time
 from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 from vulcan.memory.base import Memory, MemoryType
 # Import the module to test
-from vulcan.memory.consolidation import (CacheManager, ClusteringAlgorithm,
-                                         ConsolidationStrategy,
+from vulcan.memory.consolidation import (CacheManager, ConsolidationStrategy,
                                          DBSCANClustering,
-                                         HierarchicalClustering, IndexManager,
-                                         KMeansClustering, MemoryConsolidator,
-                                         MemoryOptimizer)
+                                         HierarchicalClustering,
+                                         IndexManager, KMeansClustering,
+                                         MemoryConsolidator, MemoryOptimizer)
 
 # Try to import optional dependencies for testing
 try:
-    import sklearn
+    pass
 
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
 
 try:
-    import networkx as nx
+    pass
 
     NETWORKX_AVAILABLE = True
 except ImportError:

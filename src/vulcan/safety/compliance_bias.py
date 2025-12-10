@@ -7,21 +7,16 @@ Implements regulatory compliance validation and multi-model bias detection.
 import hashlib
 import json
 import logging
-import re
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 
-from .safety_types import ComplianceStandard, SafetyReport, SafetyViolationType
+from .safety_types import ComplianceStandard
 
 logger = logging.getLogger(__name__)
 
@@ -1805,7 +1800,7 @@ class BiasDetector:
             json.dumps(
                 {"action": action, "context": context}, sort_keys=True, default=str
             ).encode()
-        , usedforsecurity=False).hexdigest()
+            , usedforsecurity=False).hexdigest()
 
         # Check cache
         cached_result = self.prediction_cache.get(cache_key)
@@ -2098,7 +2093,7 @@ class BiasDetector:
         if isinstance(resources, dict):
             values = list(resources.values())
             if values:
-                numeric_values = [v for v in values if isinstance(v, (int, float))]
+                numeric_values = list(values if isinstance(v, (int, float)))
                 if numeric_values:
                     features[0] = np.mean(numeric_values)
                     features[1] = np.std(numeric_values)
@@ -2181,7 +2176,7 @@ class BiasDetector:
         if "group_rates" in context:
             rates = context["group_rates"]
             if isinstance(rates, dict):
-                rate_values = [v for v in rates.values() if isinstance(v, (int, float))]
+                rate_values = list(rates.values() if isinstance(v, (int, float)))
                 if rate_values:
                     features[0] = np.mean(rate_values)
                     features[1] = np.std(rate_values)
@@ -2397,7 +2392,7 @@ class BiasDetector:
 
         # Factor in score magnitude
         max_score = max(scores)
-        min_score = min(scores)
+        min(scores)
 
         if max_score > 0.5:
             # High bias detected with confidence

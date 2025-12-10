@@ -839,7 +839,7 @@ class SafetyGovernor:
                 "safety_level": context.safety_level.value,
                 "problem_hash": hashlib.md5(
                     str(context.problem)[:1000].encode()
-                , usedforsecurity=False).hexdigest()[:8],
+                    , usedforsecurity=False).hexdigest()[:8],
             }
 
             # Already bounded by deque maxlen
@@ -900,7 +900,7 @@ class SafetyGovernor:
             with self.lock:
                 audit_data = list(self.audit_trail)
 
-            with open(export_path, "w") as f:
+            with open(export_path, "w", encoding="utf-8") as f:
                 json.dump(audit_data, f, indent=2, default=str)
 
             logger.info(f"Audit trail exported to {export_path}")

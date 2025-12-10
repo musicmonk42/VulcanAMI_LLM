@@ -10,15 +10,12 @@ FIXED: Pattern priority and temporal extrapolation for accurate predictions
 """
 
 import importlib  # Added for lazy loading
-import json
 import logging
 import threading
 import time
-import warnings
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -280,7 +277,7 @@ class RobustOptimizer:
 
         # Numerical gradient if not provided
         if jac is None:
-            jac = lambda x: RobustOptimizer._numerical_gradient(fun, x)
+            def jac(x): return RobustOptimizer._numerical_gradient(fun, x)
 
         f_prev = fun(x)
         g_prev = jac(x)
@@ -452,7 +449,7 @@ class RobustOptimizer:
         x = x0.copy()
 
         if jac is None:
-            jac = lambda x: RobustOptimizer._numerical_gradient(fun, x)
+            def jac(x): return RobustOptimizer._numerical_gradient(fun, x)
 
         # Momentum parameters
         velocity = np.zeros_like(x)

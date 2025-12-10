@@ -23,7 +23,6 @@ import time
 from abc import ABC, abstractmethod
 from concurrent import futures
 from contextlib import contextmanager
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path  # Added for unlink in temp_db fixture
 from typing import Any, Dict, List, Optional
@@ -32,8 +31,7 @@ from typing import Any, Dict, List, Optional
 try:
     import grpc
     # Import specific protobuf types if available
-    from google.protobuf import timestamp_pb2
-    from google.protobuf.json_format import MessageToDict, ParseDict
+    from google.protobuf.json_format import MessageToDict
     from google.protobuf.timestamp_pb2 import Timestamp
     from grpc import StatusCode
 

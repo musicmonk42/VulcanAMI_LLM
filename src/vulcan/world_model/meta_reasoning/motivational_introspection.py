@@ -10,6 +10,7 @@ Follows EXAMINE → SELECT → APPLY → REMEMBER pattern.
 """
 
 from __future__ import annotations  # Add this at the top
+import numpy  # For _calculate_validation_confidence
 
 import importlib  # ADDED as per fix steps
 # Existing imports remain (including from .validation_tracker)
@@ -23,7 +24,7 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field, is_dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 from unittest.mock import MagicMock  # FIXED: Added import
 
 import numpy as np
@@ -2052,7 +2053,7 @@ class MotivationalIntrospection:
 
     def _check_goal_drift(self, proposal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Check if proposal represents goal drift"""
-        proposal_obj = proposal.get("objective")
+        proposal.get("objective")
 
         # Check if proposal is trying to change core objectives
         if proposal.get("modifies_objectives"):
@@ -2973,7 +2974,8 @@ class MotivationalIntrospection:
                     c.get("description", "Conflict detected")
                     for c in introspection.get("conflicts", [])
                 ]
-                base_reasoning = f"Proposal creates manageable conflicts between objectives: {'; '.join(conflict_reasons[:2])}"  # Show first 2 reasons
+                # Show first 2 reasons
+                base_reasoning = f"Proposal creates manageable conflicts between objectives: {'; '.join(conflict_reasons[:2])}"
         elif overall_status == ObjectiveStatus.DRIFT:
             base_reasoning = (
                 "Proposal shows signs of goal drift from design specification"
@@ -3092,4 +3094,3 @@ class MotivationalIntrospection:
 
 
 # Add any necessary imports if used only within methods
-import numpy  # For _calculate_validation_confidence

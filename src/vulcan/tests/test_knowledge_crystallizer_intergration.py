@@ -5,20 +5,15 @@ Tests the full pipeline: Extract → Validate → Store → Apply → Track
 Run with: pytest src/vulcan/tests/test_knowledge_crystallizer_integration.py -v
 """
 
-import time
-from pathlib import Path
 from typing import Any, Dict
 
-import numpy as np
 import pytest
 
 from src.vulcan.knowledge_crystallizer.contraindication_tracker import (
     CascadeAnalyzer, Contraindication, ContraindicationDatabase,
-    ContraindicationGraph, FailureMode, Severity)
+    ContraindicationGraph, FailureMode)
 from src.vulcan.knowledge_crystallizer.crystallization_selector import (
-    CrystallizationMethod, CrystallizationSelector, TraceCharacteristics)
-from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
-    ApplicationMode, CrystallizationMode)
+    CrystallizationMethod, CrystallizationSelector)
 from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
     ExecutionTrace as CoreExecutionTrace
 from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
@@ -31,7 +26,7 @@ from src.vulcan.knowledge_crystallizer.principle_extractor import (
     ExecutionTrace, ExtractionStrategy, Metric, MetricType, Pattern,
     PatternType, PrincipleExtractor)
 from src.vulcan.knowledge_crystallizer.validation_engine import (
-    DomainTestCase, KnowledgeValidator, Principle, ValidationLevel)
+    KnowledgeValidator, Principle)
 
 # ============================================================================
 # MODULE-LEVEL FUNCTION (REQUIRED FOR PICKLING)

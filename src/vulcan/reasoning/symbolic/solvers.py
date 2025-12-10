@@ -42,11 +42,10 @@ import random
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 from scipy import stats
-from scipy.linalg import cho_factor, cho_solve
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +130,7 @@ class Factor:
             return self._marginalize_gaussian(var)
 
         # Discrete marginalization
-        new_vars = [v for v in self.variables if v != var]
+        new_vars = list(self.variables if v != var)
         new_values = defaultdict(float)
 
         var_idx = self.variables.index(var)
@@ -146,8 +145,8 @@ class Factor:
     def _marginalize_gaussian(self, var: str) -> "Factor":
         """Marginalize Gaussian factor."""
         # For linear Gaussian models, marginalization is analytical
-        var_idx = self.variables.index(var)
-        new_vars = [v for v in self.variables if v != var]
+        self.variables.index(var)
+        new_vars = list(self.variables if v != var)
 
         if self.mean_params is None or self.covariance is None:
             return Factor(variables=new_vars, values={})
@@ -689,7 +688,7 @@ class BayesianNetworkReasoner:
             List of parent assignments
         """
         # Separate observed and unobserved parents
-        unobserved = [p for p in parents if p not in evidence]
+        unobserved = list(parents if p not in evidence)
 
         if not unobserved:
             # All parents observed
@@ -786,8 +785,8 @@ class BayesianNetworkReasoner:
             Updated factors
         """
         # Find factors containing var
-        relevant = [f for f in factors if var in f.variables]
-        irrelevant = [f for f in factors if var not in f.variables]
+        relevant = list(factors if var in f.variables)
+        irrelevant = list(factors if var not in f.variables)
 
         if not relevant:
             return factors
@@ -1196,7 +1195,7 @@ class BayesianNetworkReasoner:
 
         for sample in data:
             # Get missing variables
-            missing = [v for v in self.variables if v not in sample]
+            missing = list(self.variables if v not in sample)
             observed = {v: sample[v] for v in sample if v in self.variables}
 
             if not missing:
@@ -1739,7 +1738,7 @@ class CSPSolver:
 
     def _select_unassigned_variable(self, assignment: Dict[str, Any]) -> str:
         """Select unassigned variable using MRV heuristic."""
-        unassigned = [v for v in self.variables if v not in assignment]
+        unassigned = list(self.variables if v not in assignment)
 
         # Choose variable with minimum remaining values
         return min(unassigned, key=lambda v: len(self.domains[v]))

@@ -10,28 +10,23 @@ Tests cover:
 - Edge cases and error handling
 """
 
-import os
+from vulcan.memory.specialized import (Concept, Episode, EpisodicMemory,
+                                       ProceduralMemory, SemanticMemory,
+                                       Skill, ToolPerformanceConcept,
+                                       WorkingMemory)
+from vulcan.memory.base import (Memory, MemoryConfig, MemoryQuery, MemoryType,
+                                RetrievalResult)
 import shutil
 # Import the module under test
 import sys
 import tempfile
 import time
-from collections import deque
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
-import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.base import (Memory, MemoryConfig, MemoryQuery, MemoryType,
-                                RetrievalResult)
-from vulcan.memory.specialized import (NETWORKX_AVAILABLE, Concept, Episode,
-                                       EpisodicMemory, ProceduralMemory,
-                                       SemanticMemory, Skill,
-                                       ToolPerformanceConcept, WorkingMemory,
-                                       WorkingMemoryBuffer)
 
 # ============================================================
 # FIXTURES
@@ -307,7 +302,7 @@ class TestEpisodicMemory:
 
         assert len(similar) >= 2
         # Should prefer coding episodes
-        coding_episodes = [ep for ep in similar if ep.context.get("task") == "coding"]
+        coding_episodes = list(similar if ep.context.get("task") == "coding")
         assert len(coding_episodes) >= 2
 
     def test_recall_by_tags(self, memory_config):
@@ -885,7 +880,7 @@ class TestProceduralMemory:
         for _ in range(15):
             skill.update_performance(success=False, execution_time=1.0)
 
-        initial_count = len(pm.skills)
+        len(pm.skills)
         consolidated = pm.consolidate()
 
         # Should remove low-performing skills

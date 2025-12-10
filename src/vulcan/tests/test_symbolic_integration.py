@@ -6,7 +6,6 @@ work together correctly.
 """
 
 import sys
-from pathlib import Path
 
 # Add the parent directory to path if needed
 # Adjust this based on your directory structure
@@ -99,7 +98,7 @@ def test_complex_formulas():
     print("=" * 70)
 
     try:
-        from vulcan.reasoning.symbolic import FormulaParser, SymbolicReasoner
+        from vulcan.reasoning.symbolic import FormulaParser
 
         parser = FormulaParser()
 
@@ -212,7 +211,7 @@ def test_fuzzy_logic():
             membership = fuzzy.evaluate_membership("hot", 35)
             print(f"  Membership of 35 in 'hot': {membership:.2f}")
             print("✓ Fuzzy logic basic operations work!")
-        except Exception as e:
+        except Exception:
             print(f"  (Expected - need to define output fuzzy sets)")
             print("✓ Fuzzy logic structure works!")
 
@@ -351,7 +350,7 @@ def test_integration():
     print("=" * 70)
 
     try:
-        from vulcan.reasoning.symbolic import HybridReasoner, SymbolicReasoner
+        from vulcan.reasoning.symbolic import HybridReasoner
 
         # Test that reasoners can work together
         print("\nTesting HybridReasoner:")

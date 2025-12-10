@@ -9,7 +9,7 @@ Multi-head attention IR structure:
 - Adds nodes/hints for Hybrid Attention and Sparse Pattern optimization.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 class IRAttention:

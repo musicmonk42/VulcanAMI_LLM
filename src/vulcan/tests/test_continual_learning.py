@@ -2,6 +2,13 @@
 Test suite for continual learning module
 """
 
+from vulcan.learning.learning_types import LearningConfig
+from vulcan.learning.continual_learning import (ContinualLearner,
+                                                EnhancedContinualLearner,
+                                                ProgressiveNeuralNetwork)
+import torch.nn as nn
+import numpy as np
+import threading
 import pytest
 
 # Skip entire module if torch is not available
@@ -9,23 +16,8 @@ torch = pytest.importorskip(
     "torch", reason="PyTorch required for continual_learning tests"
 )
 
-import shutil
-import tempfile
-import threading
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
 
 # Import the modules to test
-from vulcan.learning.continual_learning import (ContinualLearner,
-                                                ContinualMetrics,
-                                                EnhancedContinualLearner,
-                                                ProgressiveNeuralNetwork)
-from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
-                                            TaskInfo)
 
 # Test configuration
 TEST_EMBEDDING_DIM = 128
@@ -391,8 +383,8 @@ class TestProgressiveMode:
         exp1 = {"embedding": np.ones(TEST_EMBEDDING_DIM) * 0.1}
         exp2 = {"embedding": np.ones(TEST_EMBEDDING_DIM) * 0.9}
 
-        result1 = prog_learner.process_experience(exp1)
-        result2 = prog_learner.process_experience(exp2)
+        prog_learner.process_experience(exp1)
+        prog_learner.process_experience(exp2)
 
         # Check columns were added
         assert len(prog_learner.progressive_network.columns) > 0
@@ -403,7 +395,6 @@ class TestProgressiveMode:
 class TestPackNetCapacity:
     """Test PackNet-style parameter isolation"""
 
-    pass
 
 
 class TestIntegration:

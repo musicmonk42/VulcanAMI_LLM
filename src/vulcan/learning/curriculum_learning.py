@@ -948,5 +948,5 @@ class CurriculumLearner:
         }
 
         filepath = self.save_path / "curriculum_structure.json"
-        with open(filepath, "w") as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(structure, f, indent=2, default=str)

@@ -16,7 +16,6 @@ import re
 import threading
 import time
 from collections import OrderedDict, defaultdict, deque
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -1052,7 +1051,7 @@ class EvolutionEngine:
         child = copy.deepcopy(graph1)
 
         # Remove nodes from subgraph1
-        child["nodes"] = [n for n in child["nodes"] if n["id"] not in subgraph1]
+        child["nodes"] = list(child["nodes") if n["id"] not in subgraph1]
 
         # Add nodes from subgraph2
         nodes_to_add = [
@@ -1294,7 +1293,7 @@ class EvolutionEngine:
                 }
 
             # Write to file
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(population_data, f, indent=2)
 
             logger.info(f"Saved population to {filepath}")
@@ -1323,7 +1322,7 @@ class EvolutionEngine:
                 raise PermissionError(f"No read permission for {filepath}")
 
             # Read file
-            with open(filepath, "r") as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 population_data = json.load(f)
 
             # Store old population for recovery

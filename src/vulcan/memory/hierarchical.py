@@ -9,7 +9,7 @@ import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -17,9 +17,8 @@ import numpy as np
 from persistant_memory_v46 import (GraphRAG, MerkleLSM, PackfileStore,
                                    UnlearningEngine, ZKProver)
 
-from .base import (BaseMemorySystem, Memory, MemoryCapacityException,
-                   MemoryConfig, MemoryQuery, MemoryStats, MemoryType,
-                   RetrievalResult)
+from .base import (BaseMemorySystem, Memory, MemoryConfig,
+                   MemoryQuery, MemoryType, RetrievalResult)
 from .consolidation import MemoryConsolidator
 from .retrieval import AttentionMechanism, MemorySearch
 
@@ -860,7 +859,7 @@ class HierarchicalMemory(BaseMemorySystem):
                             model = SentenceTransformer(fallback)
                             logger.info(f"Loaded fallback embedding model: {fallback}")
                             return model
-                        except Exception as e:
+                        except Exception:
                             continue
 
                 logger.warning(
@@ -1281,22 +1280,22 @@ class HierarchicalMemory(BaseMemorySystem):
         # Time range filter
         if query.time_range:
             start, end = query.time_range
-            filtered = [m for m in filtered if start <= m.timestamp <= end]
+            filtered = list(filtered if start <= m.timestamp <= end)
 
         # Type filter
         if "type" in query.filters:
             memory_type = query.filters["type"]
-            filtered = [m for m in filtered if m.type == memory_type]
+            filtered = list(filtered if m.type == memory_type)
 
         # Importance filter
         if "min_importance" in query.filters:
             min_imp = query.filters["min_importance"]
-            filtered = [m for m in filtered if m.importance >= min_imp]
+            filtered = list(filtered if m.importance >= min_imp)
 
         # Content-based filter
         if "content_contains" in query.filters:
             search_text = query.filters["content_contains"].lower()
-            filtered = [m for m in filtered if search_text in str(m.content).lower()]
+            filtered = list(filtered if search_text in str(m.content).lower())
 
         # Metadata filter
         if "metadata" in query.filters:
@@ -1517,13 +1516,11 @@ class EpisodicMemory:
 class SemanticMemory:
     """Semantic memory store (stub for future implementation)."""
 
-    pass
 
 
 class ProceduralMemory:
     """Procedural memory store (stub for future implementation)."""
 
-    pass
 
 
 @dataclass
@@ -1584,7 +1581,6 @@ class PersistentHierarchicalMemory:
 
     def _serialize_to_local(self, item) -> None:
         """Serialize item to local disk storage."""
-        pass
 
     def _search_local_disk(self, q, k=10) -> list:
         """Search local disk storage."""

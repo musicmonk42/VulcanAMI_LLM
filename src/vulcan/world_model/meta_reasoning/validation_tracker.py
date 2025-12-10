@@ -28,6 +28,8 @@ FIX (2025-10-22):
 - Improved risk scoring to be less aggressive for unknown/neutral patterns
 """
 
+from dataclasses import asdict, is_dataclass
+import math
 import logging
 import math  # Import math for log2, sqrt
 import random  # Import random if needed by FakeNumpy
@@ -37,7 +39,7 @@ from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 # import numpy as np # Original import
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
 
 # --- START FIX: Add numpy fallback ---
@@ -854,7 +856,7 @@ class ValidationTracker:
 
     def analyze_failure_patterns(self) -> Dict[str, Any]:
         """Analyze patterns in validation failures"""
-        _np = self._np
+        self._np
         with self.lock:
             history_list = list(self.validation_records)  # Snapshot
             rejected = [
@@ -961,7 +963,8 @@ class ValidationTracker:
                             PatternType.RISKY,
                             PatternType.FAILURE,
                         ]:
-                            matching_risky += pattern.confidence  # Accumulate confidence for multiple matches? Weighted sum? Max? Simple sum for now.
+                            # Accumulate confidence for multiple matches? Weighted sum? Max? Simple sum for now.
+                            matching_risky += pattern.confidence
                         elif pattern.pattern_type in [
                             PatternType.SUCCESS,
                             PatternType.SAFE,
@@ -1511,7 +1514,8 @@ class ValidationTracker:
                 elif confidence < 0.4:
                     pattern_type = PatternType.RISKY
                 else:
-                    continue  # Skip patterns in the uncertain middle ground during rebuild? Or classify? Classify for now.
+                    # Skip patterns in the uncertain middle ground during rebuild? Or classify? Classify for now.
+                    continue
                     # pattern_type = PatternType.SUCCESS if confidence >= 0.5 else PatternType.RISKY
                     # logger.debug(f"Pattern for {hash(feature_key)} has uncertain confidence ({confidence:.2f}), skipping.")
                     # continue
@@ -2016,6 +2020,4 @@ class ValidationTracker:
 
 
 # Need math for float checks in _make_serializable
-import math
 # Need asdict, is_dataclass if using dataclasses and not handled by to_dict
-from dataclasses import asdict, is_dataclass

@@ -6,13 +6,12 @@ import json
 import logging
 import os
 import pickle
-import queue
 import socket
 import struct
 import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
@@ -284,7 +283,7 @@ class RPCServer:
             # Always close socket properly
             try:
                 conn.shutdown(socket.SHUT_RDWR)
-            except Exception as e:
+            except Exception:
                 pass  # Socket might already be closed
             try:
                 conn.close()
@@ -469,7 +468,7 @@ class MemoryFederation:
         # Find target nodes for migration
         for memory_id in node.primary_for:
             new_nodes = self.get_nodes_for_key(memory_id, count=3)
-            new_nodes = [nid for nid in new_nodes if nid != node_id]
+            new_nodes = list(new_nodes if nid != node_id)
 
             if new_nodes:
                 # Trigger migration

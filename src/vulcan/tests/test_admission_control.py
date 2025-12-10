@@ -6,23 +6,20 @@ and adaptive admission control with proper thread safety validation.
 """
 
 # Import the module to test
-import sys
-import threading
-import time
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, Mock, patch
-
-import psutil
-import pytest
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from vulcan.reasoning.selection.admission_control import (
     AdaptiveAdmissionController, AdmissionControlIntegration,
     AdmissionDecision, AdmissionMetrics, CircuitBreaker, PriorityQueue,
     Request, RequestPriority, ResourceMonitor, SlidingWindowRateLimiter,
     SystemHealth, TokenBucketRateLimiter)
+import sys
+import threading
+import time
+from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 class TestEnums:
@@ -513,7 +510,7 @@ class TestAdaptiveAdmissionController:
         assert decision == AdmissionDecision.ADMIT
         assert isinstance(info, dict)
 
-    def test_reject_when_circuit_open(self, controller):
+    def test_reject_when_circuit_open(self, controller, encoding="utf-8"):
         """Test rejection when circuit breaker is open"""
         # Force circuit breaker open
         for _ in range(10):

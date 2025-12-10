@@ -16,19 +16,13 @@ Tests cover:
 
 import threading
 import time
-from collections import defaultdict
-from typing import List, Set
 
 import numpy as np
 import pytest
 
 # Import the module under test
-from vulcan.world_model.causal_graph import (CausalDAG, CausalEdge, CausalPath,
-                                             CycleDetector, DSeparationChecker,
-                                             EvidenceType, GraphStructure,
-                                             PathFinder,
-                                             ProbabilityDistribution,
-                                             TopologicalSorter)
+from vulcan.world_model.causal_graph import (CausalDAG, CausalEdge, EvidenceType,
+                                             ProbabilityDistribution)
 
 # ==================== FIXTURES ====================
 
@@ -108,7 +102,7 @@ class TestBasicOperations:
 
     def test_add_duplicate_edge(self, simple_dag):
         """Test that duplicate edges update existing edge"""
-        original_edge = simple_dag.get_edge("A", "B")
+        simple_dag.get_edge("A", "B")
 
         # Add same edge with different strength
         simple_dag.add_edge("A", "B", 0.9, EvidenceType.INTERVENTION)

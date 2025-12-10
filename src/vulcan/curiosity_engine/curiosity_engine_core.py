@@ -6,18 +6,11 @@ Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
 import copy
-import io
-import json
 import logging
-import multiprocessing
-import sys
-import tempfile
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from functools import partial
-from pathlib import Path
 from queue import Empty, PriorityQueue
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -28,7 +21,7 @@ from .experiment_generator import (Experiment, ExperimentGenerator,
                                    IterativeExperimentDesigner)
 from .exploration_budget import DynamicBudget, ResourceMonitor
 # Import other curiosity_engine components
-from .gap_analyzer import GapAnalyzer, KnowledgeGap, LatentGap
+from .gap_analyzer import GapAnalyzer, KnowledgeGap
 
 logger = logging.getLogger(__name__)
 
@@ -474,7 +467,7 @@ class ExplorationFrontier:
 
                     if patterns:
                         # APPLY: Add region
-                        region_id = self.add_explored_region(domain, patterns)
+                        self.add_explored_region(domain, patterns)
 
                         # Update value history
                         if isinstance(knowledge, dict) and "value" in knowledge:
@@ -1239,7 +1232,7 @@ class CuriosityEngine:
                 gaps = all_gaps[:3]
             elif strategy == "efficient":
                 all_gaps = self.gap_analyzer.get_all_gaps()
-                gaps = [g for g in all_gaps if g.estimated_cost < 20][:5]
+                gaps = list(all_gaps if g.estimated_cost < 20)[:5]
 
             # APPLY: Add to dependency graph
             for gap in gaps:

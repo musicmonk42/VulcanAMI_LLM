@@ -7,8 +7,6 @@ demand prediction, and resource monitoring.
 
 import threading
 import time
-from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -47,7 +45,6 @@ class MockTool:
 
     def shutdown(self):
         """Mock shutdown"""
-        pass
 
 
 class TestPoolInstance:
@@ -151,7 +148,7 @@ class TestToolPool:
 
     def create_pool(self, tool_name="test_tool", min_instances=1, max_instances=3):
         """Helper to create pool and register for cleanup"""
-        factory = lambda: MockTool(tool_name)
+        def factory(): return MockTool(tool_name)
         pool = ToolPool(
             tool_name=tool_name,
             tool_factory=factory,
@@ -578,7 +575,7 @@ class TestDemandPredictor:
         predictor = DemandPredictor()
 
         # Record multiple requests
-        current_time = time.time()
+        time.time()
         for i in range(10):
             predictor.record_request("tool1")
             time.sleep(0.01)
@@ -767,7 +764,7 @@ class TestErrorHandling:
 
     def test_release_invalid_instance(self):
         """Test releasing invalid instance"""
-        factory = lambda: MockTool()
+        def factory(): return MockTool()
         pool = ToolPool(tool_name="test_tool", tool_factory=factory, min_instances=1)
 
         # Release non-existent instance - should not crash
@@ -777,7 +774,7 @@ class TestErrorHandling:
 
     def test_shutdown_with_busy_instances(self):
         """Test shutdown with busy instances"""
-        factory = lambda: MockTool()
+        def factory(): return MockTool()
         pool = ToolPool(tool_name="test_tool", tool_factory=factory, min_instances=1)
 
         time.sleep(0.3)

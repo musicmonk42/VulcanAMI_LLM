@@ -3,6 +3,14 @@ Comprehensive test suite for StochasticCostModel.
 Tests EWMA tracking, ML predictions, online learning, and adapter interfaces.
 """
 
+from vulcan.reasoning.selection.cost_model import (EWMA, LGBM_AVAILABLE,
+                                                   SKLEARN_AVAILABLE,
+                                                   ContextMode,
+                                                   CostComponent, CostEstimate,
+                                                   CostModel, ExecutionRecord,
+                                                   FeatureExtractor,
+                                                   StochasticCostModel,
+                                                   get_cost_model)
 import shutil
 # Import the module under test
 import sys
@@ -10,22 +18,12 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from vulcan.reasoning.selection.cost_model import (EWMA, LGBM_AVAILABLE,
-                                                   SCIPY_AVAILABLE,
-                                                   SKLEARN_AVAILABLE,
-                                                   ContextMode, CostComponent,
-                                                   CostEstimate, CostModel,
-                                                   ExecutionRecord,
-                                                   FeatureExtractor,
-                                                   StochasticCostModel,
-                                                   get_cost_model)
 
 # ============================================================================
 # FIXTURES

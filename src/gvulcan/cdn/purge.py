@@ -13,12 +13,11 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Callable, List, Optional, Set
 
 import boto3
-from boto3 import exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -92,13 +91,11 @@ class PurgeStats:
 class PurgeError(Exception):
     """Base exception for purge operations"""
 
-    pass
 
 
 class CloudFrontRateLimitError(PurgeError):
     """Raised when CloudFront rate limits are hit"""
 
-    pass
 
 
 class SmartPurger:

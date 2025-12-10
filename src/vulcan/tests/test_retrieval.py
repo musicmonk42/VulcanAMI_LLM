@@ -22,27 +22,24 @@ FIXES APPLIED (corrected version):
 3. test_full_search_workflow: Added skip - Same source code bug as test_hybrid_search.
 """
 
+from vulcan.memory.retrieval import (TORCH_AVAILABLE, AttentionMechanism,
+                                     LearnedAttention, MemoryIndex,
+                                     MemorySearch, NumpyIndex,
+                                     RetrievalResult, TemporalIndex, TextSearchIndex)
+from vulcan.memory.base import Memory, MemoryQuery, MemoryType
 import os
-import pickle
 import shutil
 # Import the module under test
 import sys
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vulcan.memory.base import Memory, MemoryQuery, MemoryType
-from vulcan.memory.retrieval import (FAISS_AVAILABLE, TORCH_AVAILABLE,
-                                     WHOOSH_AVAILABLE, AttentionMechanism,
-                                     LearnedAttention, MemoryIndex,
-                                     MemorySearch, NumpyIndex, RetrievalResult,
-                                     TemporalIndex, TextSearchIndex)
 
 # ============================================================
 # FIXTURES
@@ -872,7 +869,7 @@ class TestEdgeCases:
         # Should handle gracefully
         try:
             index.add("test", np.array([]))
-        except Exception as e:
+        except Exception:
             # Should not crash catastrophically
             assert True
 
@@ -990,7 +987,7 @@ class TestEdgeCases:
 
         # Should handle gracefully or raise clear error
         try:
-            weights = attention.compute_attention(query, memories)
+            attention.compute_attention(query, memories)
             # If it works, that's fine
         except Exception as e:
             # Should have a clear error message
@@ -1054,7 +1051,7 @@ class TestIntegration:
         results1 = search.semantic_search(
             sample_memories[0].embedding, {m.id: m for m in sample_memories[:5]}, k=5
         )
-        initial_count = len(results1)
+        len(results1)
 
         # Add more memories
         for memory in sample_memories[5:8]:

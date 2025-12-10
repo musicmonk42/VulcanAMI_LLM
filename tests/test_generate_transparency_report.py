@@ -229,7 +229,7 @@ class TestMetricFetching:
     def test_get_previous_report_metrics(self, mock_path, temp_report_file):
         """Test getting previous report metrics."""
         # Write sample report
-        with open(temp_report_file, 'w') as f:
+        with open(temp_report_file, 'w', encoding="utf-8") as f:
             f.write("| Metric | Value |\n")
             f.write("|---|---|\n")
             f.write("| Test Metric | 0.5 |\n")
@@ -239,7 +239,7 @@ class TestMetricFetching:
 
         # Mock open to return our temp file
         with patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value = open(temp_report_file, 'r')
+            mock_open.return_value.__enter__.return_value = open(temp_report_file, 'r', encoding="utf-8")
 
             metrics = get_previous_report_metrics()
 
@@ -259,7 +259,7 @@ class TestMetricFetching:
     def test_fetch_audit_metrics(self, mock_path, temp_report_file):
         """Test fetching audit metrics."""
         # Write sample audit log
-        with open(temp_report_file, 'w') as f:
+        with open(temp_report_file, 'w', encoding="utf-8") as f:
             f.write('{"proposal_id": "test", "bias_detected": true}\n')
             f.write('{"proposal_id": "test2", "bias_detected": false}\n')
 
@@ -386,7 +386,7 @@ class TestReportAppending:
     def test_append_report_size_limit(self, temp_report_file):
         """Test size limit handling."""
         # Write large file
-        with open(temp_report_file, 'w') as f:
+        with open(temp_report_file, 'w', encoding="utf-8") as f:
             f.write('x' * (MAX_REPORT_SIZE + 1))
 
         # Mock archive_current_report to track if it was called

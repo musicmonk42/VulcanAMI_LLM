@@ -26,6 +26,7 @@ FIX (2025-10-22):
 - Ensured consistent use of safe float conversion.
 """
 
+import math
 import hashlib
 import json
 import logging
@@ -1677,4 +1678,3 @@ class TransparencyInterface:
 
 
 # Need math for float checks
-import math

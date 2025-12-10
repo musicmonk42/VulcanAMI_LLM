@@ -4,6 +4,23 @@
 # This allows the script to find and import the 'unified_runtime' and
 # other core modules when run directly.
 # ====================================================================
+from starlette.responses import JSONResponse, Response
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from pydantic import BaseModel, Field, field_validator
+from fastapi.security import APIKeyHeader
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
+from typing import Any, Dict, List, Literal, Optional
+from datetime import datetime
+from collections import deque
+import threading
+import re
+import logging
+import json
+import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -51,7 +68,6 @@ except Exception as e:
 # ====================================================================
 
 # === Auto-apply bootstrap (must run before UnifiedRuntime/VULCAN init) ===
-import os
 
 # Ensure repo root (project root) is on sys.path so we can import vulcan.config
 _repo_root = Path(__file__).resolve().parent.parent  # e.g., D:/Graphix
@@ -105,28 +121,8 @@ Version: 2.0.0 - All issues fixed, thread-safe, validated
 Advanced distributed environment for AI agent collaboration and graph evolution.
 """
 
-import asyncio
-import json
-import logging
-import os
-import re
-import subprocess
-import sys
-import threading
-from collections import deque
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Union
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Security
 # Production Readiness Imports
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import APIKeyHeader
-from pydantic import BaseModel, Field, field_validator
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
-from starlette.responses import JSONResponse, Response
 
 # YAML for tool selection config
 try:
@@ -729,7 +725,7 @@ class GraphixArena:
                     Path(__file__).parent.parent / "configs" / "tool_selection.yaml"
                 )
                 if config_path.exists():
-                    with open(config_path, "r") as f:
+                    with open(config_path, "r", encoding="utf-8") as f:
                         self.tool_selection_config = yaml.safe_load(f)
                     logger.info("Loaded tool_selection.yaml configuration.")
                 else:
@@ -1303,7 +1299,7 @@ class GraphixArena:
 
             # Default embedding function
             if embedding_func is None and NUMPY_AVAILABLE:
-                embedding_func = lambda p: np.random.rand(128).astype("float32")
+                def embedding_func(p): return np.random.rand(128).astype("float32")
             elif embedding_func is None:
                 raise ValueError(
                     "NumPy not available and no embedding function provided"

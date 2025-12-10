@@ -2,28 +2,23 @@
 Test suite for metacognition module
 """
 
-import pytest
-
-# Skip entire module if torch is not available
-torch = pytest.importorskip("torch", reason="PyTorch required for metacognition tests")
-
-import shutil
-import tempfile
-import time
-from collections import deque
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-import torch.optim as optim
-
-from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
 from vulcan.learning.metacognition import (CausalRelation,
                                            CompositionalUnderstanding,
                                            ConfidenceEstimator,
                                            MetaCognitiveMonitor,
                                            ReasoningPhase, ReasoningStep)
+from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
+import torch.optim as optim
+import torch.nn as nn
+import numpy as np
+from pathlib import Path
+import time
+import tempfile
+import shutil
+import pytest
+
+# Skip entire module if torch is not available
+torch = pytest.importorskip("torch", reason="PyTorch required for metacognition tests")
 
 
 class SimpleModel(nn.Module):
@@ -309,11 +304,11 @@ class TestMetaCognitiveMonitor:
         old_calibration = monitor.self_model["confidence_calibration"]
 
         # Test calibration reduction (for overconfidence)
-        result = monitor._strategy_calibrate_confidence()
+        monitor._strategy_calibrate_confidence()
         assert monitor.self_model["confidence_calibration"] < old_calibration
 
         # Test confidence boost (for underconfidence)
-        result = monitor._strategy_boost_confidence()
+        monitor._strategy_boost_confidence()
         assert monitor.self_model["confidence_calibration"] > 0
 
     def test_causal_graph_updates(self, monitor):

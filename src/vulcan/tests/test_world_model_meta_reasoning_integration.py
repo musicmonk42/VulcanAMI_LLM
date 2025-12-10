@@ -26,31 +26,21 @@ Ensures end-to-end functionality, including new components.
 
 import json
 import tempfile
-import time
-from collections import deque
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict
 from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
 
 # Import components to test
-from vulcan.world_model.meta_reasoning import (ConflictSeverity, ConflictType,
-                                               CounterfactualObjectiveReasoner,
-                                               CuriosityRewardShaper,
-                                               EthicalBoundaryMonitor,
-                                               GoalConflictDetector,
+from vulcan.world_model.meta_reasoning import (CuriosityRewardShaper, EthicalBoundaryMonitor,
                                                InternalCritic,
                                                MotivationalIntrospection,
-                                               Objective, ObjectiveHierarchy,
+                                               Objective,
                                                ObjectiveNegotiator,
-                                               ObjectiveStatus, ObjectiveType,
+                                               ObjectiveType,
                                                PreferenceLearner,
-                                               SelfImprovementDrive,
-                                               TransparencyInterface,
-                                               ValidationOutcome,
-                                               ValidationTracker,
+                                               SelfImprovementDrive, ValidationOutcome,
                                                ValueEvolutionTracker)
 
 
@@ -145,7 +135,7 @@ def self_improvement_drive(temp_config_dir):
             "hist_enabled": True,
         },
     }
-    with open(config_path, "w") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config, f)
     return SelfImprovementDrive(config_path=str(config_path))
 
@@ -204,7 +194,7 @@ def test_4_pattern_learning_and_prediction(mock_world_model, design_spec):
             },
             "metadata": {"pattern": "success" if i % 2 == 0 else "risky"},
         }
-        validation = mi.validate_proposal_alignment(proposal)
+        mi.validate_proposal_alignment(proposal)
         outcome = (
             ValidationOutcome.APPROVED if i % 2 == 0 else ValidationOutcome.REJECTED
         )
@@ -302,7 +292,7 @@ def test_12_statistics_and_monitoring(mock_world_model, design_spec):
         "predicted_effects": {"accuracy": 0.94, "efficiency": 0.80, "safety": 1.0},
         "metadata": {"domain": "test"},
     }
-    validation = mi.validate_proposal_alignment(proposal)
+    mi.validate_proposal_alignment(proposal)
     mi.validation_tracker.record_validation(
         proposal, ValidationOutcome.APPROVED, "success"
     )

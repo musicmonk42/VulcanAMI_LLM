@@ -136,7 +136,7 @@ class TestVulcanUnlearn:
             assert os.path.exists(json_output)
 
             # Verify JSON structure
-            with open(json_output, 'r') as f:
+            with open(json_output, 'r', encoding="utf-8") as f:
                 data = json.load(f)
                 assert 'success' in data
                 assert 'pattern' in data

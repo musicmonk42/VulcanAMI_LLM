@@ -10,15 +10,14 @@ from __future__ import annotations
 import logging
 import struct
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 
 import zstandard as zstd
 
 from ..bloom import BloomFilter
-from ..crc32c import CRC32CResult, crc32c, crc32c_detailed
-from ..merkle import MerkleProof, MerkleTree, merkle_root
-from .header import HEADER_SIZE, HeaderFlags, PackHeaderV2, create_header
+from ..crc32c import crc32c, crc32c_detailed
+from ..merkle import merkle_root
+from .header import HEADER_SIZE, PackHeaderV2
 
 logger = logging.getLogger(__name__)
 
@@ -31,25 +30,21 @@ INDEX_ENTRY_SIZE = 64  # Size of each index entry
 class PackError(Exception):
     """Base exception for pack operations"""
 
-    pass
 
 
 class ChunkNotFoundError(PackError):
     """Raised when a chunk cannot be found in the pack"""
 
-    pass
 
 
 class IntegrityError(PackError):
     """Raised when integrity verification fails"""
 
-    pass
 
 
 class PackFullError(PackError):
     """Raised when pack cannot accept more chunks"""
 
-    pass
 
 
 @dataclass

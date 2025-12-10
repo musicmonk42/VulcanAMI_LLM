@@ -7,13 +7,12 @@ retry logic, presigned URLs, lifecycle management, and object versioning.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
@@ -45,7 +44,6 @@ class UploadResult:
 class S3Error(Exception):
     """Base exception for S3 operations"""
 
-    pass
 
 
 class S3Store:

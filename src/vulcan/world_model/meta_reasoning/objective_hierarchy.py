@@ -13,7 +13,7 @@ Tracks dependencies, conflicts, and priority ordering.
 import logging
 import threading
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 # import numpy as np # Original import

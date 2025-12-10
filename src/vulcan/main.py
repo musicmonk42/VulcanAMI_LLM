@@ -11,6 +11,30 @@
 # ====================================================================
 # PATH + SAFETY SETUP - MUST BE FIRST
 # ====================================================================
+from vulcan.orchestrator import ProductionDeployment
+from vulcan.config import AgentConfig, get_config
+from pydantic_settings import BaseSettings
+from pydantic import BaseModel, ConfigDict, Field
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Request, Response
+import uvicorn
+import numpy as np
+import msgpack
+from unittest.mock import MagicMock
+from typing import Any, Dict, List, Optional
+from threading import Thread
+from contextlib import asynccontextmanager
+import time
+import socket  # <-- ADDED
+import logging
+import json
+import hmac
+import hashlib
+import concurrent.futures
+import asyncio
+import argparse
 import sys
 from pathlib import Path
 
@@ -59,48 +83,17 @@ except Exception:
     pass
 # ====================================================================
 
-import argparse
-import asyncio
-import concurrent.futures
-import hashlib
-import hmac
-import json
-import logging
 # import os (already imported above)
-import socket  # <-- ADDED
-import time
-from collections import defaultdict
-from contextlib import asynccontextmanager
-from threading import Lock, Thread
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock
 
-import msgpack
-import numpy as np
-import uvicorn
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic_settings import BaseSettings
 
-import vulcan.memory
-import vulcan.safety
-import vulcan.semantic_bridge
 # Level 1: Pre-load core modules BEFORE orchestrator
 # This prevents circular import issues during orchestrator initialization
-import vulcan.world_model
 # Level 0: Config (no dependencies)
-from vulcan.config import AgentConfig, ProfileType, get_config, load_profile
 # Level 2: Now safe to import orchestrator (uses already-loaded modules)
-from vulcan.orchestrator import ProductionDeployment
 
 # ============================================================
 # IMPORTS - Ordered to prevent circular dependencies
 # ============================================================
-
-
 
 
 try:
@@ -706,7 +699,7 @@ async def rate_limiting(request: Request, call_next):
     with rate_limit_lock:
         bucket = rate_limit_storage.setdefault(client_id, [])
         # Evict old timestamps
-        rate_limit_storage[client_id] = [t for t in bucket if t > window_start]
+        rate_limit_storage[client_id] = list(bucket if t > window_start)
 
         if len(rate_limit_storage[client_id]) >= settings.rate_limit_requests:
             logger.warning(f"Rate limit exceeded for {client_id}")
@@ -1627,7 +1620,7 @@ def test_resource_limits(deployment: ProductionDeployment) -> bool:
     }
 
     try:
-        result = deployment.step_with_monitoring([], large_context)
+        deployment.step_with_monitoring([], large_context)
 
         status = deployment.get_status()
         memory_usage = status["health"]["memory_usage_mb"]
@@ -1995,7 +1988,7 @@ def benchmark_system(config: AgentConfig, iterations: int = 100) -> Dict[str, An
             "raw_observation": f"Benchmark iteration {i}",
         }
 
-        result = deployment.step_with_monitoring([], context)
+        deployment.step_with_monitoring([], context)
 
         latencies.append((time.time() - iter_start) * 1000)
 
@@ -2239,7 +2232,7 @@ class PerformanceBenchmark:
         }
 
         report_path = f"benchmark_{int(time.time())}.json"
-        with open(report_path, "w") as f:
+        with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, default=str)
 
         logger.info(f"Benchmark report saved to {report_path}")

@@ -15,9 +15,7 @@ import logging
 import threading
 import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -1112,7 +1110,7 @@ class ModelInferenceValidator:
                         }
                     )
 
-        critical_violations = [v for v in violations if v["severity"] == "critical"]
+        critical_violations = list(violations if v["severity") == "critical"]
         safe = len(critical_violations) == 0
 
         return {

@@ -8,8 +8,8 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import (Any, AsyncGenerator, Callable, Dict, Iterable, List,
-                    Optional, Sequence, Tuple, Union)
+from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional,
+                    Sequence, Tuple, Union)
 
 Token = Union[int, str]
 Tokens = List[Token]
@@ -908,7 +908,7 @@ class CognitiveLoop:
             ]
         new_beams: List[Dict[str, Any]] = []
         for exp in range(self.sampling.beam_max_expansions):
-            beams_to_expand = [b for b in self._beam_state if not b["is_finished"]]
+            beams_to_expand = list(self._beam_state if not b["is_finished")]
             if not beams_to_expand and exp > 0:
                 break
             temp_new_beams: List[Dict[str, Any]] = []

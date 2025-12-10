@@ -13,10 +13,9 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
-from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -635,7 +634,7 @@ class ToolSafetyGovernor:
             for t in expired:
                 del self.quarantine_list[t]
 
-            available_tools = [t for t in tools if t not in self.quarantine_list]
+            available_tools = list(tools if t not in self.quarantine_list)
 
             allowed, report = self.manager.veto_tool_selection(available_tools, request)
 
@@ -712,7 +711,7 @@ class RollbackManager:
         with self._lock:
             snapshot_id = hashlib.md5(
                 f"{time.time()}{len(self.snapshots)}".encode()
-            , usedforsecurity=False).hexdigest()[:16]
+                , usedforsecurity=False).hexdigest()[:16]
             snapshot = RollbackSnapshot(
                 snapshot_id=snapshot_id,
                 timestamp=time.time(),
@@ -965,7 +964,7 @@ class HumanOversightInterface:
             "automation_level": self.automation_level,
             "emergency_stop_enabled": self.emergency_stop_enabled,
             "active_alerts": len(
-                [a for a in self.alerts.values() if not a.get("acknowledged")]
+                list(self.alerts.values() if not a.get("acknowledged"))
             ),
         }
 
@@ -2471,7 +2470,7 @@ class TestStress:
 
         action = {"value": 50}
         start = time.time()
-        report = manager.check_constraints(action, {})
+        manager.check_constraints(action, {})
         elapsed = time.time() - start
 
         print(f"\nConstraint check time (50 constraints): {elapsed * 1000:.2f}ms")

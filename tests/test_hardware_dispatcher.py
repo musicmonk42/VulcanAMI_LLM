@@ -112,7 +112,7 @@ class TestCircuitBreaker:
         with pytest.raises(Exception, match="Circuit breaker is open"):
             cb.call(fail_func)
 
-    def test_circuit_half_open(self):
+    def test_circuit_half_open(self, encoding="utf-8"):
         """Test circuit transitions to half-open."""
         cb = CircuitBreaker(failure_threshold=2, timeout=timedelta(milliseconds=100))
 

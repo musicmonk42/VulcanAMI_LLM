@@ -4,13 +4,19 @@
 # FIXED: Added concrete TestTaskQueue implementation for testing base interface
 # ============================================================
 
+from vulcan.orchestrator.task_queues import (CELERY_AVAILABLE, RAY_AVAILABLE,
+                                             ZMQ_AVAILABLE, CeleryTaskQueue,
+                                             CustomTaskQueue, QueueType,
+                                             RayTaskQueue, TaskMetadata,
+                                             TaskQueueInterface, TaskStatus,
+                                             create_task_queue)
 import sys
 import threading
 import time
 import unittest
 from collections import defaultdict
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 # Add src directory to path if needed
 src_path = Path(__file__).parent.parent.parent
@@ -18,12 +24,6 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 # Import components to test
-from vulcan.orchestrator.task_queues import (CELERY_AVAILABLE, RAY_AVAILABLE,
-                                             ZMQ_AVAILABLE, CeleryTaskQueue,
-                                             CustomTaskQueue, QueueType,
-                                             RayTaskQueue, TaskMetadata,
-                                             TaskQueueInterface, TaskStatus,
-                                             create_task_queue)
 
 # ============================================================
 # CONCRETE TEST IMPLEMENTATION
@@ -410,7 +410,6 @@ class TestRayTaskQueue(unittest.TestCase):
 
     def tearDown(self):
         """Clean up after tests"""
-        pass
 
     @patch("vulcan.orchestrator.task_queues.ray")
     def test_initialization(self, mock_ray):

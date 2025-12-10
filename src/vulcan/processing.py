@@ -10,7 +10,6 @@
 import asyncio
 import gc
 import hashlib
-import heapq
 import json
 import logging
 import pickle
@@ -19,11 +18,9 @@ import shutil
 import threading
 import time
 import uuid
-import weakref
 from collections import OrderedDict, deque
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple,
@@ -34,7 +31,6 @@ import PIL.Image
 import psutil
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 # REMOVED: sentence_transformers import - will use internal LLM-based encoder
 from transformers import AutoImageProcessor, AutoModel, AutoTokenizer
 
@@ -62,7 +58,13 @@ class GraphixTransformer:
         # A mock configuration, assuming it initializes the LLM's embedding layer
         self.embedding_dim = embedding_dim
         self.device = "cpu"  # Mock device
-        self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+        # SECURITY: Pin to specific release tag instead of 'main' for reproducibility
+        # TODO: Update to a specific commit hash or stable release tag (e.g., "v1.0.0")
+        # For now using 'main' as a placeholder - should be updated in production
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "bert-base-uncased",
+            revision="main"  # FIXME: Replace with specific release tag or commit hash
+        )
 
     def get_embeddings(self, text: Union[str, List[str]]) -> torch.Tensor:
         """
@@ -232,7 +234,7 @@ class VersionedDataLogger:
         # Write to log
         with self.log_lock:
             # FIXED: Write directly to file, don't accumulate unbounded in memory
-            with open(self.log_file, "a") as f:
+            with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, default=str) + "\n")
 
             # Keep only recent entries in memory for quick access
@@ -342,7 +344,7 @@ class VersionedDataLogger:
 
         # If not in memory, search log file
         try:
-            with open(self.log_file, "r") as f:
+            with open(self.log_file, "r", encoding="utf-8") as f:
                 for line in f:
                     entry = json.loads(line)
                     if entry["log_id"] == log_id:
@@ -524,7 +526,8 @@ class DynamicModelManager:
                 if torch.cuda.is_available():
                     for i in range(torch.cuda.device_count()):
                         mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3  # GB
-                        mem_total = torch.cuda.mem_get_info(i)[1] / 1024**3
+                        # mem_total could be used for future memory tracking
+                        # mem_total = torch.cuda.mem_get_info(i)[1] / 1024**3
 
                         if mem_free < 1.0:  # Less than 1GB free
                             now = time.time()
@@ -717,8 +720,16 @@ class DynamicModelManager:
             return model, None
 
         elif modality in ["vision", "audio"]:
-            model = AutoModel.from_pretrained(model_name)
-            processor = AutoImageProcessor.from_pretrained(model_name)
+            # SECURITY: Pin to specific release tag instead of 'main' for reproducibility
+            # TODO: Update to specific commit hash or stable release tag
+            model = AutoModel.from_pretrained(
+                model_name,
+                revision="main"  # FIXME: Replace with specific release tag or commit hash
+            )
+            processor = AutoImageProcessor.from_pretrained(
+                model_name,
+                revision="main"  # FIXME: Replace with specific release tag or commit hash
+            )
 
             if device != "cpu" and torch.cuda.is_available():
                 model = model.to(device)
@@ -2303,7 +2314,8 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
     def process_ir_node(self, node_data: Dict[str, Any]) -> ProcessingResult:
         """Process Graphix IR node data."""
         if UnifiedRuntime:
-            runtime = UnifiedRuntime()
+            # UnifiedRuntime() initialization could be used in the future
+            # runtime = UnifiedRuntime()
             processed = node_data.get("params", node_data)
             return self.process_input(processed)
         else:

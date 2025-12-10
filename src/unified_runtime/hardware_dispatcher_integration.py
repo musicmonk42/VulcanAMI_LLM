@@ -16,7 +16,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -127,7 +127,7 @@ class HardwareProfileManager:
     def _load_profiles_from_file(self, path: str):
         """Load hardware profiles from JSON file"""
         try:
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             for backend_name, profile_data in data.items():
@@ -344,7 +344,7 @@ class HardwareDispatcherIntegration:
         """
         Main hardware dispatch function with intelligent routing
         """
-        start_time = time.perf_counter()
+        time.perf_counter()
 
         # Check cache
         cache_key = self._compute_cache_key(operation, args, kwargs)
@@ -825,7 +825,7 @@ class HardwareDispatcherIntegration:
 
         # Analyze subgraph
         tensor_size_mb = self._estimate_tensor_size(subgraph)
-        operation_type = self._identify_operation_type(subgraph)
+        self._identify_operation_type(subgraph)
 
         # Determine dispatch strategy based on metrics
         strategy = self._select_strategy(metrics)

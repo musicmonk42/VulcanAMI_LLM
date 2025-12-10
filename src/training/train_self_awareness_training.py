@@ -60,7 +60,6 @@ import time
 from typing import Any, Dict, List
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 
 from src.training.awareness_thresholds import AwarenessThresholds

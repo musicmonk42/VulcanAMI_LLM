@@ -11,9 +11,9 @@ import logging
 import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -652,8 +652,8 @@ class HybridCompaction:
         tasks = []
 
         # Separate packs by strategy
-        tier_packs = [p for p in packs if p.level in self.tier_levels]
-        leveled_packs = [p for p in packs if p.level in self.leveled_levels]
+        tier_packs = list(packs if p.level in self.tier_levels)
+        leveled_packs = list(packs if p.level in self.leveled_levels)
 
         # Apply tiered compaction to lower levels
         if tier_packs:

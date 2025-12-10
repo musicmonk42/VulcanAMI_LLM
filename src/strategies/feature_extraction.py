@@ -5,18 +5,18 @@ Implements hierarchical feature extraction with increasing complexity and cost,
 from simple syntactic features to deep semantic and multimodal analysis.
 """
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+import networkx as nx
 import hashlib
 import json
 import logging
-import pickle
 import re
 import time
 from abc import ABC, abstractmethod
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -60,9 +60,6 @@ except ImportError:
     HAS_NLTK = False
     nltk = None
 
-import networkx as nx
-from sklearn.decomposition import PCA, TruncatedSVD
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
 logger = logging.getLogger(__name__)
 
@@ -106,12 +103,10 @@ class FeatureExtractor(ABC):
     @abstractmethod
     def extract(self, problem: Any) -> np.ndarray:
         """Extract features from problem"""
-        pass
 
     @abstractmethod
     def get_feature_names(self) -> List[str]:
         """Get feature names"""
-        pass
 
 
 class SyntacticFeatureExtractor(FeatureExtractor):
@@ -269,7 +264,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             try:
                 tfidf_features = self.tfidf.fit_transform([structure.text]).toarray()[0]
                 features.extend(tfidf_features[:20])  # Top 20 TF-IDF features
-            except Exception as e:
+            except Exception:
                 features.extend([0.0] * 20)
         else:
             features.extend([0.0] * 20)
@@ -286,7 +281,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and problem:
                 try:
                     structure.tokens = nltk.word_tokenize(problem)
-                except Exception as e:
+                except Exception:
                     structure.tokens = problem.split()
             else:
                 structure.tokens = problem.split() if problem else []
@@ -306,7 +301,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and structure.text:
                 try:
                     structure.tokens = nltk.word_tokenize(structure.text)
-                except Exception as e:
+                except Exception:
                     structure.tokens = structure.text.split()
             else:
                 structure.tokens = structure.text.split() if structure.text else []
@@ -462,7 +457,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
         # Cycles
         try:
             features.append(len(nx.cycle_basis(graph)))
-        except Exception as e:
+        except Exception:
             features.append(0.0)
 
         # Diameter and radius
@@ -567,7 +562,7 @@ class SemanticFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and problem:
                 try:
                     structure.tokens = nltk.word_tokenize(problem)
-                except Exception as e:
+                except Exception:
                     structure.tokens = problem.split()
             else:
                 structure.tokens = problem.split() if problem else []
@@ -579,7 +574,7 @@ class SemanticFeatureExtractor(FeatureExtractor):
             if HAS_NLTK and structure.text:
                 try:
                     structure.tokens = nltk.word_tokenize(structure.text)
-                except Exception as e:
+                except Exception:
                     structure.tokens = structure.text.split()
             else:
                 structure.tokens = structure.text.split() if structure.text else []
@@ -900,7 +895,7 @@ class MultimodalFeatureExtractor(FeatureExtractor):
                         features.append(nx.degree_assortativity_coefficient(G))
                     else:
                         features.append(0.0)
-                except Exception as e:
+                except Exception:
                     features.append(0.0)
 
                 # Spectral properties
@@ -908,7 +903,7 @@ class MultimodalFeatureExtractor(FeatureExtractor):
                     laplacian_eigenvalues = nx.laplacian_spectrum(G)
                     features.append(np.mean(laplacian_eigenvalues))
                     features.append(np.std(laplacian_eigenvalues))
-                except Exception as e:
+                except Exception:
                     features.extend([0.0] * 2)
             else:
                 features.extend([0.0] * 5)

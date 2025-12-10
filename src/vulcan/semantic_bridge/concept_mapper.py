@@ -8,14 +8,13 @@ PRODUCTION-READY: All unbounded data structures fixed with proper limits and evi
 """
 
 import hashlib
-import json
 import logging
 import threading
 import time
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -999,7 +998,7 @@ class ConceptMapper:
         # Factor 3: Measurement consistency
         consistency_scores = []
         for effect_type in effect_types:
-            type_effects = [e for e in effects if e.effect_type == effect_type]
+            type_effects = list(effects if e.effect_type == effect_type)
             if len(type_effects) > 1:
                 # Check pairwise consistency
                 for i, e1 in enumerate(type_effects):

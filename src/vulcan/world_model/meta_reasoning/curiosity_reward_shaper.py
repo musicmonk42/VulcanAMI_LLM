@@ -46,7 +46,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 # import time # Original import
 # import numpy as np # Original import
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 # --- START FIX: Add numpy fallback ---
 # logger = logging.getLogger(__name__) # Original logger placement
@@ -958,7 +958,7 @@ class CuriosityRewardShaper:
 
             # Compute entropy using np.histogram (or fake version)
             hist, _ = _np.histogram(values, bins=10, density=True)
-            hist = [h for h in hist if h > 0]  # Remove zero bins (list comprehension)
+            hist = list(hist if h > 0)  # Remove zero bins (list comprehension)
 
             if len(hist) > 0:
                 # Use np.log2 (or fake version)

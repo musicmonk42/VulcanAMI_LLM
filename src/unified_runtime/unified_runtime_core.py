@@ -6,19 +6,15 @@ FIXED: Proper async/await handling for coroutine shutdown methods
 """
 
 import asyncio
-import hashlib
 import inspect
 import json
 import logging
-import os
-import queue
 import threading
-import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional
 
 # Import all modules (FIXED: relative imports)
 # NOTE: Assuming sibling imports from sibling modules within the 'src.unified_runtime' package
@@ -240,7 +236,7 @@ class UnifiedRuntime:
         self.manifest = {}
         if self.manifest_path.exists():
             try:
-                with open(self.manifest_path, "r") as f:
+                with open(self.manifest_path, "r", encoding="utf-8") as f:
                     self.manifest = json.load(f)
                     logger.info(f"Manifest loaded from {self.manifest_path}")
             except Exception as e:
@@ -417,7 +413,7 @@ class UnifiedRuntime:
         try:
             if self.learned_subgraphs_path.exists():
                 for f in self.learned_subgraphs_path.glob("*.json"):
-                    with open(f, "r") as fh:
+                    with open(f, "r", encoding="utf-8") as fh:
                         data = json.load(fh)
                         # Use 'name' or 'pattern_id' as key
                         key = data.get("name", data.get("pattern_id"))
@@ -451,7 +447,6 @@ class UnifiedRuntime:
         Enable VULCAN integration for this runtime
         """
         try:
-            from .vulcan_integration import VulcanIntegrationConfig
             from .vulcan_integration import \
                 enable_vulcan_integration as enable_vulcan
 

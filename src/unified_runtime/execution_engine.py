@@ -8,17 +8,15 @@ import hashlib
 import json
 import logging
 import math  # Import math
-import queue
 import threading
 import time
-import traceback
 from collections import defaultdict, deque
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import asdict, dataclass, field
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import (Any, AsyncIterator, Callable, Dict, List, Optional, Set,
-                    Tuple, Union)
+                    Union)
 
 try:
     import networkx as nx
@@ -450,7 +448,7 @@ class ExecutionScheduler:
             for dependent in self.dependents.get(node_id, []):
                 in_degree[dependent] += 1
 
-        queue = deque([n for n in self.node_map if in_degree[n] == 0])
+        queue = deque(list(self.node_map if in_degree[n) == 0])
         result = []
 
         while queue:
@@ -1328,7 +1326,7 @@ class ExecutionEngine:
                 try:
                     input_repr = hashlib.md5(
                         json.dumps(input_val, sort_keys=True, default=str).encode()
-                    , usedforsecurity=False).hexdigest()[:8]
+                        , usedforsecurity=False).hexdigest()[:8]
                 except (TypeError, ValueError) as e:
                     # If value can't be hashed, use type representation
                     logger.debug(f"Could not hash input value: {e}")

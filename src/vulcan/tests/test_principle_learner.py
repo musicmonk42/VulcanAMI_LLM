@@ -23,6 +23,16 @@ FIXES APPLIED (corrected version):
 2. Patched these mocks into the principle_learner module before tests run.
 """
 
+from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
+                                                        DecompositionStep,
+                                                        ExecutionOutcome,
+                                                        ProblemGraph)
+from problem_decomposer.principle_learner import (
+    DecompositionToTraceConverter, PrincipleLearner, PrinciplePromoter,
+    PromotionCandidate, integrate_principle_learning)
+from problem_decomposer.decomposition_library import \
+    StratifiedDecompositionLibrary
+import problem_decomposer.principle_learner as principle_learner_module
 import logging
 import shutil
 import sys
@@ -31,10 +41,9 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock, patch
+from typing import Any, Dict, List
+from unittest.mock import Mock, patch
 
-import numpy as np
 import pytest
 
 # Add parent directory to path for imports
@@ -169,7 +178,7 @@ class MockKnowledgePruner:
         return []
 
     def identify_low_quality(self, principles, threshold=0.5):
-        return [p for p in principles if getattr(p, "confidence", 1.0) < threshold]
+        return list(principles if getattr(p, "confidence", 1.0) < threshold)
 
     def identify_outdated(self, knowledge_base, max_age_days=30):
         """Identify outdated principles"""
@@ -178,7 +187,7 @@ class MockKnowledgePruner:
 
     def identify_low_confidence(self, principles, threshold=0.5):
         """Identify low confidence principles"""
-        return [p for p in principles if getattr(p, "confidence", 1.0) < threshold]
+        return list(principles if getattr(p, "confidence", 1.0) < threshold)
 
     def execute_pruning(self, candidates, knowledge_base, threshold=0.7):
         """Execute pruning on candidates"""
@@ -211,7 +220,6 @@ class MockExecutionTrace:
 
 
 # Patch the mocks into the principle_learner module
-import problem_decomposer.principle_learner as principle_learner_module
 
 # Only patch if the real implementations are None
 if principle_learner_module.MetricType is None:
@@ -232,16 +240,7 @@ if principle_learner_module.KnowledgePruner is None:
     principle_learner_module.KnowledgePruner = MockKnowledgePruner
 
 
-from problem_decomposer.decomposition_library import \
-    StratifiedDecompositionLibrary
 # Import components to test (after patching)
-from problem_decomposer.principle_learner import (
-    DecompositionToTraceConverter, PrincipleLearner, PrinciplePromoter,
-    PromotionCandidate, integrate_principle_learning)
-from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
-                                                        DecompositionStep,
-                                                        ExecutionOutcome,
-                                                        ProblemGraph)
 
 # Configure logging
 logging.basicConfig(
@@ -978,7 +977,7 @@ class TestPrincipleLearningIntegration:
 
         # Get initial stats
         initial_stats = learner.get_learning_statistics()
-        initial_extraction = initial_stats["extraction"]["total_extractions"]
+        initial_stats["extraction"]["total_extractions"]
 
         # Attempt learning (may not work if components unavailable)
         try:

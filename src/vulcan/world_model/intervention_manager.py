@@ -9,7 +9,6 @@ IMPLEMENTED: Real-world intervention execution with external system interface
 """
 
 import asyncio
-import json
 import logging
 import threading
 import time
@@ -17,9 +16,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from queue import PriorityQueue
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
@@ -228,17 +226,14 @@ class ExternalSystemInterface(ABC):
         Returns:
             Dictionary with execution results
         """
-        pass
 
     @abstractmethod
     async def check_system_status(self) -> Dict[str, Any]:
         """Check if external system is available and ready"""
-        pass
 
     @abstractmethod
     async def rollback_intervention(self, intervention_id: str) -> bool:
         """Attempt to rollback an intervention"""
-        pass
 
 
 class RESTAPIInterface(ExternalSystemInterface):

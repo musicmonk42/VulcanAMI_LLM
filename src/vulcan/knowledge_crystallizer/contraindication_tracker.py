@@ -3,17 +3,16 @@ contraindication_tracker.py - Contraindication tracking for Knowledge Crystalliz
 Part of the VULCAN-AGI system
 """
 
-import hashlib
 import json
 import logging
 import pickle
 import threading
 import time
 from collections import Counter, defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -532,7 +531,7 @@ class ContraindicationDatabase:
             }
 
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path, "w") as f:
+            with open(save_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
 
             logger.debug("Saved contraindication database to %s", save_path)
@@ -545,7 +544,7 @@ class ContraindicationDatabase:
 
         with self.lock:
             try:
-                with open(load_path, "r") as f:
+                with open(load_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Reconstruct contraindications
@@ -928,7 +927,7 @@ class ContraindicationGraph:
                 else:
                     descendants = self.graph.descendants(principle_id)
                 return set(descendants)
-            except Exception as e:
+            except Exception:
                 return set()
 
     def get_upstream_principles(self, principle_id: str) -> Set[str]:
@@ -952,7 +951,7 @@ class ContraindicationGraph:
                 else:
                     ancestors = self.graph.ancestors(principle_id)
                 return set(ancestors)
-            except Exception as e:
+            except Exception:
                 return set()
 
     def get_impact_path(
@@ -986,7 +985,7 @@ class ContraindicationGraph:
                     total_impact *= impact
 
                 return path, total_impact
-            except Exception as e:
+            except Exception:
                 return [], 0.0
 
     def find_critical_nodes(self, threshold: float = 0.7) -> List[str]:
@@ -1047,7 +1046,7 @@ class ContraindicationGraph:
             }
 
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path.with_suffix(".json"), "w") as f:
+            with open(save_path.with_suffix(".json", encoding="utf-8"), "w") as f:
                 json.dump(data, f, indent=2)
 
             # Save principle objects separately - only picklable ones
@@ -1063,7 +1062,7 @@ class ContraindicationGraph:
                     continue
 
             if picklable_nodes:
-                with open(save_path.with_suffix(".pkl"), "wb") as f:
+                with open(save_path.with_suffix(".pkl", encoding="utf-8"), "wb") as f:
                     pickle.dump(picklable_nodes, f)
 
             logger.debug("Saved contraindication graph to %s", save_path)
@@ -1077,12 +1076,12 @@ class ContraindicationGraph:
         with self.lock:
             try:
                 # Load structure
-                with open(load_path.with_suffix(".json"), "r") as f:
+                with open(load_path.with_suffix(".json", encoding="utf-8"), "r") as f:
                     data = json.load(f)
 
                 # Load principle objects
                 if load_path.with_suffix(".pkl").exists():
-                    with open(load_path.with_suffix(".pkl"), "rb") as f:
+                    with open(load_path.with_suffix(".pkl", encoding="utf-8"), "rb") as f:
                         self.principle_nodes = safe_pickle_load(f)
 
                 # Rebuild graph
@@ -1146,7 +1145,7 @@ class CascadeAnalyzer:
             impact.cascade_depth = max_depth
 
             # Get principle ID
-            principle_id = getattr(candidate, "id", str(candidate))
+            getattr(candidate, "id", str(candidate))
 
             # Find dependent principles
             dependents = self.find_dependent_principles(candidate)

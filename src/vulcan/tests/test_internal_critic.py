@@ -21,19 +21,13 @@
 # - Assertions lean on invariants rather than exact floating numbers where the score composition
 #   depends on multiple weightings.
 
-import math
 import threading
-import time
-import types
-from collections import defaultdict
 
-import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.internal_critic import (
-    ComparisonResult, Critique, CritiqueLevel, Evaluation,
-    EvaluationPerspective, InternalCritic, PerspectiveScore, Risk,
-    RiskCategory, RiskSeverity)
+    ComparisonResult, Evaluation, EvaluationPerspective, InternalCritic,
+    RiskCategory)
 
 # ---------------------------
 # Dependency stubs
@@ -278,8 +272,8 @@ def test_get_evaluation_history_filters_and_ordering(
     critic, good_proposal, risky_proposal, context
 ):
     # Generate multiple evaluations
-    ev1 = critic.evaluate_proposal(good_proposal, context)
-    ev2 = critic.evaluate_proposal(risky_proposal, context)
+    critic.evaluate_proposal(good_proposal, context)
+    critic.evaluate_proposal(risky_proposal, context)
     # Ordering: most recent first
     hist = critic.get_evaluation_history()
     assert len(hist) >= 2

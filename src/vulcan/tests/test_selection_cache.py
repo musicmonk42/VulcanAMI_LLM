@@ -5,25 +5,22 @@ Tests all cache levels, eviction policies, compression, thread safety,
 and the complete SelectionCache API.
 """
 
-import shutil
-import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 # Import the cache module
-from vulcan.reasoning.selection.selection_cache import (CacheEntry, CacheLevel,
-                                                        CacheStatistics,
+from vulcan.reasoning.selection.selection_cache import (CacheEntry, CacheStatistics,
                                                         CompressedCache,
-                                                        EvictionPolicy,
                                                         LRUCache,
                                                         MultiLevelCache,
-                                                        SelectionCache, sizeof)
+                                                        SelectionCache,
+                                                        sizeof)
 
 
 class TestSizeOf:

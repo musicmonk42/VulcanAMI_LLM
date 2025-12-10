@@ -3,7 +3,6 @@ test_semantic_bridge_core.py - PURE MOCK VERSION
 Tests semantic bridge core functionality without spawning threads.
 """
 
-import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -251,7 +250,7 @@ class MockDomainRegistry:
         return 0.5
 
     def get_similar_domains(self, domain_id: str, threshold: float = 0.5) -> List[str]:
-        return [d for d in self.domains if d != domain_id]
+        return list(self.domains if d != domain_id)
 
     def get_related_domains(self, domain_id: str) -> List[str]:
         return list(self.domains.keys())
@@ -514,7 +513,7 @@ class TestConceptOperations:
 
     def test_update_usage(self):
         concept = Concept(pattern_signature="test")
-        initial_rate = concept.success_rate
+        concept.success_rate
         concept.update_usage(True)
         assert concept.usage_count == 1
 

@@ -13,18 +13,15 @@ Tests the intrinsic drive for continuous self-improvement including:
 """
 
 import json
-import os
 import tempfile
 import time
-from collections import defaultdict
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
 from vulcan.world_model.meta_reasoning.self_improvement_drive import (
-    FailureType, ImprovementObjective, SelfImprovementDrive,
-    SelfImprovementState, TriggerType)
+    FailureType, SelfImprovementDrive, SelfImprovementState)
 
 
 @pytest.fixture
@@ -126,7 +123,7 @@ def config_path(temp_dir):
     }
 
     config_file = temp_dir / "intrinsic_drives.json"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         json.dump(config, f)
 
     return str(config_file)
@@ -259,7 +256,7 @@ class TestConfigLoading:
         }
 
         config_file = temp_dir / "bad_config.json"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(bad_config, f)
 
         # Code uses defaults instead of raising error
@@ -270,7 +267,7 @@ class TestConfigLoading:
     def test_malformed_json_uses_defaults(self, temp_dir):
         """Test that malformed JSON falls back to defaults"""
         bad_config_file = temp_dir / "bad.json"
-        with open(bad_config_file, "w") as f:
+        with open(bad_config_file, "w", encoding="utf-8") as f:
             f.write("{ invalid json }")
 
         drive = SelfImprovementDrive(str(bad_config_file), str(temp_dir / "state.json"))
@@ -392,7 +389,7 @@ class TestObjectives:
             "daily_cost_usd": 0.0,
             "monthly_cost_usd": 0.0,
         }
-        with open(unique_state_path, "w") as f:
+        with open(unique_state_path, "w", encoding="utf-8") as f:
             json.dump(state, f)
 
         drive = SelfImprovementDrive(config_path, str(unique_state_path))
@@ -1424,7 +1421,7 @@ class TestEdgeCases:
         }
 
         config_file = temp_dir / "empty_config.json"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config, f)
 
         drive = SelfImprovementDrive(str(config_file), str(temp_dir / "state.json"))
@@ -1468,7 +1465,7 @@ class TestEdgeCases:
         state_path = temp_dir / "state.json"
 
         # Write corrupted JSON
-        with open(state_path, "w") as f:
+        with open(state_path, "w", encoding="utf-8") as f:
             f.write("{ corrupted json }")
 
         # Should fall back to new state
@@ -1491,7 +1488,7 @@ class TestEdgeCases:
         }
 
         config_file = temp_dir / "minimal.json"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             json.dump(minimal_config, f)
 
         # Should handle gracefully with defaults
@@ -1532,7 +1529,7 @@ class TestIntegration:
 
         # 1. Trigger and execute
         context = {"is_startup": True, "other_drives_total_priority": 999.0}
-        action = drive.step(context)
+        drive.step(context)
 
         # 2. Get objective type
         obj_type = drive.state.current_objective

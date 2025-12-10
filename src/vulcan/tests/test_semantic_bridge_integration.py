@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 # ============================================================================

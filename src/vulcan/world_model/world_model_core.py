@@ -24,14 +24,13 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import \
     Path as FilePath  # <-- FIX: Use alias 'FilePath' to avoid name conflict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -326,7 +325,6 @@ def check_component_availability():
 class ComponentIntegrationError(Exception):
     """Raised when critical component integration fails"""
 
-    pass
 
 
 @dataclass
@@ -1345,7 +1343,7 @@ class ConsistencyValidator:
         issues.extend(self._check_calibration_issues())
 
         # SELECT: Determine if auto-fix is needed
-        critical_issues = [i for i in issues if i["severity"] == "high"]
+        critical_issues = list(issues if i["severity") == "high"]
 
         # APPLY: Auto-fix critical issues
         if critical_issues:
@@ -1961,7 +1959,7 @@ class WorldModel:
     def load_manifest(self):
         manifest_path = "D:\\Graphix\\configs\\type_system_manifest.json"
         try:
-            with open(manifest_path, "r") as f:
+            with open(manifest_path, "r", encoding="utf-8") as f:
                 self.type_manifest = json.load(f)
             logger.info("Type system manifest loaded successfully")
         except FileNotFoundError:
@@ -2025,7 +2023,7 @@ class WorldModel:
             "get_safety_stats",
         ]
 
-        missing = [m for m in required_methods if not hasattr(self.safety_validator, m)]
+        missing = list(required_methods if not hasattr(self.safety_validator, m))
 
         if missing:
             logger.error(
@@ -2843,7 +2841,8 @@ class WorldModel:
 
         with self.lock:
             try:
-                negotiator = self.motivational_introspection.objective_hierarchy
+                # Check if objective_hierarchy is available
+                _ = self.motivational_introspection.objective_hierarchy
 
                 return {
                     "status": "success",
@@ -3104,7 +3103,7 @@ class WorldModel:
         state["version"] = getattr(self, "model_version", 1.0)
         state["timestamp"] = time.time()
         temp_path = save_path / "world_model_state.tmp.json"
-        with open(temp_path, "w") as f:
+        with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2, default=str)
         temp_path.rename(save_path / "world_model_state.json")
 
@@ -3128,7 +3127,7 @@ class WorldModel:
                             self.safety_validator.constraint_manager.get_constraint_stats()
                         )
 
-                with open(save_path / "safety_state.json", "w") as f:
+                with open(save_path / "safety_state.json", "w", encoding="utf-8") as f:
                     json.dump(safety_state, f, indent=2, default=str)
             except Exception as e:
                 logger.error("Error saving safety state: %s", e)
@@ -3144,7 +3143,7 @@ class WorldModel:
                     ),
                 }
 
-                with open(save_path / "meta_reasoning_state.json", "w") as f:
+                with open(save_path / "meta_reasoning_state.json", "w", encoding="utf-8") as f:
                     json.dump(meta_reasoning_state, f, indent=2, default=str)
             except Exception as e:
                 logger.error("Error saving meta-reasoning state: %s", e)
@@ -3170,7 +3169,7 @@ class WorldModel:
             logger.warning("No saved state found at %s", load_path)
             return
 
-        with open(load_path / "world_model_state.json", "r") as f:
+        with open(load_path / "world_model_state.json", "r", encoding="utf-8") as f:
             state = json.load(f)
 
         self.model_version = state["model_version"]
@@ -3183,8 +3182,8 @@ class WorldModel:
         # Load safety validator state if available
         if self.safety_validator and (load_path / "safety_state.json").exists():
             try:
-                with open(load_path / "safety_state.json", "r") as f:
-                    safety_state = json.load(f)
+                with open(load_path / "safety_state.json", "r", encoding="utf-8") as f:
+                    json.load(f)
                 logger.info("Safety validator state loaded")
             except Exception as e:
                 logger.error("Error loading safety state: %s", e)
@@ -3195,8 +3194,8 @@ class WorldModel:
             and (load_path / "meta_reasoning_state.json").exists()
         ):
             try:
-                with open(load_path / "meta_reasoning_state.json", "r") as f:
-                    meta_reasoning_state = json.load(f)
+                with open(load_path / "meta_reasoning_state.json", "r", encoding="utf-8") as f:
+                    json.load(f)
                 logger.info("Meta-reasoning state loaded")
             except Exception as e:
                 logger.error("Error loading meta-reasoning state: %s", e)

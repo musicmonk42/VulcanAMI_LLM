@@ -2,29 +2,23 @@
 Test suite for parameter history management module
 """
 
+from vulcan.learning.parameter_history import ParameterHistoryManager
+from vulcan.learning.learning_types import LearningConfig
+import torch.nn as nn
+import numpy as np
+from unittest.mock import patch
+from pathlib import Path
+import time
+import threading
+import tempfile
+import shutil
+import json
 import pytest
 
 # Skip entire module if torch is not available
 torch = pytest.importorskip(
     "torch", reason="PyTorch required for parameter_history tests"
 )
-
-import json
-import pickle
-import queue
-import shutil
-import tempfile
-import threading
-import time
-from collections import deque
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import numpy as np
-import torch.nn as nn
-
-from vulcan.learning.learning_types import LearningConfig, LearningTrajectory
-from vulcan.learning.parameter_history import ParameterHistoryManager
 
 
 class SimpleModel(nn.Module):
@@ -84,7 +78,7 @@ class TestParameterHistoryManager:
         """Test context manager functionality"""
         with ParameterHistoryManager(base_path=temp_dir) as manager:
             # Start trajectory
-            trajectory_id = manager.start_trajectory("task_1", "agent_1")
+            manager.start_trajectory("task_1", "agent_1")
             assert manager.current_trajectory is not None
 
             # Manager should save trajectory on exit
@@ -160,7 +154,7 @@ class TestParameterHistoryManager:
 
         # Should have saved async checkpoint
         checkpoints = manager.list_checkpoints()
-        async_checkpoints = [c for c in checkpoints if c.get("async")]
+        async_checkpoints = list(checkpoints if c.get("async"))
         assert len(async_checkpoints) > 0
 
     def test_async_checkpoint_queue_full(self, manager, model):
@@ -396,7 +390,7 @@ class TestParameterHistoryManager:
         assert export_path.exists()
 
         # Load and verify exported data
-        with open(export_path, "r") as f:
+        with open(export_path, "r", encoding="utf-8") as f:
             exported = json.load(f)
 
         assert "checkpoints" in exported
@@ -427,7 +421,7 @@ class TestParameterHistoryManager:
         }
 
         import_path = Path(temp_dir) / "import.json"
-        with open(import_path, "w") as f:
+        with open(import_path, "w", encoding="utf-8") as f:
             json.dump(export_data, f)
 
         # Import
@@ -435,7 +429,7 @@ class TestParameterHistoryManager:
 
         # Verify imported checkpoints
         checkpoints = manager.list_checkpoints()
-        imported = [c for c in checkpoints if "imported" in c["checkpoint_id"]]
+        imported = list(checkpoints if "imported" in c["checkpoint_id")]
         assert len(imported) == 2
 
     def test_get_statistics(self, manager, model):

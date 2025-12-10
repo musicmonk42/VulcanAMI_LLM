@@ -3,16 +3,12 @@ RLHF (Reinforcement Learning from Human Feedback) and live feedback processing
 """
 
 import asyncio
-import json
 import logging
-import queue
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import aiohttp
 import numpy as np
@@ -1190,7 +1186,6 @@ class LiveFeedbackProcessor:
     async def _notify_retraining(self, info: Dict[str, Any]):
         """Notify external systems about retraining"""
         # This could send to a message queue, webhook, or API
-        pass
 
     def get_performance_summary(self) -> Dict[str, Any]:
         """Get comprehensive performance summary"""

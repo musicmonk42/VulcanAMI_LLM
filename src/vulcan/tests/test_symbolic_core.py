@@ -11,7 +11,6 @@ Tests cover:
 All tests validate the core functionality for symbolic reasoning.
 """
 
-from typing import Any, Dict
 
 import pytest
 

@@ -3,19 +3,6 @@
 # Comprehensive test suite for agent_lifecycle.py
 # ============================================================
 
-import sys
-import time
-import unittest
-from collections import defaultdict
-from pathlib import Path
-from unittest.mock import Mock, patch
-
-# Add src directory to path if needed
-src_path = Path(__file__).parent.parent.parent
-if str(src_path) not in sys.path:
-    sys.path.insert(0, str(src_path))
-
-# Import components to test - Updated import path
 from vulcan.orchestrator.agent_lifecycle import (AgentCapability,
                                                  AgentMetadata, AgentState,
                                                  JobProvenance,
@@ -23,6 +10,17 @@ from vulcan.orchestrator.agent_lifecycle import (AgentCapability,
                                                  create_agent_metadata,
                                                  create_job_provenance,
                                                  validate_state_machine)
+import sys
+import time
+import unittest
+from pathlib import Path
+
+# Add src directory to path if needed
+src_path = Path(__file__).parent.parent.parent
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+# Import components to test - Updated import path
 
 # ============================================================
 # TEST: AGENT STATE ENUM

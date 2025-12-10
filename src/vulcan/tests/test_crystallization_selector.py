@@ -3,10 +3,7 @@ test_crystallization_selector.py - Comprehensive tests for crystallization selec
 Part of the VULCAN-AGI system test suite
 """
 
-import time
-from collections import Counter
-from pathlib import Path
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 
@@ -14,8 +11,8 @@ import pytest
 from vulcan.knowledge_crystallizer.crystallization_selector import (
     AdaptiveStrategy, BatchStrategy, CascadeAwareStrategy,
     CrystallizationMethod, CrystallizationSelector, DomainType, HybridStrategy,
-    IncrementalStrategy, MethodSelection, SelectionStrategy, StandardStrategy,
-    TraceCharacteristics, TraceComplexity)
+    IncrementalStrategy, MethodSelection, StandardStrategy, TraceCharacteristics,
+    TraceComplexity)
 
 # ============================================================================
 # TEST HELPER CLASSES

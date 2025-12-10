@@ -33,7 +33,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 # Optional dependencies with graceful fallback
 try:
@@ -72,19 +72,16 @@ logger = logging.getLogger("Superoptimizer")
 class SuperoptimizerError(Exception):
     """Base exception for superoptimizer errors."""
 
-    pass
 
 
 class KernelGenerationError(SuperoptimizerError):
     """Raised when kernel generation fails."""
 
-    pass
 
 
 class ValidationError(SuperoptimizerError):
     """Raised when kernel validation fails."""
 
-    pass
 
 
 class Superoptimizer:
@@ -764,7 +761,7 @@ Include comments explaining optimizations made.
         with self._cache_lock:
             if cache_file.exists():
                 try:
-                    with open(cache_file, "r") as f:
+                    with open(cache_file, "r", encoding="utf-8") as f:
                         return json.load(f)
                 except Exception as e:
                     logger.warning(f"Failed to load cache: {e}")
@@ -777,7 +774,7 @@ Include comments explaining optimizations made.
 
         with self._cache_lock:
             try:
-                with open(cache_file, "w") as f:
+                with open(cache_file, "w", encoding="utf-8") as f:
                     json.dump(kernel_result, f, indent=2)
             except Exception as e:
                 logger.warning(f"Failed to save cache: {e}")

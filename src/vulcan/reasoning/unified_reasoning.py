@@ -11,7 +11,6 @@ ULTIMATE FIX: Monkey-patch applied at import time, shutdown waits for threads pr
 PRODUCTION FIX: Skips heavy UnifiedRuntime initialization during tests to prevent segfaults.
 """
 
-import json
 import logging
 import os
 import pickle
@@ -19,12 +18,12 @@ import threading
 import time
 import uuid
 from collections import defaultdict, deque
-from concurrent.futures import ThreadPoolExecutor, TimeoutError, as_completed
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -375,7 +374,7 @@ class UnifiedReasoner:
                     "LanguageReasoner"
                 ]()
             if "AbstractReasoner" in reasoning_components:
-                AbstractReasoner = reasoning_components["AbstractReasoner"]
+                reasoning_components["AbstractReasoner"]
                 # self.reasoners[ReasoningType.ABSTRACT] = AbstractReasoner() # This is an abstract class
         except Exception as e:
             logger.error(f"Error initializing core reasoners: {e}")
@@ -1908,7 +1907,7 @@ class UnifiedReasoner:
 
         ensemble_conclusion = self._weighted_voting(conclusions, weights)
         ensemble_confidence = (
-            np.average([r[1].confidence for r in results], weights=[w for w in weights])
+            np.average([r[1].confidence for r in results], weights=list(weights))
             if weights
             else 0.5
         )
@@ -2540,9 +2539,9 @@ class UnifiedReasoner:
                     merged.update(c)
             return merged
         elif all(isinstance(c, (int, float)) for c in conclusions if c is not None):
-            return np.mean([c for c in conclusions if c is not None])
+            return np.mean(list(conclusions if c is not None))
         else:
-            valid_results = [r for r in results if r]
+            valid_results = list(results if r)
             if not valid_results:
                 return None
             max_idx = np.argmax([r.confidence for r in valid_results])

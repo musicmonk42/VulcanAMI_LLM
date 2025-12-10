@@ -3,13 +3,12 @@ test_conflict_resolver.py
 Tests conflict resolver functionality without spawning threads.
 """
 
-import copy
 import threading
 import time
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 from unittest.mock import Mock
 
 import numpy as np
@@ -205,11 +204,11 @@ class MockEvidenceWeightedResolver:
             new_concept = conflict.get("new_concept")
             existing_concepts = conflict.get("existing_concepts", [])
             existing_concept = existing_concepts[0] if existing_concepts else None
-            conflict_type = conflict.get("conflict_type", "overlap")
+            conflict.get("conflict_type", "overlap")
         else:
             new_concept = conflict.new_concept
             existing_concept = conflict.existing_concept
-            conflict_type = conflict.conflict_type
+            conflict.conflict_type
 
         # Calculate evidence weights
         new_weight = self.calculate_evidence_weight(new_concept) if new_concept else 0

@@ -17,35 +17,25 @@ GVulcan/VulcanAMI system with advanced features including:
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
-import hmac
-import ipaddress
 import json
 import logging
 import os
-import re
 import secrets
-import socket
 import sys
 import threading
-import urllib.parse
 import warnings
-from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum, auto
-from functools import lru_cache, wraps
+from datetime import datetime
+from enum import Enum
+from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
-import toml
-import yaml
 
 # Advanced imports for enhanced features
 try:
-    import cryptography.fernet as fernet
+    pass
 
     CRYPTO_AVAILABLE = True
 except ImportError:
@@ -1691,17 +1681,17 @@ class GVulcanConfig:
         path.parent.mkdir(parents=True, exist_ok=True)
 
         if format == "json":
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
         elif format == "yaml":
             import yaml
 
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 yaml.safe_dump(data, f, default_flow_style=False)
         elif format == "toml":
             import toml
 
-            with open(path, "w") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 toml.dump(data, f)
         else:
             raise ValueError(f"Unsupported format: {format}")
@@ -1716,7 +1706,7 @@ class GVulcanConfig:
             ext = path.suffix.lower()
             format = ext[1:] if ext else "json"
 
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             if format == "json":
                 data = json.load(f)
             elif format == "yaml":
@@ -1902,7 +1892,6 @@ class GVulcanConfig:
 
     def auto_tune(self) -> None:
         """Auto-tune configuration based on system resources"""
-        import os
 
         import psutil
 

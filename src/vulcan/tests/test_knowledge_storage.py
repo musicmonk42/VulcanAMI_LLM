@@ -3,8 +3,6 @@ test_knowledge_storage.py - Comprehensive tests for knowledge_storage module
 Part of the VULCAN-AGI system
 """
 
-import json
-import pickle
 import shutil
 import tempfile
 import time
@@ -17,9 +15,8 @@ import pytest
 
 # Import the module under test
 from vulcan.knowledge_crystallizer.knowledge_storage import (
-    CompressionType, IndexEntry, KnowledgeIndex, KnowledgePruner,
-    PrincipleVersion, PruneCandidate, QueryResult, SimpleVectorIndex,
-    StorageBackend, VersionedKnowledgeBase)
+    IndexEntry, KnowledgeIndex, KnowledgePruner, PrincipleVersion,
+    SimpleVectorIndex, StorageBackend, VersionedKnowledgeBase)
 
 
 # Mock Principle class for testing

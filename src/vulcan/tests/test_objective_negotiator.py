@@ -2,11 +2,9 @@
 test_objective_negotiator.py - Unit tests for ObjectiveNegotiator
 """
 
-import time
 from collections import defaultdict
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.objective_negotiator import (
@@ -160,7 +158,7 @@ class TestNegotiateMultiAgentProposals:
         result = negotiator.negotiate_multi_agent_proposals(sample_proposals)
 
         assert isinstance(result, NegotiationResult)
-        assert result.outcome in [e for e in NegotiationOutcome]
+        assert result.outcome in list(NegotiationOutcome)
         assert isinstance(result.agreed_objectives, dict)
 
     def test_negotiate_empty_proposals(self, negotiator):

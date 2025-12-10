@@ -6,22 +6,20 @@ Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
 """
 
 import hashlib
-import json
 import logging
 import threading
 import time
 import warnings
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
 # Optional imports with fallbacks
 try:
-    from scipy import stats
+    pass
 
     SCIPY_AVAILABLE = True
 except ImportError:
@@ -466,10 +464,10 @@ class GapRegistry:
                     "total_gaps_found": self.total_gaps_found,
                     "gaps_by_type": dict(self.gaps_by_type),
                     "active_gaps": len(
-                        [g for g in self.identified_gaps.values() if not g.addressed]
+                        list(self.identified_gaps.values() if not g.addressed)
                     ),
                     "addressed_gaps": len(
-                        [g for g in self.identified_gaps.values() if g.addressed]
+                        list(self.identified_gaps.values() if g.addressed)
                     ),
                     "success_rates": success_rates,
                 }

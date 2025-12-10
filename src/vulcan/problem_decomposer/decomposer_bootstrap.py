@@ -29,7 +29,6 @@ try:
                                            SyntheticBridging)
     from .fallback_chain import FallbackChain
     from .problem_decomposer_core import ProblemDecomposer, ProblemGraph
-    from .problem_executor import ProblemExecutor
 except ImportError as e:
     logging.error(f"Failed to import decomposer components: {e}")
     raise

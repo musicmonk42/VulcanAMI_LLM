@@ -28,14 +28,13 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.api_key import APIKeyHeader
-from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.middleware.wsgi import WSGIMiddleware
 
@@ -106,7 +105,7 @@ class SecretsManager:
 
         # Try AWS Secrets Manager (if boto3 available)
         try:
-            import json
+            pass
 
             import boto3
 
@@ -217,7 +216,7 @@ class UnifiedPlatformSettings(BaseSettings):
                 o.strip() for o in self.cors_origins if isinstance(o, str) and o.strip()
             ]
             # Remove '*' from defaults to enforce explicit allowlist unless user sets it intentionally
-            self.cors_origins = [o for o in self.cors_origins if o != "*"]
+            self.cors_origins = list(self.cors_origins if o != "*")
 
         # Auto-select auth method if not explicitly set: prefer JWT if configured, else API key, else NONE
         if self.auth_method == AuthMethod.NONE:
@@ -592,7 +591,7 @@ async def import_service_async(
         )
 
     # Remove None entries
-    import_strategies = [s for s in import_strategies if s]
+    import_strategies = list(import_strategies if s)
 
     for strategy in import_strategies:
         try:
@@ -840,7 +839,6 @@ async def lifespan(app: FastAPI):
     Lifecycle management for the unified platform.
     Handles startup and graceful shutdown.
     """
-    startup_complete = False
     worker_id = os.getpid()
 
     # ====================================================================
@@ -1084,7 +1082,6 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to start Unified Platform: {e}", exc_info=True)
         raise
 
-    startup_complete = True
 
     try:
         yield

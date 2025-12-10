@@ -30,10 +30,9 @@ import json
 import re
 import time
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import (Any, Callable, Deque, Dict, List, Optional, Set, Tuple,
-                    Union)
+from typing import (Any, Deque, Dict, List, Optional, Tuple, Union)
 
 Token = Union[int, str]
 Candidate = Union[Token, Dict[str, Any]]
@@ -379,7 +378,7 @@ except Exception:
                     if not v.check(out, context):
                         violations.append(type(v).__name__)
                         out = v.get_safe_alternative(out, context)
-                except Exception as e:
+                except Exception:
                     # Log but continue
                     continue
 

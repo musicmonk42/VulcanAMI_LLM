@@ -3,6 +3,7 @@ Semantic Bridge - Cross-domain knowledge transfer and concept mapping system
 Part of the VULCAN-AGI system
 """
 
+import logging
 from .cache_manager import CacheManager
 from .concept_mapper import Concept, ConceptMapper
 from .concept_mapper import EffectType as MapperEffectType
@@ -186,7 +187,6 @@ def get_version_info() -> dict:
 
 
 # Module-level initialization logging
-import logging
 
 logger = logging.getLogger(__name__)
 logger.info(

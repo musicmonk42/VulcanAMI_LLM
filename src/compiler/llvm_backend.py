@@ -6,13 +6,9 @@ Compiles graph nodes to native machine code via LLVM IR
 import ctypes
 import hashlib
 import json
-import os
-import pickle
-import struct
-import tempfile
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List
 
 import llvmlite.binding as llvm
 import llvmlite.ir as ir
@@ -231,7 +227,7 @@ class LLVMBackend:
             json.dumps(
                 {"type": node_type, "params": node_params}, sort_keys=True
             ).encode()
-        , usedforsecurity=False).hexdigest()
+            , usedforsecurity=False).hexdigest()
 
         if cache_key in self.func_cache:
             return self.func_cache[cache_key]
@@ -1068,7 +1064,7 @@ class LLVMBackend:
 
     def _compile_embedding(self, params: Dict) -> CompiledFunction:
         """Compile embedding lookup"""
-        embedding_dim = params.get("embedding_dim", 128)
+        params.get("embedding_dim", 128)
 
         func_type = ir.FunctionType(
             ir.VoidType(),
@@ -1169,7 +1165,7 @@ class LLVMBackend:
 
     def _compile_attention(self, params: Dict) -> CompiledFunction:
         """Compile scaled dot-product attention"""
-        num_heads = params.get("num_heads", 8)
+        params.get("num_heads", 8)
 
         func_type = ir.FunctionType(
             ir.VoidType(),

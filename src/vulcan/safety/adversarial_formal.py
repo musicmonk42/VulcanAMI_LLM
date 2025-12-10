@@ -6,27 +6,20 @@ Tests robustness against attacks and verifies formal safety properties.
 
 import copy
 import hashlib
-import itertools
 import json
 import logging
-import platform
 import random
 import signal
-import sys
 import threading
 import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 from .safety_types import ActionType, SafetyReport, SafetyViolationType
 
@@ -58,7 +51,7 @@ def timeout(seconds):
     if not has_sigalrm:
         # Windows or other systems without SIGALRM - use simple timing
         logger.warning("SIGALRM not available, using simple timeout mechanism")
-        start_time = time.time()
+        time.time()
 
         class TimeoutChecker:
             def __init__(self, timeout_seconds):
@@ -1359,7 +1352,7 @@ class AdversarialValidator:
         patterns = []
 
         # Analyze successful attacks
-        successful_attacks = [r for r in attack_results if r.get("successful", False)]
+        successful_attacks = list(attack_results if r.get("successful", False))
 
         if successful_attacks:
             # Group by attack type

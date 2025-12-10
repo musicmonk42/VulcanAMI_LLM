@@ -308,7 +308,7 @@ class TestGovernanceLoop:
             assert os.path.exists(filepath)
 
             # Verify content
-            with open(filepath) as f:
+            with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
             assert sample_policy.id in data

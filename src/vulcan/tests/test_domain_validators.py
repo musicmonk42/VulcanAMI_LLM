@@ -3,8 +3,6 @@ Comprehensive test suite for domain-specific safety validators.
 Tests validators for causal, prediction, optimization, data processing, and model inference domains.
 """
 
-import time
-from typing import Any, Dict
 
 import numpy as np
 import pytest

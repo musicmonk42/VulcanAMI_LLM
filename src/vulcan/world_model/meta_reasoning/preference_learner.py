@@ -34,11 +34,11 @@ import math  # Import math for log, sqrt
 import random  # Import random for choices, random, normal
 import threading
 import time
-from collections import Counter, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 # import numpy as np # Original import
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 # --- START FIX: Add numpy fallback ---
 # logger = logging.getLogger(__name__) # Original logger placement
@@ -1657,7 +1657,8 @@ class PreferenceLearner:
                     self.preferences[pref_key] = Preference(
                         feature=feature_name,
                         preferred_value=feature_value,  # Store original value
-                        context_conditions=signal.context,  # Associate with current context? Or make context handling more complex? Simple association for now.
+                        # Associate with current context? Or make context handling more complex? Simple association for now.
+                        context_conditions=signal.context,
                     )
                     self.preference_index[feature_name].append(pref_key)
                 else:
@@ -1875,7 +1876,7 @@ class PreferenceLearner:
             len(args) == 3
         ):  # Code signature: _score_option(self, option, features, matching_prefs, context)
             is_test_signature = False
-            features = args[0]
+            args[0]
             matching_prefs = args[1]
             context = args[2]
         else:
@@ -1914,7 +1915,7 @@ class PreferenceLearner:
         scores = []
         weights = []
         confidences = []  # Need to calculate confidence for test signature
-        current_time = time.time()
+        time.time()
 
         for pref in matching_prefs:
             score = pref.get_confidence()  # Base score is preference confidence

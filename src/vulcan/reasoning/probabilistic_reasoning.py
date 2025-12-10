@@ -9,12 +9,12 @@ FULLY IMPLEMENTED VERSION with:
 - Automatic relevance determination (ARD)
 """
 
+from .reasoning_types import ReasoningResult, ReasoningType
+from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
 import hashlib
-import json
 import logging
 import pickle
 import time
-import uuid
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -24,9 +24,7 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
+    pass
 
     TORCH_AVAILABLE = True
 except ImportError:
@@ -36,11 +34,10 @@ except ImportError:
 try:
     from scipy import stats
     from scipy.optimize import differential_evolution, minimize
-    from sklearn.decomposition import PCA, FastICA
+    from sklearn.decomposition import PCA
     from sklearn.feature_selection import mutual_info_regression
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import RBF
-    from sklearn.gaussian_process.kernels import ConstantKernel as C
     from sklearn.gaussian_process.kernels import (ExpSineSquared, Matern,
                                                   RationalQuadratic,
                                                   WhiteKernel)
@@ -53,17 +50,13 @@ except ImportError:
     raise
 
 try:
-    from scipy.special import gamma, kv, logsumexp
-    from scipy.stats import multivariate_normal, norm
+    from scipy.special import gamma, kv
 
     SCIPY_AVAILABLE = True
     from scipy.spatial.distance import cdist
 except ImportError:
     SCIPY_AVAILABLE = False
     logger.warning("scipy not available, some features limited")
-
-from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
-from .reasoning_types import ReasoningResult, ReasoningStep, ReasoningType
 
 
 class FeatureExtractor:
@@ -200,7 +193,7 @@ class FeatureExtractor:
             except Exception:
                 return self._extract_fallback(data)
         elif isinstance(data, dict):
-            values = [v for v in data.values() if isinstance(v, (int, float))]
+            values = list(data.values() if isinstance(v, (int, float)))
             if values:
                 return np.array(values).reshape(1, -1)
 
@@ -266,7 +259,7 @@ class FeatureExtractor:
             # Hash of keys
             key_hash = hashlib.md5(
                 "".join(sorted(str(k) for k in data.keys())).encode()
-            , usedforsecurity=False)
+                , usedforsecurity=False)
             key_hash_int = int(key_hash.hexdigest()[:8], 16)
             features.append(key_hash_int / 1e10)
 

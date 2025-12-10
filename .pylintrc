@@ -1,0 +1,48 @@
+[MASTER]
+# Use multiple processes to speed up Pylint
+jobs=1
+
+# Pickle collected data for later comparisons
+persistent=no
+
+[MESSAGES CONTROL]
+# Disable less critical checks to focus on real issues
+disable=
+    C0114,  # missing-module-docstring
+    C0115,  # missing-class-docstring
+    C0116,  # missing-function-docstring
+    C0103,  # invalid-name (too noisy)
+    C0302,  # too-many-lines
+    R0801,  # duplicate-code
+    R0902,  # too-many-instance-attributes
+    R0903,  # too-few-public-methods
+    R0911,  # too-many-return-statements
+    R0912,  # too-many-branches
+    R0913,  # too-many-arguments
+    R0914,  # too-many-locals
+    R0915,  # too-many-statements
+    W0621,  # redefined-outer-name (too many false positives)
+    W0622,  # redefined-builtin (format in logging)
+    W0613,  # unused-argument (common in implementations)
+    W0718,  # broad-exception-caught (intentional in many cases)
+    C0415,  # import-outside-toplevel (sometimes needed)
+
+# Focus on these important issues:
+enable=
+    E,  # Error
+    F,  # Fatal
+    W0707,  # raise-missing-from
+    W1203,  # logging-fstring-interpolation
+    W1514,  # unspecified-encoding
+    R1705,  # no-else-return
+    R1721,  # unnecessary-comprehension
+
+[FORMAT]
+max-line-length=120
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,db,e,f,G
+
+[DESIGN]
+max-attributes=10
+max-args=10

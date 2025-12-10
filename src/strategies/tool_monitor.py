@@ -7,18 +7,13 @@ health, and resource usage with real-time tracking and trend analysis.
 
 import json
 import logging
-import pickle
-import queue
 import threading
 import time
-import traceback
-import warnings
-from collections import Counter, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import psutil
@@ -590,7 +585,7 @@ class ToolMonitor:
             self.time_series["cpu_usage"].add(cpu_percent)
 
             # Memory usage
-            memory_info = self.process.memory_info()
+            self.process.memory_info()
             memory_percent = self.process.memory_percent()
             self.system_metrics.memory_usage_percent = memory_percent
             self.time_series["memory_usage"].add(memory_percent)
@@ -685,7 +680,7 @@ class ToolMonitor:
             "health_status": self.get_health_status().value,
             "tool_rankings": self.get_tool_rankings(),
             "active_alerts": len(
-                [a for a in self.alerts if time.time() - a.timestamp < 3600]
+                list(self.alerts if time.time() - a.timestamp < 3600)
             ),
             "recent_alerts": [a.to_dict() for a in list(self.alerts)[-10:]],
         }
@@ -832,13 +827,13 @@ class ToolMonitor:
         metrics = self.get_metrics_summary()
 
         if format == "json":
-            with open(export_path, "w") as f:
+            with open(export_path, "w", encoding="utf-8") as f:
                 json.dump(metrics, f, indent=2, default=str)
         elif format == "csv":
             # Export tool metrics as CSV
             import csv
 
-            with open(export_path, "w", newline="") as f:
+            with open(export_path, "w", newline="", encoding="utf-8") as f:
                 if self.tool_metrics:
                     fieldnames = list(
                         next(iter(self.tool_metrics.values())).to_dict().keys()

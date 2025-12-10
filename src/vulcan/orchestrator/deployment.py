@@ -18,6 +18,7 @@
 # FIXED: Multimodal processor key alignment in _load_reasoners
 # FIXED: UnifiedRuntime import (unified_runtime not src.unified_runtime)
 # FIXED: Refactored checkpoint locking to avoid nested RLock acquisition.
+# SECURITY: Replaced pickle.load with safe_pickle_load to prevent deserialization attacks
 # ============================================================
 
 import asyncio
@@ -25,7 +26,6 @@ import json
 import logging
 import os
 import pickle
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +40,7 @@ from .dependencies import (EnhancedCollectiveDeps, print_dependency_report,
 from .metrics import EnhancedMetricsCollector
 from .variants import (AdaptiveOrchestrator, FaultTolerantOrchestrator,
                        ParallelOrchestrator)
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -250,18 +251,18 @@ class ProductionDeployment:
                 print_dependency_report(deps)
 
             # Initialize system state
-            sys = self._create_system_state()
+            system_state = self._create_system_state()
 
             # Create collective with specified orchestrator type
             self.collective = self._create_orchestrator(
-                self.orchestrator_type, sys, deps
+                self.orchestrator_type, system_state, deps
             )
 
             # Load checkpoint if provided
             if checkpoint_path:
                 self._load_checkpoint(checkpoint_path)
 
-            logger.info(f"System initialized with CID: {sys.CID}")
+            logger.info(f"System initialized with CID: {system_state.CID}")
             logger.info(
                 f"Agent pool status: {self.collective.agent_pool.get_pool_status()}"
             )
@@ -574,8 +575,7 @@ class ProductionDeployment:
 
         # Memory - Import from parent directory (vulcan/) with proper config handling
         try:
-            from ..memory import (EpisodicMemory, HierarchicalMemory,
-                                  MemoryIndex, MemoryPersistence, MemorySearch)
+            from ..memory import (EpisodicMemory, MemoryIndex, MemoryPersistence)
 
             # Create memory config with safe attribute access
             try:
@@ -780,9 +780,9 @@ class ProductionDeployment:
             else:
                 policies = {}
 
-            sys = SystemState(CID=f"vulcan_agi_{int(time.time())}", policies=policies)
+            system_state = SystemState(CID=f"vulcan_agi_{int(time.time())}", policies=policies)
 
-            return sys
+            return system_state
 
         except ImportError:
             logger.error("Failed to import SystemState, creating minimal state")
@@ -829,14 +829,14 @@ class ProductionDeployment:
             return MinimalSystemState()
 
     def _create_orchestrator(
-        self, orchestrator_type: str, sys: Any, deps: EnhancedCollectiveDeps
+        self, orchestrator_type: str, system_state: Any, deps: EnhancedCollectiveDeps
     ) -> VULCANAGICollective:
         """
         Create orchestrator of specified type with validation
 
         Args:
             orchestrator_type: Type of orchestrator
-            sys: System state
+            system_state: System state
             deps: Dependencies
 
         Returns:
@@ -855,16 +855,16 @@ class ProductionDeployment:
         # Create appropriate orchestrator
         if orchestrator_type == "parallel":
             logger.info("Creating ParallelOrchestrator")
-            return ParallelOrchestrator(self.config, sys, deps)
+            return ParallelOrchestrator(self.config, system_state, deps)
         elif orchestrator_type == "adaptive":
             logger.info("Creating AdaptiveOrchestrator")
-            return AdaptiveOrchestrator(self.config, sys, deps)
+            return AdaptiveOrchestrator(self.config, system_state, deps)
         elif orchestrator_type == "fault_tolerant":
             logger.info("Creating FaultTolerantOrchestrator")
-            return FaultTolerantOrchestrator(self.config, sys, deps)
+            return FaultTolerantOrchestrator(self.config, system_state, deps)
         else:
             logger.info("Creating basic VULCANAGICollective")
-            return VULCANAGICollective(self.config, sys, deps)
+            return VULCANAGICollective(self.config, system_state, deps)
 
     def step_with_monitoring(
         self, history: List[Any], context: Dict[str, Any]
@@ -1364,13 +1364,14 @@ class ProductionDeployment:
     def _load_checkpoint(self, checkpoint_path: str):
         """
         Load system from checkpoint
+        SECURITY: Use safe_pickle_load to prevent deserialization attacks
 
         Args:
             checkpoint_path: Path to checkpoint file
         """
         try:
-            with open(checkpoint_path, "rb") as f:
-                checkpoint = pickle.load(f)
+            # SECURITY FIX: Use safe_pickle_load instead of pickle.load
+            checkpoint = safe_pickle_load(checkpoint_path)
 
             # Restore system state
             self.collective.sys = checkpoint["system_state"]
@@ -1518,7 +1519,7 @@ class ProductionDeployment:
         try:
             if not self._shutdown_requested:
                 self.shutdown()
-        except Exception as e:
+        except Exception:
             # Avoid errors during interpreter shutdown
             pass  # logger might not be available here
 

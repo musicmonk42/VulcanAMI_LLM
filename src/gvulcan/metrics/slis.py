@@ -11,7 +11,7 @@ import json
 import logging
 import statistics
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
@@ -913,7 +913,7 @@ SLO Warnings: {sum(self.slo_warnings.values())}
             "history": [snapshot.to_dict() for snapshot in self.history],
         }
 
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
         logger.info(f"Saved SLI history to {path}")
@@ -929,7 +929,7 @@ SLO Warnings: {sum(self.slo_warnings.values())}
         Returns:
             Restored SLITracker
         """
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         tracker = cls()

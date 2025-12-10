@@ -127,7 +127,7 @@ from __future__ import annotations
 
 import math
 import statistics
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 # ============================================================
 # Public Export Control
