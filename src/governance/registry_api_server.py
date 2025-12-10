@@ -442,6 +442,25 @@ class DatabaseManager:
                 f"Database schema initialization failed - connection pool issue: {e}"
             )
 
+    # Security: Allowlist for table and column names to prevent SQL injection
+    ALLOWED_TABLES = {
+        'graph_proposals': {'id_column': 'id', 'data_column': 'data'},
+        'lang_proposals': {'id_column': 'id', 'data_column': 'data'},
+        'agents': {'id_column': 'agent_id', 'data_column': 'profile_data'},
+        'audit_log': {'id_column': 'id', 'data_column': 'data'}
+    }
+
+    def _validate_table_name(self, table_name: str) -> str:
+        """Validate table name against allowlist to prevent SQL injection."""
+        if table_name not in self.ALLOWED_TABLES:
+            raise ValueError(f"Invalid table name: {table_name}. Allowed tables: {list(self.ALLOWED_TABLES.keys())}")
+        return table_name
+
+    def _get_column_names(self, table_name: str) -> Dict[str, str]:
+        """Get validated column names for a table."""
+        validated_table = self._validate_table_name(table_name)
+        return self.ALLOWED_TABLES[validated_table]
+
     def _exec_query(self, query, params=(), fetch_one=False, fetch_all=False):
         """Helper to execute a DB query with retries for busy errors."""
         max_retries = 3
@@ -485,11 +504,15 @@ class DatabaseManager:
     # Generic CRUD methods using _exec_query
     def get_record(self, table_name: str, record_id: str) -> Optional[Dict]:
         """Retrieve a record by ID, parsing its JSON data."""
-        id_column = "agent_id" if table_name == "agents" else "id"
-        data_column = "profile_data" if table_name == "agents" else "data"
+        # Validate table name to prevent SQL injection
+        validated_table = self._validate_table_name(table_name)
+        columns = self._get_column_names(validated_table)
+        id_column = columns['id_column']
+        data_column = columns['data_column']
+        
         try:
             row = self._exec_query(
-                f"SELECT {data_column} FROM {table_name} WHERE {id_column} = ?",
+                f"SELECT {data_column} FROM {validated_table} WHERE {id_column} = ?",
                 (record_id,),
                 fetch_one=True,
             )
@@ -498,27 +521,31 @@ class DatabaseManager:
                     return json.loads(row[0])
                 except json.JSONDecodeError as e:
                     self.logger.error(
-                        f"Failed to decode JSON data for {table_name} ID {record_id}: {e}"
+                        f"Failed to decode JSON data for {validated_table} ID {record_id}: {e}"
                     )
                     return None  # Return None if data is corrupt
             return None  # Record not found
         except Exception as e:
             self.logger.error(
-                f"Error getting record {record_id} from {table_name}: {e}"
+                f"Error getting record {record_id} from {validated_table}: {e}"
             )
             return None  # Return None on DB error
 
     def save_record(self, table_name: str, record_id: str, data: Dict):
         """Save or update a record, storing data as JSON."""
-        id_column = "agent_id" if table_name == "agents" else "id"
-        data_column = "profile_data" if table_name == "agents" else "data"
+        # Validate table name to prevent SQL injection
+        validated_table = self._validate_table_name(table_name)
+        columns = self._get_column_names(validated_table)
+        id_column = columns['id_column']
+        data_column = columns['data_column']
+        
         try:
             self._exec_query(
-                f"INSERT OR REPLACE INTO {table_name} ({id_column}, {data_column}) VALUES (?, ?)",
+                f"INSERT OR REPLACE INTO {validated_table} ({id_column}, {data_column}) VALUES (?, ?)",
                 (record_id, json.dumps(data)),
             )
         except Exception as e:
-            self.logger.error(f"Error saving record {record_id} to {table_name}: {e}")
+            self.logger.error(f"Error saving record {record_id} to {validated_table}: {e}")
             # Optionally re-raise depending on desired error handling
 
     def query_records(
@@ -530,12 +557,13 @@ class DatabaseManager:
         offset: int = 0,
     ) -> List[Dict]:
         """Query records with optional filters, limit, and offset, parsing JSON data."""
-        data_column = "profile_data" if table_name == "agents" else "data"
-        id_column = (
-            "agent_id" if table_name == "agents" else "id"
-        )  # Needed for ORDER BY
+        # Validate table name to prevent SQL injection
+        validated_table = self._validate_table_name(table_name)
+        columns = self._get_column_names(validated_table)
+        data_column = columns['data_column']
+        id_column = columns['id_column']
 
-        query = f"SELECT {data_column} FROM {table_name}"
+        query = f"SELECT {data_column} FROM {validated_table}"
         if where_clause:
             query += f" WHERE {where_clause}"
         query += f" ORDER BY {id_column}"  # Add default ordering
@@ -554,11 +582,11 @@ class DatabaseManager:
                             results.append(json.loads(row[0]))
                         except json.JSONDecodeError as e:
                             self.logger.error(
-                                f"Failed to decode record data from {table_name} during query: {e}"
+                                f"Failed to decode record data from {validated_table} during query: {e}"
                             )
                             # Skip corrupted records
         except Exception as e:
-            self.logger.error(f"Error querying records from {table_name}: {e}")
+            self.logger.error(f"Error querying records from {validated_table}: {e}")
             # Return empty list or re-raise depending on desired behavior
         return results
 
