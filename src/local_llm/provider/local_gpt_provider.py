@@ -136,7 +136,7 @@ class LocalGPTProvider:
         if self.dtype != torch.float32:
             self.model = self.model.to(self.dtype)
 
-        ckpt = torch.load(cfg.model_path, map_location=cfg.device)
+        ckpt = torch.load(cfg.model_path, map_location=cfg.device, weights_only=True)
         state_dict = ckpt.get("model", ckpt)
         self.model.load_state_dict(state_dict)
 
