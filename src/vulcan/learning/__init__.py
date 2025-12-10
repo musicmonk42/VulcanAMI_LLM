@@ -12,20 +12,59 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
 
-from .continual_learning import EnhancedContinualLearner
+logger = logging.getLogger(__name__)
+
+# Make torch import conditional to allow module import even without torch
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+    logger.warning("torch not available - continual learning will be disabled")
+
+# Import torch-free components
 from .curriculum_learning import (CurriculumLearner,
                                   LearnedDifficultyEstimator, PacingStrategy)
 from .learning_types import (FeedbackData, LearningConfig, LearningMode,
                              TaskInfo)
-from .meta_learning import MetaLearner, MetaLearningAlgorithm, TaskDetector
-from .metacognition import (CompositionalUnderstanding, MetaCognitiveMonitor)
 from .parameter_history import ParameterHistoryManager
-from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
-from .world_model import PlanningAlgorithm, UnifiedWorldModel
 
-logger = logging.getLogger(__name__)
+# Import torch-dependent components conditionally
+if TORCH_AVAILABLE:
+    try:
+        from .continual_learning import EnhancedContinualLearner
+        from .meta_learning import MetaLearner, MetaLearningAlgorithm, TaskDetector
+        from .metacognition import (CompositionalUnderstanding, MetaCognitiveMonitor)
+        from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
+    except Exception as e:
+        logger.error(f"Failed to import torch-dependent learning components: {e}")
+        EnhancedContinualLearner = None
+        MetaLearner = None
+        MetaLearningAlgorithm = None
+        TaskDetector = None
+        CompositionalUnderstanding = None
+        MetaCognitiveMonitor = None
+        LiveFeedbackProcessor = None
+        RLHFManager = None
+else:
+    EnhancedContinualLearner = None
+    MetaLearner = None
+    MetaLearningAlgorithm = None
+    TaskDetector = None
+    CompositionalUnderstanding = None
+    MetaCognitiveMonitor = None
+    LiveFeedbackProcessor = None
+    RLHFManager = None
+
+# Import world model (no torch dependency)
+try:
+    from .world_model import PlanningAlgorithm, UnifiedWorldModel
+except Exception as e:
+    logger.error(f"Failed to import world model: {e}")
+    PlanningAlgorithm = None
+    UnifiedWorldModel = None
 
 
 class UnifiedLearningSystem:
@@ -52,17 +91,23 @@ class UnifiedLearningSystem:
 
         logger.info("Initializing UnifiedLearningSystem...")
 
-        # Core continual learner
-        self.continual_learner = EnhancedContinualLearner(
-            embedding_dim=embedding_dim,
-            config=self.config,
-            use_hierarchical=True,
-            use_progressive=True,
-        )
+        # Core continual learner (only if torch is available)
+        if TORCH_AVAILABLE and EnhancedContinualLearner:
+            self.continual_learner = EnhancedContinualLearner(
+                embedding_dim=embedding_dim,
+                config=self.config,
+                use_hierarchical=True,
+                use_progressive=True,
+            )
+        else:
+            logger.warning("EnhancedContinualLearner not available (torch not installed)")
+            self.continual_learner = None
 
         # CRITICAL: Connect metacognitive monitor AFTER continual learner is initialized
-        if enable_metacognition:
+        if enable_metacognition and TORCH_AVAILABLE and MetaCognitiveMonitor:
             self._connect_metacognition()
+        else:
+            self.meta_monitor = None
 
         # Initialize curriculum attributes first (FIXED)
         self.curriculum_active = False
