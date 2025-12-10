@@ -173,7 +173,7 @@ class TestMetricRegistration:
 class TestValidationMethods:
     """Test validation methods."""
 
-    @patch('builtins.open', mock_open(read_data='{"test": "data"}', encoding="utf-8"))
+    @patch('builtins.open', mock_open(read_data='{"test": "data"}'))
     def test_load_manifest(self):
         """Test loading manifest."""
         suite = ValidationTestSuite()

@@ -39,10 +39,110 @@ Usage:
         improvement = si_drive.step(context)
 """
 
-from .self_improvement_drive import SelfImprovementDrive
-from .objective_hierarchy import Objective
-from .motivational_introspection import (MotivationalIntrospection,
-                                         ObjectiveStatus)
+from .self_improvement_drive import (
+    SelfImprovementDrive,
+    TriggerType,
+    FailureType,
+    ImprovementObjective,
+    SelfImprovementState,
+)
+from .objective_hierarchy import (
+    Objective,
+    ObjectiveType,
+    ConflictType as HierarchyConflictType,
+    ObjectiveHierarchy,
+)
+from .motivational_introspection import (
+    MotivationalIntrospection,
+    ObjectiveStatus,
+    ObjectiveAnalysis,
+    ProposalValidation,
+)
+from .validation_tracker import (
+    ValidationTracker,
+    ValidationOutcome,
+    ValidationRecord,
+    ValidationPattern,
+    LearningInsight,
+    ObjectiveBlocker,
+    PatternType,
+)
+from .goal_conflict_detector import (
+    GoalConflictDetector,
+    Conflict,
+    ConflictSeverity,
+    ConflictType,
+    MultiObjectiveTension,
+)
+from .counterfactual_objectives import (
+    CounterfactualObjectiveReasoner,
+    CounterfactualOutcome,
+    ObjectiveComparison,
+    ParetoPoint,
+)
+from .objective_negotiator import (
+    ObjectiveNegotiator,
+    AgentProposal,
+    NegotiationResult,
+    NegotiationStrategy,
+    NegotiationOutcome,
+    ConflictResolution,
+)
+from .transparency_interface import (
+    TransparencyInterface,
+    SerializationFormat,
+    TransparencyMetadata,
+)
+from .internal_critic import (
+    InternalCritic,
+    Critique,
+    Risk,
+    PerspectiveScore,
+    Evaluation,
+    ComparisonResult,
+    CritiqueLevel,
+    EvaluationPerspective,
+    RiskCategory,
+    RiskSeverity,
+)
+from .curiosity_reward_shaper import (
+    CuriosityRewardShaper,
+    NoveltyEstimate,
+    EpisodicMemory,
+    CuriosityStatistics,
+    CuriosityMethod,
+    NoveltyLevel,
+)
+from .ethical_boundary_monitor import (
+    EthicalBoundaryMonitor,
+    EthicalBoundary,
+    EthicalViolation,
+    EnforcementAction,
+    BoundaryCategory,
+    ViolationSeverity,
+    EnforcementLevel,
+    BoundaryType,
+)
+from .preference_learner import (
+    PreferenceLearner,
+    Preference,
+    PreferenceSignal,
+    PreferencePrediction,
+    PreferenceSignalType,
+    PreferenceStrength,
+    BanditArm,
+)
+from .value_evolution_tracker import (
+    ValueEvolutionTracker,
+    ValueState,
+    ValueTrajectory,
+    DriftAlert,
+    ValueEvolutionAnalysis,
+    DriftSeverity,
+    TrendDirection,
+    ValueChangeType,
+)
+
 import logging
 
 logger = logging.getLogger(__name__)
