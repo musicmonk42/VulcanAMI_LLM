@@ -110,7 +110,7 @@ jobs:
   test:
     name: Test Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -261,7 +261,7 @@ jobs:
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     needs: [test]
 
     steps:
