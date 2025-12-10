@@ -18,6 +18,7 @@
 # FIXED: Multimodal processor key alignment in _load_reasoners
 # FIXED: UnifiedRuntime import (unified_runtime not src.unified_runtime)
 # FIXED: Refactored checkpoint locking to avoid nested RLock acquisition.
+# SECURITY: Replaced pickle.load with safe_pickle_load to prevent deserialization attacks
 # ============================================================
 
 import asyncio
@@ -40,6 +41,7 @@ from .dependencies import (EnhancedCollectiveDeps, print_dependency_report,
 from .metrics import EnhancedMetricsCollector
 from .variants import (AdaptiveOrchestrator, FaultTolerantOrchestrator,
                        ParallelOrchestrator)
+from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
 
@@ -1364,13 +1366,14 @@ class ProductionDeployment:
     def _load_checkpoint(self, checkpoint_path: str):
         """
         Load system from checkpoint
+        SECURITY: Use safe_pickle_load to prevent deserialization attacks
 
         Args:
             checkpoint_path: Path to checkpoint file
         """
         try:
-            with open(checkpoint_path, "rb") as f:
-                checkpoint = pickle.load(f)
+            # SECURITY FIX: Use safe_pickle_load instead of pickle.load
+            checkpoint = safe_pickle_load(checkpoint_path)
 
             # Restore system state
             self.collective.sys = checkpoint["system_state"]

@@ -34,6 +34,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
+from ..security_fixes import safe_pickle_load
+
 logger = logging.getLogger(__name__)
 
 # Lazy import for safety validator to avoid circular import issues
@@ -2065,15 +2067,16 @@ class WorldModelRouter:
         logger.info(f"Router state saved to {save_path}")
 
     def load_state(self, path: str):
-        """Load router state - FIXED: Merge with defaults and use Path not FilePath"""
+        """Load router state - FIXED: Merge with defaults and use Path not FilePath
+        SECURITY: Use safe_pickle_load to prevent deserialization attacks"""
         load_path = Path(path) / "router_state.pkl"
 
         if not load_path.exists():
             logger.warning(f"No saved state at {load_path}")
             return
 
-        with open(load_path, "rb") as f:
-            state = pickle.load(f)
+        # SECURITY FIX: Use safe_pickle_load instead of pickle.load
+        state = safe_pickle_load(load_path)
 
         self.metrics = defaultdict(int, state["metrics"])
         self.pattern_learner.rules = state["pattern_rules"]
