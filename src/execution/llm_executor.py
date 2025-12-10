@@ -333,11 +333,11 @@ class SafetyValidator:
         self.pattern_filters: List[Callable[[TokenID], bool]] = []
         self.validation_count = 0
 
-    def add_to_black[self, token: TokenID):
+    def add_to_blacklist(self, token: TokenID):
         """Add token to blacklist."""
         self.blacklist.add(token)
 
-    def set_white[self, tokens: Set[TokenID]):
+    def set_whitelist(self, tokens: Set[TokenID]):
         """Set whitelist (None means no whitelist)."""
         self.whitelist = tokens
 

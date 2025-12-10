@@ -859,7 +859,7 @@ class ExplainableGeneration:
         """
         Get top-k alternatives with contrastive analysis.
         """
-        idxs = list(range(len(probs))
+        idxs = list(range(len(probs)))
         idxs.sort(key=lambda i: probs[i], reverse=True)
 
         out: List[AltCandidate] = []
