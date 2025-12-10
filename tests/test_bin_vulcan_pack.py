@@ -198,7 +198,7 @@ class TestVulcanPack:
             os.makedirs(data_dir)
 
             for i in range(3):
-                with open(os.path.join(data_dir, f'file{i}.txt', encoding="utf-8"), 'w') as f:
+                with open(os.path.join(data_dir, f'file{i}.txt'), 'w', encoding="utf-8") as f:
                     f.write(f'test data {i}\n')
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -219,9 +219,9 @@ class TestVulcanPack:
             sub_dir = os.path.join(data_dir, 'subdir')
             os.makedirs(sub_dir)
 
-            with open(os.path.join(data_dir, 'file1.txt', encoding="utf-8"), 'w') as f:
+            with open(os.path.join(data_dir, 'file1.txt'), 'w', encoding="utf-8") as f:
                 f.write('top level\n')
-            with open(os.path.join(sub_dir, 'file2.txt', encoding="utf-8"), 'w') as f:
+            with open(os.path.join(sub_dir, 'file2.txt'), 'w', encoding="utf-8") as f:
                 f.write('sub level\n')
 
             output_file = os.path.join(tmpdir, 'output.pack')
@@ -335,7 +335,7 @@ class TestVulcanPack:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create some data files
             for i in range(3):
-                with open(os.path.join(tmpdir, f'data{i}.txt', encoding="utf-8"), 'w') as f:
+                with open(os.path.join(tmpdir, f'data{i}.txt'), 'w', encoding="utf-8") as f:
                     f.write(f'data {i}\n')
 
             # Create file list

@@ -311,7 +311,7 @@ class TestVulcanPackVerify:
             )
 
             # Corrupt the pack by modifying bytes
-            with open(pack_file, 'r+b', encoding="utf-8") as f:
+            with open(pack_file, 'r+b') as f:
                 f.seek(50)
                 f.write(b'\xFF' * 10)
 

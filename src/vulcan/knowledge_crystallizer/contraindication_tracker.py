@@ -1046,7 +1046,7 @@ class ContraindicationGraph:
             }
 
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path.with_suffix(".json", encoding="utf-8"), "w") as f:
+            with open(save_path.with_suffix(".json"), "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
 
             # Save principle objects separately - only picklable ones
@@ -1062,7 +1062,7 @@ class ContraindicationGraph:
                     continue
 
             if picklable_nodes:
-                with open(save_path.with_suffix(".pkl", encoding="utf-8"), "wb") as f:
+                with open(save_path.with_suffix(".pkl"), "wb") as f:
                     pickle.dump(picklable_nodes, f)
 
             logger.debug("Saved contraindication graph to %s", save_path)
@@ -1076,12 +1076,12 @@ class ContraindicationGraph:
         with self.lock:
             try:
                 # Load structure
-                with open(load_path.with_suffix(".json", encoding="utf-8"), "r") as f:
+                with open(load_path.with_suffix(".json"), "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Load principle objects
                 if load_path.with_suffix(".pkl").exists():
-                    with open(load_path.with_suffix(".pkl", encoding="utf-8"), "rb") as f:
+                    with open(load_path.with_suffix(".pkl"), "rb") as f:
                         self.principle_nodes = safe_pickle_load(f)
 
                 # Rebuild graph

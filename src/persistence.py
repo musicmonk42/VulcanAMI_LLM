@@ -595,7 +595,7 @@ class PersistenceLayer:
 
             db_signature = self._sign_data(db_bytes)
 
-            with open(backup_db_path.with_suffix(".sig", encoding="utf-8"), "w") as f:
+            with open(backup_db_path.with_suffix(".sig"), "w", encoding="utf-8") as f:
                 f.write(db_signature)
 
             logger.info(f"Created signed backup at {backup_db_path}")

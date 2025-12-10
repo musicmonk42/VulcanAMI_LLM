@@ -1633,7 +1633,7 @@ class ProblemExecutor:
                 in_degree[target] += 1
 
         # Find nodes with no incoming edges
-        queue = [item for item in nodes if in_degree[node] == 0]
+        queue = [item for item in nodes if in_degree[item] == 0]
         ordered = []
 
         while queue:
