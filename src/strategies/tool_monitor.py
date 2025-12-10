@@ -680,7 +680,7 @@ class ToolMonitor:
             "health_status": self.get_health_status().value,
             "tool_rankings": self.get_tool_rankings(),
             "active_alerts": len(
-                list(self.alerts if time.time() - a.timestamp < 3600)
+                [a for a in self.alerts if time.time() - a.timestamp < 3600]
             ),
             "recent_alerts": [a.to_dict() for a in list(self.alerts)[-10:]],
         }

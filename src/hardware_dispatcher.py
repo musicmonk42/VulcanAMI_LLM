@@ -640,7 +640,7 @@ class HardwareDispatcher:
 
         backend_stats = {}
         for backend in HardwareBackend:
-            backend_metrics = list(metrics_list if m.backend == backend)
+            backend_metrics = [m for m in metrics_list if m.backend == backend]
             if backend_metrics:
                 backend_stats[backend.value] = {
                     "count": len(backend_metrics),

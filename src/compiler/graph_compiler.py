@@ -701,7 +701,7 @@ class GraphCompiler:
         """Compile a subgraph for fusion"""
         # Extract subgraph
         subgraph = {
-            "nodes": list(graph["nodes") if n["id"] in subgraph_nodes],
+            "nodes": [n for n in graph["nodes"] if n["id"] in subgraph_nodes],
             "edges": [
                 e for e in graph["edges"] if self._edge_in_subgraph(e, subgraph_nodes)
             ],

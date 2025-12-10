@@ -142,7 +142,7 @@ class TestPhysicalConstraints:
 
         # Top throughput devices should generally have lower latency than CPU
         cpu_latency = hardware_profiles["cpu"]["latency_ms"]
-        high_throughput = list(profiles_sorted[:3)]
+        high_throughput = list(profiles_sorted[:3])
 
         for hw_type, profile in high_throughput:
             if hw_type != "cpu":

@@ -279,7 +279,7 @@ class TestComplianceChecks:
         checks = nso_aligner.check_compliance(proposal)
 
         # Should have some failures (PHI protection, Encryption, etc.)
-        failed_checks = list(checks if not c.passed and c.standard in [ComplianceStandard.HIPAA, ComplianceStandard.GDPR)]
+        failed_checks = [c for c in checks if not c.passed and c.standard in [ComplianceStandard.HIPAA, ComplianceStandard.GDPR]]
         assert len(failed_checks) > 0
 
 

@@ -1051,7 +1051,7 @@ class EvolutionEngine:
         child = copy.deepcopy(graph1)
 
         # Remove nodes from subgraph1
-        child["nodes"] = list(child["nodes") if n["id"] not in subgraph1]
+        child["nodes"] = [n for n in child["nodes"] if n["id"] not in subgraph1]
 
         # Add nodes from subgraph2
         nodes_to_add = [

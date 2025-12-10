@@ -2539,9 +2539,9 @@ class UnifiedReasoner:
                     merged.update(c)
             return merged
         elif all(isinstance(c, (int, float)) for c in conclusions if c is not None):
-            return np.mean(list(conclusions if c is not None))
+            return np.mean([c for c in conclusions if c is not None])
         else:
-            valid_results = list(results if r)
+            valid_results = [r for r in results if r]
             if not valid_results:
                 return None
             max_idx = np.argmax([r.confidence for r in valid_results])

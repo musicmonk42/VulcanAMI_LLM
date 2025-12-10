@@ -417,7 +417,7 @@ class TestGraphixArena:
                 assert arena.llm_client is None
 
                 # Check that an error was logged
-                error_records = list(log_records if r.levelno >= logging.ERROR)
+                error_records = [r for r in log_records if r.levelno >= logging.ERROR]
                 assert len(error_records) >= 1, "Expected at least one error log record"
 
                 # Check that the error message includes exception type

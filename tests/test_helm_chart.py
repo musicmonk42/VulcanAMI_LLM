@@ -392,7 +392,7 @@ class TestEnvironmentVariables:
         container = deployment['spec']['template']['spec']['containers'][0]
         env_vars = container.get('env', [])
 
-        secret_vars = list(env_vars if 'valueFrom' in e and 'secretKeyRef' in e.get('valueFrom', {}))
+        secret_vars = [e for e in env_vars if 'valueFrom' in e and 'secretKeyRef' in e.get('valueFrom', {})]
 
         # Should have at least one secret reference (API key)
         assert len(secret_vars) > 0, \
@@ -687,7 +687,7 @@ class TestConfigurationIssues:
         if secret_names:
             # Check if the secrets are defined in the helm chart
             defined_secrets = [doc['metadata']['name'] for doc in helm_chart if doc.get('kind') == 'Secret']
-            undefined_secrets = list(secret_names if s not in defined_secrets)
+            undefined_secrets = [s for s in secret_names if s not in defined_secrets]
 
             if undefined_secrets:
                 pytest.skip(

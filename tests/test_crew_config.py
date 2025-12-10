@@ -313,7 +313,7 @@ class TestAgents:
     def test_human_agent_exists(self, crew_config):
         """Test that at least one human agent exists for escalation."""
         agents = crew_config.get("agents", [])
-        human_agents = list(agents if a.get("agent_type") == "human")
+        human_agents = [a for a in agents if a.get("agent_type") == "human"]
         assert len(human_agents) > 0, "At least one human agent required for escalation"
 
     def test_agent_names_descriptive(self, crew_config):
@@ -377,7 +377,7 @@ class TestAgentComplianceControls:
         agents = crew_config.get("agents", [])
 
         # Check that human agent has AC-5 control
-        human_agents = list(agents if a.get("agent_type") == "human")
+        human_agents = [a for a in agents if a.get("agent_type") == "human"]
         for agent in human_agents:
             controls = [c.get("id") for c in agent.get("compliance_controls", [])]
             assert "AC-5" in controls, \
@@ -815,7 +815,7 @@ class TestLogicalConsistency:
         agents = crew_config.get("agents", [])
         escalation = crew_config.get("escalation_paths", {})
 
-        human_agents = list(agents if a.get("agent_type") == "human")
+        human_agents = [a for a in agents if a.get("agent_type") == "human"]
 
         if escalation:
             assert len(human_agents) > 0, \
