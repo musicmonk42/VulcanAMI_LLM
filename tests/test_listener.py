@@ -370,7 +370,7 @@ class TestGraphixListener:
         """Test initialization with default host and port."""
         listener = GraphixListener(use_mock=True)
 
-        assert listener.host == '0.0.0.0'
+        assert listener.host == '127.0.0.1'
         assert listener.port == 8181
 
     def test_shutdown_event_created(self):
