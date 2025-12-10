@@ -298,7 +298,7 @@ class AdvancedRewardModel:
                     engineered.append(features[i] ** 2)
 
                 # Interaction terms (first few features)
-                for i in range(min(5, len(features)):
+                for i in range(min(5, len(features))):
                     for j in range(i + 1, min(5, len(features)):
                         engineered.append(features[i] * features[j])
 

@@ -463,7 +463,7 @@ class TestThreadSafety:
     def test_concurrent_realign_if_drift(self, embeddings):
         """Stress realign_if_drift with concurrent calls to ensure no races."""
         detector = DriftDetector(dim=128, drift_threshold=0.01)
-        agents = [f"a{i}" for i in range(embeddings.shape[0)])]
+        agents = [f"a{i}" for i in range(embeddings.shape[0])]
 
         # Seed a reference
         detector.track_drift(embeddings)

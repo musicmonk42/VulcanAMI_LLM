@@ -450,7 +450,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(3, self.num_attacks)):
+            for _ in range(min(3, self.num_attacks))):
                 # Generate random gradient direction (simulated)
                 gradient = np.random.randn(*embedding.shape)
                 gradient = gradient / (np.linalg.norm(gradient) + 1e-10)
@@ -494,7 +494,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(2, self.num_attacks)):
+            for _ in range(min(2, self.num_attacks))):
                 perturbed = embedding.copy()
 
                 # Random initialization within epsilon ball
@@ -759,7 +759,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(2, self.num_attacks)):
+            for _ in range(min(2, self.num_attacks))):
                 perturbed = embedding.copy()
 
                 # CRITICAL: Add convergence tracking
@@ -871,7 +871,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(1, self.num_attacks):  # C&W is expensive):
+            for _ in range(min(1, self.num_attacks):  # C&W is expensive)):
                 # Initialize perturbation
                 delta = np.zeros_like(embedding)
 
@@ -965,7 +965,7 @@ class AdversarialValidator:
         if "embedding" in action and action["embedding"] is not None:
             embedding = np.array(action["embedding"])
 
-            for _ in range(min(2, self.num_attacks)):
+            for _ in range(min(2, self.num_attacks))):
                 perturbed = embedding.copy()
                 modified_indices = set()
 
@@ -2286,7 +2286,7 @@ class FormalVerifier:
         # Simplified path exploration
         # In practice, would use SMT solver for constraint satisfaction
 
-        for i in range(min(max_paths, 10)):
+        for i in range(min(max_paths, 10))):
             path = {
                 "path_id": i,
                 "constraints": constraints.copy(),

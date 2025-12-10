@@ -713,7 +713,7 @@ class ContrastiveCausalLoss(CausalLossComputer):
         num_pairs = 0
 
         # Sample pairs of hidden states
-        for i in range(min(len(hidden_states), 20)):
+        for i in range(min(len(hidden_states), 20))):
             for j in range(i + 1, min(len(hidden_states), 20)):
                 if not hidden_states[i] or not hidden_states[j]:
                     continue

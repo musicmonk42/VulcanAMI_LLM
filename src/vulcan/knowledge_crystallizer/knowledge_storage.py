@@ -1591,7 +1591,7 @@ class VersionedKnowledgeBase:
             parts2 = domain2.split("_")
 
             # Common prefix indicates relationship
-            for i in range(min(len(parts1), len(parts2))):
+            for i in range(min(len(parts1), len(parts2)))):
                 if parts1[i] != parts2[i]:
                     return False
             return True

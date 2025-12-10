@@ -47,7 +47,7 @@ except ImportError:
             if len(shape) == 1:
                 return [0.0] * shape[0]
             if len(shape) == 2:
-                return [[0.0] * shape[1] for _ in range(shape[0)])]
+                return [[0.0] * shape[1] for _ in range(shape[0])]
             raise NotImplementedError("FakeNumpy only supports 1D/2D zeros")
 
         # Add other numpy functions used in this file if any

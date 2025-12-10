@@ -524,7 +524,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                     continue
 
                 # Test conditional independence
-                for k in range(min(5, n_vars):  # Limit conditioning set size):
+                for k in range(min(5, n_vars):  # Limit conditioning set size)):
                     if self._test_conditional_independence(
                         data,
                         variable_names[i],

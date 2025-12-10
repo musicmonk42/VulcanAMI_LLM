@@ -1432,7 +1432,7 @@ class IterativeExperimentDesigner:
                 experiments = []
                 current_params = self._get_initial_parameters(gap)
 
-                for iteration in range(min(max_iterations, self.max_iterations)):
+                for iteration in range(min(max_iterations, self.max_iterations))):
                     # EXAMINE & SELECT: Apply learned adjustments
                     current_params = self._apply_learned_adjustments(
                         current_params, gap.type

@@ -773,7 +773,7 @@ class DataAugmentor:
 
                 # Connect to random existing nodes
                 if len(nodes) > 1:
-                    for _ in range(min(3, len(nodes) - 1)):
+                    for _ in range(min(3, len(nodes) - 1))):
                         target = self.rng.choice(
                             [n for n in nodes if n["id"] != adv_node_id]
                         )

@@ -767,7 +767,7 @@ class GovernedTrainer:
                     else:
                         self._add_gradient_structure(tv, sv)
         elif isinstance(target, list) and isinstance(source, list):
-            for i in range(min(len(target), len(source))):
+            for i in range(min(len(target), len(source)))):
                 tv = target[i]
                 sv = source[i]
                 if isinstance(tv, (int, float)) and isinstance(sv, (int, float)):

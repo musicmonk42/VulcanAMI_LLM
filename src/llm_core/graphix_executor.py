@@ -990,7 +990,7 @@ class GraphixExecutor:
         # For simplicity, add a small perturbation to base weights
         # In real impl, would do full matrix multiplication
         perturbed = base_weight[:]
-        for i in range(min(len(perturbed), len(lora_a))):
+        for i in range(min(len(perturbed), len(lora_a)))):
             perturbed[i] += lora_a[i] * scaling * 0.01  # Small perturbation
 
         return perturbed

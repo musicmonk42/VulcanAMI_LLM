@@ -671,7 +671,7 @@ class UnifiedWorldModel(nn.Module):
 
         current_state = initial_state
 
-        for i in range(min(horizon, len(action_sequence)):
+        for i in range(min(horizon, len(action_sequence))):
             action = action_sequence[i].to(self.device)
 
             # FIXED: Ensure action has batch dimension

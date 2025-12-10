@@ -413,7 +413,7 @@ class InterpretabilityEngine:
                 flat_gradients = gradients.flatten()
                 flat_tensor = tensor.flatten()
 
-                for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE)):
+                for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE))):
                     # Perturb element
                     perturbed_flat = flat_tensor.copy()
                     perturbed_flat[i] += epsilon
@@ -570,7 +570,7 @@ class InterpretabilityEngine:
         flat_gradients = gradients.flatten()
         flat_tensor = tensor.flatten()
 
-        for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE)):
+        for i in range(min(flat_tensor.size, MAX_TENSOR_SIZE))):
             # Perturb
             perturbed_flat = flat_tensor.copy()
             perturbed_flat[i] += epsilon

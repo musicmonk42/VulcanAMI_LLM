@@ -1750,7 +1750,7 @@ async def search_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
         1 if params.get("direction", "minimize") == "minimize" else -1
     )
 
-    for trial_idx in range(min(n_trials, 5):  # Limit random search trials):
+    for trial_idx in range(min(n_trials, 5):  # Limit random search trials)):
         trial_params = {}
         for node_id, hp_config in hyperparams.items():
             # Simplified random sampling

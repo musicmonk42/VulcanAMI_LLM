@@ -710,7 +710,7 @@ class GraphGenerator:
         # Generate levels
         for level in range(1, levels):
             nodes_in_level = len(level_nodes[level - 1]) * branching_factor
-            for _ in range(min(nodes_in_level, num_nodes - node_counter)):
+            for _ in range(min(nodes_in_level, num_nodes - node_counter))):
                 node = self._create_node(f"node_{node_counter}",
                                        node_type="ComputeNode" if level < levels - 1 else "OutputNode")
                 node["level"] = level

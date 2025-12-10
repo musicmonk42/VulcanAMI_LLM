@@ -443,7 +443,7 @@ class MemristorEmulator:
             else:
                 normalized = np.ones_like(matrix) * 0.5
 
-            for i in range(min(self.rows, matrix.shape[0)]))
+            for i in range(min(self.rows, matrix.shape[0]))
                 for j in range(min(self.cols, matrix.shape[1)]))
                     self.write(i, j, normalized[i, j])
 
@@ -920,7 +920,7 @@ class AnalogPhotonicEmulator:
                     tensor = torch.complex(tensor_h, tensor_v)
 
             elif mode == MultiplexingMode.MODE:
-                for i in range(min(3, tensor.shape[0)]))
+                for i in range(min(3, tensor.shape[0]))
                     if tensor.shape[-1] > 0:
                         mode_profile = self.waveguide.mode_profile(
                             np.linspace(-1, 1, tensor.shape[-1]), i
