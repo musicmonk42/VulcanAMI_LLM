@@ -454,11 +454,14 @@ class TestPathEffectCalculator:
     def test_effect_with_noise(self, effect_calculator, simple_path):
         """Test effect calculation with noise"""
         # Use a specific seed that ensures variation is detected
+        # Set seed right before the loop to ensure isolation from other tests
         np.random.seed(TEST_RANDOM_SEED)
 
         context = {"add_noise": True, "noise_level": 0.1}
 
         effects = []
+        # Reset seed again to ensure consistent starting state
+        np.random.seed(TEST_RANDOM_SEED)
         for _ in range(100):  # Increase samples for more reliable variation detection
             effect = effect_calculator.calculate_path_effect(simple_path, 1.0, context)
             effects.append(effect)
@@ -655,6 +658,7 @@ class TestMonteCarloSampler:
     def test_sample_variations(self, sampler, simple_path):
         """Test that samples have variations"""
         # Use a specific seed that ensures variation is detected
+        # Set seed right before sampling to ensure isolation from other tests
         np.random.seed(TEST_RANDOM_SEED)
 
         cluster = PathCluster(
@@ -663,6 +667,8 @@ class TestMonteCarloSampler:
             representative_path=simple_path,
         )
 
+        # Reset seed again to ensure consistent starting state
+        np.random.seed(TEST_RANDOM_SEED)
         samples = sampler.sample_from_cluster(
             cluster, n_samples=100
         )  # Increase samples

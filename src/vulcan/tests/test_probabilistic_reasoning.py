@@ -379,6 +379,8 @@ class TestActiveLearning:
         observations = [(x, y_val) for x, y_val in zip(X, y)]
         basic_reasoner.update_beliefs_batch(observations)
 
+        # Reset random seed to ensure consistent behavior regardless of test order
+        np.random.seed(42)
         test_point = np.array([[5.5]])
         mes = basic_reasoner.max_value_entropy_search(test_point)
 
