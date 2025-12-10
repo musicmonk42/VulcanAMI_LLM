@@ -25,12 +25,33 @@ logger = logging.getLogger(__name__)
 # Learning dependencies tracking dictionary (keep general learning deps here)
 learning_deps = {}
 
+# Distributed dependencies tracking dictionary
+distributed_deps = {}
+
 # Meta-Reasoning dependencies tracking dictionary
 meta_reasoning_deps = {}
 
+# Learning Component Imports
+try:
+    from vulcan.learning.continual_learning import ContinualLearner
+
+    learning_deps["continual"] = True
+except ImportError as e:
+    logger.debug(f"Failed to import ContinualLearner: {e}")
+    learning_deps["continual"] = False
+
+# Distributed Component Imports
+try:
+    from vulcan.planning import DistributedCoordinator
+
+    distributed_deps["distributed"] = True
+except ImportError as e:
+    logger.debug(f"Failed to import DistributedCoordinator: {e}")
+    distributed_deps["distributed"] = False
+
 # Meta-Reasoning Component Imports
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
 
     meta_reasoning_deps["self_improvement_drive"] = True
 except ImportError as e:
@@ -40,7 +61,7 @@ except ImportError as e:
     meta_reasoning_deps["self_improvement_drive"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.motivational_introspection import MotivationalIntrospection
 
     meta_reasoning_deps["motivational_introspection"] = True
 except ImportError as e:
@@ -48,7 +69,7 @@ except ImportError as e:
     meta_reasoning_deps["motivational_introspection"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.objective_hierarchy import ObjectiveHierarchy
 
     meta_reasoning_deps["objective_hierarchy"] = True
 except ImportError as e:
@@ -56,7 +77,7 @@ except ImportError as e:
     meta_reasoning_deps["objective_hierarchy"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.objective_negotiator import ObjectiveNegotiator
 
     meta_reasoning_deps["objective_negotiator"] = True
 except ImportError as e:
@@ -64,7 +85,7 @@ except ImportError as e:
     meta_reasoning_deps["objective_negotiator"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.goal_conflict_detector import GoalConflictDetector
 
     meta_reasoning_deps["goal_conflict_detector"] = True
 except ImportError as e:
@@ -72,7 +93,7 @@ except ImportError as e:
     meta_reasoning_deps["goal_conflict_detector"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.preference_learner import PreferenceLearner
 
     meta_reasoning_deps["preference_learner"] = True
 except ImportError as e:
@@ -80,7 +101,7 @@ except ImportError as e:
     meta_reasoning_deps["preference_learner"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.value_evolution_tracker import ValueEvolutionTracker
 
     meta_reasoning_deps["value_evolution_tracker"] = True
 except ImportError as e:
@@ -88,7 +109,7 @@ except ImportError as e:
     meta_reasoning_deps["value_evolution_tracker"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import EthicalBoundaryMonitor
 
     meta_reasoning_deps["ethical_boundary_monitor"] = True
 except ImportError as e:
@@ -96,7 +117,7 @@ except ImportError as e:
     meta_reasoning_deps["ethical_boundary_monitor"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import CuriosityRewardShaper
 
     meta_reasoning_deps["curiosity_reward_shaper"] = True
 except ImportError as e:
@@ -104,7 +125,7 @@ except ImportError as e:
     meta_reasoning_deps["curiosity_reward_shaper"] = False
 
 try:
-    pass
+    from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
 
     meta_reasoning_deps["internal_critic"] = True
 except ImportError as e:
@@ -113,14 +134,12 @@ except ImportError as e:
 
 # Assuming these are classes based on user request - adjust if they are functions/modules
 try:
-    # Assuming 'auto_apply_policy' refers to a component responsible for this
-    # Adjust the import path and class name as needed
-    from vulcan.world_model.meta_reasoning.policy_manager import \
-        AutoApplyPolicy  # Placeholder
+    # Import the Policy class and load_policy function from auto_apply_policy module
+    from vulcan.world_model.meta_reasoning.auto_apply_policy import Policy, load_policy
 
     meta_reasoning_deps["auto_apply_policy"] = True
 except ImportError as e:
-    logger.debug(f"Failed to import AutoApplyPolicy (or similar): {e}")
+    logger.debug(f"Failed to import auto_apply_policy module: {e}")
     meta_reasoning_deps["auto_apply_policy"] = False
 
 try:
@@ -146,14 +165,13 @@ except ImportError as e:
     meta_reasoning_deps["transparency_interface"] = False
 
 try:
-    # Assuming 'counterfactual_objectives' refers to a component
-    # Adjust the import path and class name as needed
+    # Import CounterfactualObjectiveReasoner from counterfactual_objectives
     from vulcan.world_model.meta_reasoning.counterfactual_objectives import \
-        CounterfactualObjectives  # Placeholder
+        CounterfactualObjectiveReasoner
 
     meta_reasoning_deps["counterfactual_objectives"] = True
 except ImportError as e:
-    logger.debug(f"Failed to import CounterfactualObjectives: {e}")
+    logger.debug(f"Failed to import CounterfactualObjectiveReasoner: {e}")
     meta_reasoning_deps["counterfactual_objectives"] = False
 
 # ============================================================
@@ -506,10 +524,20 @@ class EnhancedCollectiveDeps:
             else:
                 if category not in missing:
                     missing[category] = []  # Ensure category exists
-                # Check if it's a meta-reasoning component that might not be imported
+                # Check if it's a component that might not be imported
                 if (
                     category == DependencyCategory.META_REASONING
                     and not meta_reasoning_deps.get(field_name, True)
+                ):
+                    missing[category].append(f"{field_name} (import failed)")
+                elif (
+                    category == DependencyCategory.LEARNING
+                    and not learning_deps.get(field_name, True)
+                ):
+                    missing[category].append(f"{field_name} (import failed)")
+                elif (
+                    category == DependencyCategory.DISTRIBUTED
+                    and not distributed_deps.get(field_name, True)
                 ):
                     missing[category].append(f"{field_name} (import failed)")
                 else:
@@ -543,7 +571,9 @@ class EnhancedCollectiveDeps:
             "self_improvement_enabled": self_improvement_enabled,
             "available_by_category": available,
             "missing_by_category": missing,
-            "meta_reasoning_import_status": meta_reasoning_deps,  # Include the import status
+            "learning_import_status": learning_deps,  # Include learning import status
+            "distributed_import_status": distributed_deps,  # Include distributed import status
+            "meta_reasoning_import_status": meta_reasoning_deps,  # Include meta-reasoning import status
         }
 
     def get_available_components(self) -> Set[str]:
@@ -934,18 +964,38 @@ def print_dependency_report(deps: EnhancedCollectiveDeps):
     )
 
     safe_print("\n" + "-" * 60)
-    safe_print("META-REASONING IMPORT STATUS:")
+    safe_print("IMPORT STATUS BY CATEGORY:")
     safe_print("-" * 60)
-    # Use the dedicated meta-reasoning import status dict
+    
+    # Learning import status
+    learning_import_status = status.get("learning_import_status", {})
+    if learning_import_status:
+        safe_print("\nLEARNING:")
+        for component, is_imported in learning_import_status.items():
+            symbol = get_status_symbol(is_imported)
+            safe_print(
+                f"  {symbol} {component}: {'Import OK' if is_imported else 'Import FAILED'}"
+            )
+    
+    # Distributed import status
+    distributed_import_status = status.get("distributed_import_status", {})
+    if distributed_import_status:
+        safe_print("\nDISTRIBUTED:")
+        for component, is_imported in distributed_import_status.items():
+            symbol = get_status_symbol(is_imported)
+            safe_print(
+                f"  {symbol} {component}: {'Import OK' if is_imported else 'Import FAILED'}"
+            )
+    
+    # Meta-reasoning import status
     mr_import_status = status.get("meta_reasoning_import_status", {})
     if mr_import_status:
+        safe_print("\nMETA_REASONING:")
         for component, is_imported in mr_import_status.items():
             symbol = get_status_symbol(is_imported)
             safe_print(
                 f"  {symbol} {component}: {'Import OK' if is_imported else 'Import FAILED'}"
             )
-    else:
-        safe_print("  (No meta-reasoning components tracked)")
 
     safe_print("\n" + "-" * 60)
     safe_print("AVAILABLE DEPENDENCIES BY CATEGORY:")
@@ -988,6 +1038,7 @@ __all__ = [
     "print_dependency_report",
     "safe_print",
     "get_status_symbol",
-    "learning_deps",  # Keep if used for general learning deps
-    "meta_reasoning_deps",  # Export the meta-reasoning dependencies status
+    "learning_deps",  # Export learning dependencies status
+    "distributed_deps",  # Export distributed dependencies status
+    "meta_reasoning_deps",  # Export meta-reasoning dependencies status
 ]
