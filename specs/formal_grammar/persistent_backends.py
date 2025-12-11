@@ -45,14 +45,18 @@ class FileSystemBackend:
         self.logger.info(f"FileSystemBackend initialized at {self.storage_dir}")
     
     def _get_data_path(self, key: str) -> Path:
-        """Get path for data file"""
-        # Sanitize key for file system
-        safe_key = key.replace("/", "_").replace("\\", "_")
+        """Get path for data file with secure sanitization"""
+        # Use SHA-256 hash of key to avoid filesystem injection attacks
+        # This prevents: directory traversal, null bytes, control characters, path injection
+        import hashlib
+        safe_key = hashlib.sha256(key.encode('utf-8')).hexdigest()
         return self.data_dir / f"{safe_key}.json"
     
     def _get_audit_path(self, key: str) -> Path:
-        """Get path for audit log file"""
-        safe_key = key.replace("/", "_").replace("\\", "_")
+        """Get path for audit log file with secure sanitization"""
+        # Use SHA-256 hash of key to avoid filesystem injection attacks
+        import hashlib
+        safe_key = hashlib.sha256(key.encode('utf-8')).hexdigest()
         return self.audit_dir / f"{safe_key}_audit.json"
     
     def load_data(self, key: str) -> Optional[Dict]:

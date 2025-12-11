@@ -82,25 +82,16 @@ class ProductionKMS:
             except Exception as e:
                 self.logger.error(f"Failed to decode master key: {e}")
         
-        # Generate new master key if not in environment
-        self.logger.warning(
-            f"No master key found in environment variable {env_var}, "
-            f"generating new key (WARNING: old keys will not be readable)"
+        # SECURITY: Fail securely if master key not in environment
+        self.logger.error(
+            f"CRITICAL SECURITY ERROR: No master key found in environment variable {env_var}. "
+            f"KMS cannot operate securely without a master key from environment."
         )
-        
-        master_key = os.urandom(32)  # 256-bit key
-        
-        # Save to a secure file for persistence
-        master_key_file = self.keystore_path / ".master_key"
-        master_key_file.write_bytes(master_key)
-        os.chmod(master_key_file, 0o600)  # Only owner can read
-        
-        self.logger.warning(
-            f"Generated new master key and saved to {master_key_file}. "
-            f"For production, set {env_var} environment variable and delete this file."
+        raise ValueError(
+            f"Master key must be provided via {env_var} environment variable. "
+            f"Generate a secure key with: python -c 'import os,base64; "
+            f"print(base64.b64encode(os.urandom(32)).decode())' and set it as {env_var}"
         )
-        
-        return master_key
     
     def _encrypt_data(self, data: bytes) -> bytes:
         """Encrypt data using master key"""
@@ -127,7 +118,7 @@ class ProductionKMS:
         return iv + encrypted
     
     def _decrypt_data(self, encrypted_data: bytes) -> bytes:
-        """Decrypt data using master key"""
+        """Decrypt data using master key with padding oracle attack protection"""
         # Extract IV
         iv = encrypted_data[:16]
         encrypted = encrypted_data[16:]
@@ -143,8 +134,18 @@ class ProductionKMS:
         decryptor = cipher.decryptor()
         padded_data = decryptor.update(encrypted) + decryptor.finalize()
         
-        # Remove padding
+        # Remove padding with validation to prevent padding oracle attacks
         padding_length = padded_data[-1]
+        
+        # Validate padding
+        if padding_length == 0 or padding_length > 16:
+            raise ValueError("Invalid padding length")
+        
+        # Verify all padding bytes match the padding length
+        padding_bytes = padded_data[-padding_length:]
+        if not all(byte == padding_length for byte in padding_bytes):
+            raise ValueError("Invalid padding bytes - potential padding oracle attack")
+        
         data = padded_data[:-padding_length]
         
         return data

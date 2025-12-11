@@ -957,15 +957,40 @@ class DeepOptimizationEngine:
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Compute gradients (simplified placeholder)
+        Compute gradients
         
-        In production, this would use actual backpropagation
+        WARNING: This is a placeholder implementation for testing/development.
+        In production, this MUST be replaced with actual backpropagation through
+        the computation graph. Use PyTorch autograd or manual gradient computation.
+        
+        Args:
+            parameters: Parameters to compute gradients for
+            loss: Loss value
+            context: Optional context (should include computation graph)
+            
+        Returns:
+            Dictionary of gradients
+            
+        Raises:
+            NotImplementedError: Always raises in strict mode to prevent accidental use
         """
+        # Check if we're in strict production mode
+        if context and context.get("strict_mode", False):
+            raise NotImplementedError(
+                "compute_gradients must be implemented with actual backpropagation "
+                "for production use. This placeholder implementation should not be used."
+            )
+        
+        logger.warning(
+            "Using placeholder gradient computation. "
+            "This should be replaced with actual backpropagation in production."
+        )
+        
         gradients = {}
         
         for key, param in parameters.items():
             # Placeholder: use small random gradient
-            # Real implementation would compute actual gradients
+            # Real implementation would compute actual gradients via autograd
             if isinstance(param, (int, float)):
                 gradients[key] = 0.001 * loss
             elif TORCH_AVAILABLE and isinstance(param, torch.Tensor):

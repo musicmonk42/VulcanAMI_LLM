@@ -687,38 +687,38 @@ class NeuralSystemOptimizer:
             # Create hash from weights, rules, and objectives
             components = []
             
-            # Add weights hash
+            # Add weights hash using SHA-256 for security
             if TORCH_AVAILABLE and isinstance(weights, torch.Tensor):
-                weights_hash = hashlib.md5(
-                    weights.cpu().numpy().tobytes(), usedforsecurity=False
-                ).hexdigest()[:16]
+                weights_hash = hashlib.sha256(
+                    weights.cpu().numpy().tobytes()
+                ).hexdigest()[:32]
             elif isinstance(weights, np.ndarray):
-                weights_hash = hashlib.md5(
-                    weights.tobytes(), usedforsecurity=False
-                ).hexdigest()[:16]
+                weights_hash = hashlib.sha256(
+                    weights.tobytes()
+                ).hexdigest()[:32]
             else:
-                weights_hash = hashlib.md5(
-                    str(weights).encode(), usedforsecurity=False
-                ).hexdigest()[:16]
+                weights_hash = hashlib.sha256(
+                    str(weights).encode()
+                ).hexdigest()[:32]
             components.append(weights_hash)
             
-            # Add rules hash
+            # Add rules hash using SHA-256
             rules_str = json.dumps([r.to_dict() for r in rules], sort_keys=True)
-            rules_hash = hashlib.md5(rules_str.encode(), usedforsecurity=False).hexdigest()[:16]
+            rules_hash = hashlib.sha256(rules_str.encode()).hexdigest()[:32]
             components.append(rules_hash)
             
-            # Add objectives hash
+            # Add objectives hash using SHA-256
             objectives_str = json.dumps([obj.value for obj in objectives], sort_keys=True)
-            objectives_hash = hashlib.md5(
-                objectives_str.encode(), usedforsecurity=False
-            ).hexdigest()[:16]
+            objectives_hash = hashlib.sha256(
+                objectives_str.encode()
+            ).hexdigest()[:32]
             components.append(objectives_hash)
             
             return "_".join(components)
         
         except Exception as e:
             logger.warning(f"Cache key computation failed: {e}")
-            return hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()
+            return hashlib.sha256(str(time.time()).encode()).hexdigest()
     
     def _update_stats(self, result: OptimizationResult):
         """Update optimization statistics"""
