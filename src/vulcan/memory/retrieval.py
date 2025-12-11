@@ -257,8 +257,6 @@ class MemoryIndex:
         # Move to GPU if requested and available
         if self.use_gpu:
             try:
-                import faiss.contrib.torch_utils
-
                 res = faiss.StandardGpuResources()
                 index = faiss.index_cpu_to_gpu(res, 0, index)
                 logger.info("Using GPU for FAISS index")
