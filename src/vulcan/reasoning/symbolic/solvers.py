@@ -339,7 +339,9 @@ class GaussianCPD:
     def sample(self, parent_values: Dict[str, float]) -> float:
         """Sample from the distribution given parent values."""
         mean = self.mean(parent_values)
-        return np.random.normal(mean, math.sqrt(self.variance))
+        # Use default_rng() for independent random state
+        rng = np.random.default_rng()
+        return float(rng.normal(mean, math.sqrt(self.variance)))
 
 
 # ============================================================================
@@ -1087,63 +1089,65 @@ class BayesianNetworkReasoner:
     def _learn_gaussian_cpd_mle(self, var_name: str, data: List[Dict[str, Any]]):
         """Learn Gaussian CPD using linear regression."""
         var = self.variables[var_name]
-
-        if not var.parents:
-            # No parents - just compute mean and variance
-            values = [sample[var_name] for sample in data if var_name in sample]
-            mean = np.mean(values)
-            variance = np.var(values)
-
-            self.set_gaussian_cpd(var_name, {}, mean, variance)
+        parents = var.parents
+        
+        # Extract target values
+        Y = np.array([d[var_name] for d in data if var_name in d])
+        
+        if len(Y) == 0:
+            # Default parameters if no data
+            self.gaussian_cpds[var_name] = GaussianCPD(
+                variable=var_name,
+                parents=parents,
+                coefficients={p: 0.0 for p in parents},
+                intercept=0.0,
+                variance=1.0
+            )
             return
-
-        # Linear regression: X = β₀ + Σ βᵢ parent_i + ε
-        X = []  # Parent values
-        y = []  # Variable values
-
-        for sample in data:
-            if var_name not in sample:
-                continue
-
-            # Check all parents are present
-            if not all(p in sample for p in var.parents):
-                continue
-
-            parent_values = [sample[p] for p in var.parents]
-            X.append(parent_values)
-            y.append(sample[var_name])
-
-        if len(X) == 0:
-            # No data
-            self.set_gaussian_cpd(var_name, {}, 0.0, 1.0)
-            return
-
-        X = np.array(X)
-        y = np.array(y)
-
-        # Add intercept column
-        X_with_intercept = np.column_stack([np.ones(len(X)), X])
-
-        # Solve normal equations: β = (X'X)⁻¹X'y
-        try:
-            beta = np.linalg.lstsq(X_with_intercept, y, rcond=None)[0]
-        except np.linalg.LinAlgError:
-            # Singular matrix - use default
-            self.set_gaussian_cpd(var_name, {}, 0.0, 1.0)
-            return
-
-        intercept = beta[0]
-        coefficients = {var.parents[i]: beta[i + 1] for i in range(len(var.parents))}
-
-        # Compute residual variance
-        predictions = X_with_intercept @ beta
-        residuals = y - predictions
-        variance = np.var(residuals)
-
-        if variance < 1e-10:
-            variance = 1e-10
-
-        self.set_gaussian_cpd(var_name, coefficients, intercept, variance)
+        
+        if not parents:
+            # No parents - estimate mean and variance directly
+            intercept = float(np.mean(Y))
+            variance = float(np.var(Y, ddof=1)) if len(Y) > 1 else 1.0
+            self.gaussian_cpds[var_name] = GaussianCPD(
+                variable=var_name,
+                parents=[],
+                coefficients={},
+                intercept=intercept,
+                variance=max(variance, 1e-10)
+            )
+        else:
+            # Build design matrix for linear regression
+            X = np.array([[d.get(p, 0.0) for p in parents] for d in data if var_name in d])
+            
+            # Add intercept column (ones)
+            X_design = np.column_stack([np.ones(len(X)), X])
+            
+            try:
+                # Solve least squares: beta = (X'X)^-1 X'Y
+                coeffs, residuals, rank, s = np.linalg.lstsq(X_design, Y, rcond=None)
+                
+                intercept = float(coeffs[0])
+                parent_coeffs = {p: float(coeffs[i+1]) for i, p in enumerate(parents)}
+                
+                # Estimate variance from residuals
+                Y_pred = X_design @ coeffs
+                residuals = Y - Y_pred
+                variance = float(np.sum(residuals**2) / max(len(Y) - len(coeffs), 1))
+                
+            except (np.linalg.LinAlgError, ValueError):
+                # Fallback on numerical issues
+                intercept = float(np.mean(Y))
+                parent_coeffs = {p: 0.0 for p in parents}
+                variance = float(np.var(Y))
+            
+            self.gaussian_cpds[var_name] = GaussianCPD(
+                variable=var_name,
+                parents=parents,
+                coefficients=parent_coeffs,
+                intercept=intercept,
+                variance=max(variance, 1e-10)
+            )
 
     def learn_parameters_em(
         self,
