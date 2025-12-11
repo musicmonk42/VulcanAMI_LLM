@@ -1300,7 +1300,10 @@ class PathEffectCalculator:
         # Add noise if specified
         if context.get("add_noise", False):
             noise_level = context.get("noise_level", 0.1)
-            effect += np.random.normal(0, noise_level * abs(effect))
+            # Use default_rng() for independent random state
+            rng = np.random.default_rng()
+            noise_std = max(noise_level * abs(effect), 1e-10)
+            effect += rng.normal(0, noise_std)
 
         return effect
 
@@ -1479,6 +1482,8 @@ class MonteCarloSampler:
 
     def _sample_single_path(self, base_path: Path, n_samples: int) -> List[Path]:
         """Sample variations of a single path"""
+        # Use default_rng() for independent random state
+        rng = np.random.default_rng()
 
         samples = []
 
@@ -1487,7 +1492,7 @@ class MonteCarloSampler:
             varied_edges = []
             for from_node, to_node, strength in base_path.edges:
                 # Add small noise
-                noise = np.random.normal(0, 0.05 * strength)
+                noise = rng.normal(0, 0.05 * strength)
                 new_strength = max(0.01, strength + noise)
                 varied_edges.append((from_node, to_node, new_strength))
 

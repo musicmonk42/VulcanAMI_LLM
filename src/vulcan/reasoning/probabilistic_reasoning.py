@@ -666,7 +666,9 @@ class MaxValueEntropySearch:
 
         # Expected posterior entropy
         # Approximate by sampling y at x
-        y_samples = np.random.normal(mean_pred, std_pred, self.n_samples)
+        # Use default_rng and ensure array output (not scalar)
+        rng = np.random.default_rng()
+        y_samples = np.atleast_1d(rng.normal(mean_pred, std_pred, size=self.n_samples))
 
         posterior_entropies = []
         for y_sample in y_samples:
