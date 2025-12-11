@@ -26,6 +26,7 @@ except ImportError:
 
 # List of torch-dependent components
 TORCH_DEPENDENT_COMPONENTS = [
+    "ContinualLearner",
     "EnhancedContinualLearner",
     "MetaLearner",
     "MetaLearningAlgorithm",
@@ -46,7 +47,7 @@ from .parameter_history import ParameterHistoryManager
 # Import torch-dependent components conditionally
 if TORCH_AVAILABLE:
     try:
-        from .continual_learning import EnhancedContinualLearner
+        from .continual_learning import ContinualLearner, EnhancedContinualLearner
         from .meta_learning import MetaLearner, MetaLearningAlgorithm, TaskDetector
         from .metacognition import (CompositionalUnderstanding, MetaCognitiveMonitor)
         from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
@@ -781,6 +782,7 @@ class UnifiedLearningSystem:
 # Export all main classes
 __all__ = [
     "UnifiedLearningSystem",
+    "ContinualLearner",
     "EnhancedContinualLearner",
     "CurriculumLearner",
     "MetaLearner",
