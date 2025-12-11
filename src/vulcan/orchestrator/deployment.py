@@ -485,11 +485,13 @@ class ProductionDeployment:
                     components["continual"],
                     components["meta_cognitive"],
                     components["compositional"],
-                    components["world_model"]
-                    if components["world_model"] is not None
-                    and components["world_model"].__class__.__name__
-                    == "UnifiedWorldModel"
-                    else None,
+                    (
+                        components["world_model"]
+                        if components["world_model"] is not None
+                        and components["world_model"].__class__.__name__
+                        == "UnifiedWorldModel"
+                        else None
+                    ),
                 ]
                 if v is not None
             )

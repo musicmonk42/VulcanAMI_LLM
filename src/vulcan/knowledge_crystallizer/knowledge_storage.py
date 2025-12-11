@@ -32,6 +32,7 @@ try:
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
+    faiss = None  # Define faiss as None to prevent UnboundLocalError
     logging.warning("faiss not available, vector search will be limited")
 
 logger = logging.getLogger(__name__)
@@ -2155,7 +2156,7 @@ class KnowledgeIndex:
             # Build index
             embeddings = np.array(embeddings).astype("float32")
 
-            if FAISS_AVAILABLE:
+            if FAISS_AVAILABLE and faiss is not None:
                 # Use FAISS if available
                 if len(embeddings) > 1000:
                     # Use IVF index for large datasets
