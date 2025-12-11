@@ -2800,3 +2800,42 @@ if __name__ == "__main__":
     compute.resource_monitor.cleanup()
 
     print("Test completed successfully!")
+
+
+# ============================================================
+# MODULE EXPORTS
+# ============================================================
+
+__all__ = [
+    # Core Planning Classes
+    "EnhancedHierarchicalPlanner",
+    "ResourceAwareCompute",
+    "DistributedCoordinator",
+    "HierarchicalGoalSystem",
+    # Planning Types
+    "Plan",
+    "PlanStep",
+    "PlanningMethod",
+    "PlanningState",
+    # Resource Management
+    "EnhancedResourceMonitor",
+    "SurvivalProtocol",
+    "PowerManager",
+    "ResourceAllocator",
+    "SystemState",
+    "OperationalMode",
+    "ConnectivityLevel",
+    # Planning Components
+    "PlanLibrary",
+    "PlanMonitor",
+    "PlanRepairer",
+    # MCTS
+    "MonteCarloTreeSearch",
+    "MCTSNode",
+    # Consensus
+    "ConsensusProtocol",
+    # Action and Goal Types
+    "ActionType",
+    "GoalType",
+    "ResourceType",
+]
