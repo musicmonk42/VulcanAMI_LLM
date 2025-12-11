@@ -8,8 +8,9 @@ resources:
 
 namePrefix: dev-
 
-commonLabels:
-  environment: development
+labels:
+  - pairs:
+      environment: development
 
 patches:
   - patch: |-
