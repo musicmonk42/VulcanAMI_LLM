@@ -796,10 +796,15 @@ def _initialize_meta_reasoning_components(deps: EnhancedCollectiveDeps) -> None:
             logger.debug(f"Could not initialize CuriosityRewardShaper: {e}")
     
     # InternalCritic - minimal config
+    # Note: ethical_boundary_monitor reference is optional and will be None if not initialized
     if meta_reasoning_deps.get("internal_critic", False):
         try:
             from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
-            deps.internal_critic = InternalCritic()
+            # Only pass ethical_boundary_monitor if it was successfully initialized
+            ethical_monitor = getattr(deps, 'ethical_boundary_monitor', None)
+            deps.internal_critic = InternalCritic(
+                ethical_boundary_monitor=ethical_monitor
+            )
             logger.info("✓ InternalCritic initialized (minimal config)")
         except Exception as e:
             logger.debug(f"Could not initialize InternalCritic: {e}")
@@ -931,11 +936,13 @@ def create_full_deps(
     if deps.internal_critic is None and meta_reasoning_deps.get("internal_critic", False):
         try:
             from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
+            # Only pass ethical_boundary_monitor if it exists (may be None)
+            ethical_monitor = getattr(deps, 'ethical_boundary_monitor', None)
             deps.internal_critic = InternalCritic(
                 strict_mode=False,
                 max_history=10000,
                 validation_tracker=deps.validation_tracker,
-                ethical_boundary_monitor=deps.ethical_boundary_monitor,
+                ethical_boundary_monitor=ethical_monitor,  # Safe to pass None
                 transparency_interface=deps.transparency_interface,
             )
             logger.info("✓ InternalCritic initialized")
