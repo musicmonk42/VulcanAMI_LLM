@@ -96,23 +96,26 @@ docker compose -f docker-compose.prod.yml up -d
   - JWT validation on startup
   - Healthcheck enabled
   - Non-root execution
+- **Includes**: `src/`, `configs/` directories
 
 ### API Gateway (`docker/api/Dockerfile`)
 - **User**: apiuser (UID 1001)
 - **Ports**: 8000 (API), 9148 (metrics)
 - **Command**: `uvicorn src.api_gateway:app`
+- **Includes**: `src/`, `configs/` directories
 
 ### DQS Service (`docker/dqs/Dockerfile`)
 - **User**: dqs (UID 1001)
 - **Ports**: 8080 (API), 9145 (metrics)
 - **Command**: `uvicorn src.dqs_service:app`
-- **Includes**: PostgreSQL client libraries
+- **Includes**: PostgreSQL client libraries, `src/`, `configs/` directories
 
 ### PII Service (`docker/pii/Dockerfile`)
 - **User**: pii (UID 1001)
 - **Ports**: 8082 (API), 9147 (metrics)
 - **Command**: `uvicorn src.pii_service:app`
 - **Volumes**: `/models` for PII detection models
+- **Includes**: `src/`, `configs/` directories
 
 ## Security Features
 

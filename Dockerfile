@@ -109,6 +109,9 @@ RUN pip install --no-cache-dir cyclonedx-bom && \
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
 
+# Copy configuration files (required by application)
+COPY configs/ ./configs/
+
 # Install local package (graphix) if setup.py exists
 RUN if [ -f setup.py ]; then \
         echo "Installing local package from setup.py"; \
@@ -153,6 +156,7 @@ RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin graphix && \
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/configs ./configs
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
 
