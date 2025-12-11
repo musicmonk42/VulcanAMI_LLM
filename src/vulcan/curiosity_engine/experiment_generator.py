@@ -896,12 +896,28 @@ class ExperimentGenerator:
 
         logger.info("ExperimentGenerator initialized (refactored)")
 
+        # Initialize real SafetyValidator
         try:
-            from vulcan.safety import SafetyValidator
-        except ImportError:
-            SafetyValidator = MagicMock()
-            logger.warning("Using mock SafetyValidator")
-        self.safety_validator = SafetyValidator()
+            from vulcan.safety.safety_validator import SafetyValidator
+            self.safety_validator = SafetyValidator(config=None)
+            logger.info("SafetyValidator loaded successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import SafetyValidator: {e}")
+            logger.error("CRITICAL: SafetyValidator is required for experiment generation")
+            # Use a minimal fallback validator that rejects everything
+            class MinimalSafetyValidator:
+                def validate(self, *args, **kwargs):
+                    return False, ["SafetyValidator not available"]
+            self.safety_validator = MinimalSafetyValidator()
+            logger.warning("Using minimal fallback SafetyValidator - all experiments will be rejected")
+        except Exception as e:
+            logger.error(f"Failed to initialize SafetyValidator: {e}")
+            class MinimalSafetyValidator:
+                def validate(self, *args, **kwargs):
+                    return False, ["SafetyValidator initialization failed"]
+            self.safety_validator = MinimalSafetyValidator()
+            logger.warning("Using minimal fallback SafetyValidator - all experiments will be rejected")
+        
         logger.info("ExperimentGenerator initialized")
 
     def generate_for_gap(
