@@ -694,51 +694,262 @@ class EnhancedCollectiveDeps:
 # ============================================================
 
 
-def create_minimal_deps() -> EnhancedCollectiveDeps:
+# Default configuration constants for minimal initialization
+DEFAULT_MAX_AGENTS = 8
+
+
+def create_minimal_deps(
+    enable_learning: bool = False,
+    enable_distributed: bool = False,
+    enable_meta_reasoning: bool = False,
+    max_agents: int = DEFAULT_MAX_AGENTS
+) -> EnhancedCollectiveDeps:
     """
-    Create dependencies with only core components initialized
+    Create dependencies with core components and optionally learning/meta-reasoning
+    
+    Uses minimal/default configuration for all components. For more extensive
+    configuration options, use create_full_deps() instead.
+
+    Args:
+        enable_learning: Whether to initialize learning components (continual learner)
+        enable_distributed: Whether to initialize distributed coordinator
+        enable_meta_reasoning: Whether to initialize meta-reasoning components
+        max_agents: Maximum number of distributed agents (default: 8)
 
     Returns:
-        EnhancedCollectiveDeps with minimal configuration
+        EnhancedCollectiveDeps with minimal configuration plus optional components
     """
-    # Assuming Env and MetricsCollector don't need complex init here
-    return EnhancedCollectiveDeps()
+    deps = EnhancedCollectiveDeps()
+    
+    # If any optional components requested, initialize them with minimal config
+    if enable_learning or enable_distributed or enable_meta_reasoning:
+        # Initialize learning components - minimal config (no parameters required)
+        if enable_learning and learning_deps.get("continual", False):
+            try:
+                from vulcan.learning.continual_learning import ContinualLearner
+                deps.continual = ContinualLearner()
+                logger.info("✓ ContinualLearner initialized (minimal config)")
+            except Exception as e:
+                logger.debug(f"Could not initialize ContinualLearner: {e}")
+        
+        # Initialize distributed coordinator - minimal config (configurable max_agents)
+        if enable_distributed and distributed_deps.get("distributed", False):
+            try:
+                from vulcan.planning import DistributedCoordinator
+                deps.distributed = DistributedCoordinator(max_agents=max_agents)
+                logger.info(f"✓ DistributedCoordinator initialized (minimal config, max_agents={max_agents})")
+            except Exception as e:
+                logger.debug(f"Could not initialize DistributedCoordinator: {e}")
+        
+        # Initialize meta-reasoning components - minimal config via helper
+        if enable_meta_reasoning:
+            _initialize_meta_reasoning_components(deps)
+    
+    return deps
+
+
+def _initialize_meta_reasoning_components(deps: EnhancedCollectiveDeps) -> None:
+    """
+    Helper function to initialize meta-reasoning components with minimal configuration
+    
+    Initializes components with default parameters suitable for minimal setups.
+    For more extensive configuration, use create_full_deps() instead.
+    
+    Args:
+        deps: EnhancedCollectiveDeps instance to populate
+    """
+    # PreferenceLearner - minimal config
+    if meta_reasoning_deps.get("preference_learner", False):
+        try:
+            from vulcan.world_model.meta_reasoning.preference_learner import PreferenceLearner
+            deps.preference_learner = PreferenceLearner()
+            logger.info("✓ PreferenceLearner initialized (minimal config)")
+        except Exception as e:
+            logger.debug(f"Could not initialize PreferenceLearner: {e}")
+    
+    # ValueEvolutionTracker - minimal config
+    if meta_reasoning_deps.get("value_evolution_tracker", False):
+        try:
+            from vulcan.world_model.meta_reasoning.value_evolution_tracker import ValueEvolutionTracker
+            deps.value_evolution_tracker = ValueEvolutionTracker()
+            logger.info("✓ ValueEvolutionTracker initialized (minimal config)")
+        except Exception as e:
+            logger.debug(f"Could not initialize ValueEvolutionTracker: {e}")
+    
+    # EthicalBoundaryMonitor - minimal config
+    # Note: load_defaults=False to avoid automatic boundary loading in minimal setups
+    if meta_reasoning_deps.get("ethical_boundary_monitor", False):
+        try:
+            from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import EthicalBoundaryMonitor
+            deps.ethical_boundary_monitor = EthicalBoundaryMonitor(load_defaults=False)
+            logger.info("✓ EthicalBoundaryMonitor initialized (minimal config)")
+        except Exception as e:
+            logger.debug(f"Could not initialize EthicalBoundaryMonitor: {e}")
+    
+    # CuriosityRewardShaper - minimal config
+    if meta_reasoning_deps.get("curiosity_reward_shaper", False):
+        try:
+            from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import CuriosityRewardShaper
+            deps.curiosity_reward_shaper = CuriosityRewardShaper()
+            logger.info("✓ CuriosityRewardShaper initialized (minimal config)")
+        except Exception as e:
+            logger.debug(f"Could not initialize CuriosityRewardShaper: {e}")
+    
+    # InternalCritic - minimal config
+    # Note: ethical_boundary_monitor reference is optional and will be None if not initialized
+    if meta_reasoning_deps.get("internal_critic", False):
+        try:
+            from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
+            # Only pass ethical_boundary_monitor if it was successfully initialized
+            ethical_monitor = getattr(deps, 'ethical_boundary_monitor', None)
+            deps.internal_critic = InternalCritic(
+                ethical_boundary_monitor=ethical_monitor
+            )
+            logger.info("✓ InternalCritic initialized (minimal config)")
+        except Exception as e:
+            logger.debug(f"Could not initialize InternalCritic: {e}")
 
 
 def create_full_deps(
     config: Any = None, env: Any = None, enable_distributed: bool = False, **kwargs
 ) -> EnhancedCollectiveDeps:
     """
-    Create fully initialized dependencies container (placeholders for now)
+    Create fully initialized dependencies container with extensive configuration
+    
+    Initializes components with full configuration options including cross-dependencies
+    and integration with validation, transparency, and other subsystems. For simpler
+    initialization with defaults, use create_minimal_deps() instead.
 
     Args:
-        config: Configuration object (AgentConfig)
+        config: Configuration object (AgentConfig) with component-specific settings
         env: Environment interface
         enable_distributed: Whether to enable distributed processing
-        **kwargs: Additional component instances
+        **kwargs: Additional component instances (will override auto-initialization)
 
     Returns:
-        EnhancedCollectiveDeps potentially populated with components
+        EnhancedCollectiveDeps with components initialized based on availability
+        
+    Note:
+        - Components are only initialized if their imports succeed (checked via *_deps dicts)
+        - Provided kwargs override auto-initialization for specific components
+        - Meta-reasoning components get full configuration with cross-dependencies
+        - Use create_minimal_deps() for simpler initialization with default parameters
     """
-    # In a real scenario, this would import and initialize each component
-    # based on the config and available modules.
     deps = EnhancedCollectiveDeps(env=env)
-    logger.warning(
-        "create_full_deps is a placeholder; components need actual initialization."
-    )
+    logger.info("Initializing full dependencies container...")
 
-    # Set any explicitly provided components
+    # Set any explicitly provided components first
     for key, value in kwargs.items():
         if hasattr(deps, key):
             setattr(deps, key, value)
         else:
             logger.warning(f"Unknown dependency provided via kwargs: {key}")
 
-    # Example placeholder initializations (replace with real ones)
-    # deps.safety_validator = kwargs.get('safety_validator', SafetyValidatorPlaceholder())
-    # deps.ltm = kwargs.get('ltm', MemoryIndexPlaceholder())
-    # ... etc for all components based on config flags ...
+    # ========================================
+    # LEARNING: Initialize continual learner
+    # ========================================
+    if deps.continual is None and learning_deps.get("continual", False):
+        try:
+            from vulcan.learning.continual_learning import ContinualLearner
+            deps.continual = ContinualLearner()
+            logger.info("✓ ContinualLearner initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize ContinualLearner: {e}")
 
+    # ========================================
+    # DISTRIBUTED: Initialize distributed coordinator
+    # ========================================
+    if enable_distributed and deps.distributed is None and distributed_deps.get("distributed", False):
+        try:
+            from vulcan.planning import DistributedCoordinator
+            max_agents = getattr(config, "max_distributed_agents", 8) if config else 8
+            deps.distributed = DistributedCoordinator(max_agents=max_agents)
+            logger.info(f"✓ DistributedCoordinator initialized with max_agents={max_agents}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize DistributedCoordinator: {e}")
+
+    # ========================================
+    # META_REASONING: Initialize meta-reasoning components
+    # ========================================
+    
+    # PreferenceLearner
+    if deps.preference_learner is None and meta_reasoning_deps.get("preference_learner", False):
+        try:
+            from vulcan.world_model.meta_reasoning.preference_learner import PreferenceLearner
+            deps.preference_learner = PreferenceLearner(
+                decay_rate=0.99,
+                exploration_bonus=0.1,
+                validation_tracker=deps.validation_tracker,
+                transparency_interface=deps.transparency_interface,
+            )
+            logger.info("✓ PreferenceLearner initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize PreferenceLearner: {e}")
+
+    # ValueEvolutionTracker
+    if deps.value_evolution_tracker is None and meta_reasoning_deps.get("value_evolution_tracker", False):
+        try:
+            from vulcan.world_model.meta_reasoning.value_evolution_tracker import ValueEvolutionTracker
+            deps.value_evolution_tracker = ValueEvolutionTracker(
+                max_history=10000,
+                drift_threshold=0.15,
+                self_improvement_drive=deps.self_improvement_drive,
+                validation_tracker=deps.validation_tracker,
+                transparency_interface=deps.transparency_interface,
+            )
+            logger.info("✓ ValueEvolutionTracker initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize ValueEvolutionTracker: {e}")
+
+    # EthicalBoundaryMonitor
+    if deps.ethical_boundary_monitor is None and meta_reasoning_deps.get("ethical_boundary_monitor", False):
+        try:
+            from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import EthicalBoundaryMonitor
+            deps.ethical_boundary_monitor = EthicalBoundaryMonitor(
+                strict_mode=False,
+                validation_tracker=deps.validation_tracker,
+                self_improvement_drive=deps.self_improvement_drive,
+                transparency_interface=deps.transparency_interface,
+                load_defaults=False,  # Don't load defaults to avoid side effects
+            )
+            logger.info("✓ EthicalBoundaryMonitor initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize EthicalBoundaryMonitor: {e}")
+
+    # CuriosityRewardShaper
+    if deps.curiosity_reward_shaper is None and meta_reasoning_deps.get("curiosity_reward_shaper", False):
+        try:
+            from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import CuriosityRewardShaper
+            deps.curiosity_reward_shaper = CuriosityRewardShaper(
+                curiosity_weight=0.1,
+                decay_rate=0.99,
+                max_bonus=1.0,
+                world_model=deps.world_model,
+                validation_tracker=deps.validation_tracker,
+                transparency_interface=deps.transparency_interface,
+            )
+            logger.info("✓ CuriosityRewardShaper initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize CuriosityRewardShaper: {e}")
+
+    # InternalCritic
+    if deps.internal_critic is None and meta_reasoning_deps.get("internal_critic", False):
+        try:
+            from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
+            # Only pass ethical_boundary_monitor if it exists (may be None)
+            ethical_monitor = getattr(deps, 'ethical_boundary_monitor', None)
+            deps.internal_critic = InternalCritic(
+                strict_mode=False,
+                max_history=10000,
+                validation_tracker=deps.validation_tracker,
+                ethical_boundary_monitor=ethical_monitor,  # Safe to pass None
+                transparency_interface=deps.transparency_interface,
+            )
+            logger.info("✓ InternalCritic initialized")
+        except Exception as e:
+            logger.warning(f"Failed to initialize InternalCritic: {e}")
+
+    logger.info("✓ Full dependencies initialization complete")
     return deps
 
 
