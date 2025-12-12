@@ -12,6 +12,7 @@ import traceback
 import uuid
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
 
@@ -160,7 +161,6 @@ _alias_all_src_modules()
 @pytest.fixture(autouse=True)
 def reset_random_state():
     """Ensure each test starts with a fresh random state."""
-    import numpy as np
     np.random.seed(12345)
     yield
 
