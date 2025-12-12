@@ -297,10 +297,10 @@ All documents (except INDEX which is a meta-document) have:
 
 | Document | Claimed | Actual | Diff | Status |
 |----------|---------|--------|------|--------|
-| SEQUENCE_DEMO | 34 KB | 33 KB | -1 KB | ✓ |
-| AI_TRAINING | 35 KB | 34 KB | -1 KB | ✓ |
-| ROADMAP | 21 KB | 20 KB | -1 KB | ✓ |
-| TERMINAL | 19 KB | 18 KB | -1 KB | ✓ |
+| SEQUENCE_DEMO | 34 KB | 33 KB | -1 KB | OK |
+| AI_TRAINING | 35 KB | 34 KB | -1 KB | OK |
+| ROADMAP | 21 KB | 20 KB | -1 KB | OK |
+| TERMINAL | 19 KB | 18 KB | -1 KB | OK |
 
 All within acceptable tolerance (< 5 KB).
 
