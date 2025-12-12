@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulcanAMI Platform - Unified Interface</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #667eea; --primary-dark: #764ba2;
+            --success: #28a745; --warning: #ffc107; --danger: #dc3545;
+            --info: #17a2b8; --dark: #212529; --light: #f8f9fa; --border: #dee2e6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            border-radius: 15px; padding: 30px; margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .connection-bar {
+            background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
+        }
+        .connection-bar input {
+            flex: 1; min-width: 300px; padding: 12px 15px;
+            border: 2px solid var(--border); border-radius: 8px;
+        }
+        .connection-bar button {
+            padding: 12px 24px; border: none; border-radius: 8px;
+            font-weight: 600; cursor: pointer; transition: all 0.3s;
+        }
+        .btn-connect { background: var(--success); color: white; }
+        .btn-disconnect { background: var(--danger); color: white; }
+        .status-indicator {
+            padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 13px;
+        }
+        .status-connected { background: #d4edda; color: #155724; }
+        .status-disconnected { background: #f8d7da; color: #721c24; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab {
+            background: rgba(255, 255, 255, 0.9); padding: 12px 24px;
+            border-radius: 8px; cursor: pointer; font-weight: 600;
+            transition: all 0.3s; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .tab.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+        .panel {
+            display: none; background: white; border-radius: 12px; padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .panel.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .panel h2 {
+            color: var(--primary); margin-bottom: 20px; padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+        .card {
+            background: var(--light); border-radius: 8px; padding: 20px;
+            margin-bottom: 15px; border-left: 4px solid var(--primary);
+        }
+        .card-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px; margin-top: 20px;
+        }
+        .badge { padding: 5px 15px; border-radius: 15px; font-weight: 600; }
+        .badge-success { background: var(--success); color: white; }
+        .badge-danger { background: var(--danger); color: white; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-info { background: var(--info); color: white; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 10px 15px; border: 2px solid var(--border); border-radius: 6px;
+        }
+        .form-group textarea { min-height: 150px; font-family: monospace; }
+        .json-display {
+            background: #282c34; color: #abb2bf; padding: 20px; border-radius: 8px;
+            overflow-x: auto; font-family: monospace; max-height: 500px; overflow-y: auto;
+        }
+        .logs-container {
+            background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px;
+            height: 400px; overflow-y: auto; font-family: monospace;
+        }
+        .log-entry { padding: 5px 0; border-bottom: 1px solid #333; }
+        .log-entry.error { color: #f48771; }
+        .log-entry.success { color: #89d185; }
+        .log-entry.info { color: #4fc1ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 VulcanAMI Platform Interface</h1>
+            <p>Unified Control Center for VULCAN-AGI, Arena, and Registry Services</p>
+        </div>
+        
+        <div class="connection-bar">
+            <input type="text" id="baseUrl" placeholder="Platform URL" value="http://127.0.0.1:8080">
+            <button class="btn-connect" id="connectBtn" onclick="connectPlatform()">🔌 Connect</button>
+            <button class="btn-disconnect" id="disconnectBtn" onclick="disconnectPlatform()" style="display:none">⛔ Disconnect</button>
+            <span class="status-indicator status-disconnected" id="statusIndicator">Disconnected</span>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+            <div class="tab" onclick="switchTab('vulcan')">🧠 VULCAN</div>
+            <div class="tab" onclick="switchTab('arena')">⚔️ Arena</div>
+            <div class="tab" onclick="switchTab('registry')">📝 Registry</div>
+            <div class="tab" onclick="switchTab('monitoring')">📡 Monitoring</div>
+            <div class="tab" onclick="switchTab('docs')">📚 Documentation</div>
+        </div>
+        
+        <div id="dashboard" class="panel active">
+            <h2>Platform Dashboard</h2>
+            <div id="platformStatus"></div>
+            <div class="card-grid" id="servicesGrid"></div>
+        </div>
+        
+        <div id="vulcan" class="panel">
+            <h2>🧠 VULCAN-AGI Cognitive System</h2>
+            <div class="card">
+                <h3>Health Status</h3>
+                <div id="vulcanStatus">Connect to view VULCAN status...</div>
+                <button class="btn btn-primary" onclick="loadVulcanHealth()">🔍 Check Health</button>
+            </div>
+        </div>
+        
+        <div id="arena" class="panel">
+            <h2>⚔️ Arena - Agent Competition</h2>
+            <div class="card">
+                <h3>Run Agent Task</h3>
+                <div class="form-group">
+                    <label>Agent ID:</label>
+                    <input type="text" id="agentId" placeholder="Enter agent ID">
+                </div>
+                <button class="btn btn-success" onclick="runAgentTask()">▶️ Run Task</button>
+            </div>
+            <div id="arenaResults"></div>
+        </div>
+        
+        <div id="registry" class="panel">
+            <h2>📝 Registry - Agent Management</h2>
+            <div class="card">
+                <h3>Authentication</h3>
+                <div class="form-group">
+                    <label>Agent ID:</label>
+                    <input type="text" id="authAgentId" placeholder="Enter agent ID">
+                </div>
+                <button class="btn btn-primary" onclick="getNonce()">Get Nonce</button>
+            </div>
+        </div>
+        
+        <div id="monitoring" class="panel">
+            <h2>📡 System Monitoring</h2>
+            <div class="card">
+                <h3>Health Status</h3>
+                <div id="healthStatus">Loading...</div>
+                <button class="btn btn-primary" onclick="refreshHealth()">🔄 Refresh</button>
+            </div>
+            <div class="card">
+                <h3>System Logs</h3>
+                <div class="logs-container" id="logsContainer">
+                    <div class="log-entry info">System initialized...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="docs" class="panel">
+            <h2>📚 Documentation</h2>
+            <div class="card-grid">
+                <div class="card">
+                    <h3>Platform Documentation</h3>
+                    <button class="btn btn-primary" onclick="openDocs('/docs')">📖 API Docs</button>
+                    <button class="btn btn-info" onclick="openDocs('/redoc')">📘 ReDoc</button>
+                </div>
+                <div class="card">
+                    <h3>Demos</h3>
+                    <button class="btn btn-info" onclick="window.open('demos/sse_mind.html', '_blank')">📡 SSE Viewer</button>
+                    <button class="btn btn-info" onclick="window.open('demo/artifact_card.html', '_blank')">🎴 Artifact Viewer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let baseUrl = 'http://127.0.0.1:8080';
+        let isConnected = false;
+        
+        function switchTab(tabName, event) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        async function connectPlatform() {
+            baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+            addLog('Connecting to ' + baseUrl + '...', 'info');
+            try {
+                const response = await fetch(baseUrl + '/api/status');
+                const data = await response.json();
+                isConnected = true;
+                updateConnectionStatus(true);
+                addLog('✅ Connected!', 'success');
+                loadDashboard(data);
+                refreshHealth();
+            } catch (error) {
+                addLog('❌ Connection failed: ' + error.message, 'error');
+                updateConnectionStatus(false);
+            }
+        }
+        
+        function disconnectPlatform() {
+            isConnected = false;
+            updateConnectionStatus(false);
+            addLog('Disconnected', 'info');
+        }
+        
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            if (connected) {
+                indicator.textContent = 'Connected';
+                indicator.className = 'status-indicator status-connected';
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'inline-block';
+            } else {
+                indicator.textContent = 'Disconnected';
+                indicator.className = 'status-indicator status-disconnected';
+                connectBtn.style.display = 'inline-block';
+                disconnectBtn.style.display = 'none';
+            }
+        }
+        
+        async function loadDashboard(data) {
+            const platformStatus = document.getElementById('platformStatus');
+            const servicesGrid = document.getElementById('servicesGrid');
+            platformStatus.innerHTML = `
+                <div class="card">
+                    <h3>Platform Info</h3>
+                    <p><strong>Version:</strong> ${data.platform.version}</p>
+                    <p><strong>Worker PID:</strong> ${data.platform.worker_pid}</p>
+                    <p><strong>Auth:</strong> ${data.configuration.auth_method}</p>
+                </div>
+            `;
+            servicesGrid.innerHTML = '';
+            for (const [name, service] of Object.entries(data.services)) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <h3>${name.toUpperCase()}</h3>
+                    <span class="badge ${service.mounted ? 'badge-success' : 'badge-danger'}">
+                        ${service.mounted ? '✅ Mounted' : '❌ Not Mounted'}
+                    </span>
+                    ${service.mount_path ? `<p><code>${service.mount_path}</code></p>` : ''}
+                `;
+                servicesGrid.appendChild(card);
+            }
+        }
+        
+        async function refreshHealth() {
+            if (!isConnected) return alert('Please connect first');
+            try {
+                const response = await fetch(baseUrl + '/health');
+                const data = await response.json();
+                document.getElementById('healthStatus').innerHTML = 
+                    `<p><strong>Status:</strong> <span class="badge badge-success">${data.status}</span></p>
+                     <p><strong>Timestamp:</strong> ${data.timestamp}</p>`;
+                addLog('Health check completed', 'success');
+            } catch (error) {
+                addLog('Health check failed: ' + error.message, 'error');
+            }
+        }
+        
+        async function loadVulcanHealth() {
+            if (!isConnected) return alert('Please connect first');
+            try {
+                const response = await fetch(baseUrl + '/vulcan/health');
+                const data = await response.json();
+                document.getElementById('vulcanStatus').innerHTML = 
+                    `<div class="json-display"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                addLog('VULCAN health loaded', 'success');
+            } catch (error) {
+                addLog('Failed: ' + error.message, 'error');
+            }
+        }
+        
+        function addLog(message, type) {
+            const container = document.getElementById('logsContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function openDocs(path) {
+            window.open(baseUrl + path, '_blank');
+        }
+        
+        async function runAgentTask() {
+            alert('Agent task execution requires proper API integration. Connect via API.');
+        }
+        
+        async function getNonce() {
+            const agentId = document.getElementById('authAgentId').value;
+            if (!agentId) return alert('Enter agent ID');
+            try {
+                const response = await fetch(baseUrl + '/registry/auth/nonce', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ agent_id: agentId })
+                });
+                const data = await response.json();
+                addLog('Nonce: ' + data.nonce, 'success');
+                alert('Nonce: ' + data.nonce);
+            } catch (error) {
+                addLog('Failed: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
