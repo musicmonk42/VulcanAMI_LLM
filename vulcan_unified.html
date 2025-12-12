@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulcanAMI Platform - Unified Interface</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #667eea; --primary-dark: #764ba2;
+            --success: #28a745; --warning: #ffc107; --danger: #dc3545;
+            --info: #17a2b8; --dark: #212529; --light: #f8f9fa; --border: #dee2e6;
+            --purple: #6f42c1; --orange: #fd7e14; --teal: #20c997; --cyan: #0dcaf0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; min-height: 100vh;
+        }
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            border-radius: 15px; padding: 20px 30px; margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        .header-content { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .header h1 {
+            font-size: 2em;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header p { color: #666; font-size: 0.95em; }
+        .version-badge { 
+            background: var(--primary); color: white; padding: 4px 12px; 
+            border-radius: 12px; font-size: 12px; font-weight: 600;
+        }
+        
+        /* Connection Bar */
+        .connection-bar {
+            background: white; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+        }
+        .connection-bar input {
+            flex: 1; min-width: 200px; padding: 10px 15px;
+            border: 2px solid var(--border); border-radius: 8px; font-size: 14px;
+        }
+        .connection-bar input:focus { outline: none; border-color: var(--primary); }
+        .status-indicator {
+            padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 13px;
+        }
+        .status-connected { background: #d4edda; color: #155724; }
+        .status-disconnected { background: #f8d7da; color: #721c24; }
+        .status-authenticating { background: #fff3cd; color: #856404; }
+        
+        /* Buttons */
+        .btn { 
+            padding: 10px 20px; border: none; border-radius: 8px; 
+            font-weight: 600; cursor: pointer; transition: all 0.3s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-info { background: var(--info); color: white; }
+        .btn-info:hover { background: #138496; }
+        .btn-warning { background: var(--warning); color: #333; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-connect { background: var(--success); color: white; }
+        .btn-disconnect { background: var(--danger); color: white; }
+        
+        /* Tabs */
+        .tabs { 
+            display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+            background: rgba(255,255,255,0.1); padding: 10px; border-radius: 12px;
+        }
+        .tab {
+            background: rgba(255, 255, 255, 0.9); padding: 10px 16px;
+            border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;
+            transition: all 0.3s; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            white-space: nowrap;
+        }
+        .tab:hover { background: white; transform: translateY(-2px); }
+        .tab.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+        
+        /* Panels */
+        .panel {
+            display: none; background: white; border-radius: 12px; padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .panel.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .panel h2 {
+            color: var(--primary); margin-bottom: 20px; padding-bottom: 10px;
+            border-bottom: 2px solid var(--border); display: flex; align-items: center; gap: 10px;
+        }
+        .panel h3 { color: #444; margin-bottom: 15px; font-size: 1.1em; }
+        
+        /* Cards */
+        .card {
+            background: var(--light); border-radius: 8px; padding: 20px;
+            margin-bottom: 15px; border-left: 4px solid var(--primary);
+        }
+        .card.success { border-left-color: var(--success); }
+        .card.warning { border-left-color: var(--warning); }
+        .card.danger { border-left-color: var(--danger); }
+        .card.info { border-left-color: var(--info); }
+        .card.purple { border-left-color: var(--purple); }
+        .card.teal { border-left-color: var(--teal); }
+        .card-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px; margin-top: 15px;
+        }
+        
+        /* Badges */
+        .badge { 
+            padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 12px;
+            display: inline-block; margin: 2px;
+        }
+        .badge-success { background: var(--success); color: white; }
+        .badge-danger { background: var(--danger); color: white; }
+        .badge-warning { background: var(--warning); color: #333; }
+        .badge-info { background: var(--info); color: white; }
+        .badge-primary { background: var(--primary); color: white; }
+        .badge-purple { background: var(--purple); color: white; }
+        .badge-secondary { background: #6c757d; color: white; }
+        
+        /* Forms */
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 600; color: #555; }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 10px 15px; border: 2px solid var(--border); border-radius: 6px;
+            font-size: 14px; transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none; border-color: var(--primary);
+        }
+        .form-group textarea { min-height: 100px; font-family: monospace; resize: vertical; }
+        .form-row { display: flex; gap: 15px; flex-wrap: wrap; }
+        .form-row .form-group { flex: 1; min-width: 200px; }
+        
+        /* Code/JSON Display */
+        .json-display {
+            background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px;
+            overflow-x: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px;
+            max-height: 400px; overflow-y: auto;
+        }
+        .json-display pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
+        
+        /* Logs Container */
+        .logs-container {
+            background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px;
+            height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px;
+        }
+        .log-entry { padding: 4px 0; border-bottom: 1px solid #333; }
+        .log-entry.error { color: #f48771; }
+        .log-entry.success { color: #89d185; }
+        .log-entry.info { color: #4fc1ff; }
+        .log-entry.warning { color: #dcdcaa; }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px; margin: 15px 0;
+        }
+        .stat-card {
+            background: white; border-radius: 10px; padding: 15px; text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid var(--border);
+        }
+        .stat-card .stat-value { font-size: 1.8em; font-weight: 700; color: var(--primary); }
+        .stat-card .stat-label { font-size: 0.85em; color: #666; margin-top: 5px; }
+        .stat-card.success .stat-value { color: var(--success); }
+        .stat-card.warning .stat-value { color: var(--warning); }
+        .stat-card.danger .stat-value { color: var(--danger); }
+        
+        /* Metric Row */
+        .metric-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid #eee;
+        }
+        .metric-row:last-child { border-bottom: none; }
+        .metric-label { color: #666; }
+        .metric-value { font-weight: 600; color: #333; }
+        
+        /* Tables */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .data-table th, .data-table td {
+            padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border);
+        }
+        .data-table th { background: var(--light); font-weight: 600; color: #555; }
+        .data-table tr:hover { background: #f8f9fa; }
+        
+        /* Action Buttons Container */
+        .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        
+        /* Alert */
+        .alert {
+            padding: 12px 16px; border-radius: 6px; margin-bottom: 15px;
+            border-left: 4px solid;
+        }
+        .alert-info { background: #d1ecf1; color: #0c5460; border-color: var(--info); }
+        .alert-success { background: #d4edda; color: #155724; border-color: var(--success); }
+        .alert-danger { background: #f8d7da; color: #721c24; border-color: var(--danger); }
+        .alert-warning { background: #fff3cd; color: #856404; border-color: var(--warning); }
+        
+        /* Token Display */
+        .token-display {
+            background: #f8f9fa; border: 1px solid var(--border); border-radius: 6px;
+            padding: 10px; font-family: monospace; font-size: 12px;
+            word-break: break-all; max-height: 60px; overflow-y: auto;
+        }
+        
+        /* Scrollable */
+        .scrollable { max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <div>
+                    <h1>🚀 VulcanAMI Platform</h1>
+                    <p>Unified Control Center for VULCAN-AGI, Arena, Registry & Cognitive Systems</p>
+                </div>
+                <span class="version-badge" id="platformVersion">Not Connected</span>
+            </div>
+        </div>
+        
+        <!-- Connection Bar -->
+        <div class="connection-bar">
+            <input type="text" id="baseUrl" placeholder="Platform URL" value="http://127.0.0.1:8000">
+            <input type="password" id="apiKey" placeholder="API Key (for JWT auth)" style="max-width: 220px;">
+            <button class="btn btn-connect" id="connectBtn" onclick="connectPlatform()">🔌 Connect</button>
+            <button class="btn btn-disconnect" id="disconnectBtn" onclick="disconnectPlatform()" style="display:none">⛔ Disconnect</button>
+            <span class="status-indicator status-disconnected" id="statusIndicator">Disconnected</span>
+            <button class="btn btn-sm btn-info" onclick="showTokenInfo()">🔐 Token</button>
+        </div>
+        
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+            <div class="tab" onclick="switchTab('agents')">🤖 Agent Pool</div>
+            <div class="tab" onclick="switchTab('vulcan')">🧠 VULCAN</div>
+            <div class="tab" onclick="switchTab('worldmodel')">🌍 World Model</div>
+            <div class="tab" onclick="switchTab('arena')">⚔️ Arena</div>
+            <div class="tab" onclick="switchTab('registry')">📝 Registry</div>
+            <div class="tab" onclick="switchTab('safety')">🛡️ Safety</div>
+            <div class="tab" onclick="switchTab('llm')">💬 LLM</div>
+            <div class="tab" onclick="switchTab('auth')">🔐 Auth</div>
+            <div class="tab" onclick="switchTab('tools')">🛠️ Tools</div>
+            <div class="tab" onclick="switchTab('logs')">📋 Logs</div>
+        </div>
+        
+        <!-- ==================== DASHBOARD PANEL ==================== -->
+        <div id="dashboard" class="panel active">
+            <h2>📊 Platform Dashboard</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card success">
+                    <div class="stat-value" id="statAgents">--</div>
+                    <div class="stat-label">Total Agents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statJobs">--</div>
+                    <div class="stat-label">Jobs Completed</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-value" id="statPending">--</div>
+                    <div class="stat-label">Pending Tasks</div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-value" id="statErrors">--</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+            </div>
+            
+            <div id="platformStatus"></div>
+            
+            <h3 style="margin-top: 20px;">Mounted Services</h3>
+            <div class="card-grid" id="servicesGrid">
+                <p style="color: #888;">Connect to view services...</p>
+            </div>
+            
+            <div class="card" style="margin-top: 20px;">
+                <h3>Health Status</h3>
+                <div id="healthStatus">Connect to check health...</div>
+                <button class="btn btn-primary btn-sm" onclick="refreshHealth()" style="margin-top: 10px;">🔄 Refresh Health</button>
+            </div>
+        </div>
+        
+        <!-- ==================== AGENT POOL PANEL ==================== -->
+        <div id="agents" class="panel">
+            <h2>🤖 Agent Pool Management</h2>
+            
+            <div class="card-grid">
+                <div class="card success">
+                    <h3>Pool Statistics</h3>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Agents</span>
+                        <span class="metric-value" id="totalAgents">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Idle</span>
+                        <span class="metric-value" id="idleAgents">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Busy</span>
+                        <span class="metric-value" id="busyAgents">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Pending Tasks</span>
+                        <span class="metric-value" id="pendingTasks">--</span>
+                    </div>
+                </div>
+                
+                <div class="card info">
+                    <h3>Capability Distribution</h3>
+                    <div id="capabilityDist">
+                        <span class="badge badge-secondary">Connect to view...</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Job Statistics</h3>
+                    <div class="metric-row">
+                        <span class="metric-label">Submitted</span>
+                        <span class="metric-value" id="jobsSubmitted">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Completed</span>
+                        <span class="metric-value" id="jobsCompleted">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Failed</span>
+                        <span class="metric-value" id="jobsFailed">--</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Agent Actions</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="loadAgentPool()">🔄 Refresh Pool</button>
+                    <button class="btn btn-success" onclick="spawnAgent()">➕ Spawn Agent</button>
+                    <button class="btn btn-warning" onclick="scalePool()">📈 Auto-Scale</button>
+                </div>
+                <div id="agentActionResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== VULCAN PANEL ==================== -->
+        <div id="vulcan" class="panel">
+            <h2>🧠 VULCAN-AGI Cognitive System</h2>
+            
+            <div class="card">
+                <h3>System Status</h3>
+                <div id="vulcanStatus">Connect to view status...</div>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="getVulcanHealth()">Check Health</button>
+                    <button class="btn btn-info" onclick="getVulcanStatus()">Get Status</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Invoke Operation</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Operation</label>
+                        <select id="vulcanOp">
+                            <option value="reason">Reason</option>
+                            <option value="plan">Plan</option>
+                            <option value="execute">Execute</option>
+                            <option value="improve">Self-Improve</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Input Data (JSON)</label>
+                    <textarea id="vulcanInput" placeholder='{"query": "Analyze this problem", "context": {}}'></textarea>
+                </div>
+                <button class="btn btn-success" onclick="invokeVulcan()">▶️ Invoke</button>
+                <div id="vulcanResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== WORLD MODEL PANEL ==================== -->
+        <div id="worldmodel" class="panel">
+            <h2>🌍 World Model & Causal Reasoning</h2>
+            
+            <div class="card-grid">
+                <div class="card purple">
+                    <h3>Causal DAG</h3>
+                    <div class="metric-row">
+                        <span class="metric-label">Nodes</span>
+                        <span class="metric-value" id="dagNodes">--</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Edges</span>
+                        <span class="metric-value" id="dagEdges">--</span>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadWorldModel()" style="margin-top: 10px;">🔄 Refresh</button>
+                </div>
+                
+                <div class="card info">
+                    <h3>Prediction Engine</h3>
+                    <div class="metric-row">
+                        <span class="metric-label">Method</span>
+                        <span class="metric-value">Weighted Quantile</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Clustering</span>
+                        <span class="metric-value">Auto</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Query World Model</h3>
+                <div class="form-group">
+                    <label>Query</label>
+                    <input type="text" id="worldModelQuery" placeholder="Ask about causal relationships...">
+                </div>
+                <button class="btn btn-primary" onclick="queryWorldModel()">🔍 Query</button>
+                <div id="worldModelResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Run Intervention</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Target Variable</label>
+                        <input type="text" id="interventionTarget" placeholder="e.g., temperature">
+                    </div>
+                    <div class="form-group">
+                        <label>Value</label>
+                        <input type="number" id="interventionValue" placeholder="25.0">
+                    </div>
+                </div>
+                <button class="btn btn-warning" onclick="runIntervention()">🎯 Execute</button>
+                <div id="interventionResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== ARENA PANEL ==================== -->
+        <div id="arena" class="panel">
+            <h2>⚔️ Arena - Agent Competition & Training</h2>
+            
+            <div class="card">
+                <h3>Run Agent Task</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Agent ID</label>
+                        <input type="text" id="arenaAgentId" placeholder="agent-001" value="generator">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Task (JSON)</label>
+                    <textarea id="arenaTask">{"task": "generate_graph", "prompt": "Create a simple data pipeline", "max_tokens": 100}</textarea>
+                </div>
+                <button class="btn btn-success" onclick="runArenaTask()">▶️ Run Task</button>
+                <div id="arenaResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Submit Feedback</h3>
+                <div class="form-group">
+                    <label>Feedback Data (JSON)</label>
+                    <textarea id="arenaFeedback">{"agent_id": "generator", "task_id": "task-001", "score": 0.85, "feedback": "Good output"}</textarea>
+                </div>
+                <button class="btn btn-info" onclick="submitArenaFeedback()">📝 Submit</button>
+                <div id="arenaFeedbackResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Run Tournament</h3>
+                <div class="form-group">
+                    <label>Tournament Config (JSON)</label>
+                    <textarea id="tournamentConfig">{"agents": ["generator", "evolver"], "task_type": "graph_generation", "rounds": 3}</textarea>
+                </div>
+                <button class="btn btn-warning" onclick="runTournament()">🏆 Start Tournament</button>
+                <div id="tournamentResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== REGISTRY PANEL ==================== -->
+        <div id="registry" class="panel">
+            <h2>📝 Registry - Agent Management</h2>
+            
+            <div class="card">
+                <h3>Get Nonce (Step 1)</h3>
+                <div class="form-group">
+                    <label>Agent ID</label>
+                    <input type="text" id="regAgentId" placeholder="agent-xyz">
+                </div>
+                <button class="btn btn-primary" onclick="getNonce()">1️⃣ Get Nonce</button>
+                <div id="nonceResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Login (Step 2)</h3>
+                <div class="form-group">
+                    <label>Nonce</label>
+                    <input type="text" id="loginNonce" placeholder="Nonce from step 1">
+                </div>
+                <div class="form-group">
+                    <label>Signature (base64)</label>
+                    <textarea id="loginSignature" placeholder="Sign 'agentId:nonce' with private key"></textarea>
+                </div>
+                <button class="btn btn-success" onclick="registryLogin()">2️⃣ Login</button>
+                <div id="loginResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Bootstrap (First Agent)</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Agent ID</label>
+                        <input type="text" id="bootstrapAgentId" placeholder="admin-agent">
+                    </div>
+                    <div class="form-group">
+                        <label>Bootstrap Key</label>
+                        <input type="text" id="bootstrapKey" placeholder="Optional key">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Public Key</label>
+                    <textarea id="bootstrapPubkey" placeholder="SSH/RSA public key"></textarea>
+                </div>
+                <button class="btn btn-warning" onclick="bootstrap()">🔑 Bootstrap</button>
+                <div id="bootstrapResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Graph IR Proposal</h3>
+                <div class="form-group">
+                    <label>Graph IR (JSON)</label>
+                    <textarea id="graphIR">{"nodes": [{"id": "n1", "type": "INPUT"}, {"id": "n2", "type": "TRANSFORM"}, {"id": "n3", "type": "OUTPUT"}], "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}]}</textarea>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="proposeIR()">📝 Submit Proposal</button>
+                    <button class="btn btn-info btn-sm" onclick="loadSampleGraph('simple')">Simple</button>
+                    <button class="btn btn-info btn-sm" onclick="loadSampleGraph('ml')">ML Pipeline</button>
+                    <button class="btn btn-info btn-sm" onclick="loadSampleGraph('llm')">LLM Chain</button>
+                </div>
+                <div id="graphResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== SAFETY PANEL ==================== -->
+        <div id="safety" class="panel">
+            <h2>🛡️ Safety System</h2>
+            
+            <div class="card-grid">
+                <div class="card success">
+                    <h3>Safety Status</h3>
+                    <div id="safetyStatus">
+                        <div class="metric-row">
+                            <span class="metric-label">Status</span>
+                            <span class="metric-value"><span class="badge badge-success">Enabled</span></span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="metric-label">Validators</span>
+                            <span class="metric-value">5 Active</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="loadSafetyStatus()" style="margin-top: 10px;">🔄 Refresh</button>
+                </div>
+                
+                <div class="card warning">
+                    <h3>Constraints</h3>
+                    <div id="constraintsList">
+                        <span class="badge badge-warning">energy_conservation (10)</span>
+                        <span class="badge badge-warning">resource_limits (9)</span>
+                        <span class="badge badge-info">uncertainty_bounds (8)</span>
+                        <span class="badge badge-info">minimum_confidence (7)</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Validate Action</h3>
+                <div class="form-group">
+                    <label>Action to Validate (JSON)</label>
+                    <textarea id="validateAction">{"action_type": "data_processing", "parameters": {"source": "sensor_data", "operation": "aggregate"}}</textarea>
+                </div>
+                <button class="btn btn-primary" onclick="validateAction()">✅ Validate</button>
+                <div id="validateResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== LLM PANEL ==================== -->
+        <div id="llm" class="panel">
+            <h2>💬 LLM Interface</h2>
+            
+            <div class="card">
+                <h3>Chat</h3>
+                <div class="form-group">
+                    <label>Prompt</label>
+                    <textarea id="llmPrompt" placeholder="Enter your prompt here..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Max Tokens</label>
+                        <input type="number" id="llmMaxTokens" value="512">
+                    </div>
+                    <div class="form-group">
+                        <label>Temperature</label>
+                        <input type="number" id="llmTemp" value="0.7" step="0.1" min="0" max="2">
+                    </div>
+                </div>
+                <button class="btn btn-success" onclick="llmChat()">💬 Send</button>
+                <div id="llmResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Reasoning</h3>
+                <div class="form-group">
+                    <label>Query</label>
+                    <input type="text" id="reasonQuery" placeholder="What should I reason about?">
+                </div>
+                <div class="form-group">
+                    <label>Context (JSON, optional)</label>
+                    <textarea id="reasonContext" placeholder='{"domain": "science", "constraints": []}'></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="llmReason()">🤔 Reason</button>
+                <div id="reasonResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== AUTH PANEL ==================== -->
+        <div id="auth" class="panel">
+            <h2>🔐 Authentication</h2>
+            
+            <div class="card success">
+                <h3>Current Token</h3>
+                <div id="currentTokenDisplay" class="token-display">No token acquired</div>
+                <div class="action-buttons">
+                    <button class="btn btn-danger btn-sm" onclick="clearToken()">🗑️ Clear Token</button>
+                    <button class="btn btn-info btn-sm" onclick="copyToken()">📋 Copy</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Get JWT Token</h3>
+                <p style="color: #666; margin-bottom: 15px;">Acquire a JWT token using your API key (set in connection bar)</p>
+                <div class="form-group">
+                    <label>Subject (optional)</label>
+                    <input type="text" id="tokenSub" placeholder="Optional subject claim">
+                </div>
+                <button class="btn btn-success" onclick="getToken()">🔑 Get Token</button>
+                <div id="tokenResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Test Protected Endpoint</h3>
+                <button class="btn btn-info" onclick="testProtected()">🧪 Test /api/protected</button>
+                <div id="protectedResult" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+        
+        <!-- ==================== TOOLS PANEL ==================== -->
+        <div id="tools" class="panel">
+            <h2>🛠️ Developer Tools</h2>
+            
+            <div class="card">
+                <h3>Raw API Call</h3>
+                <div class="form-row">
+                    <div class="form-group" style="flex: 0 0 120px;">
+                        <label>Method</label>
+                        <select id="rawMethod">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Endpoint</label>
+                        <input type="text" id="rawEndpoint" placeholder="/vulcan/health" value="/health">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Body (JSON, for POST/PUT)</label>
+                    <textarea id="rawBody" placeholder='{"key": "value"}'></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="rawAPICall()">📤 Send Request</button>
+                <div id="rawResult" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Quick Links</h3>
+                <div class="action-buttons">
+                    <button class="btn btn-sm btn-info" onclick="openLink('/docs')">📚 API Docs</button>
+                    <button class="btn btn-sm btn-info" onclick="openLink('/redoc')">📖 ReDoc</button>
+                    <button class="btn btn-sm btn-info" onclick="openLink('/metrics')">📊 Metrics</button>
+                    <button class="btn btn-sm btn-info" onclick="openLink('/health')">❤️ Health</button>
+                    <button class="btn btn-sm btn-info" onclick="openLink('/api/status')">ℹ️ Status</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Endpoint Reference</h3>
+                <table class="data-table">
+                    <tr><th>Service</th><th>Base Path</th><th>Example Endpoints</th></tr>
+                    <tr><td>Platform</td><td>/</td><td>/health, /api/status, /auth/token</td></tr>
+                    <tr><td>VULCAN</td><td>/vulcan</td><td>/vulcan/health, /vulcan/v1/status, /vulcan/orchestrator/agents/status</td></tr>
+                    <tr><td>Arena</td><td>/arena</td><td>/arena/run/{agent_id}, /arena/feedback, /arena/tournament</td></tr>
+                    <tr><td>Registry</td><td>/registry</td><td>/registry/auth/nonce, /registry/bootstrap, /registry/ir/propose</td></tr>
+                </table>
+            </div>
+        </div>
+        
+        <!-- ==================== LOGS PANEL ==================== -->
+        <div id="logs" class="panel">
+            <h2>📋 Activity Logs</h2>
+            
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">Request/Response Log</h3>
+                    <button class="btn btn-sm btn-danger" onclick="clearLogs()">🗑️ Clear</button>
+                </div>
+                <div class="logs-container" id="logsContainer">
+                    <div class="log-entry info">[Ready] VulcanAMI Interface loaded</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Token Info Modal (simple overlay) -->
+    <div id="tokenModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+        <div style="background:white; padding:25px; border-radius:12px; max-width:500px; width:90%; max-height:80vh; overflow:auto;">
+            <h3 style="margin-bottom:15px;">🔐 Current JWT Token</h3>
+            <div id="tokenModalContent" class="token-display" style="max-height:200px;">No token</div>
+            <div style="margin-top:15px; display:flex; gap:10px;">
+                <button class="btn btn-primary" onclick="copyToken()">📋 Copy</button>
+                <button class="btn btn-secondary" onclick="hideTokenModal()" style="background:#6c757d; color:white;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== STATE ====================
+        let baseUrl = 'http://127.0.0.1:8000';
+        let apiKey = '';
+        let jwtToken = '';
+        let isConnected = false;
+        let refreshInterval = null;
+        
+        // ==================== TAB SWITCHING ====================
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+        
+        // ==================== CONNECTION ====================
+        async function connectPlatform() {
+            baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+            apiKey = document.getElementById('apiKey').value.trim();
+            
+            addLog('Connecting to ' + baseUrl + '...', 'info');
+            updateStatus('authenticating');
+            
+            try {
+                // Step 1: Get JWT token if API key provided
+                if (apiKey) {
+                    addLog('Authenticating with API key...', 'info');
+                    const tokenResponse = await fetch(baseUrl + '/auth/token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': apiKey
+                        },
+                        body: JSON.stringify({})
+                    });
+                    
+                    if (tokenResponse.ok) {
+                        const tokenData = await tokenResponse.json();
+                        jwtToken = tokenData.access_token;
+                        localStorage.setItem('vulcanJWT', jwtToken);
+                        addLog('✅ JWT token acquired', 'success');
+                        updateTokenDisplay();
+                    } else {
+                        const errorText = await tokenResponse.text();
+                        throw new Error('Auth failed: ' + errorText);
+                    }
+                }
+                
+                // Step 2: Test connection with status endpoint
+                const response = await fetch(baseUrl + '/api/status', {
+                    headers: getAuthHeaders()
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Status check failed: HTTP ' + response.status);
+                }
+                
+                const data = await response.json();
+                isConnected = true;
+                updateStatus('connected');
+                addLog('✅ Connected successfully!', 'success');
+                
+                // Update version badge
+                if (data.platform) {
+                    document.getElementById('platformVersion').textContent = 
+                        `v${data.platform.version || '?'} | PID ${data.platform.worker_pid || '?'}`;
+                }
+                
+                loadDashboard(data);
+                loadAllData();
+                
+                // Auto-refresh every 30s
+                if (refreshInterval) clearInterval(refreshInterval);
+                refreshInterval = setInterval(loadAllData, 30000);
+                
+            } catch (error) {
+                addLog('❌ Connection failed: ' + error.message, 'error');
+                updateStatus('disconnected');
+                jwtToken = '';
+            }
+        }
+        
+        function disconnectPlatform() {
+            isConnected = false;
+            if (refreshInterval) clearInterval(refreshInterval);
+            updateStatus('disconnected');
+            document.getElementById('platformVersion').textContent = 'Disconnected';
+            addLog('Disconnected', 'info');
+        }
+        
+        function updateStatus(status) {
+            const indicator = document.getElementById('statusIndicator');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            indicator.className = 'status-indicator status-' + status;
+            indicator.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            
+            connectBtn.style.display = (status === 'connected') ? 'none' : 'inline-flex';
+            disconnectBtn.style.display = (status === 'connected') ? 'inline-flex' : 'none';
+        }
+        
+        function getAuthHeaders() {
+            const headers = {'Content-Type': 'application/json'};
+            if (jwtToken) {
+                headers['Authorization'] = 'Bearer ' + jwtToken;
+            }
+            return headers;
+        }
+        
+        // ==================== DASHBOARD ====================
+        function loadDashboard(data) {
+            // Platform status
+            document.getElementById('platformStatus').innerHTML = `
+                <div class="card">
+                    <h3>Platform Info</h3>
+                    <div class="metric-row">
+                        <span class="metric-label">Version</span>
+                        <span class="metric-value">${data.platform?.version || 'N/A'}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Worker PID</span>
+                        <span class="metric-value">${data.platform?.worker_pid || 'N/A'}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Auth Method</span>
+                        <span class="metric-value">${data.configuration?.auth_method || 'N/A'}</span>
+                    </div>
+                </div>
+            `;
+            
+            // Services grid
+            const grid = document.getElementById('servicesGrid');
+            grid.innerHTML = '';
+            if (data.services) {
+                for (const [name, svc] of Object.entries(data.services)) {
+                    const card = document.createElement('div');
+                    card.className = 'card ' + (svc.mounted ? 'success' : 'danger');
+                    card.innerHTML = `
+                        <h3>${name.toUpperCase()}</h3>
+                        <span class="badge ${svc.mounted ? 'badge-success' : 'badge-danger'}">
+                            ${svc.mounted ? '✅ Mounted' : '❌ Not Mounted'}
+                        </span>
+                        ${svc.mount_path ? `<p style="margin-top:8px;"><code>${svc.mount_path}</code></p>` : ''}
+                    `;
+                    grid.appendChild(card);
+                }
+            }
+        }
+        
+        async function loadAllData() {
+            if (!isConnected) return;
+            try {
+                await Promise.all([
+                    loadAgentPool(),
+                    refreshHealth(),
+                    loadWorldModel(),
+                    loadSafetyStatus()
+                ]);
+            } catch (e) {
+                console.log('Some data failed to load:', e);
+            }
+        }
+        
+        // ==================== GENERIC API CALL ====================
+        async function callAPI(method, endpoint, body = null) {
+            if (!isConnected && !endpoint.includes('/auth/')) {
+                addLog('Not connected!', 'error');
+                return null;
+            }
+            
+            addLog(`${method} ${endpoint}`, 'info');
+            
+            try {
+                const options = {
+                    method,
+                    headers: getAuthHeaders()
+                };
+                if (body && (method === 'POST' || method === 'PUT')) {
+                    options.body = JSON.stringify(body);
+                }
+                
+                const response = await fetch(baseUrl + endpoint, options);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`✅ ${method} ${endpoint} - OK`, 'success');
+                } else {
+                    addLog(`⚠️ ${method} ${endpoint} - ${response.status}`, 'warning');
+                }
+                
+                return data;
+            } catch (error) {
+                addLog(`❌ ${method} ${endpoint} - ${error.message}`, 'error');
+                return {error: error.message};
+            }
+        }
+        
+        function displayResult(elementId, data) {
+            document.getElementById(elementId).innerHTML = 
+                `<div class="json-display"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+        }
+        
+        // ==================== HEALTH ====================
+        async function refreshHealth() {
+            const data = await callAPI('GET', '/health');
+            if (data) {
+                let html = `<div class="metric-row">
+                    <span class="metric-label">Status</span>
+                    <span class="metric-value"><span class="badge badge-${data.status === 'healthy' ? 'success' : 'warning'}">${data.status || 'unknown'}</span></span>
+                </div>`;
+                html += `<div class="metric-row">
+                    <span class="metric-label">Timestamp</span>
+                    <span class="metric-value">${data.timestamp || new Date().toISOString()}</span>
+                </div>`;
+                
+                if (data.services) {
+                    for (const [name, svc] of Object.entries(data.services)) {
+                        const h = svc.health || {};
+                        html += `<div class="metric-row">
+                            <span class="metric-label">${name}</span>
+                            <span class="metric-value"><span class="badge badge-${h.status === 'healthy' ? 'success' : 'danger'}">${h.status || 'unknown'}</span> ${h.latency_ms ? h.latency_ms.toFixed(1) + 'ms' : ''}</span>
+                        </div>`;
+                    }
+                }
+                
+                document.getElementById('healthStatus').innerHTML = html;
+            }
+        }
+        
+        // ==================== AGENT POOL ====================
+        async function loadAgentPool() {
+            const data = await callAPI('GET', '/vulcan/orchestrator/agents/status');
+            if (data && !data.error) {
+                document.getElementById('totalAgents').textContent = data.total_agents || '--';
+                document.getElementById('statAgents').textContent = data.total_agents || '--';
+                document.getElementById('idleAgents').textContent = data.state_distribution?.idle || 0;
+                document.getElementById('busyAgents').textContent = data.state_distribution?.busy || 0;
+                document.getElementById('pendingTasks').textContent = data.pending_tasks || 0;
+                document.getElementById('statPending').textContent = data.pending_tasks || 0;
+                
+                if (data.statistics) {
+                    document.getElementById('jobsSubmitted').textContent = data.statistics.total_jobs_submitted || 0;
+                    document.getElementById('jobsCompleted').textContent = data.statistics.total_jobs_completed || 0;
+                    document.getElementById('statJobs').textContent = data.statistics.total_jobs_completed || 0;
+                    document.getElementById('jobsFailed').textContent = data.statistics.total_jobs_failed || 0;
+                    document.getElementById('statErrors').textContent = data.statistics.total_jobs_failed || 0;
+                }
+                
+                if (data.capability_distribution) {
+                    document.getElementById('capabilityDist').innerHTML = 
+                        Object.entries(data.capability_distribution)
+                            .map(([cap, count]) => `<span class="badge badge-primary">${cap}: ${count}</span>`)
+                            .join(' ');
+                }
+            }
+        }
+        
+        async function spawnAgent() {
+            const data = await callAPI('POST', '/vulcan/orchestrator/agents/spawn', {capability: 'general'});
+            displayResult('agentActionResult', data);
+            if (data && !data.error) loadAgentPool();
+        }
+        
+        async function scalePool() {
+            const data = await callAPI('POST', '/vulcan/orchestrator/scale', {target_size: 15});
+            displayResult('agentActionResult', data);
+        }
+        
+        // ==================== VULCAN ====================
+        async function getVulcanHealth() {
+            const data = await callAPI('GET', '/vulcan/health');
+            displayResult('vulcanStatus', data);
+        }
+        
+        async function getVulcanStatus() {
+            const data = await callAPI('GET', '/vulcan/v1/status');
+            displayResult('vulcanStatus', data);
+        }
+        
+        async function invokeVulcan() {
+            const op = document.getElementById('vulcanOp').value;
+            let input;
+            try {
+                input = JSON.parse(document.getElementById('vulcanInput').value || '{}');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                return;
+            }
+            const data = await callAPI('POST', `/vulcan/v1/${op}`, input);
+            displayResult('vulcanResult', data);
+        }
+        
+        // ==================== WORLD MODEL ====================
+        async function loadWorldModel() {
+            const data = await callAPI('GET', '/vulcan/world-model/status');
+            if (data && !data.error) {
+                document.getElementById('dagNodes').textContent = data.causal_dag?.nodes || '--';
+                document.getElementById('dagEdges').textContent = data.causal_dag?.edges || '--';
+            }
+        }
+        
+        async function queryWorldModel() {
+            const query = document.getElementById('worldModelQuery').value;
+            const data = await callAPI('POST', '/vulcan/v1/world_model/query', {query});
+            displayResult('worldModelResult', data);
+        }
+        
+        async function runIntervention() {
+            const target = document.getElementById('interventionTarget').value;
+            const value = parseFloat(document.getElementById('interventionValue').value);
+            const data = await callAPI('POST', '/vulcan/world-model/intervene', {target, value});
+            displayResult('interventionResult', data);
+        }
+        
+        // ==================== ARENA (CORRECTED PATHS: /arena/* not /api/arena/*) ====================
+        async function runArenaTask() {
+            const agentId = document.getElementById('arenaAgentId').value;
+            let task;
+            try {
+                task = JSON.parse(document.getElementById('arenaTask').value);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                return;
+            }
+            // CORRECTED: /arena/run/ not /api/arena/run/
+            const data = await callAPI('POST', `/arena/run/${agentId}`, task);
+            displayResult('arenaResult', data);
+        }
+        
+        async function submitArenaFeedback() {
+            let feedback;
+            try {
+                feedback = JSON.parse(document.getElementById('arenaFeedback').value);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                return;
+            }
+            // CORRECTED: /arena/feedback not /api/arena/feedback
+            const data = await callAPI('POST', '/arena/feedback', feedback);
+            displayResult('arenaFeedbackResult', data);
+        }
+        
+        async function runTournament() {
+            let config;
+            try {
+                config = JSON.parse(document.getElementById('tournamentConfig').value);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                return;
+            }
+            // CORRECTED: /arena/tournament not /api/arena/tournament
+            const data = await callAPI('POST', '/arena/tournament', config);
+            displayResult('tournamentResult', data);
+        }
+        
+        // ==================== REGISTRY ====================
+        async function getNonce() {
+            const agentId = document.getElementById('regAgentId').value;
+            if (!agentId) return alert('Enter agent ID');
+            const data = await callAPI('POST', '/registry/auth/nonce', {agent_id: agentId});
+            displayResult('nonceResult', data);
+        }
+        
+        async function registryLogin() {
+            const agentId = document.getElementById('regAgentId').value;
+            const nonce = document.getElementById('loginNonce').value;
+            const signature = document.getElementById('loginSignature').value;
+            const data = await callAPI('POST', '/registry/auth/login', {agent_id: agentId, nonce, signature});
+            displayResult('loginResult', data);
+            if (data && data.access_token) {
+                jwtToken = data.access_token;
+                localStorage.setItem('vulcanJWT', jwtToken);
+                updateTokenDisplay();
+            }
+        }
+        
+        async function bootstrap() {
+            const agentId = document.getElementById('bootstrapAgentId').value;
+            const pubkey = document.getElementById('bootstrapPubkey').value;
+            const key = document.getElementById('bootstrapKey').value;
+            
+            const headers = {'Content-Type': 'application/json'};
+            if (key) headers['X-Bootstrap-Key'] = key;
+            
+            try {
+                const response = await fetch(baseUrl + '/registry/bootstrap', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({agent_id: agentId, pubkey, roles: ['admin']})
+                });
+                const data = await response.json();
+                displayResult('bootstrapResult', data);
+                if (data.access_token) {
+                    jwtToken = data.access_token;
+                    updateTokenDisplay();
+                }
+            } catch (e) {
+                addLog('Bootstrap failed: ' + e.message, 'error');
+            }
+        }
+        
+        async function proposeIR() {
+            let ir;
+            try {
+                ir = JSON.parse(document.getElementById('graphIR').value);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                return;
+            }
+            const data = await callAPI('POST', '/registry/ir/propose', ir);
+            displayResult('graphResult', data);
+        }
+        
+        function loadSampleGraph(type) {
+            const templates = {
+                simple: {nodes: [{id: "n1", type: "INPUT"}, {id: "n2", type: "OUTPUT"}], edges: [{from: "n1", to: "n2"}]},
+                ml: {nodes: [{id: "data", type: "INPUT"}, {id: "preprocess", type: "TRANSFORM"}, {id: "train", type: "GENERATIVE"}, {id: "output", type: "OUTPUT"}], edges: [{from: "data", to: "preprocess"}, {from: "preprocess", to: "train"}, {from: "train", to: "output"}]},
+                llm: {nodes: [{id: "prompt", type: "INPUT"}, {id: "llm", type: "GENERATIVE_AI"}, {id: "result", type: "OUTPUT"}], edges: [{from: "prompt", to: "llm"}, {from: "llm", to: "result"}]}
+            };
+            document.getElementById('graphIR').value = JSON.stringify(templates[type] || templates.simple, null, 2);
+        }
+        
+        // ==================== SAFETY ====================
+        async function loadSafetyStatus() {
+            const data = await callAPI('GET', '/vulcan/safety/status');
+            if (data && !data.error) {
+                displayResult('safetyStatus', data);
+            }
+        }
+        
+        async function validateAction() {
+            let action;
+            try {
+                action = JSON.parse(document.getElementById('validateAction').value);
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                return;
+            }
+            const data = await callAPI('POST', '/vulcan/safety/validate', action);
+            displayResult('validateResult', data);
+        }
+        
+        // ==================== LLM ====================
+        async function llmChat() {
+            const prompt = document.getElementById('llmPrompt').value;
+            const max_tokens = parseInt(document.getElementById('llmMaxTokens').value) || 512;
+            const temperature = parseFloat(document.getElementById('llmTemp').value) || 0.7;
+            const data = await callAPI('POST', '/vulcan/llm/chat', {prompt, max_tokens, temperature});
+            displayResult('llmResult', data);
+        }
+        
+        async function llmReason() {
+            const query = document.getElementById('reasonQuery').value;
+            let context = {};
+            try {
+                const contextStr = document.getElementById('reasonContext').value;
+                if (contextStr) context = JSON.parse(contextStr);
+            } catch (e) {
+                alert('Invalid context JSON');
+                return;
+            }
+            const data = await callAPI('POST', '/vulcan/llm/reason', {query, context});
+            displayResult('reasonResult', data);
+        }
+        
+        // ==================== AUTH ====================
+        async function getToken() {
+            if (!apiKey) {
+                apiKey = document.getElementById('apiKey').value.trim();
+            }
+            if (!apiKey) {
+                alert('Enter API key in connection bar first');
+                return;
+            }
+            
+            const sub = document.getElementById('tokenSub').value || undefined;
+            addLog('Requesting JWT token...', 'info');
+            
+            try {
+                const response = await fetch(baseUrl + '/auth/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey
+                    },
+                    body: JSON.stringify(sub ? {sub} : {})
+                });
+                const data = await response.json();
+                displayResult('tokenResult', data);
+                
+                if (data.access_token) {
+                    jwtToken = data.access_token;
+                    localStorage.setItem('vulcanJWT', jwtToken);
+                    updateTokenDisplay();
+                    addLog('✅ Token acquired', 'success');
+                }
+            } catch (e) {
+                addLog('Token request failed: ' + e.message, 'error');
+            }
+        }
+        
+        async function testProtected() {
+            const data = await callAPI('GET', '/api/protected');
+            displayResult('protectedResult', data);
+        }
+        
+        function updateTokenDisplay() {
+            const display = document.getElementById('currentTokenDisplay');
+            const modalContent = document.getElementById('tokenModalContent');
+            if (jwtToken) {
+                display.textContent = jwtToken.substring(0, 50) + '...';
+                modalContent.textContent = jwtToken;
+            } else {
+                display.textContent = 'No token acquired';
+                modalContent.textContent = 'No token';
+            }
+        }
+        
+        function clearToken() {
+            jwtToken = '';
+            localStorage.removeItem('vulcanJWT');
+            updateTokenDisplay();
+            addLog('Token cleared', 'info');
+        }
+        
+        function copyToken() {
+            if (jwtToken) {
+                navigator.clipboard.writeText(jwtToken);
+                addLog('Token copied to clipboard', 'success');
+            }
+        }
+        
+        function showTokenInfo() {
+            document.getElementById('tokenModal').style.display = 'flex';
+        }
+        
+        function hideTokenModal() {
+            document.getElementById('tokenModal').style.display = 'none';
+        }
+        
+        // ==================== TOOLS ====================
+        async function rawAPICall() {
+            const method = document.getElementById('rawMethod').value;
+            const endpoint = document.getElementById('rawEndpoint').value;
+            let body = null;
+            
+            if (method === 'POST' || method === 'PUT') {
+                try {
+                    const bodyText = document.getElementById('rawBody').value;
+                    if (bodyText) body = JSON.parse(bodyText);
+                } catch (e) {
+                    alert('Invalid JSON body');
+                    return;
+                }
+            }
+            
+            const data = await callAPI(method, endpoint, body);
+            displayResult('rawResult', data);
+        }
+        
+        function openLink(path) {
+            window.open(baseUrl + path, '_blank');
+        }
+        
+        // ==================== LOGGING ====================
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logsContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+            
+            // Keep last 100 entries
+            while (container.children.length > 100) {
+                container.removeChild(container.firstChild);
+            }
+        }
+        
+        function clearLogs() {
+            document.getElementById('logsContainer').innerHTML = 
+                '<div class="log-entry info">[Cleared] Logs reset</div>';
+        }
+        
+        // ==================== INIT ====================
+        // Load saved token
+        const savedToken = localStorage.getItem('vulcanJWT');
+        if (savedToken) {
+            jwtToken = savedToken;
+            updateTokenDisplay();
+            addLog('Loaded saved JWT token', 'info');
+        }
+        
+        addLog('VulcanAMI Unified Interface ready', 'success');
+        addLog('Default endpoint: http://127.0.0.1:8000', 'info');
+    </script>
+</body>
+</html>
