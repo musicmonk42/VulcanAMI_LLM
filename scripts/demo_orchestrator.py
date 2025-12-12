@@ -24,6 +24,7 @@ Environment Variables:
     VULCAN_BASE: VULCAN base URL (default: http://0.0.0.0:8000/vulcan)
     API_KEY: Arena X-API-Key header value (default: demo-key)
     DEMO_SEED: Random seed for deterministic behavior (default: 42)
+    USE_UNIFIED_PLATFORM: Whether to use unified platform proxies (default: true)
 """
 
 import asyncio
@@ -51,6 +52,10 @@ class DemoConfig:
         self.vulcan_base = os.getenv("VULCAN_BASE", f"{self.platform_base}/vulcan")
         self.api_key = os.getenv("API_KEY", "demo-key")
         self.demo_seed = int(os.getenv("DEMO_SEED", "42"))
+        
+        # Determine if using unified platform by checking if ARENA_BASE is explicitly different
+        # from the default standalone port, or if USE_UNIFIED_PLATFORM is explicitly set
+        self.use_unified_platform = os.getenv("USE_UNIFIED_PLATFORM", "true").lower() == "true"
 
         # Set random seed for reproducibility
         random.seed(self.demo_seed)
@@ -58,7 +63,7 @@ class DemoConfig:
     def get_arena_url(self, endpoint: str) -> str:
         """Get full Arena URL for endpoint."""
         # Check if using unified platform
-        if "8000" in self.platform_base:
+        if self.use_unified_platform:
             # Use unified platform proxy
             return urljoin(self.platform_base, f"/api/arena{endpoint}")
         else:
