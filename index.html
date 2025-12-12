@@ -118,13 +118,13 @@
         </div>
         
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
-            <div class="tab" onclick="switchTab('vulcan')">🧠 VULCAN</div>
-            <div class="tab" onclick="switchTab('llm')">🤖 LLM</div>
-            <div class="tab" onclick="switchTab('arena')">⚔️ Arena</div>
-            <div class="tab" onclick="switchTab('registry')">📝 Registry</div>
-            <div class="tab" onclick="switchTab('monitoring')">📡 Monitoring</div>
-            <div class="tab" onclick="switchTab('docs')">📚 Documentation</div>
+            <div class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Dashboard</div>
+            <div class="tab" data-tab="vulcan" onclick="switchTab('vulcan')">🧠 VULCAN</div>
+            <div class="tab" data-tab="llm" onclick="switchTab('llm')">🤖 LLM</div>
+            <div class="tab" data-tab="arena" onclick="switchTab('arena')">⚔️ Arena</div>
+            <div class="tab" data-tab="registry" onclick="switchTab('registry')">📝 Registry</div>
+            <div class="tab" data-tab="monitoring" onclick="switchTab('monitoring')">📡 Monitoring</div>
+            <div class="tab" data-tab="docs" onclick="switchTab('docs')">📚 Documentation</div>
         </div>
         
         <div id="dashboard" class="panel active">
@@ -253,12 +253,11 @@
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
-            // Find and activate the clicked tab by matching onclick content
-            document.querySelectorAll('.tab').forEach(t => {
-                if (t.getAttribute('onclick') === `switchTab('${tabName}')`) {
-                    t.classList.add('active');
-                }
-            });
+            // Activate the corresponding tab using data attribute
+            const activeTab = document.querySelector(`.tab[data-tab="${tabName}"]`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
         }
         
         async function connectPlatform() {
@@ -363,6 +362,15 @@
             container.scrollTop = container.scrollHeight;
         }
         
+        function parseJsonContext(contextStr, defaultValue = {}) {
+            try {
+                return contextStr ? JSON.parse(contextStr) : defaultValue;
+            } catch (e) {
+                addLog('Invalid JSON in context field', 'error');
+                return null;
+            }
+        }
+        
         function openDocs(path) {
             window.open(baseUrl + path, '_blank');
         }
@@ -438,13 +446,8 @@
                 return;
             }
             
-            let context = {};
-            try {
-                if (contextStr) context = JSON.parse(contextStr);
-            } catch (e) {
-                addLog('Invalid JSON in context field', 'error');
-                return;
-            }
+            const context = parseJsonContext(contextStr);
+            if (context === null) return;
             
             addLog('Sending reasoning request to LLM...', 'info');
             try {
@@ -483,13 +486,8 @@
                 return;
             }
             
-            let context = {};
-            try {
-                if (contextStr) context = JSON.parse(contextStr);
-            } catch (e) {
-                addLog('Invalid JSON in context field', 'error');
-                return;
-            }
+            const context = parseJsonContext(contextStr);
+            if (context === null) return;
             
             addLog('Sending explanation request to LLM...', 'info');
             try {
