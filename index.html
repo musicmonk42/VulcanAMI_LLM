@@ -253,7 +253,12 @@
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
+            // Find and activate the clicked tab by matching onclick content
+            document.querySelectorAll('.tab').forEach(t => {
+                if (t.getAttribute('onclick') === `switchTab('${tabName}')`) {
+                    t.classList.add('active');
+                }
+            });
         }
         
         async function connectPlatform() {
@@ -384,11 +389,17 @@
         }
         
         async function llmChat() {
-            if (!isConnected) return alert('Please connect first');
+            if (!isConnected) {
+                addLog('Please connect to the platform first', 'error');
+                return;
+            }
             const prompt = document.getElementById('chatPrompt').value.trim();
-            const maxTokens = parseInt(document.getElementById('chatMaxTokens').value);
+            const maxTokens = parseInt(document.getElementById('chatMaxTokens').value, 10);
             
-            if (!prompt) return alert('Please enter a prompt');
+            if (!prompt) {
+                addLog('Please enter a prompt', 'error');
+                return;
+            }
             
             addLog('Sending chat request to LLM...', 'info');
             try {
@@ -415,17 +426,24 @@
         }
         
         async function llmReason() {
-            if (!isConnected) return alert('Please connect first');
+            if (!isConnected) {
+                addLog('Please connect to the platform first', 'error');
+                return;
+            }
             const query = document.getElementById('reasonQuery').value.trim();
             const contextStr = document.getElementById('reasonContext').value.trim();
             
-            if (!query) return alert('Please enter a query');
+            if (!query) {
+                addLog('Please enter a query', 'error');
+                return;
+            }
             
             let context = {};
             try {
                 if (contextStr) context = JSON.parse(contextStr);
             } catch (e) {
-                return alert('Invalid JSON in context field');
+                addLog('Invalid JSON in context field', 'error');
+                return;
             }
             
             addLog('Sending reasoning request to LLM...', 'info');
@@ -453,17 +471,24 @@
         }
         
         async function llmExplain() {
-            if (!isConnected) return alert('Please connect first');
+            if (!isConnected) {
+                addLog('Please connect to the platform first', 'error');
+                return;
+            }
             const concept = document.getElementById('explainConcept').value.trim();
             const contextStr = document.getElementById('explainContext').value.trim();
             
-            if (!concept) return alert('Please enter a concept');
+            if (!concept) {
+                addLog('Please enter a concept', 'error');
+                return;
+            }
             
             let context = {};
             try {
                 if (contextStr) context = JSON.parse(contextStr);
             } catch (e) {
-                return alert('Invalid JSON in context field');
+                addLog('Invalid JSON in context field', 'error');
+                return;
             }
             
             addLog('Sending explanation request to LLM...', 'info');
