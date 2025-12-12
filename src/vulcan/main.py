@@ -1916,7 +1916,7 @@ async def search_memory_unversioned(request: MemorySearchRequest):
         loop = asyncio.get_running_loop()
         # Use the deployment's memory search
         results = await loop.run_in_executor(
-            None, deployment.search_memory, request.query, request.top_k or 5
+            None, deployment.search_memory, request.query, request.k or 5
         )
 
         return {"results": results, "query": request.query, "count": len(results)}

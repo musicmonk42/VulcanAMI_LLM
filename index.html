@@ -1374,7 +1374,7 @@
                 const response = await fetch(baseUrl + '/vulcan/memory/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query, top_k: topK })
+                    body: JSON.stringify({ query, k: topK })
                 });
                 const data = await response.json();
                 
