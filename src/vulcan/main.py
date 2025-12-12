@@ -1901,6 +1901,40 @@ async def get_memory_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/memory/search")
+async def search_memory_unversioned(request: MemorySearchRequest):
+    """
+    Search memory (unversioned endpoint for frontend compatibility).
+    This is an alias for /v1/memory/search.
+    """
+    if not hasattr(app.state, "deployment"):
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    deployment = app.state.deployment
+
+    try:
+        loop = asyncio.get_running_loop()
+        # Use the deployment's memory search
+        results = await loop.run_in_executor(
+            None, deployment.search_memory, request.query, request.top_k or 5
+        )
+
+        return {"results": results, "query": request.query, "count": len(results)}
+
+    except AttributeError:
+        # Fallback if search_memory method doesn't exist
+        return {
+            "results": [],
+            "query": request.query,
+            "count": 0,
+            "note": "Memory search not available",
+        }
+    except Exception as e:
+        error_counter.labels(error_type="memory_search").inc()
+        logger.error(f"Memory search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/memory/store")
 async def store_memory(request: Request):
     """Store a memory."""
