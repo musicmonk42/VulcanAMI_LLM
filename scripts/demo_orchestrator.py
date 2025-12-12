@@ -53,8 +53,8 @@ class DemoConfig:
         self.api_key = os.getenv("API_KEY", "demo-key")
         self.demo_seed = int(os.getenv("DEMO_SEED", "42"))
         
-        # Determine if using unified platform by checking if ARENA_BASE is explicitly different
-        # from the default standalone port, or if USE_UNIFIED_PLATFORM is explicitly set
+        # Determine if using unified platform via environment variable
+        # Set USE_UNIFIED_PLATFORM=false to use standalone Arena instead
         self.use_unified_platform = os.getenv("USE_UNIFIED_PLATFORM", "true").lower() == "true"
 
         # Set random seed for reproducibility
