@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulcanAMI Platform - Complete Interface</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #667eea; --primary-dark: #764ba2; --success: #28a745;
+            --warning: #ffc107; --danger: #dc3545; --info: #17a2b8;
+            --dark: #212529; --light: #f8f9fa; --border: #dee2e6;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333; min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .header {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            border-radius: 15px; padding: 30px; margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        .connection-bar {
+            background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: flex; gap: 15px; align-items: center; flex-wrap: wrap;
+        }
+        .connection-bar input {
+            flex: 1; min-width: 300px; padding: 12px 15px;
+            border: 2px solid var(--border); border-radius: 8px;
+        }
+        button {
+            padding: 10px 20px; border: none; border-radius: 8px;
+            font-weight: 600; cursor: pointer; transition: all 0.3s;
+            margin: 5px;
+        }
+        .btn-connect { background: var(--success); color: white; }
+        .btn-disconnect { background: var(--danger); color: white; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-info { background: var(--info); color: white; }
+        .btn-warning { background: var(--warning); color: #333; }
+        .btn-danger { background: var(--danger); color: white; }
+        .status-indicator {
+            padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 13px;
+        }
+        .status-connected { background: #d4edda; color: #155724; }
+        .status-disconnected { background: #f8d7da; color: #721c24; }
+        .tabs {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px; margin-bottom: 20px;
+        }
+        .tab {
+            background: rgba(255, 255, 255, 0.9); padding: 12px;
+            border-radius: 8px; cursor: pointer; font-weight: 600;
+            text-align: center; transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .tab:hover { background: white; transform: translateY(-2px); }
+        .tab.active {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+        .panel {
+            display: none; background: white; border-radius: 12px; padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .panel.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .panel h2 {
+            color: var(--primary); margin-bottom: 20px; padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+        .card {
+            background: var(--light); border-radius: 8px; padding: 20px;
+            margin-bottom: 15px; border-left: 4px solid var(--primary);
+        }
+        .card h3 { margin-bottom: 15px; color: var(--dark); }
+        .card-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px; margin-top: 20px;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block; margin-bottom: 8px; font-weight: 600; color: var(--dark);
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 10px 15px; border: 2px solid var(--border);
+            border-radius: 6px; font-size: 14px;
+        }
+        .form-group textarea { min-height: 120px; font-family: monospace; }
+        .json-display {
+            background: #282c34; color: #abb2bf; padding: 15px; border-radius: 8px;
+            overflow-x: auto; font-family: monospace; font-size: 13px;
+            max-height: 400px; overflow-y: auto;
+        }
+        .logs-container {
+            background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 8px;
+            height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px;
+        }
+        .log-entry { padding: 3px 0; border-bottom: 1px solid #333; }
+        .log-entry.error { color: #f48771; }
+        .log-entry.success { color: #89d185; }
+        .log-entry.info { color: #4fc1ff; }
+        .badge {
+            display: inline-block; padding: 5px 12px; border-radius: 15px;
+            font-size: 0.85em; font-weight: 600; margin: 3px;
+        }
+        .badge-success { background: var(--success); color: white; }
+        .badge-danger { background: var(--danger); color: white; }
+        .badge-warning { background: var(--warning); color: #333; }
+        .badge-info { background: var(--info); color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        table th, table td {
+            padding: 10px; text-align: left; border-bottom: 1px solid var(--border);
+        }
+        table th { background: var(--light); font-weight: 600; }
+        table tr:hover { background: rgba(102, 126, 234, 0.05); }
+        .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .alert {
+            padding: 12px; border-radius: 6px; margin-bottom: 15px;
+            border-left: 4px solid;
+        }
+        .alert-info { background: #d1ecf1; color: #0c5460; border-color: var(--info); }
+        .alert-success { background: #d4edda; color: #155724; border-color: var(--success); }
+        .alert-danger { background: #f8d7da; color: #721c24; border-color: var(--danger); }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 3px solid rgba(255,255,255,0.3); border-radius: 50%;
+            border-top-color: white; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 VulcanAMI Platform - Complete Control Interface</h1>
+            <p>Full Access to VULCAN-AGI, Arena, Registry, Graph Execution & All Platform Functions</p>
+        </div>
+        
+        <div class="connection-bar">
+            <input type="text" id="baseUrl" value="http://127.0.0.1:8080" placeholder="Platform URL">
+            <input type="text" id="apiKey" placeholder="API Key (optional)" style="max-width: 200px;">
+            <button class="btn-connect" onclick="connectPlatform()">🔌 Connect</button>
+            <button class="btn-disconnect" onclick="disconnectPlatform()" style="display:none" id="disconnectBtn">⛔ Disconnect</button>
+            <span class="status-indicator status-disconnected" id="statusIndicator">Disconnected</span>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
+            <div class="tab" onclick="switchTab('vulcan')">🧠 VULCAN</div>
+            <div class="tab" onclick="switchTab('arena')">⚔️ Arena</div>
+            <div class="tab" onclick="switchTab('registry')">📝 Registry</div>
+            <div class="tab" onclick="switchTab('graph')">📈 Graph IR</div>
+            <div class="tab" onclick="switchTab('governance')">⚖️ Governance</div>
+            <div class="tab" onclick="switchTab('auth')">🔐 Auth</div>
+            <div class="tab" onclick="switchTab('monitoring')">📡 Monitoring</div>
+            <div class="tab" onclick="switchTab('tools')">🛠️ Tools</div>
+        </div>
+        
+        <!-- Dashboard Panel -->
+        <div id="dashboard" class="panel active">
+            <h2>📊 Platform Dashboard</h2>
+            <div id="platformStatus"></div>
+            <div class="card-grid" id="servicesGrid"></div>
+        </div>
+        
+        <!-- VULCAN Panel -->
+        <div id="vulcan" class="panel">
+            <h2>🧠 VULCAN-AGI Cognitive System</h2>
+            
+            <div class="card">
+                <h3>Health & Status</h3>
+                <div id="vulcanHealth">Connect to view status...</div>
+                <div class="action-buttons">
+                    <button class="btn-primary" onclick="callAPI('GET', '/vulcan/health', null, 'vulcanHealth')">Check Health</button>
+                    <button class="btn-info" onclick="callAPI('GET', '/vulcan/v1/status', null, 'vulcanHealth')">Get Status</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Stream Events (SSE)</h3>
+                <div id="vulcanStream">
+                    <button class="btn-success" onclick="startSSE('/vulcan/v1/stream')">📡 Start Event Stream</button>
+                    <button class="btn-danger" onclick="stopSSE()" style="display:none" id="stopSSEBtn">⛔ Stop Stream</button>
+                </div>
+                <div class="logs-container" id="sseLog"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Invoke VULCAN Operation</h3>
+                <div class="form-group">
+                    <label>Operation:</label>
+                    <select id="vulcanOp">
+                        <option value="reason">Reason</option>
+                        <option value="plan">Plan</option>
+                        <option value="execute">Execute</option>
+                        <option value="improve">Self-Improve</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Input Data (JSON):</label>
+                    <textarea id="vulcanInput" placeholder='{"query": "...", "context": {}}'></textarea>
+                </div>
+                <button class="btn-success" onclick="invokeVulcan()">▶️ Invoke</button>
+                <div id="vulcanResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>World Model Query</h3>
+                <div class="form-group">
+                    <label>Query:</label>
+                    <input type="text" id="worldModelQuery" placeholder="Ask about causal relationships...">
+                </div>
+                <button class="btn-primary" onclick="queryWorldModel()">🔍 Query</button>
+                <div id="worldModelResult"></div>
+            </div>
+        </div>
+        
+        <!-- Arena Panel -->
+        <div id="arena" class="panel">
+            <h2>⚔️ Arena - Agent Competition & Training</h2>
+            
+            <div class="card">
+                <h3>Run Agent Task</h3>
+                <div class="form-group">
+                    <label>Agent ID:</label>
+                    <input type="text" id="agentId" placeholder="agent-001">
+                </div>
+                <div class="form-group">
+                    <label>Task Data (JSON):</label>
+                    <textarea id="agentTask">{"task": "generate", "prompt": "Hello", "max_tokens": 100}</textarea>
+                </div>
+                <button class="btn-success" onclick="runArenaTask()">▶️ Run Task</button>
+                <div id="arenaTaskResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Submit Feedback</h3>
+                <div class="form-group">
+                    <label>Feedback Type:</label>
+                    <select id="feedbackType">
+                        <option value="positive">Positive</option>
+                        <option value="negative">Negative</option>
+                        <option value="correction">Correction</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Feedback Data (JSON):</label>
+                    <textarea id="feedbackData">{"agent_id": "agent-001", "task_id": "...", "rating": 5}</textarea>
+                </div>
+                <button class="btn-primary" onclick="submitArenaFeedback()">📤 Submit Feedback</button>
+                <div id="arenaFeedbackResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Run Tournament</h3>
+                <div class="form-group">
+                    <label>Tournament Config (JSON):</label>
+                    <textarea id="tournamentConfig">{"agents": ["agent-001", "agent-002"], "rounds": 5}</textarea>
+                </div>
+                <button class="btn-warning" onclick="runTournament()">🏆 Start Tournament</button>
+                <div id="tournamentResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Feedback Dispatch</h3>
+                <div class="form-group">
+                    <label>Dispatch Data (JSON):</label>
+                    <textarea id="dispatchData">{"protocol": "rlhf", "data": {}}</textarea>
+                </div>
+                <button class="btn-info" onclick="dispatchFeedback()">📨 Dispatch</button>
+                <div id="dispatchResult"></div>
+            </div>
+        </div>
+        
+        <!-- Registry Panel -->
+        <div id="registry" class="panel">
+            <h2>📝 Registry - Agent Management</h2>
+            
+            <div class="card">
+                <h3>Get Nonce (Step 1)</h3>
+                <div class="form-group">
+                    <label>Agent ID:</label>
+                    <input type="text" id="regAgentId" placeholder="agent-xyz">
+                </div>
+                <button class="btn-primary" onclick="getNonce()">1️⃣ Get Nonce</button>
+                <div id="nonceResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Login (Step 2)</h3>
+                <div class="form-group">
+                    <label>Nonce:</label>
+                    <input type="text" id="nonce" placeholder="Nonce from step 1">
+                </div>
+                <div class="form-group">
+                    <label>Signature (base64):</label>
+                    <textarea id="signature" placeholder="Sign '<agentId>:<nonce>' with private key"></textarea>
+                </div>
+                <button class="btn-success" onclick="login()">2️⃣ Login</button>
+                <div id="loginResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Bootstrap (First Agent)</h3>
+                <div class="form-group">
+                    <label>Agent ID:</label>
+                    <input type="text" id="bootstrapAgentId" placeholder="admin-agent">
+                </div>
+                <div class="form-group">
+                    <label>Public Key:</label>
+                    <textarea id="bootstrapPubkey" placeholder="SSH/RSA public key"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Bootstrap Key (Header):</label>
+                    <input type="text" id="bootstrapKey" placeholder="Optional bootstrap key">
+                </div>
+                <button class="btn-warning" onclick="bootstrap()">🔑 Bootstrap</button>
+                <div id="bootstrapResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Onboard Agent (Admin Required)</h3>
+                <div class="form-group">
+                    <label>New Agent ID:</label>
+                    <input type="text" id="onboardAgentId" placeholder="agent-new">
+                </div>
+                <div class="form-group">
+                    <label>Public Key:</label>
+                    <textarea id="onboardPubkey"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Roles (comma-separated):</label>
+                    <input type="text" id="onboardRoles" value="agent" placeholder="agent,executor">
+                </div>
+                <button class="btn-success" onclick="onboardAgent()">➕ Onboard</button>
+                <div id="onboardResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Logout</h3>
+                <button class="btn-danger" onclick="logout()">🚪 Logout (Revoke Token)</button>
+                <div id="logoutResult"></div>
+            </div>
+        </div>
+        
+        <!-- Graph IR Panel -->
+        <div id="graph" class="panel">
+            <h2>📈 Graph IR - Execution & Compilation</h2>
+            
+            <div class="card">
+                <h3>Submit Graph IR Proposal</h3>
+                <div class="form-group">
+                    <label>Graph IR (JSON):</label>
+                    <textarea id="graphIR">{"nodes": [{"id": "n1", "type": "INPUT"}, {"id": "n2", "type": "TRANSFORM"}, {"id": "n3", "type": "OUTPUT"}], "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}], "metadata": {"name": "Sample Graph", "version": "1.0"}}</textarea>
+                </div>
+                <button class="btn-primary" onclick="loadSampleGraph()">📄 Load Sample</button>
+                <button class="btn-success" onclick="proposeIR()">📝 Submit Proposal</button>
+                <div id="graphResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Sample Graphs</h3>
+                <div class="action-buttons">
+                    <button class="btn-info" onclick="loadGraphTemplate('simple')">Simple Pipeline</button>
+                    <button class="btn-info" onclick="loadGraphTemplate('ml')">ML Workflow</button>
+                    <button class="btn-info" onclick="loadGraphTemplate('llm')">LLM Chain</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Governance Panel -->
+        <div id="governance" class="panel">
+            <h2>⚖️ Governance & Consensus</h2>
+            
+            <div class="card">
+                <h3>View Proposals</h3>
+                <button class="btn-primary" onclick="getProposals()">📜 Load Proposals</button>
+                <div id="proposalsList"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Vote on Proposal</h3>
+                <div class="form-group">
+                    <label>Proposal ID:</label>
+                    <input type="text" id="proposalId" placeholder="proposal-123">
+                </div>
+                <div class="form-group">
+                    <label>Vote:</label>
+                    <select id="vote">
+                        <option value="approve">Approve</option>
+                        <option value="reject">Reject</option>
+                        <option value="abstain">Abstain</option>
+                    </select>
+                </div>
+                <button class="btn-success" onclick="voteProposal()">🗳️ Submit Vote</button>
+                <div id="voteResult"></div>
+            </div>
+        </div>
+        
+        <!-- Auth Panel -->
+        <div id="auth" class="panel">
+            <h2>🔐 Authentication & Tokens</h2>
+            
+            <div class="card">
+                <h3>Get JWT Token</h3>
+                <div class="form-group">
+                    <label>Subject (optional):</label>
+                    <input type="text" id="tokenSub" placeholder="api_user">
+                </div>
+                <button class="btn-success" onclick="getToken()">🔑 Get Token</button>
+                <div id="tokenResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Test Protected Endpoint</h3>
+                <button class="btn-info" onclick="testProtected()">🔒 Test Authentication</button>
+                <div id="protectedResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Current Token</h3>
+                <div id="currentToken">No token set</div>
+                <button class="btn-warning" onclick="clearToken()">🗑️ Clear Token</button>
+            </div>
+        </div>
+        
+        <!-- Monitoring Panel -->
+        <div id="monitoring" class="panel">
+            <h2>📡 System Monitoring</h2>
+            
+            <div class="card-grid">
+                <div class="card">
+                    <h3>Health Status</h3>
+                    <div id="healthStatus">Loading...</div>
+                    <button class="btn-primary" onclick="refreshHealth()">🔄 Refresh</button>
+                </div>
+                
+                <div class="card">
+                    <h3>Platform Info</h3>
+                    <div id="platformInfo">Loading...</div>
+                    <button class="btn-primary" onclick="getPlatformInfo()">ℹ️ Get Info</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Audit Logs</h3>
+                <div class="form-group">
+                    <label>Limit:</label>
+                    <input type="number" id="auditLimit" value="50" min="1" max="1000">
+                </div>
+                <button class="btn-primary" onclick="getAuditLogs()">📜 Load Audit Logs</button>
+                <div id="auditLogs"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Prometheus Metrics</h3>
+                <button class="btn-info" onclick="viewMetrics()">📊 View Metrics (New Tab)</button>
+            </div>
+            
+            <div class="card">
+                <h3>System Logs</h3>
+                <div class="logs-container" id="logsContainer">
+                    <div class="log-entry info">[System] Initialized</div>
+                </div>
+                <button class="btn-warning" onclick="clearLogs()">🗑️ Clear Logs</button>
+            </div>
+        </div>
+        
+        <!-- Tools Panel -->
+        <div id="tools" class="panel">
+            <h2>🛠️ Developer Tools</h2>
+            
+            <div class="card">
+                <h3>Raw API Call</h3>
+                <div class="form-group">
+                    <label>Method:</label>
+                    <select id="rawMethod">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Endpoint:</label>
+                    <input type="text" id="rawEndpoint" placeholder="/api/endpoint" value="/">
+                </div>
+                <div class="form-group">
+                    <label>Body (JSON, optional):</label>
+                    <textarea id="rawBody" placeholder='{"key": "value"}'></textarea>
+                </div>
+                <button class="btn-primary" onclick="rawAPICall()">📡 Send Request</button>
+                <div id="rawResult"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Quick Links</h3>
+                <div class="action-buttons">
+                    <button class="btn-info" onclick="openLink('/')">🏠 Platform Home</button>
+                    <button class="btn-info" onclick="openLink('/docs')">📖 API Docs</button>
+                    <button class="btn-info" onclick="openLink('/redoc')">📘 ReDoc</button>
+                    <button class="btn-info" onclick="openLink('/vulcan/docs')">🧠 VULCAN Docs</button>
+                    <button class="btn-info" onclick="openLink('/arena/docs')">⚔️ Arena Docs</button>
+                    <button class="btn-info" onclick="openLink('/registry/spec')">📝 Registry Spec</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Demos</h3>
+                <div class="action-buttons">
+                    <button class="btn-success" onclick="openLink('demos/sse_mind.html')">📡 SSE Mind Viewer</button>
+                    <button class="btn-success" onclick="openLink('demo/artifact_card.html')">🎴 Artifact Card</button>
+                    <button class="btn-success" onclick="openLink('demo/preference_slider.html')">🎚️ Preference Slider</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let baseUrl = 'http://127.0.0.1:8080';
+        let apiKey = null;
+        let accessToken = null;
+        let isConnected = false;
+        let sseSource = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedUrl = localStorage.getItem('vulcanPlatformUrl');
+            const savedKey = localStorage.getItem('vulcanApiKey');
+            if (savedUrl) document.getElementById('baseUrl').value = savedUrl;
+            if (savedKey) document.getElementById('apiKey').value = savedKey;
+            updateTokenDisplay();
+        });
+        
+        // Tab Management
+        function switchTab(tabName) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // Connection
+        async function connectPlatform() {
+            baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+            apiKey = document.getElementById('apiKey').value.trim() || null;
+            localStorage.setItem('vulcanPlatformUrl', baseUrl);
+            if (apiKey) localStorage.setItem('vulcanApiKey', apiKey);
+            
+            addLog('Connecting to ' + baseUrl + '...', 'info');
+            try {
+                const response = await fetch(baseUrl + '/api/status', getHeaders());
+                if (response.ok) {
+                    const data = await response.json();
+                    isConnected = true;
+                    updateConnectionStatus(true);
+                    addLog('✅ Connected successfully!', 'success');
+                    loadDashboard(data);
+                    refreshHealth();
+                } else {
+                    throw new Error('HTTP ' + response.status);
+                }
+            } catch (error) {
+                addLog('❌ Connection failed: ' + error.message, 'error');
+                updateConnectionStatus(false);
+            }
+        }
+        
+        function disconnectPlatform() {
+            isConnected = false;
+            if (sseSource) stopSSE();
+            updateConnectionStatus(false);
+            addLog('Disconnected', 'info');
+        }
+        
+        function updateConnectionStatus(connected) {
+            document.getElementById('statusIndicator').textContent = connected ? 'Connected' : 'Disconnected';
+            document.getElementById('statusIndicator').className = 'status-indicator ' + (connected ? 'status-connected' : 'status-disconnected');
+            document.querySelector('.btn-connect').style.display = connected ? 'none' : 'inline-block';
+            document.getElementById('disconnectBtn').style.display = connected ? 'inline-block' : 'none';
+        }
+        
+        function getHeaders() {
+            const headers = {'Content-Type': 'application/json'};
+            if (apiKey) headers['X-API-Key'] = apiKey;
+            if (accessToken) headers['Authorization'] = 'Bearer ' + accessToken;
+            return {headers};
+        }
+        
+        // Dashboard
+        async function loadDashboard(data) {
+            document.getElementById('platformStatus').innerHTML = `
+                <div class="card">
+                    <h3>Platform Information</h3>
+                    <p><strong>Version:</strong> ${data.platform.version}</p>
+                    <p><strong>Worker PID:</strong> ${data.platform.worker_pid}</p>
+                    <p><strong>Workers:</strong> ${data.platform.workers}</p>
+                    <p><strong>Auth:</strong> ${data.configuration.auth_method}</p>
+                    <p><strong>Metrics:</strong> ${data.configuration.metrics_enabled ? '✅' : '❌'}</p>
+                </div>`;
+            
+            const grid = document.getElementById('servicesGrid');
+            grid.innerHTML = '';
+            for (const [name, svc] of Object.entries(data.services)) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    <h3>${name.toUpperCase()}</h3>
+                    <span class="badge ${svc.mounted ? 'badge-success' : 'badge-danger'}">
+                        ${svc.mounted ? '✅ Mounted' : '❌ Not Mounted'}
+                    </span>
+                    ${svc.mount_path ? `<p><code>${svc.mount_path}</code></p>` : ''}
+                    ${svc.error ? `<div class="alert alert-danger">${svc.error}</div>` : ''}`;
+                grid.appendChild(card);
+            }
+        }
+        
+        // Generic API Call
+        async function callAPI(method, endpoint, body, resultDiv) {
+            if (!isConnected) return alert('Connect first!');
+            addLog(`${method} ${endpoint}`, 'info');
+            try {
+                const options = {method, ...getHeaders()};
+                if (body) options.body = JSON.stringify(body);
+                const response = await fetch(baseUrl + endpoint, options);
+                const data = await response.json();
+                if (resultDiv) {
+                    document.getElementById(resultDiv).innerHTML = 
+                        `<div class="json-display"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+                addLog(`✅ ${method} ${endpoint}`, 'success');
+                return data;
+            } catch (error) {
+                addLog(`❌ ${method} ${endpoint}: ${error.message}`, 'error');
+                if (resultDiv) {
+                    document.getElementById(resultDiv).innerHTML = 
+                        `<div class="alert alert-danger">Error: ${error.message}</div>`;
+                }
+            }
+        }
+        
+        // Health
+        async function refreshHealth() {
+            const data = await callAPI('GET', '/health', null, null);
+            if (data) {
+                let html = `<p><strong>Status:</strong> <span class="badge badge-${data.status === 'healthy' ? 'success' : 'warning'}">${data.status}</span></p>`;
+                html += `<p><strong>Timestamp:</strong> ${data.timestamp}</p><table><tr><th>Service</th><th>Status</th><th>Latency</th></tr>`;
+                for (const [name, svc] of Object.entries(data.services)) {
+                    const h = svc.health || {};
+                    html += `<tr><td>${name}</td><td><span class="badge badge-${h.status === 'healthy' ? 'success' : 'danger'}">${h.status || 'unknown'}</span></td><td>${h.latency_ms ? h.latency_ms.toFixed(2) + 'ms' : 'N/A'}</td></tr>`;
+                }
+                html += '</table>';
+                document.getElementById('healthStatus').innerHTML = html;
+            }
+        }
+        
+        async function getPlatformInfo() {
+            await callAPI('GET', '/api/status', null, 'platformInfo');
+        }
+        
+        // VULCAN Functions
+        async function invokeVulcan() {
+            const op = document.getElementById('vulcanOp').value;
+            const input = document.getElementById('vulcanInput').value;
+            try {
+                const data = JSON.parse(input);
+                await callAPI('POST', `/vulcan/v1/${op}`, data, 'vulcanResult');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        async function queryWorldModel() {
+            const query = document.getElementById('worldModelQuery').value;
+            await callAPI('POST', '/vulcan/v1/world_model/query', {query}, 'worldModelResult');
+        }
+        
+        function startSSE(endpoint) {
+            if (sseSource) stopSSE();
+            sseSource = new EventSource(baseUrl + endpoint);
+            sseSource.onmessage = (e) => {
+                const log = document.getElementById('sseLog');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry info';
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${e.data}`;
+                log.appendChild(entry);
+                log.scrollTop = log.scrollHeight;
+            };
+            sseSource.onerror = () => {
+                addLog('SSE connection error', 'error');
+                stopSSE();
+            };
+            document.getElementById('stopSSEBtn').style.display = 'inline-block';
+            addLog('SSE stream started', 'success');
+        }
+        
+        function stopSSE() {
+            if (sseSource) {
+                sseSource.close();
+                sseSource = null;
+            }
+            document.getElementById('stopSSEBtn').style.display = 'none';
+            addLog('SSE stream stopped', 'info');
+        }
+        
+        // Arena Functions
+        async function runArenaTask() {
+            const agentId = document.getElementById('agentId').value;
+            const task = document.getElementById('agentTask').value;
+            try {
+                const data = JSON.parse(task);
+                await callAPI('POST', `/api/arena/run/${agentId}`, data, 'arenaTaskResult');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        async function submitArenaFeedback() {
+            const feedback = document.getElementById('feedbackData').value;
+            try {
+                const data = JSON.parse(feedback);
+                await callAPI('POST', '/api/arena/feedback', data, 'arenaFeedbackResult');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        async function runTournament() {
+            const config = document.getElementById('tournamentConfig').value;
+            try {
+                const data = JSON.parse(config);
+                await callAPI('POST', '/api/arena/tournament', data, 'tournamentResult');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        async function dispatchFeedback() {
+            const dispatch = document.getElementById('dispatchData').value;
+            try {
+                const data = JSON.parse(dispatch);
+                await callAPI('POST', '/api/arena/feedback_dispatch', data, 'dispatchResult');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        // Registry Functions
+        async function getNonce() {
+            const agentId = document.getElementById('regAgentId').value;
+            if (!agentId) return alert('Enter agent ID');
+            await callAPI('POST', '/registry/auth/nonce', {agent_id: agentId}, 'nonceResult');
+        }
+        
+        async function login() {
+            const agentId = document.getElementById('regAgentId').value;
+            const nonce = document.getElementById('nonce').value;
+            const signature = document.getElementById('signature').value;
+            const data = await callAPI('POST', '/registry/auth/login', {agent_id: agentId, nonce, signature}, 'loginResult');
+            if (data && data.access_token) {
+                accessToken = data.access_token;
+                localStorage.setItem('vulcanAccessToken', accessToken);
+                updateTokenDisplay();
+                addLog('Logged in successfully', 'success');
+            }
+        }
+        
+        async function logout() {
+            await callAPI('POST', '/registry/auth/logout', null, 'logoutResult');
+            accessToken = null;
+            localStorage.removeItem('vulcanAccessToken');
+            updateTokenDisplay();
+        }
+        
+        async function bootstrap() {
+            const agentId = document.getElementById('bootstrapAgentId').value;
+            const pubkey = document.getElementById('bootstrapPubkey').value;
+            const key = document.getElementById('bootstrapKey').value;
+            const headers = {'Content-Type': 'application/json'};
+            if (key) headers['X-Bootstrap-Key'] = key;
+            try {
+                const response = await fetch(baseUrl + '/registry/bootstrap', {
+                    method: 'POST', headers,
+                    body: JSON.stringify({agent_id: agentId, pubkey, roles: ['admin']})
+                });
+                const data = await response.json();
+                document.getElementById('bootstrapResult').innerHTML = 
+                    `<div class="json-display"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                if (data.access_token) {
+                    accessToken = data.access_token;
+                    updateTokenDisplay();
+                }
+            } catch (e) {
+                addLog('Bootstrap failed: ' + e.message, 'error');
+            }
+        }
+        
+        async function onboardAgent() {
+            const agentId = document.getElementById('onboardAgentId').value;
+            const pubkey = document.getElementById('onboardPubkey').value;
+            const roles = document.getElementById('onboardRoles').value.split(',').map(r => r.trim());
+            await callAPI('POST', '/registry/onboard', {agent_id: agentId, pubkey, roles}, 'onboardResult');
+        }
+        
+        // Graph IR
+        async function proposeIR() {
+            const ir = document.getElementById('graphIR').value;
+            try {
+                const data = JSON.parse(ir);
+                await callAPI('POST', '/registry/ir/propose', data, 'graphResult');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        function loadSampleGraph() {
+            const sample = {
+                nodes: [{id: "input1", type: "INPUT"}, {id: "transform1", type: "TRANSFORM"}, {id: "output1", type: "OUTPUT"}],
+                edges: [{from: "input1", to: "transform1"}, {from: "transform1", to: "output1"}],
+                metadata: {name: "Sample", version: "1.0"}
+            };
+            document.getElementById('graphIR').value = JSON.stringify(sample, null, 2);
+        }
+        
+        function loadGraphTemplate(type) {
+            const templates = {
+                simple: {nodes: [{id: "n1", type: "INPUT"}, {id: "n2", type: "OUTPUT"}], edges: [{from: "n1", to: "n2"}]},
+                ml: {nodes: [{id: "data", type: "INPUT"}, {id: "preprocess", type: "TRANSFORM"}, {id: "train", type: "GENERATIVE"}, {id: "output", type: "OUTPUT"}], edges: [{from: "data", to: "preprocess"}, {from: "preprocess", to: "train"}, {from: "train", to: "output"}]},
+                llm: {nodes: [{id: "prompt", type: "INPUT"}, {id: "llm", type: "GENERATIVE_AI"}, {id: "result", type: "OUTPUT"}], edges: [{from: "prompt", to: "llm"}, {from: "llm", to: "result"}]}
+            };
+            document.getElementById('graphIR').value = JSON.stringify(templates[type] || templates.simple, null, 2);
+        }
+        
+        // Governance
+        async function getProposals() {
+            await callAPI('GET', '/registry/proposals', null, 'proposalsList');
+        }
+        
+        async function voteProposal() {
+            const proposalId = document.getElementById('proposalId').value;
+            const vote = document.getElementById('vote').value;
+            await callAPI('POST', `/registry/proposals/${proposalId}/vote`, {vote}, 'voteResult');
+        }
+        
+        // Auth
+        async function getToken() {
+            const sub = document.getElementById('tokenSub').value || undefined;
+            const data = await callAPI('POST', '/auth/token', sub ? {sub} : {}, 'tokenResult');
+            if (data && data.access_token) {
+                accessToken = data.access_token;
+                localStorage.setItem('vulcanAccessToken', accessToken);
+                updateTokenDisplay();
+            }
+        }
+        
+        async function testProtected() {
+            await callAPI('GET', '/api/protected', null, 'protectedResult');
+        }
+        
+        function updateTokenDisplay() {
+            const display = document.getElementById('currentToken');
+            if (accessToken) {
+                display.innerHTML = `<div class="alert alert-success">Token: ${accessToken.substring(0, 30)}...</div>`;
+            } else {
+                display.innerHTML = '<div class="alert alert-info">No token set</div>';
+            }
+        }
+        
+        function clearToken() {
+            accessToken = null;
+            localStorage.removeItem('vulcanAccessToken');
+            updateTokenDisplay();
+            addLog('Token cleared', 'info');
+        }
+        
+        // Monitoring
+        async function getAuditLogs() {
+            const limit = document.getElementById('auditLimit').value;
+            await callAPI('GET', `/registry/audit/logs?limit=${limit}`, null, 'auditLogs');
+        }
+        
+        function viewMetrics() {
+            window.open(baseUrl + '/metrics', '_blank');
+        }
+        
+        // Tools
+        async function rawAPICall() {
+            const method = document.getElementById('rawMethod').value;
+            const endpoint = document.getElementById('rawEndpoint').value;
+            const body = document.getElementById('rawBody').value;
+            try {
+                const data = body ? JSON.parse(body) : null;
+                await callAPI(method, endpoint, data, 'rawResult');
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        function openLink(path) {
+            window.open(baseUrl + (path.startsWith('/') ? '' : '/') + path, '_blank');
+        }
+        
+        // Logging
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('logsContainer');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logsContainer').innerHTML = '<div class="log-entry info">Logs cleared</div>';
+        }
+        
+        // Load saved token on start
+        const saved = localStorage.getItem('vulcanAccessToken');
+        if (saved) {
+            accessToken = saved;
+            updateTokenDisplay();
+        }
+    </script>
+</body>
+</html>
