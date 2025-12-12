@@ -42,13 +42,21 @@
             font-weight: 600; cursor: pointer; transition: all 0.3s;
             margin: 5px;
         }
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
         .btn-connect { background: var(--success); color: white; }
+        .btn-connect:hover { background: #218838; }
         .btn-disconnect { background: var(--danger); color: white; }
+        .btn-disconnect:hover { background: #c82333; }
         .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
         .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #218838; }
         .btn-info { background: var(--info); color: white; }
+        .btn-info:hover { background: #138496; }
         .btn-warning { background: var(--warning); color: #333; }
+        .btn-warning:hover { background: #e0a800; }
         .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #c82333; }
         .status-indicator {
             padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 13px;
         }
@@ -143,8 +151,13 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 VulcanAMI Platform - Complete Control Interface</h1>
-            <p>Full Access to VULCAN-AGI, Arena, Registry, Graph Execution & All Platform Functions</p>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <img src="data:image/png;base64,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" alt="Novatrax Labs Logo" style="height: 50px; width: auto;">
+                <div>
+                    <h1>🚀 VulcanAMI Platform - Complete Control Interface</h1>
+                    <p>Full Access to VULCAN-AGI, Arena, Registry, Graph Execution & All Platform Functions</p>
+                </div>
+            </div>
         </div>
         
         <div class="connection-bar">
@@ -519,7 +532,7 @@
             <div class="card">
                 <h3>Demos</h3>
                 <div class="action-buttons">
-                    <button class="btn-success" onclick="openLink('demos/sse_mind.html')">📡 SSE Mind Viewer</button>
+                    <button class="btn-success" onclick="openLink('demo/sse_mind.html')">📡 SSE Mind Viewer</button>
                     <button class="btn-success" onclick="openLink('demo/artifact_card.html')">🎴 Artifact Card</button>
                     <button class="btn-success" onclick="openLink('demo/preference_slider.html')">🎚️ Preference Slider</button>
                 </div>
