@@ -575,6 +575,29 @@
             
             addLog('Connecting to ' + baseUrl + '...', 'info');
             try {
+                // Step 1: Get JWT token if API key is provided
+                if (apiKey) {
+                    addLog('Authenticating with API key...', 'info');
+                    const tokenResponse = await fetch(baseUrl + '/auth/token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': apiKey
+                        }
+                    });
+                    
+                    if (tokenResponse.ok) {
+                        const tokenData = await tokenResponse.json();
+                        accessToken = tokenData.access_token;
+                        localStorage.setItem('vulcanAccessToken', accessToken);
+                        addLog('✅ JWT token acquired', 'success');
+                    } else {
+                        const errorText = await tokenResponse.text();
+                        throw new Error('Token acquisition failed: ' + errorText);
+                    }
+                }
+                
+                // Step 2: Test connection with status endpoint
                 const response = await fetch(baseUrl + '/api/status', getHeaders());
                 if (response.ok) {
                     const data = await response.json();
@@ -589,6 +612,7 @@
             } catch (error) {
                 addLog('❌ Connection failed: ' + error.message, 'error');
                 updateConnectionStatus(false);
+                accessToken = null;
             }
         }
         
@@ -871,11 +895,32 @@
         // Auth
         async function getToken() {
             const sub = document.getElementById('tokenSub').value || undefined;
-            const data = await callAPI('POST', '/auth/token', sub ? {sub} : {}, 'tokenResult');
-            if (data && data.access_token) {
-                accessToken = data.access_token;
-                localStorage.setItem('vulcanAccessToken', accessToken);
-                updateTokenDisplay();
+            if (!apiKey) {
+                alert('Please enter an API key in the connection bar first');
+                return;
+            }
+            try {
+                const response = await fetch(baseUrl + '/auth/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': apiKey
+                    },
+                    body: JSON.stringify(sub ? {sub} : {})
+                });
+                const data = await response.json();
+                document.getElementById('tokenResult').innerHTML = 
+                    `<div class="json-display"><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                if (data && data.access_token) {
+                    accessToken = data.access_token;
+                    localStorage.setItem('vulcanAccessToken', accessToken);
+                    updateTokenDisplay();
+                    addLog('Token acquired successfully', 'success');
+                }
+            } catch (error) {
+                addLog('Token request failed: ' + error.message, 'error');
+                document.getElementById('tokenResult').innerHTML = 
+                    `<div class="alert alert-danger">Error: ${error.message}</div>`;
             }
         }
         
