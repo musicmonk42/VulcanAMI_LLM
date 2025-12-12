@@ -156,15 +156,15 @@
         </div>
         
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
-            <div class="tab" onclick="switchTab('vulcan')">🧠 VULCAN</div>
-            <div class="tab" onclick="switchTab('arena')">⚔️ Arena</div>
-            <div class="tab" onclick="switchTab('registry')">📝 Registry</div>
-            <div class="tab" onclick="switchTab('graph')">📈 Graph IR</div>
-            <div class="tab" onclick="switchTab('governance')">⚖️ Governance</div>
-            <div class="tab" onclick="switchTab('auth')">🔐 Auth</div>
-            <div class="tab" onclick="switchTab('monitoring')">📡 Monitoring</div>
-            <div class="tab" onclick="switchTab('tools')">🛠️ Tools</div>
+            <div class="tab active" onclick="switchTab('dashboard', event)">📊 Dashboard</div>
+            <div class="tab" onclick="switchTab('vulcan', event)">🧠 VULCAN</div>
+            <div class="tab" onclick="switchTab('arena', event)">⚔️ Arena</div>
+            <div class="tab" onclick="switchTab('registry', event)">📝 Registry</div>
+            <div class="tab" onclick="switchTab('graph', event)">📈 Graph IR</div>
+            <div class="tab" onclick="switchTab('governance', event)">⚖️ Governance</div>
+            <div class="tab" onclick="switchTab('auth', event)">🔐 Auth</div>
+            <div class="tab" onclick="switchTab('monitoring', event)">📡 Monitoring</div>
+            <div class="tab" onclick="switchTab('tools', event)">🛠️ Tools</div>
         </div>
         
         <!-- Dashboard Panel -->
@@ -544,11 +544,13 @@
         });
         
         // Tab Management
-        function switchTab(tabName) {
+        function switchTab(tabName, event) {
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
         }
         
         // Connection
@@ -908,7 +910,8 @@
         }
         
         function openLink(path) {
-            window.open(baseUrl + (path.startsWith('/') ? '' : '/') + path, '_blank');
+            const url = path.startsWith('/') ? baseUrl + path : baseUrl + '/' + path;
+            window.open(url, '_blank');
         }
         
         // Logging

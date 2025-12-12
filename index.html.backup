@@ -202,7 +202,7 @@
         let baseUrl = 'http://127.0.0.1:8080';
         let isConnected = false;
         
-        function switchTab(tabName) {
+        function switchTab(tabName, event) {
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById(tabName).classList.add('active');
