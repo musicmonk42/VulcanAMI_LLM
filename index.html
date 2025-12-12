@@ -1504,7 +1504,7 @@
             addLog('Running arena task...', 'info');
             
             try {
-                const response = await fetch(baseUrl + '/arena/run/' + agentId, {
+                const response = await fetch(baseUrl + '/api/arena/run/' + agentId, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task, prompt: task || 'Execute task', max_tokens: 100 })

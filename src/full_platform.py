@@ -179,7 +179,14 @@ class UnifiedPlatformSettings(BaseSettings):
     # CORS
     cors_enabled: bool = True
     # Tightened default origins; wildcard is no longer the default for security
-    cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Note: "null" origin is needed for file:// URLs (local HTML files)
+    cors_origins: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "null"
+    ]
 
     # Health checks
     enable_health_checks: bool = True
