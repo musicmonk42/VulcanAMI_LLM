@@ -14,7 +14,7 @@ The frontend and backend were misaligned with:
 
 ## Changes Implemented
 
-### 1. Frontend Changes (index.html)
+### 1. Frontend Changes (vulcan_unified.html)
 
 #### Arena Endpoint Fix
 - **Before**: `POST /arena/run/{agentId}`
@@ -177,7 +177,7 @@ Default port: 8080
 
 ### 2. Access the Frontend
 
-Open `index.html` in a web browser. The page should be able to:
+Open `vulcan_unified.html` in a web browser. The page should be able to:
 - Connect to the backend
 - Call all API endpoints
 - Display results without CORS errors
@@ -201,7 +201,9 @@ Open `index.html` in a web browser. The page should be able to:
 
 ## Files Modified
 
-1. **index.html** (2 changes)
+1. **vulcan_unified.html** (consolidated interface)
+   - Updated API endpoint paths
+   - Improved error handling
    - Arena endpoint path fix
    - Memory search parameter fix
 

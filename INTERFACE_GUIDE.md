@@ -2,7 +2,9 @@
 
 ## Overview
 
-The VulcanAMI Platform now includes a comprehensive web-based HTML interface (`vulcan_interface.html`) that provides full access to all platform functions through an intuitive, single-page application.
+The VulcanAMI Platform now includes a comprehensive web-based HTML interface (`vulcan_unified.html`) that provides full access to all platform functions through an intuitive, single-page application.
+
+**Note:** This unified interface consolidates all features from previous separate interfaces.
 
 ## Quick Start
 
@@ -18,16 +20,16 @@ python src/full_platform.py --host 0.0.0.0 --port 8080
 
 ### 2. Open the Interface
 
-Simply open `vulcan_interface.html` in your web browser:
+Simply open `vulcan_unified.html` in your web browser:
 
 ```bash
 # On Linux/Mac
-xdg-open vulcan_interface.html
+xdg-open vulcan_unified.html
 
 # On Windows
-start vulcan_interface.html
+start vulcan_unified.html
 
-# Or manually: File > Open > vulcan_interface.html
+# Or manually: File > Open > vulcan_unified.html
 ```
 
 ### 3. Connect
@@ -263,8 +265,8 @@ Requires:
 
 ## Comparison with Existing Demos
 
-| Feature | vulcan_interface.html | sse_mind.html | artifact_card.html |
-|---------|----------------------|---------------|-------------------|
+| Feature | vulcan_unified.html | sse_mind.html | artifact_card.html |
+|---------|---------------------|---------------|-------------------|
 | Full Platform Access | ✅ | ❌ | ❌ |
 | VULCAN Functions | ✅ | ❌ | ❌ |
 | Arena Functions | ✅ | ❌ | ❌ |
@@ -276,7 +278,7 @@ Requires:
 | Monitoring | ✅ | ❌ | ❌ |
 
 **Use Cases:**
-- **vulcan_interface.html**: Complete platform control (use this!)
+- **vulcan_unified.html**: Complete platform control (use this!)
 - **sse_mind.html**: Dedicated SSE stream viewer
 - **artifact_card.html**: Specific artifact inspection
 

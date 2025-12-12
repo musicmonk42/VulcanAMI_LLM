@@ -1,7 +1,9 @@
 # JWT Authentication Implementation Verification Checklist
 
 ## Overview
-This checklist verifies that JWT authentication has been properly implemented in both frontend interfaces.
+This checklist verifies that JWT authentication has been properly implemented in the unified frontend interface (`vulcan_unified.html`).
+
+**Note:** The interface has been consolidated into a single unified file.
 
 ## Pre-requisites
 - [ ] Backend server running with JWT authentication enabled
@@ -16,7 +18,7 @@ This checklist verifies that JWT authentication has been properly implemented in
 ### 1. Basic Connection Tests
 
 #### Test 1.1: Connect with Valid API Key
-- [ ] Open `index.html` in browser
+- [ ] Open `vulcan_unified.html` in browser
 - [ ] Enter Platform URL: `http://localhost:8000`
 - [ ] Enter valid API Key in password field
 - [ ] Click "Connect" button
@@ -26,17 +28,17 @@ This checklist verifies that JWT authentication has been properly implemented in
   - "✅ JWT token acquired"
   - "✅ Connected successfully!"
 - [ ] **Expected**: Status indicator shows "Connected" (green)
-- [ ] **Expected**: Platform version appears in top right
+- [ ] **Expected**: Platform version appears
 
 #### Test 1.2: Connect without API Key
-- [ ] Open `index.html` in browser (fresh page)
+- [ ] Open `vulcan_unified.html` in browser (fresh page)
 - [ ] Enter Platform URL only (leave API Key empty)
 - [ ] Click "Connect"
 - [ ] **Expected**: If backend allows unauthenticated access, connection succeeds
 - [ ] **Expected**: If backend requires auth, connection fails with appropriate error
 
 #### Test 1.3: Connect with Invalid API Key
-- [ ] Open `index.html` in browser (fresh page)
+- [ ] Open `vulcan_unified.html` in browser (fresh page)
 - [ ] Enter Platform URL
 - [ ] Enter invalid API Key
 - [ ] Click "Connect"

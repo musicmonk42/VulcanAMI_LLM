@@ -4,12 +4,12 @@
 
 A comprehensive, production-ready HTML interface has been created for the VulcanAMI Platform, providing complete web-based access to all platform functions including VULCAN-AGI cognitive systems, Arena agent competitions, Registry management, Graph IR execution, and system governance.
 
-## 📁 Files Created
+## 📁 Main Interface File
 
-### Main Interface Files
-- **`vulcan_interface.html`** (43KB) - Complete full-featured interface
-- **`index.html`** (16KB) - Simplified version for basic operations
+- **`vulcan_unified.html`** - Complete unified interface with all platform features
 - **`INTERFACE_GUIDE.md`** - Comprehensive usage documentation
+
+**Note:** Previous files `index.html` and `vulcan_interface.html` have been consolidated into the single unified interface `vulcan_unified.html`.
 
 ### Key Features
 
@@ -54,10 +54,10 @@ python src/full_platform.py --auth-method jwt
 ### Open Interface
 ```bash
 # Simply open in browser
-open vulcan_interface.html
+open vulcan_unified.html
 
 # Or navigate to file
-file:///path/to/VulcanAMI_LLM/vulcan_interface.html
+file:///path/to/VulcanAMI_LLM/vulcan_unified.html
 ```
 
 ## 📊 Feature Matrix
@@ -485,7 +485,7 @@ The VulcanAMI Platform now has a **complete, production-ready HTML interface** t
 **Start using it now:**
 ```bash
 python src/full_platform.py
-open vulcan_interface.html
+open vulcan_unified.html
 ```
 
 Enjoy! 🚀

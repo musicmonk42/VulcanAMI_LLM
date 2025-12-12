@@ -19,8 +19,7 @@ The frontend automatically handles the following flow:
 ### For Users
 
 1. **Open the HTML interface** in your browser:
-   - `index.html` - Enhanced Interface with all features
-   - `vulcan_interface.html` - Complete Interface with advanced controls
+   - `vulcan_unified.html` - Unified interface with all platform features
 
 2. **Enter connection details**:
    - Platform URL: `http://127.0.0.1:8000` (or your server URL)
@@ -143,7 +142,7 @@ Headers:
 ## Example Workflow
 
 ```
-1. User opens index.html in browser
+1. User opens vulcan_unified.html in browser
 2. User enters:
    - URL: http://localhost:8000
    - API Key: Abc123XyzSecureKey456

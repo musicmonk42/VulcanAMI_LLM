@@ -277,7 +277,7 @@ The platform will start on `http://localhost:8080` by default.
 
 ### Open the Frontend
 
-Open `index.html` in a web browser. The frontend will attempt to connect to the backend at the configured `baseUrl`.
+Open `vulcan_unified.html` in a web browser. The frontend will attempt to connect to the backend at the configured `baseUrl`.
 
 ### Test Each Feature
 
@@ -316,5 +316,5 @@ If endpoints return 503:
 
 If the frontend cannot connect:
 - Ensure the backend is running
-- Check the `baseUrl` in `index.html` matches the server address
+- Check the `baseUrl` in `vulcan_unified.html` matches the server address
 - Verify the server port (default 8080)
