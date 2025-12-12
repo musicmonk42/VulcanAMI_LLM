@@ -1091,22 +1091,22 @@ class BayesianNetworkReasoner:
         var = self.variables[var_name]
         parents = var.parents
         
-        # Extract target values
-        Y = np.array([d[var_name] for d in data if var_name in d])
-        
-        if len(Y) == 0:
-            # Default parameters if no data
-            self.gaussian_cpds[var_name] = GaussianCPD(
-                variable=var_name,
-                parents=parents,
-                coefficients={p: 0.0 for p in parents},
-                intercept=0.0,
-                variance=1.0
-            )
-            return
-        
         if not parents:
-            # No parents - estimate mean and variance directly
+            # No parents - estimate mean and variance directly from samples with var_name
+            valid_data = [d[var_name] for d in data if var_name in d]
+            
+            if len(valid_data) == 0:
+                # Default parameters if no data
+                self.gaussian_cpds[var_name] = GaussianCPD(
+                    variable=var_name,
+                    parents=[],
+                    coefficients={},
+                    intercept=0.0,
+                    variance=1.0
+                )
+                return
+            
+            Y = np.array(valid_data)
             intercept = float(np.mean(Y))
             variance = float(np.var(Y, ddof=1)) if len(Y) > 1 else 1.0
             self.gaussian_cpds[var_name] = GaussianCPD(
@@ -1118,7 +1118,22 @@ class BayesianNetworkReasoner:
             )
         else:
             # Build design matrix for linear regression
-            X = np.array([[d.get(p, 0.0) for p in parents] for d in data if var_name in d])
+            # Filter for samples where both target and all parents are present
+            valid_data = [d for d in data if var_name in d and all(p in d for p in parents)]
+            
+            if len(valid_data) == 0:
+                # No valid samples - use defaults
+                self.gaussian_cpds[var_name] = GaussianCPD(
+                    variable=var_name,
+                    parents=parents,
+                    coefficients={p: 0.0 for p in parents},
+                    intercept=0.0,
+                    variance=1.0
+                )
+                return
+            
+            X = np.array([[d[p] for p in parents] for d in valid_data])
+            Y = np.array([d[var_name] for d in valid_data])
             
             # Add intercept column (ones)
             X_design = np.column_stack([np.ones(len(X)), X])
