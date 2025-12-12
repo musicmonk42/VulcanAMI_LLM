@@ -266,6 +266,7 @@
         <!-- Connection Bar -->
         <div class="connection-bar">
             <input type="text" id="baseUrl" placeholder="Platform URL" value="http://127.0.0.1:8000">
+            <input type="password" id="apiKey" placeholder="API Key (required if auth enabled)" style="flex: 0 1 220px;">
             <button class="btn-connect" id="connectBtn" onclick="connectPlatform()">🔌 Connect</button>
             <button class="btn-disconnect" id="disconnectBtn" onclick="disconnectPlatform()" style="display:none">⛔ Disconnect</button>
             <span class="status-indicator status-disconnected" id="statusIndicator">Disconnected</span>
@@ -962,6 +963,8 @@
     <script>
         // ==================== GLOBAL STATE ====================
         let baseUrl = 'http://127.0.0.1:8000';
+        let apiKey = '';
+        let jwtToken = '';
         let isConnected = false;
         let refreshInterval = null;
         
@@ -977,10 +980,38 @@
         // ==================== CONNECTION ====================
         async function connectPlatform() {
             baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+            apiKey = document.getElementById('apiKey').value.trim();
             addLog('Connecting to ' + baseUrl + '...', 'info');
             
             try {
-                const response = await fetch(baseUrl + '/api/status');
+                // Step 1: Get JWT token if API key is provided
+                if (apiKey) {
+                    addLog('Authenticating with API key...', 'info');
+                    const tokenResponse = await fetch(baseUrl + '/auth/token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': apiKey
+                        }
+                    });
+                    
+                    if (tokenResponse.ok) {
+                        const tokenData = await tokenResponse.json();
+                        jwtToken = tokenData.access_token;
+                        addLog('✅ JWT token acquired', 'success');
+                    } else {
+                        const errorText = await tokenResponse.text();
+                        throw new Error('Token acquisition failed: ' + errorText);
+                    }
+                }
+                
+                // Step 2: Test connection with status endpoint
+                const headers = {'Content-Type': 'application/json'};
+                if (jwtToken) {
+                    headers['Authorization'] = 'Bearer ' + jwtToken;
+                }
+                
+                const response = await fetch(baseUrl + '/api/status', { headers });
                 const data = await response.json();
                 isConnected = true;
                 updateConnectionStatus(true);
@@ -1001,6 +1032,7 @@
             } catch (error) {
                 addLog('❌ Connection failed: ' + error.message, 'error');
                 updateConnectionStatus(false);
+                jwtToken = '';
             }
         }
         
@@ -1008,7 +1040,17 @@
             isConnected = false;
             updateConnectionStatus(false);
             if (refreshInterval) clearInterval(refreshInterval);
+            jwtToken = '';
+            apiKey = '';
             addLog('Disconnected', 'info');
+        }
+        
+        function getAuthHeaders() {
+            const headers = {'Content-Type': 'application/json'};
+            if (jwtToken) {
+                headers['Authorization'] = 'Bearer ' + jwtToken;
+            }
+            return headers;
         }
         
         function updateConnectionStatus(connected) {
@@ -1091,7 +1133,9 @@
             if (!isConnected) return;
             
             try {
-                const response = await fetch(baseUrl + '/vulcan/orchestrator/agents/status');
+                const response = await fetch(baseUrl + '/vulcan/orchestrator/agents/status', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 // Update stats
@@ -1130,7 +1174,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/orchestrator/agents/spawn', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ capability: 'general' })
                 });
                 const data = await response.json();
@@ -1146,7 +1190,9 @@
             if (!isConnected) return;
             
             try {
-                const response = await fetch(baseUrl + '/vulcan/world-model/status');
+                const response = await fetch(baseUrl + '/vulcan/world-model/status', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 document.getElementById('dagNodes').textContent = data.causal_dag?.nodes || '--';
@@ -1175,7 +1221,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/world-model/intervene', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ target, value })
                 });
                 const data = await response.json();
@@ -1206,7 +1252,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/world-model/predict', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ query, evidence })
                 });
                 const data = await response.json();
@@ -1224,7 +1270,9 @@
             if (!isConnected) return;
             
             try {
-                const response = await fetch(baseUrl + '/vulcan/safety/status');
+                const response = await fetch(baseUrl + '/vulcan/safety/status', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 document.getElementById('safetyScore').textContent = 
@@ -1254,7 +1302,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/safety/validate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(action)
                 });
                 const data = await response.json();
@@ -1277,7 +1325,9 @@
             if (!isConnected) return alert('Please connect first');
             
             try {
-                const response = await fetch(baseUrl + '/vulcan/safety/audit/recent?limit=20');
+                const response = await fetch(baseUrl + '/vulcan/safety/audit/recent?limit=20', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 const container = document.getElementById('auditLog');
@@ -1299,7 +1349,9 @@
             if (!isConnected) return alert('Please connect first');
             
             try {
-                const response = await fetch(baseUrl + '/vulcan/self-improvement/objectives');
+                const response = await fetch(baseUrl + '/vulcan/self-improvement/objectives', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 const container = document.getElementById('improvementObjectives');
@@ -1332,7 +1384,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/transparency/query', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ query })
                 });
                 const data = await response.json();
@@ -1350,7 +1402,9 @@
             if (!isConnected) return;
             
             try {
-                const response = await fetch(baseUrl + '/vulcan/memory/status');
+                const response = await fetch(baseUrl + '/vulcan/memory/status', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 document.getElementById('memoryEntries').textContent = data.total_entries || '--';
@@ -1373,7 +1427,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/memory/search', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ query, k: topK })
                 });
                 const data = await response.json();
@@ -1404,7 +1458,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/memory/store', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ content, metadata })
                 });
                 const data = await response.json();
@@ -1423,7 +1477,9 @@
             if (!isConnected) return alert('Please connect first');
             
             try {
-                const response = await fetch(baseUrl + '/vulcan/hardware/status');
+                const response = await fetch(baseUrl + '/vulcan/hardware/status', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 document.getElementById('hwHealthy').textContent = data.healthy ? 'OK' : 'ERR';
@@ -1448,7 +1504,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/llm/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ prompt, max_tokens: maxTokens, temperature })
                 });
                 const data = await response.json();
@@ -1481,7 +1537,7 @@
             try {
                 const response = await fetch(baseUrl + '/vulcan/llm/reason', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ query, context })
                 });
                 const data = await response.json();
@@ -1506,7 +1562,7 @@
             try {
                 const response = await fetch(baseUrl + '/api/arena/run/' + agentId, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify({ task, prompt: task || 'Execute task', max_tokens: 100 })
                 });
                 const data = await response.json();
@@ -1524,7 +1580,9 @@
             if (!isConnected) return;
             
             try {
-                const response = await fetch(baseUrl + '/health');
+                const response = await fetch(baseUrl + '/health', {
+                    headers: getAuthHeaders()
+                });
                 const data = await response.json();
                 
                 document.getElementById('healthStatus').innerHTML = `
