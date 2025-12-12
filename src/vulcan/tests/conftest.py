@@ -14,6 +14,7 @@ import uuid
 import warnings
 from unittest.mock import Mock
 
+import numpy as np
 import pytest
 
 # Add src directory to Python path
@@ -27,6 +28,13 @@ if str(SRC) not in sys.path:
 # - Temporary daemon threads that may not have exited yet
 # - Background cleanup threads from pytest plugins
 THREAD_LEAK_TOLERANCE = 2
+
+
+@pytest.fixture(autouse=True)
+def reset_random_state():
+    """Ensure each test starts with a fresh random state."""
+    np.random.seed(12345)
+    yield
 
 
 @pytest.fixture(scope="function", autouse=True)
