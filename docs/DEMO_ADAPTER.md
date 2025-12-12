@@ -8,9 +8,9 @@ Purpose
 ## TL;DR (Run)
 ```bash
 # Start your platform or standalone services
-export PLATFORM_BASE=http://127.0.0.1:8080
+export PLATFORM_BASE=http://0.0.0.0:8000
 export ARENA_BASE=http://127.0.0.1:8000
-export VULCAN_BASE=http://127.0.0.1:8080/vulcan
+export VULCAN_BASE=http://0.0.0.0:8000/vulcan
 export API_KEY=demo-key
 export DEMO_SEED=42
 

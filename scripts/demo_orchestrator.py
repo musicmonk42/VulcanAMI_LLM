@@ -19,9 +19,9 @@ Usage:
     ARENA_BASE=http://127.0.0.1:8000 VULCAN_BASE=http://127.0.0.1:8001 python scripts/demo_orchestrator.py
 
 Environment Variables:
-    PLATFORM_BASE: Unified platform base URL (default: http://127.0.0.1:8080)
+    PLATFORM_BASE: Unified platform base URL (default: http://0.0.0.0:8000)
     ARENA_BASE: Arena base URL (default: http://127.0.0.1:8000)
-    VULCAN_BASE: VULCAN base URL (default: http://127.0.0.1:8080/vulcan)
+    VULCAN_BASE: VULCAN base URL (default: http://0.0.0.0:8000/vulcan)
     API_KEY: Arena X-API-Key header value (default: demo-key)
     DEMO_SEED: Random seed for deterministic behavior (default: 42)
 """
@@ -46,7 +46,7 @@ class DemoConfig:
     """Configuration for demo orchestrator."""
 
     def __init__(self):
-        self.platform_base = os.getenv("PLATFORM_BASE", "http://127.0.0.1:8080")
+        self.platform_base = os.getenv("PLATFORM_BASE", "http://0.0.0.0:8000")
         self.arena_base = os.getenv("ARENA_BASE", "http://127.0.0.1:8000")
         self.vulcan_base = os.getenv("VULCAN_BASE", f"{self.platform_base}/vulcan")
         self.api_key = os.getenv("API_KEY", "demo-key")
@@ -58,7 +58,7 @@ class DemoConfig:
     def get_arena_url(self, endpoint: str) -> str:
         """Get full Arena URL for endpoint."""
         # Check if using unified platform
-        if "8080" in self.platform_base:
+        if "8000" in self.platform_base:
             # Use unified platform proxy
             return urljoin(self.platform_base, f"/api/arena{endpoint}")
         else:

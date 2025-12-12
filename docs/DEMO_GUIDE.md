@@ -168,14 +168,15 @@ pip install httpx
 Start the unified platform:
 
 ```bash
-# Start unified platform on default port 8080
-python -m uvicorn src.full_platform:app --host 127.0.0.1 --port 8080
+# Start unified platform on default port 8000
+python src/full_platform.py
+# Or with explicit host/port: python -m uvicorn src.full_platform:app --host 0.0.0.0 --port 8000
 ```
 
 In a separate terminal, run the orchestrator:
 
 ```bash
-# Run with defaults (unified platform at http://127.0.0.1:8080)
+# Run with defaults (unified platform at http://0.0.0.0:8000)
 python scripts/demo_orchestrator.py
 ```
 
@@ -206,9 +207,9 @@ python scripts/demo_orchestrator.py
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PLATFORM_BASE` | `http://127.0.0.1:8080` | Unified platform base URL |
+| `PLATFORM_BASE` | `http://0.0.0.0:8000` | Unified platform base URL |
 | `ARENA_BASE` | `http://127.0.0.1:8000` | Standalone Arena URL |
-| `VULCAN_BASE` | `http://127.0.0.1:8080/vulcan` | VULCAN URL (or standalone) |
+| `VULCAN_BASE` | `http://0.0.0.0:8000/vulcan` | VULCAN URL (or standalone) |
 | `API_KEY` | `demo-key` | Arena X-API-Key header value |
 | `DEMO_SEED` | `42` | Random seed for reproducibility |
 
@@ -229,9 +230,9 @@ The orchestrator demonstrates:
 ======================================================================
 
 Configuration:
-  Platform Base: http://127.0.0.1:8080
+  Platform Base: http://0.0.0.0:8000
   Arena Base: http://127.0.0.1:8000
-  VULCAN Base: http://127.0.0.1:8080/vulcan
+  VULCAN Base: http://0.0.0.0:8000/vulcan
   Demo Seed: 42
   API Key: demo-key...
 
@@ -239,7 +240,7 @@ Configuration:
   ACT 1: Submit Inefficient Run to Arena
 ======================================================================
 
-📤 Submitting run to: http://127.0.0.1:8080/api/arena/run/generator
+📤 Submitting run to: http://0.0.0.0:8000/api/arena/run/generator
    Payload: {...}
 ✅ Run submitted successfully!
    Response status: 200
@@ -280,8 +281,11 @@ A browser-based viewer for real-time VULCAN cognitive activity streaming via Ser
 1. **Start the platform or VULCAN service**:
 
 ```bash
-# Unified platform
-python -m uvicorn src.full_platform:app --host 127.0.0.1 --port 8080
+# Unified platform (default configuration)
+python src/full_platform.py
+
+# Or with explicit settings
+python -m uvicorn src.full_platform:app --host 0.0.0.0 --port 8000
 
 # Or standalone VULCAN
 python -m src.vulcan.main --port 8001
@@ -299,9 +303,9 @@ xdg-open demos/sse_mind.html
 ```
 
 3. **Configure connection**:
-   - For unified platform: `http://127.0.0.1:8080/vulcan` (default)
+   - For unified platform: `http://0.0.0.0:8000/vulcan` (default)
    - For standalone VULCAN: `http://127.0.0.1:8001`
-   - Via query parameter: `demos/sse_mind.html?base=http://127.0.0.1:8080/vulcan`
+   - Via query parameter: `demos/sse_mind.html?base=http://0.0.0.0:8000/vulcan`
 
 4. **Click "Connect"** to start streaming events
 

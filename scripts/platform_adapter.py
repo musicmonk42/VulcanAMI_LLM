@@ -30,7 +30,7 @@ class AdapterConfig:
 
     @classmethod
     def from_env(cls) -> "AdapterConfig":
-        platform_base = os.getenv("PLATFORM_BASE", "http://127.0.0.1:8080")
+        platform_base = os.getenv("PLATFORM_BASE", "http://0.0.0.0:8000")
         arena_base = os.getenv("ARENA_BASE", "http://127.0.0.1:8000")
         vulcan_base = os.getenv("VULCAN_BASE", f"{platform_base}/vulcan")
         api_key = os.getenv("API_KEY", "demo-key")
