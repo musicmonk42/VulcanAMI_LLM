@@ -158,6 +158,14 @@ _alias_all_src_modules()
 # ============================================================
 
 @pytest.fixture(autouse=True)
+def reset_random_state():
+    """Ensure each test starts with a fresh random state."""
+    import numpy as np
+    np.random.seed(12345)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def reset_environment_state(tmp_path, monkeypatch):
     """
     Reset environment variables before each test to prevent state contamination.

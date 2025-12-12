@@ -29,6 +29,14 @@ if str(SRC) not in sys.path:
 THREAD_LEAK_TOLERANCE = 2
 
 
+@pytest.fixture(autouse=True)
+def reset_random_state():
+    """Ensure each test starts with a fresh random state."""
+    import numpy as np
+    np.random.seed(12345)
+    yield
+
+
 @pytest.fixture(scope="function", autouse=True)
 def cleanup_resources():
     """
