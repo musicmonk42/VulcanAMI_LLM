@@ -266,7 +266,7 @@
         <!-- Connection Bar -->
         <div class="connection-bar">
             <input type="text" id="baseUrl" placeholder="Platform URL" value="http://127.0.0.1:8000">
-            <input type="password" id="apiKey" placeholder="API Key (optional)" style="flex: 0 1 200px;">
+            <input type="password" id="apiKey" placeholder="API Key (required if auth enabled)" style="flex: 0 1 220px;">
             <button class="btn-connect" id="connectBtn" onclick="connectPlatform()">🔌 Connect</button>
             <button class="btn-disconnect" id="disconnectBtn" onclick="disconnectPlatform()" style="display:none">⛔ Disconnect</button>
             <span class="status-indicator status-disconnected" id="statusIndicator">Disconnected</span>
@@ -1042,7 +1042,6 @@
             if (refreshInterval) clearInterval(refreshInterval);
             jwtToken = '';
             apiKey = '';
-            localStorage.removeItem('vulcanApiKey');
             addLog('Disconnected', 'info');
         }
         

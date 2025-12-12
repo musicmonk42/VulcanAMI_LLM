@@ -162,7 +162,7 @@
         
         <div class="connection-bar">
             <input type="text" id="baseUrl" value="http://127.0.0.1:8080" placeholder="Platform URL">
-            <input type="password" id="apiKey" placeholder="API Key (optional)" style="max-width: 200px;">
+            <input type="password" id="apiKey" placeholder="API Key (required if auth enabled)" style="max-width: 250px;">
             <button class="btn-connect" onclick="connectPlatform()">🔌 Connect</button>
             <button class="btn-disconnect" onclick="disconnectPlatform()" style="display:none" id="disconnectBtn">⛔ Disconnect</button>
             <span class="status-indicator status-disconnected" id="statusIndicator">Disconnected</span>
@@ -634,11 +634,10 @@
         
         function getHeaders() {
             const headers = {'Content-Type': 'application/json'};
-            // Only include Authorization header if we have a token
+            // Only include Authorization header if we have a token (X-API-Key is only used for token acquisition)
             if (accessToken) {
                 headers['Authorization'] = 'Bearer ' + accessToken;
             }
-            // X-API-Key is only used for token acquisition, not regular requests
             return {headers};
         }
         
