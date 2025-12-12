@@ -103,8 +103,11 @@ For a complete end-to-end demonstration, use the demo orchestrator script that e
 ### Against Unified Platform
 
 ```bash
-# Start unified platform
-python -m uvicorn src.full_platform:app --host 127.0.0.1 --port 8080
+# Start unified platform (default configuration)
+python src/full_platform.py
+
+# Or with explicit settings
+# python -m uvicorn src.full_platform:app --host 0.0.0.0 --port 8000
 
 # Run orchestrator (in separate terminal)
 python scripts/demo_orchestrator.py
@@ -153,7 +156,7 @@ Open `demos/sse_mind.html` in a browser to visualize the stream:
 
 ```bash
 # Configure base URL via query parameter
-open "demos/sse_mind.html?base=http://127.0.0.1:8080/vulcan"
+open "demos/sse_mind.html?base=http://0.0.0.0:8000/vulcan"
 
 # Or edit the base URL directly in the UI
 ```
@@ -168,7 +171,7 @@ The viewer shows:
 
 ```bash
 # Using curl (basic)
-curl -N http://127.0.0.1:8080/vulcan/v1/stream
+curl -N http://0.0.0.0:8000/vulcan/v1/stream
 
 # Or use the orchestrator's Act 3 for parsed output
 python scripts/demo_orchestrator.py
