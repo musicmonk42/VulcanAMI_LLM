@@ -1374,7 +1374,7 @@
                 const response = await fetch(baseUrl + '/vulcan/memory/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query, top_k: topK })
+                    body: JSON.stringify({ query, k: topK })
                 });
                 const data = await response.json();
                 
@@ -1504,7 +1504,7 @@
             addLog('Running arena task...', 'info');
             
             try {
-                const response = await fetch(baseUrl + '/arena/run/' + agentId, {
+                const response = await fetch(baseUrl + '/api/arena/run/' + agentId, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task, prompt: task || 'Execute task', max_tokens: 100 })
