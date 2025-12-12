@@ -1041,6 +1041,8 @@
             updateConnectionStatus(false);
             if (refreshInterval) clearInterval(refreshInterval);
             jwtToken = '';
+            apiKey = '';
+            localStorage.removeItem('vulcanApiKey');
             addLog('Disconnected', 'info');
         }
         

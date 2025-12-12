@@ -162,7 +162,7 @@
         
         <div class="connection-bar">
             <input type="text" id="baseUrl" value="http://127.0.0.1:8080" placeholder="Platform URL">
-            <input type="text" id="apiKey" placeholder="API Key (optional)" style="max-width: 200px;">
+            <input type="password" id="apiKey" placeholder="API Key (optional)" style="max-width: 200px;">
             <button class="btn-connect" onclick="connectPlatform()">🔌 Connect</button>
             <button class="btn-disconnect" onclick="disconnectPlatform()" style="display:none" id="disconnectBtn">⛔ Disconnect</button>
             <span class="status-indicator status-disconnected" id="statusIndicator">Disconnected</span>
@@ -620,6 +620,8 @@
             isConnected = false;
             if (sseSource) stopSSE();
             updateConnectionStatus(false);
+            accessToken = null;
+            localStorage.removeItem('vulcanAccessToken');
             addLog('Disconnected', 'info');
         }
         
@@ -632,8 +634,11 @@
         
         function getHeaders() {
             const headers = {'Content-Type': 'application/json'};
-            if (apiKey) headers['X-API-Key'] = apiKey;
-            if (accessToken) headers['Authorization'] = 'Bearer ' + accessToken;
+            // Only include Authorization header if we have a token
+            if (accessToken) {
+                headers['Authorization'] = 'Bearer ' + accessToken;
+            }
+            // X-API-Key is only used for token acquisition, not regular requests
             return {headers};
         }
         
@@ -894,12 +899,13 @@
         
         // Auth
         async function getToken() {
-            const sub = document.getElementById('tokenSub').value || undefined;
             if (!apiKey) {
                 alert('Please enter an API key in the connection bar first');
                 return;
             }
+            const sub = document.getElementById('tokenSub').value || undefined;
             try {
+                addLog('Requesting JWT token...', 'info');
                 const response = await fetch(baseUrl + '/auth/token', {
                     method: 'POST',
                     headers: {
@@ -915,10 +921,10 @@
                     accessToken = data.access_token;
                     localStorage.setItem('vulcanAccessToken', accessToken);
                     updateTokenDisplay();
-                    addLog('Token acquired successfully', 'success');
+                    addLog('✅ Token acquired successfully', 'success');
                 }
             } catch (error) {
-                addLog('Token request failed: ' + error.message, 'error');
+                addLog('❌ Token request failed: ' + error.message, 'error');
                 document.getElementById('tokenResult').innerHTML = 
                     `<div class="alert alert-danger">Error: ${error.message}</div>`;
             }
