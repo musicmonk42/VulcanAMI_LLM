@@ -34,7 +34,9 @@ The Omega Demo documentation suite has been thoroughly examined and validated. A
    - Purpose: Terminal UI/UX specifications
    - Status: ✅ Complete
 
-**Total Documentation:** 114 KB, 4,178 lines
+**Total Documentation:** 114 KB, 4,178 lines (including INDEX file)
+
+**Note:** INDEX file claims 109KB for the 4 main documents (excluding INDEX itself). The additional 5KB accounts for the INDEX file and slight size variations. The INDEX file claimed 3,859 lines which also excludes the INDEX file itself.
 
 ---
 
@@ -295,7 +297,9 @@ All documents (except INDEX which is a meta-document) have:
 
 ### Claimed vs Actual File Sizes
 
-| Document | Claimed | Actual | Diff | Status |
+File sizes as claimed in OMEGA_DEMO_INDEX.md vs actual file sizes:
+
+| Document | Claimed (INDEX) | Actual | Diff | Status |
 |----------|---------|--------|------|--------|
 | SEQUENCE_DEMO | 34 KB | 33 KB | -1 KB | OK |
 | AI_TRAINING | 35 KB | 34 KB | -1 KB | OK |
