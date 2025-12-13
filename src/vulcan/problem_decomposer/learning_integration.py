@@ -1182,19 +1182,19 @@ class UnifiedDecomposerLearner:
         if self.continual_learner:
             try:
                 self.continual_learner.shutdown()
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to integrate learning data: {e}")
 
         if self.rlhf_manager:
             try:
                 self.rlhf_manager.shutdown()
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to update learning metrics: {e}")
 
         if self.meta_learner:
             try:
                 self.meta_learner.shutdown()
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to persist learning state: {e}")
 
         logger.info("UnifiedDecomposerLearner shutdown complete")

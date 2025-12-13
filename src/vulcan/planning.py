@@ -1596,7 +1596,7 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
         try:
             asyncio.get_running_loop()
             return asyncio.run(self._create_mcts_plan_async(goal, context))
-        except RuntimeError:
+        except RuntimeError as e:
             logger.debug(f"Runtime error in plan execution: {e}")
 
         for step_num in range(20):

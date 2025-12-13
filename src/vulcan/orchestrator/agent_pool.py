@@ -521,7 +521,7 @@ class AgentPoolManager:
                         process.join(timeout=1)
                 try:
                     process.close()
-                except Exception:
+                except Exception as e:
                     logger.debug(f"Failed to cleanup agent: {e}")
                 del self.agent_processes[agent_id]
 
@@ -844,7 +844,7 @@ class AgentPoolManager:
                         resource_consumption["memory_mb"] = (
                             psutil.Process().memory_info().rss / 1024 / 1024
                         )
-                    except Exception:
+                    except Exception as e:
                         logger.debug(f"Failed to reset agent state: {e}")
                 provenance.update_resource_consumption(resource_consumption)
 

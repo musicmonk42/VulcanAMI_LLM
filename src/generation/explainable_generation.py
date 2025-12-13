@@ -620,7 +620,7 @@ class ExplainableGeneration:
                         "importance": 0.5,
                     }
                 )
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to generate explanation: {e}")
 
         # Safety influence
@@ -1299,7 +1299,7 @@ class ExplainableGeneration:
                     interventions=interventions,
                     context=context,
                 )
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to format explanation: {e}")
 
         parts: List[str] = []
@@ -1613,7 +1613,7 @@ class ExplainableGeneration:
         if self.vocab and hasattr(self.vocab, "id_to_token"):
             try:
                 return self.vocab.id_to_token(idx)
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to validate explanation: {e}")
         return idx
 

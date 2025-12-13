@@ -524,7 +524,7 @@ class RollbackManager:
                 if file_path.exists():
                     try:
                         file_path.unlink()
-                    except Exception:
+                    except Exception as e:
                         logger.warning(f"Failed to log rollback event: {e}")
                 raise
 
@@ -1270,7 +1270,7 @@ class AuditLogger:
                     if last_line:
                         entry = json.loads(last_line)
                         return entry.get("hash", "")
-            except Exception:
+            except Exception as e:
                 logger.warning(f"Failed to audit rollback state: {e}")
         return hashlib.sha256(b"genesis").hexdigest()
 

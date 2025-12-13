@@ -1102,7 +1102,7 @@ class ResultCache:
                 try:
                     oldest_key = min(self.cache, key=lambda k: self.cache[k]["ts"])
                     del self.cache[oldest_key]
-                except ValueError:
+                except ValueError as e:
                     logger.debug(f"Operation failed: {e}")
 
             # Ensure result has status before caching its dict representation

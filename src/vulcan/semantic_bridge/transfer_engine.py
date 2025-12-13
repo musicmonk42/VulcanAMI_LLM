@@ -31,7 +31,7 @@ try:
     from ..safety.safety_validator import EnhancedSafetyValidator
 
     SAFETY_VALIDATOR_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     logger.debug(f"Operation failed: {e}")
 
 # Fallback: Try absolute import (when vulcan is in sys.path)
@@ -41,7 +41,7 @@ if not SAFETY_VALIDATOR_AVAILABLE:
         from vulcan.safety.safety_validator import EnhancedSafetyValidator
 
         SAFETY_VALIDATOR_AVAILABLE = True
-    except ImportError:
+    except ImportError as e:
         logger.debug(f"Operation failed: {e}")
 
 # Fallback: Try src-prefixed import (when src is in sys.path)

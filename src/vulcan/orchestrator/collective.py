@@ -511,14 +511,14 @@ class VULCANAGICollective:
                 self.deps.experiment_generator.complete_experiment(
                     experiment.experiment_id, {"success": False, "error": str(e)}
                 )
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to sync collective state: {e}")
 
             try:
                 self.deps.self_improvement_drive.record_outcome(
                     objective_type, False, {"error": str(e)}
                 )
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to broadcast collective update: {e}")
 
     def _execute_improvement_direct(self, improvement_action: Dict[str, Any]):

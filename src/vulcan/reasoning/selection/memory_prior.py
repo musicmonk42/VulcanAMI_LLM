@@ -225,7 +225,7 @@ class MemoryIndex:
             if self.use_faiss and self.faiss_index is not None:
                 del self.faiss_index
                 self.faiss_index = None
-        except Exception:
+        except Exception as e:
             logger.debug(f"Failed to validate memory prior: {e}")
 
 
@@ -993,7 +993,7 @@ class BayesianMemoryPrior:
             # Cleanup index
             if hasattr(self, "memory_index"):
                 del self.memory_index
-        except Exception:
+        except Exception as e:
             logger.debug(f"Failed to update memory statistics: {e}")
 
 
@@ -1140,5 +1140,5 @@ class AdaptivePriorSelector:
             for prior in self.priors.values():
                 del prior
             self.priors.clear()
-        except Exception:
+        except Exception as e:
             logger.debug(f"Failed to clear memory cache: {e}")

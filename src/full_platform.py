@@ -114,7 +114,7 @@ class SecretsManager:
 
             if "SecretString" in secret_value:
                 return secret_value["SecretString"]
-        except Exception:
+        except Exception as e:
             logger.debug(f"Failed to initialize platform component: {e}")
         return default
 
@@ -305,7 +305,7 @@ def setup_unified_logging():
     if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:
+        except Exception as e:
             logger.debug(f"Failed to cleanup platform resource: {e}")
 
     # File handler with explicit UTF-8 encoding

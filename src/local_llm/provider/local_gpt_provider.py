@@ -408,12 +408,12 @@ class LocalGPTProvider:
         """
         try:
             del self.model
-        except Exception:
+        except Exception as e:
             logger.debug(f"Failed to load model configuration: {e}")
         if self.device.startswith("cuda"):
             try:
                 torch.cuda.empty_cache()
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Failed to initialize model tokenizer: {e}")
 
 

@@ -261,7 +261,7 @@ class UnifiedLearningSystem:
             logger.info("Already in async context, using existing loop")
             self._loop_ready.set()
             return  # Don't start thread if we're in async context
-        except RuntimeError:
+        except RuntimeError as e:
             logger.debug(f"Operation failed: {e}")
 
         # Start loop in background thread
