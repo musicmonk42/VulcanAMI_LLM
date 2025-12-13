@@ -431,33 +431,42 @@ class SemanticBridge:
         self.world_model = world_model
         self.memory = vulcan_memory
 
-        # Initialize safety validator
+        # Initialize safety validator ONCE using singleton pattern
         if SAFETY_VALIDATOR_AVAILABLE:
-            if isinstance(safety_config, dict) and safety_config:
-                self.safety_validator = EnhancedSafetyValidator(
-                    SafetyConfig.from_dict(safety_config)
+            try:
+                from ..safety.safety_validator import initialize_all_safety_components
+                self.safety_validator = initialize_all_safety_components(
+                    config=safety_config, reuse_existing=True
                 )
-            else:
-                self.safety_validator = EnhancedSafetyValidator()
-            logger.info("SemanticBridge: Safety validator initialized")
+                logger.info("SemanticBridge: Using singleton safety validator")
+            except Exception as e:
+                logger.debug("Could not get singleton safety validator: %s", e)
+                # Fallback: create new instance
+                if isinstance(safety_config, dict) and safety_config:
+                    self.safety_validator = EnhancedSafetyValidator(
+                        SafetyConfig.from_dict(safety_config)
+                    )
+                else:
+                    self.safety_validator = EnhancedSafetyValidator()
+                logger.info("SemanticBridge: Safety validator initialized (new instance)")
         else:
             self.safety_validator = None
             logger.warning(
                 "SemanticBridge: Safety validator not available - operating without safety checks"
             )
 
-        # FIXED: Pass safety_config and world_model to all components
+        # FIXED: Pass shared safety_validator instance to all components (prevents duplication)
         self.concept_mapper = ConceptMapper(
-            world_model=world_model, safety_config=safety_config
+            world_model=world_model, safety_validator=self.safety_validator
         )
         self.conflict_resolver = EvidenceWeightedResolver(
-            world_model=world_model, safety_config=safety_config
+            world_model=world_model, safety_validator=self.safety_validator
         )
         self.transfer_engine = TransferEngine(
-            world_model=world_model, safety_config=safety_config
+            world_model=world_model, safety_validator=self.safety_validator
         )
         self.domain_registry = DomainRegistry(
-            world_model=world_model, safety_config=safety_config
+            world_model=world_model, safety_validator=self.safety_validator
         )
 
         # FIXED: Concept versioning with size limits

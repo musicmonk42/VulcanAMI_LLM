@@ -1636,14 +1636,18 @@ class WorldModel:
         # Extract safety_config for passing to components
         safety_config = config.get("safety_config", {})
 
-        # Core components - All real implementations
+        # Core components - All real implementations - FIXED: Pass validator instance
         logger.info("Initializing core components...")
 
-        self.causal_graph = CausalDAG(safety_config=safety_config)
+        self.causal_graph = CausalDAG(
+            safety_config=safety_config, safety_validator=self.safety_validator
+        )
         logger.info("✓ CausalDAG initialized")
 
         if CorrelationTracker:
-            self.correlation_tracker = CorrelationTracker(safety_config=safety_config)
+            self.correlation_tracker = CorrelationTracker(
+                safety_config=safety_config, safety_validator=self.safety_validator
+            )
             logger.info("✓ CorrelationTracker initialized")
         else:
             self.correlation_tracker = (
@@ -1652,13 +1656,14 @@ class WorldModel:
 
         if INTERVENTION_MANAGER_AVAILABLE:
             self.intervention_prioritizer = InterventionPrioritizer(
-                safety_config=safety_config
+                safety_config=safety_config, safety_validator=self.safety_validator
             )
             self.intervention_executor = InterventionExecutor(
                 confidence_level=config.get("intervention_confidence", 0.95),
                 max_retries=config.get("max_retries", 3),
                 simulation_mode=config.get("simulation_mode", True),
                 safety_config=safety_config,
+                safety_validator=self.safety_validator,
             )
             logger.info("✓ InterventionManager components initialized")
         else:
@@ -1668,19 +1673,27 @@ class WorldModel:
             self.intervention_prioritizer = None
             self.intervention_executor = None
 
-        self.ensemble_predictor = EnsemblePredictor(safety_config=safety_config)
+        self.ensemble_predictor = EnsemblePredictor(
+            safety_config=safety_config, safety_validator=self.safety_validator
+        )
         logger.info("✓ EnsemblePredictor initialized")
 
         if DynamicsModel:
-            self.dynamics = DynamicsModel(safety_config=safety_config)
+            self.dynamics = DynamicsModel(
+                safety_config=safety_config, safety_validator=self.safety_validator
+            )
             logger.info("✓ DynamicsModel initialized")
         else:
             logger.warning("⚠ DynamicsModel unavailable - temporal dynamics disabled")
             self.dynamics = None
 
         if INVARIANT_DETECTOR_AVAILABLE:
-            self.invariants = InvariantRegistry(safety_config=safety_config)
-            self.invariant_detector = InvariantDetector(safety_config=safety_config)
+            self.invariants = InvariantRegistry(
+                safety_config=safety_config, safety_validator=self.safety_validator
+            )
+            self.invariant_detector = InvariantDetector(
+                safety_config=safety_config, safety_validator=self.safety_validator
+            )
             logger.info("✓ InvariantDetector components initialized")
         else:
             logger.warning(
@@ -1691,10 +1704,10 @@ class WorldModel:
 
         if CONFIDENCE_CALIBRATOR_AVAILABLE:
             self.confidence_calibrator = ConfidenceCalibrator(
-                safety_config=safety_config
+                safety_config=safety_config, safety_validator=self.safety_validator
             )
             self.confidence_tracker = ModelConfidenceTracker(
-                safety_config=safety_config
+                safety_config=safety_config, safety_validator=self.safety_validator
             )
             logger.info("✓ ConfidenceCalibrator components initialized")
         else:
@@ -1711,7 +1724,7 @@ class WorldModel:
         self.consistency_validator = ConsistencyValidator(self)
         logger.info("✓ Manager components initialized")
 
-        # Router for intelligent update selection
+        # Router for intelligent update selection - FIXED: Pass validator
         if ROUTER_AVAILABLE:
             self.router = WorldModelRouter(
                 world_model=self,
@@ -1724,6 +1737,7 @@ class WorldModel:
                     # "use_meta_reasoning": True,  # (add in router if you want a flag)
                 },
                 self_improvement_drive=getattr(self, "self_improvement_drive", None),
+                safety_validator=self.safety_validator,
             )
             logger.info("✓ WorldModelRouter initialized")
         else:

@@ -6,14 +6,6 @@
 # INTEGRATED: Autonomous self-improvement drive with full API control
 # FIXED: Data directory creation before self-improvement state persistence
 # FIXED: MotivationalIntrospection now uses modern mode (config_path) instead of legacy mode (design_spec)
-# ============================================================================#!/usr/bin/env python3
-# ============================================================
-# VULCAN-AGI Main Entry Point
-# CLI interface, testing, benchmarking, and execution
-# FULLY DEBUGGED VERSION - All critical issues resolved
-# INTEGRATED: Autonomous self-improvement drive with full API control
-# FIXED: Data directory creation before self-improvement state persistence
-# FIXED: MotivationalIntrospection now uses modern mode (config_path) instead of legacy mode (design_spec)
 # ============================================================================
 
 # ====================================================================

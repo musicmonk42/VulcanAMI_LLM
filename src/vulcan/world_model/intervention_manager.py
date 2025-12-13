@@ -929,17 +929,30 @@ class InterventionPrioritizer:
         min_effect_size: float = 0.1,
         cost_benefit_ratio: float = 2.0,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
         """
-        Initialize intervention prioritizer
+        Initialize intervention prioritizer - FIXED: Added safety_validator parameter
 
         Args:
             min_effect_size: Minimum effect size to consider
             cost_benefit_ratio: Required benefit/cost ratio
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
         self.min_effect_size = min_effect_size
         self.cost_benefit_ratio = cost_benefit_ratio
+
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            self.safety_validator = safety_validator
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        else:
+            # Note: This component doesn't currently use safety validator in its logic
+            # but accepts it for consistency with other components
+            self.safety_validator = None
+            if safety_config:
+                logger.debug(f"{self.__class__.__name__}: safety_config provided but not used")
 
         # Components
         self.info_estimator = InformationGainEstimator()
@@ -1031,17 +1044,19 @@ class InterventionExecutor:
         max_retries: int = 3,
         simulation_mode: bool = True,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
         external_interface: Optional[ExternalSystemInterface] = None,
         intervention_timeout: float = 60.0,
     ):
         """
-        Initialize intervention executor
+        Initialize intervention executor - FIXED: Added safety_validator parameter
 
         Args:
             confidence_level: Confidence level for intervals
             max_retries: Maximum retries for failed interventions
             simulation_mode: Whether to use simulation
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
             external_interface: External system interface for real interventions
             intervention_timeout: Timeout for intervention execution (seconds)
         """
@@ -1050,59 +1065,69 @@ class InterventionExecutor:
         self.simulation_mode = simulation_mode
         self.intervention_timeout = intervention_timeout
 
-        # FIXED: Lazily initialize safety validator in __init__ to avoid circular import
-        self.safety_validator = None
-        self.safety_initialization_successful = False
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            self.safety_initialization_successful = True
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        else:
+            # FIXED: Lazily initialize safety validator in __init__ to avoid circular import
+            self.safety_validator = None
+            self.safety_initialization_successful = False
 
-        # CRITICAL FIX: Only attempt to load safety validator if not in simulation mode
-        # or if a config is explicitly provided (for simulation safety tests)
-        safety_check_required = not simulation_mode or safety_config is not None
+            # CRITICAL FIX: Only attempt to load safety validator if not in simulation mode
+            # or if a config is explicitly provided (for simulation safety tests)
+            safety_check_required = not simulation_mode or safety_config is not None
 
-        if safety_check_required:
-            try:
-                # Local import to prevent circular dependency
-                from ..safety.safety_types import SafetyConfig
-                from ..safety.safety_validator import EnhancedSafetyValidator
+            if safety_check_required:
+                try:
+                    # Local import to prevent circular dependency
+                    from ..safety.safety_types import SafetyConfig
+                    from ..safety.safety_validator import EnhancedSafetyValidator, initialize_all_safety_components
 
-                # *** START FIX ***
-                # The logic here was flawed. self.safety_initialization_successful
-                # was being set to True even if no config was provided,
-                # which allowed the real-mode check to pass.
-                # Use SafetyConfig.from_dict() or default constructor
-                if isinstance(safety_config, dict) and safety_config:
-                    # Attempt to create SafetyConfig from dictionary
+                    # Try singleton first
                     try:
-                        config_instance = SafetyConfig.from_dict(safety_config)
-                    except TypeError as e:
-                        logger.error(
-                            f"InterventionExecutor: SafetyConfig.from_dict failed: {str(e)}. Using default config."
+                        self.safety_validator = initialize_all_safety_components(
+                            config=safety_config, reuse_existing=True
                         )
-                        config_instance = SafetyConfig()  # Use default if dict fails
+                        self.safety_initialization_successful = True
+                        logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                    except Exception as e:
+                        logger.debug(f"Could not get singleton safety validator: {e}")
+                        # Fallback to creating new instance
+                        if isinstance(safety_config, dict) and safety_config:
+                            # Attempt to create SafetyConfig from dictionary
+                            try:
+                                config_instance = SafetyConfig.from_dict(safety_config)
+                            except TypeError as e:
+                                logger.error(
+                                    f"InterventionExecutor: SafetyConfig.from_dict failed: {str(e)}. Using default config."
+                                )
+                                config_instance = SafetyConfig()  # Use default if dict fails
 
-                    self.safety_validator = EnhancedSafetyValidator(config_instance)
-                    # ONLY set success if a config was provided and used
-                    self.safety_initialization_successful = True
-                    logger.info("InterventionExecutor: Safety validator initialized")
+                            self.safety_validator = EnhancedSafetyValidator(config_instance)
+                            # ONLY set success if a config was provided and used
+                            self.safety_initialization_successful = True
+                            logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
 
-                # If safety_config is None (and we're in this block, meaning
-                # simulation_mode=False), we DON'T initialize a validator
-                # and we LEAVE safety_initialization_successful=False.
-                # This will cause the check below to fail, as intended by the test.
+                        # If safety_config is None (and we're in this block, meaning
+                        # simulation_mode=False), we DON'T initialize a validator
+                        # and we LEAVE safety_initialization_successful=False.
+                        # This will cause the check below to fail, as intended by the test.
 
-                # *** END FIX ***
-
-            except ImportError as e:
-                logger.warning(
-                    f"safety_validator not available: {str(e)}. InterventionExecutor operating without safety checks"
-                )
-                self.safety_validator = None
-                self.safety_initialization_successful = False  # Explicitly set false
-            except Exception as e:
-                logger.error(
-                    f"InterventionExecutor: Unexpected error initializing SafetyValidator: {str(e)}. Safety disabled."
-                )
-                self.safety_validator = None
-                self.safety_initialization_successful = False  # Explicitly set false
+                except ImportError as e:
+                    logger.warning(
+                        f"safety_validator not available: {str(e)}. InterventionExecutor operating without safety checks"
+                    )
+                    self.safety_validator = None
+                    self.safety_initialization_successful = False  # Explicitly set false
+                except Exception as e:
+                    logger.error(
+                        f"InterventionExecutor: Unexpected error initializing SafetyValidator: {str(e)}. Safety disabled."
+                    )
+                    self.safety_validator = None
+                    self.safety_initialization_successful = False  # Explicitly set false
 
         # CRITICAL FIX: If real execution is requested and safety is not successfully initialized, raise the critical error
         # This resolves the FAILED test case.

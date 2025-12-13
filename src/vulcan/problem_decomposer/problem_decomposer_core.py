@@ -657,77 +657,94 @@ class ProblemDecomposer:
         vulcan_memory=None,
         validator=None,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
         """
-        Initialize problem decomposer
+        Initialize problem decomposer - FIXED: Added safety_validator parameter
 
         Args:
             semantic_bridge: Semantic bridge component
             vulcan_memory: VULCAN memory system
             validator: Optional validator for solution validation
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
         self.semantic = semantic_bridge
         self.memory = vulcan_memory
         self.validator = validator
 
-        # Initialize safety validator
-        if SAFETY_VALIDATOR_AVAILABLE:
-            if isinstance(safety_config, dict) and safety_config:
-                # Handle test_mode - don't pass it directly to SafetyConfig
-                if "test_mode" in safety_config and len(safety_config) == 1:
-                    # Just test_mode config
-                    config_obj = SafetyConfig()
-                    # Add default values needed by RollbackManager
-                    config_obj.rollback_config = {
-                        "test_mode": True,
-                        "max_snapshots": 10,  # Small value for tests
-                        "enable_storage": False,
-                        "enable_workers": False,
-                    }
-                    self.safety_validator = EnhancedSafetyValidator(config_obj)
-                else:
-                    # Complex config - filter test_mode before passing to from_dict
-                    try:
-                        safety_config_filtered = {
-                            k: v for k, v in safety_config.items() if k != "test_mode"
-                        }
-                        config_obj = (
-                            SafetyConfig.from_dict(safety_config_filtered)
-                            if safety_config_filtered
-                            else SafetyConfig()
-                        )
-                        # Add rollback_config with full config (including test_mode) and defaults
-                        rollback_cfg = {
-                            "max_snapshots": 10
-                            if safety_config.get("test_mode")
-                            else 100,
-                            "enable_storage": not safety_config.get("test_mode", False),
-                            "enable_workers": not safety_config.get("test_mode", False),
-                        }
-                        rollback_cfg.update(safety_config)
-                        if (
-                            not hasattr(config_obj, "rollback_config")
-                            or config_obj.rollback_config is None
-                        ):
-                            config_obj.rollback_config = rollback_cfg
-                        else:
-                            config_obj.rollback_config.update(rollback_cfg)
-                        self.safety_validator = EnhancedSafetyValidator(config_obj)
-                    except Exception as e:
-                        logger.error(f"Failed to create SafetyConfig: {e}")
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info("ProblemDecomposer: Using shared safety validator instance")
+        elif SAFETY_VALIDATOR_AVAILABLE:
+            # Fallback: try to get singleton, or create new instance
+            try:
+                from ..safety.safety_validator import initialize_all_safety_components
+                # Try singleton first
+                self.safety_validator = initialize_all_safety_components(
+                    config=safety_config, reuse_existing=True
+                )
+                logger.info("ProblemDecomposer: Using singleton safety validator")
+            except Exception as e:
+                logger.debug("Could not get singleton safety validator: %s", e)
+                # Last resort: create new instance (preserving complex test_mode logic)
+                if isinstance(safety_config, dict) and safety_config:
+                    # Handle test_mode - don't pass it directly to SafetyConfig
+                    if "test_mode" in safety_config and len(safety_config) == 1:
+                        # Just test_mode config
                         config_obj = SafetyConfig()
+                        # Add default values needed by RollbackManager
                         config_obj.rollback_config = {
-                            "test_mode": safety_config.get("test_mode", False),
-                            "max_snapshots": 10,
+                            "test_mode": True,
+                            "max_snapshots": 10,  # Small value for tests
                             "enable_storage": False,
                             "enable_workers": False,
                         }
-                        config_obj.rollback_config.update(safety_config)
                         self.safety_validator = EnhancedSafetyValidator(config_obj)
-            else:
-                self.safety_validator = EnhancedSafetyValidator()
-            logger.info("ProblemDecomposer: Safety validator initialized")
+                    else:
+                        # Complex config - filter test_mode before passing to from_dict
+                        try:
+                            safety_config_filtered = {
+                                k: v for k, v in safety_config.items() if k != "test_mode"
+                            }
+                            config_obj = (
+                                SafetyConfig.from_dict(safety_config_filtered)
+                                if safety_config_filtered
+                                else SafetyConfig()
+                            )
+                            # Add rollback_config with full config (including test_mode) and defaults
+                            rollback_cfg = {
+                                "max_snapshots": 10
+                                if safety_config.get("test_mode")
+                                else 100,
+                                "enable_storage": not safety_config.get("test_mode", False),
+                                "enable_workers": not safety_config.get("test_mode", False),
+                            }
+                            rollback_cfg.update(safety_config)
+                            if (
+                                not hasattr(config_obj, "rollback_config")
+                                or config_obj.rollback_config is None
+                            ):
+                                config_obj.rollback_config = rollback_cfg
+                            else:
+                                config_obj.rollback_config.update(rollback_cfg)
+                            self.safety_validator = EnhancedSafetyValidator(config_obj)
+                        except Exception as err:
+                            logger.error(f"Failed to create SafetyConfig: {err}")
+                            config_obj = SafetyConfig()
+                            config_obj.rollback_config = {
+                                "test_mode": safety_config.get("test_mode", False),
+                                "max_snapshots": 10,
+                                "enable_storage": False,
+                                "enable_workers": False,
+                            }
+                            config_obj.rollback_config.update(safety_config)
+                            self.safety_validator = EnhancedSafetyValidator(config_obj)
+                else:
+                    self.safety_validator = EnhancedSafetyValidator()
+                logger.warning("ProblemDecomposer: Created new safety validator instance (may cause duplication)")
         else:
             self.safety_validator = None
             logger.warning(

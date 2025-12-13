@@ -1727,34 +1727,49 @@ class CausalDAG:
     Complete implementation with safety validation, advanced algorithms, and full thread safety.
     """
 
-    def __init__(self, safety_config: Optional[Dict[str, Any]] = None):
+    def __init__(self, safety_config: Optional[Dict[str, Any]] = None, safety_validator=None):
         """
-        Initialize causal DAG with optional safety configuration.
+        Initialize causal DAG with optional safety configuration - FIXED: Added safety_validator parameter
 
         Args:
-            safety_config: Optional safety configuration dictionary
+            safety_config: Optional safety configuration dictionary (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
 
         # Lazy import safety validator
         _lazy_import_safety_validator()
 
-        # Initialize safety validator
-        if SAFETY_VALIDATOR_AVAILABLE and EnhancedSafetyValidator is not None:
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        elif SAFETY_VALIDATOR_AVAILABLE and EnhancedSafetyValidator is not None:
+            # Fallback: try to get singleton, or create new instance
             try:
-                if isinstance(safety_config, dict) and safety_config:
-                    self.safety_validator = EnhancedSafetyValidator(
-                        SafetyConfig.from_dict(safety_config)
-                    )
-                else:
-                    self.safety_validator = EnhancedSafetyValidator()
-                logger.info("CausalDAG: Safety validator initialized")
+                from ..safety.safety_validator import initialize_all_safety_components
+                self.safety_validator = initialize_all_safety_components(
+                    config=safety_config, reuse_existing=True
+                )
+                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
             except Exception as e:
-                self.safety_validator = None
-                logger.warning(f"CausalDAG: Failed to initialize safety validator: {e}")
+                logger.debug(f"Could not get singleton safety validator: {e}")
+                # Last resort: create new instance (causes duplication)
+                try:
+                    if isinstance(safety_config, dict) and safety_config:
+                        self.safety_validator = EnhancedSafetyValidator(
+                            SafetyConfig.from_dict(safety_config)
+                        )
+                    else:
+                        self.safety_validator = EnhancedSafetyValidator()
+                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                except Exception as init_e:
+                    self.safety_validator = None
+                    logger.warning(f"{self.__class__.__name__}: Failed to initialize safety validator: {init_e}")
         else:
             self.safety_validator = None
             logger.warning(
-                "CausalDAG: Safety validator not available - operating without safety checks"
+                f"{self.__class__.__name__}: Safety validator not available - operating without safety checks"
             )
 
         # Initialize components with separation of concerns

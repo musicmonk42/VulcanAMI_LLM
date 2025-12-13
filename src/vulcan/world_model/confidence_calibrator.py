@@ -775,24 +775,33 @@ class ConfidenceCalibrator:
         n_bins: int = 10,
         window_size: int = 1000,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
         """
-        Initialize confidence calibrator
+        Initialize confidence calibrator - FIXED: Added safety_validator parameter
 
         Args:
             method: Calibration method - "isotonic", "platt", "histogram", "beta"
             n_bins: Number of bins for histogram calibration
             window_size: Window size for rolling calibration
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
         self.method = method
         self.n_bins = n_bins
         self.window_size = window_size
 
-        # Initialize safety validator with LAZY LOADING to prevent circular import
-        self._safety_validator_instance = None
-        self._safety_config = safety_config
-        self._safety_validator_initialized = False
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self._safety_validator_instance = safety_validator
+            self._safety_validator_initialized = True
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        else:
+            # Initialize safety validator with LAZY LOADING to prevent circular import
+            self._safety_validator_instance = None
+            self._safety_config = safety_config
+            self._safety_validator_initialized = False
 
         # Calibration models
         self.isotonic_model = IsotonicRegression(
@@ -845,19 +854,31 @@ class ConfidenceCalibrator:
         if not self._safety_validator_initialized:
             try:
                 # LAZY IMPORT - prevents circular dependency
+                from ..safety.safety_validator import (
+                    EnhancedSafetyValidator,
+                    initialize_all_safety_components,
+                )
                 from ..safety.safety_types import SafetyConfig
-                from ..safety.safety_validator import EnhancedSafetyValidator
 
-                if isinstance(self._safety_config, dict) and self._safety_config:
-                    self._safety_validator_instance = EnhancedSafetyValidator(
-                        SafetyConfig.from_dict(self._safety_config)
+                # Try singleton first
+                try:
+                    self._safety_validator_instance = initialize_all_safety_components(
+                        config=self._safety_config, reuse_existing=True
                     )
-                else:
-                    self._safety_validator_instance = EnhancedSafetyValidator()
-                logger.info("ConfidenceCalibrator: Safety validator initialized (lazy)")
+                    logger.info(f"{self.__class__.__name__}: Using singleton safety validator (lazy)")
+                except Exception as e:
+                    logger.debug(f"Could not get singleton safety validator: {e}")
+                    # Fallback: create new instance
+                    if isinstance(self._safety_config, dict) and self._safety_config:
+                        self._safety_validator_instance = EnhancedSafetyValidator(
+                            SafetyConfig.from_dict(self._safety_config)
+                        )
+                    else:
+                        self._safety_validator_instance = EnhancedSafetyValidator()
+                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (lazy, may cause duplication)")
             except ImportError as e:
                 logger.warning(
-                    f"ConfidenceCalibrator: Safety validator not available: {e}"
+                    f"{self.__class__.__name__}: Safety validator not available: {e}"
                 )
                 self._safety_validator_instance = None
 
@@ -1365,24 +1386,33 @@ class ModelConfidenceTracker:
         min_confidence: float = 0.1,
         max_confidence: float = 0.95,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
         """
-        Initialize model confidence tracker
+        Initialize model confidence tracker - FIXED: Added safety_validator parameter
 
         Args:
             decay_rate: Exponential decay rate for confidence updates
             min_confidence: Minimum allowed model confidence
             max_confidence: Maximum allowed model confidence
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
         self.decay_rate = decay_rate
         self.min_confidence = min_confidence
         self.max_confidence = max_confidence
 
-        # Initialize safety validator with LAZY LOADING to prevent circular import
-        self._safety_validator_instance = None
-        self._safety_config = safety_config
-        self._safety_validator_initialized = False
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self._safety_validator_instance = safety_validator
+            self._safety_validator_initialized = True
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        else:
+            # Initialize safety validator with LAZY LOADING to prevent circular import
+            self._safety_validator_instance = None
+            self._safety_config = safety_config
+            self._safety_validator_initialized = False
 
         # Overall model confidence
         self.model_confidence = 0.5
@@ -1423,21 +1453,31 @@ class ModelConfidenceTracker:
         if not self._safety_validator_initialized:
             try:
                 # LAZY IMPORT - prevents circular dependency
-                from ..safety.safety_types import SafetyConfig
-                from ..safety.safety_validator import EnhancedSafetyValidator
-
-                if isinstance(self._safety_config, dict) and self._safety_config:
-                    self._safety_validator_instance = EnhancedSafetyValidator(
-                        SafetyConfig.from_dict(self._safety_config)
-                    )
-                else:
-                    self._safety_validator_instance = EnhancedSafetyValidator()
-                logger.info(
-                    "ModelConfidenceTracker: Safety validator initialized (lazy)"
+                from ..safety.safety_validator import (
+                    EnhancedSafetyValidator,
+                    initialize_all_safety_components,
                 )
+                from ..safety.safety_types import SafetyConfig
+
+                # Try singleton first
+                try:
+                    self._safety_validator_instance = initialize_all_safety_components(
+                        config=self._safety_config, reuse_existing=True
+                    )
+                    logger.info(f"{self.__class__.__name__}: Using singleton safety validator (lazy)")
+                except Exception as e:
+                    logger.debug(f"Could not get singleton safety validator: {e}")
+                    # Fallback: create new instance
+                    if isinstance(self._safety_config, dict) and self._safety_config:
+                        self._safety_validator_instance = EnhancedSafetyValidator(
+                            SafetyConfig.from_dict(self._safety_config)
+                        )
+                    else:
+                        self._safety_validator_instance = EnhancedSafetyValidator()
+                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (lazy, may cause duplication)")
             except ImportError as e:
                 logger.warning(
-                    f"ModelConfidenceTracker: Safety validator not available: {e}"
+                    f"{self.__class__.__name__}: Safety validator not available: {e}"
                 )
                 self._safety_validator_instance = None
 
