@@ -143,10 +143,10 @@ class UnifiedPlatformSettings(BaseSettings):
     )
 
     # Server configuration
-    # Bind to all interfaces by default to allow external access
-    # Set UNIFIED_HOST=127.0.0.1 in environment to bind to localhost only for security
-    host: str = "0.0.0.0"
-    port: int = 8000
+    # Security: Default to localhost binding for safety
+    # Set UNIFIED_HOST=0.0.0.0 in environment to bind to all interfaces
+    host: str = "127.0.0.1"
+    port: int = 8080
     workers: int = 1  # Default to 1 for safety
     reload: bool = False
 
@@ -179,7 +179,14 @@ class UnifiedPlatformSettings(BaseSettings):
     # CORS
     cors_enabled: bool = True
     # Tightened default origins; wildcard is no longer the default for security
-    cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Note: "null" origin is needed for file:// URLs (local HTML files)
+    cors_origins: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "null"
+    ]
 
     # Health checks
     enable_health_checks: bool = True
