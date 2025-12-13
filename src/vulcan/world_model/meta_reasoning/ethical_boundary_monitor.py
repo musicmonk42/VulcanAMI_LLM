@@ -1072,8 +1072,9 @@ class EthicalBoundaryMonitor:
                     "causes_physical_harm", False
                 ),
             )
-        except ValueError:
-            pass  # Ignore if already exists
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'no_physical_harm' already exists: {e}")
 
         try:
             self.add_boundary(
@@ -1087,8 +1088,9 @@ class EthicalBoundaryMonitor:
                     "causes_psychological_harm", False
                 ),
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'no_psychological_harm' already exists: {e}")
 
         # PRIVACY: Protect user privacy
         try:
@@ -1103,8 +1105,9 @@ class EthicalBoundaryMonitor:
                     "leaks_private_data", False
                 ),
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'no_private_data_leak' already exists: {e}")
 
         try:
             self.add_boundary(
@@ -1118,8 +1121,9 @@ class EthicalBoundaryMonitor:
                     "data_collection_justified", True
                 ),
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'respect_data_minimization' already exists: {e}")
 
         # FAIRNESS: Ensure fair treatment
         try:
@@ -1134,8 +1138,9 @@ class EthicalBoundaryMonitor:
                     "discriminates_by_demographics", False
                 ),
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'no_demographic_discrimination' already exists: {e}")
 
         # TRANSPARENCY: Maintain explainability
         try:
@@ -1148,8 +1153,9 @@ class EthicalBoundaryMonitor:
                 severity=ViolationSeverity.LOW,
                 constraint_function=lambda action: action.get("is_explainable", True),
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'maintain_explainability' already exists: {e}")
 
         # AUTONOMY: Respect user agency
         try:
@@ -1163,8 +1169,9 @@ class EthicalBoundaryMonitor:
                 constraint_function=lambda action: action.get("has_user_consent", True)
                 or not action.get("requires_consent", False),
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'respect_user_consent' already exists: {e}")
 
         # TRUTHFULNESS: Prevent deception
         try:
@@ -1179,8 +1186,9 @@ class EthicalBoundaryMonitor:
                     "is_deceptive", False
                 ),
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'no_deliberate_deception' already exists: {e}")
 
         # RESOURCE LIMITS: Prevent abuse
         try:
@@ -1200,8 +1208,9 @@ class EthicalBoundaryMonitor:
                     }
                 ],
             )
-        except ValueError:
-            pass
+        except ValueError as e:
+            # Boundary already exists - expected if re-initializing
+            logger.debug(f"Boundary 'respect_computational_limits' already exists: {e}")
 
         logger.info(
             f"Initialized default ethical boundaries (if not already present). Total: {len(self.boundaries)}"
