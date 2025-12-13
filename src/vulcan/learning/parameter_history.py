@@ -799,4 +799,7 @@ class ParameterHistoryManager:
             try:
                 self.shutdown()
             except Exception as e:
-                logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
+                try:
+                    logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
+                except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+                    pass
