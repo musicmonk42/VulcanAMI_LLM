@@ -653,15 +653,34 @@ class ProductionDeployment:
             logger.error(f"Failed to initialize ProblemExecutor: {e}")
             components["problem_executor"] = None
 
+        # Semantic Bridge (Core) - Initialize before components that need it
+        try:
+            from vulcan.semantic_bridge.semantic_bridge_core import \
+                SemanticBridge
+
+            # Pass world model, memory, and safety config
+            components["semantic_bridge"] = SemanticBridge(
+                world_model=components.get("world_model"),
+                vulcan_memory=components.get("am"),  # EpisodicMemory
+                safety_config=None  # Will use singleton safety validator
+            )
+            logger.info("SemanticBridge initialized successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import SemanticBridge: {e}")
+            components["semantic_bridge"] = None
+        except Exception as e:
+            logger.error(f"Failed to initialize SemanticBridge: {e}")
+            components["semantic_bridge"] = None
+
         # Knowledge Crystallizer (Core)
         try:
             from vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
                 KnowledgeCrystallizer
 
-            # Pass memory and semantic bridge if available
+            # Pass memory and semantic bridge
             components["knowledge_crystallizer"] = KnowledgeCrystallizer(
                 vulcan_memory=components.get("am"),  # EpisodicMemory
-                semantic_bridge=None  # Will be available later if needed
+                semantic_bridge=components.get("semantic_bridge")  # Now available
             )
             logger.info("KnowledgeCrystallizer initialized successfully")
         except ImportError as e:
@@ -690,19 +709,23 @@ class ProductionDeployment:
             logger.error(f"Failed to initialize CuriosityEngine: {e}")
             components["curiosity_engine"] = None
 
-        # Problem Decomposer (Core)
+        # Problem Decomposer (Core) - Use bootstrap for proper initialization
         try:
-            from vulcan.problem_decomposer.problem_decomposer_core import \
-                ProblemDecomposer
+            from vulcan.problem_decomposer.decomposer_bootstrap import \
+                create_decomposer
 
-            # Pass semantic bridge, memory, and safety validator if available
-            components["problem_decomposer"] = ProblemDecomposer(
-                semantic_bridge=None,  # Will be available later if needed
+            # Use factory function to create fully initialized decomposer with:
+            # - All strategies registered
+            # - Fallback chain populated
+            # - Base principles initialized
+            components["problem_decomposer"] = create_decomposer(
+                semantic_bridge=components.get("semantic_bridge"),  # Now available
                 vulcan_memory=components.get("am"),  # EpisodicMemory
                 validator=None,
-                safety_validator=components.get("safety_validator")
+                storage_path=None,  # Use default in-memory for now
+                config={"safety_validator": components.get("safety_validator")}
             )
-            logger.info("ProblemDecomposer initialized successfully")
+            logger.info("ProblemDecomposer initialized successfully with bootstrap")
             
             # Now update CuriosityEngine with the decomposer
             if components.get("curiosity_engine"):
@@ -710,7 +733,7 @@ class ProductionDeployment:
                 logger.info("CuriosityEngine linked to ProblemDecomposer")
                 
         except ImportError as e:
-            logger.error(f"Failed to import ProblemDecomposer: {e}")
+            logger.error(f"Failed to import ProblemDecomposer bootstrap: {e}")
             components["problem_decomposer"] = None
         except Exception as e:
             logger.error(f"Failed to initialize ProblemDecomposer: {e}")
@@ -719,7 +742,7 @@ class ProductionDeployment:
         # --- END ADDED IMPORTS ---
 
         # Log component summary
-        total_components = 26  # Total expected components (was 23, added 3 core components)
+        total_components = 27  # Total expected components (was 26, added SemanticBridge)
         available_components = sum(1 for v in components.values() if v is not None)
         logger.info(
             f"Component loading complete: {available_components}/{total_components} components available"
