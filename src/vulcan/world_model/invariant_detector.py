@@ -1281,32 +1281,48 @@ class InvariantRegistry:
         violation_threshold: int = 5,
         confidence_threshold: float = 0.7,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
         """
-        Initialize invariant registry
+        Initialize invariant registry - FIXED: Added safety_validator parameter
 
         Args:
             violation_threshold: Max violations before removing invariant
             confidence_threshold: Minimum confidence to keep invariant
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
 
         # Lazy load safety validator if needed
         _lazy_load_safety_validator()
 
-        # Initialize safety validator
-        if SAFETY_VALIDATOR_AVAILABLE:
-            if isinstance(safety_config, dict) and safety_config:
-                self.safety_validator = EnhancedSafetyValidator(
-                    SafetyConfig.from_dict(safety_config)
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        elif SAFETY_VALIDATOR_AVAILABLE:
+            # Fallback: try to get singleton, or create new instance
+            try:
+                from ..safety.safety_validator import initialize_all_safety_components
+                self.safety_validator = initialize_all_safety_components(
+                    config=safety_config, reuse_existing=True
                 )
-            else:
-                self.safety_validator = EnhancedSafetyValidator()
-            logger.info("InvariantRegistry: Safety validator initialized")
+                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+            except Exception as e:
+                logger.debug(f"Could not get singleton safety validator: {e}")
+                # Last resort: create new instance
+                if isinstance(safety_config, dict) and safety_config:
+                    self.safety_validator = EnhancedSafetyValidator(
+                        SafetyConfig.from_dict(safety_config)
+                    )
+                else:
+                    self.safety_validator = EnhancedSafetyValidator()
+                logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
         else:
             self.safety_validator = None
             logger.warning(
-                "InvariantRegistry: Safety validator not available - operating without safety checks"
+                f"{self.__class__.__name__}: Safety validator not available - operating without safety checks"
             )
 
         # Initialize symbolic system
@@ -1748,14 +1764,16 @@ class InvariantDetector:
         min_confidence: float = 0.8,
         min_samples: int = 20,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
         """
-        Initialize invariant detector
+        Initialize invariant detector - FIXED: Added safety_validator parameter
 
         Args:
             min_confidence: Minimum confidence for detected invariants
             min_samples: Minimum samples needed for detection
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
         self.min_confidence = min_confidence
         self.min_samples = min_samples
@@ -1763,19 +1781,33 @@ class InvariantDetector:
         # Lazy load safety validator if needed
         _lazy_load_safety_validator()
 
-        # Initialize safety validator
-        if SAFETY_VALIDATOR_AVAILABLE:
-            if isinstance(safety_config, dict) and safety_config:
-                self.safety_validator = EnhancedSafetyValidator(
-                    SafetyConfig.from_dict(safety_config)
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        elif SAFETY_VALIDATOR_AVAILABLE:
+            # Fallback: try to get singleton, or create new instance
+            try:
+                from ..safety.safety_validator import initialize_all_safety_components
+                self.safety_validator = initialize_all_safety_components(
+                    config=safety_config, reuse_existing=True
                 )
-            else:
-                self.safety_validator = EnhancedSafetyValidator()
-            logger.info("InvariantDetector: Safety validator initialized")
+                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+            except Exception as e:
+                logger.debug(f"Could not get singleton safety validator: {e}")
+                # Last resort: create new instance
+                if isinstance(safety_config, dict) and safety_config:
+                    self.safety_validator = EnhancedSafetyValidator(
+                        SafetyConfig.from_dict(safety_config)
+                    )
+                else:
+                    self.safety_validator = EnhancedSafetyValidator()
+                logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
         else:
             self.safety_validator = None
             logger.warning(
-                "InvariantDetector: Safety validator not available - operating without safety checks"
+                f"{self.__class__.__name__}: Safety validator not available - operating without safety checks"
             )
 
         # Initialize symbolic system

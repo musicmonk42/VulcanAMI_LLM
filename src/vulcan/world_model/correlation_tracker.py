@@ -1590,8 +1590,17 @@ class CorrelationTracker:
         min_samples: int = 10,
         significance_level: float = 0.05,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
-        """Initialize correlation tracker"""
+        """Initialize correlation tracker - FIXED: Added safety_validator parameter
+        
+        Args:
+            method: Correlation method to use
+            min_samples: Minimum samples for correlation
+            significance_level: Significance level for tests
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
+        """
         _lazy_import_world_model()  # <--- FIXED
         _lazy_import_safety_validator()
 
@@ -1599,23 +1608,31 @@ class CorrelationTracker:
         self.min_samples = min_samples
         self.significance_level = significance_level
 
-        # Initialize safety validator
-        # --- START FIX ---
-        if EnhancedSafetyValidator and SafetyConfig:
-            # The config object is passed directly, EnhancedSafetyValidator handles
-            # it being a dict, a SafetyConfig object, or None.
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        elif EnhancedSafetyValidator and SafetyConfig:
+            # Fallback: try to get singleton, or create new instance
             try:
-                self.safety_validator = EnhancedSafetyValidator(config=safety_config)
-                logger.info("CorrelationTracker: Safety validator initialized")
-            except Exception as e:
-                logger.error(
-                    f"CorrelationTracker: Failed to initialize EnhancedSafetyValidator: {e}"
+                from ..safety.safety_validator import initialize_all_safety_components
+                self.safety_validator = initialize_all_safety_components(
+                    config=safety_config, reuse_existing=True
                 )
-                self.safety_validator = None
-        # --- END FIX ---
+                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+            except Exception as e:
+                logger.debug(f"Could not get singleton safety validator: {e}")
+                # Last resort: create new instance
+                try:
+                    self.safety_validator = EnhancedSafetyValidator(config=safety_config)
+                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                except Exception as init_e:
+                    logger.error(f"{self.__class__.__name__}: Failed to initialize EnhancedSafetyValidator: {init_e}")
+                    self.safety_validator = None
         else:
             self.safety_validator = None
-            logger.warning("CorrelationTracker: Safety validator not available")
+            logger.warning(f"{self.__class__.__name__}: Safety validator not available")
 
         # Components
         self.correlation_matrix = CorrelationMatrix()

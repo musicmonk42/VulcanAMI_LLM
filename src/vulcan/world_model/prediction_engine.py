@@ -1798,38 +1798,54 @@ class EnsemblePredictor:
         path_tracer: Optional[PathTracer] = None,
         default_method: str = "weighted_quantile",
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
         clustering_method: str = "auto",
     ):
         """
-        Initialize ensemble predictor
+        Initialize ensemble predictor - FIXED: Added safety_validator parameter
 
         Args:
             path_tracer: PathTracer instance to use
             default_method: Default combination method
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
             clustering_method: Clustering method for path grouping
         """
         self.path_tracer = path_tracer or PathTracer()
         self.default_method = default_method
 
-        # Lazy-load safety validator here
-        self.safety_validator = None
-        try:
-            from ..safety.safety_types import SafetyConfig
-            from ..safety.safety_validator import EnhancedSafetyValidator
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        else:
+            # Lazy-load safety validator here
+            self.safety_validator = None
+            try:
+                from ..safety.safety_types import SafetyConfig
+                from ..safety.safety_validator import EnhancedSafetyValidator, initialize_all_safety_components
 
-            # Use original logic for config handling
-            if isinstance(safety_config, dict) and safety_config:
-                self.safety_validator = EnhancedSafetyValidator(
-                    SafetyConfig.from_dict(safety_config)
+                # Try singleton first
+                try:
+                    self.safety_validator = initialize_all_safety_components(
+                        config=safety_config, reuse_existing=True
+                    )
+                    logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                except Exception as e:
+                    logger.debug(f"Could not get singleton safety validator: {e}")
+                    # Fallback: Use original logic for config handling
+                    if isinstance(safety_config, dict) and safety_config:
+                        self.safety_validator = EnhancedSafetyValidator(
+                            SafetyConfig.from_dict(safety_config)
+                        )
+                    else:
+                        self.safety_validator = EnhancedSafetyValidator()
+                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+            except ImportError as e:
+                logger.warning(
+                    f"safety_validator not available: {str(e)}. Operating without safety checks"
                 )
-            else:
-                self.safety_validator = EnhancedSafetyValidator()
-            logger.info("EnsemblePredictor: Safety validator initialized")
-        except ImportError as e:
-            logger.warning(
-                f"safety_validator not available: {str(e)}. Operating without safety checks"
-            )
 
         # Components - FULLY OPTIMIZED
         self.clusterer = OptimizedPathClusterer(
