@@ -12,7 +12,7 @@ Fixed with interruptible background threads.
 
 import json
 import logging
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 import time
 from collections import defaultdict, deque
@@ -246,7 +246,7 @@ class StochasticCostModel:
         model_path = Path(path) / "cost_model.pkl"
         if model_path.exists():
             with open(model_path, "rb") as f:
-                self.models = pickle.load(f)
+                self.models = pickle.load(f)  # nosec B301 - Internal data structure
 
 
 # ==============================================================================
@@ -421,7 +421,7 @@ class CalibratedDecisionMaker:
         calib_path = Path(path) / "calibration.pkl"
         if calib_path.exists():
             with open(calib_path, "rb") as f:
-                self.calibrators = pickle.load(f)
+                self.calibrators = pickle.load(f)  # nosec B301 - Internal data structure
 
 
 # ==============================================================================
@@ -746,7 +746,7 @@ class ToolSelectionBandit:
             stats_path = Path(path) / "bandit_statistics.pkl"
             if stats_path.exists():
                 with open(stats_path, "rb") as f:
-                    self.statistics = pickle.load(f)
+                    self.statistics = pickle.load(f)  # nosec B301 - Internal data structure
 
     def increase_exploration(self):
         """Increase exploration rate (delegated)."""

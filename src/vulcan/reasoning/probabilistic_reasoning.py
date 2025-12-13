@@ -1611,7 +1611,7 @@ class EnhancedProbabilisticReasoner:
 
         try:
             with open(filepath, "rb") as f:
-                model_data = pickle.load(f)
+                model_data = pickle.load(f)  # nosec B301 - Internal data structure
 
             self.gp_ensemble = model_data["gp_ensemble"]
             self.ensemble = self.gp_ensemble

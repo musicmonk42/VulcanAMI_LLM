@@ -43,12 +43,16 @@ Additional keys in `reasoning_modules`:
 
 import hashlib
 import json
+import logging
 import math
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 
@@ -480,8 +484,8 @@ class UnifiedGeneration:
                 conf = module.get_confidence()
                 if isinstance(conf, (int, float)):
                     return float(conf)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Operation failed: {e}")
         return 1.0
 
     # ================================ Normalization & Fusion ================================ #

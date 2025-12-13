@@ -306,13 +306,11 @@ class ParameterHistoryManager:
                 import gzip
 
                 with gzip.open(path, "rb") as f:
-                    # NOTE: weights_only=False allows loading metadata but increases risk
-                    # TODO: Consider separating weight loading from metadata loading
-                    checkpoint = torch.load(f, map_location="cpu", weights_only=False)
+                    # SECURITY: Use weights_only=True to prevent arbitrary code execution
+                    checkpoint = torch.load(f, map_location="cpu", weights_only=True)
             else:
-                # NOTE: weights_only=False allows loading metadata but increases risk
-                # TODO: Consider separating weight loading from metadata loading
-                checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+                # SECURITY: Use weights_only=True to prevent arbitrary code execution
+                checkpoint = torch.load(path, map_location="cpu", weights_only=True)
 
             # Validate checksum
             if "checksum" in checkpoint:
@@ -353,13 +351,11 @@ class ParameterHistoryManager:
                 import gzip
 
                 with gzip.open(path, "rb") as f:
-                    # NOTE: weights_only=False allows loading metadata but increases risk
-                    # TODO: Consider separating weight loading from metadata loading
-                    checkpoint = torch.load(f, map_location="cpu", weights_only=False)
+                    # SECURITY: Use weights_only=True to prevent arbitrary code execution
+                    checkpoint = torch.load(f, map_location="cpu", weights_only=True)
             else:
-                # NOTE: weights_only=False allows loading metadata but increases risk
-                # TODO: Consider separating weight loading from metadata loading
-                checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+                # SECURITY: Use weights_only=True to prevent arbitrary code execution
+                checkpoint = torch.load(path, map_location="cpu", weights_only=True)
 
             # Verify checksum
             if "checksum" not in checkpoint:

@@ -49,6 +49,7 @@ Performance: Optimized with caching and indexing
 """
 
 import hashlib
+import logging
 import math
 import re
 import threading
@@ -57,6 +58,9 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Tokens = List[Token]
@@ -571,8 +575,8 @@ class HierarchicalContext:
         """Background consolidation (lightweight)"""
         try:
             self.consolidate_memory(min_frequency=3)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")
 
     # ================================ Memory Pruning ================================ #
 

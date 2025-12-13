@@ -6,6 +6,9 @@ import random  # Needed for random token choice on low entropy fallback
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -97,8 +100,8 @@ class LowRankDraftTransformer(nn.Module):
         if torch.__version__ >= "2.0":
             try:
                 self.forward = torch.compile(self.forward)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Operation failed: {e}")
 
     @torch.no_grad()
     def encode(self, input_ids: torch.Tensor) -> torch.Tensor:

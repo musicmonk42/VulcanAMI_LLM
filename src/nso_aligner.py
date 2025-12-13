@@ -357,11 +357,11 @@ class NSOAligner:
                     # accelerate is available - try to load the model
                     try:
                         token = os.getenv("HF_TOKEN")  # optional
-                        self.tokenizer = AutoTokenizer.from_pretrained(
+                        self.tokenizer = AutoTokenizer.from_pretrained(  # nosec B615 - revision parameter present
                             model_id, token=token, revision=model_revision
                         )
                         self.adversarial_detector = (
-                            AutoModelForSequenceClassification.from_pretrained(
+                            AutoModelForSequenceClassification.from_pretrained(  # nosec B615 - revision parameter present
                                 model_id,
                                 token=token,
                                 revision=model_revision,
@@ -373,8 +373,8 @@ class NSOAligner:
                         )
                         try:
                             self.adversarial_detector.to("cpu")
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Operation failed: {e}")
                         self.logger.info(
                             f"Adversarial detector loaded on CPU: {model_id}"
                         )

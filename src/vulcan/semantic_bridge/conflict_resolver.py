@@ -19,6 +19,9 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 # Import safety validator with multiple fallback paths
 SAFETY_VALIDATOR_AVAILABLE = False
 EnhancedSafetyValidator = None
@@ -31,7 +34,7 @@ try:
 
     SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
-    pass
+    logger.debug("Optional dependency not available")
 
 # Fallback: Try absolute import (when vulcan is in sys.path)
 if not SAFETY_VALIDATOR_AVAILABLE:
@@ -41,7 +44,7 @@ if not SAFETY_VALIDATOR_AVAILABLE:
 
         SAFETY_VALIDATOR_AVAILABLE = True
     except ImportError:
-        pass
+        logger.debug("Optional optimization library not available")
 
 # Fallback: Try src-prefixed import (when src is in sys.path)
 if not SAFETY_VALIDATOR_AVAILABLE:

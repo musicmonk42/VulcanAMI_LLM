@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 import threading
 import time
 from collections import deque
@@ -1914,15 +1915,31 @@ class ConfigurationAPI:
 
     async def export_config(self, format: str = "json") -> Dict[str, Any]:
         """Export configuration via API."""
-        file_path = Path(f"/tmp/config_export.{format}")
-        success = self.config_manager.export(file_path)
+        # Use secure temporary file (CWE-377 mitigation)
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode='w',
+                suffix=f'.{format}',
+                delete=False,
+                encoding='utf-8'
+            ) as tmp_file:
+                file_path = Path(tmp_file.name)
+            
+            success = self.config_manager.export(file_path)
 
-        if success:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            return {"success": True, "content": content}
-        else:
-            return {"success": False, "error": "Export failed"}
+            if success:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                # Clean up temporary file
+                file_path.unlink()
+                return {"success": True, "content": content}
+            else:
+                # Clean up temporary file on failure
+                if file_path.exists():
+                    file_path.unlink()
+                return {"success": False, "error": "Export failed"}
+        except Exception as e:
+            return {"success": False, "error": f"Export failed: {e}"}
 
 
 # ============================================================

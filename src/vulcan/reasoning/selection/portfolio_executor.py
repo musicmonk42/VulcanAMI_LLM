@@ -1143,5 +1143,5 @@ class PortfolioExecutor:
         try:
             if not self._is_shutdown:
                 self.shutdown(timeout=5.0)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")

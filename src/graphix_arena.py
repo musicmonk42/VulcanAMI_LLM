@@ -1380,7 +1380,7 @@ class GraphixArena:
         import uvicorn
 
         logger.info(f"Starting Graphix Arena on http://{self.host}:{self.port}")
-        if self.host == "0.0.0.0":
+        if self.host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
             logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
         logger.info(
             "Security is ENABLED. Use the 'X-API-KEY' header for authentication."

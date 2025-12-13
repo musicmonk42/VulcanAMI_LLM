@@ -9,7 +9,7 @@ import torch
 
 def load(p):
     try:
-        return torch.load(p, map_location="cpu")
+        return torch.load(p, map_location="cpu", weights_only=True)
     except Exception:
         with open(p,"rb") as f:
             return pickle.load(f)

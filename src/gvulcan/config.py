@@ -1206,8 +1206,8 @@ class APIConfig:
     API configuration
     """
 
-    # Server
-    host: str = "0.0.0.0"
+    # Server - Default to localhost for security; override with environment variable
+    host: str = "127.0.0.1"
     port: int = 8080
     workers: int = 0  # 0 = auto
     enable_https: bool = True

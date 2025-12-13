@@ -1707,14 +1707,14 @@ class NeuralSafetyValidator:
                             )
                             if model_path.exists():
                                 model.load_state_dict(
-                                    torch.load(model_path, map_location=self.device)
+                                    torch.load(model_path, map_location=self.device, weights_only=True)
                                 )
                     else:
                         # Load single model
                         model_path = load_path / f"{model_type.value}.pth"
                         if model_path.exists():
                             model_dict.load_state_dict(
-                                torch.load(model_path, map_location=self.device)
+                                torch.load(model_path, map_location=self.device, weights_only=True)
                             )
                 except Exception as e:
                     logger.error(f"Error loading {model_type.value}: {e}")

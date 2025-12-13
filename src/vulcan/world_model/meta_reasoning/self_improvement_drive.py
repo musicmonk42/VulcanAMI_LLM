@@ -330,8 +330,8 @@ class SelfImprovementDrive:
             policy_path = get_config(
                 "intrinsic_drives_config.auto_apply_policy", policy_path
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")
 
         self._auto_apply_policy = load_policy(policy_path)
         self._auto_apply_enabled = bool(
@@ -1917,8 +1917,8 @@ class SelfImprovementDrive:
             st = getattr(self, "state", None)
             if isinstance(st, SelfImprovementState):  # Check type
                 st.last_status = status  # Add a field to track last status
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")
         return status
 
     # ---------- Main Step ----------

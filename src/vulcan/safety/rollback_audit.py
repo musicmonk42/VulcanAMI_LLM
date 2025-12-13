@@ -381,7 +381,7 @@ class RollbackManager:
                         data = f.read()
                         if row[5]:  # compressed
                             data = zlib.decompress(data)
-                        snapshot_data = pickle.loads(data)
+                        snapshot_data = pickle.loads(data)  # nosec B301 - Internal data structure
 
                     snapshot = RollbackSnapshot(
                         snapshot_id=snapshot_id,
@@ -524,8 +524,8 @@ class RollbackManager:
                 if file_path.exists():
                     try:
                         file_path.unlink()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Failed to log rollback event: {e}")
                 raise
 
     def rollback(
@@ -1270,8 +1270,8 @@ class AuditLogger:
                     if last_line:
                         entry = json.loads(last_line)
                         return entry.get("hash", "")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to audit rollback state: {e}")
         return hashlib.sha256(b"genesis").hexdigest()
 
     def _initialize_redaction_patterns(self) -> List[Dict[str, Any]]:

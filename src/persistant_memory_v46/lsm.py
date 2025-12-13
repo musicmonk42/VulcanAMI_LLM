@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-import pickle
+import pickle  # SECURITY WARNING: pickle is used for internal data structures only
 import time
 import zlib
 from collections import defaultdict
@@ -14,6 +14,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# SECURITY NOTE: This module uses pickle for serialization of internal data structures.
+# pickle.loads() can execute arbitrary code if given untrusted data.
+# All pickle operations in this module are for INTERNAL use only - never deserialize
+# user-provided or network-received pickle data without validation.
 
 
 class BloomFilter:
@@ -69,7 +74,7 @@ class BloomFilter:
     @classmethod
     def deserialize(cls, data: bytes) -> BloomFilter:
         """Deserialize bloom filter from bytes."""
-        obj_data = pickle.loads(data)
+        obj_data = pickle.loads(data)  # nosec B301 - Internal data structure, not user input
         bf = cls(obj_data["size"], obj_data["num_hashes"])
         bf.bit_array = np.frombuffer(obj_data["bit_array"], dtype=bool)
         bf.item_count = obj_data["item_count"]
@@ -691,7 +696,7 @@ class MerkleLSM:
                 data = zlib.decompress(data)
 
             # Deserialize
-            items = pickle.loads(data)
+            items = pickle.loads(data)  # nosec B301 - Internal LSM data, not user input
 
             # Binary search (items are sorted)
             left, right = 0, len(items) - 1
@@ -720,7 +725,7 @@ class MerkleLSM:
             if self.compression == "zlib":
                 data = zlib.decompress(data)
 
-            items = pickle.loads(data)
+            items = pickle.loads(data)  # nosec B301 - Internal LSM data, not user input
             return [k for k, v in items]
 
         except Exception as e:
@@ -736,7 +741,7 @@ class MerkleLSM:
             if self.compression == "zlib":
                 data = zlib.decompress(data)
 
-            items = pickle.loads(data)
+            items = pickle.loads(data)  # nosec B301 - Internal LSM data, not user input
 
             # Binary search for start
             left = 0
@@ -776,7 +781,7 @@ class MerkleLSM:
                 if self.compression == "zlib":
                     data = zlib.decompress(data)
 
-                items = pickle.loads(data)
+                items = pickle.loads(data)  # nosec B301 - Internal LSM data, not user input
                 for key, value in items:
                     if not self._is_tombstone(value):
                         merged[key] = value

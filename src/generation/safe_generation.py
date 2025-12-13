@@ -27,12 +27,16 @@ Returns same shape with validated tokens.
 
 import hashlib
 import json
+import logging
 import re
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (Any, Deque, Dict, List, Optional, Tuple, Union)
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Candidate = Union[Token, Dict[str, Any]]
@@ -397,8 +401,9 @@ except Exception:
                     if not world_model.validate_generation(token, context):
                         if hasattr(world_model, "suggest_correction"):
                             return world_model.suggest_correction(token, context)
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Safety-critical: log validation failures but continue with original token
+                    logger.warning(f"World model validation failed: {e}")
             return token
 
 
@@ -792,8 +797,9 @@ class SafeGeneration:
                     return False
                 if isinstance(ok, list):
                     return ok
-            except Exception:
-                pass
+            except Exception as e:
+                # Safety-critical: log world model validation errors
+                logger.error(f"World model sequence validation failed: {e}", exc_info=True)
 
         return repaired if changed else True
 
@@ -893,8 +899,9 @@ class SafeGeneration:
                         reasons.append("EnhancedSafetyValidator")
                         violations[ValidationCategory.CONSISTENCY] = 0.5
                     out = final
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Safety-critical: log enhanced validator failures
+                    logger.error(f"Enhanced safety validator failed: {e}", exc_info=True)
 
         # World model validation
         if world_model:
@@ -906,8 +913,9 @@ class SafeGeneration:
                         reasons.append("WorldModelCorrection")
                         violations[ValidationCategory.CONSISTENCY] = 0.4
                         out = world_model.suggest_correction(out, context)
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Safety-critical: log world model validation errors
+                    logger.error(f"World model validation/correction failed: {e}", exc_info=True)
 
         # Additional heuristic checks
         if isinstance(out, str):
@@ -1126,8 +1134,9 @@ class SafeGeneration:
                             RiskLevel.LOW,
                         )
                         return repaired
-            except Exception:
-                pass
+            except Exception as e:
+                # Safety-critical: log sequence repair failures
+                logger.error(f"Sequence repair failed: {e}", exc_info=True)
 
         return tokens
 
@@ -1176,8 +1185,9 @@ class SafeGeneration:
             if hasattr(world_model, "suggest_correction"):
                 try:
                     return world_model.suggest_correction(original, context)
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Log correction suggestion failures
+                    logger.warning(f"World model correction suggestion failed: {e}")
 
         elif strat == "filter":
             # Return empty/neutral token
@@ -1381,8 +1391,9 @@ class SafeGeneration:
                 self.observability.record(event_type, payload)
             elif hasattr(self.observability, "log"):
                 self.observability.log(event_type, payload)
-        except Exception:
-            pass
+        except Exception as e:
+            # Observability failures should not break safety checks
+            logger.debug(f"Observability recording failed: {e}")
 
     def _audit(self, event_type: str, payload: Dict[str, Any]) -> None:
         """Send to audit system"""
@@ -1393,8 +1404,9 @@ class SafeGeneration:
                 self.audit.append({"event": event_type, **payload})
             elif hasattr(self.audit, "record"):
                 self.audit.record(event_type, payload)
-        except Exception:
-            pass
+        except Exception as e:
+            # Audit failures are concerning but should not break safety checks
+            logger.warning(f"Audit recording failed: {e}")
 
     def _hash_context(self, context: Dict[str, Any]) -> str:
         """Create hash of context for audit trail"""

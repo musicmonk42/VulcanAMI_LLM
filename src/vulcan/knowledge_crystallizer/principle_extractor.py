@@ -1912,7 +1912,7 @@ class SuccessAnalyzer:
                             ) / metric.threshold
                             importance *= 1 + min(0.2, excess)
                         except (ZeroDivisionError, TypeError):
-                            pass
+                            logger.debug(f"Operation failed: {e}")
 
                     factor = SuccessFactor(
                         factor_type=f"metric_{metric.name}",

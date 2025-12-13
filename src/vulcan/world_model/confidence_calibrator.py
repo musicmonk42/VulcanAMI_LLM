@@ -1741,7 +1741,7 @@ class ModelConfidenceTracker:
                 error = abs(obs_val - pred_val) / denominator
                 return min(error, 1.0)
             except (TypeError, ValueError):
-                pass
+                logger.debug(f"Operation failed: {e}")
 
         # Default error if can't calculate
         return 0.5

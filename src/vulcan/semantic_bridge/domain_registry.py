@@ -21,6 +21,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 # Import safety validator with multiple fallback paths
 SAFETY_VALIDATOR_AVAILABLE = False
 EnhancedSafetyValidator = None
@@ -32,8 +35,8 @@ try:
     from ..safety.safety_validator import EnhancedSafetyValidator
 
     SAFETY_VALIDATOR_AVAILABLE = True
-except ImportError:
-    pass
+except ImportError as e:
+    logger.debug(f"Operation failed: {e}")
 
 # Fallback: Try absolute import (when vulcan is in sys.path)
 if not SAFETY_VALIDATOR_AVAILABLE:
@@ -42,8 +45,8 @@ if not SAFETY_VALIDATOR_AVAILABLE:
         from vulcan.safety.safety_validator import EnhancedSafetyValidator
 
         SAFETY_VALIDATOR_AVAILABLE = True
-    except ImportError:
-        pass
+    except ImportError as e:
+        logger.debug(f"Operation failed: {e}")
 
 # Fallback: Try src-prefixed import (when src is in sys.path)
 if not SAFETY_VALIDATOR_AVAILABLE:
@@ -1223,7 +1226,7 @@ class DomainRegistry:
         if domains_file.exists():
             try:
                 with open(domains_file, "rb") as f:
-                    loaded_domains = pickle.load(f)
+                    loaded_domains = pickle.load(f)  # nosec B301 - Internal data structure
                     for name, profile in loaded_domains.items():
                         self.register_domain(name, profile)
             except Exception as e:

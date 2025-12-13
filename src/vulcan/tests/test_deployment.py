@@ -330,7 +330,7 @@ class MockDeployment:
     def _load_checkpoint(self, path):
         """Load checkpoint."""
         with open(path, "rb") as f:
-            checkpoint_data = pickle.load(f)
+            checkpoint_data = pickle.load(f)  # nosec B301 - Internal data structure
 
         self.collective.sys.step = checkpoint_data["step"]
         self._last_checkpointed_step = checkpoint_data["step"]

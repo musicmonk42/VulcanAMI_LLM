@@ -123,8 +123,14 @@ class DataQualityClassifier:
         # Load transformer model for PII
         if pii_config['models']['transformer']['enabled']:
             model_name = pii_config['models']['transformer']['model']
-            self.pii_tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.pii_model = AutoModelForTokenClassification.from_pretrained(model_name)
+            # Support model revision pinning for security (CWE-494)
+            # Set 'revision' in config to pin to specific commit hash
+            model_kwargs = {}
+            if 'revision' in pii_config['models']['transformer']:
+                model_kwargs['revision'] = pii_config['models']['transformer']['revision']
+            
+            self.pii_tokenizer = AutoTokenizer.from_pretrained(model_name, **model_kwargs)
+            self.pii_model = AutoModelForTokenClassification.from_pretrained(model_name, **model_kwargs)
             self.pii_pipeline = pipeline(
                 "token-classification",
                 model=self.pii_model,

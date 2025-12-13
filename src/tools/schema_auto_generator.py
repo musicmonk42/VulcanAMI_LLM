@@ -26,9 +26,13 @@ Author: The Graphix AI Engineering Team
 import argparse
 import hashlib
 import json
+import logging
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 try:
     from ecdsa import NIST256p, SigningKey, VerifyingKey
@@ -238,7 +242,7 @@ def parse_expression(
             try:
                 val = json.loads(val)
             except json.JSONDecodeError:
-                pass
+                logger.debug(f"Operation failed: {e}")
             add_to_seq({"type": "literal", "value": val})
             index += 1
         elif kind == "IDENT":

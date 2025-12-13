@@ -1347,8 +1347,8 @@ class BayesianNetworkReasoner:
             self.set_gaussian_cpd(
                 var_name, coefficients, intercept, max(variance, 1e-10)
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")
 
     def _compute_log_likelihood(self, data: List[Dict[str, Any]]) -> float:
         """Compute log-likelihood of data."""

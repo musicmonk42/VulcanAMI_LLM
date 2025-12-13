@@ -2513,7 +2513,7 @@ class BiasDetector:
     def load_models(self, path: str):
         """Load bias detection models."""
         with self.lock:
-            model_state = torch.load(path, map_location=self.device)
+            model_state = torch.load(path, map_location=self.device, weights_only=True)
 
             for name, state_dict in model_state["models"].items():
                 if name in self.bias_models:

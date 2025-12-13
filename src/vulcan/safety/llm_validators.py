@@ -44,10 +44,14 @@ Public API:
 
 import asyncio
 import inspect
+import logging
 import re
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Tokens = Sequence[Token]
@@ -598,8 +602,8 @@ class EnhancedSafetyValidator:
                             )
                             self.last_events.append(ev)
                             replacement = corr
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to validate LLM output: {e}")
 
         if self.policy.get(
             "block_on_high_risk", True
@@ -685,8 +689,8 @@ class EnhancedSafetyValidator:
                             )
                             self.last_events.append(ev)
                             replacement = corr
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to check safety constraints: {e}")
 
         # High-risk block policy
         if self.policy.get(

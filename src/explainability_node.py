@@ -228,7 +228,7 @@ class ExplainabilityValidator:
             try:
                 validated["drift"] = float(drift_data["drift"])
             except (ValueError, TypeError):
-                pass
+                logger.debug(f"Operation failed: {e}")
 
         if "timestamp" in drift_data:
             validated["timestamp"] = str(drift_data["timestamp"])

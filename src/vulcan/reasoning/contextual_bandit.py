@@ -11,7 +11,7 @@ FULLY IMPLEMENTED VERSION with:
 """
 
 import logging
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
@@ -377,8 +377,8 @@ class AdvancedRewardModel:
                     try:
                         pred = model.predict(features_scaled)[0]
                         predictions.append(pred)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Operation failed: {e}")
 
             if not predictions:
                 return 0.5, 1.0
@@ -1376,12 +1376,12 @@ class AdaptiveBanditOrchestrator:
                 if hasattr(bandit, "load_state_dict"):
                     model_file = load_path / f"{name}_model.pt"
                     if model_file.exists():
-                        bandit.load_state_dict(torch.load(model_file))
+                        bandit.load_state_dict(torch.load(model_file, weights_only=True))
                 else:
                     state_file = load_path / f"{name}_state.pkl"
                     if state_file.exists():
                         with open(state_file, "rb") as f:
-                            state = pickle.load(f)
+                            state = pickle.load(f)  # nosec B301 - Internal data structure
                             if hasattr(bandit, "q_values"):
                                 bandit.q_values = defaultdict(
                                     lambda: np.zeros(self.n_actions), state["q_values"]
@@ -1394,7 +1394,7 @@ class AdaptiveBanditOrchestrator:
             meta_file = load_path / "meta_bandit.pkl"
             if meta_file.exists():
                 with open(meta_file, "rb") as f:
-                    meta_state = pickle.load(f)
+                    meta_state = pickle.load(f)  # nosec B301 - Internal data structure
                     self.performance_window = defaultdict(
                         lambda: deque(maxlen=100),
                         {

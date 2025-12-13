@@ -367,7 +367,7 @@ def get_previous_report_metrics() -> Dict[str, float]:
                         val_clean = val.split()[0] if " " in val else val
                         metrics[name] = float(val_clean)
                     except (ValueError, IndexError):
-                        pass
+                        logger.debug(f"Operation failed: {e}")
 
         # Validate extracted metrics
         valid, error = validator.validate_metrics(metrics)
@@ -414,7 +414,7 @@ def fetch_interpretability_metrics() -> Dict[str, Any]:
             try:
                 metrics["shap_coverage_percent"] = float(metrics["shap_coverage"]) * 100
             except (ValueError, TypeError):
-                pass
+                logger.debug(f"Operation failed: {e}")
 
         return metrics
 
@@ -1011,8 +1011,8 @@ def main():
         logger.exception("Critical error in report generation")
         try:
             notify_error(f"Transparency report generation failed: {err}")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")
         raise
 
 

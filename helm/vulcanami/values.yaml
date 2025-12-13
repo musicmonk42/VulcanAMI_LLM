@@ -155,6 +155,22 @@ secrets:
   postgresPassword: ""  # REQUIRED
   redisPassword: ""  # REQUIRED
 
+# Security Configuration (Optional - for enhanced security)
+# HuggingFace Model Pinning: Pin models to specific commit hashes
+# Find revision hashes at: https://huggingface.co/<model-name>/commits/main
+security:
+  # Model revision pinning (recommended for production)
+  modelRevisions:
+    textModel: ""  # Optional: VULCAN_TEXT_MODEL_REVISION
+    audioModel: ""  # Optional: VULCAN_AUDIO_MODEL_REVISION
+    bertModel: ""  # Optional: VULCAN_BERT_MODEL_REVISION
+    visionAudioModel: ""  # Optional: VULCAN_VISION_AUDIO_MODEL_REVISION
+    adversarialDetector: ""  # Optional: ADVERSARIAL_DETECTOR_REVISION
+  
+  # Network binding (automatically set to appropriate value in container)
+  # Note: Container binding is handled internally; this is for reference only
+  bindHost: "0.0.0.0"  # Container environments require 0.0.0.0
+
 # Monitoring
 monitoring:
   enabled: true

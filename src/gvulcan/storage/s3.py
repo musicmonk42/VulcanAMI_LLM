@@ -308,8 +308,8 @@ class S3Store:
                 self.s3.abort_multipart_upload(
                     Bucket=self.bucket, Key=key, UploadId=upload_id
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Operation failed: {e}")
             raise
 
     def delete_object(self, path: str) -> bool:

@@ -368,8 +368,8 @@ class TamperEvidentLogger:
                 trace_hex = hex(context.trace_id)[2:]
                 span_hex = hex(context.span_id)[2:]
                 return trace_hex, span_hex
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.debug(f"Failed to extract OpenTelemetry trace context: {e}")
         return None, None
 
     @staticmethod
@@ -552,8 +552,8 @@ class TamperEvidentLogger:
                                         self.config.syslog_facility | syslog.LOG_INFO,
                                         json.dumps(syslog_data, ensure_ascii=False),
                                     )
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    self._logger.debug(f"Failed to send log to syslog: {e}")
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -735,8 +735,8 @@ class TamperEvidentLogger:
                                 self.config.syslog_facility | syslog.LOG_INFO,
                                 json.dumps(syslog_data, ensure_ascii=False),
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Operation failed: {e}")
 
                 if self._metrics:
                     self._metrics["batch_size"].set(len(self._batch_queue))
@@ -958,7 +958,7 @@ class TamperEvidentLogger:
             try:
                 await self._batch_task
             except asyncio.CancelledError:
-                pass
+                logger.debug(f"Operation failed: {e}")
 
         # Flush any remaining batched entries
         async with self._lock:
@@ -980,8 +980,8 @@ class TamperEvidentLogger:
         for handler in self._logger.handlers[:]:
             try:
                 handler.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Operation failed: {e}")
             self._logger.removeHandler(handler)
 
 

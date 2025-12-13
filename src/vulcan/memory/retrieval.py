@@ -895,7 +895,7 @@ class AttentionMechanism:
         weights_path = Path("./models/attention_weights.pt")
         if weights_path.exists():
             try:
-                state_dict = torch.load(weights_path, map_location="cpu")
+                state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
                 self.learned_attention.load_state_dict(state_dict)
                 logger.info("Loaded pre-trained attention weights")
             except Exception as e:

@@ -1111,15 +1111,17 @@ class TimeSeriesAnalyzer:
                 peaks, _ = signal.find_peaks(autocorr, height=0.3)
                 if len(peaks) > 0:
                     return False
-        except Exception:
-            pass
+        except Exception as e:
+            # Autocorrelation analysis failure - log but continue with other methods
+            logger.debug(f"Autocorrelation analysis failed: {e}")
 
         if STATSMODELS_AVAILABLE:
             try:
                 result = adfuller(values)
                 return result[1] < p_value_threshold
-            except Exception:
-                pass
+            except Exception as e:
+                # ADF test failure - log but continue with fallback method
+                logger.debug(f"ADF test failed: {e}")
 
         mid = len(values) // 2
         var1 = np.var(values[:mid])
@@ -1183,8 +1185,9 @@ class TimeSeriesAnalyzer:
 
             if abs(r_value) > 0.8:
                 return {"rate": slope, "confidence": abs(r_value)}
-        except Exception:
-            pass
+        except Exception as e:
+            # Exponential decay detection failed - log and return None
+            logger.warning(f"Exponential decay detection failed: {e}")
 
         return None
 
@@ -1382,8 +1385,9 @@ class ModelFitter:
             score = model.score(X, y)
             if score > self.min_score:
                 return model
-        except Exception:
-            pass
+        except Exception as e:
+            # Linear model fitting failed - log and return None
+            logger.warning(f"Linear model fitting failed: {e}")
 
         return None
 
@@ -1404,8 +1408,9 @@ class ModelFitter:
                 return lambda x, dt: model.predict(poly_features.transform([[x, dt]]))[
                     0
                 ]
-        except Exception:
-            pass
+        except Exception as e:
+            # Polynomial model fitting failed - log and return None
+            logger.warning(f"Polynomial model fitting failed: {e}")
 
         return None
 
@@ -1429,8 +1434,9 @@ class ModelFitter:
             models.append(
                 ("linear", abs(r_value), {"slope": slope, "intercept": intercept})
             )
-        except Exception:
-            pass
+        except Exception as e:
+            # Linear regression failed - log but try other models
+            logger.debug(f"Linear regression in fit_best_model failed: {e}")
 
         try:
             log_values = np.log(np.abs(values_array) + 1e-10)
@@ -1442,8 +1448,9 @@ class ModelFitter:
                     {"rate": slope, "initial": np.exp(intercept)},
                 )
             )
-        except Exception:
-            pass
+        except Exception as e:
+            # Exponential regression failed - log but continue with available models
+            logger.debug(f"Exponential regression in fit_best_model failed: {e}")
 
         if models:
             best_model = max(models, key=lambda x: x[1])

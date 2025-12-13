@@ -11,7 +11,7 @@ PATCH 5: Interruptible cleanup loop with Event-based shutdown.
 import hashlib
 import json
 import logging
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import sys
 import threading
 import time
@@ -227,7 +227,7 @@ class CompressedCache:
             if isinstance(compressed, bytes):
                 # Decompress
                 try:
-                    decompressed = pickle.loads(zlib.decompress(compressed))
+                    decompressed = pickle.loads(zlib.decompress(compressed))  # nosec B301 - Internal data structure
                     return decompressed
                 except Exception as e:
                     logger.warning(f"Decompression failed: {e}")
@@ -430,7 +430,7 @@ class MultiLevelCache:
 
             try:
                 with open(file_path, "rb") as f:
-                    return pickle.load(f)
+                    return pickle.load(f)  # nosec B301 - Internal data structure
             except Exception as e:
                 logger.error(f"Disk cache read failed: {e}")
                 return None

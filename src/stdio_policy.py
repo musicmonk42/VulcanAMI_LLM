@@ -54,8 +54,8 @@ At the top of `src/__init__.py`:
     try:
         from .stdio_policy import install
         install(replace_builtins=True, patch_ray=True, patch_colorama=True)
-    except Exception:
-        pass
+    except Exception as e:
+        _logger.debug(f"StdIO policy install in __init__.py failed (may not be needed): {e}")
 
 License: MIT (or your project's license)
 """
@@ -399,8 +399,8 @@ class StdIOHandle:
                     sys.__stderr__.write("[stdio_policy] restored\n")
                     try:
                         sys.__stderr__.flush()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        _logger.debug(f"Failed to flush stderr during restore: {e}")
             except Exception as e:
                 _logger.error(f"Error during restore: {e}")
 
@@ -418,8 +418,8 @@ class StdIOHandle:
         try:
             if not self.restored:
                 self.restore()
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.debug(f"Failed to restore StdIO during __del__: {e}")
 
 
 def install(
@@ -471,8 +471,8 @@ def install(
             )
             try:
                 sys.__stderr__.flush()
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug(f"Failed to flush stderr: {e}")
         return StdIOHandle(cfg=cfg, restored=False)
 
     with _STATE.lock:
@@ -524,8 +524,8 @@ def install(
         )
         try:
             sys.__stderr__.flush()
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.debug(f"Failed to flush stderr during install: {e}")
 
     return StdIOHandle(cfg=cfg, restored=False)
 

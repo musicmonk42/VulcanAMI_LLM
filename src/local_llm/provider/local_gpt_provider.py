@@ -7,6 +7,9 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 import torch
 
 from src.local_llm.tokenizer.simple_tokenizer import SimpleTokenizer
@@ -408,13 +411,13 @@ class LocalGPTProvider:
         """
         try:
             del self.model
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to load model configuration: {e}")
         if self.device.startswith("cuda"):
             try:
                 torch.cuda.empty_cache()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to initialize model tokenizer: {e}")
 
 
 # Convenience factory for external runtimes

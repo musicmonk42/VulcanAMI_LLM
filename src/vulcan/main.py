@@ -43,8 +43,9 @@ try:
     import faulthandler
 
     faulthandler.enable()
-except Exception:
-    pass
+except Exception as e:
+    # Faulthandler may not be available on all platforms
+    logging.getLogger(__name__).debug(f"Faulthandler not available: {e}")
 
 # Safe-mode environmental guards to reduce native segfault risk on Windows
 import os
@@ -79,8 +80,8 @@ try:
     # Not all torch builds have this; guard it
     if hasattr(torch, "set_num_interop_threads"):
         torch.set_num_interop_threads(1)
-except Exception:
-    pass
+except Exception as e:
+    logging.getLogger(__name__).debug(f"Failed to configure torch threading: {e}")
 # ====================================================================
 
 # import os (already imported above)
@@ -191,7 +192,8 @@ class Settings(BaseSettings):
     enable_sandboxing: bool = True
     allowed_modules: List[str] = ["numpy", "pandas", "scipy", "sklearn"]
 
-    api_host: str = "0.0.0.0"
+    # API server defaults to localhost for security; override with environment variable
+    api_host: str = "127.0.0.1"
     api_port: int = 8080
     api_workers: int = 4
     api_title: str = "VULCAN-AGI API"
@@ -1432,8 +1434,8 @@ async def health_check():
                 health_checks["self_improvement"] = hasattr(
                     world_model, "improvement_running"
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to check self-improvement status: {e}")
 
         # Add LLM check
         health_checks["llm_available"] = hasattr(app.state, "llm")
@@ -2016,8 +2018,8 @@ async def get_hardware_status():
             hardware_status["memory_usage_mb"] = mem.used / (1024 * 1024)
             disk = psutil.disk_usage('/')
             hardware_status["disk_usage_percent"] = disk.percent
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Failed to get hardware status (psutil may not be available): {e}")
         
         return hardware_status
 

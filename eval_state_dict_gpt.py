@@ -243,7 +243,7 @@ def evaluate(model: TinyGPT, tokenizer: SimpleVocabTokenizer, vfile: str, device
 
 
 def load_checkpoint(checkpoint_path: str):
-    obj = torch.load(checkpoint_path, map_location="cpu")
+    obj = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     if not isinstance(obj, dict) or "model" not in obj:
         raise ValueError("Checkpoint must be a dict containing key 'model'.")
     model_sd = obj["model"]

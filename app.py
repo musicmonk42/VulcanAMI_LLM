@@ -1075,4 +1075,7 @@ def internal_error(error):
 # ============================================================
 if __name__ == "__main__":
     # Recommended: run under a production WSGI/ASGI server (gunicorn/uvicorn) in prod
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), threaded=True)
+    # Security: Default to localhost (127.0.0.1) unless explicitly configured via environment
+    host = os.environ.get("API_HOST", "127.0.0.1")
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host=host, port=port, threaded=True)

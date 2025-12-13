@@ -120,8 +120,8 @@ def atomic_write_with_retry(
         if temp_fd is not None:
             try:
                 os.close(temp_fd)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Operation failed: {e}")
 
         # Cleanup: Remove temporary file if it still exists
         if temp_path and Path(temp_path).exists():
@@ -1164,8 +1164,8 @@ class UnifiedWorldModel(nn.Module):
 
     def load_model(self, path: str):
         """FIXED: Load model state with proper deserialization"""
-        # Load with weights_only=False to handle deque objects
-        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        # SECURITY: Use weights_only=True to prevent arbitrary code execution
+        checkpoint = torch.load(path, map_location=self.device, weights_only=True)
         self.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 

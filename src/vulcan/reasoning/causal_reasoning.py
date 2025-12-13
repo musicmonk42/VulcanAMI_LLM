@@ -1043,8 +1043,8 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             descendants = set()
             try:
                 descendants = nx.descendants(self.causal_dag, treatment)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to infer causal relationship: {e}")
 
             # If adjustment set contains any descendants, it's invalid
             if adjustment_set & descendants:
@@ -1264,8 +1264,8 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                     except nx.NetworkXNoPath:
                         # No path from node to outcome, which is fine
                         instruments.add(node)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Failed to update causal graph: {e}")
         except Exception as e:
             logger.warning(f"IV identification failed: {e}")
 
@@ -1426,7 +1426,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
 
         try:
             with open(model_file, "rb") as f:
-                model_data = pickle.load(f)
+                model_data = pickle.load(f)  # nosec B301 - Internal data structure
 
             self.causal_graph = defaultdict(dict, model_data["causal_graph"])
             self.variable_types = model_data["variable_types"]

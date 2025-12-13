@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import random
 import threading
@@ -10,6 +11,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional,
                     Sequence, Tuple, Union)
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Tokens = List[Token]
@@ -488,8 +492,9 @@ class CognitiveLoop:
                                 final_text_segment = split_text[0] + pattern
                                 final_tokens = await self._tokenize(final_text_segment)
                                 generated = final_tokens[len(init_tokens) :]
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                # Log tokenization errors but continue
+                                logger.warning(f"Failed to tokenize stop pattern: {e}")
                             yield await self._finalize(
                                 prompt,
                                 init_tokens,
@@ -596,8 +601,9 @@ class CognitiveLoop:
                         self.bridge.world_model.update, {"tokens": prompt_tokens}, None
                     )
                     sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
-                except Exception:
-                    pass
+                except Exception as e:
+                    # World model update is optional; log errors but continue
+                    logger.debug(f"World model update failed: {e}")
 
             t_enc = time.time()
             hidden_state = await self._async_safe(
@@ -855,8 +861,9 @@ class CognitiveLoop:
                     return logits
                 if hasattr(logits, "tolist"):
                     return logits.tolist()
-            except Exception:
-                pass
+            except Exception as e:
+                # Log logit extraction failure and fall through to alternative methods
+                logger.warning(f"Failed to get logits from transformer: {e}")
         vocab_size = getattr(self.transformer, "vocab_size", None)
         if vocab_size is None and self.vocab and hasattr(self.vocab, "size"):
             vocab_size = await self._async_safe(self.vocab.size, (), 200)
@@ -890,8 +897,9 @@ class CognitiveLoop:
         if self.vocab and hasattr(self.vocab, "id_to_token"):
             try:
                 return await asyncio.to_thread(self.vocab.id_to_token, idx)
-            except Exception:
-                pass
+            except Exception as e:
+                # Log vocab lookup failure, fallback to returning index
+                logger.debug(f"Failed to convert index to token: {e}")
         return idx
 
     async def _multi_step_beam_search_expansion(
@@ -1070,8 +1078,9 @@ class CognitiveLoop:
                     token, hidden_state, context
                 )
                 rationale["explanation"] = explanation
-            except Exception:
-                pass
+            except Exception as e:
+                # Rationale explanation is supplementary; log but continue
+                logger.debug(f"Failed to get choice explanation: {e}")
         return rationale
 
     async def _finalize(
@@ -1124,24 +1133,27 @@ class CognitiveLoop:
         if self.tokenizer and hasattr(self.tokenizer, "encode"):
             try:
                 return await asyncio.to_thread(self.tokenizer.encode, text)
-            except Exception:
-                pass
+            except Exception as e:
+                # Log tokenization failure, fallback to word splitting
+                logger.warning(f"Tokenization failed, using word split: {e}")
         return list(text.split())
 
     async def _decode(self, tokens: Tokens) -> str:
         if self.tokenizer and hasattr(self.tokenizer, "decode"):
             try:
                 return await asyncio.to_thread(self.tokenizer.decode, tokens)
-            except Exception:
-                pass
+            except Exception as e:
+                # Log decoding failure, fallback to sync method
+                logger.warning(f"Async decoding failed, using fallback: {e}")
         return self._decode_sync(tokens)
 
     def _decode_sync(self, tokens: Tokens) -> str:
         if self.tokenizer and hasattr(self.tokenizer, "decode"):
             try:
                 return self.tokenizer.decode(tokens)
-            except Exception:
-                pass
+            except Exception as e:
+                # Log sync decoding failure
+                logger.warning(f"Sync decoding failed: {e}")
         if (
             tokens
             and isinstance(tokens[0], int)
@@ -1150,8 +1162,9 @@ class CognitiveLoop:
         ):
             try:
                 return "".join(self.vocab.id_to_token(t) for t in tokens)
-            except Exception:
-                pass
+            except Exception as e:
+                # Log vocab-based decoding failure
+                logger.warning(f"Vocab-based decoding failed: {e}")
         return " ".join(str(t) for t in tokens)
 
     def _improvement(self, window: List[float]) -> float:
@@ -1171,7 +1184,9 @@ class CognitiveLoop:
             else:
                 loop = asyncio.get_event_loop()
                 return await loop.run_in_executor(None, fn, *args_tuple)
-        except Exception:
+        except Exception as e:
+            # Log async operation failures
+            logger.warning(f"Async safe operation failed, returning default: {e}")
             return default
 
     def _log_audit_record(self, record: Dict[str, Any]) -> None:
@@ -1181,8 +1196,9 @@ class CognitiveLoop:
                     self.audit_log.append(record)
                 elif hasattr(self.audit_log, "record"):
                     self.audit_log.record("cognitive_step", record)
-            except Exception:
-                pass
+            except Exception as e:
+                # Audit logging failures should be visible
+                logger.warning(f"Failed to log audit record: {e}")
 
     def _obs_sync(self, event_type: str, payload: Dict[str, Any]) -> None:
         if not self.observability:
@@ -1192,5 +1208,6 @@ class CognitiveLoop:
                 self.observability.record(event_type, payload)
             elif hasattr(self.observability, "log"):
                 self.observability.log(event_type, payload)
-        except Exception:
-            pass
+        except Exception as e:
+            # Observability failures should not break operations
+            logger.debug(f"Observability recording failed: {e}")

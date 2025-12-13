@@ -6,7 +6,7 @@ Part of the VULCAN-AGI system
 import hashlib
 import json
 import logging
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 import time
 from collections import defaultdict
@@ -871,7 +871,7 @@ class DecompositionLibrary:
                         return
 
                     with open(patterns_file, "rb") as f:
-                        data = pickle.load(f)
+                        data = pickle.load(f)  # nosec B301 - Internal data structure
 
                         # Validate loaded data
                         if not isinstance(data, dict):
@@ -900,7 +900,7 @@ class DecompositionLibrary:
                         return
 
                     with open(principles_file, "rb") as f:
-                        data = pickle.load(f)
+                        data = pickle.load(f)  # nosec B301 - Internal data structure
 
                         # Validate loaded data
                         if not isinstance(data, dict):

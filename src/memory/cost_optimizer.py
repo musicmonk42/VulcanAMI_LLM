@@ -586,8 +586,8 @@ class CostAnalyzer:
                             total_savings += (
                                 current_bandwidth * 0.2 * self.pricing["bandwidth_gb"]
                             )
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Operation failed: {e}")
             except (ValueError, TypeError, KeyError) as e:
                 logger.warning(f"Failed to estimate savings for opportunity: {e}")
                 continue

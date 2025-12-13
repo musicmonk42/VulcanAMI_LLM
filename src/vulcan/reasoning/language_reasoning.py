@@ -42,10 +42,14 @@ Returned structure from generate():
 This module is dependency-light and uses pure Python numerics.
 """
 
+import logging
 import math
 import random
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
 
 # --------------------------- Configuration --------------------------- #
 
@@ -229,13 +233,15 @@ class LanguageReasoning:
         if self.mask_hook:
             try:
                 logits = self.mask_hook(logits, context)
-            except Exception:
-                pass
+            except Exception as e:
+                # Mask hook failure - log but continue with unmasked logits
+                logger.warning(f"Mask hook failed: {e}")
         if self.bias_hook:
             try:
                 logits = self.bias_hook(logits, context)
-            except Exception:
-                pass
+            except Exception as e:
+                # Bias hook failure - log but continue with unbiased logits
+                logger.warning(f"Bias hook failed: {e}")
 
         # Step 3: Base probability distribution
         base_probs = _softmax(logits)
@@ -296,8 +302,9 @@ class LanguageReasoning:
                 candidates = self.reranker(
                     candidates, {"context": context, "entropy": ent}
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                # Reranker failure - log but continue with original candidate order
+                logger.warning(f"Candidate reranking failed: {e}")
 
         # Step 8: Safety + world model validation/correction
         final_token_id = self._validate_token(token_id, context)
@@ -336,15 +343,18 @@ class LanguageReasoning:
                     return l
                 if hasattr(l, "tolist"):
                     return l.tolist()
-            except Exception:
+            except Exception as e:
+                # Logits extraction failed - log and return empty list
+                logger.warning(f"Failed to extract logits: {e}")
                 return []
         # Fallback uniform logits of limited vocab
         vocab_size = getattr(self.model, "vocab_size", None)
         if callable(vocab_size):
             try:
                 vocab_size = vocab_size()
-            except Exception:
-                pass
+            except Exception as e:
+                # Vocab size callable failed - log and use default
+                logger.debug(f"Failed to get vocab size: {e}")
         if not isinstance(vocab_size, int) or vocab_size <= 0:
             vocab_size = 100
         return [0.0] * vocab_size
@@ -412,8 +422,9 @@ class LanguageReasoning:
                 )
                 if isinstance(safe_tok, int):
                     token_id = safe_tok
-            except Exception:
-                pass
+            except Exception as e:
+                # Safety validation failure - log error but continue
+                logger.error(f"Safety validation failed: {e}", exc_info=True)
 
         # World model correction
         if (
@@ -427,8 +438,9 @@ class LanguageReasoning:
                     alt = self.world_model.suggest_correction(token_id, context)
                     if isinstance(alt, int):
                         token_id = alt
-            except Exception:
-                pass
+            except Exception as e:
+                # World model validation/correction failure - log but continue
+                logger.warning(f"World model validation/correction failed: {e}")
 
         return token_id
 

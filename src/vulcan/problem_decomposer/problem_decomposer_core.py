@@ -1780,8 +1780,8 @@ class ProblemDecomposer:
                     path_length = nx.dag_longest_path_length(G)
                     if path_length > 10:
                         return "deep_hierarchy_handling"
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Operation failed: {e}")
             else:
                 return "cycle_handling"
 

@@ -9,7 +9,7 @@ import gzip
 import hashlib
 import json
 import logging
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import shutil
 import sqlite3
 import threading
@@ -1029,7 +1029,7 @@ class VersionedKnowledgeBase:
                     try:
                         data = json.loads(content)
                     except Exception:
-                        data = pickle.loads(content)
+                        data = pickle.loads(content)  # nosec B301 - Internal data structure
                 else:
                     # Load based on extension
                     if path.suffix == ".json":
@@ -1312,7 +1312,7 @@ class VersionedKnowledgeBase:
 
                 for row in cursor:
                     principle_id, data, created_at, updated_at, access_count = row
-                    principle = pickle.loads(data)
+                    principle = pickle.loads(data)  # nosec B301 - Internal data structure
                     self.principles[principle_id] = principle
                     self.creation_times[principle_id] = created_at
                     self.update_times[principle_id] = updated_at
@@ -1337,7 +1337,7 @@ class VersionedKnowledgeBase:
                     ) = row
 
                     try:
-                        principle_data = pickle.loads(data)
+                        principle_data = pickle.loads(data)  # nosec B301 - Internal data structure
 
                         # Check if it's a diff or full principle
                         if (

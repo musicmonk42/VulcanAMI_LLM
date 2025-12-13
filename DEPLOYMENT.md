@@ -92,6 +92,15 @@ REGISTRY=ghcr.io
 IMAGE_NAME=musicmonk42/vulcanami_llm
 ENVIRONMENT=production
 LOG_LEVEL=INFO
+
+# Security: Network binding (set to 0.0.0.0 for container networking)
+HOST=0.0.0.0
+API_HOST=0.0.0.0
+
+# Optional: HuggingFace Model Pinning (recommended for production)
+# VULCAN_TEXT_MODEL_REVISION=86b5e0934494bd15c9632b12f734a8a67f723594
+# VULCAN_AUDIO_MODEL_REVISION=<commit-hash>
+# VULCAN_BERT_MODEL_REVISION=<commit-hash>
 EOF
 
 # Start production stack

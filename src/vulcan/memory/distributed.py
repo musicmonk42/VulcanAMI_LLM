@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 import os
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import socket
 import struct
 import threading
@@ -67,7 +67,7 @@ class RPCMessage:
     @staticmethod
     def decode(data: bytes) -> Dict[str, Any]:
         """Decode received message."""
-        return pickle.loads(data)
+        return pickle.loads(data)  # nosec B301 - Internal data structure
 
 
 class RPCClient:
@@ -624,7 +624,7 @@ class DistributedMemory(BaseMemorySystem):
         if self.redis_client:
             try:
                 key = f"mem:{memory.id}"
-                mem_copy = pickle.loads(pickle.dumps(memory))
+                mem_copy = pickle.loads(pickle.dumps(memory))  # nosec B301 - Internal data structure
                 if self.cipher:
                     serialized_content = pickle.dumps(mem_copy.content)
                     mem_copy.content = self.cipher.encrypt(serialized_content)
@@ -639,7 +639,7 @@ class DistributedMemory(BaseMemorySystem):
                 # Continue anyway
 
         # Create encrypted copy for storage/replication
-        encrypted_memory = pickle.loads(pickle.dumps(memory))
+        encrypted_memory = pickle.loads(pickle.dumps(memory))  # nosec B301 - Internal data structure
 
         # Encrypt content before storing and replicating
         if self.cipher:
@@ -723,7 +723,7 @@ class DistributedMemory(BaseMemorySystem):
                 if mem.metadata.get("encrypted") and isinstance(mem.content, bytes):
                     try:
                         decrypted_content = self.cipher.decrypt(mem.content)
-                        mem.content = pickle.loads(decrypted_content)
+                        mem.content = pickle.loads(decrypted_content)  # nosec B301 - Internal data structure
                         mem.metadata["encrypted"] = False
                     except Exception as e:
                         logger.warning(

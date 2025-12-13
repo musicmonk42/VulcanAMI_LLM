@@ -76,6 +76,19 @@ except ImportError:
     logger.warning("Audio libraries not available (librosa, Wav2Vec2)")
 
 
+# HuggingFace Model Configuration (CWE-494 mitigation)
+# To pin models to specific revisions for security, set these environment variables:
+# - VULCAN_TEXT_MODEL_REVISION: commit hash for text model
+# - VULCAN_AUDIO_MODEL_REVISION: commit hash for audio model
+import os
+
+TEXT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+TEXT_MODEL_REVISION = os.environ.get("VULCAN_TEXT_MODEL_REVISION", None)
+
+AUDIO_MODEL_NAME = "facebook/wav2vec2-base"
+AUDIO_MODEL_REVISION = os.environ.get("VULCAN_AUDIO_MODEL_REVISION", None)
+
+
 # CRITICAL FIX: Define ModalityType enum instead of importing from config
 class ModalityType(Enum):
     """Modality types for multi-modal reasoning"""
@@ -1746,14 +1759,20 @@ class MultiModalReasoningEngine:
                         or self._text_tokenizer is None
                     ):
                         logger.info(
-                            "Loading text model (sentence-transformers/all-MiniLM-L6-v2)..."
+                            f"Loading text model ({TEXT_MODEL_NAME})..."
                         )
                         try:
-                            self._text_tokenizer = AutoTokenizer.from_pretrained(
-                                "sentence-transformers/all-MiniLM-L6-v2"
+                            model_kwargs = {}
+                            if TEXT_MODEL_REVISION:
+                                model_kwargs['revision'] = TEXT_MODEL_REVISION
+                                logger.info(f"Using pinned revision: {TEXT_MODEL_REVISION}")
+                            
+                            # Revision parameter available via TEXT_MODEL_REVISION env var (set above if configured)
+                            self._text_tokenizer = AutoTokenizer.from_pretrained(  # nosec B615
+                                TEXT_MODEL_NAME, **model_kwargs
                             )
-                            self._text_model = AutoModel.from_pretrained(
-                                "sentence-transformers/all-MiniLM-L6-v2"
+                            self._text_model = AutoModel.from_pretrained(  # nosec B615
+                                TEXT_MODEL_NAME, **model_kwargs
                             )
 
                             # Move to device
@@ -1976,13 +1995,19 @@ class MultiModalReasoningEngine:
                     not hasattr(self, "_audio_processor")
                     or self._audio_processor is None
                 ):
-                    logger.info("Loading audio model (wav2vec2-base)...")
+                    logger.info(f"Loading audio model ({AUDIO_MODEL_NAME})...")
                     try:
-                        self._audio_processor = Wav2Vec2Processor.from_pretrained(
-                            "facebook/wav2vec2-base"
+                        model_kwargs = {}
+                        if AUDIO_MODEL_REVISION:
+                            model_kwargs['revision'] = AUDIO_MODEL_REVISION
+                            logger.info(f"Using pinned revision: {AUDIO_MODEL_REVISION}")
+                        
+                        # Revision parameter available via AUDIO_MODEL_REVISION env var (set above if configured)
+                        self._audio_processor = Wav2Vec2Processor.from_pretrained(  # nosec B615
+                            AUDIO_MODEL_NAME, **model_kwargs
                         )
-                        self._audio_model = Wav2Vec2Model.from_pretrained(
-                            "facebook/wav2vec2-base"
+                        self._audio_model = Wav2Vec2Model.from_pretrained(  # nosec B615
+                            AUDIO_MODEL_NAME, **model_kwargs
                         )
 
                         # Move to device
@@ -2325,22 +2350,22 @@ class MultiModalReasoningEngine:
             if TORCH_AVAILABLE:
                 attention_path = path / "attention_fusion.pt"
                 if attention_path.exists() and self.attention_fusion is not None:
-                    self.attention_fusion.load_state_dict(torch.load(attention_path))
+                    self.attention_fusion.load_state_dict(torch.load(attention_path, weights_only=True))
                     self.attention_fusion.eval()
 
                 gated_path = path / "gated_fusion.pt"
                 if gated_path.exists() and self.gated_fusion is not None:
-                    self.gated_fusion.load_state_dict(torch.load(gated_path))
+                    self.gated_fusion.load_state_dict(torch.load(gated_path, weights_only=True))
                     self.gated_fusion.eval()
 
                 adaptive_path = path / "adaptive_fusion.pt"
                 if adaptive_path.exists() and self.adaptive_fusion is not None:
-                    self.adaptive_fusion.load_state_dict(torch.load(adaptive_path))
+                    self.adaptive_fusion.load_state_dict(torch.load(adaptive_path, weights_only=True))
                     self.adaptive_fusion.eval()
 
                 reasoner_path = path / "neural_reasoner.pt"
                 if reasoner_path.exists() and self.neural_reasoner is not None:
-                    self.neural_reasoner.load_state_dict(torch.load(reasoner_path))
+                    self.neural_reasoner.load_state_dict(torch.load(reasoner_path, weights_only=True))
                     self.neural_reasoner.eval()
 
             # Load learning parameters

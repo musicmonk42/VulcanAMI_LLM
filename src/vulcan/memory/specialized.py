@@ -1898,7 +1898,7 @@ class SemanticMemory(BaseMemorySystem):
                             inferred[relation_key].append(target)
 
                 except nx.NetworkXNoPath:
-                    pass
+                    logger.debug(f"Operation failed: {e}")
 
         return inferred
 

@@ -110,6 +110,8 @@ cp .env.example .env
 # - REDIS_URL=redis://<host>:<port>            # optional; falls back to in-memory rate limiting
 # - AUDIT_DB_PATH=./audit.db                   # default shown; secure paths recommended in production
 # - SLACK_WEBHOOK_URL=<optional-for-alerts>
+# - HOST=127.0.0.1                             # SECURITY: localhost binding (change to 0.0.0.0 for containers)
+# - API_HOST=127.0.0.1                         # SECURITY: localhost binding (change to 0.0.0.0 for containers)
 
 Example (development only):
 ```bash
@@ -117,6 +119,8 @@ export JWT_SECRET_KEY="dev-only-change-me"
 export BOOTSTRAP_KEY="dev-bootstrap"
 export REDIS_URL="redis://localhost:6379"
 export AUDIT_DB_PATH="./audit.db"
+export HOST="127.0.0.1"  # Secure default - localhost only
+export API_HOST="127.0.0.1"  # Secure default - localhost only
 # export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 ```
 
@@ -131,7 +135,9 @@ python app.py
 
 Option B — Arena API (FastAPI)
 ```bash
-uvicorn src.graphix_arena:app --host 0.0.0.0 --port 8000 --reload
+# SECURITY NOTE: Defaults to 127.0.0.1 (localhost only)
+# For Docker/container deployment, set HOST=0.0.0.0 in environment
+uvicorn src.graphix_arena:app --host 127.0.0.1 --port 8000 --reload
 # Health check: curl http://127.0.0.1:8000/health
 # Metrics (if enabled): curl http://127.0.0.1:8000/metrics
 ```

@@ -28,6 +28,8 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 from urllib import error, request
 from urllib.request import HTTPSHandler, build_opener
 
+from src.utils.url_validator import validate_url_scheme
+
 # Pydantic for declarative structures
 from pydantic import BaseModel, Field, validator
 
@@ -292,6 +294,9 @@ class ProviderClient:
         data: Optional[Dict] = None,
     ) -> request.Request:
         """Prepare an HTTP request."""
+        # SECURITY: Validate URL scheme before creating request (CWE-22 mitigation)
+        validate_url_scheme(url)
+        
         if headers is None:
             headers = {}
 
@@ -319,7 +324,7 @@ class ProviderClient:
                     opener = self.connection_pool.get_opener()
                     response = opener.open(req, timeout=timeout, encoding="utf-8")
                 else:
-                    response = request.urlopen(req, timeout=timeout, encoding="utf-8")
+                    response = request.urlopen(req, timeout=timeout, encoding="utf-8")  # nosec B310 - URL validated in prepare_request
 
                 response_data = response.read().decode("utf-8")
                 return json.loads(response_data)

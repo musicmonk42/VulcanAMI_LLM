@@ -35,11 +35,15 @@ Key features:
 - Tracks feature importance and attention patterns
 """
 
+import logging
 import math
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Tokens = List[Token]
@@ -620,8 +624,8 @@ class ExplainableGeneration:
                         "importance": 0.5,
                     }
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to generate explanation: {e}")
 
         # Safety influence
         safety_count = len(meta.get("safety_events", []))
@@ -1299,8 +1303,8 @@ class ExplainableGeneration:
                     interventions=interventions,
                     context=context,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to format explanation: {e}")
 
         parts: List[str] = []
 
@@ -1613,8 +1617,8 @@ class ExplainableGeneration:
         if self.vocab and hasattr(self.vocab, "id_to_token"):
             try:
                 return self.vocab.id_to_token(idx)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to validate explanation: {e}")
         return idx
 
     def _token_to_str(self, token: Token) -> str:

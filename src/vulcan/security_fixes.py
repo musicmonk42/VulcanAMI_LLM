@@ -115,7 +115,7 @@ class RestrictedUnpickler(pickle.Unpickler):
 
                         return getattr(nm, name)
                     except (ImportError, AttributeError):
-                        pass
+                        logger.warning(f"Operation failed: {e}")
 
         # Allow PyTorch tensor reconstruction functions (critical for model loading)
         if module == "torch._utils":

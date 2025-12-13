@@ -43,6 +43,9 @@ import traceback
 import urllib.parse
 import uuid
 from collections import defaultdict, deque
+
+# Import URL validation utility
+from src.utils.url_validator import validate_url_scheme
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -940,8 +943,8 @@ def is_revoked(jti: str) -> bool:
     if redis_client:
         try:
             return redis_client.get(f"{REVOCATION_PREFIX}{jti}") is not None
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")
     return jti in revoked_jti_set
 
 
@@ -1768,6 +1771,9 @@ class GraphAPIServer:
         try:
             import urllib.request
 
+            # Validate URL scheme before making request
+            validate_url_scheme(url)
+
             req = urllib.request.Request(
                 url,
                 data=json.dumps(data).encode("utf-8"),
@@ -1777,7 +1783,7 @@ class GraphAPIServer:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10, encoding="utf-8") as response:
+            with urllib.request.urlopen(req, timeout=10, encoding="utf-8") as response:  # nosec B310 - URL validated at line 1775
                 if response.status >= 300:
                     self.logger.error(
                         f"Callback to {url} failed with status {response.status}"
@@ -1984,7 +1990,7 @@ def main():
     args = parser.parse_args()
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    if args.host == "0.0.0.0":
+    if args.host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
         logger.warning("Binding to 0.0.0.0 - ensure firewall is configured!")
     server = GraphAPIServer(host=args.host, port=args.port)
     print("\n" + "=" * 60)

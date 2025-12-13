@@ -25,6 +25,9 @@ import numpy as np
 
 from .security_fixes import safe_pickle_load
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 # Performance tracking
 try:
     import psutil
@@ -151,8 +154,8 @@ class CompiledBinaryCache:
         try:
             with open(index_file, "w", encoding="utf-8") as f:
                 json.dump(self.cache_index, f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to save cache index: {e}")
 
     def get(self, graph_hash: str) -> Optional[bytes]:
         """Get compiled binary from cache"""
@@ -166,7 +169,8 @@ class CompiledBinaryCache:
         try:
             with open(cache_file, "rb") as f:
                 return f.read()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to read cache file {graph_hash}: {e}")
             return None
 
     def put(self, graph_hash: str, binary: bytes, metadata: Dict = None):
@@ -183,8 +187,8 @@ class CompiledBinaryCache:
                 "metadata": metadata or {},
             }
             self._save_index()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Operation failed: {e}")
 
     def cleanup(self, max_age_days: int = 7):
         """Clean old cache entries"""
@@ -197,8 +201,8 @@ class CompiledBinaryCache:
                 if cache_file.exists():
                     try:
                         cache_file.unlink()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Operation failed: {e}")
                 del self.cache_index[graph_hash]
 
         self._save_index()
@@ -820,12 +824,12 @@ class HybridExecutor:
         """Cleanup called by atexit"""
         try:
             self.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup on exit failed: {e}")
 
     def __del__(self):
         """Destructor"""
         try:
             self.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup in destructor failed: {e}")
