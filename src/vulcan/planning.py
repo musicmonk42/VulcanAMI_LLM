@@ -517,7 +517,7 @@ class EnhancedResourceMonitor:
                 latency = (time.time() - start_time) * 1000
                 successful_tests += 1
                 total_latency += latency
-            except (socket.timeout, socket.error, OSError):
+            except (socket.timeout, socket.error, OSError) as e:
                 logger.debug(f"Network timeout during planning operation: {e}")
 
         # Track network quality in history
