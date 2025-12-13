@@ -4,6 +4,9 @@ import sys
 import time
 import urllib.request
 
+# Import URL validation utility
+from src.utils.url_validator import validate_url_scheme
+
 HOST = os.getenv("ARENA_HOST", "127.0.0.1")
 PORT = int(os.getenv("ARENA_PORT", "8181"))
 URL  = f"http://{HOST}:{PORT}/api/metrics"
@@ -24,6 +27,9 @@ def main():
         print(f"warn: port {HOST}:{PORT} not open; skipping live probe")
         sys.exit(0)
     try:
+        # Validate URL scheme before making request
+        validate_url_scheme(URL)
+        
         with urllib.request.urlopen(URL, timeout=5) as r:
             if r.status != 200:
                 print(f"error: metrics status {r.status}")

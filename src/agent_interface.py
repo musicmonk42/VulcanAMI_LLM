@@ -28,6 +28,9 @@ from concurrent.futures import \
     ThreadPoolExecutor  # FIX: Import from correct module
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
+
+# Import URL validation utility
+from src.utils.url_validator import validate_url_scheme
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -258,6 +261,9 @@ class TelemetryCollector:
             return
 
         try:
+            # Validate URL scheme before making request
+            validate_url_scheme(self.endpoint)
+            
             metrics = self.get_metrics()
             with self.lock:
                 events = list(self.events)
@@ -352,6 +358,9 @@ class HTTPCommunicator:
             if self.session_token:
                 headers["X-Session-Token"] = self.session_token
 
+        # Validate URL scheme before making request
+        validate_url_scheme(url)
+        
         # Prepare request data
         request_data = None
         if data:

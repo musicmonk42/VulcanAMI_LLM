@@ -43,6 +43,9 @@ import traceback
 import urllib.parse
 import uuid
 from collections import defaultdict, deque
+
+# Import URL validation utility
+from src.utils.url_validator import validate_url_scheme
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -1767,6 +1770,9 @@ class GraphAPIServer:
     def _send_callback(self, url: str, data: Dict):
         try:
             import urllib.request
+
+            # Validate URL scheme before making request
+            validate_url_scheme(url)
 
             req = urllib.request.Request(
                 url,
