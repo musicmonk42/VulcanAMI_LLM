@@ -368,8 +368,8 @@ class TamperEvidentLogger:
                 trace_hex = hex(context.trace_id)[2:]
                 span_hex = hex(context.span_id)[2:]
                 return trace_hex, span_hex
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.debug(f"Failed to extract OpenTelemetry trace context: {e}")
         return None, None
 
     @staticmethod
@@ -552,8 +552,8 @@ class TamperEvidentLogger:
                                         self.config.syslog_facility | syslog.LOG_INFO,
                                         json.dumps(syslog_data, ensure_ascii=False),
                                     )
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    self._logger.debug(f"Failed to send log to syslog: {e}")
             except asyncio.CancelledError:
                 break
             except Exception as e:

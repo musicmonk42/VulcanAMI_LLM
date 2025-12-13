@@ -72,12 +72,16 @@ Output:
 """
 
 import hashlib
+import logging
 import re
 import time
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+# Set up logger for this module
+_logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Tokens = List[Token]
@@ -480,8 +484,8 @@ class CausalContext:
                     {variable: counterfactual_value}, outcome_variable
                 )
                 outcome_diff = cf_outcome - original_outcome
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug(f"Failed to compute counterfactual outcome: {e}")
 
         # Generate explanation
         explanation = (
@@ -553,13 +557,13 @@ class CausalContext:
         if hasattr(world_model, "causal_graph"):
             try:
                 graph = self._extract_graph_structure(world_model.causal_graph)
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug(f"Failed to extract graph from causal_graph: {e}")
         elif hasattr(world_model, "causal_dag"):
             try:
                 graph = self._extract_graph_structure(world_model.causal_dag)
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug(f"Failed to extract graph from causal_dag: {e}")
 
         # Build minimal graph from concepts if not available
         if not graph and concepts:
@@ -585,8 +589,8 @@ class CausalContext:
                 nodes = set(graph_obj.nodes())
                 for u, v in graph_obj.edges():
                     edges.append({"source": str(u), "target": str(v), "weight": 1.0})
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug(f"Failed to extract edges from graph object: {e}")
 
         # Try dict representation
         elif isinstance(graph_obj, dict):
@@ -624,7 +628,8 @@ class CausalContext:
                                         "weight": 0.5,
                                     }
                                 )
-                except Exception:
+                except Exception as e:
+                    _logger.debug(f"Failed to compute Granger causality: {e}")
                     continue
 
         return {
@@ -1279,8 +1284,8 @@ class CausalContext:
                 c = wm.extract_concepts(qtext)
                 if isinstance(c, list) and c:
                     return [str(x) for x in c][:50]
-            except Exception:
-                pass
+            except Exception as e:
+                _logger.debug(f"Failed to extract concepts from world model: {e}")
         # Fallback: use tokenized terms
         return [t for t in qterms if len(t) > 2][:50]
 
@@ -1311,7 +1316,8 @@ class CausalContext:
 
                     for c in concepts[:20]:
                         related.extend(adjacency.get(c, []))
-        except Exception:
+        except Exception as e:
+            _logger.warning(f"Failed to get related concepts from world model: {e}")
             related = []
 
         if not related:
