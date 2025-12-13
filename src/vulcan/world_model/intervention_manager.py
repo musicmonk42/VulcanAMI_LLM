@@ -1076,9 +1076,18 @@ class InterventionExecutor:
             self.safety_validator = None
             self.safety_initialization_successful = False
 
-            # CRITICAL FIX: Only attempt to load safety validator if not in simulation mode
-            # or if a config is explicitly provided (for simulation safety tests)
-            safety_check_required = not simulation_mode or safety_config is not None
+            # CRITICAL FIX: In real mode without explicit safety config, don't attempt initialization
+            # This is a safety-critical requirement - real interventions require explicit safety
+            if not simulation_mode and safety_config is None:
+                # Don't try to get singleton - let the safety check below raise the error
+                logger.warning(
+                    f"{self.__class__.__name__}: Real mode without explicit safety_config - initialization skipped"
+                )
+                safety_check_required = False
+            else:
+                # Only attempt to load safety validator if not in simulation mode
+                # or if a config is explicitly provided (for simulation safety tests)
+                safety_check_required = not simulation_mode or safety_config is not None
 
             if safety_check_required:
                 try:
