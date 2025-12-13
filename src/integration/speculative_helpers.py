@@ -98,7 +98,7 @@ class LowRankDraftTransformer(nn.Module):
             try:
                 self.forward = torch.compile(self.forward)
             except Exception:
-                pass
+                logger.debug(f"Operation failed: {e}")
 
     @torch.no_grad()
     def encode(self, input_ids: torch.Tensor) -> torch.Tensor:

@@ -572,7 +572,7 @@ class HierarchicalContext:
         try:
             self.consolidate_memory(min_frequency=3)
         except Exception:
-            pass
+            logger.debug(f"Operation failed: {e}")
 
     # ================================ Memory Pruning ================================ #
 

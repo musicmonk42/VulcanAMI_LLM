@@ -495,7 +495,7 @@ class MilvusIndex:
             try:
                 self.disconnect()
             except Exception:
-                pass
+                logger.debug(f"Operation failed: {e}")
 
 
 def create_index(uri: str, **kwargs) -> MilvusIndex:

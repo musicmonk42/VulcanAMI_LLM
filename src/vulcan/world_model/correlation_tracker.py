@@ -1553,7 +1553,7 @@ class CorrelationMatrix:
                 p_value = 2.0 * (1.0 - t_dist.cdf(abs(t_stat), df))
                 return float(p_value)
             except Exception:
-                pass
+                logger.debug(f"Operation failed: {e}")
 
         # Approximate using normal distribution for large df
         if df > 30:

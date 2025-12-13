@@ -481,7 +481,7 @@ class UnifiedGeneration:
                 if isinstance(conf, (int, float)):
                     return float(conf)
             except Exception:
-                pass
+                logger.debug(f"Operation failed: {e}")
         return 1.0
 
     # ================================ Normalization & Fusion ================================ #

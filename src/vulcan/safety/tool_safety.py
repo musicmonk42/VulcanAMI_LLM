@@ -32,7 +32,7 @@ def safe_log(log_func, message):
     try:
         log_func(message)
     except (ValueError, AttributeError, OSError, RuntimeError):
-        pass
+        logger.warning(f"Operation failed: {e}")
 
 
 # ============================================================

@@ -1348,7 +1348,7 @@ class BayesianNetworkReasoner:
                 var_name, coefficients, intercept, max(variance, 1e-10)
             )
         except Exception:
-            pass
+            logger.debug(f"Operation failed: {e}")
 
     def _compute_log_likelihood(self, data: List[Dict[str, Any]]) -> float:
         """Compute log-likelihood of data."""

@@ -185,7 +185,7 @@ class CompiledBinaryCache:
             }
             self._save_index()
         except Exception:
-            pass
+            logger.debug(f"Operation failed: {e}")
 
     def cleanup(self, max_age_days: int = 7):
         """Clean old cache entries"""
@@ -199,7 +199,7 @@ class CompiledBinaryCache:
                     try:
                         cache_file.unlink()
                     except Exception:
-                        pass
+                        logger.debug(f"Operation failed: {e}")
                 del self.cache_index[graph_hash]
 
         self._save_index()

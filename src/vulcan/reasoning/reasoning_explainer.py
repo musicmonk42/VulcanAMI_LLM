@@ -504,7 +504,7 @@ class SafetyAwareReasoning:
                     except Exception:
                         continue
             except Exception:
-                pass
+                logger.debug(f"Operation failed: {e}")
 
         # Output is safe
         return {"is_safe": True, "reason": "Output validation passed"}

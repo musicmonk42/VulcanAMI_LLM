@@ -238,7 +238,7 @@ def parse_expression(
             try:
                 val = json.loads(val)
             except json.JSONDecodeError:
-                pass
+                logger.debug(f"Operation failed: {e}")
             add_to_seq({"type": "literal", "value": val})
             index += 1
         elif kind == "IDENT":

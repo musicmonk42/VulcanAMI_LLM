@@ -1781,7 +1781,7 @@ class ProblemDecomposer:
                     if path_length > 10:
                         return "deep_hierarchy_handling"
                 except Exception:
-                    pass
+                    logger.debug(f"Operation failed: {e}")
             else:
                 return "cycle_handling"
 

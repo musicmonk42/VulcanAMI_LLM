@@ -931,7 +931,7 @@ class OptimizedPathClusterer:
                     best_score = score
                     best_k = k
             except Exception:
-                pass
+                logger.debug(f"Operation failed: {e}")
 
         # Final clustering with best k
         clustering = KMeans(n_clusters=best_k, n_init=10, max_iter=300, random_state=42)

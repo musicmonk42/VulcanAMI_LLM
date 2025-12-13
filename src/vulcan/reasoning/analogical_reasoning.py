@@ -2105,7 +2105,7 @@ class AnalogicalReasoner(AbstractReasoner):
                             self.semantic_enricher._tfidf_corpus
                         )
                     except Exception:
-                        pass
+                        logger.debug(f"Operation failed: {e}")
 
             if NETWORKX_AVAILABLE:
                 for domain_name, domain_data in self.domain_knowledge.items():

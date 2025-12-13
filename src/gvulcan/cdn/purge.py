@@ -397,7 +397,7 @@ class SmartPurger:
                             try:
                                 req.callback(False, str(e))
                             except Exception:
-                                pass
+                                logger.debug(f"Operation failed: {e}")
                     raise
 
         return None

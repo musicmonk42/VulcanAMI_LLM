@@ -154,7 +154,7 @@ class GovernanceManager:
                 ):
                     cls._instance.shutdown()
             except Exception:
-                pass
+                logger.warning(f"Operation failed: {e}")
         cls._instance = None
 
     @property

@@ -309,7 +309,7 @@ class S3Store:
                     Bucket=self.bucket, Key=key, UploadId=upload_id
                 )
             except Exception:
-                pass
+                logger.debug(f"Operation failed: {e}")
             raise
 
     def delete_object(self, path: str) -> bool:

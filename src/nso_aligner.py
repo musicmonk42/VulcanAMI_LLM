@@ -374,7 +374,7 @@ class NSOAligner:
                         try:
                             self.adversarial_detector.to("cpu")
                         except Exception:
-                            pass
+                            logger.debug(f"Operation failed: {e}")
                         self.logger.info(
                             f"Adversarial detector loaded on CPU: {model_id}"
                         )

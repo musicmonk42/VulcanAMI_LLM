@@ -1413,7 +1413,7 @@ class TransparencyInterface:
                     try:
                         v_dict = self._make_serializable(v.to_dict(), seen=None)
                     except Exception:
-                        pass
+                        logger.debug(f"Operation failed: {e}")
                 if not v_dict:  # Fallback if to_dict fails or not present
                     v_dict = {
                         "proposal_id": getattr(v, "proposal_id", "unknown"),

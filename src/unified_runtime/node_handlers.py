@@ -914,7 +914,7 @@ async def photonic_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> D
                     vec_np = np.asarray(vec)
                     tensor_mb = (mat_np.nbytes + vec_np.nbytes) / (1024 * 1024)
                 except Exception:
-                    pass
+                    logger.debug(f"Operation failed: {e}")
 
             dispatch_result = await runtime.hardware_dispatcher.run_tensor_op(
                 op=my_closure, estimated_tensor_mb=tensor_mb
