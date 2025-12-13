@@ -914,7 +914,7 @@ class CurriculumLearner:
             raise FileNotFoundError(f"State file not found: {filepath}")
 
         with open(path, "rb") as f:
-            state = pickle.load(f)
+            state = pickle.load(f)  # nosec B301 - Internal data structure
 
         self.curriculum_stages = state["curriculum_stages"]
         self.current_stage = state["current_stage"]

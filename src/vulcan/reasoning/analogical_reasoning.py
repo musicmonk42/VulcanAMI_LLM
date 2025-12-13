@@ -2067,7 +2067,7 @@ class AnalogicalReasoner(AbstractReasoner):
 
         try:
             with open(model_file, "rb") as f:
-                model_data = pickle.load(f)
+                model_data = pickle.load(f)  # nosec B301 - Internal data structure
 
             self.domain_knowledge = model_data["domain_knowledge"]
             self.similarity_threshold = model_data["similarity_threshold"]

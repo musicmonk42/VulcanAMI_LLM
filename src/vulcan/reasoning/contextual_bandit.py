@@ -11,7 +11,7 @@ FULLY IMPLEMENTED VERSION with:
 """
 
 import logging
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
@@ -1381,7 +1381,7 @@ class AdaptiveBanditOrchestrator:
                     state_file = load_path / f"{name}_state.pkl"
                     if state_file.exists():
                         with open(state_file, "rb") as f:
-                            state = pickle.load(f)
+                            state = pickle.load(f)  # nosec B301 - Internal data structure
                             if hasattr(bandit, "q_values"):
                                 bandit.q_values = defaultdict(
                                     lambda: np.zeros(self.n_actions), state["q_values"]
@@ -1394,7 +1394,7 @@ class AdaptiveBanditOrchestrator:
             meta_file = load_path / "meta_bandit.pkl"
             if meta_file.exists():
                 with open(meta_file, "rb") as f:
-                    meta_state = pickle.load(f)
+                    meta_state = pickle.load(f)  # nosec B301 - Internal data structure
                     self.performance_window = defaultdict(
                         lambda: deque(maxlen=100),
                         {

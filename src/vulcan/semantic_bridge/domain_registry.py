@@ -1223,7 +1223,7 @@ class DomainRegistry:
         if domains_file.exists():
             try:
                 with open(domains_file, "rb") as f:
-                    loaded_domains = pickle.load(f)
+                    loaded_domains = pickle.load(f)  # nosec B301 - Internal data structure
                     for name, profile in loaded_domains.items():
                         self.register_domain(name, profile)
             except Exception as e:

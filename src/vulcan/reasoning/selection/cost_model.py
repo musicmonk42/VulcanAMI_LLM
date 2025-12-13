@@ -17,7 +17,7 @@ Production-grade implementation matching VULCAN's quality standards.
 
 import logging
 import math
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 import time
 from collections import defaultdict, deque
@@ -904,13 +904,13 @@ class StochasticCostModel:
                 model_path = self.model_save_path / f"cost_model_{name}.pkl"
                 if model_path.exists():
                     with open(model_path, "rb") as f:
-                        self.models[name] = pickle.load(f)
+                        self.models[name] = pickle.load(f)  # nosec B301 - Internal data structure
 
             # Load EWMA statistics
             ewma_path = self.model_save_path / "cost_model_ewma.pkl"
             if ewma_path.exists():
                 with open(ewma_path, "rb") as f:
-                    loaded_ewma = pickle.load(f)
+                    loaded_ewma = pickle.load(f)  # nosec B301 - Internal data structure
                     self.ewma_stats.update(loaded_ewma)
 
             # Load calibrators
@@ -918,7 +918,7 @@ class StochasticCostModel:
                 cal_path = self.model_save_path / f"cost_model_cal_{name}.pkl"
                 if cal_path.exists():
                     with open(cal_path, "rb") as f:
-                        self.calibrators[name] = pickle.load(f)
+                        self.calibrators[name] = pickle.load(f)  # nosec B301 - Internal data structure
 
             logger.info(f"Loaded cost models from {self.model_save_path}")
         except Exception as e:

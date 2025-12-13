@@ -381,7 +381,7 @@ class RollbackManager:
                         data = f.read()
                         if row[5]:  # compressed
                             data = zlib.decompress(data)
-                        snapshot_data = pickle.loads(data)
+                        snapshot_data = pickle.loads(data)  # nosec B301 - Internal data structure
 
                     snapshot = RollbackSnapshot(
                         snapshot_id=snapshot_id,

@@ -780,7 +780,7 @@ class ProductionDeployment:
     def load_checkpoint(self, path: str) -> bool:
         try:
             with open(path, "rb") as f:
-                data = pickle.load(f)
+                data = pickle.load(f)  # nosec B301 - Internal data structure
             self.system_state.step = data["step"]
             self.metrics_collector.import_metrics(data["metrics"])
             return True

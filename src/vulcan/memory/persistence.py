@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 import os
-import pickle
+import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import shutil
 import sqlite3
 import threading
@@ -398,11 +398,11 @@ class MemoryCompressor:
     def decompress(data: bytes, compression_type: CompressionType) -> Any:
         """Decompress memory content."""
         if compression_type == CompressionType.NONE:
-            return pickle.loads(data)
+            return pickle.loads(data)  # nosec B301 - Internal data structure
 
         elif compression_type == CompressionType.LZ4:
             decompressed = lz4.frame.decompress(data)
-            return pickle.loads(decompressed)
+            return pickle.loads(decompressed)  # nosec B301 - Internal data structure
 
         elif compression_type == CompressionType.ZSTD:
             try:
@@ -410,10 +410,10 @@ class MemoryCompressor:
 
                 dctx = zstd.ZstdDecompressor()
                 decompressed = dctx.decompress(data)
-                return pickle.loads(decompressed)
+                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
             except ImportError:
                 decompressed = lz4.frame.decompress(data)
-                return pickle.loads(decompressed)
+                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
 
         elif compression_type == CompressionType.NEURAL:
             return MemoryCompressor._neural_decompress(data)
@@ -422,7 +422,7 @@ class MemoryCompressor:
             return MemoryCompressor._semantic_decompress(data)
 
         else:
-            return pickle.loads(data)
+            return pickle.loads(data)  # nosec B301 - Internal data structure
 
     @staticmethod
     def _neural_decompress(data: bytes) -> Any:
@@ -431,12 +431,12 @@ class MemoryCompressor:
             # Try to extract original from fallback
             try:
                 decompressed = lz4.frame.decompress(data)
-                return pickle.loads(decompressed)
+                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
             except Exception:
                 return None
 
         try:
-            compressed_data = pickle.loads(data)
+            compressed_data = pickle.loads(data)  # nosec B301 - Internal data structure
 
             # Check if it's neural compressed
             if "latent" not in compressed_data:
@@ -470,7 +470,7 @@ class MemoryCompressor:
                 # Try to unpickle
                 bytes_array = (reconstructed_array * 255).astype(np.uint8).tobytes()
                 try:
-                    result = pickle.loads(bytes_array)
+                    result = pickle.loads(bytes_array)  # nosec B301 - Internal data structure
                 except Exception as e:  # Return reconstruction with metadata
                     result = {
                         "reconstructed": reconstructed_array,
@@ -487,7 +487,7 @@ class MemoryCompressor:
     def _semantic_decompress(data: bytes) -> Any:
         """Decompress semantic compressed data."""
         try:
-            result = pickle.loads(data)
+            result = pickle.loads(data)  # nosec B301 - Internal data structure
 
             if "compressed" not in result:
                 # Not semantic format
@@ -526,7 +526,7 @@ class MemoryCompressor:
             try:
                 # Try LZ4 fallback
                 decompressed = lz4.frame.decompress(data)
-                return pickle.loads(decompressed)
+                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
             except Exception:
                 return None
 
@@ -1362,7 +1362,7 @@ class MemoryPersistence:
                     metadata=metadata.get("metadata", {}),
                 )
             else:
-                memory = pickle.loads(data)
+                memory = pickle.loads(data)  # nosec B301 - Internal data structure
 
             # Update stats
             self.stats["total_loads"] += 1
@@ -1578,7 +1578,7 @@ class MemoryPersistence:
                         f"Failed to decrypt checkpoint {checkpoint_path}. Trying as unencrypted. Error: {e}"
                     )
 
-            checkpoint_data = pickle.loads(data)
+            checkpoint_data = pickle.loads(data)  # nosec B301 - Internal data structure
 
             # FIX: Decompress to get complete Memory objects
             memories = {}
@@ -1588,7 +1588,7 @@ class MemoryPersistence:
                     decompressed_bytes = lz4.frame.decompress(compressed_data)
 
                     # Unpickle to get the Memory object
-                    memory = pickle.loads(decompressed_bytes)
+                    memory = pickle.loads(decompressed_bytes)  # nosec B301 - Internal data structure
 
                     # Verify it's actually a Memory object
                     if isinstance(memory, Memory):

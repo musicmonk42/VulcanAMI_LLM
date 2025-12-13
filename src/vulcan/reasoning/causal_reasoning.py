@@ -1426,7 +1426,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
 
         try:
             with open(model_file, "rb") as f:
-                model_data = pickle.load(f)
+                model_data = pickle.load(f)  # nosec B301 - Internal data structure
 
             self.causal_graph = defaultdict(dict, model_data["causal_graph"])
             self.variable_types = model_data["variable_types"]

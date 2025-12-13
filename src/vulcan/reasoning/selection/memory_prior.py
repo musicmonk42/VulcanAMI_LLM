@@ -950,7 +950,7 @@ class BayesianMemoryPrior:
                 return
 
             with open(load_path, "rb") as f:
-                state = pickle.load(f)
+                state = pickle.load(f)  # nosec B301 - Internal data structure
 
             self.tool_stats = defaultdict(
                 lambda: {

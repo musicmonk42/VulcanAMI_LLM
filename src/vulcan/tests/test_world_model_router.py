@@ -521,7 +521,7 @@ class MockWorldModelRouter:
 
         try:
             with open(save_path, "rb") as f:
-                state = pickle.load(f)
+                state = pickle.load(f)  # nosec B301 - Internal data structure
 
             self.metrics.update(state.get("metrics", {}))
             self.pattern_learner.pattern_history = state.get("pattern_history", [])

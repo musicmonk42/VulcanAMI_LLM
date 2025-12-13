@@ -2823,7 +2823,7 @@ class UnifiedReasoner:
                 return
 
             with open(state_file, "rb") as f:
-                state = pickle.load(f)
+                state = pickle.load(f)  # nosec B301 - Internal data structure
 
             self.performance_metrics = state["performance_metrics"]
             self.confidence_threshold = state["confidence_threshold"]

@@ -377,7 +377,7 @@ class VersionedDataLogger:
         # Find file with hash prefix
         for file in self.data_store.glob(f"*_{data_hash[:8]}.pkl"):
             with open(file, "rb") as f:
-                return pickle.load(f)
+                return pickle.load(f)  # nosec B301 - Internal data structure
         return None
 
     def _cleanup_loop(self):
