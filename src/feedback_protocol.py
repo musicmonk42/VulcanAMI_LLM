@@ -676,9 +676,8 @@ class FeedbackProtocol:
         """Destructor to ensure cleanup on garbage collection."""
         try:
             self.cleanup()
-        except Exception:
-            # Silently ignore errors during garbage collection
-            pass
+        except Exception as e:
+            logger.error(f"Error during cleanup in destructor: {e}", exc_info=True)
 
 
 class FeedbackQueryNode:

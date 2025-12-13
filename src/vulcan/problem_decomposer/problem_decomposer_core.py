@@ -1095,9 +1095,8 @@ class ProblemDecomposer:
                 )
                 if not metadata_validation.safe:
                     violations.append(f"Unsafe metadata: {metadata_validation.reason}")
-            except Exception:
-                # Skip validation if method signature doesn't match
-                pass
+            except Exception as e:
+                logger.error(f"Error during metadata validation: {e}", exc_info=True)
 
         if violations:
             return {"safe": False, "reason": "; ".join(violations)}

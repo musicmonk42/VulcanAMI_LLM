@@ -798,5 +798,5 @@ class ParameterHistoryManager:
         if hasattr(self, "_running") and self._running:
             try:
                 self.shutdown()
-            except Exception:
-                pass  # Suppress errors in destructor
+            except Exception as e:
+                logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)

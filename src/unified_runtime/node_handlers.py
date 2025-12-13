@@ -776,8 +776,8 @@ async def memristor_mvm_node(node: Dict, context: NodeContext, inputs: Dict) -> 
                     t1_np = np.asarray(tensor1)
                     t2_np = np.asarray(tensor2)
                     tensor_mb = (t1_np.nbytes + t2_np.nbytes) / (1024 * 1024)
-                except Exception:
-                    pass  # Ignore estimation errors
+                except Exception as e:
+                    logger.error(f"Error estimating tensor size: {e}", exc_info=True)
 
             dispatch_result = await runtime.hardware_dispatcher.run_tensor_op(
                 op=my_closure, estimated_tensor_mb=tensor_mb

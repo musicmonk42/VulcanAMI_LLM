@@ -1606,9 +1606,8 @@ class ProductionDeployment:
         try:
             if not self._shutdown_requested:
                 self.shutdown()
-        except Exception:
-            # Avoid errors during interpreter shutdown
-            pass  # logger might not be available here
+        except Exception as e:
+            logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
 
 
 # ============================================================

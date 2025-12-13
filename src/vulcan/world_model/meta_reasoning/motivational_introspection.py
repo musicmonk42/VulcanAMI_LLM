@@ -2330,8 +2330,8 @@ class MotivationalIntrospection:
                     try:  # Try string comparison
                         if str(val_a) == str(val_b):
                             matching_values += 1
-                    except Exception:
-                        pass  # Cannot compare
+                    except Exception as e:
+                        logger.error(f"Error comparing values: {e}", exc_info=True)
                 elif val_a == val_b:
                     matching_values += 1
 

@@ -11,12 +11,15 @@ used safely both in the core execution engine and at UnifiedRuntime scope.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 # psutil is optional. We degrade gracefully if not installed.
 try:
@@ -74,9 +77,8 @@ def _collect_resource_snapshot() -> Dict[str, Any]:
 
         snapshot["rss_mb"] = float(rss_mb)
         snapshot["cpu_percent"] = float(cpu_percent)
-    except Exception:
-        # If psutil explodes for some reason, just return partial.
-        pass
+    except Exception as e:
+        logger.error(f"Error getting system snapshot with psutil: {e}", exc_info=True)
 
     return snapshot
 

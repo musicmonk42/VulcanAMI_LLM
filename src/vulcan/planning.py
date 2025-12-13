@@ -629,8 +629,8 @@ class EnhancedResourceMonitor:
         """Ensure cleanup on deletion."""
         try:
             self.cleanup()
-        except Exception:
-            pass  # Suppress errors during cleanup
+        except Exception as e:
+            logger.error(f"Error during cleanup in destructor: {e}", exc_info=True)
 
 
 # ============================================================

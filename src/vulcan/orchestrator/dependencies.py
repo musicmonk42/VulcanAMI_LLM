@@ -684,9 +684,8 @@ class EnhancedCollectiveDeps:
         try:
             if not self._shutdown:
                 self.shutdown_all()
-        except Exception:
-            # Avoid errors during interpreter shutdown
-            pass  # logger might already be gone
+        except Exception as e:
+            logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
 
 
 # ============================================================
