@@ -20,6 +20,9 @@ from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 # Import safety validator with multiple fallback paths
 SAFETY_VALIDATOR_AVAILABLE = False
 EnhancedSafetyValidator = None

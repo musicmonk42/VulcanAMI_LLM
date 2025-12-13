@@ -23,6 +23,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
+# Initialize logger early before any usage
+logger = logging.getLogger(__name__)
+
 # DO NOT import safety validator at module level - use lazy loading
 # This prevents circular import: invariant_detector -> safety_validator -> domain_validators -> invariant_detector
 EnhancedSafetyValidator = None
