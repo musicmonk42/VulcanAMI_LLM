@@ -1559,15 +1559,30 @@ class DynamicsModel:
         history_size: int = 1000,
         min_pattern_confidence: float = 0.7,
         safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
-        """Initialize dynamics model"""
+        """Initialize dynamics model - FIXED: Added safety_validator parameter
+        
+        Args:
+            history_size: Maximum size of state history
+            min_pattern_confidence: Minimum confidence for pattern detection
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
+        """
 
         self.history_size = history_size
         self.min_pattern_confidence = min_pattern_confidence
         self.safety_config = safety_config or {}  # Store config
-
-        # Initialize safety validator (lazy-loaded)
-        self.safety_validator = None  # This will be populated by _get_safety_validator
+        
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info("DynamicsModel: Using shared safety validator instance")
+        else:
+            # Will be lazy-loaded if needed
+            self.safety_validator = None  # This will be populated by _get_safety_validator
+            logger.info("DynamicsModel: Safety validator will be lazy-loaded")
 
         # Components
         self.pattern_detector = PatternDetector(min_pattern_confidence)
@@ -1632,15 +1647,30 @@ class DynamicsModel:
                     validator_mod, "EnhancedSafetyValidator"
                 )
                 SafetyConfig = getattr(types_mod, "SafetyConfig")
+                initialize_all_safety_components = getattr(
+                    validator_mod, "initialize_all_safety_components", None
+                )
 
+                # FIXED: Try singleton first
+                if initialize_all_safety_components is not None:
+                    try:
+                        self.safety_validator = initialize_all_safety_components(
+                            config=self.safety_config, reuse_existing=True
+                        )
+                        logger.info("DynamicsModel: Using singleton safety validator")
+                        return self.safety_validator
+                    except Exception as e:
+                        logger.debug("Could not get singleton safety validator: %s", e)
+
+                # Fallback: Create new instance
                 if isinstance(self.safety_config, dict) and self.safety_config:
                     config_obj = SafetyConfig.from_dict(self.safety_config)
                     self.safety_validator = EnhancedSafetyValidator(config_obj)
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
 
-                logger.info(
-                    "DynamicsModel: Safety validator lazy-loaded and initialized"
+                logger.warning(
+                    "DynamicsModel: Created new safety validator instance (may cause duplication)"
                 )
 
             except Exception as e:
