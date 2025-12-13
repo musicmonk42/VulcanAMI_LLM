@@ -684,9 +684,11 @@ class EnhancedCollectiveDeps:
         try:
             if not self._shutdown:
                 self.shutdown_all()
-        except Exception:
-            # Avoid errors during interpreter shutdown
-            pass  # logger might already be gone
+        except Exception as e:
+            try:
+                logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
+            except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+                pass
 
 
 # ============================================================

@@ -55,6 +55,7 @@ except ImportError:
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+logger = logging.getLogger(__name__)
 
 # Constants
 MAX_TENSOR_SIZE = 100_000_000  # 100M elements
@@ -169,11 +170,8 @@ class InterpretabilityEngine(metaclass=_SingletonMeta):
         # Create log directory
         try:
             os.makedirs(self.log_dir, exist_ok=True)
-        except Exception:
-            # FIX: Retained original logic, as the failure was due to skipped __init__
-            # If a genuine IOError occurs during creation, it's suppressed here,
-            # but the test logic expects os.path.exists(log_dir) to be true if __init__ is called.
-            pass
+        except Exception as e:
+            logger.error(f"Error creating log directory: {e}", exc_info=True)
 
         # Setup logging
         self.logger = logging.getLogger("InterpretabilityEngine")

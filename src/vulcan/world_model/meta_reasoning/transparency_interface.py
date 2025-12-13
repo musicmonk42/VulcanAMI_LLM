@@ -1024,8 +1024,8 @@ class TransparencyInterface:
                 ):
                     try:
                         pressure = self.self_improvement_drive._csiu_pressure(U_ewma)
-                    except Exception:
-                        pass  # Ignore pressure calc errors
+                    except Exception as e:
+                        logger.error(f"Error calculating CSIU pressure: {e}", exc_info=True)
 
             internal_audit = {
                 "csiu": {

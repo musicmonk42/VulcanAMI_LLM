@@ -6,6 +6,7 @@ Compiles graph nodes to native machine code via LLVM IR
 import ctypes
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List
@@ -13,6 +14,8 @@ from typing import Dict, List
 import llvmlite.binding as llvm
 import llvmlite.ir as ir
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 # Initialize LLVM
@@ -23,8 +26,8 @@ def initialize_llvm():
         target = llvm.Target.from_default_triple()
         if target:
             return  # Already initialized successfully
-    except Exception:
-        pass  # Need to initialize
+    except Exception as e:
+        logger.error(f"Error checking LLVM initialization: {e}", exc_info=True)
 
     # Initialize LLVM core
     try:

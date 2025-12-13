@@ -1697,8 +1697,8 @@ class DomainValidator:
 
             try:
                 shutil.rmtree(sandbox_dir, ignore_errors=True)
-            except Exception:
-                pass  # Best effort cleanup
+            except Exception as e:
+                logger.error(f"Error during sandbox cleanup: {e}", exc_info=True)
 
     def _create_test_script(
         self, principle, test_case: DomainTestCase, sandbox_dir: str

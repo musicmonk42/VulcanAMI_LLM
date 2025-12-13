@@ -673,8 +673,8 @@ class EnhancedContinualLearner(nn.Module):
                             try:
                                 pickle.dumps(v)
                                 clean_config_dict[k] = v
-                            except Exception as e:  # Skip non-picklable values
-                                pass
+                            except Exception as e:
+                                logger.error(f"Error pickling config value for key {k}: {e}", exc_info=True)
 
                         # Sanitize task_info dicts
                         clean_task_info = {}

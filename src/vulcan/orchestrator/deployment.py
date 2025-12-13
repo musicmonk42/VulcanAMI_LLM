@@ -1606,9 +1606,11 @@ class ProductionDeployment:
         try:
             if not self._shutdown_requested:
                 self.shutdown()
-        except Exception:
-            # Avoid errors during interpreter shutdown
-            pass  # logger might not be available here
+        except Exception as e:
+            try:
+                logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
+            except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+                pass
 
 
 # ============================================================

@@ -798,5 +798,8 @@ class ParameterHistoryManager:
         if hasattr(self, "_running") and self._running:
             try:
                 self.shutdown()
-            except Exception:
-                pass  # Suppress errors in destructor
+            except Exception as e:
+                try:
+                    logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
+                except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+                    pass

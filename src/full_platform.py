@@ -1142,9 +1142,8 @@ async def request_size_limit_middleware(request: Request, call_next):
                     status_code=400, content={"error": "Invalid Content-Length"}
                 )
         # For chunked requests, rely on upstream reverse proxy limits
-    except Exception:
-        # Fail-safe: allow request to proceed if checking fails
-        pass
+    except Exception as e:
+        logger.error(f"Error checking request size: {e}", exc_info=True)
     return await call_next(request)
 
 

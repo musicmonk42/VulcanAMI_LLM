@@ -283,8 +283,8 @@ class RPCServer:
             # Always close socket properly
             try:
                 conn.shutdown(socket.SHUT_RDWR)
-            except Exception:
-                pass  # Socket might already be closed
+            except Exception as e:
+                logger.error(f"Error shutting down socket: {e}", exc_info=True)
             try:
                 conn.close()
             except Exception as e:
