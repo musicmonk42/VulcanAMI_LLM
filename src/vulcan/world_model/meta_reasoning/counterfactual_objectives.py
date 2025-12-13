@@ -1072,7 +1072,7 @@ class CounterfactualObjectiveReasoner:
                         if hasattr(obj, "maximize"):
                             return obj.maximize
                 except (TypeError, AttributeError):
-                    pass
+                    logger.debug(f"Operation failed: {e}")
 
         # Default: maximize (standard for most objectives)
         return True
@@ -1181,7 +1181,7 @@ class CounterfactualObjectiveReasoner:
                     if isinstance(mi.active_objectives, dict):
                         return list(mi.active_objectives.keys())
                 except (TypeError, AttributeError):
-                    pass
+                    logger.debug(f"Operation failed: {e}")
 
         # Fallback to common objectives
         return [

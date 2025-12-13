@@ -409,12 +409,12 @@ class LocalGPTProvider:
         try:
             del self.model
         except Exception:
-            pass
+            logger.debug(f"Failed to load model configuration: {e}")
         if self.device.startswith("cuda"):
             try:
                 torch.cuda.empty_cache()
             except Exception:
-                pass
+                logger.debug(f"Failed to initialize model tokenizer: {e}")
 
 
 # Convenience factory for external runtimes

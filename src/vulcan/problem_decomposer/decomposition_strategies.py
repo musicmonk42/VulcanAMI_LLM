@@ -542,7 +542,7 @@ class ExactDecomposition(DecompositionStrategy):
                 matcher = isomorphism.DiGraphMatcher(G, pattern)
                 return matcher.subgraph_is_isomorphic()
             except Exception:
-                pass
+                logger.debug(f"Failed to apply decomposition strategy: {e}")
 
         # Fallback to simple check
         if hasattr(pattern, "nodes") and hasattr(G, "nodes"):
@@ -1105,7 +1105,7 @@ class StructuralDecomposition(DecompositionStrategy):
                         "cycles": cycles,
                     }
             except Exception:
-                pass
+                logger.debug(f"Failed to merge decomposition results: {e}")
 
         return None
 

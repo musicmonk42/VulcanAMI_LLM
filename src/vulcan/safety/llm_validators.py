@@ -599,7 +599,7 @@ class EnhancedSafetyValidator:
                             self.last_events.append(ev)
                             replacement = corr
             except Exception:
-                pass
+                logger.warning(f"Failed to validate LLM output: {e}")
 
         if self.policy.get(
             "block_on_high_risk", True
@@ -686,7 +686,7 @@ class EnhancedSafetyValidator:
                             self.last_events.append(ev)
                             replacement = corr
             except Exception:
-                pass
+                logger.warning(f"Failed to check safety constraints: {e}")
 
         # High-risk block policy
         if self.policy.get(

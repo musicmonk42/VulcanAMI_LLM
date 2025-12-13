@@ -518,7 +518,7 @@ class EnhancedResourceMonitor:
                 successful_tests += 1
                 total_latency += latency
             except (socket.timeout, socket.error, OSError):
-                pass
+                logger.debug(f"Network timeout during planning operation: {e}")
 
         # Track network quality in history
         success_rate = successful_tests / len(test_endpoints)
@@ -1597,7 +1597,7 @@ class EnhancedHierarchicalPlanner(HierarchicalGoalSystem):
             asyncio.get_running_loop()
             return asyncio.run(self._create_mcts_plan_async(goal, context))
         except RuntimeError:
-            pass
+            logger.debug(f"Runtime error in plan execution: {e}")
 
         for step_num in range(20):
             action, value = self.mcts.search(current_state)

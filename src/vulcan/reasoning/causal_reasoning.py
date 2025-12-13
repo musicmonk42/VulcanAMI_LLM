@@ -1044,7 +1044,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
             try:
                 descendants = nx.descendants(self.causal_dag, treatment)
             except Exception:
-                pass
+                logger.debug(f"Failed to infer causal relationship: {e}")
 
             # If adjustment set contains any descendants, it's invalid
             if adjustment_set & descendants:
@@ -1265,7 +1265,7 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
                         # No path from node to outcome, which is fine
                         instruments.add(node)
                     except Exception:
-                        pass
+                        logger.debug(f"Failed to update causal graph: {e}")
         except Exception as e:
             logger.warning(f"IV identification failed: {e}")
 

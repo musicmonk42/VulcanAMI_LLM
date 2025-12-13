@@ -525,7 +525,7 @@ class RollbackManager:
                     try:
                         file_path.unlink()
                     except Exception:
-                        pass
+                        logger.warning(f"Failed to log rollback event: {e}")
                 raise
 
     def rollback(
@@ -1271,7 +1271,7 @@ class AuditLogger:
                         entry = json.loads(last_line)
                         return entry.get("hash", "")
             except Exception:
-                pass
+                logger.warning(f"Failed to audit rollback state: {e}")
         return hashlib.sha256(b"genesis").hexdigest()
 
     def _initialize_redaction_patterns(self) -> List[Dict[str, Any]]:
