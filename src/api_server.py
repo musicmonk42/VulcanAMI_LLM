@@ -943,7 +943,7 @@ def is_revoked(jti: str) -> bool:
     if redis_client:
         try:
             return redis_client.get(f"{REVOCATION_PREFIX}{jti}") is not None
-        except Exception:
+        except Exception as e:
             logger.debug(f"Operation failed: {e}")
     return jti in revoked_jti_set
 

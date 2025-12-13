@@ -735,7 +735,7 @@ class TamperEvidentLogger:
                                 self.config.syslog_facility | syslog.LOG_INFO,
                                 json.dumps(syslog_data, ensure_ascii=False),
                             )
-                        except Exception:
+                        except Exception as e:
                             logger.debug(f"Operation failed: {e}")
 
                 if self._metrics:
@@ -980,7 +980,7 @@ class TamperEvidentLogger:
         for handler in self._logger.handlers[:]:
             try:
                 handler.close()
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
             self._logger.removeHandler(handler)
 

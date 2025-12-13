@@ -153,7 +153,7 @@ class GovernanceManager:
                     and not cls._instance._shutdown_event.is_set()
                 ):
                     cls._instance.shutdown()
-            except Exception:
+            except Exception as e:
                 logger.warning(f"Operation failed: {e}")
         cls._instance = None
 

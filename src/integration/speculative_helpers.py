@@ -97,7 +97,7 @@ class LowRankDraftTransformer(nn.Module):
         if torch.__version__ >= "2.0":
             try:
                 self.forward = torch.compile(self.forward)
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
 
     @torch.no_grad()

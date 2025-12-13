@@ -480,7 +480,7 @@ class UnifiedGeneration:
                 conf = module.get_confidence()
                 if isinstance(conf, (int, float)):
                     return float(conf)
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
         return 1.0
 

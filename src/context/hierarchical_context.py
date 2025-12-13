@@ -571,7 +571,7 @@ class HierarchicalContext:
         """Background consolidation (lightweight)"""
         try:
             self.consolidate_memory(min_frequency=3)
-        except Exception:
+        except Exception as e:
             logger.debug(f"Operation failed: {e}")
 
     # ================================ Memory Pruning ================================ #

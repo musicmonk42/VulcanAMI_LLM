@@ -465,7 +465,7 @@ class ZKProver:
             if perf_context is not None:
                 try:
                     perf_context.__exit__(None, None, None)
-                except Exception:
+                except Exception as e:
                     logger.debug(f"Operation failed: {e}")
 
     def verify_unlearning_proof(self, proof: Dict[str, Any]) -> bool:

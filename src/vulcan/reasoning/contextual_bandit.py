@@ -377,7 +377,7 @@ class AdvancedRewardModel:
                     try:
                         pred = model.predict(features_scaled)[0]
                         predictions.append(pred)
-                    except Exception:
+                    except Exception as e:
                         logger.debug(f"Operation failed: {e}")
 
             if not predictions:

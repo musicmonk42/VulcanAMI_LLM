@@ -120,7 +120,7 @@ def atomic_write_with_retry(
         if temp_fd is not None:
             try:
                 os.close(temp_fd)
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
 
         # Cleanup: Remove temporary file if it still exists

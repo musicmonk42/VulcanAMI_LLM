@@ -871,7 +871,7 @@ class GovernanceLoop:
             if temp_path.exists():
                 try:
                     temp_path.unlink()
-                except Exception:
+                except Exception as e:
                     logger.warning(f"Operation failed: {e}")
             raise RuntimeError(f"Failed to export policies: {e}") from e
 

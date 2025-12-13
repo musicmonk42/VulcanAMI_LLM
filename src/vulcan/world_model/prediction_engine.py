@@ -930,7 +930,7 @@ class OptimizedPathClusterer:
                 if score > best_score:
                     best_score = score
                     best_k = k
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
 
         # Final clustering with best k

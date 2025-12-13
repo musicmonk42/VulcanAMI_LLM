@@ -308,7 +308,7 @@ class S3Store:
                 self.s3.abort_multipart_upload(
                     Bucket=self.bucket, Key=key, UploadId=upload_id
                 )
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
             raise
 

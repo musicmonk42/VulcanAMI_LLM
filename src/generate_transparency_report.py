@@ -1011,7 +1011,7 @@ def main():
         logger.exception("Critical error in report generation")
         try:
             notify_error(f"Transparency report generation failed: {err}")
-        except Exception:
+        except Exception as e:
             logger.debug(f"Operation failed: {e}")
         raise
 

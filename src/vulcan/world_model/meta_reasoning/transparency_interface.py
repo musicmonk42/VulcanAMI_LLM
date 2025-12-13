@@ -1412,7 +1412,7 @@ class TransparencyInterface:
                 if hasattr(v, "to_dict") and callable(v.to_dict):
                     try:
                         v_dict = self._make_serializable(v.to_dict(), seen=None)
-                    except Exception:
+                    except Exception as e:
                         logger.debug(f"Operation failed: {e}")
                 if not v_dict:  # Fallback if to_dict fails or not present
                     v_dict = {

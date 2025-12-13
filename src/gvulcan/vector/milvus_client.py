@@ -494,7 +494,7 @@ class MilvusIndex:
         if self._connected:
             try:
                 self.disconnect()
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
 
 

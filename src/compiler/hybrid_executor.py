@@ -184,7 +184,7 @@ class CompiledBinaryCache:
                 "metadata": metadata or {},
             }
             self._save_index()
-        except Exception:
+        except Exception as e:
             logger.debug(f"Operation failed: {e}")
 
     def cleanup(self, max_age_days: int = 7):
@@ -198,7 +198,7 @@ class CompiledBinaryCache:
                 if cache_file.exists():
                     try:
                         cache_file.unlink()
-                    except Exception:
+                    except Exception as e:
                         logger.debug(f"Operation failed: {e}")
                 del self.cache_index[graph_hash]
 

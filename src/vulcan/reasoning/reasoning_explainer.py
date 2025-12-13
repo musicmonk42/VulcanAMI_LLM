@@ -503,7 +503,7 @@ class SafetyAwareReasoning:
                             }
                     except Exception:
                         continue
-            except Exception:
+            except Exception as e:
                 logger.debug(f"Operation failed: {e}")
 
         # Output is safe

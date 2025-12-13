@@ -2104,7 +2104,7 @@ class AnalogicalReasoner(AbstractReasoner):
                         self.semantic_enricher._tfidf_vectorizer.fit(
                             self.semantic_enricher._tfidf_corpus
                         )
-                    except Exception:
+                    except Exception as e:
                         logger.debug(f"Operation failed: {e}")
 
             if NETWORKX_AVAILABLE:
