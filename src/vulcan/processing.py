@@ -46,6 +46,9 @@ from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
 BERT_MODEL_REVISION = os.environ.get("VULCAN_BERT_MODEL_REVISION", None)
 VISION_AUDIO_MODEL_REVISION = os.environ.get("VULCAN_VISION_AUDIO_MODEL_REVISION", None)
 
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
+
 # --- Graphix Module Imports ---
 try:
     from src.ai_providers import AIProviders
@@ -316,8 +319,9 @@ class VersionedDataLogger:
         try:
             # Force Python to close any open handles to the file
             gc.collect()
-        except Exception:
-            pass
+        except Exception as e:
+            # GC failure is unexpected but not critical
+            logger.warning(f"Garbage collection failed during log rotation: {e}")
 
         # Move current log to archive
         if self.log_file.exists():
@@ -362,8 +366,9 @@ class VersionedDataLogger:
                             return input_data, output_data
                         else:
                             return entry["input_summary"], entry["output_summary"]
-        except Exception:
-            pass
+        except Exception as e:
+            # Log retrieval failures should be logged
+            logger.warning(f"Failed to retrieve log entry {log_id}: {e}")
 
         return None
 
@@ -433,8 +438,9 @@ class VersionedDataLogger:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except Exception:
-            pass
+        except Exception as e:
+            # Destructor failures in ProcessingLogger should be logged at debug level
+            logger.debug(f"ProcessingLogger cleanup in destructor failed: {e}")
 
 
 # ============================================================
@@ -804,8 +810,9 @@ class DynamicModelManager:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except Exception:
-            pass
+        except Exception as e:
+            # Destructor failures in ModelManager should be logged at debug level
+            logger.debug(f"ModelManager cleanup in destructor failed: {e}")
 
 
 # ============================================================
@@ -1103,8 +1110,9 @@ class WorkloadManager:
         """Destructor to ensure cleanup."""
         try:
             self.shutdown()
-        except Exception:
-            pass
+        except Exception as e:
+            # Destructor failures in WorkloadManager should be logged at debug level
+            logger.debug(f"WorkloadManager cleanup in destructor failed: {e}")
 
 
 # ============================================================
@@ -2193,8 +2201,9 @@ class AdaptiveMultimodalProcessor(nn.Module):
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            # Destructor failures in EmbeddingCache should be logged at debug level
+            logger.debug(f"EmbeddingCache cleanup in destructor failed: {e}")
 
 
 # ============================================================
@@ -2295,8 +2304,9 @@ class StreamingProcessor:
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            # Destructor failures in StreamingProcessor should be logged at debug level
+            logger.debug(f"StreamingProcessor cleanup in destructor failed: {e}")
 
 
 # ============================================================
@@ -2480,5 +2490,6 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
         """Destructor to ensure cleanup."""
         try:
             self.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            # Destructor failures in AdaptiveMultimodalProcessor should be logged at debug level
+            logger.debug(f"AdaptiveMultimodalProcessor cleanup in destructor failed: {e}")
