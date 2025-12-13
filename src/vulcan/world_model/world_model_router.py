@@ -414,7 +414,17 @@ class WorldModelRouter:
         world_model,
         config: Optional[Dict[str, Any]] = None,
         self_improvement_drive=None,
+        safety_validator=None,
     ):
+        """
+        Initialize WorldModelRouter - FIXED: Added safety_validator parameter
+        
+        Args:
+            world_model: The world model instance to route updates for
+            config: Optional configuration dictionary
+            self_improvement_drive: Optional self-improvement drive instance
+            safety_validator: Optional shared safety validator instance (preferred over config)
+        """
         self.world_model = world_model
         self.config = config or {}
         self.self_improvement_drive = self_improvement_drive
@@ -431,18 +441,18 @@ class WorldModelRouter:
         self.strategies = self._initialize_strategies()
 
         # Resource constraints
-        self.time_budget_ms = config.get("time_budget_ms", 1000)
-        self.min_confidence = config.get("min_confidence", 0.5)
+        self.time_budget_ms = config.get("time_budget_ms", 1000) if config else 1000
+        self.min_confidence = config.get("min_confidence", 0.5) if config else 0.5
 
         # Performance tracking
         self.metrics = defaultdict(int)
         self.execution_history = deque(maxlen=1000)
         self.cache = {}  # Signature -> UpdatePlan cache
-        self.cache_ttl = config.get("cache_ttl", 60)
+        self.cache_ttl = config.get("cache_ttl", 60) if config else 60
 
         # Learning parameters
-        self.exploration_rate = config.get("exploration_rate", 0.1)
-        self.use_learned_patterns = config.get("use_learning", True)
+        self.exploration_rate = config.get("exploration_rate", 0.1) if config else 0.1
+        self.use_learned_patterns = config.get("use_learning", True) if config else True
 
         # Safety tracking
         self.safety_blocks = defaultdict(int)
@@ -468,29 +478,49 @@ class WorldModelRouter:
             "meta_reweight_priorities", True
         )
 
-        # Initialize safety validator (using lazy imports to avoid circular import issues)
-        EnhancedSafetyValidator = _get_safety_validator()
-        SafetyConfig = _get_safety_config()
-
-        if EnhancedSafetyValidator is not None and SafetyConfig is not None:
-            safety_config = config.get("safety_config", {})
-            if isinstance(safety_config, dict) and safety_config:
-                self.safety_validator = EnhancedSafetyValidator(
-                    SafetyConfig.from_dict(safety_config)
-                )
-            elif (
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+        else:
+            # Fallback: try to get from world_model, or lazy import and create
+            if (
                 hasattr(world_model, "safety_validator")
                 and world_model.safety_validator
             ):
                 self.safety_validator = world_model.safety_validator
+                logger.info(f"{self.__class__.__name__}: Using world model's safety validator instance")
             else:
-                self.safety_validator = EnhancedSafetyValidator()
-            logger.info("WorldModelRouter: Safety validator initialized")
-        else:
-            self.safety_validator = None
-            logger.warning(
-                "WorldModelRouter: Safety validator not available - operating without safety checks"
-            )
+                # Initialize safety validator (using lazy imports to avoid circular import issues)
+                EnhancedSafetyValidator = _get_safety_validator()
+                SafetyConfig = _get_safety_config()
+
+                if EnhancedSafetyValidator is not None and SafetyConfig is not None:
+                    # Try singleton first
+                    try:
+                        from ..safety.safety_validator import initialize_all_safety_components
+                        self.safety_validator = initialize_all_safety_components(
+                            config=config.get("safety_config") if config else None,
+                            reuse_existing=True
+                        )
+                        logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                    except Exception as e:
+                        logger.debug(f"Could not get singleton safety validator: {e}")
+                        # Last resort: create new instance
+                        safety_config = config.get("safety_config", {}) if config else {}
+                        if isinstance(safety_config, dict) and safety_config:
+                            self.safety_validator = EnhancedSafetyValidator(
+                                SafetyConfig.from_dict(safety_config)
+                            )
+                        else:
+                            self.safety_validator = EnhancedSafetyValidator()
+                        logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                else:
+                    self.safety_validator = None
+                    logger.warning(
+                        f"{self.__class__.__name__}: Safety validator not available - operating without safety checks"
+                    )
 
         logger.info(
             "WorldModelRouter initialized with %d strategies", len(self.strategies)
