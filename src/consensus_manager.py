@@ -434,8 +434,8 @@ class ConsensusManager:
             try:
                 if ray.is_initialized():
                     return "ray"
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ray not available, falling back to thread: {e}")
 
         return "thread"
 
@@ -800,8 +800,8 @@ class ConsensusManager:
                     for ref in pending.values():
                         try:
                             ray.cancel(ref, force=True)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Failed to cancel ray task: {e}")
 
                     return True
 
@@ -849,8 +849,8 @@ class ConsensusManager:
 
                     try:
                         ray.cancel(ref, force=True)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Failed to cancel ray task: {e}")
 
                     attempts[agent] += 1
                     if attempts[agent] <= self.max_retries:
@@ -882,8 +882,8 @@ class ConsensusManager:
                             if attempts[agent] > 0:
                                 try:
                                     ray.cancel(ref, force=True)
-                                except Exception:
-                                    pass
+                                except Exception as e:
+                                    logger.debug(f"Failed to cancel ray task: {e}")
 
                                 attempts[agent] += 1
                                 if attempts[agent] <= self.max_retries:

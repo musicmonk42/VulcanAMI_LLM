@@ -478,8 +478,8 @@ class SemanticEnricher:
                 doc = nlp(entity.name)
                 if doc:
                     entity.pos_tag = doc[0].pos_ if len(doc) > 0 else None
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to assign POS tag to entity: {e}")
 
         # Cache
         self.entity_cache[cache_key] = entity
@@ -735,8 +735,8 @@ class GoalRelevanceAnalyzer:
                 for token in doc:
                     if token.pos_ in ["NOUN", "PROPN"] and not token.is_stop:
                         entities.add(token.text.lower())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to extract entities from text: {e}")
 
         # Fallback: extract capitalized words and nouns heuristically
         words = goal_text.split()
@@ -763,8 +763,8 @@ class GoalRelevanceAnalyzer:
                 for token in doc:
                     if token.pos_ == "ADJ" and not token.is_stop:
                         concepts.add(token.text.lower())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to extract concepts from text: {e}")
 
         # Fallback: extract action words
         action_indicators = [
