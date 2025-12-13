@@ -233,26 +233,41 @@ class TransferEngine:
     """Manages concept transfer between domains - FIXED with safety and world_model"""
 
     def __init__(
-        self, world_model=None, safety_config: Optional[Dict[str, Any]] = None
+        self, world_model=None, safety_config: Optional[Dict[str, Any]] = None, safety_validator=None
     ):
         """
-        Initialize transfer engine - FIXED: Added world_model and safety_config
+        Initialize transfer engine - FIXED: Added world_model, safety_config, and safety_validator
 
         Args:
             world_model: World model instance for accessing causal knowledge
-            safety_config: Optional safety configuration
+            safety_config: Optional safety configuration (deprecated, use safety_validator)
+            safety_validator: Optional shared safety validator instance (preferred over safety_config)
         """
         self.world_model = world_model
 
-        # Initialize safety validator
-        if SAFETY_VALIDATOR_AVAILABLE:
-            if isinstance(safety_config, dict) and safety_config:
-                self.safety_validator = EnhancedSafetyValidator(
-                    SafetyConfig.from_dict(safety_config)
+        # Initialize safety validator - prefer shared instance
+        if safety_validator is not None:
+            # Use provided shared instance (PREFERRED - prevents duplication)
+            self.safety_validator = safety_validator
+            logger.info("TransferEngine: Using shared safety validator instance")
+        elif SAFETY_VALIDATOR_AVAILABLE:
+            # Fallback: try to get singleton, or create new instance
+            try:
+                from ..safety.safety_validator import initialize_all_safety_components
+                self.safety_validator = initialize_all_safety_components(
+                    config=safety_config, reuse_existing=True
                 )
-            else:
-                self.safety_validator = EnhancedSafetyValidator()
-            logger.info("TransferEngine: Safety validator initialized")
+                logger.info("TransferEngine: Using singleton safety validator")
+            except Exception as e:
+                logger.debug("Could not get singleton safety validator: %s", e)
+                # Last resort: create new instance (causes duplication)
+                if isinstance(safety_config, dict) and safety_config:
+                    self.safety_validator = EnhancedSafetyValidator(
+                        SafetyConfig.from_dict(safety_config)
+                    )
+                else:
+                    self.safety_validator = EnhancedSafetyValidator()
+                logger.warning("TransferEngine: Created new safety validator instance (may cause duplication)")
         else:
             self.safety_validator = None
             logger.warning(
