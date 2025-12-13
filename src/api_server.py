@@ -1783,7 +1783,7 @@ class GraphAPIServer:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10, encoding="utf-8") as response:
+            with urllib.request.urlopen(req, timeout=10, encoding="utf-8") as response:  # nosec B310 - URL validated at line 1775
                 if response.status >= 300:
                     self.logger.error(
                         f"Callback to {url} failed with status {response.status}"
@@ -1990,7 +1990,7 @@ def main():
     args = parser.parse_args()
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    if args.host == "0.0.0.0":
+    if args.host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
         logger.warning("Binding to 0.0.0.0 - ensure firewall is configured!")
     server = GraphAPIServer(host=args.host, port=args.port)
     print("\n" + "=" * 60)

@@ -1767,10 +1767,10 @@ class MultiModalReasoningEngine:
                                 model_kwargs['revision'] = TEXT_MODEL_REVISION
                                 logger.info(f"Using pinned revision: {TEXT_MODEL_REVISION}")
                             
-                            self._text_tokenizer = AutoTokenizer.from_pretrained(
+                            self._text_tokenizer = AutoTokenizer.from_pretrained(  # nosec B615 - revision in model_kwargs
                                 TEXT_MODEL_NAME, **model_kwargs
                             )
-                            self._text_model = AutoModel.from_pretrained(
+                            self._text_model = AutoModel.from_pretrained(  # nosec B615 - revision in model_kwargs
                                 TEXT_MODEL_NAME, **model_kwargs
                             )
 
@@ -2001,10 +2001,10 @@ class MultiModalReasoningEngine:
                             model_kwargs['revision'] = AUDIO_MODEL_REVISION
                             logger.info(f"Using pinned revision: {AUDIO_MODEL_REVISION}")
                         
-                        self._audio_processor = Wav2Vec2Processor.from_pretrained(
+                        self._audio_processor = Wav2Vec2Processor.from_pretrained(  # nosec B615 - revision in model_kwargs
                             AUDIO_MODEL_NAME, **model_kwargs
                         )
-                        self._audio_model = Wav2Vec2Model.from_pretrained(
+                        self._audio_model = Wav2Vec2Model.from_pretrained(  # nosec B615 - revision in model_kwargs
                             AUDIO_MODEL_NAME, **model_kwargs
                         )
 

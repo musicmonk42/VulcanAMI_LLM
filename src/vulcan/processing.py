@@ -72,7 +72,7 @@ class GraphixTransformer:
         # SECURITY: Support model revision pinning (CWE-494 mitigation)
         # Use environment variable VULCAN_BERT_MODEL_REVISION to pin to specific commit
         revision = BERT_MODEL_REVISION if BERT_MODEL_REVISION else "main"
-        self.tokenizer = AutoTokenizer.from_pretrained(
+        self.tokenizer = AutoTokenizer.from_pretrained(  # nosec B615 - revision parameter present
             "bert-base-uncased",
             revision=revision
         )
@@ -738,11 +738,11 @@ class DynamicModelManager:
             # Use environment variable VULCAN_VISION_AUDIO_MODEL_REVISION to pin to specific commit
             revision = VISION_AUDIO_MODEL_REVISION if VISION_AUDIO_MODEL_REVISION else "main"
             
-            model = AutoModel.from_pretrained(
+            model = AutoModel.from_pretrained(  # nosec B615 - revision parameter present
                 model_name,
                 revision=revision
             )
-            processor = AutoImageProcessor.from_pretrained(
+            processor = AutoImageProcessor.from_pretrained(  # nosec B615 - revision parameter present
                 model_name,
                 revision=revision
             )

@@ -2443,7 +2443,7 @@ class APIGateway:
             port: Port to bind to
         """
         logger.info(f"Starting VULCAN-AGI API Gateway on {host}:{port}")
-        if host == "0.0.0.0":
+        if host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
             logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
 
         loop = asyncio.get_event_loop()

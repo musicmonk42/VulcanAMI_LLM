@@ -136,7 +136,7 @@ def safe_urlopen(url: str, allowed_schemes: Optional[Set[str]] = None, **kwargs)
     validate_url_scheme(url, allowed_schemes)
     
     try:
-        return urllib.request.urlopen(url, **kwargs)
+        return urllib.request.urlopen(url, **kwargs)  # nosec B310 - This function validates URL before opening
     except urllib.error.HTTPError as e:
         logger.warning(
             f"HTTP error for URL: {url}",

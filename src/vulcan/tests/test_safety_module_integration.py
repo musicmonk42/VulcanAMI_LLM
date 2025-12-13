@@ -257,10 +257,10 @@ class SafetyConfig:
         }
     )
     rollback_config: Dict[str, Any] = field(
-        default_factory=lambda: {"storage_path": "/tmp/rollback"}
+        default_factory=lambda: {"storage_path": "/tmp/rollback"}  # nosec B108 - test fixture default
     )
     audit_config: Dict[str, Any] = field(
-        default_factory=lambda: {"log_path": "/tmp/audit"}
+        default_factory=lambda: {"log_path": "/tmp/audit"}  # nosec B108 - test fixture default
     )
 
 
@@ -785,7 +785,7 @@ class RollbackManager:
 
 
 class AuditLogger:
-    def __init__(self, log_path: str = "/tmp/audit", config: Dict = None):
+    def __init__(self, log_path: str = "/tmp/audit", config: Dict = None):  # nosec B108 - test fixture default
         self.log_path = log_path
         self.config = config or {}
         self.redact_sensitive = config.get("redact_sensitive", True) if config else True
@@ -1136,7 +1136,7 @@ class EnhancedSafetyValidator:
 
         self.audit_logger = (
             AuditLogger(
-                log_path=self.config.audit_config.get("log_path", "/tmp/audit"),
+                log_path=self.config.audit_config.get("log_path", "/tmp/audit"),  # nosec B108 - test fixture, uses config value
                 config=self.config.audit_config,
             )
             if self.config.enable_audit_logging

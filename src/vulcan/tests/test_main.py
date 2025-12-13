@@ -307,7 +307,7 @@ class _FakeHttpClient:
         if path == "/v1/checkpoint" and method == "POST":
             if deployment:
                 deployment.save_checkpoint()
-            return MockResponse(200, {"status": "saved", "path": "/tmp/checkpoint"})
+            return MockResponse(200, {"status": "saved", "path": "/tmp/checkpoint"})  # nosec B108 - mock response, not actual file operation
 
         # OPTIONS for CORS
         if method == "OPTIONS":

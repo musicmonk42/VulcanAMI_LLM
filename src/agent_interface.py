@@ -278,7 +278,7 @@ class TelemetryCollector:
                 },
             )
 
-            with urllib.request.urlopen(req, timeout=5, encoding="utf-8") as response:
+            with urllib.request.urlopen(req, timeout=5, encoding="utf-8") as response:  # nosec B310 - URL validated above
                 if response.status == 200:
                     logger.debug("Telemetry reported successfully")
 
@@ -377,11 +377,11 @@ class HTTPCommunicator:
 
         try:
             if self.ssl_context:
-                response = urllib.request.urlopen(
+                response = urllib.request.urlopen(  # nosec B310 - URL validated at line 362
                     req, timeout=self.config.timeout, context=self.ssl_context
                 , encoding="utf-8")
             else:
-                response = urllib.request.urlopen(req, timeout=self.config.timeout, encoding="utf-8")
+                response = urllib.request.urlopen(req, timeout=self.config.timeout, encoding="utf-8")  # nosec B310 - URL validated at line 362
 
             response_data = response.read()
 

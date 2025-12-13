@@ -654,7 +654,7 @@ def run_listener(
         use_mock: Use mock implementations for testing
         max_requests_per_minute: Rate limit per client
     """
-    if host == "0.0.0.0":
+    if host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
         logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
 
     listener = GraphixListener(
