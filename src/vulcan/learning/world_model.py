@@ -1164,8 +1164,8 @@ class UnifiedWorldModel(nn.Module):
 
     def load_model(self, path: str):
         """FIXED: Load model state with proper deserialization"""
-        # Load with weights_only=False to handle deque objects
-        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        # SECURITY: Use weights_only=True to prevent arbitrary code execution
+        checkpoint = torch.load(path, map_location=self.device, weights_only=True)
         self.load_state_dict(checkpoint["model_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
