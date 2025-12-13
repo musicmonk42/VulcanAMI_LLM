@@ -148,12 +148,21 @@ def _get_safety_validator(self):
                     )
                     logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
                     return self.safety_validator
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Could not get singleton safety validator: {e}")
             
             # Fallback to new instance
+            if isinstance(self.safety_config, dict) and self.safety_config:
+                config_obj = SafetyConfig.from_dict(self.safety_config)
+                self.safety_validator = EnhancedSafetyValidator(config_obj)
+            else:
+                self.safety_validator = EnhancedSafetyValidator()
+            
+            logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+        except Exception as e:
+            logger.error(f"Safety validator initialization failed: {e}")
+            # Create stub validator
             # ... existing fallback code ...
-```
 
 ### Test Mode Configuration
 For components with special test_mode handling (like `problem_decomposer_core.py`), preserve the complex logic but wrap it in the fallback section.

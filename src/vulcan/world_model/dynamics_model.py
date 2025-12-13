@@ -1578,11 +1578,11 @@ class DynamicsModel:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info("DynamicsModel: Using shared safety validator instance")
+            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
         else:
             # Will be lazy-loaded if needed
             self.safety_validator = None  # This will be populated by _get_safety_validator
-            logger.info("DynamicsModel: Safety validator will be lazy-loaded")
+            logger.info(f"{self.__class__.__name__}: Safety validator will be lazy-loaded")
 
         # Components
         self.pattern_detector = PatternDetector(min_pattern_confidence)
@@ -1657,10 +1657,10 @@ class DynamicsModel:
                         self.safety_validator = initialize_all_safety_components(
                             config=self.safety_config, reuse_existing=True
                         )
-                        logger.info("DynamicsModel: Using singleton safety validator")
+                        logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
                         return self.safety_validator
                     except Exception as e:
-                        logger.debug("Could not get singleton safety validator: %s", e)
+                        logger.debug(f"Could not get singleton safety validator: {e}")
 
                 # Fallback: Create new instance
                 if isinstance(self.safety_config, dict) and self.safety_config:
@@ -1670,7 +1670,7 @@ class DynamicsModel:
                     self.safety_validator = EnhancedSafetyValidator()
 
                 logger.warning(
-                    "DynamicsModel: Created new safety validator instance (may cause duplication)"
+                    f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
                 )
 
             except Exception as e:
