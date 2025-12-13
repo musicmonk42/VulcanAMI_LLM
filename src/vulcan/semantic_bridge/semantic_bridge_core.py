@@ -975,8 +975,8 @@ class SemanticBridge:
                                 var, concept_vars
                             )
                             paths.extend(var_paths)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Failed to find causal paths for variable {var}: {e}")
 
                     insights["causal_paths"] = len(paths)
                     insights["causal_depth"] = max(
