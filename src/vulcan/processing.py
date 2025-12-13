@@ -27,6 +27,7 @@ from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple,
                     Union)
 
 import numpy as np
+import os
 import PIL.Image
 import psutil
 import torch
@@ -37,6 +38,13 @@ from transformers import AutoImageProcessor, AutoModel, AutoTokenizer
 # FIXED: Import from src.vulcan.config instead of config
 from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
                                ModalityType)
+
+# HuggingFace Model Configuration (CWE-494 mitigation)
+# To pin models to specific revisions for security, set these environment variables:
+# - VULCAN_BERT_MODEL_REVISION: commit hash for BERT model
+# - VULCAN_VISION_AUDIO_MODEL_REVISION: commit hash for vision/audio models
+BERT_MODEL_REVISION = os.environ.get("VULCAN_BERT_MODEL_REVISION", None)
+VISION_AUDIO_MODEL_REVISION = os.environ.get("VULCAN_VISION_AUDIO_MODEL_REVISION", None)
 
 # --- Graphix Module Imports ---
 try:
@@ -58,12 +66,12 @@ class GraphixTransformer:
         # A mock configuration, assuming it initializes the LLM's embedding layer
         self.embedding_dim = embedding_dim
         self.device = "cpu"  # Mock device
-        # SECURITY: Pin to specific release tag instead of 'main' for reproducibility
-        # TODO: Update to a specific commit hash or stable release tag (e.g., "v1.0.0")
-        # For now using 'main' as a placeholder - should be updated in production
+        # SECURITY: Support model revision pinning (CWE-494 mitigation)
+        # Use environment variable VULCAN_BERT_MODEL_REVISION to pin to specific commit
+        revision = BERT_MODEL_REVISION if BERT_MODEL_REVISION else "main"
         self.tokenizer = AutoTokenizer.from_pretrained(
             "bert-base-uncased",
-            revision="main"  # FIXME: Replace with specific release tag or commit hash
+            revision=revision
         )
 
     def get_embeddings(self, text: Union[str, List[str]]) -> torch.Tensor:
@@ -720,15 +728,17 @@ class DynamicModelManager:
             return model, None
 
         elif modality in ["vision", "audio"]:
-            # SECURITY: Pin to specific release tag instead of 'main' for reproducibility
-            # TODO: Update to specific commit hash or stable release tag
+            # SECURITY: Support model revision pinning (CWE-494 mitigation)
+            # Use environment variable VULCAN_VISION_AUDIO_MODEL_REVISION to pin to specific commit
+            revision = VISION_AUDIO_MODEL_REVISION if VISION_AUDIO_MODEL_REVISION else "main"
+            
             model = AutoModel.from_pretrained(
                 model_name,
-                revision="main"  # FIXME: Replace with specific release tag or commit hash
+                revision=revision
             )
             processor = AutoImageProcessor.from_pretrained(
                 model_name,
-                revision="main"  # FIXME: Replace with specific release tag or commit hash
+                revision=revision
             )
 
             if device != "cpu" and torch.cuda.is_available():

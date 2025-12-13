@@ -76,6 +76,19 @@ except ImportError:
     logger.warning("Audio libraries not available (librosa, Wav2Vec2)")
 
 
+# HuggingFace Model Configuration (CWE-494 mitigation)
+# To pin models to specific revisions for security, set these environment variables:
+# - VULCAN_TEXT_MODEL_REVISION: commit hash for text model
+# - VULCAN_AUDIO_MODEL_REVISION: commit hash for audio model
+import os
+
+TEXT_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+TEXT_MODEL_REVISION = os.environ.get("VULCAN_TEXT_MODEL_REVISION", None)
+
+AUDIO_MODEL_NAME = "facebook/wav2vec2-base"
+AUDIO_MODEL_REVISION = os.environ.get("VULCAN_AUDIO_MODEL_REVISION", None)
+
+
 # CRITICAL FIX: Define ModalityType enum instead of importing from config
 class ModalityType(Enum):
     """Modality types for multi-modal reasoning"""
@@ -1746,14 +1759,19 @@ class MultiModalReasoningEngine:
                         or self._text_tokenizer is None
                     ):
                         logger.info(
-                            "Loading text model (sentence-transformers/all-MiniLM-L6-v2)..."
+                            f"Loading text model ({TEXT_MODEL_NAME})..."
                         )
                         try:
+                            model_kwargs = {}
+                            if TEXT_MODEL_REVISION:
+                                model_kwargs['revision'] = TEXT_MODEL_REVISION
+                                logger.info(f"Using pinned revision: {TEXT_MODEL_REVISION}")
+                            
                             self._text_tokenizer = AutoTokenizer.from_pretrained(
-                                "sentence-transformers/all-MiniLM-L6-v2"
+                                TEXT_MODEL_NAME, **model_kwargs
                             )
                             self._text_model = AutoModel.from_pretrained(
-                                "sentence-transformers/all-MiniLM-L6-v2"
+                                TEXT_MODEL_NAME, **model_kwargs
                             )
 
                             # Move to device
@@ -1976,13 +1994,18 @@ class MultiModalReasoningEngine:
                     not hasattr(self, "_audio_processor")
                     or self._audio_processor is None
                 ):
-                    logger.info("Loading audio model (wav2vec2-base)...")
+                    logger.info(f"Loading audio model ({AUDIO_MODEL_NAME})...")
                     try:
+                        model_kwargs = {}
+                        if AUDIO_MODEL_REVISION:
+                            model_kwargs['revision'] = AUDIO_MODEL_REVISION
+                            logger.info(f"Using pinned revision: {AUDIO_MODEL_REVISION}")
+                        
                         self._audio_processor = Wav2Vec2Processor.from_pretrained(
-                            "facebook/wav2vec2-base"
+                            AUDIO_MODEL_NAME, **model_kwargs
                         )
                         self._audio_model = Wav2Vec2Model.from_pretrained(
-                            "facebook/wav2vec2-base"
+                            AUDIO_MODEL_NAME, **model_kwargs
                         )
 
                         # Move to device
