@@ -128,14 +128,14 @@ def ensure_json_serializable(obj: Any) -> Any:
         try:
             return ensure_json_serializable(obj.to_dict())
         except Exception:
-            pass
+            logger.debug(f"Failed to load principle: {e}")
 
     # Handle objects with __dict__
     if hasattr(obj, "__dict__"):
         try:
             return ensure_json_serializable(obj.__dict__)
         except Exception:
-            pass
+            logger.debug(f"Failed to save principle: {e}")
 
     # Last resort: convert to string
     return str(obj)
@@ -677,7 +677,7 @@ class PrinciplePromoter:
                     try:
                         pattern = principle.core_pattern.to_dict()
                     except Exception:
-                        pass
+                        logger.debug(f"Failed to update principle score: {e}")
 
                 # If pattern is still not set or might contain non-serializable objects
                 if pattern == {"pattern_type": "unknown"} or not isinstance(

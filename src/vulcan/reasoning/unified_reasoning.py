@@ -619,8 +619,8 @@ class UnifiedReasoner:
             for thread in self.executor._threads:
                 try:
                     thread.daemon = True
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Could not set thread as daemon: {e}")
 
         # Configuration
         self.confidence_threshold = config.get("confidence_threshold", 0.5)
@@ -693,8 +693,8 @@ class UnifiedReasoner:
                     for thread in component.executor._threads:
                         try:
                             thread.daemon = True
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Could not set thread as daemon: {e}")
         except Exception as e:
             logger.debug(f"Could not daemonize all threads in component: {e}")
 
@@ -1649,8 +1649,8 @@ class UnifiedReasoner:
                 arr = np.array(input_data)
                 if np.issubdtype(arr.dtype, np.number):
                     scores[ReasoningType.PROBABILISTIC] += 0.6  # Increased from 0.4
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to check numeric data type: {e}")
 
         # FIX: Reduced symbolic preference for plain strings
         if isinstance(input_data, str):

@@ -116,7 +116,7 @@ def _standalone_agent_worker(agent_id: str):
             # TODO: Execute tasks
             # TODO: Report results back via IPC
     except KeyboardInterrupt:
-        pass
+        logger.info("KeyboardInterrupt - graceful shutdown")
     except Exception as e:
         logger.error(f"Agent {agent_id} worker error: {e}")
 
@@ -522,7 +522,7 @@ class AgentPoolManager:
                 try:
                     process.close()
                 except Exception:
-                    pass
+                    logger.debug(f"Failed to cleanup agent: {e}")
                 del self.agent_processes[agent_id]
 
             # Respawn agent based on location
@@ -845,7 +845,7 @@ class AgentPoolManager:
                             psutil.Process().memory_info().rss / 1024 / 1024
                         )
                     except Exception:
-                        pass
+                        logger.debug(f"Failed to reset agent state: {e}")
                 provenance.update_resource_consumption(resource_consumption)
 
             # Update statistics

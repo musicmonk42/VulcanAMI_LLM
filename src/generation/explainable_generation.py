@@ -621,7 +621,7 @@ class ExplainableGeneration:
                     }
                 )
             except Exception:
-                pass
+                logger.debug(f"Failed to generate explanation: {e}")
 
         # Safety influence
         safety_count = len(meta.get("safety_events", []))
@@ -1300,7 +1300,7 @@ class ExplainableGeneration:
                     context=context,
                 )
             except Exception:
-                pass
+                logger.debug(f"Failed to format explanation: {e}")
 
         parts: List[str] = []
 
@@ -1614,7 +1614,7 @@ class ExplainableGeneration:
             try:
                 return self.vocab.id_to_token(idx)
             except Exception:
-                pass
+                logger.debug(f"Failed to validate explanation: {e}")
         return idx
 
     def _token_to_str(self, token: Token) -> str:
