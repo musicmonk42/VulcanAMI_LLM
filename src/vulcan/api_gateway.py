@@ -61,6 +61,9 @@ try:
 except Exception:
     BCRYPT_AVAILABLE = False
 
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
+
 # FIXED: Local imports with proper error handling and stubs
 try:
     from .config import ActionType, AgentConfig, ModalityType
@@ -507,7 +510,8 @@ class ServiceRegistry:
             try:
                 await self._health_check_task
             except asyncio.CancelledError:
-                pass
+                # Expected during cleanup - task was cancelled
+                logger.debug("Health check task cancelled during cleanup")
 
         if self._http_session and not self._http_session.closed:
             await self._http_session.close()
@@ -645,16 +649,18 @@ class UserStore:
             if self.argon2:
                 try:
                     self.argon2.hash("dummy_password_for_timing_attack")
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Timing attack prevention - log but continue
+                    logger.debug(f"Dummy hash for timing attack failed: {e}")
             elif BCRYPT_AVAILABLE:
                 try:
                     BcryptLib.hashpw(
                         "dummy_password_for_timing_attack".encode("utf-8"),
                         BcryptLib.gensalt(rounds=4),
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    # Timing attack prevention - log but continue
+                    logger.debug(f"Dummy bcrypt for timing attack failed: {e}")
             else:
                 self._pbkdf2_hash(password, "dummy_salt_for_timing_attack")
             return False, None
@@ -1278,7 +1284,8 @@ class CacheManager:
                 del self.lru_cache[key]
                 count += 1
             except KeyError:
-                pass
+                # Key already removed - not an error
+                logger.debug(f"Cache key already removed: {key}")
 
         # Invalidate TTL
         keys_to_remove_ttl = [
@@ -1289,7 +1296,8 @@ class CacheManager:
                 del self.memory_cache[key]
                 count += 1  # Note: might double count if in both
             except KeyError:
-                pass
+                # Key already removed - not an error
+                logger.debug(f"TTL cache key already removed: {key}")
 
         if self.redis and not self.degraded_mode:
             try:
@@ -1713,21 +1721,24 @@ class APIGateway:
                 try:
                     await task
                 except asyncio.CancelledError:
-                    pass
+                    # Expected during shutdown - task was cancelled
+                    logger.debug("Background task cancelled during shutdown")
 
             if self._redis_init_task:
                 self._redis_init_task.cancel()
                 try:
                     await self._redis_init_task
                 except asyncio.CancelledError:
-                    pass
+                    # Expected during shutdown - redis init task was cancelled
+                    logger.debug("Redis init task cancelled during shutdown")
 
             if self._seed_default_users_task:
                 self._seed_default_users_task.cancel()
                 try:
                     await self._seed_default_users_task
                 except asyncio.CancelledError:
-                    pass
+                    # Expected during shutdown - seed users task was cancelled
+                    logger.debug("Seed users task cancelled during shutdown")
 
             await self.cleanup()
 
@@ -2446,7 +2457,8 @@ class APIGateway:
             try:
                 loop.add_signal_handler(sig, signal_handler)
             except NotImplementedError:
-                pass
+                # Signal handlers not supported on this platform (e.g., Windows)
+                logger.debug(f"Signal handler not supported for {sig}")
 
         web.run_app(self.app, host=host, port=port)
 
