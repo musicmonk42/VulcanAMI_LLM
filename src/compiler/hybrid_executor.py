@@ -151,8 +151,8 @@ class CompiledBinaryCache:
         try:
             with open(index_file, "w", encoding="utf-8") as f:
                 json.dump(self.cache_index, f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to save cache index: {e}")
 
     def get(self, graph_hash: str) -> Optional[bytes]:
         """Get compiled binary from cache"""
@@ -166,7 +166,8 @@ class CompiledBinaryCache:
         try:
             with open(cache_file, "rb") as f:
                 return f.read()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to read cache file {graph_hash}: {e}")
             return None
 
     def put(self, graph_hash: str, binary: bytes, metadata: Dict = None):
@@ -820,12 +821,12 @@ class HybridExecutor:
         """Cleanup called by atexit"""
         try:
             self.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup on exit failed: {e}")
 
     def __del__(self):
         """Destructor"""
         try:
             self.cleanup()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Cleanup in destructor failed: {e}")
