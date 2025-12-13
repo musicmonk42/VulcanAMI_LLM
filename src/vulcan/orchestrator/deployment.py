@@ -723,7 +723,8 @@ class ProductionDeployment:
                 vulcan_memory=components.get("am"),  # EpisodicMemory
                 validator=None,
                 storage_path=None,  # Use default in-memory for now
-                config={"safety_validator": components.get("safety_validator")}
+                config=None,  # No special config needed
+                safety_validator=components.get("safety_validator")  # Pass as separate parameter
             )
             logger.info("ProblemDecomposer initialized successfully with bootstrap")
             

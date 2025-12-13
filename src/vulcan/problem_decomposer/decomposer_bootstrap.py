@@ -434,6 +434,7 @@ class DecomposerBootstrap:
         validator=None,
         storage_path: Optional[Path] = None,
         config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ) -> ProblemDecomposer:
         """
         Create fully initialized and wired ProblemDecomposer
@@ -444,6 +445,7 @@ class DecomposerBootstrap:
             validator: Optional validator for solution validation
             storage_path: Optional path for persistent storage
             config: Optional configuration dictionary (including test_mode)
+            safety_validator: Optional shared safety validator instance
 
         Returns:
             Fully initialized ProblemDecomposer
@@ -455,12 +457,17 @@ class DecomposerBootstrap:
             strategies = self.create_strategy_instances()
             self.strategy_registry = strategies
 
-            # Step 2: Create decomposer with components - pass config as safety_config
+            # Step 2: Create decomposer with components
+            # Extract safety_validator from config if present, or use passed parameter
+            if safety_validator is None and config and "safety_validator" in config:
+                safety_validator = config.pop("safety_validator")
+            
             decomposer = ProblemDecomposer(
                 semantic_bridge=semantic_bridge,
                 vulcan_memory=vulcan_memory,
                 validator=validator,
                 safety_config=config,  # Pass config to enable test_mode
+                safety_validator=safety_validator,  # Pass safety validator directly
             )
 
             # Step 3: Register strategies in library
@@ -512,6 +519,7 @@ def create_decomposer(
     validator=None,
     storage_path: Optional[Path] = None,
     config: Optional[Dict[str, Any]] = None,
+    safety_validator=None,
 ) -> ProblemDecomposer:
     """
     Factory function to create fully initialized ProblemDecomposer
@@ -526,6 +534,7 @@ def create_decomposer(
         validator: Optional validator for solution validation
         storage_path: Optional path for persistent storage
         config: Optional configuration dictionary (including test_mode)
+        safety_validator: Optional shared safety validator instance
 
     Returns:
         Fully initialized and wired ProblemDecomposer
@@ -559,6 +568,7 @@ def create_decomposer(
         validator=validator,
         storage_path=storage_path,
         config=config,
+        safety_validator=safety_validator,
     )
 
 
