@@ -25,7 +25,7 @@ def main():
         print(f"[error] File not found: {p}")
         sys.exit(1)
 
-    obj = torch.load(str(p), map_location="cpu")
+    obj = torch.load(str(p), map_location="cpu", weights_only=True)
     print(f"[info] Loaded object type: {type(obj)}")
 
     # Case 1: full model object

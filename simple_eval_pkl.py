@@ -102,7 +102,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() and args.device in ("auto","cuda") else "cpu"
     print(f"[info] device: {device}")
 
-    ckpt = torch.load(args.checkpoint, map_location="cpu")
+    ckpt = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     if not hasattr(ckpt, "forward"):
         print("[error] This checkpoint does NOT contain a full model object.")
         print("        Run inspect_pkl_checkpoint.py and paste output here.")

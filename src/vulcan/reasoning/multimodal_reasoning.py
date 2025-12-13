@@ -2325,22 +2325,22 @@ class MultiModalReasoningEngine:
             if TORCH_AVAILABLE:
                 attention_path = path / "attention_fusion.pt"
                 if attention_path.exists() and self.attention_fusion is not None:
-                    self.attention_fusion.load_state_dict(torch.load(attention_path))
+                    self.attention_fusion.load_state_dict(torch.load(attention_path, weights_only=True))
                     self.attention_fusion.eval()
 
                 gated_path = path / "gated_fusion.pt"
                 if gated_path.exists() and self.gated_fusion is not None:
-                    self.gated_fusion.load_state_dict(torch.load(gated_path))
+                    self.gated_fusion.load_state_dict(torch.load(gated_path, weights_only=True))
                     self.gated_fusion.eval()
 
                 adaptive_path = path / "adaptive_fusion.pt"
                 if adaptive_path.exists() and self.adaptive_fusion is not None:
-                    self.adaptive_fusion.load_state_dict(torch.load(adaptive_path))
+                    self.adaptive_fusion.load_state_dict(torch.load(adaptive_path, weights_only=True))
                     self.adaptive_fusion.eval()
 
                 reasoner_path = path / "neural_reasoner.pt"
                 if reasoner_path.exists() and self.neural_reasoner is not None:
-                    self.neural_reasoner.load_state_dict(torch.load(reasoner_path))
+                    self.neural_reasoner.load_state_dict(torch.load(reasoner_path, weights_only=True))
                     self.neural_reasoner.eval()
 
             # Load learning parameters

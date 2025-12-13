@@ -1376,7 +1376,7 @@ class AdaptiveBanditOrchestrator:
                 if hasattr(bandit, "load_state_dict"):
                     model_file = load_path / f"{name}_model.pt"
                     if model_file.exists():
-                        bandit.load_state_dict(torch.load(model_file))
+                        bandit.load_state_dict(torch.load(model_file, weights_only=True))
                 else:
                     state_file = load_path / f"{name}_state.pkl"
                     if state_file.exists():
