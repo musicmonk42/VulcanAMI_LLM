@@ -56,7 +56,7 @@ class Settings:
     max_graph_size: int = 1000
     max_execution_time_s: float = 30.0
     max_memory_mb: int = 2000
-    api_host: str = "0.0.0.0"
+    api_host: str = "127.0.0.1"  # Default to localhost for security
     api_port: int = 8080
     api_workers: int = 4
     api_key: Optional[str] = None
@@ -392,7 +392,7 @@ def cleanup_rate_limits():
                     del rate_limit_storage[client_id]
 
 
-def run_production_server(config, host="0.0.0.0", port=8080):
+def run_production_server(config, host="127.0.0.1", port=8080):
     """Mock production server runner"""
     # In real implementation, this would call uvicorn.run
 
@@ -517,7 +517,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="test")
     parser.add_argument("--profile", default="testing")
-    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--host", default="127.0.0.1")  # Default to localhost for security
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--benchmark-iterations", type=int, default=100)
@@ -629,7 +629,7 @@ class TestSettings:
         settings = Settings()
         assert settings.max_graph_size == 1000
         assert settings.max_execution_time_s == 30.0
-        assert settings.api_host == "0.0.0.0"
+        assert settings.api_host == "127.0.0.1"  # Updated to secure default
         assert settings.api_port == 8080
         assert settings.deployment_mode == "standalone"
 

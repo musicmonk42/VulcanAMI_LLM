@@ -2424,9 +2424,16 @@ class APIGateway:
 
         return graphene.Schema(query=Query, mutation=Mutation)
 
-    def run(self, host: str = "0.0.0.0", port: int = 8080):
-        """Run the API Gateway."""
+    def run(self, host: str = "127.0.0.1", port: int = 8080):
+        """Run the API Gateway.
+        
+        Args:
+            host: Host to bind to (default: 127.0.0.1 for localhost only)
+            port: Port to bind to
+        """
         logger.info(f"Starting VULCAN-AGI API Gateway on {host}:{port}")
+        if host == "0.0.0.0":
+            logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
 
         loop = asyncio.get_event_loop()
 
@@ -2449,7 +2456,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="VULCAN-AGI API Gateway")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8080, help="Port to bind to")
     parser.add_argument("--config", help="Configuration file path")
 

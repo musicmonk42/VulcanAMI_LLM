@@ -191,7 +191,8 @@ class Settings(BaseSettings):
     enable_sandboxing: bool = True
     allowed_modules: List[str] = ["numpy", "pandas", "scipy", "sklearn"]
 
-    api_host: str = "0.0.0.0"
+    # API server defaults to localhost for security; override with environment variable
+    api_host: str = "127.0.0.1"
     api_port: int = 8080
     api_workers: int = 4
     api_title: str = "VULCAN-AGI API"
