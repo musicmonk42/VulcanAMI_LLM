@@ -99,6 +99,34 @@ spec:
         - name: PYTHON_UNBUFFERED
           value: {{ .pythonUnbuffered | quote }}
         {{- end }}
+        {{- if .Values.security }}
+        {{- if .Values.security.modelRevisions }}
+        {{- if .Values.security.modelRevisions.textModel }}
+        - name: VULCAN_TEXT_MODEL_REVISION
+          value: {{ .Values.security.modelRevisions.textModel | quote }}
+        {{- end }}
+        {{- if .Values.security.modelRevisions.audioModel }}
+        - name: VULCAN_AUDIO_MODEL_REVISION
+          value: {{ .Values.security.modelRevisions.audioModel | quote }}
+        {{- end }}
+        {{- if .Values.security.modelRevisions.bertModel }}
+        - name: VULCAN_BERT_MODEL_REVISION
+          value: {{ .Values.security.modelRevisions.bertModel | quote }}
+        {{- end }}
+        {{- if .Values.security.modelRevisions.visionAudioModel }}
+        - name: VULCAN_VISION_AUDIO_MODEL_REVISION
+          value: {{ .Values.security.modelRevisions.visionAudioModel | quote }}
+        {{- end }}
+        {{- if .Values.security.modelRevisions.adversarialDetector }}
+        - name: ADVERSARIAL_DETECTOR_REVISION
+          value: {{ .Values.security.modelRevisions.adversarialDetector | quote }}
+        {{- end }}
+        {{- end }}
+        - name: HOST
+          value: {{ .Values.security.bindHost | default "0.0.0.0" | quote }}
+        - name: API_HOST
+          value: {{ .Values.security.bindHost | default "0.0.0.0" | quote }}
+        {{- end }}
         # Volumes for readOnlyRootFilesystem compatibility
         volumeMounts:
         - name: tmp

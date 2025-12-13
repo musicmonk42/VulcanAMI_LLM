@@ -36,6 +36,15 @@ export REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d '+/')
 
 # Update .env file with your secrets
 # DO NOT commit .env to git!
+
+# Security: Set network binding
+# - Development (local): Use 127.0.0.1 (localhost only - secure default)
+# - Docker/Container: Use 0.0.0.0 (container networking)
+export HOST=0.0.0.0  # For Docker
+export API_HOST=0.0.0.0  # For Docker
+
+# Optional: Pin HuggingFace models to specific versions (production recommended)
+# export VULCAN_TEXT_MODEL_REVISION=86b5e0934494bd15c9632b12f734a8a67f723594
 ```
 
 #### 2. Build Images
