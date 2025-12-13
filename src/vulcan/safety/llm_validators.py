@@ -44,10 +44,14 @@ Public API:
 
 import asyncio
 import inspect
+import logging
 import re
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Tokens = Sequence[Token]

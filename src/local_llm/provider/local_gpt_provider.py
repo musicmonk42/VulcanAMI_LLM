@@ -7,6 +7,9 @@ import os
 from dataclasses import dataclass
 from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 import torch
 
 from src.local_llm.tokenizer.simple_tokenizer import SimpleTokenizer

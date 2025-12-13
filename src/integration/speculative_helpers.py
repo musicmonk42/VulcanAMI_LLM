@@ -6,6 +6,9 @@ import random  # Needed for random token choice on low entropy fallback
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

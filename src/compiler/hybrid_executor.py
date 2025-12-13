@@ -25,6 +25,9 @@ import numpy as np
 
 from .security_fixes import safe_pickle_load
 
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 # Performance tracking
 try:
     import psutil

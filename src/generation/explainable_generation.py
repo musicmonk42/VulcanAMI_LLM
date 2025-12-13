@@ -35,11 +35,15 @@ Key features:
 - Tracks feature importance and attention patterns
 """
 
+import logging
 import math
 import time
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Union
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 Token = Union[int, str]
 Tokens = List[Token]

@@ -26,9 +26,13 @@ Author: The Graphix AI Engineering Team
 import argparse
 import hashlib
 import json
+import logging
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 try:
     from ecdsa import NIST256p, SigningKey, VerifyingKey
