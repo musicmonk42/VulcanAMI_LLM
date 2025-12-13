@@ -653,10 +653,73 @@ class ProductionDeployment:
             logger.error(f"Failed to initialize ProblemExecutor: {e}")
             components["problem_executor"] = None
 
+        # Knowledge Crystallizer (Core)
+        try:
+            from vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
+                KnowledgeCrystallizer
+
+            # Pass memory and semantic bridge if available
+            components["knowledge_crystallizer"] = KnowledgeCrystallizer(
+                vulcan_memory=components.get("am"),  # EpisodicMemory
+                semantic_bridge=None  # Will be available later if needed
+            )
+            logger.info("KnowledgeCrystallizer initialized successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import KnowledgeCrystallizer: {e}")
+            components["knowledge_crystallizer"] = None
+        except Exception as e:
+            logger.error(f"Failed to initialize KnowledgeCrystallizer: {e}")
+            components["knowledge_crystallizer"] = None
+
+        # Curiosity Engine (Core)
+        try:
+            from vulcan.curiosity_engine.curiosity_engine_core import \
+                CuriosityEngine
+
+            # Pass knowledge crystallizer, decomposer, and world model if available
+            components["curiosity_engine"] = CuriosityEngine(
+                knowledge=components.get("knowledge_crystallizer"),
+                decomposer=None,  # Will be set after ProblemDecomposer is created
+                world_model=components.get("world_model")
+            )
+            logger.info("CuriosityEngine initialized successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import CuriosityEngine: {e}")
+            components["curiosity_engine"] = None
+        except Exception as e:
+            logger.error(f"Failed to initialize CuriosityEngine: {e}")
+            components["curiosity_engine"] = None
+
+        # Problem Decomposer (Core)
+        try:
+            from vulcan.problem_decomposer.problem_decomposer_core import \
+                ProblemDecomposer
+
+            # Pass semantic bridge, memory, and safety validator if available
+            components["problem_decomposer"] = ProblemDecomposer(
+                semantic_bridge=None,  # Will be available later if needed
+                vulcan_memory=components.get("am"),  # EpisodicMemory
+                validator=None,
+                safety_validator=components.get("safety_validator")
+            )
+            logger.info("ProblemDecomposer initialized successfully")
+            
+            # Now update CuriosityEngine with the decomposer
+            if components.get("curiosity_engine"):
+                components["curiosity_engine"].decomposer = components["problem_decomposer"]
+                logger.info("CuriosityEngine linked to ProblemDecomposer")
+                
+        except ImportError as e:
+            logger.error(f"Failed to import ProblemDecomposer: {e}")
+            components["problem_decomposer"] = None
+        except Exception as e:
+            logger.error(f"Failed to initialize ProblemDecomposer: {e}")
+            components["problem_decomposer"] = None
+
         # --- END ADDED IMPORTS ---
 
         # Log component summary
-        total_components = 23  # Total expected components (was 21, added 2)
+        total_components = 26  # Total expected components (was 23, added 3 core components)
         available_components = sum(1 for v in components.values() if v is not None)
         logger.info(
             f"Component loading complete: {available_components}/{total_components} components available"
