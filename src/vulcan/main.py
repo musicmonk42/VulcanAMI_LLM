@@ -45,7 +45,6 @@ try:
     faulthandler.enable()
 except Exception as e:
     # Faulthandler may not be available on all platforms
-    import logging
     logging.getLogger(__name__).debug(f"Faulthandler not available: {e}")
 
 # Safe-mode environmental guards to reduce native segfault risk on Windows
@@ -82,7 +81,6 @@ try:
     if hasattr(torch, "set_num_interop_threads"):
         torch.set_num_interop_threads(1)
 except Exception as e:
-    import logging
     logging.getLogger(__name__).debug(f"Failed to configure torch threading: {e}")
 # ====================================================================
 

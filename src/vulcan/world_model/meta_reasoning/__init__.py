@@ -827,7 +827,7 @@ _initialize_module()
 try:
     MetaReasoner  # type: ignore[name-defined]
 except NameError:
-    # MetaReasoner not defined, this is expected in some imports
+    # MetaReasoner not defined - expected during module initialization when imported lazily
     pass
 
 try:
