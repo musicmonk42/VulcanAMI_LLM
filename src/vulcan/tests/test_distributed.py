@@ -210,15 +210,22 @@ class TestRPCClient:
     def test_connect_basic_socket(self, rpc_client):
         """Test basic socket connection."""
         with patch("vulcan.memory.distributed.ZMQ_AVAILABLE", False):
-            with patch("socket.socket") as mock_socket:
-                mock_sock = MagicMock()
-                mock_socket.return_value = mock_sock
-
+            # Create multiple mock sockets to handle concurrent socket creations
+            # (e.g., from network quality checks in other code)
+            mock_socks = [MagicMock() for _ in range(10)]
+            
+            with patch("socket.socket", side_effect=mock_socks):
                 result = rpc_client.connect("node_1", "localhost", 5555)
 
                 assert result is True
                 assert "node_1" in rpc_client.connections
-                mock_sock.connect.assert_called_with(("localhost", 5555))
+                
+                # The socket stored in connections should be one of our mocks
+                stored_socket = rpc_client.connections["node_1"]
+                assert stored_socket in mock_socks
+                
+                # Verify that the stored socket was connected to our target
+                stored_socket.connect.assert_called_with(("localhost", 5555))
 
     def test_disconnect(self, rpc_client):
         """Test disconnecting from node."""
