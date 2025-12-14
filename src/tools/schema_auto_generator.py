@@ -241,7 +241,7 @@ def parse_expression(
             val = value[1:-1]
             try:
                 val = json.loads(val)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 logger.debug(f"Operation failed: {e}")
             add_to_seq({"type": "literal", "value": val})
             index += 1
