@@ -1813,8 +1813,8 @@ def calculate_match_score(output, expected):
         diff = abs(output_num - expected_num)
         max_val = max(abs(output_num), abs(expected_num), 1.0)
         return max(0.0, 1.0 - (diff / max_val))
-    except (ValueError, TypeError):
-        logger.debug(f"Operation failed: {e}")
+    except (ValueError, TypeError) as e:
+        pass  # Not numeric, will return 0.0 below
 
     # Default: no match
     return 0.0
