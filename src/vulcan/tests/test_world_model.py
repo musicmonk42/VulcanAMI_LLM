@@ -2,10 +2,16 @@
 Test suite for unified world model
 """
 
-from vulcan.learning.world_model import (AttentionBlock, CuriosityModule,
-                                         MCTSNode, MultiHeadAttention,
-                                         PlanningAlgorithm, StateAbstractor,
-                                         UnifiedWorldModel, WorldState)
+from vulcan.learning.world_model import (
+    AttentionBlock,
+    CuriosityModule,
+    MCTSNode,
+    MultiHeadAttention,
+    PlanningAlgorithm,
+    StateAbstractor,
+    UnifiedWorldModel,
+    WorldState,
+)
 from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
 import numpy as np
 from unittest.mock import patch

@@ -34,13 +34,26 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, str(Path(__file__).parent))
 
 try:
-    from vulcan.memory import (AttentionMechanism, CompressionType, ConsolidationStrategy,
-                               DistributedMemory, EpisodicMemory,
-                               HierarchicalMemory, Memory, MemoryConfig,
-                               MemoryConsolidator, MemoryFederation, MemoryIndex,
-                               MemoryPersistence, MemoryQuery,
-                               MemoryType, MemoryVersionControl, ProceduralMemory,
-                               SemanticMemory, WorkingMemory)
+    from vulcan.memory import (
+        AttentionMechanism,
+        CompressionType,
+        ConsolidationStrategy,
+        DistributedMemory,
+        EpisodicMemory,
+        HierarchicalMemory,
+        Memory,
+        MemoryConfig,
+        MemoryConsolidator,
+        MemoryFederation,
+        MemoryIndex,
+        MemoryPersistence,
+        MemoryQuery,
+        MemoryType,
+        MemoryVersionControl,
+        ProceduralMemory,
+        SemanticMemory,
+        WorkingMemory,
+    )
 
     MEMORY_MODULE_AVAILABLE = True
 except ImportError as e:

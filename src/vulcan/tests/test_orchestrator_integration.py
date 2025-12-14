@@ -639,9 +639,11 @@ class FaultTolerantOrchestrator(VULCANAGICollective):
         return {
             "total_attempts": self.total_attempts,
             "successful_attempts": self.successful_attempts,
-            "success_rate": self.successful_attempts / self.total_attempts
-            if self.total_attempts > 0
-            else 1.0,
+            "success_rate": (
+                self.successful_attempts / self.total_attempts
+                if self.total_attempts > 0
+                else 1.0
+            ),
         }
 
 
@@ -1602,9 +1604,9 @@ class TestStressConditions:
                 if result is not None:
                     results_returned += 1
 
-            assert results_returned >= 8, (
-                f"Fault-tolerant system should handle most requests: {results_returned}/10"
-            )
+            assert (
+                results_returned >= 8
+            ), f"Fault-tolerant system should handle most requests: {results_returned}/10"
 
             status = deployment.get_status()
             assert status["step"] == 10

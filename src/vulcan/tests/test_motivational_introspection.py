@@ -8,8 +8,11 @@ from unittest.mock import Mock
 import pytest
 
 from vulcan.world_model.meta_reasoning.motivational_introspection import (
-    MotivationalIntrospection, ObjectiveAnalysis, ObjectiveStatus,
-    ProposalValidation)
+    MotivationalIntrospection,
+    ObjectiveAnalysis,
+    ObjectiveStatus,
+    ProposalValidation,
+)
 
 
 @pytest.fixture
@@ -227,9 +230,7 @@ class TestDetectObjectivePathology:
 
     def test_constraint_violation_detected(self, introspector):
         """Test detection of constraint violations"""
-        proposal = {
-            "prediction_accuracy": 0.5  # Below minimum of 0.9
-        }
+        proposal = {"prediction_accuracy": 0.5}  # Below minimum of 0.9
 
         result = introspector.detect_objective_pathology(proposal)
 
@@ -304,9 +305,7 @@ class TestDetectObjectivePathology:
 
     def test_severity_assessment(self, introspector):
         """Test severity assessment"""
-        critical_proposal = {
-            "prediction_accuracy": 0.1  # Severe violation
-        }
+        critical_proposal = {"prediction_accuracy": 0.1}  # Severe violation
 
         result = introspector.detect_objective_pathology(critical_proposal)
 
@@ -442,9 +441,7 @@ class TestValidateProposalAlignment:
 
     def test_validate_violating_proposal(self, introspector):
         """Test validation of violating proposal"""
-        proposal = {
-            "prediction_accuracy": 0.5  # Below minimum
-        }
+        proposal = {"prediction_accuracy": 0.5}  # Below minimum
 
         validation = introspector.validate_proposal_alignment(proposal)
 
@@ -475,9 +472,7 @@ class TestValidateProposalAlignment:
 
     def test_validation_includes_alternatives(self, introspector):
         """Test that validation includes alternatives"""
-        proposal = {
-            "prediction_accuracy": 0.5  # Violation
-        }
+        proposal = {"prediction_accuracy": 0.5}  # Violation
 
         validation = introspector.validate_proposal_alignment(proposal)
 

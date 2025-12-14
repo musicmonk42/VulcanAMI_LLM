@@ -52,10 +52,12 @@ class DemoConfig:
         self.vulcan_base = os.getenv("VULCAN_BASE", f"{self.platform_base}/vulcan")
         self.api_key = os.getenv("API_KEY", "demo-key")
         self.demo_seed = int(os.getenv("DEMO_SEED", "42"))
-        
+
         # Determine if using unified platform via environment variable
         # Set USE_UNIFIED_PLATFORM=false to use standalone Arena instead
-        self.use_unified_platform = os.getenv("USE_UNIFIED_PLATFORM", "true").lower() == "true"
+        self.use_unified_platform = (
+            os.getenv("USE_UNIFIED_PLATFORM", "true").lower() == "true"
+        )
 
         # Set random seed for reproducibility
         random.seed(self.demo_seed)
@@ -101,7 +103,7 @@ class DemoOrchestrator:
         url: str,
         max_retries: int = 3,
         backoff_factor: float = 1.5,
-        **kwargs
+        **kwargs,
     ) -> httpx.Response:
         """Make HTTP request with retries and exponential backoff."""
         for attempt in range(max_retries):
@@ -112,7 +114,7 @@ class DemoOrchestrator:
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt == max_retries - 1:
                     raise
-                wait_time = backoff_factor ** attempt
+                wait_time = backoff_factor**attempt
                 print(f"⚠️  Request failed (attempt {attempt + 1}/{max_retries}): {e}")
                 print(f"   Retrying in {wait_time:.1f}s...")
                 await asyncio.sleep(wait_time)
@@ -129,25 +131,19 @@ class DemoOrchestrator:
             "parameters": {
                 "goal": "Photonic sentiment analysis with demo latency",
                 "demo_latency_ms": 8000,
-                "complexity": "high"
-            }
+                "complexity": "high",
+            },
         }
 
         url = self.config.get_arena_url("/run/generator")
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": self.config.api_key
-        }
+        headers = {"Content-Type": "application/json", "X-API-Key": self.config.api_key}
 
         print(f"📤 Submitting run to: {url}")
         print(f"   Payload: {json.dumps(payload, indent=2)}")
 
         try:
             response = await self.retry_request(
-                "POST",
-                url,
-                headers=headers,
-                json=payload
+                "POST", url, headers=headers, json=payload
             )
 
             result = response.json()
@@ -165,7 +161,7 @@ class DemoOrchestrator:
 
         except httpx.HTTPError as e:
             print(f"❌ Failed to submit run: {e}")
-            if hasattr(e, 'response') and e.response:
+            if hasattr(e, "response") and e.response:
                 print(f"   Response: {e.response.text[:200]}")
             # Continue with demo even if Act 1 fails
             return None
@@ -179,18 +175,11 @@ class DemoOrchestrator:
             "proposal_id": self.proposal_id or "initial_graph_v1",
             "score": 0.1,
             "rationale": "Performance is suboptimal - high latency detected, needs optimization",
-            "metrics": {
-                "latency_ms": 8500,
-                "accuracy": 0.75,
-                "energy_efficiency": 0.4
-            }
+            "metrics": {"latency_ms": 8500, "accuracy": 0.75, "energy_efficiency": 0.4},
         }
 
         url = self.config.get_arena_url("/feedback_dispatch")
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": self.config.api_key
-        }
+        headers = {"Content-Type": "application/json", "X-API-Key": self.config.api_key}
 
         print(f"📤 Submitting feedback to: {url}")
         print(f"   Feedback: score={feedback_payload['score']}")
@@ -198,10 +187,7 @@ class DemoOrchestrator:
 
         try:
             response = await self.retry_request(
-                "POST",
-                url,
-                headers=headers,
-                json=feedback_payload
+                "POST", url, headers=headers, json=feedback_payload
             )
 
             result = response.json()
@@ -211,7 +197,7 @@ class DemoOrchestrator:
 
         except httpx.HTTPError as e:
             print(f"❌ Failed to submit feedback: {e}")
-            if hasattr(e, 'response') and e.response:
+            if hasattr(e, "response") and e.response:
                 print(f"   Response: {e.response.text[:200]}")
             return None
 
@@ -275,23 +261,16 @@ class DemoOrchestrator:
             "spec_id": "sentiment_3d_spec",
             "parameters": {
                 "goal": "Photonic sentiment analysis - optimized",
-                "complexity": "medium"
-            }
+                "complexity": "medium",
+            },
         }
 
         url = self.config.get_arena_url("/run/generator")
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": self.config.api_key
-        }
+        headers = {"Content-Type": "application/json", "X-API-Key": self.config.api_key}
 
         try:
             response = await self.retry_request(
-                "POST",
-                url,
-                headers=headers,
-                json=payload,
-                max_retries=2
+                "POST", url, headers=headers, json=payload, max_retries=2
             )
 
             result = response.json()
@@ -311,7 +290,7 @@ class DemoOrchestrator:
                 "GET",
                 metrics_url,
                 headers={"X-API-Key": self.config.api_key},
-                max_retries=2
+                max_retries=2,
             )
 
             metrics_text = response.text
@@ -330,7 +309,7 @@ class DemoOrchestrator:
         """Summarize key metrics from Prometheus format."""
         print(f"\n📈 Key Metrics Summary:")
 
-        lines = metrics_text.split('\n')
+        lines = metrics_text.split("\n")
 
         # Look for interesting metrics
         metrics_of_interest = [
@@ -338,12 +317,12 @@ class DemoOrchestrator:
             "agent_task_completed",
             "execution_latency",
             "arena_requests_total",
-            "graphix_energy"
+            "graphix_energy",
         ]
 
         found_metrics = []
         for line in lines:
-            if line.startswith('#'):
+            if line.startswith("#"):
                 continue
 
             for metric in metrics_of_interest:
@@ -357,7 +336,7 @@ class DemoOrchestrator:
         else:
             print(f"   No specific metrics found (showing first 5 lines):")
             for line in lines[:5]:
-                if line and not line.startswith('#'):
+                if line and not line.startswith("#"):
                     print(f"   {line}")
 
         print(f"\n💡 Before/After Summary:")
@@ -375,7 +354,11 @@ class DemoOrchestrator:
         print(f"  Arena Base: {self.config.arena_base}")
         print(f"  VULCAN Base: {self.config.vulcan_base}")
         print(f"  Demo Seed: {self.config.demo_seed}")
-        print(f"  API Key: {self.config.api_key[:8]}..." if len(self.config.api_key) > 8 else f"  API Key: {self.config.api_key}")
+        print(
+            f"  API Key: {self.config.api_key[:8]}..."
+            if len(self.config.api_key) > 8
+            else f"  API Key: {self.config.api_key}"
+        )
 
         start_time = time.time()
 
@@ -412,6 +395,7 @@ class DemoOrchestrator:
         except Exception as e:
             print(f"\n\n❌ Demo failed with error: {e}")
             import traceback
+
             traceback.print_exc()
             return 1
 
@@ -439,5 +423,6 @@ if __name__ == "__main__":
     except RuntimeError:
         # Already in async context
         import asyncio
+
         loop = asyncio.get_event_loop()
         loop.run_until_complete(main())

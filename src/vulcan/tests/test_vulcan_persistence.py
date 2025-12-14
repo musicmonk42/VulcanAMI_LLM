@@ -13,12 +13,17 @@ Tests cover:
 - Edge cases and error handling
 """
 
-from vulcan.memory.persistence import (MemoryCompressor, MemoryPersistence,
-                                       MemoryVersionControl, SemanticCompressor)
+from vulcan.memory.persistence import (
+    MemoryCompressor,
+    MemoryPersistence,
+    MemoryVersionControl,
+    SemanticCompressor,
+)
 from vulcan.memory.base import CompressionType, Memory, MemoryType
 import os
 import pickle
 import shutil
+
 # Import the module under test
 import sys
 import tempfile

@@ -792,24 +792,30 @@ class ValueOfInformationGate:
                 "histogram": np.histogram(confidences, bins=10)[0].tolist(),
             },
             "gather_pattern": {
-                "gather_when_uncertain": np.mean(
-                    [g for g, u in zip(gather_decisions, uncertainties) if u > 0.5]
-                )
-                if any(u > 0.5 for u in uncertainties)
-                else 0,
-                "gather_when_confident": np.mean(
-                    [g for g, c in zip(gather_decisions, confidences) if c > 0.7]
-                )
-                if any(c > 0.7 for c in confidences)
-                else 0,
+                "gather_when_uncertain": (
+                    np.mean(
+                        [g for g, u in zip(gather_decisions, uncertainties) if u > 0.5]
+                    )
+                    if any(u > 0.5 for u in uncertainties)
+                    else 0
+                ),
+                "gather_when_confident": (
+                    np.mean(
+                        [g for g, c in zip(gather_decisions, confidences) if c > 0.7]
+                    )
+                    if any(c > 0.7 for c in confidences)
+                    else 0
+                ),
             },
             "source_distribution": dict(source_counts),
             "value_distribution": {
                 "positive_value_rate": sum(1 for v in net_values if v > 0)
                 / len(net_values),
-                "mean_positive_value": np.mean([v for v in net_values if v > 0])
-                if any(v > 0 for v in net_values)
-                else 0,
+                "mean_positive_value": (
+                    np.mean([v for v in net_values if v > 0])
+                    if any(v > 0 for v in net_values)
+                    else 0
+                ),
             },
         }
 

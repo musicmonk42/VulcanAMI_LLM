@@ -25,12 +25,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 try:
     from vulcan.reasoning.selection.admission_control import (
-        AdmissionControlIntegration, Request, RequestPriority)
+        AdmissionControlIntegration,
+        Request,
+        RequestPriority,
+    )
     from vulcan.reasoning.selection.portfolio_executor import (
-        ExecutionStrategy, PortfolioExecutor, PortfolioResult)
-    from vulcan.reasoning.selection.utility_model import (ContextMode,
-                                                          UtilityContext,
-                                                          UtilityModel)
+        ExecutionStrategy,
+        PortfolioExecutor,
+        PortfolioResult,
+    )
+    from vulcan.reasoning.selection.utility_model import (
+        ContextMode,
+        UtilityContext,
+        UtilityModel,
+    )
     from vulcan.reasoning.selection.warm_pool import WarmStartPool
 except ImportError as e:
     print(f"Failed to import selection modules: {e}")

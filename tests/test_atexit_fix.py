@@ -15,8 +15,9 @@ import time
 
 def test_pytest_running_flag_is_set():
     """Verify that PYTEST_RUNNING environment variable is set."""
-    assert os.environ.get("PYTEST_RUNNING") == "1", \
-        "PYTEST_RUNNING environment variable should be set during test execution"
+    assert (
+        os.environ.get("PYTEST_RUNNING") == "1"
+    ), "PYTEST_RUNNING environment variable should be set during test execution"
 
 
 def test_atexit_handlers_respect_test_mode():
@@ -67,11 +68,10 @@ def test_session_finish_will_clear_handlers():
     """
 
     # Check that we can access the atexit internals
-    if hasattr(atexit, '_exithandlers'):
+    if hasattr(atexit, "_exithandlers"):
         # We can see the handlers list exists
         handlers = atexit._exithandlers
-        assert isinstance(handlers, list), \
-            "_exithandlers should be a list"
+        assert isinstance(handlers, list), "_exithandlers should be a list"
 
         # Note: We don't test clearing here as that would affect all subsequent tests
         # The actual clearing happens in conftest.py::pytest_sessionfinish

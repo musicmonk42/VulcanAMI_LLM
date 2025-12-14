@@ -10,8 +10,12 @@ from unittest.mock import Mock
 import pytest
 
 from vulcan.world_model.meta_reasoning.goal_conflict_detector import (
-    Conflict, ConflictSeverity, ConflictType, GoalConflictDetector,
-    MultiObjectiveTension)
+    Conflict,
+    ConflictSeverity,
+    ConflictType,
+    GoalConflictDetector,
+    MultiObjectiveTension,
+)
 
 
 @pytest.fixture
@@ -379,9 +383,7 @@ class TestConstraintValidation:
 
     def test_minimum_violation(self, detector):
         """Test detection of minimum constraint violation"""
-        proposal = {
-            "prediction_accuracy": 0.5  # Below minimum of 0.9
-        }
+        proposal = {"prediction_accuracy": 0.5}  # Below minimum of 0.9
 
         violations = detector.check_constraint_violations(proposal)
         assert len(violations) > 0
@@ -392,9 +394,7 @@ class TestConstraintValidation:
 
     def test_maximum_violation(self, detector):
         """Test detection of maximum constraint violation"""
-        proposal = {
-            "efficiency": 1.5  # Above maximum of 1.0
-        }
+        proposal = {"efficiency": 1.5}  # Above maximum of 1.0
 
         violations = detector.check_constraint_violations(proposal)
         assert len(violations) > 0

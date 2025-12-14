@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 import torch
 
 from src.local_llm.tokenizer.simple_tokenizer import SimpleTokenizer
+
 # Reuse your training model
 from src.training.gpt_model import GPTConfig, GPTModel
 

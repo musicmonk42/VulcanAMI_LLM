@@ -2,9 +2,13 @@
 Test suite for learning types module
 """
 
-from vulcan.learning.learning_types import (FeedbackData, LearningConfig,
-                                            LearningMode, LearningTrajectory,
-                                            TaskInfo)
+from vulcan.learning.learning_types import (
+    FeedbackData,
+    LearningConfig,
+    LearningMode,
+    LearningTrajectory,
+    TaskInfo,
+)
 import numpy as np
 from dataclasses import asdict, fields
 import time

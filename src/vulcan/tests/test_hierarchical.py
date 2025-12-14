@@ -15,6 +15,7 @@ Tests cover:
 from vulcan.memory.hierarchical import HierarchicalMemory
 from vulcan.memory.base import MemoryConfig, MemoryQuery, MemoryType
 import shutil
+
 # Import the module under test
 import sys
 import tempfile
@@ -1080,9 +1081,9 @@ class TestIntegration:
                 problem_features=test_features, limit=20, min_similarity=0.7
             )
             # Should find most of them as similar
-            assert len(similar) >= 15, (
-                f"Only found {len(similar)} similar problems out of 20"
-            )
+            assert (
+                len(similar) >= 15
+            ), f"Only found {len(similar)} similar problems out of 20"
         else:
             # Patterns found - verify structure
             assert patterns[0].occurrence_count >= 3

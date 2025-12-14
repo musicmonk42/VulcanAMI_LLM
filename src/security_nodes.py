@@ -71,7 +71,6 @@ class SecurityNodeError(Exception):
     """Base exception for security node errors."""
 
 
-
 class EncryptNode:
     """
     Encrypts data using specified algorithm and key, supporting secure data handling.
@@ -516,9 +515,9 @@ class PolicyNode:
             result = {
                 "compliance": compliance_result,
                 "compression_ok": compression_ok if policy == "ITU-F.748.53" else None,
-                "compression_meta": compression_meta
-                if policy == "ITU-F.748.53"
-                else {},
+                "compression_meta": (
+                    compression_meta if policy == "ITU-F.748.53" else {}
+                ),
                 "audit": {
                     "timestamp": datetime.utcnow().isoformat(),
                     "node_type": "PolicyNode",
@@ -526,9 +525,9 @@ class PolicyNode:
                     "status": "success",
                     "ethical_label": ethical_label,
                     "rationale": rationale,
-                    "compression_ok": compression_ok
-                    if policy == "ITU-F.748.53"
-                    else None,
+                    "compression_ok": (
+                        compression_ok if policy == "ITU-F.748.53" else None
+                    ),
                 },
             }
 

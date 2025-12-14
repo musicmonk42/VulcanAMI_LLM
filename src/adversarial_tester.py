@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
+
 # Scientific computing imports
 import scipy.stats as stats
 from scipy.special import softmax
@@ -389,9 +390,11 @@ class InterpretabilityEngine:
 
             return {
                 "features": explanation.as_list(),
-                "local_pred": float(explanation.local_pred[0])
-                if hasattr(explanation.local_pred, "__iter__")
-                else float(explanation.local_pred),
+                "local_pred": (
+                    float(explanation.local_pred[0])
+                    if hasattr(explanation.local_pred, "__iter__")
+                    else float(explanation.local_pred)
+                ),
             }
 
         except Exception as e:
@@ -1110,7 +1113,8 @@ class AdversarialTester:
         conn = sqlite3.connect(str(db_path))
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS attack_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1122,18 +1126,23 @@ class AdversarialTester:
                     CHECK (perturbation_norm >= 0),
                     CHECK (iterations >= 0)
                 )
-            """)
+            """
+            )
 
             # Create index for faster queries
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_attack_type
                 ON attack_logs(attack_type)
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_timestamp
                 ON attack_logs(timestamp)
-            """)
+            """
+            )
 
             conn.commit()
         finally:
@@ -1922,7 +1931,10 @@ class AdversarialTester:
                 "id": f"file_writer_{uuid.uuid4().hex[:8]}",
                 "type": "FileNode",
                 # Security: Use tempfile.gettempdir() instead of hardcoded /tmp
-                "params": {"path": os.path.join(tempfile.gettempdir(), "test"), "mode": "w"},
+                "params": {
+                    "path": os.path.join(tempfile.gettempdir(), "test"),
+                    "mode": "w",
+                },
             },
             {
                 "id": f"network_scanner_{uuid.uuid4().hex[:8]}",

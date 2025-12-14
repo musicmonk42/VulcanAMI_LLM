@@ -979,9 +979,9 @@ class EnhancedCausalReasoning(CausalReasoningEngine):
         return {
             "direct_effect": float(direct_effect),
             "total_effect": float(total_effect),
-            "estimated_effect": float(estimated_effect)
-            if estimated_effect is not None
-            else None,
+            "estimated_effect": (
+                float(estimated_effect) if estimated_effect is not None else None
+            ),
             "adjustment_set": list(adjustment_set),
             "adjustment_valid": is_valid,
             "confidence": 0.9 if is_valid else 0.5,

@@ -376,27 +376,33 @@ class RLHFManager:
                 if not isinstance(states, torch.Tensor):
                     states = torch.stack(
                         [
-                            s.detach().clone()
-                            if isinstance(s, torch.Tensor)
-                            else torch.tensor(s, dtype=torch.float32)
+                            (
+                                s.detach().clone()
+                                if isinstance(s, torch.Tensor)
+                                else torch.tensor(s, dtype=torch.float32)
+                            )
                             for s in states
                         ]
                     )
                 if not isinstance(actions, torch.Tensor):
                     actions = torch.stack(
                         [
-                            a.detach().clone()
-                            if isinstance(a, torch.Tensor)
-                            else torch.tensor(a, dtype=torch.float32)
+                            (
+                                a.detach().clone()
+                                if isinstance(a, torch.Tensor)
+                                else torch.tensor(a, dtype=torch.float32)
+                            )
                             for a in actions
                         ]
                     )
                 if not isinstance(log_probs, torch.Tensor):
                     log_probs = torch.stack(
                         [
-                            lp.detach().clone()
-                            if isinstance(lp, torch.Tensor)
-                            else torch.tensor(lp, dtype=torch.float32)
+                            (
+                                lp.detach().clone()
+                                if isinstance(lp, torch.Tensor)
+                                else torch.tensor(lp, dtype=torch.float32)
+                            )
                             for lp in log_probs
                         ]
                     )

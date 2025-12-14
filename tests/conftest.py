@@ -18,10 +18,12 @@ from dotenv import load_dotenv  # <<< --- ADDED DOTENV --- >>>
 
 # CRITICAL FIX: Ensure cryptography and other critical packages are never mocked
 # This must happen BEFORE any imports that might use these packages
-PROTECTED_MODULES = ['cryptography', 'OpenSSL', 'ssl']
+PROTECTED_MODULES = ["cryptography", "OpenSSL", "ssl"]
 for mod_name in list(sys.modules.keys()):
-    if any(mod_name == protected or mod_name.startswith(protected + '.')
-           for protected in PROTECTED_MODULES):
+    if any(
+        mod_name == protected or mod_name.startswith(protected + ".")
+        for protected in PROTECTED_MODULES
+    ):
         if isinstance(sys.modules[mod_name], MagicMock):
             del sys.modules[mod_name]
 
@@ -36,9 +38,11 @@ if str(SRC) not in sys.path:
 # <<< --- ADDED DOTENV LOADING --- >>>
 print("[conftest] Attempting to load .env file...")
 # Assumes .env file is in the project root directory (one level up from tests/)
-dotenv_path = ROOT / '.env'
+dotenv_path = ROOT / ".env"
 print(f"[conftest] Looking for .env at: {dotenv_path}")
-loaded = load_dotenv(dotenv_path=dotenv_path, override=True) # Override existing system vars if needed
+loaded = load_dotenv(
+    dotenv_path=dotenv_path, override=True
+)  # Override existing system vars if needed
 if loaded:
     print("[conftest] .env file loaded successfully.")
     # Optional: Verify a specific key (uncomment to debug)
@@ -65,13 +69,53 @@ if not os.environ.get("GRAPHIX_JWT_SECRET"):
 # (not exhaustive, but we cover the big offenders and anything under "cryptography*").
 BLOCKLIST_BASENAMES = {
     # common third-party or stdlib module roots to avoid shadowing:
-    "cryptography", "asyncio", "concurrent", "multiprocessing", "logging", "json",
-    "numpy", "pytest", "unittest", "threading", "collections", "dataclasses",
-    "typing", "pathlib", "importlib", "inspect", "time", "datetime", "math",
-    "random", "re", "subprocess", "http", "urllib", "email", "hashlib", "hmac",
-    "secrets", "ssl", "socket", "select", "selectors", "io", "os", "sys",
-    "platform", "statistics", "functools", "itertools", "tempfile", "shutil",
-    "pydantic", "pandas", "scipy", "faiss", "sklearn", "requests",
+    "cryptography",
+    "asyncio",
+    "concurrent",
+    "multiprocessing",
+    "logging",
+    "json",
+    "numpy",
+    "pytest",
+    "unittest",
+    "threading",
+    "collections",
+    "dataclasses",
+    "typing",
+    "pathlib",
+    "importlib",
+    "inspect",
+    "time",
+    "datetime",
+    "math",
+    "random",
+    "re",
+    "subprocess",
+    "http",
+    "urllib",
+    "email",
+    "hashlib",
+    "hmac",
+    "secrets",
+    "ssl",
+    "socket",
+    "select",
+    "selectors",
+    "io",
+    "os",
+    "sys",
+    "platform",
+    "statistics",
+    "functools",
+    "itertools",
+    "tempfile",
+    "shutil",
+    "pydantic",
+    "pandas",
+    "scipy",
+    "faiss",
+    "sklearn",
+    "requests",
 }
 
 # Modules that should not be aliased because they have problematic dependencies
@@ -83,6 +127,7 @@ SKIP_ALIAS_MODULES = {
     "execution_engine",
 }
 
+
 def _is_python_file(p: pathlib.Path) -> bool:
     # Skip __init__.py and test files
     if p.name.startswith("test_") or p.name.endswith("_test.py"):
@@ -92,6 +137,7 @@ def _is_python_file(p: pathlib.Path) -> bool:
         return False
     return p.is_file() and p.suffix == ".py" and p.name not in {"__init__.py"}
 
+
 def _to_dotted_module(path: pathlib.Path) -> str:
     # Convert a src-relative file path to a dotted module, e.g.:
     #   SRC / "unified_runtime" / "hardware_dispatcher.py" -> "unified_runtime.hardware_dispatcher"
@@ -99,6 +145,7 @@ def _to_dotted_module(path: pathlib.Path) -> str:
     parts = list(rel.parts)
     parts[-1] = parts[-1][:-3]  # drop .py
     return ".".join(parts)
+
 
 def _safe_alias(simple_name: str, dotted: str):
     """
@@ -134,6 +181,7 @@ def _safe_alias(simple_name: str, dotted: str):
     if simple_name not in sys.modules:
         sys.modules[simple_name] = mod
 
+
 def _alias_all_src_modules():
     for path in SRC.rglob("*.py"):
         if not _is_python_file(path):
@@ -141,6 +189,7 @@ def _alias_all_src_modules():
         dotted = _to_dotted_module(path)
         simple = path.stem
         _safe_alias(simple, dotted)
+
 
 # Perform the aliasing once per session import
 _alias_all_src_modules()
@@ -157,6 +206,7 @@ _alias_all_src_modules()
 # ============================================================
 # FIX: Test Isolation - Reset State Between Tests
 # ============================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_random_state():
@@ -178,9 +228,9 @@ def reset_environment_state(tmp_path, monkeypatch):
     # Remove CSIU environment variables to ensure clean state
     # monkeypatch automatically restores original values after test
     env_vars_to_reset = [
-        'INTRINSIC_CSIU_OFF',
-        'INTRINSIC_CSIU_REGS_OFF',
-        'INTRINSIC_CSIU_CALC_OFF',
+        "INTRINSIC_CSIU_OFF",
+        "INTRINSIC_CSIU_REGS_OFF",
+        "INTRINSIC_CSIU_CALC_OFF",
     ]
 
     for var in env_vars_to_reset:
@@ -190,7 +240,7 @@ def reset_environment_state(tmp_path, monkeypatch):
     # This ensures each test gets its own isolated database
     test_storage_path = tmp_path / f"test_storage_{uuid.uuid4().hex}"
     test_storage_path.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv('VULCAN_STORAGE_PATH', str(test_storage_path))
+    monkeypatch.setenv("VULCAN_STORAGE_PATH", str(test_storage_path))
 
     yield
     # monkeypatch automatically restores environment on cleanup
@@ -319,6 +369,7 @@ def reset_pytorch_state():
 # FIX: Prevent atexit handlers from blocking test suite exit
 # ============================================================
 
+
 def pytest_sessionstart(session):
     """
     Set environment variable to indicate we're in test mode.
@@ -326,6 +377,7 @@ def pytest_sessionstart(session):
     """
     os.environ["PYTEST_RUNNING"] = "1"
     print("[conftest] Test session starting - atexit handlers will be non-blocking")
+
 
 def pytest_sessionfinish(session, exitstatus):
     """
@@ -351,7 +403,7 @@ def pytest_sessionfinish(session, exitstatus):
 
     # Get the list of registered atexit handlers
     # We'll clear them to prevent blocking during cleanup
-    if hasattr(atexit_module, '_exithandlers'):
+    if hasattr(atexit_module, "_exithandlers"):
         # Python stores atexit handlers in a list of (func, args, kwargs) tuples
         handlers = atexit_module._exithandlers
         original_count = len(handlers)
@@ -361,7 +413,9 @@ def pytest_sessionfinish(session, exitstatus):
         handlers.clear()
         print(f"[conftest] Cleared {original_count} atexit handlers to prevent freeze")
     else:
-        print("[conftest] Could not access _exithandlers (Python implementation may vary)")
+        print(
+            "[conftest] Could not access _exithandlers (Python implementation may vary)"
+        )
 
     # Clean up any remaining multiprocessing child processes
     # This prevents pytest from hanging while waiting for child processes to exit
@@ -371,7 +425,9 @@ def pytest_sessionfinish(session, exitstatus):
         print(f"[conftest] Found {len(active_children)} active child processes")
         for child in active_children:
             try:
-                print(f"[conftest] Terminating child process {child.pid} ({child.name})")
+                print(
+                    f"[conftest] Terminating child process {child.pid} ({child.name})"
+                )
                 child.terminate()
             except Exception as e:
                 print(f"[conftest] Error terminating child process {child.pid}: {e}")

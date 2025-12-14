@@ -3,10 +3,18 @@
 # Run: pytest src/vulcan/tests/test_api_gateway.py -v --tb=short --cov=src.vulcan.api_gateway --cov-report=html
 
 from src.vulcan.config import AgentConfig
-from src.vulcan.api_gateway import (APIGateway, APIRequest, APIResponse,
-                                    AuthManager, CacheManager, CircuitBreaker,
-                                    RateLimiter, RequestTransformer,
-                                    ServiceEndpoint, ServiceRegistry)
+from src.vulcan.api_gateway import (
+    APIGateway,
+    APIRequest,
+    APIResponse,
+    AuthManager,
+    CacheManager,
+    CircuitBreaker,
+    RateLimiter,
+    RequestTransformer,
+    ServiceEndpoint,
+    ServiceRegistry,
+)
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 import numpy as np
 import msgpack
@@ -576,7 +584,9 @@ class TestCircuitBreaker:
         assert circuit_breaker.state[service] == "closed"
 
     @pytest.mark.asyncio
-    async def test_half_open_fails_back_to_open(self, circuit_breaker, encoding="utf-8"):
+    async def test_half_open_fails_back_to_open(
+        self, circuit_breaker, encoding="utf-8"
+    ):
         """Test half-open returns to open on failure."""
         service = "unstable_service"
 

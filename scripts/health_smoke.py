@@ -9,7 +9,8 @@ from src.utils.url_validator import validate_url_scheme
 
 HOST = os.getenv("ARENA_HOST", "127.0.0.1")
 PORT = int(os.getenv("ARENA_PORT", "8181"))
-URL  = f"http://{HOST}:{PORT}/api/metrics"
+URL = f"http://{HOST}:{PORT}/api/metrics"
+
 
 def wait_port(host, port, timeout=10.0):
     t0 = time.time()
@@ -21,6 +22,7 @@ def wait_port(host, port, timeout=10.0):
             time.sleep(0.2)
     return False
 
+
 def main():
     # If the server is already running (recommended), just probe it.
     if not wait_port(HOST, PORT, timeout=5.0):
@@ -29,7 +31,7 @@ def main():
     try:
         # Validate URL scheme before making request
         validate_url_scheme(URL)
-        
+
         with urllib.request.urlopen(URL, timeout=5) as r:
             if r.status != 200:
                 print(f"error: metrics status {r.status}")
@@ -43,6 +45,7 @@ def main():
     except Exception as e:
         print(f"error: metrics probe failed: {e}")
         sys.exit(4)
+
 
 if __name__ == "__main__":
     main()

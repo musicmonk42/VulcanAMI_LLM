@@ -20,8 +20,14 @@ from typing import Any, Dict, List
 
 # Import the module under test. These names must match the public API.
 from src.vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
-    BoundaryCategory, BoundaryType, EnforcementLevel, EthicalBoundary,
-    EthicalBoundaryMonitor, EthicalViolation, ViolationSeverity)
+    BoundaryCategory,
+    BoundaryType,
+    EnforcementLevel,
+    EthicalBoundary,
+    EthicalBoundaryMonitor,
+    EthicalViolation,
+    ViolationSeverity,
+)
 
 # ---------------------------
 # Helpers

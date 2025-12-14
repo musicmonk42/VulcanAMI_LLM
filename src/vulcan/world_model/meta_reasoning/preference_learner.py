@@ -37,6 +37,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -987,9 +988,9 @@ class PreferenceLearner:
             actual_signal = PreferenceSignal(
                 signal_type=signal_type,
                 chosen_option=actual,
-                rejected_options=[predicted]
-                if not correct
-                else [],  # Reject predicted if wrong
+                rejected_options=(
+                    [predicted] if not correct else []
+                ),  # Reject predicted if wrong
                 context=context,
                 signal_strength=1.0,  # High strength for actual choice feedback
                 reward=reward,  # Use calculated reward
@@ -1137,9 +1138,11 @@ class PreferenceLearner:
                             rejected_options=s_dict.get("rejected_options", []),
                             context=s_dict.get("context", {}),
                             signal_strength=float(s_dict.get("signal_strength", 1.0)),
-                            reward=float(s_dict["reward"])
-                            if s_dict.get("reward") is not None
-                            else None,
+                            reward=(
+                                float(s_dict["reward"])
+                                if s_dict.get("reward") is not None
+                                else None
+                            ),
                             timestamp=float(s_dict.get("timestamp", time.time())),
                             metadata=s_dict.get("metadata", {}),
                         )
@@ -1177,9 +1180,11 @@ class PreferenceLearner:
                                     total_reward=float(
                                         arm_dict.get("total_reward", 0.0)
                                     ),
-                                    last_pulled=float(arm_dict["last_pulled"])
-                                    if arm_dict.get("last_pulled") is not None
-                                    else None,
+                                    last_pulled=(
+                                        float(arm_dict["last_pulled"])
+                                        if arm_dict.get("last_pulled") is not None
+                                        else None
+                                    ),
                                     created_at=float(
                                         arm_dict.get("created_at", time.time())
                                     ),
@@ -1625,9 +1630,9 @@ class PreferenceLearner:
                 rejected_options=rejected_list,
                 context=context,
                 signal_strength=max(0.0, min(1.0, strength)),  # Clamp strength 0-1
-                reward=max(0.0, min(1.0, reward))
-                if reward is not None
-                else None,  # Clamp reward 0-1
+                reward=(
+                    max(0.0, min(1.0, reward)) if reward is not None else None
+                ),  # Clamp reward 0-1
                 timestamp=timestamp,
                 metadata=metadata,
             )
@@ -2288,7 +2293,9 @@ class PreferenceLearner:
             context_str = json.dumps(
                 context_items
             )  # Use items for better structure handling
-            return hashlib.md5(context_str.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]
+            return hashlib.md5(
+                context_str.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()[:16]
         except Exception as e:
             logger.warning(
                 f"Failed to hash context with JSON ({e}), using fallback hash."

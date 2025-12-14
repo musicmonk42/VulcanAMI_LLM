@@ -26,7 +26,6 @@ class CompilationError(Exception):
     """Compilation-specific errors"""
 
 
-
 class NodeType(Enum):
     """Supported node types for compilation"""
 

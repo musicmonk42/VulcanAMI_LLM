@@ -277,7 +277,9 @@ class RobustOptimizer:
 
         # Numerical gradient if not provided
         if jac is None:
-            def jac(x): return RobustOptimizer._numerical_gradient(fun, x)
+
+            def jac(x):
+                return RobustOptimizer._numerical_gradient(fun, x)
 
         f_prev = fun(x)
         g_prev = jac(x)
@@ -449,7 +451,9 @@ class RobustOptimizer:
         x = x0.copy()
 
         if jac is None:
-            def jac(x): return RobustOptimizer._numerical_gradient(fun, x)
+
+            def jac(x):
+                return RobustOptimizer._numerical_gradient(fun, x)
 
         # Momentum parameters
         velocity = np.zeros_like(x)
@@ -1569,7 +1573,7 @@ class DynamicsModel:
         safety_validator=None,
     ):
         """Initialize dynamics model - FIXED: Added safety_validator parameter
-        
+
         Args:
             history_size: Maximum size of state history
             min_pattern_confidence: Minimum confidence for pattern detection
@@ -1580,16 +1584,22 @@ class DynamicsModel:
         self.history_size = history_size
         self.min_pattern_confidence = min_pattern_confidence
         self.safety_config = safety_config or {}  # Store config
-        
+
         # Initialize safety validator - prefer shared instance
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         else:
             # Will be lazy-loaded if needed
-            self.safety_validator = None  # This will be populated by _get_safety_validator
-            logger.info(f"{self.__class__.__name__}: Safety validator will be lazy-loaded")
+            self.safety_validator = (
+                None  # This will be populated by _get_safety_validator
+            )
+            logger.info(
+                f"{self.__class__.__name__}: Safety validator will be lazy-loaded"
+            )
 
         # Components
         self.pattern_detector = PatternDetector(min_pattern_confidence)
@@ -1664,7 +1674,9 @@ class DynamicsModel:
                         self.safety_validator = initialize_all_safety_components(
                             config=self.safety_config, reuse_existing=True
                         )
-                        logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                        logger.info(
+                            f"{self.__class__.__name__}: Using singleton safety validator"
+                        )
                         return self.safety_validator
                     except Exception as e:
                         logger.debug(f"Could not get singleton safety validator: {e}")
@@ -1926,9 +1938,11 @@ class DynamicsModel:
                 graph["nodes"].append(
                     {
                         "id": f"cluster_{i}",
-                        "center": center.tolist()
-                        if isinstance(center, np.ndarray)
-                        else center,
+                        "center": (
+                            center.tolist()
+                            if isinstance(center, np.ndarray)
+                            else center
+                        ),
                         "size": sum(1 for label in self.cluster_labels if label == i),
                     }
                 )
@@ -1962,9 +1976,9 @@ class DynamicsModel:
                 "upper_bound": prediction.upper_bound,
                 "confidence": prediction.confidence,
             },
-            metadata=prediction.metadata.copy()
-            if hasattr(prediction, "metadata")
-            else {},
+            metadata=(
+                prediction.metadata.copy() if hasattr(prediction, "metadata") else {}
+            ),
         )
 
     def _state_to_prediction(self, state: State, original: Prediction) -> Prediction:

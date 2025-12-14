@@ -38,6 +38,7 @@ import time
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import numpy as np # Original import
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
@@ -319,7 +320,9 @@ class ValidationPattern:
             # Fallback comparison if features contain unhashable types
             return self.pattern_type == other.pattern_type and str(
                 self.features
-            ) == str(other.features)  # Less reliable fallback
+            ) == str(
+                other.features
+            )  # Less reliable fallback
 
 
 @dataclass
@@ -902,9 +905,9 @@ class ValidationTracker:
 
             return {
                 "total_failures": len(rejected),
-                "failure_rate": len(rejected) / total_records
-                if total_records > 0
-                else 0.0,
+                "failure_rate": (
+                    len(rejected) / total_records if total_records > 0 else 0.0
+                ),
                 "common_features": common_features,
                 "temporal_pattern": temporal_pattern,
                 "failure_reasons": dict(failure_reasons),
@@ -1084,9 +1087,11 @@ class ValidationTracker:
                         f'Objective "{b.objective}" often blocked by "{b.blocker_type}" ({b.frequency} times)',
                         [{"blocker": b.blocker_type, "freq": b.frequency}],
                         min(1.0, b.frequency / 10),
-                        b.potential_solutions[0]
-                        if b.potential_solutions
-                        else "Investigate blocker",
+                        (
+                            b.potential_solutions[0]
+                            if b.potential_solutions
+                            else "Investigate blocker"
+                        ),
                         "high" if b.severity > 0.7 else "medium",
                     )
                 )
@@ -1586,18 +1591,22 @@ class ValidationTracker:
             set_a = set(
                 (
                     k,
-                    v
-                    if isinstance(v, (str, int, float, bool, tuple, type(None)))
-                    else str(v),
+                    (
+                        v
+                        if isinstance(v, (str, int, float, bool, tuple, type(None)))
+                        else str(v)
+                    ),
                 )
                 for k, v in features_a.items()
             )
             set_b = set(
                 (
                     k,
-                    v
-                    if isinstance(v, (str, int, float, bool, tuple, type(None)))
-                    else str(v),
+                    (
+                        v
+                        if isinstance(v, (str, int, float, bool, tuple, type(None)))
+                        else str(v)
+                    ),
                 )
                 for k, v in features_b.items()
             )
@@ -1936,12 +1945,14 @@ class ValidationTracker:
                 "total_validations_processed": total_validations,
                 "patterns_learned": len(self.patterns),
                 "blockers_identified": len(self.blockers),
-                "approval_rate": (approved_validations / total_validations)
-                if total_validations > 0
-                else 0.0,
-                "actual_success_rate": (actual_successes / total_actuals)
-                if total_actuals > 0
-                else None,  # Rate based on actuals
+                "approval_rate": (
+                    (approved_validations / total_validations)
+                    if total_validations > 0
+                    else 0.0
+                ),
+                "actual_success_rate": (
+                    (actual_successes / total_actuals) if total_actuals > 0 else None
+                ),  # Rate based on actuals
                 "raw_stats": stats_snapshot,  # Include raw counts
             }
 

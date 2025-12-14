@@ -295,9 +295,11 @@ class DecompositionStrategy(ABC):
                     "type": self.strategy_type.value,
                     "component": component,
                     "confidence": result.confidence,
-                    "action_type": component.get("type", "process")
-                    if isinstance(component, dict)
-                    else "process",
+                    "action_type": (
+                        component.get("type", "process")
+                        if isinstance(component, dict)
+                        else "process"
+                    ),
                     "description": self._generate_step_description(component, i),
                     "dependencies": [],
                     "estimated_complexity": 1.0,

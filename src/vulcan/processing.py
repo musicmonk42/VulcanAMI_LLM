@@ -23,8 +23,7 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple,
-                    Union)
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import os
@@ -32,12 +31,12 @@ import PIL.Image
 import psutil
 import torch
 import torch.nn as nn
+
 # REMOVED: sentence_transformers import - will use internal LLM-based encoder
 from transformers import AutoImageProcessor, AutoModel, AutoTokenizer
 
 # FIXED: Import from src.vulcan.config instead of config
-from src.vulcan.config import (EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM,
-                               ModalityType)
+from src.vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, LATENT_DIM, ModalityType
 
 # HuggingFace Model Configuration (CWE-494 mitigation)
 # To pin models to specific revisions for security, set these environment variables:
@@ -72,9 +71,10 @@ class GraphixTransformer:
         # SECURITY: Support model revision pinning (CWE-494 mitigation)
         # Use environment variable VULCAN_BERT_MODEL_REVISION to pin to specific commit
         revision = BERT_MODEL_REVISION if BERT_MODEL_REVISION else "main"
-        self.tokenizer = AutoTokenizer.from_pretrained(  # nosec B615 - revision parameter present
-            "bert-base-uncased",
-            revision=revision
+        self.tokenizer = (
+            AutoTokenizer.from_pretrained(  # nosec B615 - revision parameter present
+                "bert-base-uncased", revision=revision
+            )
         )
 
     def get_embeddings(self, text: Union[str, List[str]]) -> torch.Tensor:
@@ -736,15 +736,17 @@ class DynamicModelManager:
         elif modality in ["vision", "audio"]:
             # SECURITY: Support model revision pinning (CWE-494 mitigation)
             # Use environment variable VULCAN_VISION_AUDIO_MODEL_REVISION to pin to specific commit
-            revision = VISION_AUDIO_MODEL_REVISION if VISION_AUDIO_MODEL_REVISION else "main"
-            
-            model = AutoModel.from_pretrained(  # nosec B615 - revision parameter present
-                model_name,
-                revision=revision
+            revision = (
+                VISION_AUDIO_MODEL_REVISION if VISION_AUDIO_MODEL_REVISION else "main"
+            )
+
+            model = (
+                AutoModel.from_pretrained(  # nosec B615 - revision parameter present
+                    model_name, revision=revision
+                )
             )
             processor = AutoImageProcessor.from_pretrained(  # nosec B615 - revision parameter present
-                model_name,
-                revision=revision
+                model_name, revision=revision
             )
 
             if device != "cpu" and torch.cuda.is_available():
@@ -2106,9 +2108,11 @@ class AdaptiveMultimodalProcessor(nn.Module):
             embedding=final_embedding.detach().numpy(),
             modality=ModalityType.MULTIMODAL,
             uncertainty=uncertainty,
-            attention_weights=attention_weights.detach().numpy()
-            if attention_weights is not None
-            else None,
+            attention_weights=(
+                attention_weights.detach().numpy()
+                if attention_weights is not None
+                else None
+            ),
             sub_modalities=sub_modalities,
             model_used=",".join(models_used),
         )
@@ -2172,12 +2176,16 @@ class AdaptiveMultimodalProcessor(nn.Module):
                 float(data.flat[-1]) if data.size > 0 else 0,
                 float(data.mean()) if data.size > 0 else 0,
             )
-            return hashlib.md5(str(fingerprint).encode(), usedforsecurity=False).hexdigest()
+            return hashlib.md5(
+                str(fingerprint).encode(), usedforsecurity=False
+            ).hexdigest()
 
         elif isinstance(data, PIL.Image.Image):
             # Hash image size and mode as fingerprint
             fingerprint = (data.size, data.mode)
-            return hashlib.md5(str(fingerprint).encode(), usedforsecurity=False).hexdigest()
+            return hashlib.md5(
+                str(fingerprint).encode(), usedforsecurity=False
+            ).hexdigest()
 
         else:
             # Fallback for other types
@@ -2430,9 +2438,9 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
         """Get comprehensive statistics."""
         stats = {
             "cache": self.cache.get_detailed_stats(),
-            "workload": self.workload_manager.get_stats()
-            if self.workload_manager
-            else {},
+            "workload": (
+                self.workload_manager.get_stats() if self.workload_manager else {}
+            ),
             "models": {
                 "loaded_count": len(self.model_manager._models),
                 "models": list(self.model_manager._models.keys()),
@@ -2492,4 +2500,6 @@ class MultimodalProcessor(AdaptiveMultimodalProcessor):
             self.cleanup()
         except Exception as e:
             # Destructor failures in AdaptiveMultimodalProcessor should be logged at debug level
-            logger.debug(f"AdaptiveMultimodalProcessor cleanup in destructor failed: {e}")
+            logger.debug(
+                f"AdaptiveMultimodalProcessor cleanup in destructor failed: {e}"
+            )

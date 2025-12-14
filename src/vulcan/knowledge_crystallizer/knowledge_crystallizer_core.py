@@ -16,12 +16,15 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from .contraindication_tracker import (CascadeAnalyzer, Contraindication,
-                                       ContraindicationDatabase,
-                                       ContraindicationGraph)
-from .crystallization_selector import (CrystallizationMethod,
-                                       CrystallizationSelector)
+from .contraindication_tracker import (
+    CascadeAnalyzer,
+    Contraindication,
+    ContraindicationDatabase,
+    ContraindicationGraph,
+)
+from .crystallization_selector import CrystallizationMethod, CrystallizationSelector
 from .knowledge_storage import VersionedKnowledgeBase
+
 # Import other components
 from .principle_extractor import Principle, PrincipleExtractor
 from .validation_engine import KnowledgeValidator, ValidationResult
@@ -117,9 +120,11 @@ class ApplicationResult:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
-            "principle_used": self.principle_used.to_dict()
-            if self.principle_used and hasattr(self.principle_used, "to_dict")
-            else str(self.principle_used),
+            "principle_used": (
+                self.principle_used.to_dict()
+                if self.principle_used and hasattr(self.principle_used, "to_dict")
+                else str(self.principle_used)
+            ),
             "solution": self.solution,
             "confidence": self.confidence,
             "adaptations": self.adaptations,
@@ -595,9 +600,11 @@ class KnowledgeCrystallizer:
             "iteration": iteration,
             "traces": accumulated_traces[-parameters.get("max_iterations", 100) :],
             "principles": valid_principles,
-            "confidence": np.mean([p.confidence for p in valid_principles])
-            if valid_principles
-            else 0.0,
+            "confidence": (
+                np.mean([p.confidence for p in valid_principles])
+                if valid_principles
+                else 0.0
+            ),
         }
 
         # Calculate overall confidence
@@ -1396,9 +1403,9 @@ class KnowledgeCrystallizer:
             is_valid=success_rate > 0.3,
             confidence=success_rate,
             errors=[] if success_rate > 0.3 else ["Low historical success rate"],
-            warnings=[]
-            if success_rate > 0.5
-            else ["Below average historical performance"],
+            warnings=(
+                [] if success_rate > 0.5 else ["Below average historical performance"]
+            ),
         )
 
     def _apply_principle(self, principle: Principle, problem: Dict[str, Any]) -> Any:

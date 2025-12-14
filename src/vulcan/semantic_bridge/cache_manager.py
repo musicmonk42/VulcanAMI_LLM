@@ -145,9 +145,9 @@ class CacheManager:
             result = {
                 "total_mb": total_size / (1024 * 1024),
                 "limit_mb": self.max_memory / (1024 * 1024),
-                "usage_percent": (total_size / self.max_memory * 100)
-                if self.max_memory > 0
-                else 0,
+                "usage_percent": (
+                    (total_size / self.max_memory * 100) if self.max_memory > 0 else 0
+                ),
                 "cache_sizes": {k: v / (1024 * 1024) for k, v in cache_sizes.items()},
                 "over_limit": total_size > self.max_memory,
                 "evicted": [],
@@ -375,9 +375,9 @@ class CacheManager:
                 "hits": meta["hits"],
                 "misses": meta["misses"],
                 "total_requests": total_requests,
-                "hit_rate": meta["hits"] / total_requests
-                if total_requests > 0
-                else 0.0,
+                "hit_rate": (
+                    meta["hits"] / total_requests if total_requests > 0 else 0.0
+                ),
                 "evictions": meta["evictions"],
                 "last_clear": meta["last_clear"],
                 "age_seconds": time.time() - meta["created"],
@@ -406,9 +406,9 @@ class CacheManager:
                     "priority": self.priorities[name],
                     "hits": meta["hits"],
                     "misses": meta["misses"],
-                    "hit_rate": meta["hits"] / total_requests
-                    if total_requests > 0
-                    else 0.0,
+                    "hit_rate": (
+                        meta["hits"] / total_requests if total_requests > 0 else 0.0
+                    ),
                     "evictions": meta["evictions"],
                     "last_clear": meta["last_clear"],
                     "age_seconds": time.time() - meta["created"],
@@ -427,9 +427,9 @@ class CacheManager:
                     "total_entries": total_entries,
                     "total_hits": total_hits,
                     "total_misses": total_misses,
-                    "overall_hit_rate": total_hits / overall_requests
-                    if overall_requests > 0
-                    else 0.0,
+                    "overall_hit_rate": (
+                        total_hits / overall_requests if overall_requests > 0 else 0.0
+                    ),
                     "total_evictions": self.total_evictions,
                     "last_memory_check": self.last_memory_check,
                     "memory_limit_mb": self.max_memory / (1024 * 1024),

@@ -665,12 +665,12 @@ class CurriculumLearner:
             {
                 "stage": self.current_stage,
                 "samples": self.samples_in_stage,
-                "avg_performance": np.mean(self.stage_performance)
-                if self.stage_performance
-                else 0,
-                "std_performance": np.std(self.stage_performance)
-                if self.stage_performance
-                else 0,
+                "avg_performance": (
+                    np.mean(self.stage_performance) if self.stage_performance else 0
+                ),
+                "std_performance": (
+                    np.std(self.stage_performance) if self.stage_performance else 0
+                ),
                 "time_spent": time.time() - self.stage_start_time,
                 "learning_rate": self.learning_rate_estimate,
                 "timestamp": time.time(),
@@ -801,9 +801,9 @@ class CurriculumLearner:
                 "current_stage": self.current_stage,
                 "total_stages": len(self.curriculum_stages),
                 "samples_in_stage": self.samples_in_stage,
-                "avg_stage_performance": np.mean(self.stage_performance)
-                if self.stage_performance
-                else 0,
+                "avg_stage_performance": (
+                    np.mean(self.stage_performance) if self.stage_performance else 0
+                ),
                 "tasks_per_stage": [len(stage) for stage in self.curriculum_stages],
                 "stage_history": self.stage_history,
                 "difficulty_adjustments": self.difficulty_adjustments,
@@ -820,9 +820,11 @@ class CurriculumLearner:
                     "num_tasks": info.num_tasks,
                     "samples_seen": info.samples_seen,
                     "completed": info.completed,
-                    "avg_performance": np.mean(info.performance_history)
-                    if info.performance_history
-                    else 0,
+                    "avg_performance": (
+                        np.mean(info.performance_history)
+                        if info.performance_history
+                        else 0
+                    ),
                 }
             stats["stage_details"] = stage_stats
 
@@ -831,12 +833,14 @@ class CurriculumLearner:
     def analyze_curriculum_effectiveness(self) -> Dict[str, Any]:
         """Analyze effectiveness of curriculum learning"""
         analysis = {
-            "total_time": sum(self.metrics.time_per_stage)
-            if self.metrics.time_per_stage
-            else 0,
-            "avg_time_per_stage": np.mean(self.metrics.time_per_stage)
-            if self.metrics.time_per_stage
-            else 0,
+            "total_time": (
+                sum(self.metrics.time_per_stage) if self.metrics.time_per_stage else 0
+            ),
+            "avg_time_per_stage": (
+                np.mean(self.metrics.time_per_stage)
+                if self.metrics.time_per_stage
+                else 0
+            ),
             "learning_efficiency": 0,
             "curriculum_smoothness": 0,
             "optimal_stages": 0,

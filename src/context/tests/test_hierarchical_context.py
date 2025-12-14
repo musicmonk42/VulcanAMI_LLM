@@ -14,11 +14,17 @@ Tests cover:
 - Performance benchmarks
 """
 
-from hierarchical_context import (ConsolidationStrategy, EpisodicItem,
-                                  HierarchicalContext, MemoryStatistics,
-                                  ProceduralPattern, PruningStrategy,
-                                  RetrievalStrategy, SemanticEntry,
-                                  create_default_memory)
+from hierarchical_context import (
+    ConsolidationStrategy,
+    EpisodicItem,
+    HierarchicalContext,
+    MemoryStatistics,
+    ProceduralPattern,
+    PruningStrategy,
+    RetrievalStrategy,
+    SemanticEntry,
+    create_default_memory,
+)
 import sys
 import threading
 import time

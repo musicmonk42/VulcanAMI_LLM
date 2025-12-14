@@ -21,6 +21,7 @@ import numpy as np
 import scipy.constants as const
 import torch
 import torch.nn as nn
+
 # Scientific computing
 from scipy.special import hermite
 

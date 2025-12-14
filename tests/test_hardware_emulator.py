@@ -7,10 +7,17 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from hardware_emulator import (DEFAULT_MAX_NORM, MAX_BATCH_SIZE, MAX_NOISE_STD,
-                               MIN_NOISE_STD, HardwareEmulator,
-                               batch_emulate_memristor, emulate_memristor,
-                               emulate_pyscf_analog, emulate_rdkit_analog)
+from hardware_emulator import (
+    DEFAULT_MAX_NORM,
+    MAX_BATCH_SIZE,
+    MAX_NOISE_STD,
+    MIN_NOISE_STD,
+    HardwareEmulator,
+    batch_emulate_memristor,
+    emulate_memristor,
+    emulate_pyscf_analog,
+    emulate_rdkit_analog,
+)
 
 
 @pytest.fixture
@@ -67,6 +74,7 @@ class TestHardwareEmulator:
 
     def test_register_op(self, emulator):
         """Test operation registration."""
+
         def custom_op(x):
             return x * 2
 
@@ -301,7 +309,7 @@ class TestHardwareEmulator:
         result = emulator.emulate_rdkit_analog("CCO", tensor=tensor)
 
         # Should return array with same shape
-        assert hasattr(result, 'shape') or isinstance(result, (int, float))
+        assert hasattr(result, "shape") or isinstance(result, (int, float))
 
     def test_emulate_pyscf_analog_without_pyscf(self, emulator):
         """Test PySCF analog without PySCF installed."""
@@ -365,9 +373,7 @@ class TestModuleLevelFunctions:
         batch_vectors = [np.random.randn(4) for _ in range(3)]
 
         results = batch_emulate_memristor(
-            batch_matrices,
-            op_type="mvm",
-            vectors=batch_vectors
+            batch_matrices, op_type="mvm", vectors=batch_vectors
         )
 
         assert len(results) == 3

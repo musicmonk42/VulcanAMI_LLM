@@ -229,8 +229,9 @@ class LLVMBackend:
         cache_key = hashlib.md5(
             json.dumps(
                 {"type": node_type, "params": node_params}, sort_keys=True
-            ).encode()
-            , usedforsecurity=False).hexdigest()
+            ).encode(),
+            usedforsecurity=False,
+        ).hexdigest()
 
         if cache_key in self.func_cache:
             return self.func_cache[cache_key]

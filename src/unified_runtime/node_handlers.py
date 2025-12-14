@@ -100,7 +100,6 @@ class NodeExecutorError(Exception):
     """Base exception for node execution errors"""
 
 
-
 class AI_ERRORS(Enum):
     """AI Runtime error codes"""
 
@@ -606,9 +605,11 @@ async def attention_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
 
     return {
         "output": output,
-        "scores_shape": list(scores.shape)
-        if "scores" in locals() and hasattr(scores, "shape")
-        else "N/A",
+        "scores_shape": (
+            list(scores.shape)
+            if "scores" in locals() and hasattr(scores, "shape")
+            else "N/A"
+        ),
         "message": "Multi-head attention executed (mocked/numpy fallback)",
     }
 
@@ -713,8 +714,11 @@ async def load_tensor_node(node: Dict, context: NodeContext, inputs: Dict) -> Di
         framework_choice = "np" if NUMPY_AVAILABLE else "pt"
         device_choice = "cpu"  # Load to CPU first
         with safe_open(
-            abs_filepath, framework=framework_choice, device=device_choice
-        , encoding="utf-8") as f:
+            abs_filepath,
+            framework=framework_choice,
+            device=device_choice,
+            encoding="utf-8",
+        ) as f:
             tensor = f.get_tensor(key)
             # Convert to list to ensure JSON safety for transport
             return {"tensor": tensor.tolist() if hasattr(tensor, "tolist") else tensor}
@@ -1829,9 +1833,9 @@ async def search_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
             logger.error(f"Random search trial {trial_idx} failed: {e}")
 
     return {
-        "best_value": best_value
-        if not math.isinf(best_value)
-        else None,  # Return None if no valid trial found
+        "best_value": (
+            best_value if not math.isinf(best_value) else None
+        ),  # Return None if no valid trial found
         "best_params": best_params,
         "n_trials": min(n_trials, 5),
         "optimization_complete": True,
@@ -2276,9 +2280,9 @@ async def normalize_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict
             normalized = data_array  # Unknown method, return original
 
         return {
-            "output": normalized.tolist()
-            if hasattr(normalized, "tolist")
-            else normalized
+            "output": (
+                normalized.tolist() if hasattr(normalized, "tolist") else normalized
+            )
         }
 
     except Exception as e:

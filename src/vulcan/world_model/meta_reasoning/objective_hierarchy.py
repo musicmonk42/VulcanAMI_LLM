@@ -16,6 +16,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import numpy as np # Original import
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -268,9 +269,11 @@ class ObjectiveHierarchy:
                             conflicts_with=obj_config.get("conflicts_with", []),
                             objective_type=obj_type,
                             weight=float(obj_config.get("weight", 1.0)),  # Ensure float
-                            target_value=float(obj_config["target"])
-                            if obj_config.get("target") is not None
-                            else None,  # Ensure float if present
+                            target_value=(
+                                float(obj_config["target"])
+                                if obj_config.get("target") is not None
+                                else None
+                            ),  # Ensure float if present
                             maximize=bool(
                                 obj_config.get("maximize", True)
                             ),  # Ensure bool

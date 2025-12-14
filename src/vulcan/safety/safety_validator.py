@@ -14,9 +14,17 @@ Revision / Fix Notes (Applied):
 """
 
 from __future__ import annotations
-from .safety_types import (ActionType, ComplianceStandard, ExplainabilityNode,
-                           SafetyConfig, SafetyConstraint, SafetyMetrics,
-                           SafetyReport, SafetyValidator, SafetyViolationType)
+from .safety_types import (
+    ActionType,
+    ComplianceStandard,
+    ExplainabilityNode,
+    SafetyConfig,
+    SafetyConstraint,
+    SafetyMetrics,
+    SafetyReport,
+    SafetyValidator,
+    SafetyViolationType,
+)
 
 import asyncio
 import atexit
@@ -65,8 +73,11 @@ except ImportError:
 
 # Lazy-load modules to avoid circular imports
 try:
-    from .tool_safety import (ToolSafetyGovernor, ToolSafetyManager,
-                              initialize_tool_safety)
+    from .tool_safety import (
+        ToolSafetyGovernor,
+        ToolSafetyManager,
+        initialize_tool_safety,
+    )
 except ImportError:
     ToolSafetyManager = None
     ToolSafetyGovernor = None
@@ -88,8 +99,11 @@ except ImportError:
     logger.warning("Rollback and audit modules not available")
 
 try:
-    from .adversarial_formal import (AdversarialValidator, FormalVerifier,
-                                     initialize_adversarial)
+    from .adversarial_formal import (
+        AdversarialValidator,
+        FormalVerifier,
+        initialize_adversarial,
+    )
 except ImportError:
     AdversarialValidator = None
     FormalVerifier = None
@@ -104,8 +118,11 @@ try:
     logger.info(
         f"Neural dependencies checked: torch v{torch.__version__}, scipy v{scipy.__version__}, statsmodels v{statsmodels.__version__}"
     )
-    from .neural_safety import (FeatureExtractor, SafetyPredictor,
-                                initialize_neural_safety)
+    from .neural_safety import (
+        FeatureExtractor,
+        SafetyPredictor,
+        initialize_neural_safety,
+    )
 
     logger.info(
         "Neural safety modules (SafetyPredictor, FeatureExtractor, initialize_neural_safety) loaded."
@@ -120,9 +137,13 @@ except Exception as e:
 
 # --- LLM Safety Validators (Mocked Fallback) ---
 try:
-    from .llm_validators import (EthicalValidator, HallucinationValidator,
-                                 PromptInjectionValidator, StructuralValidator,
-                                 ToxicityValidator)
+    from .llm_validators import (
+        EthicalValidator,
+        HallucinationValidator,
+        PromptInjectionValidator,
+        StructuralValidator,
+        ToxicityValidator,
+    )
 
     LLM_VALIDATORS_AVAILABLE = True
     logger.info("LLM safety validator modules loaded.")
@@ -280,9 +301,9 @@ class ConstraintManager:
                 passed, confidence = constraint.check(action, context)
                 with self.lock:
                     self.constraint_metrics[constraint.name]["checks"] += 1
-                    self.constraint_metrics[constraint.name]["last_checked"] = (
-                        time.time()
-                    )
+                    self.constraint_metrics[constraint.name][
+                        "last_checked"
+                    ] = time.time()
 
                 if not passed:
                     violations.append(SafetyViolationType.OPERATIONAL)
@@ -1120,11 +1141,7 @@ class EnhancedSafetyValidator(SafetyValidator):
             logger.warning("LLM safety validators skipped due to missing dependencies.")
 
     def _load_governance_modules(self):
-        global \
-            AdaptiveGovernance, \
-            EnhancedNSOAligner, \
-            SymbolicSafetyChecker, \
-            GOVERNANCE_AVAILABLE
+        global AdaptiveGovernance, EnhancedNSOAligner, SymbolicSafetyChecker, GOVERNANCE_AVAILABLE
         if self._governance_modules is None:
             try:
                 gov_mod = importlib.import_module(
@@ -1342,10 +1359,12 @@ class EnhancedSafetyValidator(SafetyValidator):
 
     def _initialize_domain_validators(self):
         try:
-            from .domain_validators import (CausalSafetyValidator,
-                                            DataProcessingSafetyValidator,
-                                            OptimizationSafetyValidator,
-                                            PredictionSafetyValidator)
+            from .domain_validators import (
+                CausalSafetyValidator,
+                DataProcessingSafetyValidator,
+                OptimizationSafetyValidator,
+                PredictionSafetyValidator,
+            )
 
             self.causal_validator = CausalSafetyValidator(self.safe_regions)
             self.prediction_validator = PredictionSafetyValidator(self.safe_regions)
@@ -1760,9 +1779,11 @@ class EnhancedSafetyValidator(SafetyValidator):
             return SafetyReport(
                 safe=compliance_result["compliant"],
                 confidence=0.9 if compliance_result["compliant"] else 0.3,
-                violations=[]
-                if compliance_result["compliant"]
-                else [SafetyViolationType.COMPLIANCE],
+                violations=(
+                    []
+                    if compliance_result["compliant"]
+                    else [SafetyViolationType.COMPLIANCE]
+                ),
                 compliance_checks=compliance_result.get("standard_results", {}),
             )
 
@@ -1776,9 +1797,11 @@ class EnhancedSafetyValidator(SafetyValidator):
             return SafetyReport(
                 safe=not bias_result["bias_detected"],
                 confidence=0.85 if not bias_result["bias_detected"] else 0.4,
-                violations=[]
-                if not bias_result["bias_detected"]
-                else [SafetyViolationType.BIAS],
+                violations=(
+                    []
+                    if not bias_result["bias_detected"]
+                    else [SafetyViolationType.BIAS]
+                ),
                 bias_scores=bias_result.get("bias_scores", {}),
                 mitigations=bias_result.get("recommendations", []),
             )
@@ -1884,9 +1907,11 @@ class EnhancedSafetyValidator(SafetyValidator):
                     SafetyReport(
                         safe=compliance_result["compliant"],
                         confidence=0.9 if compliance_result["compliant"] else 0.3,
-                        violations=[]
-                        if compliance_result["compliant"]
-                        else [SafetyViolationType.COMPLIANCE],
+                        violations=(
+                            []
+                            if compliance_result["compliant"]
+                            else [SafetyViolationType.COMPLIANCE]
+                        ),
                         compliance_checks=compliance_result.get("standard_results", {}),
                     )
                 )
@@ -1900,9 +1925,11 @@ class EnhancedSafetyValidator(SafetyValidator):
                     SafetyReport(
                         safe=not bias_result["bias_detected"],
                         confidence=0.85 if not bias_result["bias_detected"] else 0.4,
-                        violations=[]
-                        if not bias_result["bias_detected"]
-                        else [SafetyViolationType.BIAS],
+                        violations=(
+                            []
+                            if not bias_result["bias_detected"]
+                            else [SafetyViolationType.BIAS]
+                        ),
                         bias_scores=bias_result.get("bias_scores", {}),
                         mitigations=bias_result.get("recommendations", []),
                     )
@@ -2521,9 +2548,11 @@ class EnhancedSafetyValidator(SafetyValidator):
             report = SafetyReport(
                 safe=len(veto_report_data.get("tool_vetoes", [])) == 0,
                 confidence=veto_report_data.get("confidence", 0.5),
-                violations=[SafetyViolationType.TOOL_VETO]
-                if veto_report_data.get("tool_vetoes")
-                else [],
+                violations=(
+                    [SafetyViolationType.TOOL_VETO]
+                    if veto_report_data.get("tool_vetoes")
+                    else []
+                ),
                 reasons=veto_report_data.get("reasons", []),
                 tool_vetoes=veto_report_data.get("tool_vetoes", []),
                 metadata=governance_result,

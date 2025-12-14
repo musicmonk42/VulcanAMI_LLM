@@ -42,15 +42,12 @@ class PerceptionError(Exception):
     """Raised when perception phase fails"""
 
 
-
 class ReasoningError(Exception):
     """Raised when reasoning phase fails"""
 
 
-
 class ExecutionError(Exception):
     """Raised when execution phase fails"""
-
 
 
 # ============================================================
@@ -901,9 +898,9 @@ class AdaptiveOrchestrator(VULCANAGICollective):
         return {
             "total_adaptations": len(adaptations),
             "strategy_distribution": strategy_counts,
-            "current_strategy": adaptations[-1]["strategy"]
-            if adaptations
-            else "balanced",
+            "current_strategy": (
+                adaptations[-1]["strategy"] if adaptations else "balanced"
+            ),
             "recent_metrics": self.performance_monitor.get_recent_metrics(),
         }
 

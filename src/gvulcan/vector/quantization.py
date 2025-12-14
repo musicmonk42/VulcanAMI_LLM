@@ -119,9 +119,11 @@ def rotational_8bit(
     meta = {
         "scale": scale.squeeze().tolist() if scale.size < 1000 else scale.mean(),
         "has_rotation": rotation_matrix is not None,
-        "rotation_matrix": rotation_matrix.tolist()
-        if rotation_matrix is not None and rotation_matrix.size < 10000
-        else None,
+        "rotation_matrix": (
+            rotation_matrix.tolist()
+            if rotation_matrix is not None and rotation_matrix.size < 10000
+            else None
+        ),
         "compression_ratio": compression_ratio,
         "quantization_range": [-128, 127],
         "method": "rotational_8bit",

@@ -9,10 +9,19 @@ import pytest
 
 # Import the module components to test
 from vulcan.knowledge_crystallizer.crystallization_selector import (
-    AdaptiveStrategy, BatchStrategy, CascadeAwareStrategy,
-    CrystallizationMethod, CrystallizationSelector, DomainType, HybridStrategy,
-    IncrementalStrategy, MethodSelection, StandardStrategy, TraceCharacteristics,
-    TraceComplexity)
+    AdaptiveStrategy,
+    BatchStrategy,
+    CascadeAwareStrategy,
+    CrystallizationMethod,
+    CrystallizationSelector,
+    DomainType,
+    HybridStrategy,
+    IncrementalStrategy,
+    MethodSelection,
+    StandardStrategy,
+    TraceCharacteristics,
+    TraceComplexity,
+)
 
 # ============================================================================
 # TEST HELPER CLASSES

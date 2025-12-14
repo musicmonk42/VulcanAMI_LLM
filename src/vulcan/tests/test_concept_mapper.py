@@ -17,8 +17,13 @@ Tests cover:
 """
 
 # Add parent directory to path for imports
-from semantic_bridge.concept_mapper import (Concept, ConceptMapper, EffectType,
-                                            MeasurableEffect, PatternOutcome)
+from semantic_bridge.concept_mapper import (
+    Concept,
+    ConceptMapper,
+    EffectType,
+    MeasurableEffect,
+    PatternOutcome,
+)
 import sys
 import threading
 import time

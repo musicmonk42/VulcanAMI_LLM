@@ -18,15 +18,23 @@ CRITICAL NOTES:
 - The force_shutdown_reasoner function makes ALL threads daemon immediately to prevent hangs
 """
 
-from vulcan.reasoning.unified_reasoning import (ReasoningPlan,
-                                                ReasoningStrategy,
-                                                ReasoningTask, UnifiedReasoner,
-                                                _load_optional_components,
-                                                _load_reasoning_components,
-                                                _load_selection_components)
-from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
-                                              ReasoningStep, ReasoningType)
+from vulcan.reasoning.unified_reasoning import (
+    ReasoningPlan,
+    ReasoningStrategy,
+    ReasoningTask,
+    UnifiedReasoner,
+    _load_optional_components,
+    _load_reasoning_components,
+    _load_selection_components,
+)
+from vulcan.reasoning.reasoning_types import (
+    ReasoningChain,
+    ReasoningResult,
+    ReasoningStep,
+    ReasoningType,
+)
 import gc
+
 # CRITICAL: Mock problematic components BEFORE any imports that might load them
 import sys
 import threading
@@ -956,12 +964,12 @@ class TestUnifiedReasoner:
             reasoner.load_state("test_state")
 
             # Verify state was restored
-            assert reasoner.confidence_threshold == initial_threshold, (
-                "Confidence threshold should be restored"
-            )
-            assert len(reasoner.reasoning_history) == initial_history_len, (
-                "History should be restored"
-            )
+            assert (
+                reasoner.confidence_threshold == initial_threshold
+            ), "Confidence threshold should be restored"
+            assert (
+                len(reasoner.reasoning_history) == initial_history_len
+            ), "History should be restored"
 
         finally:
             # Restore original model_path
@@ -1359,9 +1367,9 @@ class TestPerformance:
 
         # Secondary check: Cached call should be faster or equal
         if first_time > 0 and second_time > 0:
-            assert second_time <= first_time, (
-                f"Cached call ({second_time}s) should be <= first call ({first_time}s)"
-            )
+            assert (
+                second_time <= first_time
+            ), f"Cached call ({second_time}s) should be <= first call ({first_time}s)"
 
         # The cache definitely worked if we only called the slow function once
         stats = reasoner.get_statistics()

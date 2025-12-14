@@ -71,8 +71,11 @@ try:
     # Use relative imports within the selection package
     from .admission_control import AdmissionControlIntegration, RequestPriority
     from .memory_prior import BayesianMemoryPrior, PriorType
-    from .portfolio_executor import (ExecutionMonitor, ExecutionStrategy,
-                                     PortfolioExecutor)
+    from .portfolio_executor import (
+        ExecutionMonitor,
+        ExecutionStrategy,
+        PortfolioExecutor,
+    )
     from .safety_governor import SafetyContext, SafetyGovernor, SafetyLevel
     from .selection_cache import SelectionCache
     from .utility_model import UtilityModel
@@ -102,8 +105,12 @@ except ImportError as e:
 
 # CRITICAL FIX: Bandit import is separate - it might not exist
 try:
-    from ..contextual_bandit import (AdaptiveBanditOrchestrator, BanditAction,
-                                     BanditContext, BanditFeedback)
+    from ..contextual_bandit import (
+        AdaptiveBanditOrchestrator,
+        BanditAction,
+        BanditContext,
+        BanditFeedback,
+    )
 
     BANDIT_AVAILABLE = True
     logger.info("Contextual bandit imported successfully")
@@ -421,7 +428,9 @@ class CalibratedDecisionMaker:
         calib_path = Path(path) / "calibration.pkl"
         if calib_path.exists():
             with open(calib_path, "rb") as f:
-                self.calibrators = pickle.load(f)  # nosec B301 - Internal data structure
+                self.calibrators = pickle.load(
+                    f
+                )  # nosec B301 - Internal data structure
 
 
 # ==============================================================================
@@ -735,7 +744,9 @@ class ToolSelectionBandit:
         else:
             # CRITICAL FIX: Save fallback statistics when disabled
             Path(path).mkdir(parents=True, exist_ok=True)
-            with open(Path(path, encoding="utf-8") / "bandit_statistics.pkl", "wb") as f:
+            with open(
+                Path(path, encoding="utf-8") / "bandit_statistics.pkl", "wb"
+            ) as f:
                 pickle.dump(self.statistics, f)
 
     def load_model(self, path: str):
@@ -746,7 +757,9 @@ class ToolSelectionBandit:
             stats_path = Path(path) / "bandit_statistics.pkl"
             if stats_path.exists():
                 with open(stats_path, "rb") as f:
-                    self.statistics = pickle.load(f)  # nosec B301 - Internal data structure
+                    self.statistics = pickle.load(
+                        f
+                    )  # nosec B301 - Internal data structure
 
     def increase_exploration(self):
         """Increase exploration rate (delegated)."""
@@ -1638,9 +1651,11 @@ class ToolSelector:
                     "cache_stats": self.cache.get_statistics(),
                     "safety_stats": self.safety_governor.get_statistics(),
                     "executor_stats": self.portfolio_executor.get_statistics(),
-                    "bandit_stats": self.bandit.get_statistics()
-                    if hasattr(self.bandit, "get_statistics")
-                    else {},
+                    "bandit_stats": (
+                        self.bandit.get_statistics()
+                        if hasattr(self.bandit, "get_statistics")
+                        else {}
+                    ),
                     "voi_stats": self.voi_gate.get_statistics(),
                     "total_executions": len(self.execution_history),
                     "recent_executions": list(self.execution_history)[-10:],

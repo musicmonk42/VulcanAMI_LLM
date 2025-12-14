@@ -33,8 +33,9 @@ logger = logging.getLogger(__name__)
 try:
     # WorldModel is now lazy-loaded to prevent circular imports
     from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
-    from vulcan.world_model.meta_reasoning.motivational_introspection import \
-        MotivationalIntrospection
+    from vulcan.world_model.meta_reasoning.motivational_introspection import (
+        MotivationalIntrospection,
+    )
 
     VULCAN_AVAILABLE = True
 except ImportError as e:
@@ -48,10 +49,8 @@ WorldModel = None
 
 # Import Graphix components (relative imports within package)
 try:
-    from .execution_engine import (ExecutionContext, ExecutionMode,
-                                   GraphExecutionResult)
-    from .execution_metrics import \
-        ExecutionMetrics  # Needed for on_run_complete
+    from .execution_engine import ExecutionContext, ExecutionMode, GraphExecutionResult
+    from .execution_metrics import ExecutionMetrics  # Needed for on_run_complete
     from .graph_validator import ValidationResult
 except ImportError as e:
     # Fallback for potential direct script execution or testing issues
@@ -237,8 +236,7 @@ class VulcanGraphixBridge:
         global WorldModel  # Use global to cache the import
         if WorldModel is None:
             try:
-                from vulcan.world_model.world_model_core import \
-                    WorldModel as WM
+                from vulcan.world_model.world_model_core import WorldModel as WM
 
                 WorldModel = WM  # Assign to global
                 logger.info("WorldModel lazy loaded successfully")

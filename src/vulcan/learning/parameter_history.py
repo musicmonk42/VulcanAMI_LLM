@@ -575,9 +575,11 @@ class ParameterHistoryManager:
 
         analysis = {
             "trajectory_id": trajectory_id,
-            "duration": trajectory.end_time - trajectory.start_time
-            if trajectory.end_time
-            else None,
+            "duration": (
+                trajectory.end_time - trajectory.start_time
+                if trajectory.end_time
+                else None
+            ),
             "num_steps": len(trajectory.states),
             "num_checkpoints": len(trajectory.parameter_snapshots),
         }
@@ -800,6 +802,10 @@ class ParameterHistoryManager:
                 self.shutdown()
             except Exception as e:
                 try:
-                    logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
-                except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+                    logger.error(
+                        f"Error during shutdown in destructor: {e}", exc_info=True
+                    )
+                except (
+                    Exception
+                ):  # nosec B110 - Logger may be unavailable during interpreter shutdown
                     pass

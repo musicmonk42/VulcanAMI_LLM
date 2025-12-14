@@ -690,20 +690,20 @@ async def test_graph_validation(golden_file: str):
 
         # Ethical validation
         ethics_result = suite._validate_ethics(graph)
-        assert ethics_result["status"] != "error", (
-            f"Ethics validation failed: {ethics_result.get('error')}"
-        )
-        assert ethics_result["ethical"] == "safe", (
-            f"Graph {golden_file} not ethically safe: {ethics_result['ethical']}"
-        )
+        assert (
+            ethics_result["status"] != "error"
+        ), f"Ethics validation failed: {ethics_result.get('error')}"
+        assert (
+            ethics_result["ethical"] == "safe"
+        ), f"Graph {golden_file} not ethically safe: {ethics_result['ethical']}"
         suite._log_metrics(f"ethics_{test_name}", ethics_result)
         suite._log_audit(f"ethics_{test_name}", ethics_result)
 
         # Execution validation
         exec_result = await suite._validate_execution(graph)
-        assert exec_result["status"] == "completed", (
-            f"Execution failed: {exec_result.get('error')}"
-        )
+        assert (
+            exec_result["status"] == "completed"
+        ), f"Execution failed: {exec_result.get('error')}"
         suite._log_metrics(f"exec_{test_name}", exec_result)
         suite._log_audit(f"exec_{test_name}", exec_result)
 
@@ -734,9 +734,9 @@ async def test_parallel_validation():
                 "execution",
                 "photonic",
             }
-            assert set(results.keys()) >= expected_aspects, (
-                f"Missing validation aspects: {expected_aspects - set(results.keys())}"
-            )
+            assert (
+                set(results.keys()) >= expected_aspects
+            ), f"Missing validation aspects: {expected_aspects - set(results.keys())}"
 
             # Generate and log report
             report = suite.generate_validation_report(results)
@@ -758,9 +758,9 @@ async def test_stress_validation():
         logger.info(f"Testing large graph with hash: {graph_hash[:8]}...")
 
         exec_result = await suite._validate_execution(graph)
-        assert exec_result["status"] == "completed", (
-            f"Stress test failed: {exec_result.get('error')}"
-        )
+        assert (
+            exec_result["status"] == "completed"
+        ), f"Stress test failed: {exec_result.get('error')}"
         suite._log_metrics("stress_test", exec_result)
         suite._log_audit("stress_test", {"graph_hash": graph_hash, **exec_result})
 
@@ -790,9 +790,9 @@ async def test_adversarial_validation():
                 )
 
         ethics_result = suite._validate_ethics(adv_graph)
-        assert ethics_result["ethical"] == "risky", (
-            "Adversarial graph not flagged as risky"
-        )
+        assert (
+            ethics_result["ethical"] == "risky"
+        ), "Adversarial graph not flagged as risky"
         suite._log_metrics("adversarial_test", ethics_result)
         suite._log_audit("adversarial_test", ethics_result)
 
@@ -822,9 +822,9 @@ async def test_tournament_validation():
 
         for idx in winners:
             graph = proposals[idx]
-            assert suite._validate_schema(graph), (
-                f"Tournament winner {graph['id']} invalid schema"
-            )
+            assert suite._validate_schema(
+                graph
+            ), f"Tournament winner {graph['id']} invalid schema"
 
         suite._log_metrics("tournament_test", {"status": "completed", "duration_ms": 0})
         suite._log_audit("tournament_test", {"num_winners": len(winners)})
@@ -845,12 +845,12 @@ def test_manifest_completeness():
         manifest_nodes = set(suite.manifest.get("node_types", {}).keys())
         manifest_edges = set(suite.manifest.get("edge_types", {}).keys())
 
-        assert used_node_types.issubset(manifest_nodes), (
-            f"Missing node types: {used_node_types - manifest_nodes}"
-        )
-        assert used_edge_types.issubset(manifest_edges), (
-            f"Missing edge types: {used_edge_types - manifest_edges}"
-        )
+        assert used_node_types.issubset(
+            manifest_nodes
+        ), f"Missing node types: {used_node_types - manifest_nodes}"
+        assert used_edge_types.issubset(
+            manifest_edges
+        ), f"Missing edge types: {used_edge_types - manifest_edges}"
         suite._log_metrics(
             "manifest_completeness", {"status": "completed", "duration_ms": 0}
         )
@@ -885,9 +885,9 @@ def test_caching_functionality():
     # On very fast filesystems, cache time might be slightly higher due to overhead.
     # We check for correctness first, and performance as a secondary goal.
     if second_cache_time > 0 and first_cache_time > 0:
-        assert second_cache_time <= first_cache_time, (
-            "Cache did not improve performance"
-        )
+        assert (
+            second_cache_time <= first_cache_time
+        ), "Cache did not improve performance"
     else:
         assert graph3 == graph2, "Cached content doesn't match"
 

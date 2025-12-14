@@ -636,9 +636,11 @@ class GraphRAG:
         stats = {
             **self.stats,
             "cache_hit_rate": cache_hit_rate,
-            "index_size": self.vector_index.ntotal
-            if (self.use_faiss and self.vector_index)
-            else len(getattr(self, "embeddings_list", [])),
+            "index_size": (
+                self.vector_index.ntotal
+                if (self.use_faiss and self.vector_index)
+                else len(getattr(self, "embeddings_list", []))
+            ),
             "graph_nodes": len(self.nodes),
             "bm25_docs": len(self.bm25_corpus),
         }

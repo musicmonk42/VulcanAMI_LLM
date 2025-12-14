@@ -10,22 +10,30 @@ Tests:
 - Integration validation
 """
 
-from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
-                                                        ExecutionOutcome,
-                                                        ProblemDecomposer,
-                                                        ProblemGraph)
+from problem_decomposer.problem_decomposer_core import (
+    DecompositionPlan,
+    ExecutionOutcome,
+    ProblemDecomposer,
+    ProblemGraph,
+)
 from problem_decomposer.fallback_chain import FallbackChain
 from problem_decomposer.decomposition_strategies import (
-    AnalogicalDecomposition, BruteForceSearch, ExactDecomposition,
-    SemanticDecomposition, StructuralDecomposition, SyntheticBridging)
-from problem_decomposer.decomposition_library import (
-    StratifiedDecompositionLibrary)
-from problem_decomposer.decomposer_bootstrap import (DecomposerBootstrap,
-                                                     create_decomposer,
-                                                     create_test_problem,
-                                                     get_bootstrap,
-                                                     run_bootstrap_test,
-                                                     validate_decomposer_setup)
+    AnalogicalDecomposition,
+    BruteForceSearch,
+    ExactDecomposition,
+    SemanticDecomposition,
+    StructuralDecomposition,
+    SyntheticBridging,
+)
+from problem_decomposer.decomposition_library import StratifiedDecompositionLibrary
+from problem_decomposer.decomposer_bootstrap import (
+    DecomposerBootstrap,
+    create_decomposer,
+    create_test_problem,
+    get_bootstrap,
+    run_bootstrap_test,
+    validate_decomposer_setup,
+)
 from problem_decomposer.adaptive_thresholds import AdaptiveThresholds
 import logging
 import sys
@@ -123,9 +131,9 @@ class TestDecomposerBootstrap:
         ]
 
         for strategy_type in required_types:
-            assert strategy_type in strategies, (
-                f"Missing strategy type: {strategy_type}"
-            )
+            assert (
+                strategy_type in strategies
+            ), f"Missing strategy type: {strategy_type}"
 
         # Check strategy instances are unique
         unique_instances = set(id(s) for s in bootstrap.strategy_instances)
@@ -167,9 +175,9 @@ class TestDecomposerBootstrap:
         # Verify all have required methods
         for name, strategy in strategies.items():
             assert hasattr(strategy, "apply"), f"Strategy {name} missing apply method"
-            assert hasattr(strategy, "decompose"), (
-                f"Strategy {name} missing decompose method"
-            )
+            assert hasattr(
+                strategy, "decompose"
+            ), f"Strategy {name} missing decompose method"
             assert hasattr(strategy, "name"), f"Strategy {name} missing name attribute"
 
         logger.info("✓ Strategy type validation passed")
@@ -188,9 +196,9 @@ class TestDecomposerBootstrap:
         # Test strategy retrieval
         for strategy_name in ["exact", "semantic", "structural"]:
             retrieved = library.get_strategy(strategy_name)
-            assert retrieved is not None, (
-                f"Failed to retrieve strategy: {strategy_name}"
-            )
+            assert (
+                retrieved is not None
+            ), f"Failed to retrieve strategy: {strategy_name}"
             assert retrieved == strategies[strategy_name]
 
         # Test get_strategy_by_type
@@ -246,9 +254,9 @@ class TestDecomposerBootstrap:
         ]
 
         for principle_id in expected_principles:
-            assert principle_id in library.principles, (
-                f"Missing principle: {principle_id}"
-            )
+            assert (
+                principle_id in library.principles
+            ), f"Missing principle: {principle_id}"
 
         # Verify principle structure
         for principle_id, principle in library.principles.items():

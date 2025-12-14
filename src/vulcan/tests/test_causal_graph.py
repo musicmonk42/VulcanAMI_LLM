@@ -21,8 +21,12 @@ import numpy as np
 import pytest
 
 # Import the module under test
-from vulcan.world_model.causal_graph import (CausalDAG, CausalEdge, EvidenceType,
-                                             ProbabilityDistribution)
+from vulcan.world_model.causal_graph import (
+    CausalDAG,
+    CausalEdge,
+    EvidenceType,
+    ProbabilityDistribution,
+)
 
 # ==================== FIXTURES ====================
 

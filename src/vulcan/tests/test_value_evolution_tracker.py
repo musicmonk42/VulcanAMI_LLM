@@ -19,7 +19,10 @@ import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.value_evolution_tracker import (
-    DriftSeverity, TrendDirection, ValueEvolutionTracker)
+    DriftSeverity,
+    TrendDirection,
+    ValueEvolutionTracker,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

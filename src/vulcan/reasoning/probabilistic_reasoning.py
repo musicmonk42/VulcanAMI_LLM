@@ -38,9 +38,12 @@ try:
     from sklearn.feature_selection import mutual_info_regression
     from sklearn.gaussian_process import GaussianProcessRegressor
     from sklearn.gaussian_process.kernels import RBF
-    from sklearn.gaussian_process.kernels import (ExpSineSquared, Matern,
-                                                  RationalQuadratic,
-                                                  WhiteKernel)
+    from sklearn.gaussian_process.kernels import (
+        ExpSineSquared,
+        Matern,
+        RationalQuadratic,
+        WhiteKernel,
+    )
     from sklearn.preprocessing import RobustScaler, StandardScaler
 
     SKLEARN_AVAILABLE = True
@@ -258,8 +261,9 @@ class FeatureExtractor:
 
             # Hash of keys
             key_hash = hashlib.md5(
-                "".join(sorted(str(k) for k in data.keys())).encode()
-                , usedforsecurity=False)
+                "".join(sorted(str(k) for k in data.keys())).encode(),
+                usedforsecurity=False,
+            )
             key_hash_int = int(key_hash.hexdigest()[:8], 16)
             features.append(key_hash_int / 1e10)
 
@@ -335,7 +339,10 @@ class FeatureExtractor:
         features = []
         for i in range(10):
             seed_str = f"{category_str}_{i}"
-            hash_val = int(hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest()[:8], 16)
+            hash_val = int(
+                hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest()[:8],
+                16,
+            )
             features.append(hash_val % 100 / 100.0)
 
         return np.array(features).reshape(1, -1)
@@ -349,7 +356,10 @@ class FeatureExtractor:
         features = []
         for i in range(dim):
             seed_str = f"{text}_{i}"
-            hash_val = int(hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest()[:8], 16)
+            hash_val = int(
+                hashlib.md5(seed_str.encode(), usedforsecurity=False).hexdigest()[:8],
+                16,
+            )
             # Map to [-1, 1] range
             features.append((hash_val % 10000) / 5000.0 - 1.0)
         return np.array(features)
@@ -597,12 +607,12 @@ class KernelParameterOptimizer:
             if result.success:
                 optimal_params = result.x
                 param_dict = {
-                    "length_scale": float(optimal_params[0])
-                    if len(optimal_params) > 0
-                    else 1.0,
-                    "noise_level": float(optimal_params[1])
-                    if len(optimal_params) > 1
-                    else 0.1,
+                    "length_scale": (
+                        float(optimal_params[0]) if len(optimal_params) > 0 else 1.0
+                    ),
+                    "noise_level": (
+                        float(optimal_params[1]) if len(optimal_params) > 1 else 0.1
+                    ),
                 }
                 return param_dict
 
@@ -1419,9 +1429,11 @@ class EnhancedProbabilisticReasoner:
         """Knowledge gradient acquisition"""
         if len(self.observations) > 0:
             current_best = max(
-                obs[1]
-                if isinstance(obs[1], (int, float))
-                else (obs[1].mean() if hasattr(obs[1], "mean") else 0.0)
+                (
+                    obs[1]
+                    if isinstance(obs[1], (int, float))
+                    else (obs[1].mean() if hasattr(obs[1], "mean") else 0.0)
+                )
                 for obs in self.observations
             )
         else:
@@ -1554,9 +1566,9 @@ class EnhancedProbabilisticReasoner:
             "ensemble_size": len(self.gp_ensemble),
             "kernel_type": self.kernel_type,
             "sparse_enabled": self.enable_sparse,
-            "n_inducing_points": len(self.inducing_points)
-            if self.inducing_points is not None
-            else 0,
+            "n_inducing_points": (
+                len(self.inducing_points) if self.inducing_points is not None else 0
+            ),
             "timestamp": time.time(),
         }
 
@@ -1583,12 +1595,12 @@ class EnhancedProbabilisticReasoner:
             "belief_state": self.belief_state,
             "observations": list(self.observations),
             "trained": self.trained,
-            "feature_scaler": self.feature_scaler
-            if self.feature_engineering_enabled
-            else None,
-            "feature_pca": self.feature_pca
-            if self.feature_engineering_enabled
-            else None,
+            "feature_scaler": (
+                self.feature_scaler if self.feature_engineering_enabled else None
+            ),
+            "feature_pca": (
+                self.feature_pca if self.feature_engineering_enabled else None
+            ),
             "diagnostics": {k: list(v) for k, v in self.diagnostics.items()},
             "feature_extractor": self.feature_extractor,
         }
@@ -1655,7 +1667,9 @@ class EnhancedProbabilisticReasoner:
             )
 
         if self.diagnostics["optimization_history"]:
-            diagnostics["recent_optimizations"] = list(self.diagnostics["optimization_history"])[-5:]
+            diagnostics["recent_optimizations"] = list(
+                self.diagnostics["optimization_history"]
+            )[-5:]
 
         return diagnostics
 

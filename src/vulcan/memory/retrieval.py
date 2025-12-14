@@ -78,9 +78,11 @@ class RetrievalResult:
         return {
             "memory_id": self.memory_id,
             "score": self.score,
-            "memory": self.memory.to_dict()
-            if self.memory and hasattr(self.memory, "to_dict")
-            else str(self.memory),
+            "memory": (
+                self.memory.to_dict()
+                if self.memory and hasattr(self.memory, "to_dict")
+                else str(self.memory)
+            ),
             "metadata": self.metadata,
             "relevance": self.relevance,
             "context": self.context,
@@ -862,6 +864,7 @@ if TORCH_AVAILABLE:
             output = output + self.ffn(output)
 
             return output.squeeze(1), attention_weights.mean(dim=1).squeeze(1)
+
 else:
     # Stub class when torch is not available
     LearnedAttention = None
@@ -895,7 +898,9 @@ class AttentionMechanism:
         weights_path = Path("./models/attention_weights.pt")
         if weights_path.exists():
             try:
-                state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
+                state_dict = torch.load(
+                    weights_path, map_location="cpu", weights_only=True
+                )
                 self.learned_attention.load_state_dict(state_dict)
                 logger.info("Loaded pre-trained attention weights")
             except Exception as e:

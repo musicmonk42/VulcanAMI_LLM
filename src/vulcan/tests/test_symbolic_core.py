@@ -11,14 +11,20 @@ Tests cover:
 All tests validate the core functionality for symbolic reasoning.
 """
 
-
 import pytest
 
 # Import the classes we're testing
-from src.vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
-                                                KnowledgeBase, Literal,
-                                                ProofNode, Term, Unifier,
-                                                Variable)
+from src.vulcan.reasoning.symbolic.core import (
+    Clause,
+    Constant,
+    Function,
+    KnowledgeBase,
+    Literal,
+    ProofNode,
+    Term,
+    Unifier,
+    Variable,
+)
 
 # ============================================================================
 # TERM TESTS

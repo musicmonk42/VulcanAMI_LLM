@@ -1,8 +1,14 @@
 """Comprehensive test suite for cost_optimizer.py"""
 
-from cost_optimizer import (CostAnalyzer, CostBreakdown, CostOptimizer,
-                            OptimizationMetrics, OptimizationPhase,
-                            OptimizationReport, OptimizationStrategy)
+from cost_optimizer import (
+    CostAnalyzer,
+    CostBreakdown,
+    CostOptimizer,
+    OptimizationMetrics,
+    OptimizationPhase,
+    OptimizationReport,
+    OptimizationStrategy,
+)
 import sys
 import threading
 import time

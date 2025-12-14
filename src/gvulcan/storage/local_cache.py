@@ -106,7 +106,7 @@ class LocalCache:
     Example:
         import tempfile
         from pathlib import Path
-        
+
         # Use secure temporary directory (CWE-377 mitigation)
         cache_dir = Path(tempfile.gettempdir()) / "vulcan_cache"
         cache = LocalCache(root=cache_dir, max_size=1_000_000_000)

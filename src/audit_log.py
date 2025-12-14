@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from typing import (Any, Callable, Dict, Iterator, List, Optional, Tuple)
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 import aiohttp
 
@@ -287,9 +287,11 @@ class TamperEvidentLogger:
         if not logger.handlers:
             handler = SizedTimedRotatingFileHandler(
                 filename=str(self.config.log_path),
-                when="midnight"
-                if self.config.rotation_type == RotationType.SIZE
-                else self.config.rotation_type,
+                when=(
+                    "midnight"
+                    if self.config.rotation_type == RotationType.SIZE
+                    else self.config.rotation_type
+                ),
                 interval=self.config.rotation_interval,
                 backupCount=self.config.retention_count,
                 maxBytes=self.config.max_file_size,
@@ -553,7 +555,9 @@ class TamperEvidentLogger:
                                         json.dumps(syslog_data, ensure_ascii=False),
                                     )
                                 except Exception as e:
-                                    self._logger.debug(f"Failed to send log to syslog: {e}")
+                                    self._logger.debug(
+                                        f"Failed to send log to syslog: {e}"
+                                    )
             except asyncio.CancelledError:
                 break
             except Exception as e:

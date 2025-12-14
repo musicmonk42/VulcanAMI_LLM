@@ -20,12 +20,31 @@ def test_imports():
 
     try:
         from vulcan.reasoning.symbolic import (  # Main interfaces; Core components; Parsing; Provers; Solvers; Advanced
-            BayesianNetworkReasoner, Clause, Constant, CSPSolver,
-            FormulaParser, Function, FuzzyLogicReasoner, HybridReasoner, Lexer,
-            Literal, MetaReasoner, ParallelProver, Parser,
-            ProbabilisticReasoner, ProofLearner, ProofNode, ResolutionProver,
-            SymbolicReasoner, TableauProver, TemporalReasoner, Term, Unifier,
-            Variable, VariableType)
+            BayesianNetworkReasoner,
+            Clause,
+            Constant,
+            CSPSolver,
+            FormulaParser,
+            Function,
+            FuzzyLogicReasoner,
+            HybridReasoner,
+            Lexer,
+            Literal,
+            MetaReasoner,
+            ParallelProver,
+            Parser,
+            ProbabilisticReasoner,
+            ProofLearner,
+            ProofNode,
+            ResolutionProver,
+            SymbolicReasoner,
+            TableauProver,
+            TemporalReasoner,
+            Term,
+            Unifier,
+            Variable,
+            VariableType,
+        )
 
         print("✓ All imports successful!")
         return True
@@ -232,8 +251,7 @@ def test_bayesian_network():
     print("=" * 70)
 
     try:
-        from vulcan.reasoning.symbolic import (BayesianNetworkReasoner,
-                                               VariableType)
+        from vulcan.reasoning.symbolic import BayesianNetworkReasoner, VariableType
 
         bn = BayesianNetworkReasoner()
 

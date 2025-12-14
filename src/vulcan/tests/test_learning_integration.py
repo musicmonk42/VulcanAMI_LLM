@@ -12,14 +12,20 @@ Tests:
 - State persistence
 """
 
-from problem_decomposer.problem_decomposer_core import (DecompositionPlan,
-                                                        DecompositionStep,
-                                                        ExecutionOutcome,
-                                                        ProblemGraph)
+from problem_decomposer.problem_decomposer_core import (
+    DecompositionPlan,
+    DecompositionStep,
+    ExecutionOutcome,
+    ProblemGraph,
+)
 from problem_decomposer.learning_integration import (
-    DecompositionDifficultyEstimator, IntegratedLearningCoordinator,
-    ProblemToExperienceConverter, RLHFFeedbackRouter, UnifiedDecomposerLearner,
-    create_unified_decomposer)
+    DecompositionDifficultyEstimator,
+    IntegratedLearningCoordinator,
+    ProblemToExperienceConverter,
+    RLHFFeedbackRouter,
+    UnifiedDecomposerLearner,
+    create_unified_decomposer,
+)
 import numpy as np
 from unittest.mock import Mock
 from pathlib import Path

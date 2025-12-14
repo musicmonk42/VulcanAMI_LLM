@@ -7,12 +7,20 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from pattern_matcher import (DEFAULT_MATCH_TIMEOUT, MAX_GRAPH_EDGES,
-                             MAX_GRAPH_NODES, MAX_MATCHES_TO_PROCESS,
-                             MAX_PATTERN_NODES, GraphSizeLimitError,
-                             GraphValidationError, GraphValidationResult,
-                             MatchingStats, MatchingTimeoutError,
-                             PatternMatcher, PatternMatcherError)
+from pattern_matcher import (
+    DEFAULT_MATCH_TIMEOUT,
+    MAX_GRAPH_EDGES,
+    MAX_GRAPH_NODES,
+    MAX_MATCHES_TO_PROCESS,
+    MAX_PATTERN_NODES,
+    GraphSizeLimitError,
+    GraphValidationError,
+    GraphValidationResult,
+    MatchingStats,
+    MatchingTimeoutError,
+    PatternMatcher,
+    PatternMatcherError,
+)
 
 
 @pytest.fixture
@@ -28,12 +36,9 @@ def simple_graph():
         "nodes": [
             {"id": "n1", "type": "CONST", "params": {"value": 5}},
             {"id": "n2", "type": "CONST", "params": {"value": 20}},
-            {"id": "n3", "type": "ADD", "params": {}}
+            {"id": "n3", "type": "ADD", "params": {}},
         ],
-        "edges": [
-            {"from": "n1", "to": "n3"},
-            {"from": "n2", "to": "n3"}
-        ]
+        "edges": [{"from": "n1", "to": "n3"}, {"from": "n2", "to": "n3"}],
     }
 
 
@@ -41,10 +46,8 @@ def simple_graph():
 def simple_pattern():
     """Create simple valid pattern."""
     return {
-        "nodes": [
-            {"id": "?p1", "type": "CONST", "params": {"value": "> 10"}}
-        ],
-        "edges": []
+        "nodes": [{"id": "?p1", "type": "CONST", "params": {"value": "> 10"}}],
+        "edges": [],
     }
 
 
@@ -65,7 +68,7 @@ class TestPatternMatcherInitialization:
             match_timeout=60.0,
             max_matches=500,
             enable_validation=False,
-            strict_mode=False
+            strict_mode=False,
         )
 
         assert matcher.match_timeout == 60.0
@@ -73,7 +76,7 @@ class TestPatternMatcherInitialization:
         assert matcher.enable_validation is False
         assert matcher.strict_mode is False
 
-    @patch('pattern_matcher.NETWORKX_AVAILABLE', False)
+    @patch("pattern_matcher.NETWORKX_AVAILABLE", False)
     def test_initialization_no_networkx(self):
         """Test initialization without NetworkX."""
         with pytest.raises(ImportError):
@@ -115,8 +118,10 @@ class TestGraphValidation:
     def test_validate_too_many_nodes(self, matcher):
         """Test graph with too many nodes."""
         graph = {
-            "nodes": [{"id": f"n{i}", "type": "Node"} for i in range(MAX_GRAPH_NODES + 1)],
-            "edges": []
+            "nodes": [
+                {"id": f"n{i}", "type": "Node"} for i in range(MAX_GRAPH_NODES + 1)
+            ],
+            "edges": [],
         }
 
         result = matcher._validate_graph_structure(graph, "graph")
@@ -127,11 +132,8 @@ class TestGraphValidation:
     def test_validate_duplicate_node_ids(self, matcher):
         """Test duplicate node IDs."""
         graph = {
-            "nodes": [
-                {"id": "n1", "type": "Node"},
-                {"id": "n1", "type": "Node"}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "Node"}, {"id": "n1", "type": "Node"}],
+            "edges": [],
         }
 
         result = matcher._validate_graph_structure(graph, "graph")
@@ -143,7 +145,7 @@ class TestGraphValidation:
         """Test edge referencing non-existent node."""
         graph = {
             "nodes": [{"id": "n1", "type": "Node"}],
-            "edges": [{"from": "n1", "to": "nonexistent"}]
+            "edges": [{"from": "n1", "to": "nonexistent"}],
         }
 
         result = matcher._validate_graph_structure(graph, "graph")
@@ -279,11 +281,11 @@ class TestFindMatches:
         """Test pattern with no matches."""
         graph = {
             "nodes": [{"id": "n1", "type": "CONST", "params": {"value": 5}}],
-            "edges": []
+            "edges": [],
         }
         pattern = {
             "nodes": [{"id": "?p1", "type": "CONST", "params": {"value": "> 10"}}],
-            "edges": []
+            "edges": [],
         }
 
         matches = []
@@ -324,46 +326,52 @@ class TestRewriteGraph:
         """Test rewriting with approved mutator."""
         graph = {
             "nodes": [{"id": "n1", "type": "CONST", "params": {"value": 15}}],
-            "edges": []
+            "edges": [],
         }
         pattern = {
             "nodes": [{"id": "?p1", "type": "CONST", "params": {"value": "> 10"}}],
-            "edges": []
+            "edges": [],
         }
 
         def safe_mutator(g, match):
             import copy
+
             new_g = copy.deepcopy(g)
-            for node in new_g['nodes']:
-                if node['id'] == match['?p1']:
-                    node['params']['value'] *= 2
+            for node in new_g["nodes"]:
+                if node["id"] == match["?p1"]:
+                    node["params"]["value"] *= 2
             return new_g
 
         # Mock NSO Aligner to approve
-        with patch.object(matcher.nso_aligner, 'multi_model_audit', return_value='safe'):
+        with patch.object(
+            matcher.nso_aligner, "multi_model_audit", return_value="safe"
+        ):
             result = await matcher.rewrite_graph(graph, pattern, safe_mutator)
 
         # Should have been rewritten
-        assert result['nodes'][0]['params']['value'] == 30
+        assert result["nodes"][0]["params"]["value"] == 30
 
     @pytest.mark.asyncio
     async def test_rewrite_graph_rejected(self, matcher):
         """Test rewriting with rejected mutator."""
         graph = {
             "nodes": [{"id": "n1", "type": "CONST", "params": {"value": 15}}],
-            "edges": []
+            "edges": [],
         }
         pattern = {
             "nodes": [{"id": "?p1", "type": "CONST", "params": {"value": "> 10"}}],
-            "edges": []
+            "edges": [],
         }
 
         def risky_mutator(g, match):
             import copy
+
             return copy.deepcopy(g)
 
         # Mock NSO Aligner to reject
-        with patch.object(matcher.nso_aligner, 'multi_model_audit', return_value='risky'):
+        with patch.object(
+            matcher.nso_aligner, "multi_model_audit", return_value="risky"
+        ):
             result = await matcher.rewrite_graph(graph, pattern, risky_mutator)
 
         # Should be unchanged
@@ -374,12 +382,9 @@ class TestRewriteGraph:
         """Test rewriting with failing mutator."""
         graph = {
             "nodes": [{"id": "n1", "type": "CONST", "params": {"value": 15}}],
-            "edges": []
+            "edges": [],
         }
-        pattern = {
-            "nodes": [{"id": "?p1", "type": "CONST", "params": {}}],
-            "edges": []
-        }
+        pattern = {"nodes": [{"id": "?p1", "type": "CONST", "params": {}}], "edges": []}
 
         def failing_mutator(g, match):
             raise Exception("Mutator failed")

@@ -15,6 +15,7 @@ import pytest
 
 try:
     import numpy as np
+
     NUMPY_AVAILABLE = True
 except ImportError:
     np = None
@@ -61,7 +62,7 @@ class TestSubgraphPattern:
             metadata={"test": True},
             performance_metrics={"latency": 0.1},
             usage_count=5,
-            confidence_score=0.8
+            confidence_score=0.8,
         )
 
         assert pattern.pattern_id == "test_123"
@@ -74,14 +75,14 @@ class TestSubgraphPattern:
         pattern = re.SubgraphPattern(
             pattern_id="test_456",
             name="TestPattern2",
-            graph_definition={"nodes": [], "edges": []}
+            graph_definition={"nodes": [], "edges": []},
         )
 
         pattern_dict = pattern.to_dict()
-        assert pattern_dict['pattern_id'] == "test_456"
-        assert pattern_dict['name'] == "TestPattern2"
-        assert 'creation_time' in pattern_dict
-        assert pattern_dict['last_used'] is None
+        assert pattern_dict["pattern_id"] == "test_456"
+        assert pattern_dict["name"] == "TestPattern2"
+        assert "creation_time" in pattern_dict
+        assert pattern_dict["last_used"] is None
 
 
 class TestExecutionExplanation:
@@ -94,7 +95,7 @@ class TestExecutionExplanation:
             explanation_type=re.ExplanationType.SIMPLE,
             summary="Test explanation",
             details={"key": "value"},
-            confidence=0.75
+            confidence=0.75,
         )
 
         assert explanation.subgraph_id == "sg_001"
@@ -106,13 +107,13 @@ class TestExecutionExplanation:
         explanation = re.ExecutionExplanation(
             subgraph_id="sg_002",
             explanation_type=re.ExplanationType.DETAILED,
-            summary="Detailed test"
+            summary="Detailed test",
         )
 
         exp_dict = explanation.to_dict()
-        assert exp_dict['subgraph_id'] == "sg_002"
-        assert exp_dict['explanation_type'] == "detailed"
-        assert 'timestamp' in exp_dict
+        assert exp_dict["subgraph_id"] == "sg_002"
+        assert exp_dict["explanation_type"] == "detailed"
+        assert "timestamp" in exp_dict
 
 
 class TestAutonomousCycleReport:
@@ -126,7 +127,7 @@ class TestAutonomousCycleReport:
             optimizations_applied=["opt1", "opt2"],
             evolution_proposals=[{"proposal": "test"}],
             safety_violations=[],
-            performance_delta={"latency": -0.1}
+            performance_delta={"latency": -0.1},
         )
 
         assert report.cycle_id == "cycle_001"
@@ -141,13 +142,13 @@ class TestAutonomousCycleReport:
             optimizations_applied=[],
             evolution_proposals=[],
             safety_violations=["violation1"],
-            performance_delta={}
+            performance_delta={},
         )
 
         report_dict = report.to_dict()
-        assert report_dict['cycle_id'] == "cycle_002"
-        assert report_dict['fitness_score'] == 0.9
-        assert len(report_dict['safety_violations']) == 1
+        assert report_dict["cycle_id"] == "cycle_002"
+        assert report_dict["fitness_score"] == 0.9
+        assert len(report_dict["safety_violations"]) == 1
 
 
 class TestSubgraphLearner:
@@ -157,7 +158,7 @@ class TestSubgraphLearner:
     def temp_dir(self):
         """Create temporary directory for tests"""
         temp_dir_path = Path(tempfile.mkdtemp())
-        yield str(temp_dir_path) # Pass the path as a string
+        yield str(temp_dir_path)  # Pass the path as a string
         shutil.rmtree(temp_dir_path)
 
     @pytest.fixture
@@ -168,20 +169,19 @@ class TestSubgraphLearner:
     @pytest.fixture
     def valid_graph(self):
         """Create valid graph definition"""
+
         # Return a function to ensure a fresh dict each time
         def _create_graph():
             return {
                 "nodes": [
                     {"id": "n1", "type": "Source"},
                     {"id": "n2", "type": "Process"},
-                    {"id": "n3", "type": "Sink"}
+                    {"id": "n3", "type": "Sink"},
                 ],
-                "edges": [
-                    {"from": "n1", "to": "n2"},
-                    {"from": "n2", "to": "n3"}
-                ]
+                "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
             }
-        return _create_graph() # Call the function to return the dict
+
+        return _create_graph()  # Call the function to return the dict
 
     def test_learner_creation(self, learner, temp_dir):
         """Test creating SubgraphLearner"""
@@ -195,7 +195,7 @@ class TestSubgraphLearner:
             "TestType",
             valid_graph,
             mode=re.LearningMode.SUPERVISED,
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
         assert success is True
@@ -207,9 +207,7 @@ class TestSubgraphLearner:
     def test_learn_subgraph_unsupervised(self, learner, valid_graph):
         """Test learning a subgraph in unsupervised mode"""
         success, pattern_id = learner.learn_subgraph(
-            "TestType",
-            valid_graph,
-            mode=re.LearningMode.UNSUPERVISED
+            "TestType", valid_graph, mode=re.LearningMode.UNSUPERVISED
         )
 
         assert success is True
@@ -251,9 +249,9 @@ class TestSubgraphLearner:
         invalid_graph = {
             "nodes": [
                 {"id": "n1", "type": "A"},
-                {"id": "n1", "type": "B"}  # Duplicate
+                {"id": "n1", "type": "B"},  # Duplicate
             ],
-            "edges": []
+            "edges": [],
         }
         assert learner._validate_graph_structure(invalid_graph) is False
 
@@ -261,7 +259,7 @@ class TestSubgraphLearner:
         """Test validation with unknown node in edge"""
         invalid_graph = {
             "nodes": [{"id": "n1"}],
-            "edges": [{"from": "n1", "to": "n2"}]  # n2 doesn't exist
+            "edges": [{"from": "n1", "to": "n2"}],  # n2 doesn't exist
         }
         assert learner._validate_graph_structure(invalid_graph) is False
 
@@ -293,16 +291,28 @@ class TestSubgraphLearner:
         """Test getting patterns by type"""
         # Define graph structures explicitly
         graph_a1 = {
-            "nodes": [{"id": "n1", "type": "Source"}, {"id": "n2", "type": "Process"}, {"id": "n3", "type": "Sink"}],
-            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}]
+            "nodes": [
+                {"id": "n1", "type": "Source"},
+                {"id": "n2", "type": "Process"},
+                {"id": "n3", "type": "Sink"},
+            ],
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
         }
         graph_a2 = {
-            "nodes": [{"id": "n1a", "type": "Source"}, {"id": "n2", "type": "Process"}, {"id": "n3", "type": "Sink"}],
-            "edges": [{"from": "n1a", "to": "n2"}, {"from": "n2", "to": "n3"}]
+            "nodes": [
+                {"id": "n1a", "type": "Source"},
+                {"id": "n2", "type": "Process"},
+                {"id": "n3", "type": "Sink"},
+            ],
+            "edges": [{"from": "n1a", "to": "n2"}, {"from": "n2", "to": "n3"}],
         }
-        graph_b1 = { # Same structure as graph_a1
-            "nodes": [{"id": "n1", "type": "Source"}, {"id": "n2", "type": "Process"}, {"id": "n3", "type": "Sink"}],
-            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}]
+        graph_b1 = {  # Same structure as graph_a1
+            "nodes": [
+                {"id": "n1", "type": "Source"},
+                {"id": "n2", "type": "Process"},
+                {"id": "n3", "type": "Sink"},
+            ],
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
         }
 
         # Learn the patterns
@@ -311,8 +321,8 @@ class TestSubgraphLearner:
         success3, id3 = learner.learn_subgraph("TypeB", graph_b1)
 
         assert success1 and success2 and success3
-        assert id1 != id2 # Ensure different graphs yield different IDs for same type
-        assert id1 != id3 # Ensure same graph yields different IDs for different types
+        assert id1 != id2  # Ensure different graphs yield different IDs for same type
+        assert id1 != id3  # Ensure same graph yields different IDs for different types
         assert id2 != id3
 
         # Get patterns by type
@@ -332,11 +342,7 @@ class TestSubgraphLearner:
         success, pattern_id = learner.learn_subgraph("PerfTest", valid_graph)
         assert success
 
-        metrics = {
-            "latency": 0.05,
-            "throughput": 1000,
-            "success_rate": 0.95
-        }
+        metrics = {"latency": 0.05, "throughput": 1000, "success_rate": 0.95}
 
         updated = learner.update_pattern_performance(pattern_id, metrics)
         assert updated is True
@@ -349,8 +355,7 @@ class TestSubgraphLearner:
         """Test evicting least used patterns"""
         # Create a learner with max_patterns=2 to test eviction
         small_learner = re.SubgraphLearner(
-            learned_subgraphs_dir=learner.learned_dir,
-            max_patterns=2
+            learned_subgraphs_dir=learner.learned_dir, max_patterns=2
         )
 
         # Add 3 patterns (should trigger eviction of one)
@@ -358,13 +363,16 @@ class TestSubgraphLearner:
         for i in range(3):
             graph = valid_graph.copy()
             # Must modify graph to get new pattern ID
-            graph["nodes"] = [{"id": f"n{i}", "type": "Source"}, {"id": f"n_sink_{i}", "type": "Sink"}]
+            graph["nodes"] = [
+                {"id": f"n{i}", "type": "Source"},
+                {"id": f"n_sink_{i}", "type": "Sink"},
+            ]
             graph["edges"] = [{"from": f"n{i}", "to": f"n_sink_{i}"}]
             # Use distinct types as well to guarantee different IDs with the fixed generator
             success, pid = small_learner.learn_subgraph(f"Type{i}", graph)
             assert success
             ids.append(pid)
-            time.sleep(0.01) # Ensure different creation/last_used times initially
+            time.sleep(0.01)  # Ensure different creation/last_used times initially
 
         # At this point, ids[0] was evicted when ids[2] was added.
         # Cache contains: ids[1], ids[2]
@@ -374,9 +382,9 @@ class TestSubgraphLearner:
         assert ids[2] in small_learner.patterns
 
         # Get patterns to update usage and last_used time
-        small_learner.get_pattern(ids[1]) # Access ids[1]
+        small_learner.get_pattern(ids[1])  # Access ids[1]
         time.sleep(0.01)
-        small_learner.get_pattern(ids[2]) # Access ids[2] (most recent)
+        small_learner.get_pattern(ids[2])  # Access ids[2] (most recent)
         time.sleep(0.01)
 
         # Add one more pattern to trigger eviction
@@ -389,11 +397,10 @@ class TestSubgraphLearner:
         # Now, the cache should contain ids[2] (most recently used) and id4 (newest).
         # ids[1] should have been evicted because it was used *before* ids[2].
         assert len(small_learner.patterns) == 2
-        assert ids[0] not in small_learner.patterns # Still evicted
-        assert ids[1] not in small_learner.patterns # Newly evicted (LRU)
-        assert ids[2] in small_learner.patterns     # Remained (more recently used)
-        assert id4 in small_learner.patterns        # The newly added one
-
+        assert ids[0] not in small_learner.patterns  # Still evicted
+        assert ids[1] not in small_learner.patterns  # Newly evicted (LRU)
+        assert ids[2] in small_learner.patterns  # Remained (more recently used)
+        assert id4 in small_learner.patterns  # The newly added one
 
     def test_generate_pattern_id(self, learner, valid_graph):
         """Test pattern ID generation"""
@@ -421,10 +428,10 @@ class TestSubgraphLearner:
         pattern_file = learner.learned_dir / f"{pattern_id}.json"
         assert pattern_file.exists()
 
-        with open(pattern_file, 'r', encoding="utf-8") as f:
+        with open(pattern_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-            assert data['pattern_id'] == pattern_id
-            assert data['name'] == "Persistent"
+            assert data["pattern_id"] == pattern_id
+            assert data["name"] == "Persistent"
 
 
 class TestAutonomousOptimizer:
@@ -436,7 +443,7 @@ class TestAutonomousOptimizer:
 
         assert optimizer.current_fitness == 0.5
         assert len(optimizer.optimization_history) == 0
-        assert optimizer.optimization_config['min_fitness_threshold'] == 0.3
+        assert optimizer.optimization_config["min_fitness_threshold"] == 0.3
 
     @pytest.mark.asyncio
     async def test_trigger_autonomous_cycle(self):
@@ -448,20 +455,20 @@ class TestAutonomousOptimizer:
             "latency": 0.1,
             "throughput": 500,
             "success_rate": 0.95,
-            "cache_hit_rate": 0.7
+            "cache_hit_rate": 0.7,
         }
 
         # Fitness should be high, so no optimizations applied
         fitness = optimizer._calculate_fitness(metrics)
-        assert fitness >= optimizer.optimization_config['min_fitness_threshold']
+        assert fitness >= optimizer.optimization_config["min_fitness_threshold"]
 
         report = await optimizer.trigger_autonomous_cycle(graph, metrics)
 
         assert report is not None
         assert report.cycle_id.startswith("cycle_")
         assert report.fitness_score == fitness
-        assert len(report.optimizations_applied) == 0 # No optimizations needed
-        assert len(report.evolution_proposals) == 0 # No optimizations needed
+        assert len(report.optimizations_applied) == 0  # No optimizations needed
+        assert len(report.evolution_proposals) == 0  # No optimizations needed
         assert len(optimizer.optimization_history) == 1
 
     @pytest.mark.asyncio
@@ -474,26 +481,28 @@ class TestAutonomousOptimizer:
             "latency": 0.9,  # High latency
             "throughput": 10,  # Low throughput
             "success_rate": 0.2,  # Low success
-            "cache_hit_rate": 0.1
+            "cache_hit_rate": 0.1,
         }
 
         fitness = optimizer._calculate_fitness(metrics)
-        assert fitness < optimizer.optimization_config['min_fitness_threshold']
+        assert fitness < optimizer.optimization_config["min_fitness_threshold"]
 
         report = await optimizer.trigger_autonomous_cycle(graph, metrics)
 
         assert report.fitness_score == fitness
         # Should trigger optimizations/evolution when fitness is low, if available
-        optimizations_triggered = (len(report.optimizations_applied) > 0 or
-                                   len(report.evolution_proposals) > 0)
+        optimizations_triggered = (
+            len(report.optimizations_applied) > 0 or len(report.evolution_proposals) > 0
+        )
 
-        should_trigger = (re.EVOLUTION_AVAILABLE or re.OPTIMIZER_AVAILABLE or
-                         re.NSO_AVAILABLE)
+        should_trigger = (
+            re.EVOLUTION_AVAILABLE or re.OPTIMIZER_AVAILABLE or re.NSO_AVAILABLE
+        )
 
         if should_trigger:
-             assert optimizations_triggered is True
+            assert optimizations_triggered is True
         else:
-             assert optimizations_triggered is False
+            assert optimizations_triggered is False
 
     def test_calculate_fitness(self):
         """Test fitness calculation"""
@@ -503,7 +512,7 @@ class TestAutonomousOptimizer:
             "latency": 0.2,
             "throughput": 800,
             "success_rate": 0.9,
-            "cache_hit_rate": 0.6
+            "cache_hit_rate": 0.6,
         }
 
         fitness = optimizer._calculate_fitness(metrics)
@@ -522,7 +531,7 @@ class TestAutonomousOptimizer:
             "latency": 2.0,  # Very high (clamps to 1.0 in calculation)
             "throughput": 0,  # Zero
             "success_rate": 0.0,
-            "cache_hit_rate": 0.0
+            "cache_hit_rate": 0.0,
         }
 
         fitness = optimizer._calculate_fitness(metrics)
@@ -546,8 +555,8 @@ class TestExecutionExplainer:
 
     def test_explain_execution_no_tensors(self, explainer):
         """Test explaining execution without tensors"""
-        subgraph = MagicMock() # Use mock object
-        subgraph.__repr__ = lambda s: "<MockSubgraph>" # for clarity if needed
+        subgraph = MagicMock()  # Use mock object
+        subgraph.__repr__ = lambda s: "<MockSubgraph>"  # for clarity if needed
         inputs = {"x": 1, "y": 2}
         result = {"output": 3}
 
@@ -571,16 +580,18 @@ class TestExecutionExplainer:
         result = {"tensor": np.zeros((3, 3))}
 
         explanations = explainer.explain_execution(
-            subgraph, inputs, result,
-            explanation_type=re.ExplanationType.TECHNICAL # Use enum directly
+            subgraph,
+            inputs,
+            result,
+            explanation_type=re.ExplanationType.TECHNICAL,  # Use enum directly
         )
 
         assert len(explanations) == 1
         explanation = explanations[0]
         assert explanation.explanation_type == re.ExplanationType.TECHNICAL
         assert explanation.subgraph_id.startswith("subgraph_")
-        assert 'tensor_shapes' in explanation.details
-        assert explanation.details['tensor_shapes'] == {'tensor': '(3, 3)'}
+        assert "tensor_shapes" in explanation.details
+        assert explanation.details["tensor_shapes"] == {"tensor": "(3, 3)"}
 
     def test_flag_unclear_explanation_high_sparsity(self, explainer):
         """Test flagging unclear explanation with sparse output"""
@@ -591,7 +602,7 @@ class TestExecutionExplainer:
             subgraph_id="sparse",
             explanation_type=re.ExplanationType.SIMPLE,
             summary="Test",
-            confidence=0.4 # Confidence < 0.5 triggers the check in explain_execution
+            confidence=0.4,  # Confidence < 0.5 triggers the check in explain_execution
         )
 
         # Create sparse output (>90% zeros)
@@ -601,8 +612,8 @@ class TestExecutionExplainer:
         # Call the internal method directly for focused testing
         explainer._flag_unclear_explanation(explanation, sparse_output)
 
-        assert 'warning' in explanation.details
-        assert 'sparsity' in explanation.details['warning'].lower()
+        assert "warning" in explanation.details
+        assert "sparsity" in explanation.details["warning"].lower()
 
     def test_flag_unclear_explanation_low_sparsity(self, explainer):
         """Test no warning for non-sparse output"""
@@ -613,7 +624,7 @@ class TestExecutionExplainer:
             subgraph_id="dense",
             explanation_type=re.ExplanationType.SIMPLE,
             summary="Test",
-            confidence=0.4
+            confidence=0.4,
         )
 
         # Create dense output (<90% zeros)
@@ -622,7 +633,7 @@ class TestExecutionExplainer:
         explainer._flag_unclear_explanation(explanation, dense_output)
 
         # Should not add warning for dense data
-        assert 'warning' not in explanation.details
+        assert "warning" not in explanation.details
 
     def test_get_explanation_summary(self, explainer):
         """Test getting explanation summary"""
@@ -632,11 +643,15 @@ class TestExecutionExplainer:
         outputs = {"y": 2}
 
         # Generate multiple explanations
-        exp1 = explainer.explain_execution(subgraph, inputs, outputs, re.ExplanationType.SIMPLE)
-        exp2 = explainer.explain_execution(subgraph, inputs, outputs, re.ExplanationType.DETAILED)
+        exp1 = explainer.explain_execution(
+            subgraph, inputs, outputs, re.ExplanationType.SIMPLE
+        )
+        exp2 = explainer.explain_execution(
+            subgraph, inputs, outputs, re.ExplanationType.DETAILED
+        )
 
         # Get summary
-        subgraph_id = explainer._generate_subgraph_id(subgraph) # Get the generated ID
+        subgraph_id = explainer._generate_subgraph_id(subgraph)  # Get the generated ID
         summary = explainer.get_explanation_summary(subgraph_id)
 
         assert summary is not None
@@ -657,9 +672,7 @@ class TestExecutionExplainer:
         result = {
             "array": np.array([1, 2, 3]),
             "scalar": 42,
-            "nested": {
-                "tensor": np.zeros((2, 2))
-            }
+            "nested": {"tensor": np.zeros((2, 2))},
         }
 
         tensors = explainer._extract_tensors(result)
@@ -678,9 +691,9 @@ class TestExecutionExplainer:
 
         result = [
             np.array([1]),
-            {"data": "not a tensor"}, # Dict does not contain tensor
+            {"data": "not a tensor"},  # Dict does not contain tensor
             "string",
-            (np.array([4, 5]),) # Tensor inside tuple
+            (np.array([4, 5]),),  # Tensor inside tuple
         ]
 
         tensors = explainer._extract_tensors(result)
@@ -691,7 +704,7 @@ class TestExecutionExplainer:
         # Nested list/tuple extraction is not recursive in the current implementation
         # It only finds tensors that are direct elements of the list/tuple.
         # assert "item_3.item_0" in tensors # This would fail based on current code
-        assert len(tensors) == 1 # Only item_0 is directly a tensor
+        assert len(tensors) == 1  # Only item_0 is directly a tensor
 
     def test_is_tensor_numpy(self, explainer):
         """Test tensor identification for numpy"""
@@ -728,10 +741,10 @@ class TestExecutionExplainer:
         # simple adds 0.3 -> 0.8
         # dict adds 0.1 * min(len, 5)/5
         assert abs(conf1 - 0.8) < 1e-9
-        assert abs(conf2 - (0.5 + 0.1 * 5/5)) < 1e-9 # max len effect is 5
-        assert abs(conf3 - (0.5 + 0.1 * 2/5)) < 1e-9 # len is 2
+        assert abs(conf2 - (0.5 + 0.1 * 5 / 5)) < 1e-9  # max len effect is 5
+        assert abs(conf3 - (0.5 + 0.1 * 2 / 5)) < 1e-9  # len is 2
         assert conf1 > conf2
-        assert conf2 > conf3 # This comparison depends on base vs dict adjustment
+        assert conf2 > conf3  # This comparison depends on base vs dict adjustment
 
 
 class TestRuntimeExtensions:
@@ -741,15 +754,14 @@ class TestRuntimeExtensions:
     def temp_dir(self):
         """Create temporary directory"""
         temp_dir_path = Path(tempfile.mkdtemp())
-        yield str(temp_dir_path) # Pass the path as a string
+        yield str(temp_dir_path)  # Pass the path as a string
         shutil.rmtree(temp_dir_path)
 
     @pytest.fixture
     def extensions(self, temp_dir):
         """Create RuntimeExtensions instance"""
         return re.RuntimeExtensions(
-            learned_subgraphs_dir=temp_dir,
-            enable_autonomous=True
+            learned_subgraphs_dir=temp_dir, enable_autonomous=True
         )
 
     def test_extensions_creation(self, extensions):
@@ -757,34 +769,28 @@ class TestRuntimeExtensions:
         assert extensions.subgraph_learner is not None
         assert extensions.autonomous_optimizer is not None
         assert extensions.execution_explainer is not None
-        assert extensions.stats['patterns_learned'] == 0
+        assert extensions.stats["patterns_learned"] == 0
 
     def test_learn_subgraph(self, extensions):
         """Test learning subgraph through main interface"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}],
-            "edges": [{"from": "n1", "to": "n2"}]
+            "edges": [{"from": "n1", "to": "n2"}],
         }
 
         success, result = extensions.learn_subgraph(
-            "TestPattern",
-            graph,
-            mode="supervised",
-            metadata={"source": "test"}
+            "TestPattern", graph, mode="supervised", metadata={"source": "test"}
         )
 
         assert success is True
-        assert isinstance(result, str) # Should return pattern ID or message
-        assert extensions.stats['patterns_learned'] == 1
+        assert isinstance(result, str)  # Should return pattern ID or message
+        assert extensions.stats["patterns_learned"] == 1
         assert len(extensions.load_learned_subgraphs()) == 1
 
     def test_load_learned_subgraphs(self, extensions):
         """Test loading learned subgraphs"""
-        graph = {
-            "nodes": [{"id": "a"}],
-            "edges": []
-        }
-        assert len(extensions.load_learned_subgraphs()) == 0 # Initially empty
+        graph = {"nodes": [{"id": "a"}], "edges": []}
+        assert len(extensions.load_learned_subgraphs()) == 0  # Initially empty
 
         success, pattern_id = extensions.learn_subgraph("Pattern1", graph)
         assert success
@@ -803,21 +809,20 @@ class TestRuntimeExtensions:
             "latency": 0.1,
             "throughput": 500,
             "success_rate": 0.95,
-            "cache_hit_rate": 0.7
+            "cache_hit_rate": 0.7,
         }
-        assert extensions.stats['optimizations_run'] == 0
+        assert extensions.stats["optimizations_run"] == 0
 
         report = await extensions.trigger_autonomous_cycle(graph, metrics)
 
         assert report is not None
-        assert extensions.stats['optimizations_run'] == 1
+        assert extensions.stats["optimizations_run"] == 1
 
     @pytest.mark.asyncio
     async def test_trigger_autonomous_cycle_disabled(self, temp_dir):
         """Test autonomous cycle when disabled"""
         extensions_disabled = re.RuntimeExtensions(
-            learned_subgraphs_dir=temp_dir,
-            enable_autonomous=False
+            learned_subgraphs_dir=temp_dir, enable_autonomous=False
         )
         assert extensions_disabled.autonomous_optimizer is None
 
@@ -827,7 +832,7 @@ class TestRuntimeExtensions:
         report = await extensions_disabled.trigger_autonomous_cycle(graph, metrics)
 
         assert report is None
-        assert extensions_disabled.stats['optimizations_run'] == 0
+        assert extensions_disabled.stats["optimizations_run"] == 0
 
     def test_explain_execution(self, extensions):
         """Test execution explanation"""
@@ -836,15 +841,14 @@ class TestRuntimeExtensions:
         inputs = {"x": 1}
         outputs = {"y": 2}
 
-        assert extensions.stats['explanations_generated'] == 0
+        assert extensions.stats["explanations_generated"] == 0
         explanations = extensions.explain_execution(
-            subgraph, inputs, outputs,
-            explanation_type="detailed"
+            subgraph, inputs, outputs, explanation_type="detailed"
         )
 
         assert len(explanations) == 1
         assert explanations[0].explanation_type == re.ExplanationType.DETAILED
-        assert extensions.stats['explanations_generated'] == 1
+        assert extensions.stats["explanations_generated"] == 1
 
     def test_flag_unclear_explanation(self, extensions):
         """Test flagging unclear explanations (via main interface)"""
@@ -853,7 +857,7 @@ class TestRuntimeExtensions:
             subgraph_id="unclear",
             explanation_type=re.ExplanationType.SIMPLE,
             summary="Unclear",
-            confidence=0.3
+            confidence=0.3,
         )
 
         outputs = {"result": "unclear"}
@@ -870,20 +874,20 @@ class TestRuntimeExtensions:
         extensions.learn_subgraph("Stat", graph)
 
         stats_before = extensions.get_statistics()
-        assert stats_before['patterns_learned'] == 1
-        assert stats_before['total_patterns'] == 1
+        assert stats_before["patterns_learned"] == 1
+        assert stats_before["total_patterns"] == 1
 
         # Explain something
         extensions.explain_execution(MagicMock(), {}, {})
 
         stats_after = extensions.get_statistics()
 
-        assert stats_after['patterns_learned'] == 1
-        assert stats_after['total_patterns'] == 1
-        assert stats_after['explanations_generated'] == 1
-        assert 'current_fitness' in stats_after
-        assert 'cached_explanations' in stats_after
-        assert stats_after['cached_explanations'] >= 1
+        assert stats_after["patterns_learned"] == 1
+        assert stats_after["total_patterns"] == 1
+        assert stats_after["explanations_generated"] == 1
+        assert "current_fitness" in stats_after
+        assert "cached_explanations" in stats_after
+        assert stats_after["cached_explanations"] >= 1
 
 
 class TestHelperFunctions:
@@ -896,7 +900,7 @@ class TestHelperFunctions:
             ext = re.create_runtime_extensions()
             assert ext is not None
             assert ext.subgraph_learner.learned_dir == Path("learned_subgraphs")
-            assert ext.autonomous_optimizer is not None # Default is True
+            assert ext.autonomous_optimizer is not None  # Default is True
         except Exception as e:
             pytest.fail(f"create_runtime_extensions raised an exception: {e}")
         finally:
@@ -904,36 +908,29 @@ class TestHelperFunctions:
             if Path("learned_subgraphs").exists():
                 shutil.rmtree("learned_subgraphs", ignore_errors=True)
 
-
     def test_create_runtime_extensions_with_config(self, tmp_path):
         """Test creating extensions with custom config"""
         # Use pytest's tmp_path fixture for safer temp dirs
         custom_dir = tmp_path / "custom_learn"
-        config = {
-            'learned_subgraphs_dir': str(custom_dir),
-            'enable_autonomous': False
-        }
+        config = {"learned_subgraphs_dir": str(custom_dir), "enable_autonomous": False}
 
         ext = re.create_runtime_extensions(config)
 
         assert ext is not None
         assert ext.subgraph_learner.learned_dir == custom_dir
-        assert ext.autonomous_optimizer is None # Check disabled
+        assert ext.autonomous_optimizer is None  # Check disabled
 
     def test_load_extension_config(self, tmp_path):
         """Test loading config from file"""
         config_file = tmp_path / "config.json"
-        config_data = {
-            "learned_subgraphs_dir": "test_dir",
-            "enable_autonomous": True
-        }
+        config_data = {"learned_subgraphs_dir": "test_dir", "enable_autonomous": True}
 
         config_file.write_text(json.dumps(config_data))
 
         loaded_config = re.load_extension_config(str(config_file))
 
-        assert loaded_config['learned_subgraphs_dir'] == "test_dir"
-        assert loaded_config['enable_autonomous'] is True
+        assert loaded_config["learned_subgraphs_dir"] == "test_dir"
+        assert loaded_config["enable_autonomous"] is True
 
     def test_load_extension_config_missing_file(self):
         """Test loading config from missing file"""
@@ -957,7 +954,7 @@ class TestIntegration:
         """Test complete workflow of learning, optimizing, and explaining"""
         # Create extensions using the temp_dir
         ext = re.create_runtime_extensions(
-            config={'learned_subgraphs_dir': temp_dir, 'enable_autonomous': True}
+            config={"learned_subgraphs_dir": temp_dir, "enable_autonomous": True}
         )
 
         # Define test graph
@@ -965,42 +962,43 @@ class TestIntegration:
             "nodes": [
                 {"id": "input", "type": "Source"},
                 {"id": "process", "type": "Transform"},
-                {"id": "output", "type": "Sink"}
+                {"id": "output", "type": "Sink"},
             ],
             "edges": [
                 {"from": "input", "to": "process"},
-                {"from": "process", "to": "output"}
-            ]
+                {"from": "process", "to": "output"},
+            ],
         }
 
         # Learn subgraph
         success, pattern_id = ext.learn_subgraph(
-            "MyPattern",
-            graph,
-            mode="supervised",
-            metadata={"version": 1}
+            "MyPattern", graph, mode="supervised", metadata={"version": 1}
         )
         assert success
 
         # Check initial stats
         stats_after_learn = ext.get_statistics()
-        assert stats_after_learn['patterns_learned'] == 1
-        assert stats_after_learn['total_patterns'] == 1
+        assert stats_after_learn["patterns_learned"] == 1
+        assert stats_after_learn["total_patterns"] == 1
 
         # Trigger optimization with some metrics
         metrics = {
-            "latency": 0.8, # Low enough to potentially trigger cycle
+            "latency": 0.8,  # Low enough to potentially trigger cycle
             "throughput": 100,
             "success_rate": 0.4,
-            "cache_hit_rate": 0.7
+            "cache_hit_rate": 0.7,
         }
 
         # Mock sub-components if they are not fully available or for deterministic test
         # Only mock if necessary and if the component exists
-        if ext.autonomous_optimizer and hasattr(ext.autonomous_optimizer, 'evolution_engine') and ext.autonomous_optimizer.evolution_engine:
-             mock_evo_engine = MagicMock()
-             # Configure mock return values as needed for evolution if called
-             ext.autonomous_optimizer.evolution_engine = mock_evo_engine
+        if (
+            ext.autonomous_optimizer
+            and hasattr(ext.autonomous_optimizer, "evolution_engine")
+            and ext.autonomous_optimizer.evolution_engine
+        ):
+            mock_evo_engine = MagicMock()
+            # Configure mock return values as needed for evolution if called
+            ext.autonomous_optimizer.evolution_engine = mock_evo_engine
 
         # Mock the trigger method on the optimizer itself IF NEEDED
         # If testing the full flow including the optimizer logic, don't mock this
@@ -1010,8 +1008,12 @@ class TestIntegration:
             # Use AsyncMock for async methods
             ext.autonomous_optimizer.trigger_autonomous_cycle = AsyncMock(
                 return_value=re.AutonomousCycleReport(
-                    cycle_id="mock_cycle_1", fitness_score=0.25, optimizations_applied=["mock_opt"],
-                    evolution_proposals=[], safety_violations=[], performance_delta={}
+                    cycle_id="mock_cycle_1",
+                    fitness_score=0.25,
+                    optimizations_applied=["mock_opt"],
+                    evolution_proposals=[],
+                    safety_violations=[],
+                    performance_delta={},
                 )
             )
 
@@ -1019,14 +1021,14 @@ class TestIntegration:
         report = await ext.trigger_autonomous_cycle(graph, metrics)
 
         # Check report and stats after optimization
-        if ext.autonomous_optimizer: # Only check if optimizer was enabled
+        if ext.autonomous_optimizer:  # Only check if optimizer was enabled
             assert report is not None
-            assert report.cycle_id.startswith("mock_cycle_") # Check mock was used
-            assert ext.stats['optimizations_run'] == 1
+            assert report.cycle_id.startswith("mock_cycle_")  # Check mock was used
+            assert ext.stats["optimizations_run"] == 1
             assert 0.0 <= report.fitness_score <= 1.0
         else:
             assert report is None
-            assert ext.stats['optimizations_run'] == 0
+            assert ext.stats["optimizations_run"] == 0
 
         # Explain an execution
         subgraph_mock = MagicMock()
@@ -1037,10 +1039,10 @@ class TestIntegration:
 
         # Get final stats
         stats = ext.get_statistics()
-        assert stats['patterns_learned'] == 1
-        assert stats['total_patterns'] == 1 # Only one pattern learned
-        assert stats['optimizations_run'] == (1 if ext.autonomous_optimizer else 0)
-        assert stats['explanations_generated'] == 1
+        assert stats["patterns_learned"] == 1
+        assert stats["total_patterns"] == 1  # Only one pattern learned
+        assert stats["optimizations_run"] == (1 if ext.autonomous_optimizer else 0)
+        assert stats["explanations_generated"] == 1
 
 
 if __name__ == "__main__":

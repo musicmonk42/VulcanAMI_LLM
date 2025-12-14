@@ -31,20 +31,16 @@ class PackError(Exception):
     """Base exception for pack operations"""
 
 
-
 class ChunkNotFoundError(PackError):
     """Raised when a chunk cannot be found in the pack"""
-
 
 
 class IntegrityError(PackError):
     """Raised when integrity verification fails"""
 
 
-
 class PackFullError(PackError):
     """Raised when pack cannot accept more chunks"""
-
 
 
 @dataclass

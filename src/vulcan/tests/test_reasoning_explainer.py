@@ -9,10 +9,16 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from vulcan.reasoning.reasoning_explainer import (ReasoningExplainer,
-                                                  SafetyAwareReasoning)
-from vulcan.reasoning.reasoning_types import (ReasoningChain, ReasoningResult,
-                                              ReasoningStep, ReasoningType)
+from vulcan.reasoning.reasoning_explainer import (
+    ReasoningExplainer,
+    SafetyAwareReasoning,
+)
+from vulcan.reasoning.reasoning_types import (
+    ReasoningChain,
+    ReasoningResult,
+    ReasoningStep,
+    ReasoningType,
+)
 
 
 # Fixtures

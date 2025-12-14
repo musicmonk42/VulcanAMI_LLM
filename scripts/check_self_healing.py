@@ -20,6 +20,7 @@ from pathlib import Path
 repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(repo_root / "src"))
 
+
 def clear_bytecode_cache():
     """Clear all bytecode cache files"""
     print("Clearing bytecode cache...")
@@ -29,6 +30,7 @@ def clear_bytecode_cache():
     for pycache_dir in repo_root.rglob("__pycache__"):
         try:
             import shutil
+
             shutil.rmtree(pycache_dir)
             cache_cleared += 1
         except Exception as e:
@@ -52,6 +54,7 @@ def check_imports():
 
     try:
         from vulcan.world_model import world_model_core
+
         print("  ✓ vulcan.world_model.world_model_core imported")
     except ImportError as e:
         issues.append(f"Cannot import world_model_core: {e}")
@@ -60,6 +63,7 @@ def check_imports():
 
     try:
         from vulcan.world_model.world_model_core import WorldModel
+
         print("  ✓ WorldModel class imported")
     except ImportError as e:
         issues.append(f"Cannot import WorldModel: {e}")
@@ -68,6 +72,7 @@ def check_imports():
 
     try:
         from vulcan.world_model.meta_reasoning import SelfImprovementDrive
+
         print("  ✓ SelfImprovementDrive imported")
     except ImportError as e:
         issues.append(f"Cannot import SelfImprovementDrive: {e}")
@@ -86,13 +91,13 @@ def check_worldmodel_methods():
         from vulcan.world_model.world_model_core import WorldModel
 
         required_methods = [
-            '_handle_improvement_alert',
-            '_check_improvement_approval',
-            'start_autonomous_improvement',
-            'stop_autonomous_improvement',
-            'get_improvement_status',
-            'report_error',
-            'update_performance_metric'
+            "_handle_improvement_alert",
+            "_check_improvement_approval",
+            "start_autonomous_improvement",
+            "stop_autonomous_improvement",
+            "get_improvement_status",
+            "report_error",
+            "update_performance_metric",
         ]
 
         for method_name in required_methods:
@@ -121,7 +126,9 @@ def run_module_diagnostics():
 
     try:
         from vulcan.world_model.world_model_core import (
-            print_diagnostics, print_self_healing_diagnostics)
+            print_diagnostics,
+            print_self_healing_diagnostics,
+        )
 
         print_diagnostics()
         print_self_healing_diagnostics()

@@ -22,7 +22,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
-from .core import (Clause, Constant, Function, ProofNode, Term, Variable)
+from .core import Clause, Constant, Function, ProofNode, Term, Variable
 
 logger = logging.getLogger(__name__)
 
@@ -1946,7 +1946,9 @@ class MetaReasoner:
         self.reasoning_strategies = {}
         self.performance_history = defaultdict(list)
         self.resource_budgets = {}
-        self.problem_database = []  # FIXED: Store solved problems for similarity matching
+        self.problem_database = (
+            []
+        )  # FIXED: Store solved problems for similarity matching
 
     def register_strategy(
         self, name: str, strategy_func: Callable, cost: float, expected_quality: float
@@ -3132,9 +3134,9 @@ class ProofLearner:
             if proof_entry["goal_signature"] == goal_sig:
                 for tactic in proof_entry["tactics"]:
                     base_tactic = tactic.split("@")[0]
-                    tactic_scores[base_tactic] += (
-                        2.0  # Higher weight for exact signature match
-                    )
+                    tactic_scores[
+                        base_tactic
+                    ] += 2.0  # Higher weight for exact signature match
 
         # Source 3: Similar goal size
         goal_size = len(goal.literals)
@@ -3142,9 +3144,9 @@ class ProofLearner:
             if abs(proof_entry["goal_size"] - goal_size) <= 1:
                 for tactic in proof_entry["tactics"]:
                     base_tactic = tactic.split("@")[0]
-                    tactic_scores[base_tactic] += (
-                        0.5  # Lower weight for size similarity
-                    )
+                    tactic_scores[
+                        base_tactic
+                    ] += 0.5  # Lower weight for size similarity
 
         # Sort by score
         if tactic_scores:

@@ -60,11 +60,14 @@ Perplexity may differ slightly from training logs but should be close.
 
 # ---------------- Tokenizer (matches your SimpleTokenizer logic) ----------------
 
-TOKEN_PATTERN = torch.compile if False else None  # (placeholder to avoid TorchDynamo picking up regex)
+TOKEN_PATTERN = (
+    torch.compile if False else None
+)  # (placeholder to avoid TorchDynamo picking up regex)
 
 TOKEN_REGEX = re.compile(r"\w+|\S", re.UNICODE)
 
 SPECIAL_TOKENS = ["<PAD>", "<BOS>", "<EOS>", "<UNK>"]
+
 
 class SimpleVocabTokenizer:
     def __init__(self, vocab_path: str):
@@ -77,7 +80,9 @@ class SimpleVocabTokenizer:
         # Validate first four tokens
         for i, st in enumerate(SPECIAL_TOKENS):
             if self.vocab[i] != st:
-                raise ValueError(f"Special token mismatch: index {i} expected {st} got {self.vocab[i]}")
+                raise ValueError(
+                    f"Special token mismatch: index {i} expected {st} got {self.vocab[i]}"
+                )
 
     def tokenize(self, text: str):
         if self.lowercase:
@@ -85,13 +90,17 @@ class SimpleVocabTokenizer:
         return TOKEN_REGEX.findall(text)
 
     def encode(self, text: str):
-        return [self.token_to_id.get(tok, self.token_to_id["<UNK>"]) for tok in self.tokenize(text)]
+        return [
+            self.token_to_id.get(tok, self.token_to_id["<UNK>"])
+            for tok in self.tokenize(text)
+        ]
 
     def encode_with_bos(self, text: str, bos_id: int):
         return [bos_id] + self.encode(text)
 
 
 # ---------------- Model Components ----------------
+
 
 def layer_norm(x, weight, bias, eps=1e-5):
     # x: (B, T, C)
@@ -100,12 +109,18 @@ def layer_norm(x, weight, bias, eps=1e-5):
     x_norm = (x - mean) / torch.sqrt(var + eps)
     return x_norm * weight + bias
 
+
 class GPTBlocks(nn.Module):
     def __init__(self, state_dict: OrderedDict):
         super().__init__()
         # Infer number of blocks by scanning keys
-        block_indices = sorted({int(k.split('.')[1]) for k in state_dict.keys()
-                                if k.startswith("blocks.") and k.split('.')[1].isdigit()})
+        block_indices = sorted(
+            {
+                int(k.split(".")[1])
+                for k in state_dict.keys()
+                if k.startswith("blocks.") and k.split(".")[1].isdigit()
+            }
+        )
         self.n_blocks = len(block_indices)
         # Determine d_model from first ln1.weight
         w0 = state_dict[f"blocks.{block_indices[0]}.ln1.weight"]
@@ -115,27 +130,59 @@ class GPTBlocks(nn.Module):
         for i in block_indices:
             prefix = f"blocks.{i}"
             # LayerNorm 1
-            self.register_parameter(f"ln1_weight_{i}", nn.Parameter(state_dict[f"{prefix}.ln1.weight"]))
-            self.register_parameter(f"ln1_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ln1.bias"]))
+            self.register_parameter(
+                f"ln1_weight_{i}", nn.Parameter(state_dict[f"{prefix}.ln1.weight"])
+            )
+            self.register_parameter(
+                f"ln1_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ln1.bias"])
+            )
             # Attention qkv
-            self.register_parameter(f"attn_qkv_weight_{i}", nn.Parameter(state_dict[f"{prefix}.attn.qkv.weight"]))
-            self.register_parameter(f"attn_qkv_bias_{i}", nn.Parameter(state_dict[f"{prefix}.attn.qkv.bias"]))
-            self.register_parameter(f"attn_out_proj_weight_{i}", nn.Parameter(state_dict[f"{prefix}.attn.out_proj.weight"]))
-            self.register_parameter(f"attn_out_proj_bias_{i}", nn.Parameter(state_dict[f"{prefix}.attn.out_proj.bias"]))
+            self.register_parameter(
+                f"attn_qkv_weight_{i}",
+                nn.Parameter(state_dict[f"{prefix}.attn.qkv.weight"]),
+            )
+            self.register_parameter(
+                f"attn_qkv_bias_{i}",
+                nn.Parameter(state_dict[f"{prefix}.attn.qkv.bias"]),
+            )
+            self.register_parameter(
+                f"attn_out_proj_weight_{i}",
+                nn.Parameter(state_dict[f"{prefix}.attn.out_proj.weight"]),
+            )
+            self.register_parameter(
+                f"attn_out_proj_bias_{i}",
+                nn.Parameter(state_dict[f"{prefix}.attn.out_proj.bias"]),
+            )
             # LayerNorm 2
-            self.register_parameter(f"ln2_weight_{i}", nn.Parameter(state_dict[f"{prefix}.ln2.weight"]))
-            self.register_parameter(f"ln2_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ln2.bias"]))
+            self.register_parameter(
+                f"ln2_weight_{i}", nn.Parameter(state_dict[f"{prefix}.ln2.weight"])
+            )
+            self.register_parameter(
+                f"ln2_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ln2.bias"])
+            )
             # Feedforward
-            self.register_parameter(f"ff_0_weight_{i}", nn.Parameter(state_dict[f"{prefix}.ff.net.0.weight"]))
-            self.register_parameter(f"ff_0_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ff.net.0.bias"]))
-            self.register_parameter(f"ff_3_weight_{i}", nn.Parameter(state_dict[f"{prefix}.ff.net.3.weight"]))
-            self.register_parameter(f"ff_3_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ff.net.3.bias"]))
+            self.register_parameter(
+                f"ff_0_weight_{i}",
+                nn.Parameter(state_dict[f"{prefix}.ff.net.0.weight"]),
+            )
+            self.register_parameter(
+                f"ff_0_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ff.net.0.bias"])
+            )
+            self.register_parameter(
+                f"ff_3_weight_{i}",
+                nn.Parameter(state_dict[f"{prefix}.ff.net.3.weight"]),
+            )
+            self.register_parameter(
+                f"ff_3_bias_{i}", nn.Parameter(state_dict[f"{prefix}.ff.net.3.bias"])
+            )
 
     def forward(self, x):
         B, T, C = x.shape
         device = x.device
         # Precompute causal mask once per forward
-        causal_mask = torch.triu(torch.ones(T, T, device=device, dtype=torch.bool), diagonal=1)
+        causal_mask = torch.triu(
+            torch.ones(T, T, device=device, dtype=torch.bool), diagonal=1
+        )
         for i in range(self.n_blocks):
             # LN1
             ln1_w = getattr(self, f"ln1_weight_{i}")
@@ -172,6 +219,7 @@ class GPTBlocks(nn.Module):
             x = x + ff_out  # Residual
         return x
 
+
 class TinyGPT(nn.Module):
     def __init__(self, sd: OrderedDict):
         super().__init__()
@@ -196,10 +244,12 @@ class TinyGPT(nn.Module):
         # idx: (B, T)
         B, T = idx.shape
         if T > self.max_positions:
-            raise ValueError(f"Sequence length {T} exceeds max positional embeddings {self.max_positions}")
+            raise ValueError(
+                f"Sequence length {T} exceeds max positional embeddings {self.max_positions}"
+            )
         pos_ids = torch.arange(T, device=idx.device).unsqueeze(0)  # (1, T)
-        tok = self.token_emb(idx)          # (B, T, C)
-        pos = self.pos_emb(pos_ids)        # (1, T, C)
+        tok = self.token_emb(idx)  # (B, T, C)
+        pos = self.pos_emb(pos_ids)  # (1, T, C)
         x = tok + pos
         x = self.blocks(x)
         if self.ln_f_weight is not None:
@@ -208,10 +258,19 @@ class TinyGPT(nn.Module):
         logits = x @ self.token_emb.weight.t()
         return logits
 
+
 # ---------------- Evaluation ----------------
 
+
 @torch.no_grad()
-def evaluate(model: TinyGPT, tokenizer: SimpleVocabTokenizer, vfile: str, device: str, max_len: int, bos_id: int):
+def evaluate(
+    model: TinyGPT,
+    tokenizer: SimpleVocabTokenizer,
+    vfile: str,
+    device: str,
+    max_len: int,
+    bos_id: int,
+):
     total_loss = 0.0
     total_tokens = 0
     lines = 0
@@ -228,7 +287,7 @@ def evaluate(model: TinyGPT, tokenizer: SimpleVocabTokenizer, vfile: str, device
             inp = torch.tensor(ids[:-1], dtype=torch.long, device=device).unsqueeze(0)
             tgt = torch.tensor(ids[1:], dtype=torch.long, device=device).unsqueeze(0)
             logits = model(inp)
-            logits = logits[:, :tgt.size(1), :]
+            logits = logits[:, : tgt.size(1), :]
             loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), tgt.reshape(-1))
             total_loss += loss.item() * tgt.size(1)
             total_tokens += tgt.size(1)
@@ -259,20 +318,32 @@ def load_checkpoint(checkpoint_path: str):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--checkpoint", required=True, help="Path to .pt with 'model' state_dict")
+    ap.add_argument(
+        "--checkpoint", required=True, help="Path to .pt with 'model' state_dict"
+    )
     ap.add_argument("--vocab", required=True, help="Path to vocab.json")
-    ap.add_argument("--vfile", required=True, help="Validation text file (one example per line)")
+    ap.add_argument(
+        "--vfile", required=True, help="Validation text file (one example per line)"
+    )
     ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
-    ap.add_argument("--max-len", type=int, default=256, help="Max tokens (truncate longer)")
+    ap.add_argument(
+        "--max-len", type=int, default=256, help="Max tokens (truncate longer)"
+    )
     ap.add_argument("--bos", type=int, default=1, help="BOS token id")
     args = ap.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() and args.device in ("auto", "cuda") else "cpu"
+    device = (
+        "cuda"
+        if torch.cuda.is_available() and args.device in ("auto", "cuda")
+        else "cpu"
+    )
     print(f"[info] device: {device}")
 
     model_sd = load_checkpoint(args.checkpoint)
     model = TinyGPT(model_sd).to(device)
-    print(f"[info] vocab size: {model.token_emb.weight.shape[0]}  d_model: {model.d_model}  n_blocks: {model.blocks.n_blocks}")
+    print(
+        f"[info] vocab size: {model.token_emb.weight.shape[0]}  d_model: {model.d_model}  n_blocks: {model.blocks.n_blocks}"
+    )
     if model.ln_f_weight is not None:
         print("[info] final layer norm detected")
     else:

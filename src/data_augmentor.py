@@ -612,15 +612,19 @@ class DataAugmentor:
 
                     # Semantic negation strategies
                     negation_strategies = {
-                        "NOT_": lambda l: l.replace("NOT_", "")
-                        if "NOT_" in l
-                        else f"NOT_{l}",
-                        "Anti": lambda l: l.replace("Anti", "")
-                        if l.startswith("Anti")
-                        else f"Anti{l}",
-                        "Inverse": lambda l: l.replace("Inverse", "")
-                        if l.startswith("Inverse")
-                        else f"Inverse{l}",
+                        "NOT_": lambda l: (
+                            l.replace("NOT_", "") if "NOT_" in l else f"NOT_{l}"
+                        ),
+                        "Anti": lambda l: (
+                            l.replace("Anti", "")
+                            if l.startswith("Anti")
+                            else f"Anti{l}"
+                        ),
+                        "Inverse": lambda l: (
+                            l.replace("Inverse", "")
+                            if l.startswith("Inverse")
+                            else f"Inverse{l}"
+                        ),
                     }
 
                     # Choose strategy

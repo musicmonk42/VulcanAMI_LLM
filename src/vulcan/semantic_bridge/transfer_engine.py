@@ -236,7 +236,10 @@ class TransferEngine:
     """Manages concept transfer between domains - FIXED with safety and world_model"""
 
     def __init__(
-        self, world_model=None, safety_config: Optional[Dict[str, Any]] = None, safety_validator=None
+        self,
+        world_model=None,
+        safety_config: Optional[Dict[str, Any]] = None,
+        safety_validator=None,
     ):
         """
         Initialize transfer engine - FIXED: Added world_model, safety_config, and safety_validator
@@ -257,6 +260,7 @@ class TransferEngine:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
@@ -270,7 +274,9 @@ class TransferEngine:
                     )
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.warning("TransferEngine: Created new safety validator instance (may cause duplication)")
+                logger.warning(
+                    "TransferEngine: Created new safety validator instance (may cause duplication)"
+                )
         else:
             self.safety_validator = None
             logger.warning(
@@ -812,7 +818,9 @@ class TransferEngine:
             try:
                 self.world_model.causal_graph.remove_edge(domain_node, concept_id)
             except Exception as e:
-                logger.error(f"Error removing edge from causal graph: {e}", exc_info=True)
+                logger.error(
+                    f"Error removing edge from causal graph: {e}", exc_info=True
+                )
 
     def _update_world_model_for_transfer(
         self,
@@ -1609,9 +1617,11 @@ class PartialTransferEngine:
             # Create constraint for missing effect
             constraint = Constraint(
                 constraint_id=f"missing_effect_{effect.effect_id}",
-                constraint_type=ConstraintType.PRECONDITION
-                if effect.effect_type == EffectType.PREREQUISITE
-                else ConstraintType.INVARIANT,
+                constraint_type=(
+                    ConstraintType.PRECONDITION
+                    if effect.effect_type == EffectType.PREREQUISITE
+                    else ConstraintType.INVARIANT
+                ),
                 description=f"Missing effect: {effect.description}",
                 condition=f"not requires({effect.effect_id})",
                 severity=effect.importance,

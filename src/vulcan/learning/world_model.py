@@ -8,6 +8,7 @@ import math
 import os
 import pickle
 import random
+
 # ADDED for atomic save
 import tempfile
 import threading
@@ -764,9 +765,9 @@ class UnifiedWorldModel(nn.Module):
                 best_action = action
                 best_rollout = rollout
 
-        return best_action if best_action is not None else candidate_actions[
-            0
-        ], best_rollout
+        return (
+            best_action if best_action is not None else candidate_actions[0]
+        ), best_rollout
 
     def _plan_beam_search(
         self,

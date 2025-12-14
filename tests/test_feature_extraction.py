@@ -9,12 +9,17 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-from feature_extraction import (ExtractionResult, FeatureExtractor,
-                                FeatureTier, MultimodalFeatureExtractor,
-                                MultiTierFeatureExtractor, ProblemStructure,
-                                SemanticFeatureExtractor,
-                                StructuralFeatureExtractor,
-                                SyntacticFeatureExtractor)
+from feature_extraction import (
+    ExtractionResult,
+    FeatureExtractor,
+    FeatureTier,
+    MultimodalFeatureExtractor,
+    MultiTierFeatureExtractor,
+    ProblemStructure,
+    SemanticFeatureExtractor,
+    StructuralFeatureExtractor,
+    SyntacticFeatureExtractor,
+)
 
 
 @pytest.fixture
@@ -40,8 +45,8 @@ def dict_problem():
         "text": "Find the shortest path in a graph",
         "graph": {
             "nodes": ["A", "B", "C", "D"],
-            "edges": [("A", "B"), ("B", "C"), ("C", "D"), ("A", "D")]
-        }
+            "edges": [("A", "B"), ("B", "C"), ("C", "D"), ("A", "D")],
+        },
     }
 
 
@@ -95,7 +100,7 @@ class TestDataClasses:
             features=features,
             tier=FeatureTier.TIER1_SYNTACTIC,
             extraction_time_ms=10.5,
-            feature_names=["f1", "f2", "f3"]
+            feature_names=["f1", "f2", "f3"],
         )
 
         assert result.tier == FeatureTier.TIER1_SYNTACTIC
@@ -103,10 +108,7 @@ class TestDataClasses:
 
     def test_problem_structure_creation(self):
         """Test creating ProblemStructure."""
-        structure = ProblemStructure(
-            text="test problem",
-            tokens=["test", "problem"]
-        )
+        structure = ProblemStructure(text="test problem", tokens=["test", "problem"])
 
         assert structure.text == "test problem"
         assert len(structure.tokens) == 2
@@ -163,7 +165,7 @@ class TestSyntacticFeatureExtractor:
         features = syntactic_extractor.extract(problem_with_equation)
 
         # has_equation feature should be positive
-        equation_idx = syntactic_extractor.feature_names.index('has_equation')
+        equation_idx = syntactic_extractor.feature_names.index("has_equation")
         assert features[equation_idx] > 0
 
     def test_probability_detection(self, syntactic_extractor):
@@ -172,7 +174,7 @@ class TestSyntacticFeatureExtractor:
         features = syntactic_extractor.extract(problem_with_prob)
 
         # has_probability feature should be positive
-        prob_idx = syntactic_extractor.feature_names.index('has_probability')
+        prob_idx = syntactic_extractor.feature_names.index("has_probability")
         assert features[prob_idx] > 0
 
 
@@ -219,7 +221,7 @@ class TestStructuralFeatureExtractor:
         """Test structural complexity features."""
         structure = ProblemStructure(
             text="This is a test. This is another sentence.",
-            tokens=["This", "is", "a", "test"]
+            tokens=["This", "is", "a", "test"],
         )
 
         features = structural_extractor._extract_structural_complexity(structure)
@@ -246,7 +248,7 @@ class TestSemanticFeatureExtractor:
         """Test semantic similarity extraction."""
         structure = ProblemStructure(
             text="If premise is true, then conclusion follows",
-            tokens=["premise", "true", "conclusion", "follows"]
+            tokens=["premise", "true", "conclusion", "follows"],
         )
 
         features = semantic_extractor._extract_semantic_similarity(structure)
@@ -256,9 +258,7 @@ class TestSemanticFeatureExtractor:
 
     def test_reasoning_patterns(self, semantic_extractor):
         """Test reasoning pattern extraction."""
-        structure = ProblemStructure(
-            text="If A then B, therefore C"
-        )
+        structure = ProblemStructure(text="If A then B, therefore C")
 
         features = semantic_extractor._extract_reasoning_patterns(structure)
 
@@ -268,7 +268,7 @@ class TestSemanticFeatureExtractor:
         """Test conceptual feature extraction."""
         structure = ProblemStructure(
             text="All men are mortal. Some men are wise.",
-            tokens=["all", "men", "are", "mortal", "some", "wise"]
+            tokens=["all", "men", "are", "mortal", "some", "wise"],
         )
 
         features = semantic_extractor._extract_conceptual_features(structure)
@@ -277,9 +277,7 @@ class TestSemanticFeatureExtractor:
 
     def test_inference_complexity(self, semantic_extractor):
         """Test inference complexity extraction."""
-        structure = ProblemStructure(
-            text="Therefore, if not A and not B, then C"
-        )
+        structure = ProblemStructure(text="Therefore, if not A and not B, then C")
 
         features = semantic_extractor._extract_inference_complexity(structure)
 
@@ -300,13 +298,13 @@ class TestMultimodalFeatureExtractor:
 
         modalities = multimodal_extractor._detect_modalities(problem)
 
-        assert 'text' in modalities
+        assert "text" in modalities
 
     def test_detect_modalities_graph(self, multimodal_extractor, dict_problem):
         """Test modality detection for graph."""
         modalities = multimodal_extractor._detect_modalities(dict_problem)
 
-        assert 'text' in modalities or 'graph' in modalities
+        assert "text" in modalities or "graph" in modalities
 
     def test_extract_text(self, multimodal_extractor, simple_text_problem):
         """Test extraction from text."""
@@ -330,9 +328,7 @@ class TestMultimodalFeatureExtractor:
 
     def test_table_features(self, multimodal_extractor):
         """Test table feature extraction."""
-        problem = {
-            'table': [[1, 2, 3], [4, 5, 6]]
-        }
+        problem = {"table": [[1, 2, 3], [4, 5, 6]]}
 
         features = multimodal_extractor._extract_table_features(problem)
 
@@ -341,9 +337,7 @@ class TestMultimodalFeatureExtractor:
 
     def test_formula_features(self, multimodal_extractor):
         """Test formula feature extraction."""
-        problem = {
-            'formula': 'x^2 + 2x + 1 = 0'
-        }
+        problem = {"formula": "x^2 + 2x + 1 = 0"}
 
         features = multimodal_extractor._extract_formula_features(problem)
 
@@ -352,7 +346,7 @@ class TestMultimodalFeatureExtractor:
 
     def test_cross_modal_features(self, multimodal_extractor):
         """Test cross-modal feature extraction."""
-        modalities = ['text', 'graph']
+        modalities = ["text", "graph"]
 
         features = multimodal_extractor._extract_cross_modal_features({}, modalities)
 
@@ -404,14 +398,18 @@ class TestMultiTierFeatureExtractor:
 
     def test_extract_adaptive_fast(self, multitier_extractor, simple_text_problem):
         """Test adaptive extraction with fast budget."""
-        features = multitier_extractor.extract_adaptive(simple_text_problem, time_budget_ms=5)
+        features = multitier_extractor.extract_adaptive(
+            simple_text_problem, time_budget_ms=5
+        )
 
         assert isinstance(features, np.ndarray)
         # Should use lowest tier
 
     def test_extract_adaptive_slow(self, multitier_extractor, simple_text_problem):
         """Test adaptive extraction with slow budget."""
-        features = multitier_extractor.extract_adaptive(simple_text_problem, time_budget_ms=1000)
+        features = multitier_extractor.extract_adaptive(
+            simple_text_problem, time_budget_ms=1000
+        )
 
         assert isinstance(features, np.ndarray)
         # Should use higher tier
@@ -419,10 +417,14 @@ class TestMultiTierFeatureExtractor:
     def test_feature_caching(self, multitier_extractor, simple_text_problem):
         """Test feature caching."""
         # First extraction
-        features1 = multitier_extractor.extract_adaptive(simple_text_problem, time_budget_ms=100)
+        features1 = multitier_extractor.extract_adaptive(
+            simple_text_problem, time_budget_ms=100
+        )
 
         # Second extraction (should use cache)
-        features2 = multitier_extractor.extract_adaptive(simple_text_problem, time_budget_ms=100)
+        features2 = multitier_extractor.extract_adaptive(
+            simple_text_problem, time_budget_ms=100
+        )
 
         np.testing.assert_array_equal(features1, features2)
 

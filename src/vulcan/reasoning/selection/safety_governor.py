@@ -833,13 +833,13 @@ class SafetyGovernor:
                 "timestamp": time.time(),
                 "tool": context.tool_name,
                 "action": result[0].value,
-                "reason": result[1][:500]
-                if result[1]
-                else None,  # CRITICAL FIX: Limit reason length
+                "reason": (
+                    result[1][:500] if result[1] else None
+                ),  # CRITICAL FIX: Limit reason length
                 "safety_level": context.safety_level.value,
                 "problem_hash": hashlib.md5(
-                    str(context.problem)[:1000].encode()
-                    , usedforsecurity=False).hexdigest()[:8],
+                    str(context.problem)[:1000].encode(), usedforsecurity=False
+                ).hexdigest()[:8],
             }
 
             # Already bounded by deque maxlen
@@ -857,7 +857,9 @@ class SafetyGovernor:
             key_parts = [
                 context.tool_name,
                 str(context.safety_level.value),
-                hashlib.md5(problem_str.encode(), usedforsecurity=False).hexdigest()[:16],
+                hashlib.md5(problem_str.encode(), usedforsecurity=False).hexdigest()[
+                    :16
+                ],
             ]
 
             return "_".join(key_parts)

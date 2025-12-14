@@ -20,8 +20,10 @@ import pytest
 # Graph Validator Implementation
 # ============================================================================
 
+
 class ValidationError(Exception):
     """Graph validation error."""
+
     pass
 
 
@@ -30,10 +32,23 @@ class GraphValidator:
 
     # Valid node types
     VALID_NODE_TYPES = {
-        "CONST", "LOAD", "EMBED", "GenerativeNode", "OutputNode",
-        "ContractNode", "PATTERN_COMPILE", "FIND_SUBGRAPH", "GRAPH_SPLICE",
-        "GRAPH_COMMIT", "NSO_MODIFY", "ETHICAL_LABEL", "MUL", "ADD",
-        "HALT", "EVAL", "Matrix3DNode"
+        "CONST",
+        "LOAD",
+        "EMBED",
+        "GenerativeNode",
+        "OutputNode",
+        "ContractNode",
+        "PATTERN_COMPILE",
+        "FIND_SUBGRAPH",
+        "GRAPH_SPLICE",
+        "GRAPH_COMMIT",
+        "NSO_MODIFY",
+        "ETHICAL_LABEL",
+        "MUL",
+        "ADD",
+        "HALT",
+        "EVAL",
+        "Matrix3DNode",
     }
 
     # Valid edge kinds
@@ -69,7 +84,9 @@ class GraphValidator:
         try:
             self._validate_root_structure(graph_data)
             self._validate_nodes(graph_data.get("nodes", []))
-            self._validate_edges(graph_data.get("edges", []), graph_data.get("nodes", []))
+            self._validate_edges(
+                graph_data.get("edges", []), graph_data.get("nodes", [])
+            )
             self._validate_graph_connectivity(graph_data)
             self._validate_metadata(graph_data.get("metadata", {}))
 
@@ -128,18 +145,26 @@ class GraphValidator:
             # Validate node type
             if node_type not in self.VALID_NODE_TYPES:
                 if self.strict_mode:
-                    self.errors.append(f"Node '{node_id}' has invalid type: {node_type}")
+                    self.errors.append(
+                        f"Node '{node_id}' has invalid type: {node_type}"
+                    )
                 else:
-                    self.warnings.append(f"Node '{node_id}' has unknown type: {node_type}")
+                    self.warnings.append(
+                        f"Node '{node_id}' has unknown type: {node_type}"
+                    )
 
             # Validate params if present
             if "params" in node:
                 self._validate_node_params(node_id, node_type, node.get("params", {}))
 
-    def _validate_node_params(self, node_id: str, node_type: str, params: Dict[str, Any]) -> None:
+    def _validate_node_params(
+        self, node_id: str, node_type: str, params: Dict[str, Any]
+    ) -> None:
         """Validate node parameters."""
         if not isinstance(params, dict):
-            self.errors.append(f"Node '{node_id}' params must be a dict, got {type(params)}")
+            self.errors.append(
+                f"Node '{node_id}' params must be a dict, got {type(params)}"
+            )
             return
 
         # Type-specific validation
@@ -151,11 +176,17 @@ class GraphValidator:
 
         if node_type == "ContractNode":
             if "target_node" not in params:
-                self.errors.append(f"ContractNode '{node_id}' missing 'target_node' param")
+                self.errors.append(
+                    f"ContractNode '{node_id}' missing 'target_node' param"
+                )
             if "constraints" not in params:
-                self.errors.append(f"ContractNode '{node_id}' missing 'constraints' param")
+                self.errors.append(
+                    f"ContractNode '{node_id}' missing 'constraints' param"
+                )
 
-    def _validate_edges(self, edges: List[Dict[str, Any]], nodes: List[Dict[str, Any]]) -> None:
+    def _validate_edges(
+        self, edges: List[Dict[str, Any]], nodes: List[Dict[str, Any]]
+    ) -> None:
         """Validate all edges."""
         if not isinstance(edges, list):
             self.errors.append(f"Edges must be a list, got {type(edges)}")
@@ -179,14 +210,18 @@ class GraphValidator:
             else:
                 from_node = from_spec.get("node")
                 if from_node not in node_ids:
-                    self.errors.append(f"Edge {idx} references non-existent source node: {from_node}")
+                    self.errors.append(
+                        f"Edge {idx} references non-existent source node: {from_node}"
+                    )
 
             if not isinstance(to_spec, dict) or "node" not in to_spec:
                 self.errors.append(f"Edge {idx} has invalid 'to' specification")
             else:
                 to_node = to_spec.get("node")
                 if to_node not in node_ids:
-                    self.errors.append(f"Edge {idx} references non-existent target node: {to_node}")
+                    self.errors.append(
+                        f"Edge {idx} references non-existent target node: {to_node}"
+                    )
 
             # Validate edge kind
             edge_kind = edge.get("kind")
@@ -291,7 +326,7 @@ class GraphValidator:
 def load_graph_file(filepath: Path) -> Dict[str, Any]:
     """Load and parse graph JSON file."""
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             return json.load(f)
     except json.JSONDecodeError as e:
         raise ValidationError(f"Invalid JSON in {filepath}: {e}")
@@ -302,6 +337,7 @@ def load_graph_file(filepath: Path) -> Dict[str, Any]:
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture
 def validator():
@@ -325,23 +361,37 @@ def mutator_graph():
         "metadata": {
             "author_agent": "OptimizerAgent_v3",
             "creation_timestamp": "2025-08-26T21:04:44Z",
-            "description": "A generic metaprogram"
+            "description": "A generic metaprogram",
         },
         "nodes": [
             {"id": "pattern_input", "type": "CONST", "params": {"value": {}}},
             {"id": "template_input", "type": "CONST", "params": {"value": {}}},
-            {"id": "target_graph_input", "type": "CONST", "params": {"value": "graph_id"}},
+            {
+                "id": "target_graph_input",
+                "type": "CONST",
+                "params": {"value": "graph_id"},
+            },
             {"id": "pat", "type": "PATTERN_COMPILE"},
             {"id": "find", "type": "FIND_SUBGRAPH", "params": {"start_idx": 0}},
-            {"id": "splice", "type": "GRAPH_SPLICE", "params": {"method": "replace_subgraph"}},
-            {"id": "commit", "type": "GRAPH_COMMIT"}
+            {
+                "id": "splice",
+                "type": "GRAPH_SPLICE",
+                "params": {"method": "replace_subgraph"},
+            },
+            {"id": "commit", "type": "GRAPH_COMMIT"},
         ],
         "edges": [
-            {"from": {"node": "pattern_input", "port": "value"},
-             "to": {"node": "pat", "port": "pattern_in"}, "kind": "data"},
-            {"from": {"node": "pat", "port": "pattern_out"},
-             "to": {"node": "find", "port": "pattern_in"}, "kind": "data"}
-        ]
+            {
+                "from": {"node": "pattern_input", "port": "value"},
+                "to": {"node": "pat", "port": "pattern_in"},
+                "kind": "data",
+            },
+            {
+                "from": {"node": "pat", "port": "pattern_out"},
+                "to": {"node": "find", "port": "pattern_in"},
+                "kind": "data",
+            },
+        ],
     }
 
 
@@ -357,14 +407,18 @@ def sentiment_graph():
             {"id": "matrix", "type": "CONST", "params": {"value": [[[1, 2], [3, 4]]]}},
             {"id": "m_emb", "type": "EMBED", "params": {"provider": "dummy"}},
             {"id": "gen", "type": "GenerativeNode", "params": {"provider": "dummy"}},
-            {"id": "out", "type": "OutputNode", "params": {}}
+            {"id": "out", "type": "OutputNode", "params": {}},
         ],
         "edges": [
-            {"from": {"node": "t_in", "port": "value"},
-             "to": {"node": "m_emb", "port": "text"}},
-            {"from": {"node": "m_emb", "port": "vector"},
-             "to": {"node": "gen", "port": "input"}}
-        ]
+            {
+                "from": {"node": "t_in", "port": "value"},
+                "to": {"node": "m_emb", "port": "text"},
+            },
+            {
+                "from": {"node": "m_emb", "port": "vector"},
+                "to": {"node": "gen", "port": "input"},
+            },
+        ],
     }
 
 
@@ -376,38 +430,39 @@ def classification_graph():
         "type": "Graph",
         "grammar_version": "1.2.0",
         "nodes": [
-            {"id": "accuracy_metric", "type": "LOAD", "params": {"addr": "metrics.accuracy"}},
-            {"id": "token_penalty_weight", "type": "CONST", "params": {"value": -0.0001}},
+            {
+                "id": "accuracy_metric",
+                "type": "LOAD",
+                "params": {"addr": "metrics.accuracy"},
+            },
+            {
+                "id": "token_penalty_weight",
+                "type": "CONST",
+                "params": {"value": -0.0001},
+            },
             {"id": "token_penalty_calc", "type": "MUL"},
             {"id": "final_sum", "type": "ADD"},
-            {"id": "fitness_output", "type": "HALT"}
+            {"id": "fitness_output", "type": "HALT"},
         ],
         "edges": [
-            {"from": {"node": "accuracy_metric", "port": "data_out"},
-             "to": {"node": "token_penalty_calc", "port": "val1"}}
-        ]
+            {
+                "from": {"node": "accuracy_metric", "port": "data_out"},
+                "to": {"node": "token_penalty_calc", "port": "val1"},
+            }
+        ],
     }
 
 
 @pytest.fixture
 def invalid_graph_missing_id():
     """Graph missing required id field."""
-    return {
-        "type": "Graph",
-        "nodes": [],
-        "edges": []
-    }
+    return {"type": "Graph", "nodes": [], "edges": []}
 
 
 @pytest.fixture
 def invalid_graph_wrong_type():
     """Graph with wrong type."""
-    return {
-        "id": "test",
-        "type": "NotAGraph",
-        "nodes": [],
-        "edges": []
-    }
+    return {"id": "test", "type": "NotAGraph", "nodes": [], "edges": []}
 
 
 @pytest.fixture
@@ -416,11 +471,8 @@ def invalid_graph_duplicate_nodes():
     return {
         "id": "test",
         "type": "Graph",
-        "nodes": [
-            {"id": "node1", "type": "CONST"},
-            {"id": "node1", "type": "LOAD"}
-        ],
-        "edges": []
+        "nodes": [{"id": "node1", "type": "CONST"}, {"id": "node1", "type": "LOAD"}],
+        "edges": [],
     }
 
 
@@ -430,19 +482,20 @@ def invalid_graph_broken_edge():
     return {
         "id": "test",
         "type": "Graph",
-        "nodes": [
-            {"id": "node1", "type": "CONST", "params": {"value": 1}}
-        ],
+        "nodes": [{"id": "node1", "type": "CONST", "params": {"value": 1}}],
         "edges": [
-            {"from": {"node": "node1", "port": "out"},
-             "to": {"node": "nonexistent", "port": "in"}}
-        ]
+            {
+                "from": {"node": "node1", "port": "out"},
+                "to": {"node": "nonexistent", "port": "in"},
+            }
+        ],
     }
 
 
 # ============================================================================
 # Test Root Structure Validation
 # ============================================================================
+
 
 class TestRootStructureValidation:
     """Test root-level graph structure validation."""
@@ -466,8 +519,13 @@ class TestRootStructureValidation:
 
     def test_invalid_grammar_version(self, validator):
         """Test detection of invalid grammar version."""
-        graph = {"id": "test", "type": "Graph", "nodes": [], "edges": [],
-                 "grammar_version": 123}
+        graph = {
+            "id": "test",
+            "type": "Graph",
+            "nodes": [],
+            "edges": [],
+            "grammar_version": 123,
+        }
         validator._validate_root_structure(graph)
         assert len(validator.errors) > 0
         assert any("grammar_version" in err for err in validator.errors)
@@ -476,6 +534,7 @@ class TestRootStructureValidation:
 # ============================================================================
 # Test Node Validation
 # ============================================================================
+
 
 class TestNodeValidation:
     """Test node validation."""
@@ -556,6 +615,7 @@ class TestNodeValidation:
 # Test Edge Validation
 # ============================================================================
 
+
 class TestEdgeValidation:
     """Test edge validation."""
 
@@ -594,25 +654,29 @@ class TestEdgeValidation:
     def test_edge_nonexistent_source_node(self, validator, invalid_graph_broken_edge):
         """Test edge pointing to non-existent source node."""
         validator._validate_edges(
-            invalid_graph_broken_edge["edges"],
-            invalid_graph_broken_edge["nodes"]
+            invalid_graph_broken_edge["edges"], invalid_graph_broken_edge["nodes"]
         )
         assert len(validator.errors) > 0
         assert any("non-existent target node" in err for err in validator.errors)
 
     def test_edge_nonexistent_target_node(self, validator):
         """Test edge with non-existent target."""
-        edges = [{"from": {"node": "n1", "port": "out"},
-                  "to": {"node": "n2", "port": "in"}}]
+        edges = [
+            {"from": {"node": "n1", "port": "out"}, "to": {"node": "n2", "port": "in"}}
+        ]
         nodes = [{"id": "n1", "type": "CONST"}]
         validator._validate_edges(edges, nodes)
         assert len(validator.errors) > 0
 
     def test_edge_invalid_kind_strict(self, strict_validator):
         """Test invalid edge kind in strict mode."""
-        edges = [{"from": {"node": "n1", "port": "out"},
-                  "to": {"node": "n2", "port": "in"},
-                  "kind": "invalid_kind"}]
+        edges = [
+            {
+                "from": {"node": "n1", "port": "out"},
+                "to": {"node": "n2", "port": "in"},
+                "kind": "invalid_kind",
+            }
+        ]
         nodes = [{"id": "n1", "type": "CONST"}, {"id": "n2", "type": "LOAD"}]
         strict_validator._validate_edges(edges, nodes)
         assert len(strict_validator.errors) > 0
@@ -624,16 +688,25 @@ class TestEdgeValidation:
             {"id": "n1", "type": "CONST"},
             {"id": "n2", "type": "LOAD"},
             {"id": "n3", "type": "ADD"},
-            {"id": "n4", "type": "HALT"}
+            {"id": "n4", "type": "HALT"},
         ]
 
         edges = [
-            {"from": {"node": "n1", "port": "out"}, "to": {"node": "n2", "port": "in"},
-             "kind": "data"},
-            {"from": {"node": "n2", "port": "out"}, "to": {"node": "n3", "port": "in"},
-             "kind": "contract_binding"},
-            {"from": {"node": "n3", "port": "out"}, "to": {"node": "n4", "port": "in"},
-             "kind": "nso_binding"}
+            {
+                "from": {"node": "n1", "port": "out"},
+                "to": {"node": "n2", "port": "in"},
+                "kind": "data",
+            },
+            {
+                "from": {"node": "n2", "port": "out"},
+                "to": {"node": "n3", "port": "in"},
+                "kind": "contract_binding",
+            },
+            {
+                "from": {"node": "n3", "port": "out"},
+                "to": {"node": "n4", "port": "in"},
+                "kind": "nso_binding",
+            },
         ]
 
         validator._validate_edges(edges, nodes)
@@ -643,6 +716,7 @@ class TestEdgeValidation:
 # ============================================================================
 # Test Graph Connectivity
 # ============================================================================
+
 
 class TestGraphConnectivity:
     """Test graph connectivity validation."""
@@ -659,13 +733,22 @@ class TestGraphConnectivity:
             "nodes": [
                 {"id": "n1", "type": "CONST"},
                 {"id": "n2", "type": "ADD"},
-                {"id": "n3", "type": "MUL"}
+                {"id": "n3", "type": "MUL"},
             ],
             "edges": [
-                {"from": {"node": "n1", "port": "out"}, "to": {"node": "n2", "port": "in"}},
-                {"from": {"node": "n2", "port": "out"}, "to": {"node": "n3", "port": "in"}},
-                {"from": {"node": "n3", "port": "out"}, "to": {"node": "n2", "port": "in"}}
-            ]
+                {
+                    "from": {"node": "n1", "port": "out"},
+                    "to": {"node": "n2", "port": "in"},
+                },
+                {
+                    "from": {"node": "n2", "port": "out"},
+                    "to": {"node": "n3", "port": "in"},
+                },
+                {
+                    "from": {"node": "n3", "port": "out"},
+                    "to": {"node": "n2", "port": "in"},
+                },
+            ],
         }
 
         validator._validate_graph_connectivity(graph)
@@ -677,11 +760,14 @@ class TestGraphConnectivity:
             "nodes": [
                 {"id": "n1", "type": "CONST"},
                 {"id": "n2", "type": "ADD"},
-                {"id": "isolated", "type": "MUL"}
+                {"id": "isolated", "type": "MUL"},
             ],
             "edges": [
-                {"from": {"node": "n1", "port": "out"}, "to": {"node": "n2", "port": "in"}}
-            ]
+                {
+                    "from": {"node": "n1", "port": "out"},
+                    "to": {"node": "n2", "port": "in"},
+                }
+            ],
         }
 
         strict_validator._validate_graph_connectivity(graph)
@@ -692,6 +778,7 @@ class TestGraphConnectivity:
 # ============================================================================
 # Test Metadata Validation
 # ============================================================================
+
 
 class TestMetadataValidation:
     """Test metadata validation."""
@@ -720,6 +807,7 @@ class TestMetadataValidation:
 # ============================================================================
 # Test Full Graph Validation
 # ============================================================================
+
 
 class TestFullGraphValidation:
     """Test complete graph validation."""
@@ -759,13 +847,8 @@ class TestFullGraphValidation:
         invalid_graph = {
             "id": "",  # Invalid empty id
             "type": "WrongType",
-            "nodes": [
-                {"id": "n1"},  # Missing type
-                {"type": "CONST"}  # Missing id
-            ],
-            "edges": [
-                {"from": {"node": "nonexistent"}}  # Missing 'to'
-            ]
+            "nodes": [{"id": "n1"}, {"type": "CONST"}],  # Missing type  # Missing id
+            "edges": [{"from": {"node": "nonexistent"}}],  # Missing 'to'
         }
 
         result = validator.validate_graph(invalid_graph)
@@ -777,6 +860,7 @@ class TestFullGraphValidation:
 # Test File Loading
 # ============================================================================
 
+
 class TestFileLoading:
     """Test graph file loading."""
 
@@ -785,7 +869,7 @@ class TestFileLoading:
         graph_file = tmp_path / "test_graph.json"
         graph_data = {"id": "test", "type": "Graph", "nodes": [], "edges": []}
 
-        with open(graph_file, 'w', encoding='utf-8') as f:
+        with open(graph_file, "w", encoding="utf-8") as f:
             json.dump(graph_data, f)
 
         loaded = load_graph_file(graph_file)
@@ -795,7 +879,7 @@ class TestFileLoading:
         """Test loading invalid JSON file."""
         graph_file = tmp_path / "invalid.json"
 
-        with open(graph_file, 'w', encoding='utf-8') as f:
+        with open(graph_file, "w", encoding="utf-8") as f:
             f.write("{invalid json}")
 
         with pytest.raises(ValidationError, match="Invalid JSON"):
@@ -811,6 +895,7 @@ class TestFileLoading:
 # Integration Tests
 # ============================================================================
 
+
 class TestGraphValidationIntegration:
     """Integration tests with real graph structures."""
 
@@ -822,12 +907,14 @@ class TestGraphValidationIntegration:
                 "type": "Graph",
                 "nodes": [
                     {"id": "input", "type": "CONST", "params": {"value": 1}},
-                    {"id": "output", "type": "HALT"}
+                    {"id": "output", "type": "HALT"},
                 ],
                 "edges": [
-                    {"from": {"node": "input", "port": "value"},
-                     "to": {"node": "output", "port": "final_in"}}
-                ]
+                    {
+                        "from": {"node": "input", "port": "value"},
+                        "to": {"node": "output", "port": "final_in"},
+                    }
+                ],
             },
             {
                 "id": "test_sentiment",
@@ -835,13 +922,19 @@ class TestGraphValidationIntegration:
                 "grammar_version": "2.0.0",
                 "nodes": [
                     {"id": "embed", "type": "EMBED", "params": {"provider": "test"}},
-                    {"id": "gen", "type": "GenerativeNode", "params": {"model": "test"}}
+                    {
+                        "id": "gen",
+                        "type": "GenerativeNode",
+                        "params": {"model": "test"},
+                    },
                 ],
                 "edges": [
-                    {"from": {"node": "embed", "port": "out"},
-                     "to": {"node": "gen", "port": "in"}}
-                ]
-            }
+                    {
+                        "from": {"node": "embed", "port": "out"},
+                        "to": {"node": "gen", "port": "in"},
+                    }
+                ],
+            },
         ]
 
         for graph in graphs:
@@ -857,30 +950,51 @@ class TestGraphValidationIntegration:
             "metadata": {
                 "author_agent": "test",
                 "creation_timestamp": "2025-01-01T00:00:00Z",
-                "description": "Complex test graph"
+                "description": "Complex test graph",
             },
             "nodes": [
                 {"id": "const1", "type": "CONST", "params": {"value": 1}},
                 {"id": "load1", "type": "LOAD", "params": {"addr": "test.data"}},
-                {"id": "contract1", "type": "ContractNode",
-                 "params": {"target_node": "gen1", "constraints": {"max_cost_usd": 0.01}}},
+                {
+                    "id": "contract1",
+                    "type": "ContractNode",
+                    "params": {
+                        "target_node": "gen1",
+                        "constraints": {"max_cost_usd": 0.01},
+                    },
+                },
                 {"id": "gen1", "type": "GenerativeNode", "params": {"model": "test"}},
                 {"id": "add1", "type": "ADD"},
                 {"id": "mul1", "type": "MUL"},
-                {"id": "out1", "type": "HALT"}
+                {"id": "out1", "type": "HALT"},
             ],
             "edges": [
-                {"from": {"node": "const1", "port": "value"},
-                 "to": {"node": "add1", "port": "val1"}, "kind": "data"},
-                {"from": {"node": "load1", "port": "data_out"},
-                 "to": {"node": "add1", "port": "val2"}, "kind": "data"},
-                {"from": {"node": "add1", "port": "sum"},
-                 "to": {"node": "mul1", "port": "val1"}, "kind": "data"},
-                {"from": {"node": "contract1", "port": "output"},
-                 "to": {"node": "gen1", "port": "contract"}, "kind": "contract_binding"},
-                {"from": {"node": "mul1", "port": "product"},
-                 "to": {"node": "out1", "port": "final_in"}, "kind": "data"}
-            ]
+                {
+                    "from": {"node": "const1", "port": "value"},
+                    "to": {"node": "add1", "port": "val1"},
+                    "kind": "data",
+                },
+                {
+                    "from": {"node": "load1", "port": "data_out"},
+                    "to": {"node": "add1", "port": "val2"},
+                    "kind": "data",
+                },
+                {
+                    "from": {"node": "add1", "port": "sum"},
+                    "to": {"node": "mul1", "port": "val1"},
+                    "kind": "data",
+                },
+                {
+                    "from": {"node": "contract1", "port": "output"},
+                    "to": {"node": "gen1", "port": "contract"},
+                    "kind": "contract_binding",
+                },
+                {
+                    "from": {"node": "mul1", "port": "product"},
+                    "to": {"node": "out1", "port": "final_in"},
+                    "kind": "data",
+                },
+            ],
         }
 
         result = validator.validate_graph(graph)

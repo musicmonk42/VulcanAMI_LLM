@@ -2,11 +2,14 @@
 Test suite for metacognition module
 """
 
-from vulcan.learning.metacognition import (CausalRelation,
-                                           CompositionalUnderstanding,
-                                           ConfidenceEstimator,
-                                           MetaCognitiveMonitor,
-                                           ReasoningPhase, ReasoningStep)
+from vulcan.learning.metacognition import (
+    CausalRelation,
+    CompositionalUnderstanding,
+    ConfidenceEstimator,
+    MetaCognitiveMonitor,
+    ReasoningPhase,
+    ReasoningStep,
+)
 from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM
 import torch.optim as optim
 import torch.nn as nn

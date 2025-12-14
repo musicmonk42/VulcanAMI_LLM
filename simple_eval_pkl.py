@@ -38,6 +38,7 @@ Adjust BOS_ID if different.
 
 BOS_ID = 1  # Change if your tokenizer uses a different BOS id
 
+
 @torch.no_grad()
 def evaluate(model, tokenizer, vfile, device, max_len):
     total_loss = 0.0
@@ -75,7 +76,7 @@ def evaluate(model, tokenizer, vfile, device, max_len):
             tgt = torch.tensor(ids[1:], dtype=torch.long, device=device).unsqueeze(0)
 
             logits = model(inp)  # (1, seq, vocab)
-            logits = logits[:, :tgt.size(1), :]
+            logits = logits[:, : tgt.size(1), :]
 
             loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), tgt.reshape(-1))
             total_loss += loss.item() * tgt.size(1)
@@ -93,13 +94,19 @@ def evaluate(model, tokenizer, vfile, device, max_len):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--checkpoint", required=True, help="Path to .pkl file (full model object)")
+    ap.add_argument(
+        "--checkpoint", required=True, help="Path to .pkl file (full model object)"
+    )
     ap.add_argument("--vfile", required=True, help="Validation text file")
-    ap.add_argument("--device", default="auto", choices=["auto","cpu","cuda"])
+    ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     ap.add_argument("--max-len", type=int, default=512)
     args = ap.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() and args.device in ("auto","cuda") else "cpu"
+    device = (
+        "cuda"
+        if torch.cuda.is_available() and args.device in ("auto", "cuda")
+        else "cpu"
+    )
     print(f"[info] device: {device}")
 
     ckpt = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
@@ -120,7 +127,9 @@ def main():
 
     if tokenizer is None:
         print("[error] Model object does not have an attached tokenizer attribute.")
-        print("        We would need to load tokenizer separately. Tell me and I'll modify the script.")
+        print(
+            "        We would need to load tokenizer separately. Tell me and I'll modify the script."
+        )
         sys.exit(1)
 
     print(f"[info] Found tokenizer on model: {tokenizer.__class__.__name__}")

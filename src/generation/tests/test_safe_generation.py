@@ -13,9 +13,14 @@ Tests cover:
 - Performance metrics
 """
 
-from safe_generation import (HallucinationValidator, PromptInjectionValidator,
-                             RiskLevel, SafeGeneration, SafetyMetrics,
-                             ToxicityValidator)
+from safe_generation import (
+    HallucinationValidator,
+    PromptInjectionValidator,
+    RiskLevel,
+    SafeGeneration,
+    SafetyMetrics,
+    ToxicityValidator,
+)
 import sys
 import unittest
 

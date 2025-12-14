@@ -529,9 +529,9 @@ class GraphixVulcanBridge:
                     await self._obs(
                         "bridge.timeout_final",
                         {
-                            "function": fn.__name__
-                            if hasattr(fn, "__name__")
-                            else "unknown",
+                            "function": (
+                                fn.__name__ if hasattr(fn, "__name__") else "unknown"
+                            ),
                             "attempts": attempt + 1,
                         },
                     )
@@ -851,23 +851,31 @@ class GraphixVulcanBridge:
             try:
                 if inspect.iscoroutinefunction(fn):
                     await fn(
-                        record_payload
-                        if getattr(self._audit_log, "append", None)
-                        else event_type,
-                        record_payload
-                        if not getattr(self._audit_log, "append", None)
-                        else None,
+                        (
+                            record_payload
+                            if getattr(self._audit_log, "append", None)
+                            else event_type
+                        ),
+                        (
+                            record_payload
+                            if not getattr(self._audit_log, "append", None)
+                            else None
+                        ),
                     )
                 else:
                     # Run sync audit in a thread
                     await asyncio.to_thread(
                         fn,
-                        record_payload
-                        if getattr(self._audit_log, "append", None)
-                        else event_type,
-                        record_payload
-                        if not getattr(self._audit_log, "append", None)
-                        else None,
+                        (
+                            record_payload
+                            if getattr(self._audit_log, "append", None)
+                            else event_type
+                        ),
+                        (
+                            record_payload
+                            if not getattr(self._audit_log, "append", None)
+                            else None
+                        ),
                     )
             except Exception as e:
                 # Log audit failures for debugging (non-critical)

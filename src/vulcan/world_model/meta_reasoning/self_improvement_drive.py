@@ -60,8 +60,12 @@ logger = logging.getLogger(__name__)
 
 
 try:
-    from .auto_apply_policy import (Policy, check_files_against_policy,
-                                    load_policy, run_gates)
+    from .auto_apply_policy import (
+        Policy,
+        check_files_against_policy,
+        load_policy,
+        run_gates,
+    )
 except Exception:
     # Fallback: disable auto-apply if policy module isn't present
     def load_policy(_):
@@ -825,9 +829,11 @@ class SelfImprovementDrive:
             "working_metrics": working_count,
             "total_tested": len(test_metrics),
             "details": results,
-            "message": f"{working_count}/{len(test_metrics)} metrics returning data"
-            if is_working
-            else "No metrics returning data",
+            "message": (
+                f"{working_count}/{len(test_metrics)} metrics returning data"
+                if is_working
+                else "No metrics returning data"
+            ),
         }
 
     def _safe_get_metric(self, dotted: str, default: float = 0.0) -> float:

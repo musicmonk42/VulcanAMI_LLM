@@ -449,8 +449,9 @@ async def lifespan(app: FastAPI):
 
                 # ADDED: Initialize meta-reasoning introspection (MODERN MODE - FIXED)
                 if world_model:
-                    from vulcan.world_model.meta_reasoning import \
-                        MotivationalIntrospection
+                    from vulcan.world_model.meta_reasoning import (
+                        MotivationalIntrospection,
+                    )
 
                     # Modern approach: get config path from AgentConfig
                     world_model_config = (
@@ -565,6 +566,7 @@ except Exception as e:
 # ============================================================
 from prometheus_client import REGISTRY
 
+
 def _get_or_create_metric(metric_class, name, description, labelnames=None):
     """Safely get or create a Prometheus metric (handles module re-imports)."""
     # Check if already registered by name
@@ -578,32 +580,47 @@ def _get_or_create_metric(metric_class, name, description, labelnames=None):
         # Race condition fallback - another import registered it
         return REGISTRY._names_to_collectors.get(name)
 
-step_counter = _get_or_create_metric(Counter, "vulcan_steps_total", "Total steps executed")
-step_duration = _get_or_create_metric(Histogram, "vulcan_step_duration_seconds", "Step execution time")
-active_requests = _get_or_create_metric(Gauge, "vulcan_active_requests", "Number of active requests")
-error_counter = _get_or_create_metric(Counter, "vulcan_errors_total", "Total errors", ["error_type"])
-auth_failures = _get_or_create_metric(Counter, "vulcan_auth_failures_total", "Authentication failures")
+
+step_counter = _get_or_create_metric(
+    Counter, "vulcan_steps_total", "Total steps executed"
+)
+step_duration = _get_or_create_metric(
+    Histogram, "vulcan_step_duration_seconds", "Step execution time"
+)
+active_requests = _get_or_create_metric(
+    Gauge, "vulcan_active_requests", "Number of active requests"
+)
+error_counter = _get_or_create_metric(
+    Counter, "vulcan_errors_total", "Total errors", ["error_type"]
+)
+auth_failures = _get_or_create_metric(
+    Counter, "vulcan_auth_failures_total", "Authentication failures"
+)
 
 # Self-improvement metrics
 improvement_attempts = _get_or_create_metric(
-    Counter, "vulcan_improvement_attempts_total",
-    "Total improvement attempts", ["objective_type"]
+    Counter,
+    "vulcan_improvement_attempts_total",
+    "Total improvement attempts",
+    ["objective_type"],
 )
 improvement_successes = _get_or_create_metric(
-    Counter, "vulcan_improvement_successes_total", 
-    "Successful improvements", ["objective_type"]
+    Counter,
+    "vulcan_improvement_successes_total",
+    "Successful improvements",
+    ["objective_type"],
 )
 improvement_failures = _get_or_create_metric(
-    Counter, "vulcan_improvement_failures_total", 
-    "Failed improvements", ["objective_type"]
+    Counter,
+    "vulcan_improvement_failures_total",
+    "Failed improvements",
+    ["objective_type"],
 )
 improvement_cost = _get_or_create_metric(
-    Counter, "vulcan_improvement_cost_usd_total", 
-    "Total improvement cost in USD"
+    Counter, "vulcan_improvement_cost_usd_total", "Total improvement cost in USD"
 )
 improvement_approvals_pending = _get_or_create_metric(
-    Gauge, "vulcan_improvement_approvals_pending", 
-    "Number of pending approvals"
+    Gauge, "vulcan_improvement_approvals_pending", "Number of pending approvals"
 )
 
 # Thread-safe storage for simple rate limiting
@@ -1494,9 +1511,11 @@ async def system_status():
         status["llm"] = {
             "initialized": hasattr(app.state, "llm")
             and not isinstance(app.state.llm, MagicMock),
-            "mocked": isinstance(app.state.llm, MagicMock)
-            if hasattr(app.state, "llm")
-            else False,
+            "mocked": (
+                isinstance(app.state.llm, MagicMock)
+                if hasattr(app.state, "llm")
+                else False
+            ),
         }
 
         return status
@@ -1550,7 +1569,7 @@ async def get_agents_status():
 
     try:
         status = deployment.get_status()
-        
+
         # Extract agent pool information
         agent_pool_status = {
             "total_agents": 0,
@@ -1561,17 +1580,19 @@ async def get_agents_status():
                 "total_jobs_submitted": 0,
                 "total_jobs_completed": 0,
                 "total_jobs_failed": 0,
-                "total_recoveries_successful": 0
-            }
+                "total_recoveries_successful": 0,
+            },
         }
-        
+
         # Try to get agent pool stats if available
-        if hasattr(deployment, "collective") and hasattr(deployment.collective, "agent_pool"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective, "agent_pool"
+        ):
             pool = deployment.collective.agent_pool
             if hasattr(pool, "get_pool_status"):
                 pool_status = pool.get_pool_status()
                 agent_pool_status.update(pool_status)
-        
+
         return agent_pool_status
 
     except Exception as e:
@@ -1590,16 +1611,27 @@ async def spawn_agent(request: Request):
     try:
         body = await request.json()
         capability = body.get("capability", "general")
-        
+
         # Try to spawn agent if agent pool supports it
-        if hasattr(deployment, "collective") and hasattr(deployment.collective, "agent_pool"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective, "agent_pool"
+        ):
             pool = deployment.collective.agent_pool
             if hasattr(pool, "spawn_agent"):
                 agent_id = pool.spawn_agent(capability=capability)
-                return {"status": "spawned", "agent_id": agent_id, "capability": capability}
-        
+                return {
+                    "status": "spawned",
+                    "agent_id": agent_id,
+                    "capability": capability,
+                }
+
         # Fallback response
-        return {"status": "spawned", "agent_id": f"agent_{int(time.time())}", "capability": capability, "note": "Simulated spawn"}
+        return {
+            "status": "spawned",
+            "agent_id": f"agent_{int(time.time())}",
+            "capability": capability,
+            "note": "Simulated spawn",
+        }
 
     except Exception as e:
         logger.error(f"Failed to spawn agent: {e}")
@@ -1621,24 +1653,26 @@ async def get_world_model_status():
 
     try:
         status = deployment.get_status()
-        
+
         world_model_status = {
             "active": False,
             "entities_tracked": 0,
             "relationships_tracked": 0,
             "prediction_accuracy": 0.0,
-            "last_update": time.time()
+            "last_update": time.time(),
         }
-        
+
         # Try to get world model stats
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "world_model"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "world_model"
+        ):
             wm = deployment.collective.deps.world_model
             if wm:
                 world_model_status["active"] = True
                 if hasattr(wm, "get_stats"):
                     wm_stats = wm.get_stats()
                     world_model_status.update(wm_stats)
-        
+
         return world_model_status
 
     except Exception as e:
@@ -1659,15 +1693,22 @@ async def world_model_intervene(request: Request):
         entity = body.get("entity")
         action = body.get("action")
         parameters = body.get("parameters", {})
-        
+
         # Try to intervene if world model supports it
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "world_model"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "world_model"
+        ):
             wm = deployment.collective.deps.world_model
             if wm and hasattr(wm, "intervene"):
                 result = wm.intervene(entity, action, parameters)
                 return {"status": "success", "result": result}
-        
-        return {"status": "acknowledged", "entity": entity, "action": action, "note": "Intervention recorded"}
+
+        return {
+            "status": "acknowledged",
+            "entity": entity,
+            "action": action,
+            "note": "Intervention recorded",
+        }
 
     except Exception as e:
         logger.error(f"World model intervention failed: {e}")
@@ -1686,15 +1727,21 @@ async def world_model_predict(request: Request):
         body = await request.json()
         query = body.get("query")
         evidence = body.get("evidence", {})
-        
+
         # Try to make prediction if world model supports it
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "world_model"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "world_model"
+        ):
             wm = deployment.collective.deps.world_model
             if wm and hasattr(wm, "predict"):
                 prediction = wm.predict(query, evidence)
                 return {"prediction": prediction, "confidence": 0.85}
-        
-        return {"prediction": f"Prediction for: {query}", "confidence": 0.5, "note": "Simulated prediction"}
+
+        return {
+            "prediction": f"Prediction for: {query}",
+            "confidence": 0.5,
+            "note": "Simulated prediction",
+        }
 
     except Exception as e:
         logger.error(f"World model prediction failed: {e}")
@@ -1716,22 +1763,24 @@ async def get_safety_status():
 
     try:
         status = deployment.get_status()
-        
+
         safety_status = {
             "safety_score": 0.95,
             "violations_detected": 0,
             "violations_prevented": 0,
             "audit_entries": 0,
-            "monitoring_active": True
+            "monitoring_active": True,
         }
-        
+
         # Try to get safety stats
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "safety_monitor"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "safety_monitor"
+        ):
             safety = deployment.collective.deps.safety_monitor
             if safety and hasattr(safety, "get_status"):
                 safety_stats = safety.get_status()
                 safety_status.update(safety_stats)
-        
+
         return safety_status
 
     except Exception as e:
@@ -1750,16 +1799,22 @@ async def validate_safety_action(request: Request):
     try:
         body = await request.json()
         action = body.get("action", body)
-        
+
         # Try to validate if safety monitor supports it
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "safety_monitor"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "safety_monitor"
+        ):
             safety = deployment.collective.deps.safety_monitor
             if safety and hasattr(safety, "validate"):
                 is_safe, reason = safety.validate(action)
                 return {"safe": is_safe, "reason": reason, "action": action}
-        
+
         # Default: allow with warning
-        return {"safe": True, "reason": "No safety constraints configured", "action": action}
+        return {
+            "safe": True,
+            "reason": "No safety constraints configured",
+            "action": action,
+        }
 
     except Exception as e:
         logger.error(f"Safety validation failed: {e}")
@@ -1777,12 +1832,14 @@ async def get_recent_audit_logs(limit: int = 20):
     try:
         # Try to get audit logs if available
         audit_logs = []
-        
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "safety_monitor"):
+
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "safety_monitor"
+        ):
             safety = deployment.collective.deps.safety_monitor
             if safety and hasattr(safety, "get_audit_logs"):
                 audit_logs = safety.get_audit_logs(limit=limit)
-        
+
         # Return sample data if no logs available
         if not audit_logs:
             audit_logs = [
@@ -1790,11 +1847,11 @@ async def get_recent_audit_logs(limit: int = 20):
                     "timestamp": time.time() - i * 60,
                     "event": "action_validated",
                     "result": "safe",
-                    "details": f"Sample audit entry {i+1}"
+                    "details": f"Sample audit entry {i+1}",
                 }
                 for i in range(min(5, limit))
             ]
-        
+
         return {"audit_logs": audit_logs, "count": len(audit_logs)}
 
     except Exception as e:
@@ -1820,22 +1877,40 @@ async def get_improvement_objectives():
             "active_objectives": [],
             "completed_objectives": 0,
             "improvement_rate": 0.0,
-            "current_focus": "efficiency"
+            "current_focus": "efficiency",
         }
-        
+
         # Try to get improvement objectives if available
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "world_model"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "world_model"
+        ):
             wm = deployment.collective.deps.world_model
-            if wm and hasattr(wm, "self_improvement_enabled") and wm.self_improvement_enabled:
+            if (
+                wm
+                and hasattr(wm, "self_improvement_enabled")
+                and wm.self_improvement_enabled
+            ):
                 if hasattr(wm, "get_objectives"):
                     objectives = wm.get_objectives()
                 else:
                     objectives["active_objectives"] = [
-                        {"id": 1, "description": "Improve reasoning accuracy", "progress": 0.65},
-                        {"id": 2, "description": "Optimize memory usage", "progress": 0.42},
-                        {"id": 3, "description": "Enhance error recovery", "progress": 0.78}
+                        {
+                            "id": 1,
+                            "description": "Improve reasoning accuracy",
+                            "progress": 0.65,
+                        },
+                        {
+                            "id": 2,
+                            "description": "Optimize memory usage",
+                            "progress": 0.42,
+                        },
+                        {
+                            "id": 3,
+                            "description": "Enhance error recovery",
+                            "progress": 0.78,
+                        },
                     ]
-        
+
         return objectives
 
     except Exception as e:
@@ -1859,15 +1934,15 @@ async def transparency_query(request: Request):
     try:
         body = await request.json()
         query = body.get("query", "")
-        
+
         # Try to answer transparency query
         explanation = {
             "query": query,
             "explanation": f"The system made this decision based on its internal reasoning process.",
             "confidence": 0.8,
-            "supporting_facts": []
+            "supporting_facts": [],
         }
-        
+
         # If LLM is available, use it for better explanations
         if hasattr(app.state, "llm"):
             llm = app.state.llm
@@ -1879,7 +1954,7 @@ async def transparency_query(request: Request):
                 explanation["explanation"] = response
             except Exception as e:
                 logger.warning(f"LLM explanation failed, using default: {e}")
-        
+
         return explanation
 
     except Exception as e:
@@ -1902,21 +1977,23 @@ async def get_memory_status():
 
     try:
         status = deployment.get_status()
-        
+
         memory_status = {
             "total_memories": 0,
             "memory_usage_mb": status.get("health", {}).get("memory_usage_mb", 0),
             "retrieval_latency_ms": 0,
-            "storage_backend": "in-memory"
+            "storage_backend": "in-memory",
         }
-        
+
         # Try to get memory stats
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "memory"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "memory"
+        ):
             memory = deployment.collective.deps.memory
             if memory and hasattr(memory, "get_stats"):
                 memory_stats = memory.get_stats()
                 memory_status.update(memory_stats)
-        
+
         return memory_status
 
     except Exception as e:
@@ -1970,15 +2047,21 @@ async def store_memory(request: Request):
         body = await request.json()
         content = body.get("content")
         metadata = body.get("metadata", {})
-        
+
         # Try to store if memory system supports it
-        if hasattr(deployment, "collective") and hasattr(deployment.collective.deps, "memory"):
+        if hasattr(deployment, "collective") and hasattr(
+            deployment.collective.deps, "memory"
+        ):
             memory = deployment.collective.deps.memory
             if memory and hasattr(memory, "store"):
                 memory_id = memory.store(content, metadata)
                 return {"status": "stored", "memory_id": memory_id}
-        
-        return {"status": "stored", "memory_id": f"mem_{int(time.time())}", "note": "Simulated storage"}
+
+        return {
+            "status": "stored",
+            "memory_id": f"mem_{int(time.time())}",
+            "note": "Simulated storage",
+        }
 
     except Exception as e:
         logger.error(f"Memory store failed: {e}")
@@ -2000,27 +2083,32 @@ async def get_hardware_status():
 
     try:
         status = deployment.get_status()
-        
+
         hardware_status = {
             "cpu_usage_percent": 0,
             "memory_usage_mb": status.get("health", {}).get("memory_usage_mb", 0),
             "disk_usage_percent": 0,
             "gpu_available": False,
             "gpu_usage_percent": 0,
-            "energy_budget_left_nJ": status.get("health", {}).get("energy_budget_left_nJ", 0)
+            "energy_budget_left_nJ": status.get("health", {}).get(
+                "energy_budget_left_nJ", 0
+            ),
         }
-        
+
         # Try to get more detailed hardware stats
         try:
             import psutil
+
             hardware_status["cpu_usage_percent"] = psutil.cpu_percent(interval=0.1)
             mem = psutil.virtual_memory()
             hardware_status["memory_usage_mb"] = mem.used / (1024 * 1024)
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
             hardware_status["disk_usage_percent"] = disk.percent
         except Exception as e:
-            logger.debug(f"Failed to get hardware status (psutil may not be available): {e}")
-        
+            logger.debug(
+                f"Failed to get hardware status (psutil may not be available): {e}"
+            )
+
         return hardware_status
 
     except Exception as e:
@@ -2050,9 +2138,9 @@ def test_basic_functionality(deployment: ProductionDeployment) -> bool:
         try:
             result = deployment.step_with_monitoring([], context)
 
-            assert ("action" in result) or ("output" in result), (
-                f"Test {i}: Missing action/output in result"
-            )
+            assert ("action" in result) or (
+                "output" in result
+            ), f"Test {i}: Missing action/output in result"
             assert (
                 result.get("error") is None
                 or "stub" in str(result.get("error", "")).lower()
@@ -2141,9 +2229,9 @@ def test_resource_limits(deployment: ProductionDeployment) -> bool:
         status = deployment.get_status()
         memory_usage = status["health"]["memory_usage_mb"]
 
-        assert memory_usage < settings.max_memory_mb, (
-            f"Memory limit exceeded: {memory_usage}MB"
-        )
+        assert (
+            memory_usage < settings.max_memory_mb
+        ), f"Memory limit exceeded: {memory_usage}MB"
 
         logger.info("Resource limits test passed")
         return True
@@ -2317,9 +2405,9 @@ class IntegrationTestSuite:
         print(f"✅ Successful: {successful}")
         print(f"❌ Failed: {failed}")
 
-        assert success_rate > 0.8, (
-            f"Low success rate: {success_rate:.2%} ({successful}/{total} tasks succeeded)"
-        )
+        assert (
+            success_rate > 0.8
+        ), f"Low success rate: {success_rate:.2%} ({successful}/{total} tasks succeeded)"
 
         return {
             "success_rate": success_rate,
@@ -2390,18 +2478,26 @@ class IntegrationTestSuite:
         results = await asyncio.gather(*operations, return_exceptions=True)
 
         return {
-            "planning": results[0]
-            if not isinstance(results[0], Exception)
-            else {"success": False, "error": str(results[0])},
-            "memory": results[1]
-            if not isinstance(results[1], Exception)
-            else {"success": False, "error": str(results[1])},
-            "reasoning": results[2]
-            if not isinstance(results[2], Exception)
-            else {"success": False, "error": str(results[2])},
-            "learning": results[3]
-            if not isinstance(results[3], Exception)
-            else {"success": False, "error": str(results[3])},
+            "planning": (
+                results[0]
+                if not isinstance(results[0], Exception)
+                else {"success": False, "error": str(results[0])}
+            ),
+            "memory": (
+                results[1]
+                if not isinstance(results[1], Exception)
+                else {"success": False, "error": str(results[1])}
+            ),
+            "reasoning": (
+                results[2]
+                if not isinstance(results[2], Exception)
+                else {"success": False, "error": str(results[2])}
+            ),
+            "learning": (
+                results[3]
+                if not isinstance(results[3], Exception)
+                else {"success": False, "error": str(results[3])}
+            ),
         }
 
     async def _test_planning(self):
@@ -3269,8 +3365,9 @@ def main():
     if config.enable_self_improvement:
         try:
             logger.info("Initializing meta-reasoning self-improvement drive...")
-            from vulcan.world_model.meta_reasoning.self_improvement_drive import \
-                SelfImprovementDrive
+            from vulcan.world_model.meta_reasoning.self_improvement_drive import (
+                SelfImprovementDrive,
+            )
 
             # Ensure config and data directories exist
             Path("configs").mkdir(parents=True, exist_ok=True)

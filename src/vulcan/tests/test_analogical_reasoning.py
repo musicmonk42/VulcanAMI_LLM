@@ -12,11 +12,14 @@ Tests cover:
 FIXED VERSION - All platform compatibility issues resolved
 """
 
-from vulcan.reasoning.analogical_reasoning import (AnalogicalMapping,
-                                                   AnalogicalReasoner,
-                                                   AnalogicalReasoningEngine,
-                                                   Entity, MappingType,
-                                                   Relation)
+from vulcan.reasoning.analogical_reasoning import (
+    AnalogicalMapping,
+    AnalogicalReasoner,
+    AnalogicalReasoningEngine,
+    Entity,
+    MappingType,
+    Relation,
+)
 import os
 import sys
 import threading
@@ -387,9 +390,9 @@ class TestCacheManagement:
 
         # FIXED: Use approximate equality for floating-point score comparison
         # Allow for minor numerical differences (tolerance of 0.01)
-        assert abs(result1["score"] - result2["score"]) < 0.01, (
-            f"Scores differ too much: {result1['score']} vs {result2['score']}"
-        )
+        assert (
+            abs(result1["score"] - result2["score"]) < 0.01
+        ), f"Scores differ too much: {result1['score']} vs {result2['score']}"
 
         assert result1["mappings"] == result2["mappings"]
 

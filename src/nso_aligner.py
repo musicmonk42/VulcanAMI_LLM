@@ -297,8 +297,10 @@ class NSOAligner:
 
             try:
                 # --- Heavy imports moved here ---
-                from transformers import (AutoModelForSequenceClassification,
-                                          AutoTokenizer)
+                from transformers import (
+                    AutoModelForSequenceClassification,
+                    AutoTokenizer,
+                )
                 from transformers import logging as hf_logging
                 from transformers import pipeline
 
@@ -360,16 +362,14 @@ class NSOAligner:
                         self.tokenizer = AutoTokenizer.from_pretrained(  # nosec B615 - revision parameter present
                             model_id, token=token, revision=model_revision
                         )
-                        self.adversarial_detector = (
-                            AutoModelForSequenceClassification.from_pretrained(  # nosec B615 - revision parameter present
-                                model_id,
-                                token=token,
-                                revision=model_revision,
-                                trust_remote_code=False,
-                                low_cpu_mem_usage=True,
-                                torch_dtype=torch.float32,
-                                device_map={"": "cpu"},  # Force CPU
-                            )
+                        self.adversarial_detector = AutoModelForSequenceClassification.from_pretrained(  # nosec B615 - revision parameter present
+                            model_id,
+                            token=token,
+                            revision=model_revision,
+                            trust_remote_code=False,
+                            low_cpu_mem_usage=True,
+                            torch_dtype=torch.float32,
+                            device_map={"": "cpu"},  # Force CPU
                         )
                         try:
                             self.adversarial_detector.to("cpu")
@@ -515,7 +515,8 @@ class NSOAligner:
             # Create comprehensive audit tables
             # FIX: Adding `event_type` to audit_log with a default value to prevent NOT NULL constraint failures
             # FIX: Adding `severity` to audit_log to prevent schema conflict with SecurityAuditEngine
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS audit_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     audit_id TEXT UNIQUE NOT NULL,
@@ -533,9 +534,11 @@ class NSOAligner:
                     quarantine_id TEXT,
                     metadata TEXT
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS compliance_checks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     audit_id TEXT NOT NULL,
@@ -547,9 +550,11 @@ class NSOAligner:
                     timestamp REAL NOT NULL,
                     FOREIGN KEY (audit_id) REFERENCES audit_log(audit_id)
                 )
-            """)
+            """
+            )
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS rollback_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     snapshot_id TEXT UNIQUE NOT NULL,
@@ -561,10 +566,12 @@ class NSOAligner:
                     restored BOOLEAN DEFAULT FALSE,
                     restore_timestamp REAL
                 )
-            """)
+            """
+            )
 
             # FIX: Ensure quarantine_log table exists to prevent 'no such table' errors
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS quarantine_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     quarantine_id TEXT UNIQUE NOT NULL,
@@ -578,7 +585,8 @@ class NSOAligner:
                     decision TEXT,
                     decision_timestamp REAL
                 )
-            """)
+            """
+            )
 
             # Create indexes for performance
             cursor.execute(
@@ -1393,8 +1401,8 @@ class NSOAligner:
     def _check_real_world_data(self, proposal: Dict[str, Any]) -> Dict[str, Any]:
         """Check proposal against real-world threat intelligence with bounded cache."""
         cache_key = hashlib.md5(
-            json.dumps(proposal, sort_keys=True).encode()
-            , usedforsecurity=False).hexdigest()
+            json.dumps(proposal, sort_keys=True).encode(), usedforsecurity=False
+        ).hexdigest()
 
         current_time = time.time()
 

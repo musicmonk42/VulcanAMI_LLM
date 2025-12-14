@@ -13,8 +13,12 @@ Tests cover:
 - Performance metrics
 """
 
-from unified_generation import (FusionStrategy, NormalizationMethod,
-                                UnifiedGenConfig, UnifiedGeneration)
+from unified_generation import (
+    FusionStrategy,
+    NormalizationMethod,
+    UnifiedGenConfig,
+    UnifiedGeneration,
+)
 import math
 import sys
 import unittest

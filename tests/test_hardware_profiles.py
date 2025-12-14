@@ -21,9 +21,11 @@ def hardware_profiles():
     """Load the hardware profiles JSON file."""
     config_path = Path(__file__).parent / "configs" / "hardware_profiles.json"
     if not config_path.exists():
-        config_path = Path(__file__).parent / ".." / "configs" / "hardware_profiles.json"
+        config_path = (
+            Path(__file__).parent / ".." / "configs" / "hardware_profiles.json"
+        )
 
-    with open(config_path, 'r', encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -37,7 +39,7 @@ def required_fields():
         "serialization_cost_mb_per_s",
         "energy_per_op_nj",
         "max_tensor_size_mb",
-        "dynamic_metrics"
+        "dynamic_metrics",
     }
 
 
@@ -69,18 +71,20 @@ class TestJSONStructure:
         for hw_type in expected_types:
             assert hw_type in actual_types, f"Missing hardware type: {hw_type}"
 
-    def test_all_profiles_have_required_fields(self, hardware_profiles, required_fields):
+    def test_all_profiles_have_required_fields(
+        self, hardware_profiles, required_fields
+    ):
         """Test that each profile has all required fields."""
         for hw_type, profile in hardware_profiles.items():
             for field in required_fields:
-                assert field in profile, \
-                    f"Profile {hw_type} missing required field: {field}"
+                assert (
+                    field in profile
+                ), f"Profile {hw_type} missing required field: {field}"
 
     def test_all_profiles_are_dicts(self, hardware_profiles):
         """Test that all profiles are dictionaries."""
         for hw_type, profile in hardware_profiles.items():
-            assert isinstance(profile, dict), \
-                f"Profile {hw_type} is not a dictionary"
+            assert isinstance(profile, dict), f"Profile {hw_type} is not a dictionary"
 
 
 # Test Metric Value Ranges
@@ -97,7 +101,9 @@ class TestMetricRanges:
         for hw_type, profile in hardware_profiles.items():
             throughput = profile.get("throughput_tops")
             assert throughput > 0, f"{hw_type} throughput must be positive"
-            assert throughput < 1000, f"{hw_type} throughput unrealistic: {throughput} TOPS"
+            assert (
+                throughput < 1000
+            ), f"{hw_type} throughput unrealistic: {throughput} TOPS"
 
     def test_energy_per_op_positive(self, hardware_profiles):
         """Test that energy per operation is positive."""
@@ -118,7 +124,9 @@ class TestMetricRanges:
         for hw_type, profile in hardware_profiles.items():
             max_size = profile.get("max_tensor_size_mb")
             assert max_size > 0, f"{hw_type} max tensor size must be positive"
-            assert max_size <= 1024 * 1024, f"{hw_type} max tensor size unrealistic: {max_size}MB"
+            assert (
+                max_size <= 1024 * 1024
+            ), f"{hw_type} max tensor size unrealistic: {max_size}MB"
 
     def test_bus_saturation_in_valid_range(self, hardware_profiles):
         """Test that bus saturation is between 0 and 1."""
@@ -126,8 +134,9 @@ class TestMetricRanges:
             metrics = profile.get("dynamic_metrics", {})
             saturation = metrics.get("bus_saturation")
             if saturation is not None:
-                assert 0 <= saturation <= 1, \
-                    f"{hw_type} bus saturation must be in [0,1]: {saturation}"
+                assert (
+                    0 <= saturation <= 1
+                ), f"{hw_type} bus saturation must be in [0,1]: {saturation}"
 
 
 # Test Physical Constraints
@@ -137,7 +146,7 @@ class TestPhysicalConstraints:
         profiles_sorted = sorted(
             hardware_profiles.items(),
             key=lambda x: x[1]["throughput_tops"],
-            reverse=True
+            reverse=True,
         )
 
         # Top throughput devices should generally have lower latency than CPU
@@ -164,9 +173,13 @@ class TestPhysicalConstraints:
                 photonic_eff = efficiency
 
         # Photonic should have high efficiency
-        cpu_eff = hardware_profiles["cpu"]["throughput_tops"] / hardware_profiles["cpu"]["energy_per_op_nj"]
-        assert photonic_eff > cpu_eff * 10, \
-            "Photonic should be significantly more efficient than CPU"
+        cpu_eff = (
+            hardware_profiles["cpu"]["throughput_tops"]
+            / hardware_profiles["cpu"]["energy_per_op_nj"]
+        )
+        assert (
+            photonic_eff > cpu_eff * 10
+        ), "Photonic should be significantly more efficient than CPU"
 
     def test_exotic_hardware_advantages(self, hardware_profiles, exotic_hardware):
         """Test that exotic hardware has clear advantages over conventional."""
@@ -188,8 +201,9 @@ class TestPhysicalConstraints:
                 if exotic["energy_per_op_nj"] < cpu["energy_per_op_nj"] * 0.1:
                     advantages.append("energy")
 
-                assert len(advantages) > 0, \
-                    f"Exotic hardware {hw_type} should have clear advantage over CPU"
+                assert (
+                    len(advantages) > 0
+                ), f"Exotic hardware {hw_type} should have clear advantage over CPU"
 
     def test_memory_bandwidth_constraint(self, hardware_profiles):
         """Test that memory constraints are realistic."""
@@ -199,8 +213,9 @@ class TestPhysicalConstraints:
 
             # Rough check: very high throughput needs large memory
             if throughput > 50:  # High-end accelerator
-                assert max_tensor >= 1024, \
-                    f"{hw_type} needs larger memory for {throughput} TOPS throughput"
+                assert (
+                    max_tensor >= 1024
+                ), f"{hw_type} needs larger memory for {throughput} TOPS throughput"
 
     def test_density_metrics_for_exotic(self, hardware_profiles, exotic_hardware):
         """Test that exotic hardware has density metrics defined."""
@@ -208,8 +223,9 @@ class TestPhysicalConstraints:
             if hw_type in hardware_profiles:
                 profile = hardware_profiles[hw_type]
                 # Exotic hardware should have density metrics
-                assert "density_tops_per_mm2" in profile or True, \
-                    f"Exotic hardware {hw_type} should have density metrics"
+                assert (
+                    "density_tops_per_mm2" in profile or True
+                ), f"Exotic hardware {hw_type} should have density metrics"
 
 
 # Test Dynamic Metrics
@@ -243,8 +259,9 @@ class TestDynamicMetrics:
 
             if last_updated:
                 update_date = datetime.strptime(last_updated, "%Y-%m-%d")
-                assert update_date <= now, \
-                    f"{hw_type} last_updated is in the future: {last_updated}"
+                assert (
+                    update_date <= now
+                ), f"{hw_type} last_updated is in the future: {last_updated}"
 
     def test_metrics_staleness_warning(self, hardware_profiles):
         """Test for stale metrics and warn if data is old."""
@@ -277,8 +294,9 @@ class TestDynamicMetrics:
         # All shouldn't have identical values (suspicious)
         values = [s[1] for s in saturations]
         unique_values = set(values)
-        assert len(unique_values) > 1 or len(unique_values) == 0, \
-            "All hardware has identical bus_saturation - likely static placeholder"
+        assert (
+            len(unique_values) > 1 or len(unique_values) == 0
+        ), "All hardware has identical bus_saturation - likely static placeholder"
 
 
 # Test Relative Performance
@@ -288,10 +306,12 @@ class TestRelativePerformance:
         cpu = hardware_profiles["cpu"]
         gpu = hardware_profiles["gpu"]
 
-        assert gpu["throughput_tops"] > cpu["throughput_tops"], \
-            "GPU should have higher throughput than CPU"
-        assert gpu["latency_ms"] < cpu["latency_ms"], \
-            "GPU should have lower latency than CPU"
+        assert (
+            gpu["throughput_tops"] > cpu["throughput_tops"]
+        ), "GPU should have higher throughput than CPU"
+        assert (
+            gpu["latency_ms"] < cpu["latency_ms"]
+        ), "GPU should have lower latency than CPU"
 
     def test_photonic_performance_characteristics(self, hardware_profiles):
         """Test that photonic hardware has expected characteristics."""
@@ -300,16 +320,19 @@ class TestRelativePerformance:
             cpu = hardware_profiles["cpu"]
 
             # Photonic should be very energy efficient
-            assert photonic["energy_per_op_nj"] < cpu["energy_per_op_nj"] / 100, \
-                "Photonic should be 100x+ more energy efficient than CPU"
+            assert (
+                photonic["energy_per_op_nj"] < cpu["energy_per_op_nj"] / 100
+            ), "Photonic should be 100x+ more energy efficient than CPU"
 
             # Photonic should have high throughput
-            assert photonic["throughput_tops"] > cpu["throughput_tops"] * 50, \
-                "Photonic should have much higher throughput than CPU"
+            assert (
+                photonic["throughput_tops"] > cpu["throughput_tops"] * 50
+            ), "Photonic should have much higher throughput than CPU"
 
             # Photonic should have very low latency
-            assert photonic["latency_ms"] < cpu["latency_ms"] / 10, \
-                "Photonic should have much lower latency than CPU"
+            assert (
+                photonic["latency_ms"] < cpu["latency_ms"] / 10
+            ), "Photonic should have much lower latency than CPU"
 
     def test_vllm_optimization_characteristics(self, hardware_profiles):
         """Test that vLLM has characteristics suitable for inference."""
@@ -318,8 +341,9 @@ class TestRelativePerformance:
             gpu = hardware_profiles["gpu"]
 
             # vLLM should have reasonable throughput
-            assert vllm["throughput_tops"] > gpu["throughput_tops"] * 0.5, \
-                "vLLM should have comparable throughput to GPU"
+            assert (
+                vllm["throughput_tops"] > gpu["throughput_tops"] * 0.5
+            ), "vLLM should have comparable throughput to GPU"
 
     def test_fpga_characteristics(self, hardware_profiles):
         """Test that FPGA has expected characteristics."""
@@ -328,26 +352,30 @@ class TestRelativePerformance:
             cpu = hardware_profiles["cpu"]
 
             # FPGA should have better throughput than CPU
-            assert fpga["throughput_tops"] > cpu["throughput_tops"], \
-                "FPGA should have better throughput than CPU"
+            assert (
+                fpga["throughput_tops"] > cpu["throughput_tops"]
+            ), "FPGA should have better throughput than CPU"
 
 
 # Test Scheduling Suitability
 class TestSchedulingSuitability:
-    def test_all_metrics_present_for_scheduling(self, hardware_profiles, required_fields):
+    def test_all_metrics_present_for_scheduling(
+        self, hardware_profiles, required_fields
+    ):
         """Test that all metrics needed for scheduling decisions are present."""
         scheduling_metrics = {
             "latency_ms",
             "throughput_tops",
             "energy_per_op_nj",
             "max_tensor_size_mb",
-            "serialization_cost_mb_per_s"
+            "serialization_cost_mb_per_s",
         }
 
         for hw_type, profile in hardware_profiles.items():
             for metric in scheduling_metrics:
-                assert metric in profile, \
-                    f"{hw_type} missing scheduling metric: {metric}"
+                assert (
+                    metric in profile
+                ), f"{hw_type} missing scheduling metric: {metric}"
 
     def test_workload_classification_possible(self, hardware_profiles):
         """Test that profiles support workload classification."""
@@ -373,15 +401,18 @@ class TestSchedulingSuitability:
         max_sizes = [p["max_tensor_size_mb"] for p in hardware_profiles.values()]
 
         # Should have variety for different workload sizes
-        assert max(max_sizes) > min(max_sizes) * 2, \
-            "Hardware should have diverse memory capacities"
+        assert (
+            max(max_sizes) > min(max_sizes) * 2
+        ), "Hardware should have diverse memory capacities"
 
     def test_cost_model_supportable(self, hardware_profiles):
         """Test that profiles support building a cost model."""
         # Cost model needs: throughput, energy, latency
         for hw_type, profile in hardware_profiles.items():
             # Can compute operations per second
-            ops_per_sec = profile["throughput_tops"] * 1e12 / 1000  # Convert TOPS to ops/ms
+            ops_per_sec = (
+                profile["throughput_tops"] * 1e12 / 1000
+            )  # Convert TOPS to ops/ms
 
             # Can compute energy per second at full utilization
             energy_per_sec = profile["energy_per_op_nj"] * ops_per_sec
@@ -396,34 +427,40 @@ class TestMissingFeatures:
         """Test that cost metrics are missing (document limitation)."""
         for hw_type, profile in hardware_profiles.items():
             # Document that these are missing
-            assert "cost_per_hour" not in profile, \
-                "Cost metrics not yet implemented"
-            assert "cost_per_operation" not in profile, \
-                "Cost metrics not yet implemented"
+            assert "cost_per_hour" not in profile, "Cost metrics not yet implemented"
+            assert (
+                "cost_per_operation" not in profile
+            ), "Cost metrics not yet implemented"
 
     def test_no_availability_metrics(self, hardware_profiles):
         """Test that availability metrics are missing (document limitation)."""
         for hw_type, profile in hardware_profiles.items():
-            assert "availability_percentage" not in profile, \
-                "Availability metrics not yet implemented"
-            assert "failure_rate" not in profile, \
-                "Reliability metrics not yet implemented"
+            assert (
+                "availability_percentage" not in profile
+            ), "Availability metrics not yet implemented"
+            assert (
+                "failure_rate" not in profile
+            ), "Reliability metrics not yet implemented"
 
     def test_no_thermal_constraints(self, hardware_profiles):
         """Test that thermal constraints are missing (document limitation)."""
         for hw_type, profile in hardware_profiles.items():
-            assert "thermal_design_power_watts" not in profile, \
-                "Thermal metrics not yet implemented"
-            assert "max_operating_temp_celsius" not in profile, \
-                "Thermal metrics not yet implemented"
+            assert (
+                "thermal_design_power_watts" not in profile
+            ), "Thermal metrics not yet implemented"
+            assert (
+                "max_operating_temp_celsius" not in profile
+            ), "Thermal metrics not yet implemented"
 
     def test_no_multi_tenancy_constraints(self, hardware_profiles):
         """Test that multi-tenancy constraints are missing (document limitation)."""
         for hw_type, profile in hardware_profiles.items():
-            assert "max_concurrent_workloads" not in profile, \
-                "Multi-tenancy metrics not yet implemented"
-            assert "isolation_level" not in profile, \
-                "Isolation metrics not yet implemented"
+            assert (
+                "max_concurrent_workloads" not in profile
+            ), "Multi-tenancy metrics not yet implemented"
+            assert (
+                "isolation_level" not in profile
+            ), "Isolation metrics not yet implemented"
 
 
 # Test Data Consistency
@@ -431,15 +468,17 @@ class TestDataConsistency:
     def test_no_duplicate_descriptions(self, hardware_profiles):
         """Test that descriptions are unique."""
         descriptions = [p.get("description", "") for p in hardware_profiles.values()]
-        assert len(descriptions) == len(set(descriptions)), \
-            "Hardware profiles have duplicate descriptions"
+        assert len(descriptions) == len(
+            set(descriptions)
+        ), "Hardware profiles have duplicate descriptions"
 
     def test_descriptions_informative(self, hardware_profiles):
         """Test that descriptions are informative."""
         for hw_type, profile in hardware_profiles.items():
             description = profile.get("description", "")
-            assert len(description) > 10, \
-                f"{hw_type} description too short: {description}"
+            assert (
+                len(description) > 10
+            ), f"{hw_type} description too short: {description}"
 
     def test_numeric_types_consistent(self, hardware_profiles):
         """Test that numeric values have consistent types."""
@@ -455,23 +494,26 @@ class TestDataConsistency:
         for hw_type, profile in hardware_profiles.items():
             for key, value in profile.items():
                 if key in ["latency_ms", "throughput_tops", "energy_per_op_nj"]:
-                    assert value is not None, \
-                        f"{hw_type}.{key} should not be null"
+                    assert value is not None, f"{hw_type}.{key} should not be null"
 
 
 # Test Hardware Type Coverage
 class TestHardwareTypeCoverage:
-    def test_conventional_hardware_present(self, hardware_profiles, conventional_hardware):
+    def test_conventional_hardware_present(
+        self, hardware_profiles, conventional_hardware
+    ):
         """Test that conventional hardware types are present."""
         for hw_type in conventional_hardware:
-            assert hw_type in hardware_profiles, \
-                f"Missing conventional hardware type: {hw_type}"
+            assert (
+                hw_type in hardware_profiles
+            ), f"Missing conventional hardware type: {hw_type}"
 
     def test_emerging_hardware_present(self, hardware_profiles, exotic_hardware):
         """Test that emerging hardware types are present."""
         for hw_type in exotic_hardware:
-            assert hw_type in hardware_profiles, \
-                f"Missing emerging hardware type: {hw_type}"
+            assert (
+                hw_type in hardware_profiles
+            ), f"Missing emerging hardware type: {hw_type}"
 
     def test_cloud_vendor_coverage(self, hardware_profiles):
         """Test that cloud vendor options are represented."""
@@ -481,8 +523,9 @@ class TestHardwareTypeCoverage:
                 cloud_vendors.append(hw_type)
 
         # Should have at least one cloud vendor option
-        assert len(cloud_vendors) > 0, \
-            "Should include at least one cloud vendor hardware option"
+        assert (
+            len(cloud_vendors) > 0
+        ), "Should include at least one cloud vendor hardware option"
 
     def test_specialized_accelerators(self, hardware_profiles):
         """Test that specialized accelerators are represented."""
@@ -492,8 +535,7 @@ class TestHardwareTypeCoverage:
             hw for hw in accelerator_types if hw in hardware_profiles
         ]
 
-        assert len(present_accelerators) >= 3, \
-            "Should have diverse accelerator types"
+        assert len(present_accelerators) >= 3, "Should have diverse accelerator types"
 
 
 # Test Calculation Correctness
@@ -508,8 +550,9 @@ class TestCalculations:
             estimated_power_watts = throughput_ops * energy_per_op
 
             # Sanity check: reasonable power draw
-            assert 0 < estimated_power_watts < 10000, \
-                f"{hw_type} estimated power unrealistic: {estimated_power_watts}W"
+            assert (
+                0 < estimated_power_watts < 10000
+            ), f"{hw_type} estimated power unrealistic: {estimated_power_watts}W"
 
     def test_bandwidth_requirements(self, hardware_profiles):
         """Test that bandwidth requirements are consistent."""
@@ -522,8 +565,9 @@ class TestCalculations:
             transfer_time_sec = max_tensor_mb / ser_cost if ser_cost > 0 else 0
 
             # Should be reasonable (not hours to transfer)
-            assert transfer_time_sec < 60, \
-                f"{hw_type} transfer time too long: {transfer_time_sec}s for max tensor"
+            assert (
+                transfer_time_sec < 60
+            ), f"{hw_type} transfer time too long: {transfer_time_sec}s for max tensor"
 
     def test_efficiency_metrics(self, hardware_profiles):
         """Test that efficiency metrics are calculable."""
@@ -544,36 +588,37 @@ class TestOptimizationScenarios:
     def test_latency_optimal_selection(self, hardware_profiles):
         """Test that latency-optimal hardware can be identified."""
         sorted_by_latency = sorted(
-            hardware_profiles.items(),
-            key=lambda x: x[1]["latency_ms"]
+            hardware_profiles.items(), key=lambda x: x[1]["latency_ms"]
         )
 
         best_latency = sorted_by_latency[0]
-        assert best_latency[1]["latency_ms"] < 1.0, \
-            f"Best latency should be sub-millisecond, got {best_latency[1]['latency_ms']}ms"
+        assert (
+            best_latency[1]["latency_ms"] < 1.0
+        ), f"Best latency should be sub-millisecond, got {best_latency[1]['latency_ms']}ms"
 
     def test_throughput_optimal_selection(self, hardware_profiles):
         """Test that throughput-optimal hardware can be identified."""
         sorted_by_throughput = sorted(
             hardware_profiles.items(),
             key=lambda x: x[1]["throughput_tops"],
-            reverse=True
+            reverse=True,
         )
 
         best_throughput = sorted_by_throughput[0]
-        assert best_throughput[1]["throughput_tops"] > 50, \
-            f"Best throughput should exceed 50 TOPS"
+        assert (
+            best_throughput[1]["throughput_tops"] > 50
+        ), f"Best throughput should exceed 50 TOPS"
 
     def test_energy_optimal_selection(self, hardware_profiles):
         """Test that energy-optimal hardware can be identified."""
         sorted_by_energy = sorted(
-            hardware_profiles.items(),
-            key=lambda x: x[1]["energy_per_op_nj"]
+            hardware_profiles.items(), key=lambda x: x[1]["energy_per_op_nj"]
         )
 
         best_energy = sorted_by_energy[0]
-        assert best_energy[1]["energy_per_op_nj"] < 10, \
-            f"Best energy efficiency should be under 10 nJ/op"
+        assert (
+            best_energy[1]["energy_per_op_nj"] < 10
+        ), f"Best energy efficiency should be under 10 nJ/op"
 
     def test_balanced_selection(self, hardware_profiles):
         """Test that balanced hardware can be selected."""
@@ -591,7 +636,9 @@ class TestOptimizationScenarios:
             energy_score = min_energy / profile["energy_per_op_nj"]
 
             # Geometric mean
-            geometric_mean = (throughput_score * latency_score * energy_score) ** (1/3)
+            geometric_mean = (throughput_score * latency_score * energy_score) ** (
+                1 / 3
+            )
             scores[hw_type] = geometric_mean
 
         # Should be able to rank hardware
@@ -608,7 +655,7 @@ class TestIntegration:
             "tensor_size_mb": 200,
             "latency_requirement_ms": 5.0,
             "energy_budget_uj": 10000,  # microjoules
-            "operations": 1e9  # billion operations
+            "operations": 1e9,  # billion operations
         }
 
         suitable_hardware = []
@@ -616,13 +663,16 @@ class TestIntegration:
             # Check constraints
             if profile["max_tensor_size_mb"] >= workload["tensor_size_mb"]:
                 if profile["latency_ms"] <= workload["latency_requirement_ms"]:
-                    energy_cost = workload["operations"] * profile["energy_per_op_nj"] / 1000
+                    energy_cost = (
+                        workload["operations"] * profile["energy_per_op_nj"] / 1000
+                    )
                     if energy_cost <= workload["energy_budget_uj"]:
                         suitable_hardware.append(hw_type)
 
         # Should find at least one suitable option
-        assert len(suitable_hardware) > 0, \
-            "Scheduler should find suitable hardware for typical workload"
+        assert (
+            len(suitable_hardware) > 0
+        ), "Scheduler should find suitable hardware for typical workload"
 
     def test_profiles_support_multi_objective_optimization(self, hardware_profiles):
         """Test that profiles support multi-objective optimization."""
@@ -631,21 +681,25 @@ class TestIntegration:
 
         for hw_type, profile in hardware_profiles.items():
             # Maximize throughput, minimize latency, minimize energy
-            objectives.append({
-                "name": hw_type,
-                "throughput": profile["throughput_tops"],
-                "latency": profile["latency_ms"],
-                "energy": profile["energy_per_op_nj"]
-            })
+            objectives.append(
+                {
+                    "name": hw_type,
+                    "throughput": profile["throughput_tops"],
+                    "latency": profile["latency_ms"],
+                    "energy": profile["energy_per_op_nj"],
+                }
+            )
 
         # Verify diversity in trade-offs
         throughputs = [o["throughput"] for o in objectives]
         latencies = [o["latency"] for o in objectives]
 
-        assert max(throughputs) > min(throughputs) * 2, \
-            "Should have diverse throughput options"
-        assert max(latencies) > min(latencies) * 2, \
-            "Should have diverse latency options"
+        assert (
+            max(throughputs) > min(throughputs) * 2
+        ), "Should have diverse throughput options"
+        assert (
+            max(latencies) > min(latencies) * 2
+        ), "Should have diverse latency options"
 
 
 # Test Recommended Enhancements
@@ -656,7 +710,7 @@ class TestRecommendedEnhancements:
         recommended_fields = [
             "cost_per_hour",
             "cost_per_million_ops",
-            "acquisition_cost"
+            "acquisition_cost",
         ]
 
         for hw_type, profile in hardware_profiles.items():
@@ -668,7 +722,7 @@ class TestRecommendedEnhancements:
         recommended_fields = [
             "uptime_percentage",
             "mtbf_hours",
-            "provisioning_time_minutes"
+            "provisioning_time_minutes",
         ]
 
         for hw_type, profile in hardware_profiles.items():
@@ -679,8 +733,7 @@ class TestRecommendedEnhancements:
         """Document that dynamic metrics need refresh mechanism."""
         # All profiles have same bus_saturation - suspicious
         saturations = [
-            p["dynamic_metrics"]["bus_saturation"]
-            for p in hardware_profiles.values()
+            p["dynamic_metrics"]["bus_saturation"] for p in hardware_profiles.values()
         ]
 
         if len(set(saturations)) == 1:

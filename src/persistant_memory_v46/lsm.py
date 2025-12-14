@@ -74,7 +74,9 @@ class BloomFilter:
     @classmethod
     def deserialize(cls, data: bytes) -> BloomFilter:
         """Deserialize bloom filter from bytes."""
-        obj_data = pickle.loads(data)  # nosec B301 - Internal data structure, not user input
+        obj_data = pickle.loads(
+            data
+        )  # nosec B301 - Internal data structure, not user input
         bf = cls(obj_data["size"], obj_data["num_hashes"])
         bf.bit_array = np.frombuffer(obj_data["bit_array"], dtype=bool)
         bf.item_count = obj_data["item_count"]
@@ -781,7 +783,9 @@ class MerkleLSM:
                 if self.compression == "zlib":
                     data = zlib.decompress(data)
 
-                items = pickle.loads(data)  # nosec B301 - Internal LSM data, not user input
+                items = pickle.loads(
+                    data
+                )  # nosec B301 - Internal LSM data, not user input
                 for key, value in items:
                     if not self._is_tombstone(value):
                         merged[key] = value

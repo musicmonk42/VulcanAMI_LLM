@@ -13,9 +13,15 @@ Tests:
 
 from problem_decomposer.problem_decomposer_core import ProblemGraph
 from problem_decomposer.decomposition_strategies import (
-    AnalogicalDecomposition, BruteForceSearch, DecompositionResult,
-    ExactDecomposition, SemanticDecomposition, StrategyType,
-    StructuralDecomposition, SyntheticBridging)
+    AnalogicalDecomposition,
+    BruteForceSearch,
+    DecompositionResult,
+    ExactDecomposition,
+    SemanticDecomposition,
+    StrategyType,
+    StructuralDecomposition,
+    SyntheticBridging,
+)
 import logging
 import sys
 from pathlib import Path

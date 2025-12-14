@@ -2,12 +2,15 @@
 test_objective_hierarchy.py - Unit tests for ObjectiveHierarchy
 """
 
-
 import numpy as np
 import pytest
 
 from vulcan.world_model.meta_reasoning.objective_hierarchy import (
-    ConflictType, Objective, ObjectiveHierarchy, ObjectiveType)
+    ConflictType,
+    Objective,
+    ObjectiveHierarchy,
+    ObjectiveType,
+)
 
 
 @pytest.fixture

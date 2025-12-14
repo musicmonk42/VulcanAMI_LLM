@@ -43,6 +43,7 @@ from urllib.parse import urlparse
 @dataclass
 class GAConfig:
     """Configuration for genetic algorithm parameters."""
+
     # Fitness function coefficients (documented for reproducibility)
     base_tokens: float = 120.0
     tokens_per_node: float = 7.0
@@ -69,6 +70,7 @@ class GAConfig:
     max_nodes: int = 1000  # Maximum nodes per graph
     max_edges: int = 5000  # Maximum edges per graph
 
+
 # =========================
 # Default Paths
 # =========================
@@ -93,7 +95,11 @@ log = logging.getLogger(__name__)
 # =========================
 try:
     from specs.formal_grammar.language_evolution_registry import (
-        DevelopmentKMS, InMemoryBackend, LanguageEvolutionRegistry)
+        DevelopmentKMS,
+        InMemoryBackend,
+        LanguageEvolutionRegistry,
+    )
+
     HAS_REGISTRY = True
 except ImportError:
     HAS_REGISTRY = False
@@ -102,11 +108,13 @@ except ImportError:
 try:
     # FIXED: Import AgentInterface instead of the non-existent GraphixClient
     from agent_interface import AgentInterface, ConnectionConfig
+
     HAS_SDK = True
 except ImportError:
     AgentInterface, ConnectionConfig = None, None
     HAS_SDK = False
     log.warning("AgentInterface not available, online mode disabled")
+
 
 # =========================
 # Types
@@ -114,18 +122,22 @@ except ImportError:
 @dataclass
 class Metrics:
     """Metrics for graph evaluation."""
+
     accuracy: float
     tokens: float
     cycles: float
     score: float
 
+
 @dataclass
 class GraphCandidate:
     """A candidate graph with cached metrics."""
+
     graph: Dict[str, Any]
     metrics: Optional[Metrics] = None
     generation: int = 0
     parent_ids: List[str] = field(default_factory=list)
+
 
 # =========================
 # Validation Functions
@@ -141,18 +153,18 @@ class GraphValidator:
         if not isinstance(graph, dict):
             return False, "Graph must be a dictionary"
 
-        nodes = graph.get('nodes')
+        nodes = graph.get("nodes")
         if not isinstance(nodes, list):
             return False, "'nodes' must be a list"
 
         # Validate nodes and collect IDs
         node_id_set = set()
         for i, node in enumerate(nodes):
-            if not isinstance(node, dict) or 'id' not in node:
+            if not isinstance(node, dict) or "id" not in node:
                 return False, f"Node at index {i} is malformed or missing 'id'"
-            node_id_set.add(node['id'])
+            node_id_set.add(node["id"])
 
-        edges = graph.get('edges')
+        edges = graph.get("edges")
         if not isinstance(edges, list):
             return False, "'edges' must be a list"
 
@@ -166,8 +178,8 @@ class GraphValidator:
             from_ref = edge["from"]
             to_ref = edge["to"]
 
-            source_id = from_ref['node'] if isinstance(from_ref, dict) else from_ref
-            target_id = to_ref['node'] if isinstance(to_ref, dict) else to_ref
+            source_id = from_ref["node"] if isinstance(from_ref, dict) else from_ref
+            target_id = to_ref["node"] if isinstance(to_ref, dict) else to_ref
             # --- END OF THE FIX ---
 
             if source_id not in node_id_set:
@@ -177,6 +189,7 @@ class GraphValidator:
                 return False, f"Edge {i} has invalid 'to' reference: {target_id}"
 
         return True, None
+
 
 class PathValidator:
     """Validates file paths for security."""
@@ -218,6 +231,7 @@ class PathValidator:
             return True, ""
         except Exception as e:
             return False, f"Path validation error: {e}"
+
 
 # =========================
 # Fitness Evaluation
@@ -261,9 +275,14 @@ class FitnessEvaluator:
         cycles = self.config.base_cycles + (node_count * self.config.cycles_per_node)
 
         # Estimate accuracy (decreases with complexity)
-        accuracy = max(0.0, min(1.0,
-            self.config.base_accuracy - (node_count * self.config.accuracy_drop_per_node)
-        ))
+        accuracy = max(
+            0.0,
+            min(
+                1.0,
+                self.config.base_accuracy
+                - (node_count * self.config.accuracy_drop_per_node),
+            ),
+        )
 
         # Composite fitness score (maximize accuracy, minimize tokens and cycles)
         score = (
@@ -272,24 +291,22 @@ class FitnessEvaluator:
             - (cycles / 1000.0 * self.config.beta_cycles_per_k)
         )
 
-        metrics = Metrics(
-            accuracy=accuracy,
-            tokens=tokens,
-            cycles=cycles,
-            score=score
-        )
+        metrics = Metrics(accuracy=accuracy, tokens=tokens, cycles=cycles, score=score)
 
         # Cache result
         self.cache[graph_hash] = metrics
 
-        log.debug(f"Fitness for {graph['id']}: score={score:.4f}, acc={accuracy:.3f}, "
-                 f"tokens={tokens:.0f}, cycles={cycles:.0f}")
+        log.debug(
+            f"Fitness for {graph['id']}: score={score:.4f}, acc={accuracy:.3f}, "
+            f"tokens={tokens:.0f}, cycles={cycles:.0f}"
+        )
 
         return metrics
 
     def clear_cache(self):
         """Clear fitness cache."""
         self.cache.clear()
+
 
 # =========================
 # GA Operators
@@ -324,7 +341,9 @@ class GAOperators:
             graph = copy.deepcopy(base_graph)
 
             # Generate unique ID
-            unique_id = f"{base_graph['id']}_gen0_ind{len(population)}_{uuid.uuid4().hex[:8]}"
+            unique_id = (
+                f"{base_graph['id']}_gen0_ind{len(population)}_{uuid.uuid4().hex[:8]}"
+            )
             graph["id"] = unique_id
 
             # Apply random perturbations
@@ -340,7 +359,9 @@ class GAOperators:
                 log.debug(f"Invalid initial graph: {errors}")
 
         if len(population) < population_size:
-            log.warning(f"Only generated {len(population)}/{population_size} valid graphs")
+            log.warning(
+                f"Only generated {len(population)}/{population_size} valid graphs"
+            )
 
         log.info(f"Initialized population with {len(population)} graphs")
         return population
@@ -436,8 +457,8 @@ class GAOperators:
             from_ref = edge["from"]
             to_ref = edge["to"]
 
-            source_id = from_ref['node'] if isinstance(from_ref, dict) else from_ref
-            target_id = to_ref['node'] if isinstance(to_ref, dict) else to_ref
+            source_id = from_ref["node"] if isinstance(from_ref, dict) else from_ref
+            target_id = to_ref["node"] if isinstance(to_ref, dict) else to_ref
 
             if source_id in child_node_ids and target_id in child_node_ids:
                 valid_edges.append(copy.deepcopy(edge))
@@ -448,16 +469,16 @@ class GAOperators:
         # Validate
         is_valid, errors = self.validator.validate_graph(child)
         if is_valid:
-            log.debug(f"Successfully crossed {parent1['id']} and {parent2['id']} -> {child['id']}")
+            log.debug(
+                f"Successfully crossed {parent1['id']} and {parent2['id']} -> {child['id']}"
+            )
             return child
         else:
             log.debug(f"Crossover produced invalid graph: {errors}")
             return None
 
     def tournament_selection(
-        self,
-        population: List[GraphCandidate],
-        tournament_size: int
+        self, population: List[GraphCandidate], tournament_size: int
     ) -> GraphCandidate:
         """
         Perform tournament selection.
@@ -476,10 +497,15 @@ class GAOperators:
         candidates = self.rng.sample(population, tournament_size)
 
         # Select best
-        best = max(candidates, key=lambda c: c.metrics.score if c.metrics else float('-inf'))
+        best = max(
+            candidates, key=lambda c: c.metrics.score if c.metrics else float("-inf")
+        )
 
-        log.debug(f"Tournament selected {best.graph['id']} with score {best.metrics.score:.4f}")
+        log.debug(
+            f"Tournament selected {best.graph['id']} with score {best.metrics.score:.4f}"
+        )
         return best
+
 
 # =========================
 # Checkpointing
@@ -497,7 +523,7 @@ class CheckpointManager:
         population: List[GraphCandidate],
         champions: List[GraphCandidate],
         rng_state: Any,
-        config: GAConfig
+        config: GAConfig,
     ):
         """Save checkpoint to disk."""
         checkpoint = {
@@ -505,28 +531,36 @@ class CheckpointManager:
             "population": [
                 {
                     "graph": c.graph,
-                    "metrics": {
-                        "accuracy": c.metrics.accuracy,
-                        "tokens": c.metrics.tokens,
-                        "cycles": c.metrics.cycles,
-                        "score": c.metrics.score
-                    } if c.metrics else None,
+                    "metrics": (
+                        {
+                            "accuracy": c.metrics.accuracy,
+                            "tokens": c.metrics.tokens,
+                            "cycles": c.metrics.cycles,
+                            "score": c.metrics.score,
+                        }
+                        if c.metrics
+                        else None
+                    ),
                     "generation": c.generation,
-                    "parent_ids": c.parent_ids
+                    "parent_ids": c.parent_ids,
                 }
                 for c in population
             ],
             "champions": [
                 {
                     "graph": c.graph,
-                    "metrics": {
-                        "accuracy": c.metrics.accuracy,
-                        "tokens": c.metrics.tokens,
-                        "cycles": c.metrics.cycles,
-                        "score": c.metrics.score
-                    } if c.metrics else None,
+                    "metrics": (
+                        {
+                            "accuracy": c.metrics.accuracy,
+                            "tokens": c.metrics.tokens,
+                            "cycles": c.metrics.cycles,
+                            "score": c.metrics.score,
+                        }
+                        if c.metrics
+                        else None
+                    ),
                     "generation": c.generation,
-                    "parent_ids": c.parent_ids
+                    "parent_ids": c.parent_ids,
                 }
                 for c in champions
             ],
@@ -541,19 +575,21 @@ class CheckpointManager:
                 "alpha_tokens": config.alpha_tokens,
                 "beta_cycles_per_k": config.beta_cycles_per_k,
                 "mutation_rate": config.mutation_rate,
-                "crossover_rate": config.crossover_rate
-            }
+                "crossover_rate": config.crossover_rate,
+            },
         }
 
         # Write to temporary file first, then rename for atomicity
         checkpoint_file = self.checkpoint_dir / f"checkpoint_gen{generation}.json"
-        temp_file = checkpoint_file.with_suffix('.tmp')
+        temp_file = checkpoint_file.with_suffix(".tmp")
 
         try:
-            with open(temp_file, 'w') as f:
+            with open(temp_file, "w") as f:
                 json.dump(checkpoint, f, indent=2)
             temp_file.replace(checkpoint_file)
-            log.info(f"Saved checkpoint at generation {generation} to {checkpoint_file}")
+            log.info(
+                f"Saved checkpoint at generation {generation} to {checkpoint_file}"
+            )
         except Exception as e:
             log.error(f"Failed to save checkpoint: {e}")
             if temp_file.exists():
@@ -562,13 +598,14 @@ class CheckpointManager:
     def load_checkpoint(self, checkpoint_file: Path) -> Optional[Dict[str, Any]]:
         """Load checkpoint from disk."""
         try:
-            with open(checkpoint_file, 'r') as f:
+            with open(checkpoint_file, "r") as f:
                 checkpoint = json.load(f)
             log.info(f"Loaded checkpoint from {checkpoint_file}")
             return checkpoint
         except Exception as e:
             log.error(f"Failed to load checkpoint: {e}")
             return None
+
 
 # =========================
 # Offline Mode
@@ -591,14 +628,15 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
 
     # Increase the rate limit specifically for this offline simulation.
     from specs.formal_grammar.language_evolution_registry import RateLimiter
+
     high_limit_rate_limiter = RateLimiter(max_per_hour=1000)
 
     registry = LanguageEvolutionRegistry(
-        backend=backend,
-        kms=kms,
-        rate_limiter=high_limit_rate_limiter
+        backend=backend, kms=kms, rate_limiter=high_limit_rate_limiter
     )
-    log.info("Initialized LanguageEvolutionRegistry for offline mode with high rate limit")
+    log.info(
+        "Initialized LanguageEvolutionRegistry for offline mode with high rate limit"
+    )
 
     validator = GraphValidator(config)
     evaluator = FitnessEvaluator(config)
@@ -608,18 +646,22 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
     # Validate and load files
     path_validator = PathValidator()
 
-    is_valid, error = path_validator.validate_path(args.graph_file, args.graphs_dir.parent)
+    is_valid, error = path_validator.validate_path(
+        args.graph_file, args.graphs_dir.parent
+    )
     if not is_valid:
         raise RuntimeError(f"Invalid graph file: {error}")
 
-    is_valid, error = path_validator.validate_path(args.workload_file, args.graphs_dir.parent)
+    is_valid, error = path_validator.validate_path(
+        args.workload_file, args.graphs_dir.parent
+    )
     if not is_valid:
         raise RuntimeError(f"Invalid workload file: {error}")
 
     try:
-        with open(args.graph_file, 'r') as f:
+        with open(args.graph_file, "r") as f:
             base_graph = json.load(f)
-        with open(args.workload_file, 'r') as f:
+        with open(args.workload_file, "r") as f:
             workload = json.load(f)
     except Exception as e:
         log.error(f"Failed to load files: {e}")
@@ -643,7 +685,7 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
                     graph=c["graph"],
                     metrics=Metrics(**c["metrics"]) if c["metrics"] else None,
                     generation=c["generation"],
-                    parent_ids=c["parent_ids"]
+                    parent_ids=c["parent_ids"],
                 )
                 for c in checkpoint["population"]
             ]
@@ -652,7 +694,7 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
                     graph=c["graph"],
                     metrics=Metrics(**c["metrics"]) if c["metrics"] else None,
                     generation=c["generation"],
-                    parent_ids=c["parent_ids"]
+                    parent_ids=c["parent_ids"],
                 )
                 for c in checkpoint["champions"]
             ]
@@ -664,8 +706,7 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
         # Initialize population
         population_graphs = operators.initialize_population(base_graph, args.population)
         population_candidates = [
-            GraphCandidate(graph=g, generation=0)
-            for g in population_graphs
+            GraphCandidate(graph=g, generation=0) for g in population_graphs
         ]
         champions = []
 
@@ -689,70 +730,90 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
                     "proposed_by": "tournament-agent-offline",
                     "rationale": f"GA candidate from generation {generation}",
                     "proposal_content": {
-                        "add": {
-                            candidate.graph["id"]: candidate.graph
-                        }
+                        "add": {candidate.graph["id"]: candidate.graph}
                     },
                     "metadata": {
                         "author": "tournament-agent-offline",
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "version": "1.0.0",
                         "generation": generation,
-                        "fitness_score": candidate.metrics.score if candidate.metrics else 0.0
-                    }
+                        "fitness_score": (
+                            candidate.metrics.score if candidate.metrics else 0.0
+                        ),
+                    },
                 }
 
                 proposal_id = registry.submit_proposal(proposal)
-                log.debug(f"Submitted proposal {proposal_id} for graph {candidate.graph['id']}")
+                log.debug(
+                    f"Submitted proposal {proposal_id} for graph {candidate.graph['id']}"
+                )
 
                 # Simulate voting (auto-approve for now)
                 consensus = {
                     "proposal_id": proposal_id,
                     "votes": {"tournament-agent-offline": "yes"},
-                    "weights": {"tournament-agent-offline": 1.0}
+                    "weights": {"tournament-agent-offline": 1.0},
                 }
                 registry.record_vote(consensus)
 
             except Exception as e:
-                log.warning(f"Failed to process graph {candidate.graph['id']} in registry: {e}")
+                log.warning(
+                    f"Failed to process graph {candidate.graph['id']} in registry: {e}"
+                )
 
         # Sort by fitness
-        population_candidates.sort(key=lambda c: c.metrics.score if c.metrics else float('-inf'), reverse=True)
+        population_candidates.sort(
+            key=lambda c: c.metrics.score if c.metrics else float("-inf"), reverse=True
+        )
 
         # Log statistics
         scores = [c.metrics.score for c in population_candidates if c.metrics]
         if scores:
             best_score = max(scores)
             avg_score = sum(scores) / len(scores)
-            diversity = len(set(c.graph["id"] for c in population_candidates)) / len(population_candidates)
+            diversity = len(set(c.graph["id"] for c in population_candidates)) / len(
+                population_candidates
+            )
 
-            log.info(f"Gen {generation}: Best={best_score:.4f}, Avg={avg_score:.4f}, "
-                    f"Diversity={diversity:.2f}, PopSize={len(population_candidates)}")
+            log.info(
+                f"Gen {generation}: Best={best_score:.4f}, Avg={avg_score:.4f}, "
+                f"Diversity={diversity:.2f}, PopSize={len(population_candidates)}"
+            )
 
             best_fitness_history.append(best_score)
 
         # Early stopping check
         if len(best_fitness_history) >= config.convergence_window:
-            recent = best_fitness_history[-config.convergence_window:]
+            recent = best_fitness_history[-config.convergence_window :]
             if max(recent) - min(recent) < config.convergence_threshold:
-                log.info(f"Converged after {generation + 1} generations, stopping early")
+                log.info(
+                    f"Converged after {generation + 1} generations, stopping early"
+                )
                 break
 
         # Select elites
-        elites = population_candidates[:args.elites]
+        elites = population_candidates[: args.elites]
 
         # Add to champions (limit size)
         champions.extend(elites)
         if len(champions) > config.max_champions:
-            champions.sort(key=lambda c: c.metrics.score if c.metrics else float('-inf'), reverse=True)
-            champions = champions[:config.max_champions]
+            champions.sort(
+                key=lambda c: c.metrics.score if c.metrics else float("-inf"),
+                reverse=True,
+            )
+            champions = champions[: config.max_champions]
 
         log.info(f"Selected {len(elites)} elites, total champions: {len(champions)}")
 
         # Generate new population
-        new_population = [GraphCandidate(graph=copy.deepcopy(e.graph), generation=generation+1,
-                                        parent_ids=[e.graph["id"]])
-                         for e in elites]
+        new_population = [
+            GraphCandidate(
+                graph=copy.deepcopy(e.graph),
+                generation=generation + 1,
+                parent_ids=[e.graph["id"]],
+            )
+            for e in elites
+        ]
 
         attempts = 0
         max_attempts = args.population * 5
@@ -761,13 +822,19 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
             attempts += 1
 
             # Select parents
-            parent1 = operators.tournament_selection(population_candidates, args.tournament)
-            parent2 = operators.tournament_selection(population_candidates, args.tournament)
+            parent1 = operators.tournament_selection(
+                population_candidates, args.tournament
+            )
+            parent2 = operators.tournament_selection(
+                population_candidates, args.tournament
+            )
 
             # Ensure parents are different
             retry_count = 0
             while parent1.graph["id"] == parent2.graph["id"] and retry_count < 10:
-                parent2 = operators.tournament_selection(population_candidates, args.tournament)
+                parent2 = operators.tournament_selection(
+                    population_candidates, args.tournament
+                )
                 retry_count += 1
 
             # Crossover or clone
@@ -788,15 +855,15 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
             # Add to population if valid
             if child_graph:
                 candidate = GraphCandidate(
-                    graph=child_graph,
-                    generation=generation + 1,
-                    parent_ids=parent_ids
+                    graph=child_graph, generation=generation + 1, parent_ids=parent_ids
                 )
                 candidate.metrics = evaluator.evaluate(child_graph)
                 new_population.append(candidate)
 
         if len(new_population) < args.population:
-            log.warning(f"Only generated {len(new_population)}/{args.population} valid offspring")
+            log.warning(
+                f"Only generated {len(new_population)}/{args.population} valid offspring"
+            )
 
         population_candidates = new_population
 
@@ -807,19 +874,23 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
                 population=population_candidates,
                 champions=champions,
                 rng_state=args.rng.getstate(),
-                config=config
+                config=config,
             )
 
         # --- START OF THE FIX ---
         # Add a delay between generations to allow the rate limiter's token bucket to recover.
-        if generation < args.generations - 1: # Don't sleep after the last generation
-            log.info(f"Pausing for 2 seconds before next generation to respect rate limits...")
+        if generation < args.generations - 1:  # Don't sleep after the last generation
+            log.info(
+                f"Pausing for 2 seconds before next generation to respect rate limits..."
+            )
             await asyncio.sleep(2)
         # --- END OF THE FIX ---
 
     # Save final champion
     if champions:
-        champion = max(champions, key=lambda c: c.metrics.score if c.metrics else float('-inf'))
+        champion = max(
+            champions, key=lambda c: c.metrics.score if c.metrics else float("-inf")
+        )
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         out_dir = args.champions_dir / f"offline_{timestamp}"
@@ -827,35 +898,39 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
 
         # Write champion atomically
         champion_file = out_dir / "champion_final.json"
-        temp_file = champion_file.with_suffix('.tmp')
+        temp_file = champion_file.with_suffix(".tmp")
 
         champion_data = {
             "graph": champion.graph,
-            "metrics": {
-                "accuracy": champion.metrics.accuracy,
-                "tokens": champion.metrics.tokens,
-                "cycles": champion.metrics.cycles,
-                "score": champion.metrics.score
-            } if champion.metrics else None,
+            "metrics": (
+                {
+                    "accuracy": champion.metrics.accuracy,
+                    "tokens": champion.metrics.tokens,
+                    "cycles": champion.metrics.cycles,
+                    "score": champion.metrics.score,
+                }
+                if champion.metrics
+                else None
+            ),
             "generation": champion.generation,
-            "parent_ids": champion.parent_ids
+            "parent_ids": champion.parent_ids,
         }
 
-        with open(temp_file, 'w') as f:
+        with open(temp_file, "w") as f:
             json.dump(champion_data, f, indent=2)
         temp_file.replace(champion_file)
 
         # Save workload
         workload_file = out_dir / "champion_eval_workload.json"
-        temp_file = workload_file.with_suffix('.tmp')
-        with open(temp_file, 'w') as f:
+        temp_file = workload_file.with_suffix(".tmp")
+        with open(temp_file, "w") as f:
             json.dump(workload, f, indent=2)
         temp_file.replace(workload_file)
 
         # Save metrics history
         metrics_file = out_dir / "metrics_history.json"
-        temp_file = metrics_file.with_suffix('.tmp')
-        with open(temp_file, 'w') as f:
+        temp_file = metrics_file.with_suffix(".tmp")
+        with open(temp_file, "w") as f:
             json.dump({"best_fitness": best_fitness_history}, f, indent=2)
         temp_file.replace(metrics_file)
 
@@ -864,10 +939,13 @@ async def run_offline(args: argparse.Namespace, config: GAConfig) -> None:
 
     log.info("Offline tournament complete.")
 
+
 # =========================
 # Online Mode
 # =========================
-async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentInterface") -> None:
+async def run_online(
+    args: argparse.Namespace, config: GAConfig, client: "AgentInterface"
+) -> None:
     """
     Run tournament in online mode using AgentInterface.
 
@@ -890,18 +968,22 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
     # Validate and load files
     path_validator = PathValidator()
 
-    is_valid, error = path_validator.validate_path(args.graph_file, args.graphs_dir.parent)
+    is_valid, error = path_validator.validate_path(
+        args.graph_file, args.graphs_dir.parent
+    )
     if not is_valid:
         raise RuntimeError(f"Invalid graph file: {error}")
 
-    is_valid, error = path_validator.validate_path(args.workload_file, args.graphs_dir.parent)
+    is_valid, error = path_validator.validate_path(
+        args.workload_file, args.graphs_dir.parent
+    )
     if not is_valid:
         raise RuntimeError(f"Invalid workload file: {error}")
 
     try:
-        with open(args.graph_file, 'r') as f:
+        with open(args.graph_file, "r") as f:
             base_graph = json.load(f)
-        with open(args.workload_file, 'r') as f:
+        with open(args.workload_file, "r") as f:
             workload = json.load(f)
     except Exception as e:
         log.error(f"Failed to load files: {e}")
@@ -915,8 +997,7 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
     # Initialize population
     population_graphs = operators.initialize_population(base_graph, args.population)
     population_candidates = [
-        GraphCandidate(graph=g, generation=0)
-        for g in population_graphs
+        GraphCandidate(graph=g, generation=0) for g in population_graphs
     ]
     champions = []
     best_fitness_history = []
@@ -929,7 +1010,9 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
         tasks = []
         for candidate in population_candidates:
             if candidate.metrics is None:
-                tasks.append(evaluate_candidate_online(client, candidate, evaluator, args))
+                tasks.append(
+                    evaluate_candidate_online(client, candidate, evaluator, args)
+                )
 
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -938,7 +1021,9 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
                     log.error(f"Evaluation failed: {result}")
 
         # Filter out failed evaluations
-        population_candidates = [c for c in population_candidates if c.metrics is not None]
+        population_candidates = [
+            c for c in population_candidates if c.metrics is not None
+        ]
 
         if not population_candidates:
             log.error("No valid candidates remaining, aborting")
@@ -952,29 +1037,35 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
         best_score = max(scores)
         avg_score = sum(scores) / len(scores)
 
-        log.info(f"Gen {generation}: Best={best_score:.4f}, Avg={avg_score:.4f}, "
-                f"PopSize={len(population_candidates)}")
+        log.info(
+            f"Gen {generation}: Best={best_score:.4f}, Avg={avg_score:.4f}, "
+            f"PopSize={len(population_candidates)}"
+        )
 
         best_fitness_history.append(best_score)
 
         # Early stopping
         if len(best_fitness_history) >= config.convergence_window:
-            recent = best_fitness_history[-config.convergence_window:]
+            recent = best_fitness_history[-config.convergence_window :]
             if max(recent) - min(recent) < config.convergence_threshold:
                 log.info(f"Converged after {generation + 1} generations")
                 break
 
         # Select elites
-        elites = population_candidates[:args.elites]
+        elites = population_candidates[: args.elites]
         champions.extend(elites)
 
         if len(champions) > config.max_champions:
             champions.sort(key=lambda c: c.metrics.score, reverse=True)
-            champions = champions[:config.max_champions]
+            champions = champions[: config.max_champions]
 
         # Generate new population
         new_population = [
-            GraphCandidate(graph=copy.deepcopy(e.graph), generation=generation+1, parent_ids=[e.graph["id"]])
+            GraphCandidate(
+                graph=copy.deepcopy(e.graph),
+                generation=generation + 1,
+                parent_ids=[e.graph["id"]],
+            )
             for e in elites
         ]
 
@@ -984,13 +1075,19 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
         while len(new_population) < args.population and attempts < max_attempts:
             attempts += 1
 
-            parent1 = operators.tournament_selection(population_candidates, args.tournament)
-            parent2 = operators.tournament_selection(population_candidates, args.tournament)
+            parent1 = operators.tournament_selection(
+                population_candidates, args.tournament
+            )
+            parent2 = operators.tournament_selection(
+                population_candidates, args.tournament
+            )
 
             # Ensure different parents
             retry = 0
             while parent1.graph["id"] == parent2.graph["id"] and retry < 10:
-                parent2 = operators.tournament_selection(population_candidates, args.tournament)
+                parent2 = operators.tournament_selection(
+                    population_candidates, args.tournament
+                )
                 retry += 1
 
             # Crossover or clone
@@ -1010,7 +1107,11 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
 
             if child_graph:
                 new_population.append(
-                    GraphCandidate(graph=child_graph, generation=generation+1, parent_ids=parent_ids)
+                    GraphCandidate(
+                        graph=child_graph,
+                        generation=generation + 1,
+                        parent_ids=parent_ids,
+                    )
                 )
 
         population_candidates = new_population
@@ -1022,7 +1123,7 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
                 population=population_candidates,
                 champions=champions,
                 rng_state=args.rng.getstate(),
-                config=config
+                config=config,
             )
 
     # Save champion
@@ -1039,23 +1140,23 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
                 "accuracy": champion.metrics.accuracy,
                 "tokens": champion.metrics.tokens,
                 "cycles": champion.metrics.cycles,
-                "score": champion.metrics.score
+                "score": champion.metrics.score,
             },
             "generation": champion.generation,
-            "parent_ids": champion.parent_ids
+            "parent_ids": champion.parent_ids,
         }
 
         # Atomic write
         champion_file = out_dir / "champion_final.json"
-        temp_file = champion_file.with_suffix('.tmp')
-        with open(temp_file, 'w') as f:
+        temp_file = champion_file.with_suffix(".tmp")
+        with open(temp_file, "w") as f:
             json.dump(champion_data, f, indent=2)
         temp_file.replace(champion_file)
 
         # Save workload
         workload_file = out_dir / "champion_eval_workload.json"
-        temp_file = workload_file.with_suffix('.tmp')
-        with open(temp_file, 'w') as f:
+        temp_file = workload_file.with_suffix(".tmp")
+        with open(temp_file, "w") as f:
             json.dump(workload, f, indent=2)
         temp_file.replace(workload_file)
 
@@ -1064,19 +1165,18 @@ async def run_online(args: argparse.Namespace, config: GAConfig, client: "AgentI
 
     log.info("Online tournament complete.")
 
+
 async def evaluate_candidate_online(
     client: "AgentInterface",
     candidate: GraphCandidate,
     evaluator: FitnessEvaluator,
-    args: argparse.Namespace
+    args: argparse.Namespace,
 ) -> GraphCandidate:
     """Evaluate a candidate using online services."""
     try:
         # FIXED: Use submit_graph method from AgentInterface
         execution_result = await client.submit_graph(
-            ir_graph=candidate.graph,
-            wait_for_result=True,
-            timeout=args.timeout
+            ir_graph=candidate.graph, wait_for_result=True, timeout=args.timeout
         )
 
         # Extract metrics
@@ -1086,11 +1186,13 @@ async def evaluate_candidate_online(
                 accuracy=metrics_data.get("accuracy", 0.0),
                 tokens=metrics_data.get("tokens", 0.0),
                 cycles=metrics_data.get("cycles", 0.0),
-                score=metrics_data.get("score", 0.0)
+                score=metrics_data.get("score", 0.0),
             )
         else:
             # Fallback to heuristic
-            log.warning(f"Online execution for {candidate.graph['id']} failed or returned no metrics. Falling back.")
+            log.warning(
+                f"Online execution for {candidate.graph['id']} failed or returned no metrics. Falling back."
+            )
             candidate.metrics = evaluator.evaluate(candidate.graph)
 
         return candidate
@@ -1100,64 +1202,126 @@ async def evaluate_candidate_online(
         candidate.metrics = evaluator.evaluate(candidate.graph)
         return candidate
 
+
 # =========================
 # CLI
 # =========================
 def main() -> None:
     p = argparse.ArgumentParser(
         description="Graphix GA/Tournament driver",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
     # Mode
-    p.add_argument("--mode", choices=["offline", "online"], default="offline",
-                   help="Run mode: offline (registry simulation) or online (live services)")
+    p.add_argument(
+        "--mode",
+        choices=["offline", "online"],
+        default="offline",
+        help="Run mode: offline (registry simulation) or online (live services)",
+    )
 
     # GA parameters
-    p.add_argument("--generations", type=int, default=6,
-                   help="Number of generations to run")
-    p.add_argument("--population", type=int, default=8,
-                   help="Population size per generation")
-    p.add_argument("--tournament", type=int, default=3,
-                   help="Tournament size for selection (2-5 recommended)")
-    p.add_argument("--elites", type=int, default=1,
-                   help="Number of elites to preserve each generation")
+    p.add_argument(
+        "--generations", type=int, default=6, help="Number of generations to run"
+    )
+    p.add_argument(
+        "--population", type=int, default=8, help="Population size per generation"
+    )
+    p.add_argument(
+        "--tournament",
+        type=int,
+        default=3,
+        help="Tournament size for selection (2-5 recommended)",
+    )
+    p.add_argument(
+        "--elites",
+        type=int,
+        default=1,
+        help="Number of elites to preserve each generation",
+    )
 
     # File paths
-    p.add_argument("--graph-file", type=Path, default=DEFAULT_SENTIMENT_GRAPH,
-                   help="Path to base graph JSON file")
-    p.add_argument("--workload-file", type=Path, default=DEFAULT_EVAL_WORKLOAD,
-                   help="Path to evaluation workload JSON file")
-    p.add_argument("--graphs-dir", type=Path, default=DEFAULT_GRAPHS_DIR,
-                   help="Base directory for graphs (for path validation)")
-    p.add_argument("--champions-dir", type=Path, default=DEFAULT_CHAMPIONS_OUT,
-                   help="Output directory for champion artifacts")
-    p.add_argument("--checkpoint-dir", type=Path, default=DEFAULT_CHECKPOINT_DIR,
-                   help="Directory for checkpoints")
-    p.add_argument("--checkpoint-interval", type=int, default=5,
-                   help="Save checkpoint every N generations")
-    p.add_argument("--resume", type=Path, default=None,
-                   help="Resume from checkpoint file")
+    p.add_argument(
+        "--graph-file",
+        type=Path,
+        default=DEFAULT_SENTIMENT_GRAPH,
+        help="Path to base graph JSON file",
+    )
+    p.add_argument(
+        "--workload-file",
+        type=Path,
+        default=DEFAULT_EVAL_WORKLOAD,
+        help="Path to evaluation workload JSON file",
+    )
+    p.add_argument(
+        "--graphs-dir",
+        type=Path,
+        default=DEFAULT_GRAPHS_DIR,
+        help="Base directory for graphs (for path validation)",
+    )
+    p.add_argument(
+        "--champions-dir",
+        type=Path,
+        default=DEFAULT_CHAMPIONS_OUT,
+        help="Output directory for champion artifacts",
+    )
+    p.add_argument(
+        "--checkpoint-dir",
+        type=Path,
+        default=DEFAULT_CHECKPOINT_DIR,
+        help="Directory for checkpoints",
+    )
+    p.add_argument(
+        "--checkpoint-interval",
+        type=int,
+        default=5,
+        help="Save checkpoint every N generations",
+    )
+    p.add_argument(
+        "--resume", type=Path, default=None, help="Resume from checkpoint file"
+    )
 
     # Online mode parameters
-    p.add_argument("--host", default="http://localhost:8787",
-                   help="Host endpoint for online mode (e.g., http://localhost:8787)")
-    p.add_argument("--api-key", type=str, default=None,
-                   help="API key for online mode (required)")
-    p.add_argument("--timeout", type=int, default=120,
-                   help="Timeout in seconds for online graph execution")
+    p.add_argument(
+        "--host",
+        default="http://localhost:8787",
+        help="Host endpoint for online mode (e.g., http://localhost:8787)",
+    )
+    p.add_argument(
+        "--api-key", type=str, default=None, help="API key for online mode (required)"
+    )
+    p.add_argument(
+        "--timeout",
+        type=int,
+        default=120,
+        help="Timeout in seconds for online graph execution",
+    )
 
     # GA configuration
-    p.add_argument("--mutation-rate", type=float, default=0.1,
-                   help="Mutation probability (0.0-1.0)")
-    p.add_argument("--crossover-rate", type=float, default=0.8,
-                   help="Crossover probability (0.0-1.0)")
+    p.add_argument(
+        "--mutation-rate",
+        type=float,
+        default=0.1,
+        help="Mutation probability (0.0-1.0)",
+    )
+    p.add_argument(
+        "--crossover-rate",
+        type=float,
+        default=0.8,
+        help="Crossover probability (0.0-1.0)",
+    )
 
     # Other
-    p.add_argument("--seed", type=int, default=None,
-                   help="Random seed for reproducibility")
-    p.add_argument("-v", "--verbose", action="count", default=0,
-                   help="Increase logging verbosity (-v, -vv)")
+    p.add_argument(
+        "--seed", type=int, default=None, help="Random seed for reproducibility"
+    )
+    p.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase logging verbosity (-v, -vv)",
+    )
 
     args = p.parse_args()
 
@@ -1173,8 +1337,7 @@ def main() -> None:
 
     # Create GA config
     config = GAConfig(
-        mutation_rate=args.mutation_rate,
-        crossover_rate=args.crossover_rate
+        mutation_rate=args.mutation_rate, crossover_rate=args.crossover_rate
     )
 
     # Run
@@ -1191,14 +1354,16 @@ def main() -> None:
 
             # FIXED: Instantiate AgentInterface and use it as a context manager
             # The host URL needs the http:// prefix
-            host_url = args.host if args.host.startswith("http") else f"http://{args.host}"
+            host_url = (
+                args.host if args.host.startswith("http") else f"http://{args.host}"
+            )
             # Extract just the hostname for the ConnectionConfig
             parsed_url = urlparse(host_url)
 
             conn_config = ConnectionConfig(
                 host=parsed_url.hostname,
                 port=parsed_url.port or 80,
-                api_key=args.api_key
+                api_key=args.api_key,
             )
 
             # The interface must be used as a context manager to connect/disconnect
@@ -1213,6 +1378,7 @@ def main() -> None:
     except Exception as e:
         log.error(f"Tournament failed with an unexpected error: {e}", exc_info=True)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

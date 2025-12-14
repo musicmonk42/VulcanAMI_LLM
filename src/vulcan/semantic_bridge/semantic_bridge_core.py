@@ -127,9 +127,7 @@ except ImportError as e:
 
     class Concept:
         def __init__(self, pattern_signature, grounded_effects, confidence):
-            self.concept_id = (
-                f"concept_{hashlib.md5(pattern_signature.encode(), usedforsecurity=False).hexdigest()[:8]}"
-            )
+            self.concept_id = f"concept_{hashlib.md5(pattern_signature.encode(), usedforsecurity=False).hexdigest()[:8]}"
             self.pattern_signature = pattern_signature
             self.grounded_effects = grounded_effects
             self.confidence = confidence
@@ -164,7 +162,9 @@ except ImportError as e:
             self.safety_config = safety_config
 
         def map_pattern_to_concept(self, pattern, domain="general"):
-            pattern_sig = hashlib.md5(str(pattern).encode(), usedforsecurity=False).hexdigest()
+            pattern_sig = hashlib.md5(
+                str(pattern).encode(), usedforsecurity=False
+            ).hexdigest()
             if pattern_sig not in self.concepts:
                 concept = Concept(pattern_sig, [], 0.5)
                 concept.domains.add(domain)
@@ -438,6 +438,7 @@ class SemanticBridge:
         if SAFETY_VALIDATOR_AVAILABLE:
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
@@ -451,7 +452,9 @@ class SemanticBridge:
                     )
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.info("SemanticBridge: Safety validator initialized (new instance)")
+                logger.info(
+                    "SemanticBridge: Safety validator initialized (new instance)"
+                )
         else:
             self.safety_validator = None
             logger.warning(
@@ -858,9 +861,11 @@ class SemanticBridge:
                 for entry in list(self.operation_history):
                     # Convert to JSON-serializable format
                     serialized = {
-                        "pattern_signature": entry["pattern_signature"].to_dict()
-                        if hasattr(entry["pattern_signature"], "to_dict")
-                        else str(entry["pattern_signature"]),
+                        "pattern_signature": (
+                            entry["pattern_signature"].to_dict()
+                            if hasattr(entry["pattern_signature"], "to_dict")
+                            else str(entry["pattern_signature"])
+                        ),
                         "operations_run": list(entry["operations_run"]),
                         "success": entry["success"],
                         "execution_time": entry["execution_time"],
@@ -979,7 +984,9 @@ class SemanticBridge:
                             )
                             paths.extend(var_paths)
                         except Exception as e:
-                            logger.debug(f"Failed to find causal paths for variable {var}: {e}")
+                            logger.debug(
+                                f"Failed to find causal paths for variable {var}: {e}"
+                            )
 
                     insights["causal_paths"] = len(paths)
                     insights["causal_depth"] = max(
@@ -1020,7 +1027,9 @@ class SemanticBridge:
             Pattern signature for operation selection
         """
         pattern_str = str(pattern)
-        pattern_hash = hashlib.md5(pattern_str.encode(), usedforsecurity=False).hexdigest()
+        pattern_hash = hashlib.md5(
+            pattern_str.encode(), usedforsecurity=False
+        ).hexdigest()
 
         # FIXED: Create cache key that includes outcome count to prevent staleness
         cache_key = f"{pattern_hash}_{len(outcomes)}"

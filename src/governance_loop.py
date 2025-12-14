@@ -707,8 +707,8 @@ class GovernanceLoop:
         try:
             entry_copy = copy.deepcopy(entry)
             entry_copy["id"] = hashlib.md5(
-                json.dumps(entry_copy, sort_keys=True).encode()
-                , usedforsecurity=False).hexdigest()[:8]
+                json.dumps(entry_copy, sort_keys=True).encode(), usedforsecurity=False
+            ).hexdigest()[:8]
 
             with self.lock:
                 self.audit_log.append(entry_copy)
@@ -808,9 +808,7 @@ class GovernanceLoop:
         # Time-based analysis
         current_time = time.time()
         recent_violations = sum(
-            1
-            for v in violations_copy
-            if current_time - v.timestamp < 3600  # Last hour
+            1 for v in violations_copy if current_time - v.timestamp < 3600  # Last hour
         )
 
         return {

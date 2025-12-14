@@ -44,6 +44,7 @@ import time  # Moved import here
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import time # Original import
 # import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -1140,7 +1141,9 @@ class EthicalBoundaryMonitor:
             )
         except ValueError as e:
             # Boundary already exists - expected if re-initializing
-            logger.debug(f"Boundary 'no_demographic_discrimination' already exists: {e}")
+            logger.debug(
+                f"Boundary 'no_demographic_discrimination' already exists: {e}"
+            )
 
         # TRANSPARENCY: Maintain explainability
         try:
@@ -1233,11 +1236,15 @@ class EthicalBoundaryMonitor:
         log_level = (
             logging.CRITICAL
             if violation.severity == ViolationSeverity.CRITICAL
-            else logging.ERROR
-            if violation.severity == ViolationSeverity.HIGH
-            else logging.WARNING
-            if violation.severity == ViolationSeverity.MEDIUM
-            else logging.INFO
+            else (
+                logging.ERROR
+                if violation.severity == ViolationSeverity.HIGH
+                else (
+                    logging.WARNING
+                    if violation.severity == ViolationSeverity.MEDIUM
+                    else logging.INFO
+                )
+            )
         )  # Use INFO for LOW severity
 
         logger.log(

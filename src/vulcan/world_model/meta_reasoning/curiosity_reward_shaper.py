@@ -44,6 +44,7 @@ import time  # Moved import here to be grouped
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import time # Original import
 # import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional
@@ -430,9 +431,9 @@ class CuriosityRewardShaper:
         self.total_states_seen: int = 0
 
         # ICM components (simplified)
-        self.icm_forward_predictions: Dict[
-            str, np.ndarray
-        ] = {}  # Will store lists if numpy failed
+        self.icm_forward_predictions: Dict[str, np.ndarray] = (
+            {}
+        )  # Will store lists if numpy failed
         self.icm_prediction_errors: deque = deque(maxlen=1000)
 
         # RND components (simplified - using random projections)
@@ -744,9 +745,11 @@ class CuriosityRewardShaper:
                     "unique_states_seen": len(self.state_visits),
                     "episodic_memory_size": len(self.episodic_memory),
                     "novelty_estimates": len(self.novelty_estimates),
-                    "hybrid_weights": self.hybrid_weights.copy()
-                    if self.method == CuriosityMethod.HYBRID
-                    else None,
+                    "hybrid_weights": (
+                        self.hybrid_weights.copy()
+                        if self.method == CuriosityMethod.HYBRID
+                        else None
+                    ),
                 }
             )
 
@@ -1123,7 +1126,11 @@ class CuriosityRewardShaper:
             # Convert state to a string representation that handles common types
             # Sort dict keys for consistent hashing
             state_repr = json.dumps(state, sort_keys=True, default=str)
-            return hashlib.md5(state_repr.encode("utf-8"), usedforsecurity=False).hexdigest()[:16]  # Use utf-8
+            return hashlib.md5(
+                state_repr.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()[
+                :16
+            ]  # Use utf-8
         except Exception as e:
             # Fallback for unhashable types
             logger.debug(f"Hashing state failed with JSON ({e}), using fallback hash.")

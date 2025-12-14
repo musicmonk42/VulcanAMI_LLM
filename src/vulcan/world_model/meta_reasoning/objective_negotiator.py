@@ -18,6 +18,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import numpy as np # Original import
 # FIXED: Added Union to the import
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -80,8 +81,7 @@ try:
     # Use real imports if available
     from .objective_hierarchy import ConflictType as RealHierarchyConflictType
     from .objective_hierarchy import Objective as RealObjective
-    from .objective_hierarchy import \
-        ObjectiveHierarchy as RealObjectiveHierarchy
+    from .objective_hierarchy import ObjectiveHierarchy as RealObjectiveHierarchy
     from .objective_hierarchy import ObjectiveType as RealObjectiveType
 
     ObjectiveHierarchy = RealObjectiveHierarchy
@@ -503,20 +503,26 @@ class ObjectiveNegotiator:
                     },  # Use normalized base weights
                     # Estimate outcomes assuming no conflict (e.g., target or high value)
                     expected_outcomes={
-                        obj_a: getattr(
-                            self.objective_hierarchy.objectives.get(obj_a),
-                            "target_value",
-                            1.0,
-                        )
-                        if obj_a in getattr(self.objective_hierarchy, "objectives", {})
-                        else 1.0,
-                        obj_b: getattr(
-                            self.objective_hierarchy.objectives.get(obj_b),
-                            "target_value",
-                            1.0,
-                        )
-                        if obj_b in getattr(self.objective_hierarchy, "objectives", {})
-                        else 1.0,
+                        obj_a: (
+                            getattr(
+                                self.objective_hierarchy.objectives.get(obj_a),
+                                "target_value",
+                                1.0,
+                            )
+                            if obj_a
+                            in getattr(self.objective_hierarchy, "objectives", {})
+                            else 1.0
+                        ),
+                        obj_b: (
+                            getattr(
+                                self.objective_hierarchy.objectives.get(obj_b),
+                                "target_value",
+                                1.0,
+                            )
+                            if obj_b
+                            in getattr(self.objective_hierarchy, "objectives", {})
+                            else 1.0
+                        ),
                     },
                     tradeoffs=[],
                     confidence=1.0,

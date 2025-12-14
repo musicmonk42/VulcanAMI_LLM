@@ -674,7 +674,10 @@ class EnhancedContinualLearner(nn.Module):
                                 pickle.dumps(v)
                                 clean_config_dict[k] = v
                             except Exception as e:
-                                logger.error(f"Error pickling config value for key {k}: {e}", exc_info=True)
+                                logger.error(
+                                    f"Error pickling config value for key {k}: {e}",
+                                    exc_info=True,
+                                )
 
                         # Sanitize task_info dicts
                         clean_task_info = {}
@@ -1261,16 +1264,20 @@ class EnhancedContinualLearner(nn.Module):
                         }
                         for task_id, info in self.task_info.items()
                     },
-                    "free_capacity": float(self.free_capacity.mean())
-                    if hasattr(self, "free_capacity")
-                    else 1.0,
+                    "free_capacity": (
+                        float(self.free_capacity.mean())
+                        if hasattr(self, "free_capacity")
+                        else 1.0
+                    ),
                 }
 
                 if self.hierarchical_memory:
                     stats["hierarchical_memory"] = {
-                        "num_levels": len(self.hierarchical_memory.levels)
-                        if hasattr(self.hierarchical_memory, "levels")
-                        else 0
+                        "num_levels": (
+                            len(self.hierarchical_memory.levels)
+                            if hasattr(self.hierarchical_memory, "levels")
+                            else 0
+                        )
                     }
 
                 return stats

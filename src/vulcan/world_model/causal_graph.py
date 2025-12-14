@@ -1727,7 +1727,9 @@ class CausalDAG:
     Complete implementation with safety validation, advanced algorithms, and full thread safety.
     """
 
-    def __init__(self, safety_config: Optional[Dict[str, Any]] = None, safety_validator=None):
+    def __init__(
+        self, safety_config: Optional[Dict[str, Any]] = None, safety_validator=None
+    ):
         """
         Initialize causal DAG with optional safety configuration - FIXED: Added safety_validator parameter
 
@@ -1743,15 +1745,20 @@ class CausalDAG:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         elif SAFETY_VALIDATOR_AVAILABLE and EnhancedSafetyValidator is not None:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
-                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                logger.info(
+                    f"{self.__class__.__name__}: Using singleton safety validator"
+                )
             except Exception as e:
                 logger.debug(f"Could not get singleton safety validator: {e}")
                 # Last resort: create new instance (causes duplication)
@@ -1762,10 +1769,14 @@ class CausalDAG:
                         )
                     else:
                         self.safety_validator = EnhancedSafetyValidator()
-                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                    logger.warning(
+                        f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
+                    )
                 except Exception as init_e:
                     self.safety_validator = None
-                    logger.warning(f"{self.__class__.__name__}: Failed to initialize safety validator: {init_e}")
+                    logger.warning(
+                        f"{self.__class__.__name__}: Failed to initialize safety validator: {init_e}"
+                    )
         else:
             self.safety_validator = None
             logger.warning(
@@ -2396,9 +2407,9 @@ class CausalDAG:
             "cycle_checks": self.cycle_checks,
             "path_queries": self.path_queries,
             "has_cycles": self.has_cycles(),
-            "longest_path": self.get_longest_path_length()
-            if not self.has_cycles()
-            else -1,
+            "longest_path": (
+                self.get_longest_path_length() if not self.has_cycles() else -1
+            ),
             "cache_size": len(self.path_finder.path_cache),
         }
 

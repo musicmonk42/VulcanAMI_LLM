@@ -1593,7 +1593,7 @@ class CorrelationTracker:
         safety_validator=None,
     ):
         """Initialize correlation tracker - FIXED: Added safety_validator parameter
-        
+
         Args:
             method: Correlation method to use
             min_samples: Minimum samples for correlation
@@ -1612,23 +1612,34 @@ class CorrelationTracker:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         elif EnhancedSafetyValidator and SafetyConfig:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
-                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                logger.info(
+                    f"{self.__class__.__name__}: Using singleton safety validator"
+                )
             except Exception as e:
                 logger.debug(f"Could not get singleton safety validator: {e}")
                 # Last resort: create new instance
                 try:
-                    self.safety_validator = EnhancedSafetyValidator(config=safety_config)
-                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                    self.safety_validator = EnhancedSafetyValidator(
+                        config=safety_config
+                    )
+                    logger.warning(
+                        f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
+                    )
                 except Exception as init_e:
-                    logger.error(f"{self.__class__.__name__}: Failed to initialize EnhancedSafetyValidator: {init_e}")
+                    logger.error(
+                        f"{self.__class__.__name__}: Failed to initialize EnhancedSafetyValidator: {init_e}"
+                    )
                     self.safety_validator = None
         else:
             self.safety_validator = None

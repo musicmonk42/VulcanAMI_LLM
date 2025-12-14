@@ -15,13 +15,25 @@ import pytest
 try:
     # Attempt import assuming tests run relative to src/
     import setup_agent  # Import the module itself to patch its logger
-    from setup_agent import (VALID_ROLES, SetupError, ValidationError, setup,
-                             validate_agent_id, validate_roles)
+    from setup_agent import (
+        VALID_ROLES,
+        SetupError,
+        ValidationError,
+        setup,
+        validate_agent_id,
+        validate_roles,
+    )
 except ModuleNotFoundError:
     # Fallback assuming tests run from root and src is in PYTHONPATH
     import src.setup_agent as setup_agent  # Import the module itself
-    from src.setup_agent import (VALID_ROLES, SetupError, ValidationError,
-                                 setup, validate_agent_id, validate_roles)
+    from src.setup_agent import (
+        VALID_ROLES,
+        SetupError,
+        ValidationError,
+        setup,
+        validate_agent_id,
+        validate_roles,
+    )
 
 
 class TestValidateAgentId:
@@ -129,22 +141,25 @@ class TestValidateRoles:
 class TestSetup:
     """Test setup function."""
 
-    @patch('setup_agent.AgentRegistry')
+    @patch("setup_agent.AgentRegistry")
     def test_setup_success(self, mock_registry_class):
         """Test successful setup."""
         mock_registry = MagicMock()
         mock_registry.register_agent.return_value = {
-            'agent_id': 'test_agent',
-            'public_key': 'mock_public_key',
-            'private_key': 'mock_private_key_long_enough_to_be_split_for_testing_output' * 3
+            "agent_id": "test_agent",
+            "public_key": "mock_public_key",
+            "private_key": "mock_private_key_long_enough_to_be_split_for_testing_output"
+            * 3,
         }
         mock_registry_class.return_value = mock_registry
 
-        with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             result = setup("test_agent", ["executor", "validator"])
 
         assert result is True
-        mock_registry.register_agent.assert_called_once_with("test_agent", "test_agent", ["executor", "validator"])
+        mock_registry.register_agent.assert_called_once_with(
+            "test_agent", "test_agent", ["executor", "validator"]
+        )
         output = mock_stdout.getvalue()
         assert "AGENT CREDENTIALS" in output
         assert "-----BEGIN PRIVATE KEY-----" in output
@@ -152,26 +167,27 @@ class TestSetup:
         assert "-----END PRIVATE KEY-----" in output
         assert "SUCCESS: 'test_agent'" in output
 
-
-    @patch('setup_agent.AgentRegistry')
+    @patch("setup_agent.AgentRegistry")
     def test_setup_already_registered(self, mock_registry_class):
         """Test setup with already registered agent."""
         mock_registry = MagicMock()
         mock_registry.register_agent.side_effect = ValueError("Agent already exists")
         mock_registry_class.return_value = mock_registry
 
-        with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             result = setup("existing_agent", ["executor"])
 
         assert result is True
-        mock_registry.register_agent.assert_called_once_with("existing_agent", "existing_agent", ["executor"])
+        mock_registry.register_agent.assert_called_once_with(
+            "existing_agent", "existing_agent", ["executor"]
+        )
         output = mock_stdout.getvalue()
         assert "INFO: Agent 'existing_agent' was already registered" in output
 
-    @patch('setup_agent.AgentRegistry')
+    @patch("setup_agent.AgentRegistry")
     def test_setup_invalid_agent_id(self, mock_registry_class):
         """Test setup with invalid agent_id."""
-        with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             result = setup("ab", ["executor"])
 
         assert result is False
@@ -179,10 +195,10 @@ class TestSetup:
         output = mock_stdout.getvalue()
         assert "ERROR: Agent ID must be at least 3 characters" in output
 
-    @patch('setup_agent.AgentRegistry')
+    @patch("setup_agent.AgentRegistry")
     def test_setup_invalid_roles(self, mock_registry_class):
         """Test setup with invalid roles."""
-        with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             result = setup("test_agent", [])
 
         assert result is False
@@ -190,47 +206,55 @@ class TestSetup:
         output = mock_stdout.getvalue()
         assert "ERROR: At least one role must be specified" in output
 
-    @patch('setup_agent.AgentRegistry')
+    @patch("setup_agent.AgentRegistry")
     def test_setup_registry_init_fails(self, mock_registry_class):
         """Test setup when registry initialization fails."""
         mock_registry_class.side_effect = Exception("Init failed")
 
-        with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             result = setup("test_agent", ["executor"])
 
         assert result is False
         output = mock_stdout.getvalue()
         assert "ERROR: AgentRegistry initialization failed: Init failed" in output
 
-    @patch('setup_agent.AgentRegistry')
+    @patch("setup_agent.AgentRegistry")
     def test_setup_registration_fails_other_value_error(self, mock_registry_class):
         """Test setup when registration fails with a non-'already exists' ValueError."""
         mock_registry = MagicMock()
-        mock_registry.register_agent.side_effect = ValueError("Some other registration error")
+        mock_registry.register_agent.side_effect = ValueError(
+            "Some other registration error"
+        )
         mock_registry_class.return_value = mock_registry
 
-        with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             result = setup("test_agent", ["executor"])
 
         assert result is False
         mock_registry.register_agent.assert_called_once()
         output = mock_stdout.getvalue()
-        assert "ERROR: Agent registration failed: Some other registration error" in output
+        assert (
+            "ERROR: Agent registration failed: Some other registration error" in output
+        )
 
-    @patch('setup_agent.AgentRegistry')
+    @patch("setup_agent.AgentRegistry")
     def test_setup_registration_fails_generic_exception(self, mock_registry_class):
         """Test setup when registration fails with a generic Exception."""
         mock_registry = MagicMock()
-        mock_registry.register_agent.side_effect = Exception("Generic registration failure")
+        mock_registry.register_agent.side_effect = Exception(
+            "Generic registration failure"
+        )
         mock_registry_class.return_value = mock_registry
 
-        with patch('sys.stdout', new_callable=StringIO) as mock_stdout:
+        with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
             result = setup("test_agent", ["executor"])
 
         assert result is False
         mock_registry.register_agent.assert_called_once()
         output = mock_stdout.getvalue()
-        assert "ERROR: Agent registration failed: Generic registration failure" in output
+        assert (
+            "ERROR: Agent registration failed: Generic registration failure" in output
+        )
 
 
 class TestExceptions:
@@ -252,8 +276,10 @@ class TestExceptions:
 class TestMain:
     """Test main function."""
 
-    @patch('setup_agent.setup')
-    @patch.object(sys, 'argv', ['setup_agent.py', 'test_agent', 'executor', 'validator'])
+    @patch("setup_agent.setup")
+    @patch.object(
+        sys, "argv", ["setup_agent.py", "test_agent", "executor", "validator"]
+    )
     def test_main_success(self, mock_setup):
         """Test main with successful setup."""
         mock_setup.return_value = True
@@ -264,10 +290,10 @@ class TestMain:
             main()
 
         assert exc_info.value.code == 0
-        mock_setup.assert_called_once_with('test_agent', ['executor', 'validator'])
+        mock_setup.assert_called_once_with("test_agent", ["executor", "validator"])
 
-    @patch('setup_agent.setup')
-    @patch.object(sys, 'argv', ['setup_agent.py', 'test_agent', 'executor'])
+    @patch("setup_agent.setup")
+    @patch.object(sys, "argv", ["setup_agent.py", "test_agent", "executor"])
     def test_main_failure(self, mock_setup):
         """Test main with failed setup."""
         mock_setup.return_value = False
@@ -278,48 +304,53 @@ class TestMain:
             main()
 
         assert exc_info.value.code == 1
-        mock_setup.assert_called_once_with('test_agent', ['executor'])
+        mock_setup.assert_called_once_with("test_agent", ["executor"])
 
     # --- FIX START ---
-    @patch('setup_agent.setup')
-    @patch('logging.getLogger') # Mock the function that gets the root logger
-    @patch.object(setup_agent, 'logger', new_callable=MagicMock) # Mock the module's logger instance
-    @patch.object(sys, 'argv', ['setup_agent.py', 'verbose_agent', 'reader', '-v'])
+    @patch("setup_agent.setup")
+    @patch("logging.getLogger")  # Mock the function that gets the root logger
+    @patch.object(
+        setup_agent, "logger", new_callable=MagicMock
+    )  # Mock the module's logger instance
+    @patch.object(sys, "argv", ["setup_agent.py", "verbose_agent", "reader", "-v"])
     def test_main_verbose(self, mock_module_logger, mock_get_root_logger, mock_setup):
         """Test main with verbose flag."""
         mock_root_logger = MagicMock()
-        mock_get_root_logger.return_value = mock_root_logger # getLogger() returns this
+        mock_get_root_logger.return_value = mock_root_logger  # getLogger() returns this
 
         mock_setup.return_value = True
         from setup_agent import main
 
         with pytest.raises(SystemExit):
-             main()
+            main()
 
         # Check if setLevel was called with DEBUG on both loggers
         mock_root_logger.setLevel.assert_called_with(logging.DEBUG)
         mock_module_logger.setLevel.assert_called_with(logging.DEBUG)
-        mock_setup.assert_called_once_with('verbose_agent', ['reader'])
+        mock_setup.assert_called_once_with("verbose_agent", ["reader"])
 
-    @patch('setup_agent.setup')
-    @patch('logging.getLogger') # Mock the function that gets the root logger
-    @patch.object(setup_agent, 'logger', new_callable=MagicMock) # Mock the module's logger instance
-    @patch.object(sys, 'argv', ['setup_agent.py', 'quiet_agent', 'monitor', '-q'])
+    @patch("setup_agent.setup")
+    @patch("logging.getLogger")  # Mock the function that gets the root logger
+    @patch.object(
+        setup_agent, "logger", new_callable=MagicMock
+    )  # Mock the module's logger instance
+    @patch.object(sys, "argv", ["setup_agent.py", "quiet_agent", "monitor", "-q"])
     def test_main_quiet(self, mock_module_logger, mock_get_root_logger, mock_setup):
         """Test main with quiet flag."""
         mock_root_logger = MagicMock()
-        mock_get_root_logger.return_value = mock_root_logger # getLogger() returns this
+        mock_get_root_logger.return_value = mock_root_logger  # getLogger() returns this
 
         mock_setup.return_value = True
         from setup_agent import main
 
         with pytest.raises(SystemExit):
-             main()
+            main()
 
         # Check if setLevel was called with ERROR on both loggers
         mock_root_logger.setLevel.assert_called_with(logging.ERROR)
         mock_module_logger.setLevel.assert_called_with(logging.ERROR)
-        mock_setup.assert_called_once_with('quiet_agent', ['monitor'])
+        mock_setup.assert_called_once_with("quiet_agent", ["monitor"])
+
     # --- FIX END ---
 
 

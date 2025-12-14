@@ -9,15 +9,21 @@ import numpy as np
 import pytest
 
 # Fix import path for the project structure
-from vulcan.curiosity_engine.gap_analyzer import (AnomalyAnalyzer,
-                                                  DecompositionAnalyzer,
-                                                  FailureTracker, GapAnalyzer,
-                                                  GapRegistry, KnowledgeGap,
-                                                  LatentGap, LatentGapDetector,
-                                                  Pattern, PatternTracker,
-                                                  PredictionAnalyzer,
-                                                  SimpleAnomalyDetector,
-                                                  TransferAnalyzer)
+from vulcan.curiosity_engine.gap_analyzer import (
+    AnomalyAnalyzer,
+    DecompositionAnalyzer,
+    FailureTracker,
+    GapAnalyzer,
+    GapRegistry,
+    KnowledgeGap,
+    LatentGap,
+    LatentGapDetector,
+    Pattern,
+    PatternTracker,
+    PredictionAnalyzer,
+    SimpleAnomalyDetector,
+    TransferAnalyzer,
+)
 
 
 class TestPattern:

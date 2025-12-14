@@ -114,9 +114,7 @@ class MockObservationProcessor:
                     patterns["trends"][var] = (
                         "increasing"
                         if trend > 0.1
-                        else "decreasing"
-                        if trend < -0.1
-                        else "stable"
+                        else "decreasing" if trend < -0.1 else "stable"
                     )
 
         return patterns

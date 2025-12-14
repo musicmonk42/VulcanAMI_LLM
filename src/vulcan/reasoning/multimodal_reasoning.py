@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import (TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple)
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -32,8 +32,12 @@ except ImportError:
     torch = None  # type: ignore
     logging.getLogger(__name__).warning("PyTorch not available, neural fusion disabled")
 
-from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
-                              ReasoningType)
+from .reasoning_types import (
+    ReasoningChain,
+    ReasoningResult,
+    ReasoningStep,
+    ReasoningType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -341,9 +345,10 @@ if TORCH_AVAILABLE:
             """Forward pass with adaptive fusion weights"""
             if not features or len(features) != self.num_modalities:
                 output_dim = self.modality_encoders[0][0].out_features
-                return torch.zeros(1, output_dim), torch.ones(
-                    1, self.num_modalities
-                ) / self.num_modalities
+                return (
+                    torch.zeros(1, output_dim),
+                    torch.ones(1, self.num_modalities) / self.num_modalities,
+                )
 
             # Encode each modality
             encoded = []
@@ -989,9 +994,11 @@ class MultiModalReasoningEngine:
             else:
                 # Use numpy-based attention fusion
                 embeddings = {
-                    mod: data.embedding
-                    if data.embedding is not None
-                    else np.zeros(self.embed_dim)
+                    mod: (
+                        data.embedding
+                        if data.embedding is not None
+                        else np.zeros(self.embed_dim)
+                    )
                     for mod, data in inputs.items()
                 }
                 fused = self.attention_fusion_numpy(embeddings)
@@ -1758,18 +1765,20 @@ class MultiModalReasoningEngine:
                         not hasattr(self, "_text_tokenizer")
                         or self._text_tokenizer is None
                     ):
-                        logger.info(
-                            f"Loading text model ({TEXT_MODEL_NAME})..."
-                        )
+                        logger.info(f"Loading text model ({TEXT_MODEL_NAME})...")
                         try:
                             model_kwargs = {}
                             if TEXT_MODEL_REVISION:
-                                model_kwargs['revision'] = TEXT_MODEL_REVISION
-                                logger.info(f"Using pinned revision: {TEXT_MODEL_REVISION}")
-                            
+                                model_kwargs["revision"] = TEXT_MODEL_REVISION
+                                logger.info(
+                                    f"Using pinned revision: {TEXT_MODEL_REVISION}"
+                                )
+
                             # Revision parameter available via TEXT_MODEL_REVISION env var (set above if configured)
-                            self._text_tokenizer = AutoTokenizer.from_pretrained(  # nosec B615
-                                TEXT_MODEL_NAME, **model_kwargs
+                            self._text_tokenizer = (
+                                AutoTokenizer.from_pretrained(  # nosec B615
+                                    TEXT_MODEL_NAME, **model_kwargs
+                                )
                             )
                             self._text_model = AutoModel.from_pretrained(  # nosec B615
                                 TEXT_MODEL_NAME, **model_kwargs
@@ -1999,12 +2008,16 @@ class MultiModalReasoningEngine:
                     try:
                         model_kwargs = {}
                         if AUDIO_MODEL_REVISION:
-                            model_kwargs['revision'] = AUDIO_MODEL_REVISION
-                            logger.info(f"Using pinned revision: {AUDIO_MODEL_REVISION}")
-                        
+                            model_kwargs["revision"] = AUDIO_MODEL_REVISION
+                            logger.info(
+                                f"Using pinned revision: {AUDIO_MODEL_REVISION}"
+                            )
+
                         # Revision parameter available via AUDIO_MODEL_REVISION env var (set above if configured)
-                        self._audio_processor = Wav2Vec2Processor.from_pretrained(  # nosec B615
-                            AUDIO_MODEL_NAME, **model_kwargs
+                        self._audio_processor = (
+                            Wav2Vec2Processor.from_pretrained(  # nosec B615
+                                AUDIO_MODEL_NAME, **model_kwargs
+                            )
                         )
                         self._audio_model = Wav2Vec2Model.from_pretrained(  # nosec B615
                             AUDIO_MODEL_NAME, **model_kwargs
@@ -2098,10 +2111,12 @@ class MultiModalReasoningEngine:
             if isinstance(data, np.ndarray):
                 # Numerical data
                 features = {
-                    "embedding": data.flatten()[: self.embed_dim]
-                    if len(data.flatten()) >= self.embed_dim
-                    else np.pad(
-                        data.flatten(), (0, self.embed_dim - len(data.flatten()))
+                    "embedding": (
+                        data.flatten()[: self.embed_dim]
+                        if len(data.flatten()) >= self.embed_dim
+                        else np.pad(
+                            data.flatten(), (0, self.embed_dim - len(data.flatten()))
+                        )
                     ),
                     "confidence": 0.5,
                     "data_type": "numeric",
@@ -2111,10 +2126,12 @@ class MultiModalReasoningEngine:
                 # Convert to array and process
                 arr = np.array(data)
                 features = {
-                    "embedding": arr.flatten()[: self.embed_dim]
-                    if len(arr.flatten()) >= self.embed_dim
-                    else np.pad(
-                        arr.flatten(), (0, self.embed_dim - len(arr.flatten()))
+                    "embedding": (
+                        arr.flatten()[: self.embed_dim]
+                        if len(arr.flatten()) >= self.embed_dim
+                        else np.pad(
+                            arr.flatten(), (0, self.embed_dim - len(arr.flatten()))
+                        )
                     ),
                     "confidence": 0.5,
                     "data_type": "sequence",
@@ -2350,22 +2367,30 @@ class MultiModalReasoningEngine:
             if TORCH_AVAILABLE:
                 attention_path = path / "attention_fusion.pt"
                 if attention_path.exists() and self.attention_fusion is not None:
-                    self.attention_fusion.load_state_dict(torch.load(attention_path, weights_only=True))
+                    self.attention_fusion.load_state_dict(
+                        torch.load(attention_path, weights_only=True)
+                    )
                     self.attention_fusion.eval()
 
                 gated_path = path / "gated_fusion.pt"
                 if gated_path.exists() and self.gated_fusion is not None:
-                    self.gated_fusion.load_state_dict(torch.load(gated_path, weights_only=True))
+                    self.gated_fusion.load_state_dict(
+                        torch.load(gated_path, weights_only=True)
+                    )
                     self.gated_fusion.eval()
 
                 adaptive_path = path / "adaptive_fusion.pt"
                 if adaptive_path.exists() and self.adaptive_fusion is not None:
-                    self.adaptive_fusion.load_state_dict(torch.load(adaptive_path, weights_only=True))
+                    self.adaptive_fusion.load_state_dict(
+                        torch.load(adaptive_path, weights_only=True)
+                    )
                     self.adaptive_fusion.eval()
 
                 reasoner_path = path / "neural_reasoner.pt"
                 if reasoner_path.exists() and self.neural_reasoner is not None:
-                    self.neural_reasoner.load_state_dict(torch.load(reasoner_path, weights_only=True))
+                    self.neural_reasoner.load_state_dict(
+                        torch.load(reasoner_path, weights_only=True)
+                    )
                     self.neural_reasoner.eval()
 
             # Load learning parameters

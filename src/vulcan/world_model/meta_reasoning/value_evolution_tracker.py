@@ -43,6 +43,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock  # --- START FIX: Import MagicMock ---
@@ -561,9 +562,9 @@ class ValueEvolutionTracker:
         self.trajectories: Dict[str, ValueTrajectory] = {}
 
         # CUSUM state for drift detection
-        self.cusum_state: Dict[
-            str, Dict[str, float]
-        ] = {}  # value -> {cusum_pos, cusum_neg, baseline}
+        self.cusum_state: Dict[str, Dict[str, float]] = (
+            {}
+        )  # value -> {cusum_pos, cusum_neg, baseline}
 
         # Drift alerts history
         self.drift_alerts: deque[DriftAlert] = deque(
@@ -1591,11 +1592,15 @@ class ValueEvolutionTracker:
         log_level = (
             logging.CRITICAL
             if alert.severity == DriftSeverity.CRITICAL
-            else logging.ERROR
-            if alert.severity == DriftSeverity.MAJOR
-            else logging.WARNING
-            if alert.severity == DriftSeverity.MODERATE
-            else logging.INFO
+            else (
+                logging.ERROR
+                if alert.severity == DriftSeverity.MAJOR
+                else (
+                    logging.WARNING
+                    if alert.severity == DriftSeverity.MODERATE
+                    else logging.INFO
+                )
+            )
         )  # Use INFO for MINOR/NONE
 
         logger.log(

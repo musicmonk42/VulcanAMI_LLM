@@ -14,10 +14,17 @@ import numpy as np
 import pytest
 
 # Import all compiler components - FIX: Use correct import paths
-from src.compiler.graph_compiler import (CompilationError, GraphCompiler,
-                                         GraphOptimizer, NodeType)
-from src.compiler.hybrid_executor import (ExecutionMode, HybridExecutor,
-                                          OptimizationLevel)
+from src.compiler.graph_compiler import (
+    CompilationError,
+    GraphCompiler,
+    GraphOptimizer,
+    NodeType,
+)
+from src.compiler.hybrid_executor import (
+    ExecutionMode,
+    HybridExecutor,
+    OptimizationLevel,
+)
 from src.compiler.llvm_backend import CompiledFunction, DataType, LLVMBackend
 
 
@@ -44,10 +51,9 @@ def graph_compiler():
 def mock_runtime():
     """Create mock runtime for hybrid executor."""
     runtime = MagicMock()
-    runtime.execute_graph = AsyncMock(return_value={
-        "status": "success",
-        "outputs": {"output1": [1.0]}
-    })
+    runtime.execute_graph = AsyncMock(
+        return_value={"status": "success", "outputs": {"output1": [1.0]}}
+    )
     return runtime
 
 
@@ -59,7 +65,7 @@ def hybrid_executor(mock_runtime, temp_dir):
         compiler=GraphCompiler(optimization_level=2),
         cache_dir=temp_dir,
         enable_compilation=True,
-        enable_profiling=True
+        enable_profiling=True,
     )
 
 
@@ -72,13 +78,13 @@ def simple_compute_graph():
             {"id": "input1", "type": "InputNode", "params": {"value": 2.0}},
             {"id": "input2", "type": "InputNode", "params": {"value": 3.0}},
             {"id": "mul1", "type": "MUL", "params": {}},
-            {"id": "output1", "type": "OutputNode", "params": {}}
+            {"id": "output1", "type": "OutputNode", "params": {}},
         ],
         "edges": [
             {"from": "input1", "to": "mul1"},
             {"from": "input2", "to": "mul1"},
-            {"from": "mul1", "to": "output1"}
-        ]
+            {"from": "mul1", "to": "output1"},
+        ],
     }
 
 
@@ -94,7 +100,7 @@ def complex_graph():
             {"id": "add1", "type": "ADD", "params": {}},
             {"id": "mul1", "type": "MUL", "params": {}},
             {"id": "relu1", "type": "RELU", "params": {}},
-            {"id": "output1", "type": "OutputNode", "params": {}}
+            {"id": "output1", "type": "OutputNode", "params": {}},
         ],
         "edges": [
             {"from": "input1", "to": "add1"},
@@ -102,8 +108,8 @@ def complex_graph():
             {"from": "add1", "to": "mul1"},
             {"from": "const1", "to": "mul1"},
             {"from": "mul1", "to": "relu1"},
-            {"from": "relu1", "to": "output1"}
-        ]
+            {"from": "relu1", "to": "output1"},
+        ],
     }
 
 
@@ -147,7 +153,9 @@ class TestLLVMBackendIntegration:
 class TestGraphCompilerIntegration:
     """Test graph compiler integration."""
 
-    def test_compiler_can_compile_simple_graph(self, graph_compiler, simple_compute_graph):
+    def test_compiler_can_compile_simple_graph(
+        self, graph_compiler, simple_compute_graph
+    ):
         """Test compiling simple graph."""
         can_compile = graph_compiler.can_compile(simple_compute_graph)
 
@@ -158,10 +166,8 @@ class TestGraphCompilerIntegration:
         """Test that compiler rejects invalid graphs."""
         # Graph with unsupported node
         invalid_graph = {
-            "nodes": [
-                {"id": "n1", "type": "UNSUPPORTED_NODE", "params": {}}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "UNSUPPORTED_NODE", "params": {}}],
+            "edges": [],
         }
 
         can_compile = graph_compiler.can_compile(invalid_graph)
@@ -188,9 +194,12 @@ class TestCompilerBackendConnection:
         assert graph_compiler.llvm_backend is not None
         # FIX: Import the correct class for isinstance check
         from src.compiler.llvm_backend import LLVMBackend
+
         assert isinstance(graph_compiler.llvm_backend, LLVMBackend)
 
-    def test_compiler_passes_params_to_backend(self, graph_compiler, simple_compute_graph):
+    def test_compiler_passes_params_to_backend(
+        self, graph_compiler, simple_compute_graph
+    ):
         """Test that compiler passes parameters to backend correctly."""
         # FIX: Instead of mocking, just verify the backend was used by checking compilation works
         # The backend should have functions compiled after compile_graph runs
@@ -201,7 +210,7 @@ class TestCompilerBackendConnection:
             result = graph_compiler.compile_graph(simple_compute_graph)
             # If compilation succeeded, check the result
             if result:
-                assert result.get('compiled', False) or result.get('cached', False)
+                assert result.get("compiled", False) or result.get("cached", False)
         except Exception:
             # Even if compile_graph fails, the backend cache should have grown
             pass
@@ -220,14 +229,12 @@ class TestHybridExecutorIntegration:
     async def test_executor_creates_compiler(self, mock_runtime, temp_dir):
         """Test that executor creates compiler if not provided."""
         # FIX: Instead of mocking, just verify a compiler was created
-        executor = HybridExecutor(
-            runtime=mock_runtime,
-            cache_dir=temp_dir
-        )
+        executor = HybridExecutor(runtime=mock_runtime, cache_dir=temp_dir)
 
         # Should have created a compiler
         assert executor.compiler is not None
         from src.compiler.graph_compiler import GraphCompiler
+
         assert isinstance(executor.compiler, GraphCompiler)
 
     @pytest.mark.asyncio
@@ -236,19 +243,18 @@ class TestHybridExecutorIntegration:
         compiler = GraphCompiler(optimization_level=3)
 
         executor = HybridExecutor(
-            runtime=mock_runtime,
-            compiler=compiler,
-            cache_dir=temp_dir
+            runtime=mock_runtime, compiler=compiler, cache_dir=temp_dir
         )
 
         assert executor.compiler == compiler
 
     @pytest.mark.asyncio
-    async def test_executor_interpreted_mode(self, hybrid_executor, simple_compute_graph):
+    async def test_executor_interpreted_mode(
+        self, hybrid_executor, simple_compute_graph
+    ):
         """Test executor in interpreted mode."""
         result = await hybrid_executor.execute_with_profiling(
-            simple_compute_graph,
-            force_mode=ExecutionMode.INTERPRETED
+            simple_compute_graph, force_mode=ExecutionMode.INTERPRETED
         )
 
         assert result is not None
@@ -260,7 +266,9 @@ class TestEndToEndCompilation:
     """Test end-to-end compilation workflows."""
 
     @pytest.mark.asyncio
-    async def test_full_pipeline_simple_graph(self, hybrid_executor, simple_compute_graph):
+    async def test_full_pipeline_simple_graph(
+        self, hybrid_executor, simple_compute_graph
+    ):
         """Test full pipeline from graph to execution."""
         # Execute with profiling (will try both modes)
         result = await hybrid_executor.execute_with_profiling(simple_compute_graph)
@@ -270,7 +278,9 @@ class TestEndToEndCompilation:
         assert "execution_metrics" in result
 
     @pytest.mark.asyncio
-    async def test_compilation_caching_works(self, hybrid_executor, simple_compute_graph):
+    async def test_compilation_caching_works(
+        self, hybrid_executor, simple_compute_graph
+    ):
         """Test that compilation results are cached."""
         # First execution
         result1 = await hybrid_executor.execute_with_profiling(simple_compute_graph)
@@ -301,10 +311,8 @@ class TestErrorPropagation:
         """Test that backend errors propagate correctly."""
         # Create invalid parameters that would cause backend error
         graph = {
-            "nodes": [
-                {"id": "n1", "type": "INVALID_TYPE", "params": {}}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "INVALID_TYPE", "params": {}}],
+            "edges": [],
         }
 
         # Should not be able to compile
@@ -315,19 +323,14 @@ class TestErrorPropagation:
     async def test_compilation_error_falls_back(self, mock_runtime, temp_dir):
         """Test that compilation errors fall back to interpreted mode."""
         executor = HybridExecutor(
-            runtime=mock_runtime,
-            cache_dir=temp_dir,
-            enable_compilation=True
+            runtime=mock_runtime, cache_dir=temp_dir, enable_compilation=True
         )
 
         # Mock compiler to fail
         executor.compiler = MagicMock()
         executor.compiler.can_compile = Mock(return_value=False)
 
-        graph = {
-            "nodes": [{"id": "n1", "type": "ADD", "params": {}}],
-            "edges": []
-        }
+        graph = {"nodes": [{"id": "n1", "type": "ADD", "params": {}}], "edges": []}
 
         # Should still execute in interpreted mode
         result = await executor.execute_with_profiling(graph)
@@ -361,7 +364,7 @@ class TestOptimizationLevels:
         executor = HybridExecutor(
             runtime=mock_runtime,
             cache_dir=temp_dir,
-            optimization_level=OptimizationLevel.O3
+            optimization_level=OptimizationLevel.O3,
         )
 
         assert executor.optimization_level == OptimizationLevel.O3
@@ -402,18 +405,15 @@ class TestConcurrentCompilation:
     @pytest.mark.asyncio
     async def test_multiple_graphs_concurrently(self, mock_runtime, temp_dir):
         """Test executing multiple graphs concurrently."""
-        executor = HybridExecutor(
-            runtime=mock_runtime,
-            cache_dir=temp_dir
-        )
+        executor = HybridExecutor(runtime=mock_runtime, cache_dir=temp_dir)
 
         graph1 = {
             "id": "graph1",
             "nodes": [
                 {"id": "n1", "type": "InputNode", "params": {}},
-                {"id": "n2", "type": "OutputNode", "params": {}}
+                {"id": "n2", "type": "OutputNode", "params": {}},
             ],
-            "edges": [{"from": "n1", "to": "n2"}]
+            "edges": [{"from": "n1", "to": "n2"}],
         }
 
         graph2 = {
@@ -421,15 +421,15 @@ class TestConcurrentCompilation:
             "nodes": [
                 {"id": "n1", "type": "InputNode", "params": {}},
                 {"id": "n2", "type": "ADD", "params": {}},
-                {"id": "n3", "type": "OutputNode", "params": {}}
+                {"id": "n3", "type": "OutputNode", "params": {}},
             ],
-            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}]
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
         }
 
         # Execute both concurrently
         results = await asyncio.gather(
             executor.execute_with_profiling(graph1),
-            executor.execute_with_profiling(graph2)
+            executor.execute_with_profiling(graph2),
         )
 
         assert len(results) == 2
@@ -487,15 +487,9 @@ class TestRealWorldScenarios:
     @pytest.mark.asyncio
     async def test_graph_modification_changes_hash(self, hybrid_executor):
         """Test that modifying graph changes its hash."""
-        graph1 = {
-            "nodes": [{"id": "n1", "type": "ADD", "params": {}}],
-            "edges": []
-        }
+        graph1 = {"nodes": [{"id": "n1", "type": "ADD", "params": {}}], "edges": []}
 
-        graph2 = {
-            "nodes": [{"id": "n1", "type": "MUL", "params": {}}],
-            "edges": []
-        }
+        graph2 = {"nodes": [{"id": "n1", "type": "MUL", "params": {}}], "edges": []}
 
         hash1 = hybrid_executor._compute_graph_hash(graph1)
         hash2 = hybrid_executor._compute_graph_hash(graph2)
@@ -510,15 +504,12 @@ class TestResourceCleanup:
     @pytest.mark.asyncio
     async def test_executor_cleanup(self, mock_runtime, temp_dir):
         """Test that executor cleans up resources."""
-        executor = HybridExecutor(
-            runtime=mock_runtime,
-            cache_dir=temp_dir
-        )
+        executor = HybridExecutor(runtime=mock_runtime, cache_dir=temp_dir)
 
         # Execute some graphs
         graph = {
             "nodes": [{"id": "n1", "type": "InputNode", "params": {}}],
-            "edges": []
+            "edges": [],
         }
         await executor.execute_with_profiling(graph)
 
@@ -540,7 +531,9 @@ class TestResourceCleanup:
         # Manually set timestamps to be old
         current_time = time.time()
         for key in cache.cache_index:
-            cache.cache_index[key]['timestamp'] = current_time - (86400 * 2)  # 2 days old
+            cache.cache_index[key]["timestamp"] = current_time - (
+                86400 * 2
+            )  # 2 days old
 
         # Cleanup with max_age_days=1 (should remove all entries older than 1 day)
         cache.cleanup(max_age_days=1)
@@ -560,16 +553,15 @@ class TestSystemIntegration:
         compiler = GraphCompiler(optimization_level=2)
 
         mock_runtime = MagicMock()
-        mock_runtime.execute_graph = AsyncMock(return_value={
-            "status": "success",
-            "outputs": {}
-        })
+        mock_runtime.execute_graph = AsyncMock(
+            return_value={"status": "success", "outputs": {}}
+        )
 
         executor = HybridExecutor(
             runtime=mock_runtime,
             compiler=compiler,
             cache_dir=temp_dir,
-            enable_compilation=True
+            enable_compilation=True,
         )
 
         # 2. Define graph
@@ -579,13 +571,13 @@ class TestSystemIntegration:
                 {"id": "input1", "type": "InputNode", "params": {"value": 1.0}},
                 {"id": "const1", "type": "CONST", "params": {"value": 2.0}},
                 {"id": "add1", "type": "ADD", "params": {}},
-                {"id": "output1", "type": "OutputNode", "params": {}}
+                {"id": "output1", "type": "OutputNode", "params": {}},
             ],
             "edges": [
                 {"from": "input1", "to": "add1"},
                 {"from": "const1", "to": "add1"},
-                {"from": "add1", "to": "output1"}
-            ]
+                {"from": "add1", "to": "output1"},
+            ],
         }
 
         # 3. Check compilability

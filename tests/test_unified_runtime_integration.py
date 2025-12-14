@@ -24,10 +24,10 @@ import sys
 # ============================================================================
 
 # Set environment variable for test mode - services will check this
-os.environ['VULCAN_TEST_MODE'] = '1'
-os.environ['WORKER_CHECK_INTERVAL'] = '1.0'
-os.environ['HEALTH_CHECK_INTERVAL'] = '1.0'
-os.environ['SAMPLING_INTERVAL'] = '0.5'
+os.environ["VULCAN_TEST_MODE"] = "1"
+os.environ["WORKER_CHECK_INTERVAL"] = "1.0"
+os.environ["HEALTH_CHECK_INTERVAL"] = "1.0"
+os.environ["SAMPLING_INTERVAL"] = "0.5"
 
 # Now proceed with regular imports
 import asyncio
@@ -44,10 +44,14 @@ import pytest
 from unified_runtime.execution_engine import ExecutionMode, ExecutionStatus
 from unified_runtime.graph_validator import ValidationError, ValidationResult
 from unified_runtime.node_handlers import AI_ERRORS
-from unified_runtime.unified_runtime_core import (RuntimeConfig,
-                                                  UnifiedRuntime,
-                                                  async_cleanup, execute_batch,
-                                                  execute_graph, get_runtime)
+from unified_runtime.unified_runtime_core import (
+    RuntimeConfig,
+    UnifiedRuntime,
+    async_cleanup,
+    execute_batch,
+    execute_graph,
+    get_runtime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +59,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # PYTEST FIXTURES FOR PROPER CLEANUP
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def cleanup_threads():
@@ -103,6 +108,7 @@ def fast_runtime_config():
 # ============================================================================
 # TEST FUNCTIONS
 # ============================================================================
+
 
 # FIX 1: Added @pytest.mark.asyncio decorator (was missing!)
 @pytest.mark.asyncio
@@ -170,7 +176,9 @@ async def test_zzz_final_cleanup_verification():
         logger.info(f"  - {t.name}: daemon={t.daemon}, alive={t.is_alive()}")
 
     # Count non-daemon threads (these are the problematic ones)
-    non_daemon_threads = [t for t in thread_list if not t.daemon and t.name != 'MainThread']
+    non_daemon_threads = [
+        t for t in thread_list if not t.daemon and t.name != "MainThread"
+    ]
     daemon_threads = [t for t in thread_list if t.daemon]
 
     # Expected threads that are acceptable:
@@ -180,18 +188,21 @@ async def test_zzz_final_cleanup_verification():
 
     # Filter out known acceptable non-daemon threads
     acceptable_patterns = [
-        'MainThread',
-        'pytest_timeout',  # From pytest-timeout plugin
+        "MainThread",
+        "pytest_timeout",  # From pytest-timeout plugin
     ]
 
     problematic_threads = [
-        t for t in non_daemon_threads
+        t
+        for t in non_daemon_threads
         if not any(pattern in t.name for pattern in acceptable_patterns)
     ]
 
     # Log daemon threads as informational (not errors)
     if daemon_threads:
-        logger.info(f"Daemon threads (acceptable, will auto-terminate): {[t.name for t in daemon_threads]}")
+        logger.info(
+            f"Daemon threads (acceptable, will auto-terminate): {[t.name for t in daemon_threads]}"
+        )
 
     # Only fail on non-daemon thread leaks that aren't from pytest itself
     if problematic_threads:

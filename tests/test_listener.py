@@ -13,11 +13,19 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
 
-from listener import (MAX_AGENT_ID_LENGTH, MAX_CONTENT_LENGTH,
-                      MAX_REQUESTS_PER_MINUTE, MAX_SIGNATURE_LENGTH,
-                      MIN_CONTENT_LENGTH, RATE_LIMIT_WINDOW, GraphixListener,
-                      MockAgentRegistry, MockUnifiedRuntime, RateLimiter,
-                      RequestHandler)
+from listener import (
+    MAX_AGENT_ID_LENGTH,
+    MAX_CONTENT_LENGTH,
+    MAX_REQUESTS_PER_MINUTE,
+    MAX_SIGNATURE_LENGTH,
+    MIN_CONTENT_LENGTH,
+    RATE_LIMIT_WINDOW,
+    GraphixListener,
+    MockAgentRegistry,
+    MockUnifiedRuntime,
+    RateLimiter,
+    RequestHandler,
+)
 
 
 @pytest.fixture
@@ -30,13 +38,11 @@ def rate_limiter():
 def valid_graph():
     """Create valid graph."""
     return {
-        'nodes': [
-            {'id': 'node1', 'type': 'CONST', 'params': {'value': 1.0}},
-            {'id': 'node2', 'type': 'ADD', 'params': {'value': 2.0}}
+        "nodes": [
+            {"id": "node1", "type": "CONST", "params": {"value": 1.0}},
+            {"id": "node2", "type": "ADD", "params": {"value": 2.0}},
         ],
-        'edges': [
-            {'from': 'node1', 'to': 'node2', 'type': 'data'}
-        ]
+        "edges": [{"from": "node1", "to": "node2", "type": "data"}],
     }
 
 
@@ -51,14 +57,14 @@ def mock_request_handler():
     mock_server = MagicMock()
 
     # Create handler with mocked setup
-    with patch.object(RequestHandler, 'setup'), \
-         patch.object(RequestHandler, 'handle'), \
-         patch.object(RequestHandler, 'finish'):
+    with (
+        patch.object(RequestHandler, "setup"),
+        patch.object(RequestHandler, "handle"),
+        patch.object(RequestHandler, "finish"),
+    ):
 
         handler = RequestHandler(
-            request=mock_socket,
-            client_address=('127.0.0.1', 12345),
-            server=mock_server
+            request=mock_socket, client_address=("127.0.0.1", 12345), server=mock_server
         )
 
         # Set required attributes
@@ -131,17 +137,17 @@ class TestRateLimiter:
 
         stats = rate_limiter.get_stats("client1")
 
-        assert stats['client_id'] == "client1"
-        assert stats['requests_in_window'] == 2
-        assert stats['max_requests'] == 5
-        assert stats['remaining'] == 3
+        assert stats["client_id"] == "client1"
+        assert stats["requests_in_window"] == 2
+        assert stats["max_requests"] == 5
+        assert stats["remaining"] == 3
 
     def test_get_stats_unknown_client(self, rate_limiter):
         """Test stats for unknown client."""
         stats = rate_limiter.get_stats("unknown")
 
-        assert stats['requests_in_window'] == 0
-        assert stats['remaining'] == 5
+        assert stats["requests_in_window"] == 0
+        assert stats["remaining"] == 5
 
 
 class TestMockImplementations:
@@ -159,15 +165,12 @@ class TestMockImplementations:
         """Test mock runtime execution."""
         runtime = MockUnifiedRuntime()
 
-        graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': []
-        }
+        graph = {"nodes": [{"id": "n1"}], "edges": []}
 
         result = runtime.execute_graph(graph)
 
-        assert result['status'] == 'mock_executed'
-        assert result['nodes_processed'] == 1
+        assert result["status"] == "mock_executed"
+        assert result["nodes_processed"] == 1
 
 
 class TestRequestHandler:
@@ -188,7 +191,7 @@ class TestRequestHandler:
 
     def test_validate_graph_missing_nodes(self, mock_request_handler):
         """Test validating graph without nodes."""
-        graph = {'edges': []}
+        graph = {"edges": []}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -196,7 +199,7 @@ class TestRequestHandler:
 
     def test_validate_graph_missing_edges(self, mock_request_handler):
         """Test validating graph without edges."""
-        graph = {'nodes': []}
+        graph = {"nodes": []}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -204,7 +207,7 @@ class TestRequestHandler:
 
     def test_validate_graph_nodes_not_list(self, mock_request_handler):
         """Test validating graph with nodes not a list."""
-        graph = {'nodes': 'not a list', 'edges': []}
+        graph = {"nodes": "not a list", "edges": []}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -212,10 +215,7 @@ class TestRequestHandler:
 
     def test_validate_graph_too_many_nodes(self, mock_request_handler):
         """Test validating graph with too many nodes."""
-        graph = {
-            'nodes': [{'id': f'n{i}'} for i in range(100001)],
-            'edges': []
-        }
+        graph = {"nodes": [{"id": f"n{i}"} for i in range(100001)], "edges": []}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -223,7 +223,7 @@ class TestRequestHandler:
 
     def test_validate_graph_edges_not_list(self, mock_request_handler):
         """Test validating graph with edges not a list."""
-        graph = {'nodes': [], 'edges': 'not a list'}
+        graph = {"nodes": [], "edges": "not a list"}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -232,8 +232,8 @@ class TestRequestHandler:
     def test_validate_graph_too_many_edges(self, mock_request_handler):
         """Test validating graph with too many edges."""
         graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': [{'from': 'n1', 'to': 'n1'} for _ in range(1000001)]
+            "nodes": [{"id": "n1"}],
+            "edges": [{"from": "n1", "to": "n1"} for _ in range(1000001)],
         }
         error = mock_request_handler.validate_graph(graph)
 
@@ -242,10 +242,7 @@ class TestRequestHandler:
 
     def test_validate_graph_node_not_dict(self, mock_request_handler):
         """Test validating graph with node not a dict."""
-        graph = {
-            'nodes': ['not a dict'],
-            'edges': []
-        }
+        graph = {"nodes": ["not a dict"], "edges": []}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -253,10 +250,7 @@ class TestRequestHandler:
 
     def test_validate_graph_node_missing_id(self, mock_request_handler):
         """Test validating graph with node missing id."""
-        graph = {
-            'nodes': [{'type': 'CONST'}],
-            'edges': []
-        }
+        graph = {"nodes": [{"type": "CONST"}], "edges": []}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -264,10 +258,7 @@ class TestRequestHandler:
 
     def test_validate_graph_node_non_string_id(self, mock_request_handler):
         """Test validating graph with node having non-string id."""
-        graph = {
-            'nodes': [{'id': 123}],
-            'edges': []
-        }
+        graph = {"nodes": [{"id": 123}], "edges": []}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -275,10 +266,7 @@ class TestRequestHandler:
 
     def test_validate_graph_edge_not_dict(self, mock_request_handler):
         """Test validating graph with edge not a dict."""
-        graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': ['not a dict']
-        }
+        graph = {"nodes": [{"id": "n1"}], "edges": ["not a dict"]}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -286,10 +274,7 @@ class TestRequestHandler:
 
     def test_validate_graph_edge_missing_from(self, mock_request_handler):
         """Test validating graph with edge missing from."""
-        graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': [{'to': 'n1'}]
-        }
+        graph = {"nodes": [{"id": "n1"}], "edges": [{"to": "n1"}]}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -297,10 +282,7 @@ class TestRequestHandler:
 
     def test_validate_graph_edge_missing_to(self, mock_request_handler):
         """Test validating graph with edge missing to."""
-        graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': [{'from': 'n1'}]
-        }
+        graph = {"nodes": [{"id": "n1"}], "edges": [{"from": "n1"}]}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -308,10 +290,7 @@ class TestRequestHandler:
 
     def test_validate_graph_edge_non_string_from(self, mock_request_handler):
         """Test validating graph with edge having non-string from."""
-        graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': [{'from': 123, 'to': 'n1'}]
-        }
+        graph = {"nodes": [{"id": "n1"}], "edges": [{"from": 123, "to": "n1"}]}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -319,10 +298,7 @@ class TestRequestHandler:
 
     def test_validate_graph_edge_non_string_to(self, mock_request_handler):
         """Test validating graph with edge having non-string to."""
-        graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': [{'from': 'n1', 'to': 123}]
-        }
+        graph = {"nodes": [{"id": "n1"}], "edges": [{"from": "n1", "to": 123}]}
         error = mock_request_handler.validate_graph(graph)
 
         assert error is not None
@@ -334,9 +310,9 @@ class TestGraphixListener:
 
     def test_initialization(self):
         """Test listener initialization."""
-        listener = GraphixListener(host='127.0.0.1', port=8182, use_mock=True)
+        listener = GraphixListener(host="127.0.0.1", port=8182, use_mock=True)
 
-        assert listener.host == '127.0.0.1'
+        assert listener.host == "127.0.0.1"
         assert listener.port == 8182
         assert listener.registry is not None
         assert listener.runtime is not None
@@ -344,10 +320,7 @@ class TestGraphixListener:
     def test_initialization_with_custom_rate_limit(self):
         """Test initialization with custom rate limit."""
         listener = GraphixListener(
-            host='127.0.0.1',
-            port=8182,
-            use_mock=True,
-            max_requests_per_minute=100
+            host="127.0.0.1", port=8182, use_mock=True, max_requests_per_minute=100
         )
 
         assert listener.rate_limiter.max_requests == 100
@@ -370,7 +343,7 @@ class TestGraphixListener:
         """Test initialization with default host and port."""
         listener = GraphixListener(use_mock=True)
 
-        assert listener.host == '127.0.0.1'
+        assert listener.host == "127.0.0.1"
         assert listener.port == 8181
 
     def test_shutdown_event_created(self):
@@ -450,7 +423,7 @@ class TestThreadSafety:
     def test_rate_limiter_multiple_clients_thread_safe(self):
         """Test rate limiter with multiple clients is thread safe."""
         limiter = RateLimiter(max_requests=50, window=60)
-        results = {'client1': [], 'client2': [], 'client3': []}
+        results = {"client1": [], "client2": [], "client3": []}
 
         def make_requests(client_id):
             for i in range(10):
@@ -460,7 +433,7 @@ class TestThreadSafety:
         # Create threads for different clients
         threads = [
             threading.Thread(target=make_requests, args=(cid,))
-            for cid in ['client1', 'client2', 'client3']
+            for cid in ["client1", "client2", "client3"]
         ]
 
         # Start all threads
@@ -482,7 +455,7 @@ class TestEdgeCases:
 
     def test_validate_graph_empty_nodes_and_edges(self, mock_request_handler):
         """Test validating graph with empty nodes and edges."""
-        graph = {'nodes': [], 'edges': []}
+        graph = {"nodes": [], "edges": []}
         error = mock_request_handler.validate_graph(graph)
 
         # Empty graph should be valid
@@ -490,11 +463,7 @@ class TestEdgeCases:
 
     def test_validate_graph_with_metadata(self, mock_request_handler):
         """Test validating graph with additional metadata."""
-        graph = {
-            'nodes': [{'id': 'n1'}],
-            'edges': [],
-            'metadata': {'version': '1.0'}
-        }
+        graph = {"nodes": [{"id": "n1"}], "edges": [], "metadata": {"version": "1.0"}}
         error = mock_request_handler.validate_graph(graph)
 
         # Should be valid - extra fields are ok

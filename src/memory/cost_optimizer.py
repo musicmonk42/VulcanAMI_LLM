@@ -473,9 +473,9 @@ class CostAnalyzer:
                                 {
                                     "type": "tier_migration",
                                     "items": candidate_count,
-                                    "priority": "medium"
-                                    if candidate_count > 50
-                                    else "low",
+                                    "priority": (
+                                        "medium" if candidate_count > 50 else "low"
+                                    ),
                                     "action": "migrate_to_cold_storage",
                                 }
                             )
@@ -646,10 +646,10 @@ class CostAnalyzer:
             "first_half_avg": first_half_avg,
             "second_half_avg": second_half_avg,
             "change_percentage": (
-                (second_half_avg - first_half_avg) / first_half_avg * 100
-            )
-            if first_half_avg > 0
-            else 0,
+                ((second_half_avg - first_half_avg) / first_half_avg * 100)
+                if first_half_avg > 0
+                else 0
+            ),
         }
 
 

@@ -2,6 +2,7 @@
 Test fixes for BridgeConfig validation and timeout handling.
 Tests the improvements made during the deep code audit.
 """
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
@@ -24,7 +25,7 @@ def test_bridge_config_validation_positive():
         max_retries=3,
         vocab_size=5000,
         cache_ttl_seconds=60.0,
-        consensus_timeout_seconds=2.0
+        consensus_timeout_seconds=2.0,
     )
 
     assert config.async_timeout == 2.0
@@ -80,8 +81,7 @@ def test_bridge_config_validation_negative_kl_threshold():
 @pytest.mark.asyncio
 async def test_safe_call_async_uses_custom_timeout():
     """Test that custom timeout parameter is respected."""
-    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
-                                                       GraphixVulcanBridge)
+    from src.integration.graphix_vulcan_bridge import BridgeConfig, GraphixVulcanBridge
 
     # Create bridge with default timeout of 2.0 seconds
     config = BridgeConfig(async_timeout=2.0)
@@ -102,7 +102,7 @@ async def test_safe_call_async_uses_custom_timeout():
         args=(),
         default="default_value",
         timeout=0.1,  # 0.1 second timeout
-        max_retries=0  # No retries
+        max_retries=0,  # No retries
     )
 
     # Should return default due to timeout
@@ -112,8 +112,7 @@ async def test_safe_call_async_uses_custom_timeout():
 @pytest.mark.asyncio
 async def test_safe_call_async_uses_config_default_timeout():
     """Test that config default timeout is used when no custom timeout provided."""
-    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
-                                                       GraphixVulcanBridge)
+    from src.integration.graphix_vulcan_bridge import BridgeConfig, GraphixVulcanBridge
 
     # Reset singleton to ensure fresh instance
     GraphixVulcanBridge._instance = None
@@ -133,10 +132,7 @@ async def test_safe_call_async_uses_config_default_timeout():
 
     # Call without custom timeout (should use config default)
     result = await bridge._safe_call_async(
-        slow_mock,
-        args=(),
-        default="default_value",
-        max_retries=0  # No retries
+        slow_mock, args=(), default="default_value", max_retries=0  # No retries
     )
 
     # Should return default due to timeout
@@ -146,8 +142,7 @@ async def test_safe_call_async_uses_config_default_timeout():
 @pytest.mark.asyncio
 async def test_safe_call_async_respects_custom_max_retries():
     """Test that custom max_retries parameter is respected."""
-    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
-                                                       GraphixVulcanBridge)
+    from src.integration.graphix_vulcan_bridge import BridgeConfig, GraphixVulcanBridge
 
     config = BridgeConfig(max_retries=5)  # Default is 5
     bridge = GraphixVulcanBridge(config=config)
@@ -170,7 +165,7 @@ async def test_safe_call_async_respects_custom_max_retries():
         args=(),
         default="default_value",
         timeout=0.05,  # Very short timeout
-        max_retries=1  # Only 1 retry
+        max_retries=1,  # Only 1 retry
     )
 
     # Should have tried twice (initial + 1 retry)
@@ -181,8 +176,7 @@ async def test_safe_call_async_respects_custom_max_retries():
 @pytest.mark.asyncio
 async def test_consensus_timeout_uses_config_value():
     """Test that consensus_approve_token uses configured consensus timeout."""
-    from src.integration.graphix_vulcan_bridge import (BridgeConfig,
-                                                       GraphixVulcanBridge)
+    from src.integration.graphix_vulcan_bridge import BridgeConfig, GraphixVulcanBridge
 
     # Create bridge with custom consensus timeout
     config = BridgeConfig(consensus_timeout_seconds=5.0)
@@ -214,7 +208,7 @@ def test_validation_refactoring_maintains_behavior():
         max_retries=2,
         vocab_size=1000,
         cache_ttl_seconds=30.0,
-        consensus_timeout_seconds=3.0
+        consensus_timeout_seconds=3.0,
     )
     assert config is not None
 

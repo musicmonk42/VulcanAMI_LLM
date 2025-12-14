@@ -4,14 +4,16 @@
 # FIXED: Corrected test_complex_dependency_setup to match actual shutdown behavior
 # ============================================================
 
-from vulcan.orchestrator.dependencies import (DependencyCategory,
-                                              EnhancedCollectiveDeps,
-                                              create_full_deps,
-                                              create_minimal_deps,
-                                              get_status_symbol,
-                                              print_dependency_report,
-                                              safe_print,
-                                              validate_dependencies)
+from vulcan.orchestrator.dependencies import (
+    DependencyCategory,
+    EnhancedCollectiveDeps,
+    create_full_deps,
+    create_minimal_deps,
+    get_status_symbol,
+    print_dependency_report,
+    safe_print,
+    validate_dependencies,
+)
 import io
 import sys
 import unittest

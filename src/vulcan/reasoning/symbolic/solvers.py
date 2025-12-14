@@ -1090,11 +1090,11 @@ class BayesianNetworkReasoner:
         """Learn Gaussian CPD using linear regression."""
         var = self.variables[var_name]
         parents = var.parents
-        
+
         if not parents:
             # No parents - estimate mean and variance directly from samples with var_name
             valid_data = [d[var_name] for d in data if var_name in d]
-            
+
             if len(valid_data) == 0:
                 # Default parameters if no data
                 self.gaussian_cpds[var_name] = GaussianCPD(
@@ -1102,10 +1102,10 @@ class BayesianNetworkReasoner:
                     parents=[],
                     coefficients={},
                     intercept=0.0,
-                    variance=1.0
+                    variance=1.0,
                 )
                 return
-            
+
             Y = np.array(valid_data)
             intercept = float(np.mean(Y))
             variance = float(np.var(Y, ddof=1)) if len(Y) > 1 else 1.0
@@ -1114,13 +1114,15 @@ class BayesianNetworkReasoner:
                 parents=[],
                 coefficients={},
                 intercept=intercept,
-                variance=max(variance, 1e-10)
+                variance=max(variance, 1e-10),
             )
         else:
             # Build design matrix for linear regression
             # Filter for samples where both target and all parents are present
-            valid_data = [d for d in data if var_name in d and all(p in d for p in parents)]
-            
+            valid_data = [
+                d for d in data if var_name in d and all(p in d for p in parents)
+            ]
+
             if len(valid_data) == 0:
                 # No valid samples - use defaults
                 self.gaussian_cpds[var_name] = GaussianCPD(
@@ -1128,40 +1130,40 @@ class BayesianNetworkReasoner:
                     parents=parents,
                     coefficients={p: 0.0 for p in parents},
                     intercept=0.0,
-                    variance=1.0
+                    variance=1.0,
                 )
                 return
-            
+
             X = np.array([[d[p] for p in parents] for d in valid_data])
             Y = np.array([d[var_name] for d in valid_data])
-            
+
             # Add intercept column (ones)
             X_design = np.column_stack([np.ones(len(X)), X])
-            
+
             try:
                 # Solve least squares: beta = (X'X)^-1 X'Y
                 coeffs, residuals, rank, s = np.linalg.lstsq(X_design, Y, rcond=None)
-                
+
                 intercept = float(coeffs[0])
-                parent_coeffs = {p: float(coeffs[i+1]) for i, p in enumerate(parents)}
-                
+                parent_coeffs = {p: float(coeffs[i + 1]) for i, p in enumerate(parents)}
+
                 # Estimate variance from residuals
                 Y_pred = X_design @ coeffs
                 residuals = Y - Y_pred
                 variance = float(np.sum(residuals**2) / max(len(Y) - len(coeffs), 1))
-                
+
             except (np.linalg.LinAlgError, ValueError):
                 # Fallback on numerical issues
                 intercept = float(np.mean(Y))
                 parent_coeffs = {p: 0.0 for p in parents}
                 variance = float(np.var(Y))
-            
+
             self.gaussian_cpds[var_name] = GaussianCPD(
                 variable=var_name,
                 parents=parents,
                 coefficients=parent_coeffs,
                 intercept=intercept,
-                variance=max(variance, 1e-10)
+                variance=max(variance, 1e-10),
             )
 
     def learn_parameters_em(
@@ -1284,9 +1286,9 @@ class BayesianNetworkReasoner:
                 parent_values = (
                     tuple(sample[p] for p in var.parents) if var.parents else ()
                 )
-                expected_counts["discrete"][var_name][parent_values][var_value] += (
-                    weight
-                )
+                expected_counts["discrete"][var_name][parent_values][
+                    var_value
+                ] += weight
 
     def _m_step(self, expected_counts: Dict[str, Any]):
         """M-step: Update parameters from expected counts."""

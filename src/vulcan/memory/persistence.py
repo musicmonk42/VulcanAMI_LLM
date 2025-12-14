@@ -98,6 +98,7 @@ if TORCH_AVAILABLE:
             z = self.encode(x)
             x_recon = self.decode(z)
             return x_recon, z
+
 else:
     # Stub class when torch is not available
     NeuralCompressor = None
@@ -410,10 +411,14 @@ class MemoryCompressor:
 
                 dctx = zstd.ZstdDecompressor()
                 decompressed = dctx.decompress(data)
-                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
+                return pickle.loads(
+                    decompressed
+                )  # nosec B301 - Internal data structure
             except ImportError:
                 decompressed = lz4.frame.decompress(data)
-                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
+                return pickle.loads(
+                    decompressed
+                )  # nosec B301 - Internal data structure
 
         elif compression_type == CompressionType.NEURAL:
             return MemoryCompressor._neural_decompress(data)
@@ -431,7 +436,9 @@ class MemoryCompressor:
             # Try to extract original from fallback
             try:
                 decompressed = lz4.frame.decompress(data)
-                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
+                return pickle.loads(
+                    decompressed
+                )  # nosec B301 - Internal data structure
             except Exception:
                 return None
 
@@ -470,7 +477,9 @@ class MemoryCompressor:
                 # Try to unpickle
                 bytes_array = (reconstructed_array * 255).astype(np.uint8).tobytes()
                 try:
-                    result = pickle.loads(bytes_array)  # nosec B301 - Internal data structure
+                    result = pickle.loads(
+                        bytes_array
+                    )  # nosec B301 - Internal data structure
                 except Exception as e:  # Return reconstruction with metadata
                     result = {
                         "reconstructed": reconstructed_array,
@@ -526,7 +535,9 @@ class MemoryCompressor:
             try:
                 # Try LZ4 fallback
                 decompressed = lz4.frame.decompress(data)
-                return pickle.loads(decompressed)  # nosec B301 - Internal data structure
+                return pickle.loads(
+                    decompressed
+                )  # nosec B301 - Internal data structure
             except Exception:
                 return None
 
@@ -602,7 +613,8 @@ class MemoryVersionControl:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS versions (
                 version_id TEXT PRIMARY KEY,
                 memory_id TEXT NOT NULL,
@@ -614,19 +626,24 @@ class MemoryVersionControl:
                 branch TEXT,
                 metadata TEXT
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_memory_id ON versions(memory_id)
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS branches (
                 name TEXT PRIMARY KEY,
                 head_version TEXT,
                 created_at REAL
             )
-        """)
+        """
+        )
 
         conn.commit()
         conn.close()
@@ -1588,7 +1605,9 @@ class MemoryPersistence:
                     decompressed_bytes = lz4.frame.decompress(compressed_data)
 
                     # Unpickle to get the Memory object
-                    memory = pickle.loads(decompressed_bytes)  # nosec B301 - Internal data structure
+                    memory = pickle.loads(
+                        decompressed_bytes
+                    )  # nosec B301 - Internal data structure
 
                     # Verify it's actually a Memory object
                     if isinstance(memory, Memory):
@@ -1683,9 +1702,9 @@ class MemoryPersistence:
             "timestamp": memory.timestamp,
             "importance": memory.importance,
             "compressed": memory.compressed,
-            "compression_type": memory.compression_type.value
-            if memory.compression_type
-            else None,
+            "compression_type": (
+                memory.compression_type.value if memory.compression_type else None
+            ),
             "version_id": version_id,
             "metadata": memory.metadata,
             "last_modified": time.time(),

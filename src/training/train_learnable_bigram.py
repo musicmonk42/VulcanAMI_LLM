@@ -551,9 +551,7 @@ class NGramCounts:
             prev2 = seq[i - 2] if i > 1 else bos_id
             self.trigram[prev2][prev1][tok] += 1
 
-    def smooth_log_probs(
-        self, V: int, alpha: float, discount_d: float
-    ) -> Tuple[
+    def smooth_log_probs(self, V: int, alpha: float, discount_d: float) -> Tuple[
         Dict[Tuple[int, int, int], float],
         Dict[Tuple[int, int], float],
         Dict[int, float],
@@ -1292,9 +1290,11 @@ def run_training(args: argparse.Namespace) -> None:
                 full=args.val_full,
                 backoff_enabled=args.enable_backoff,
                 backoff_lambda=args.backoff_lambda,
-                backoff_weights=tuple(map(float, args.backoff_weights.split(",")))
-                if isinstance(args.backoff_weights, str)
-                else args.backoff_weights,
+                backoff_weights=(
+                    tuple(map(float, args.backoff_weights.split(",")))
+                    if isinstance(args.backoff_weights, str)
+                    else args.backoff_weights
+                ),
                 trigram_weight=args.trigram_weight,
                 bigram_weight=args.bigram_weight,
                 counts=counts,
@@ -1309,9 +1309,11 @@ def run_training(args: argparse.Namespace) -> None:
                 best_update = applied_updates
                 patience_counter = 0
                 optimizer_state = {
-                    "learning_rate": trainer.optimizer.get_lr()
-                    if hasattr(trainer, "optimizer")
-                    else args.learning_rate,
+                    "learning_rate": (
+                        trainer.optimizer.get_lr()
+                        if hasattr(trainer, "optimizer")
+                        else args.learning_rate
+                    ),
                     "applied_updates": applied_updates,
                 }
                 save_best_params(
@@ -1363,9 +1365,11 @@ def run_training(args: argparse.Namespace) -> None:
         f"[TRAIN] Training complete. Best val loss: {best_val:.4f} at step {best_update}"
     )
     optimizer_state = {
-        "learning_rate": trainer.optimizer.get_lr()
-        if hasattr(trainer, "optimizer")
-        else args.learning_rate,
+        "learning_rate": (
+            trainer.optimizer.get_lr()
+            if hasattr(trainer, "optimizer")
+            else args.learning_rate
+        ),
         "applied_updates": applied_updates,
     }
     save_best_params(
@@ -1416,9 +1420,11 @@ def run_training(args: argparse.Namespace) -> None:
             args.mask_bos,
             args.enable_backoff,
             args.backoff_lambda,
-            tuple(map(float, args.backoff_weights.split(",")))
-            if isinstance(args.backoff_weights, str)
-            else args.backoff_weights,
+            (
+                tuple(map(float, args.backoff_weights.split(",")))
+                if isinstance(args.backoff_weights, str)
+                else args.backoff_weights
+            ),
             args.trigram_weight,
             args.bigram_weight,
             tri_log,

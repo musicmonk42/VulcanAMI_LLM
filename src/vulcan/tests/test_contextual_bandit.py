@@ -5,15 +5,18 @@ Tests all bandit algorithms, exploration strategies, off-policy evaluation,
 and numerical stability fixes.
 """
 
-from vulcan.reasoning.contextual_bandit import (AdaptiveBanditOrchestrator,
-                                                BanditAction, BanditContext,
-                                                BanditFeedback,
-                                                ContextualBandit,
-                                                ExplorationStrategy,
-                                                LinUCBBandit,
-                                                NeuralContextualBandit,
-                                                OffPolicyEvaluator,
-                                                ToolSelectionBandit)
+from vulcan.reasoning.contextual_bandit import (
+    AdaptiveBanditOrchestrator,
+    BanditAction,
+    BanditContext,
+    BanditFeedback,
+    ContextualBandit,
+    ExplorationStrategy,
+    LinUCBBandit,
+    NeuralContextualBandit,
+    OffPolicyEvaluator,
+    ToolSelectionBandit,
+)
 import numpy as np
 import tempfile
 import shutil

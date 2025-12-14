@@ -16,11 +16,23 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from api_server import (MAX_GRAPH_EDGES, MAX_GRAPH_NODES, MAX_REQUEST_SIZE,
-                        Agent, APIEndpoint, CacheManager,
-                        DatabaseConnectionPool, DatabaseManager,
-                        ExecutionEngine, ExecutionStatus, GraphAPIServer,
-                        GraphSubmission, InputValidator, Proposal, RateLimiter)
+from api_server import (
+    MAX_GRAPH_EDGES,
+    MAX_GRAPH_NODES,
+    MAX_REQUEST_SIZE,
+    Agent,
+    APIEndpoint,
+    CacheManager,
+    DatabaseConnectionPool,
+    DatabaseManager,
+    ExecutionEngine,
+    ExecutionStatus,
+    GraphAPIServer,
+    GraphSubmission,
+    InputValidator,
+    Proposal,
+    RateLimiter,
+)
 
 
 @pytest.fixture
@@ -69,11 +81,11 @@ def api_server():
     """Create API server on random port."""
     # Find available port
     sock = socket.socket()
-    sock.bind(('', 0))
+    sock.bind(("", 0))
     port = sock.getsockname()[1]
     sock.close()
 
-    server = GraphAPIServer(host='127.0.0.1', port=port)
+    server = GraphAPIServer(host="127.0.0.1", port=port)
     yield server
     server.stop()
 
@@ -169,11 +181,9 @@ class TestInputValidator:
             "type": "Graph",
             "nodes": [
                 {"id": "n1", "type": "TestNode"},
-                {"id": "n2", "type": "TestNode"}
+                {"id": "n2", "type": "TestNode"},
             ],
-            "edges": [
-                {"from": "n1", "to": "n2"}
-            ]
+            "edges": [{"from": "n1", "to": "n2"}],
         }
 
         valid, error = InputValidator.validate_graph(graph)
@@ -190,12 +200,7 @@ class TestInputValidator:
 
     def test_invalid_nodes(self):
         """Test graph with invalid nodes."""
-        graph = {
-            "id": "test",
-            "type": "Graph",
-            "nodes": "not a list",
-            "edges": []
-        }
+        graph = {"id": "test", "type": "Graph", "nodes": "not a list", "edges": []}
 
         valid, error = InputValidator.validate_graph(graph)
         assert not valid
@@ -208,9 +213,9 @@ class TestInputValidator:
             "type": "Graph",
             "nodes": [
                 {"id": "n1", "type": "TestNode"},
-                {"id": "n1", "type": "TestNode"}
+                {"id": "n1", "type": "TestNode"},
             ],
-            "edges": []
+            "edges": [],
         }
 
         valid, error = InputValidator.validate_graph(graph)
@@ -223,7 +228,7 @@ class TestInputValidator:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "TestNode"}],
-            "edges": [{"from": "n1", "to": "nonexistent"}]
+            "edges": [{"from": "n1", "to": "nonexistent"}],
         }
 
         valid, error = InputValidator.validate_graph(graph)
@@ -232,13 +237,10 @@ class TestInputValidator:
 
     def test_too_many_nodes(self):
         """Test graph with too many nodes."""
-        nodes = [{"id": f"n{i}", "type": "TestNode"} for i in range(MAX_GRAPH_NODES + 1)]
-        graph = {
-            "id": "test",
-            "type": "Graph",
-            "nodes": nodes,
-            "edges": []
-        }
+        nodes = [
+            {"id": f"n{i}", "type": "TestNode"} for i in range(MAX_GRAPH_NODES + 1)
+        ]
+        graph = {"id": "test", "type": "Graph", "nodes": nodes, "edges": []}
 
         valid, error = InputValidator.validate_graph(graph)
         assert not valid
@@ -293,14 +295,11 @@ class TestDatabaseManager:
             "id": "test_graph",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "TestNode"}],
-            "edges": []
+            "edges": [],
         }
 
         submission = GraphSubmission(
-            id="sub123",
-            graph=graph,
-            agent_id="agent1",
-            status=ExecutionStatus.PENDING
+            id="sub123", graph=graph, agent_id="agent1", status=ExecutionStatus.PENDING
         )
 
         db_manager.save_graph(submission)
@@ -314,12 +313,7 @@ class TestDatabaseManager:
 
     def test_save_and_get_agent(self, db_manager):
         """Test saving and retrieving agent."""
-        agent = Agent(
-            id="agent1",
-            name="Test Agent",
-            api_key="a" * 32,
-            roles=["user"]
-        )
+        agent = Agent(id="agent1", name="Test Agent", api_key="a" * 32, roles=["user"])
 
         db_manager.save_agent(agent)
 
@@ -335,7 +329,7 @@ class TestDatabaseManager:
             agent_id="agent1",
             action="test_action",
             resource="test_resource",
-            details={"key": "value"}
+            details={"key": "value"},
         )
 
         # Verify logged (would need query method)
@@ -351,14 +345,10 @@ class TestExecutionEngine:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "TestNode"}],
-            "edges": []
+            "edges": [],
         }
 
-        submission = GraphSubmission(
-            id="sub123",
-            graph=graph,
-            agent_id="agent1"
-        )
+        submission = GraphSubmission(id="sub123", graph=graph, agent_id="agent1")
 
         future = execution_engine.execute_graph(submission)
         future.result(timeout=5)
@@ -370,11 +360,7 @@ class TestExecutionEngine:
         """Test executing invalid graph."""
         graph = {"invalid": "graph"}
 
-        submission = GraphSubmission(
-            id="sub123",
-            graph=graph,
-            agent_id="agent1"
-        )
+        submission = GraphSubmission(id="sub123", graph=graph, agent_id="agent1")
 
         future = execution_engine.execute_graph(submission)
         future.result(timeout=5)
@@ -388,14 +374,10 @@ class TestExecutionEngine:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "TestNode"}],
-            "edges": []
+            "edges": [],
         }
 
-        submission = GraphSubmission(
-            id="sub123",
-            graph=graph,
-            agent_id="agent1"
-        )
+        submission = GraphSubmission(id="sub123", graph=graph, agent_id="agent1")
 
         future = execution_engine.execute_graph(submission)
 
@@ -460,9 +442,9 @@ class TestGraphAPIServer:
 
     def test_initialization(self):
         """Test server initialization."""
-        server = GraphAPIServer(host='127.0.0.1', port=9999)
+        server = GraphAPIServer(host="127.0.0.1", port=9999)
 
-        assert server.host == '127.0.0.1'
+        assert server.host == "127.0.0.1"
         assert server.port == 9999
         assert server.db is not None
 
@@ -485,7 +467,7 @@ class TestGraphAPIServer:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "TestNode"}],
-            "edges": []
+            "edges": [],
         }
 
         result = api_server.submit_graph(graph, agent.id)
@@ -501,14 +483,14 @@ class TestGraphAPIServer:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "ProposalNode"}],
-            "edges": []
+            "edges": [],
         }
 
         proposal = api_server.create_proposal(
             title="Test Proposal",
             description="Test Description",
             graph=graph,
-            proposer_id=agent.id
+            proposer_id=agent.id,
         )
 
         assert proposal is not None
@@ -523,7 +505,7 @@ class TestGraphAPIServer:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "ProposalNode"}],
-            "edges": []
+            "edges": [],
         }
 
         proposal = api_server.create_proposal("Test", "Test", graph, agent1.id)
@@ -556,11 +538,7 @@ class TestGraphSubmission:
         """Test creating submission."""
         graph = {"id": "test", "type": "Graph", "nodes": [], "edges": []}
 
-        submission = GraphSubmission(
-            id="sub123",
-            graph=graph,
-            agent_id="agent1"
-        )
+        submission = GraphSubmission(id="sub123", graph=graph, agent_id="agent1")
 
         assert submission.id == "sub123"
         assert submission.status == ExecutionStatus.PENDING
@@ -570,11 +548,7 @@ class TestGraphSubmission:
         """Test conversion to dict."""
         graph = {"id": "test", "type": "Graph", "nodes": [], "edges": []}
 
-        submission = GraphSubmission(
-            id="sub123",
-            graph=graph,
-            agent_id="agent1"
-        )
+        submission = GraphSubmission(id="sub123", graph=graph, agent_id="agent1")
 
         data = submission.to_dict()
 
@@ -599,7 +573,7 @@ class TestThreadSafety:
                     "id": f"test_{threading.current_thread().name}",
                     "type": "Graph",
                     "nodes": [{"id": "n1", "type": "TestNode"}],
-                    "edges": []
+                    "edges": [],
                 }
                 result = api_server.submit_graph(graph, agent.id)
                 results.append(result)
@@ -624,7 +598,7 @@ class TestThreadSafety:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "ProposalNode"}],
-            "edges": []
+            "edges": [],
         }
 
         proposal = api_server.create_proposal("Test", "Test", graph, agents[0].id)

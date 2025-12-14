@@ -13,8 +13,14 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
-from .base import (BaseMemorySystem, Memory, MemoryConfig, MemoryQuery,
-                   MemoryType, RetrievalResult)
+from .base import (
+    BaseMemorySystem,
+    Memory,
+    MemoryConfig,
+    MemoryQuery,
+    MemoryType,
+    RetrievalResult,
+)
 from .hierarchical import HierarchicalMemory
 
 # Try to import optional dependencies
@@ -1358,9 +1364,11 @@ class SemanticMemory(BaseMemorySystem):
             concept.confidence,
             len(concept.problem_domains) / 10,
             len(concept.performance_metrics) / 10,
-            np.mean(list(concept.performance_metrics.values()))
-            if concept.performance_metrics
-            else 0,
+            (
+                np.mean(list(concept.performance_metrics.values()))
+                if concept.performance_metrics
+                else 0
+            ),
         ]
 
         # Combine and normalize
@@ -2117,31 +2125,50 @@ class Skill:
                     import ast
 
                     # Parse the condition
-                    tree = ast.parse(condition, mode='eval')
+                    tree = ast.parse(condition, mode="eval")
 
                     # Only allow safe operations (Python 3.8+ compatible)
                     # Removed deprecated ast.Num, ast.Str, ast.NameConstant
-                    safe_nodes = (ast.Expression, ast.Constant,
-                                  ast.List, ast.Tuple, ast.Dict,
-                                  ast.Name, ast.Load, ast.Compare, ast.BoolOp,
-                                  ast.And, ast.Or, ast.Eq, ast.NotEq, ast.Lt,
-                                  ast.LtE, ast.Gt, ast.GtE, ast.In, ast.NotIn,
-                                  ast.UnaryOp, ast.Not)
+                    safe_nodes = (
+                        ast.Expression,
+                        ast.Constant,
+                        ast.List,
+                        ast.Tuple,
+                        ast.Dict,
+                        ast.Name,
+                        ast.Load,
+                        ast.Compare,
+                        ast.BoolOp,
+                        ast.And,
+                        ast.Or,
+                        ast.Eq,
+                        ast.NotEq,
+                        ast.Lt,
+                        ast.LtE,
+                        ast.Gt,
+                        ast.GtE,
+                        ast.In,
+                        ast.NotIn,
+                        ast.UnaryOp,
+                        ast.Not,
+                    )
 
                     for node in ast.walk(tree):
                         if not isinstance(node, safe_nodes):
-                            logger.warning(f"Unsafe node in condition '{condition}': {type(node).__name__}")
+                            logger.warning(
+                                f"Unsafe node in condition '{condition}': {type(node).__name__}"
+                            )
                             # Fail securely - return False instead of True
                             return False
 
                     # Create a restricted namespace with only the context variables
                     # and no builtins to prevent code injection
-                    namespace = {'__builtins__': {}}
+                    namespace = {"__builtins__": {}}
                     namespace.update(context)
 
                     # Compile and evaluate the safe expression
                     # nosec B307: Using eval with restricted namespace (no builtins) for safe evaluation
-                    code = compile(tree, '<condition>', 'eval')
+                    code = compile(tree, "<condition>", "eval")
                     return bool(eval(code, namespace, {}))  # nosec B307
 
                 except (SyntaxError, ValueError, TypeError) as e:

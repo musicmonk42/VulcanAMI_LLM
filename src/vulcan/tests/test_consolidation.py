@@ -8,12 +8,18 @@ import numpy as np
 import pytest
 
 from vulcan.memory.base import Memory, MemoryType
+
 # Import the module to test
-from vulcan.memory.consolidation import (CacheManager, ConsolidationStrategy,
-                                         DBSCANClustering,
-                                         HierarchicalClustering,
-                                         IndexManager, KMeansClustering,
-                                         MemoryConsolidator, MemoryOptimizer)
+from vulcan.memory.consolidation import (
+    CacheManager,
+    ConsolidationStrategy,
+    DBSCANClustering,
+    HierarchicalClustering,
+    IndexManager,
+    KMeansClustering,
+    MemoryConsolidator,
+    MemoryOptimizer,
+)
 
 # Try to import optional dependencies for testing
 try:

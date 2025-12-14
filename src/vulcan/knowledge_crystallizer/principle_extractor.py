@@ -972,9 +972,11 @@ class PrincipleExtractor:
                     applicable_domains=abstracted.get("domains", ["general"]),
                     confidence=abstracted.get("confidence", 0.5),
                     measurement_requirements=abstracted.get("requirements", []),
-                    domain=abstracted.get("domains", ["general"])[0]
-                    if abstracted.get("domains")
-                    else "general",
+                    domain=(
+                        abstracted.get("domains", ["general"])[0]
+                        if abstracted.get("domains")
+                        else "general"
+                    ),
                     tags=abstracted.get("tags", []),
                 )
 
@@ -1523,9 +1525,11 @@ class PatternDetector:
                         pattern_type=PatternType.CONDITIONAL,
                         components=[action_type] + branches,
                         structure={
-                            "condition": action.get("condition", "unknown")
-                            if isinstance(action, dict)
-                            else "unknown",
+                            "condition": (
+                                action.get("condition", "unknown")
+                                if isinstance(action, dict)
+                                else "unknown"
+                            ),
                             "position": i,
                             "branches": len(branches),
                         },
@@ -1919,9 +1923,11 @@ class SuccessAnalyzer:
                         importance=importance,
                         evidence_count=1,
                         conditions=[
-                            f"{metric.name}>={metric.threshold}"
-                            if metric.threshold
-                            else f"{metric.name}_success"
+                            (
+                                f"{metric.name}>={metric.threshold}"
+                                if metric.threshold
+                                else f"{metric.name}_success"
+                            )
                         ],
                         metrics=[metric],
                     )

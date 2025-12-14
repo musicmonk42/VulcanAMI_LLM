@@ -19,8 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Tuple,
-                    Union)
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 # TYPE_CHECKING import for type annotations without runtime import
 # This allows using aiohttp types in annotations even when aiohttp is not installed
@@ -135,8 +134,11 @@ class AITask:
         if not self.trace_id:
             # Generate trace ID for tracking (non-cryptographic use)
             trace_data = f"{self.operation}_{self.provider}_{self.model}_{time.time()}_{random.random()}"
-            self.trace_id = hashlib.md5(trace_data.encode(), usedforsecurity=False).hexdigest()[
-                :16]  # nosec B324 - used for trace ID generation, not security
+            self.trace_id = hashlib.md5(
+                trace_data.encode(), usedforsecurity=False
+            ).hexdigest()[
+                :16
+            ]  # nosec B324 - used for trace ID generation, not security
 
     def is_expired(self) -> bool:
         """Check if task has passed deadline"""
@@ -914,8 +916,9 @@ class LocalGPTAIProvider(AIProvider):
         self.artifacts_dir = artifacts_dir
         # Defer import to avoid hard dependency if artifacts are not used
         try:
-            from src.local_llm.provider.local_gpt_provider import \
-                build_provider_from_artifacts
+            from src.local_llm.provider.local_gpt_provider import (
+                build_provider_from_artifacts,
+            )
         except Exception as e:
             raise ImportError(
                 f"LocalGPTProvider import failed. Ensure files are added to src/local_llm. Error: {e}"
@@ -1688,9 +1691,9 @@ class AIMetrics:
                 "total_failures": sum(self.failures.values()),
                 "cache_hits": self.cache_hits,
                 "cache_misses": self.cache_misses,
-                "cache_hit_rate": (self.cache_hits / total_lookups)
-                if total_lookups > 0
-                else 0.0,  # Avoid division by zero
+                "cache_hit_rate": (
+                    (self.cache_hits / total_lookups) if total_lookups > 0 else 0.0
+                ),  # Avoid division by zero
                 "by_provider_operation": {},  # Corrected key name
             }
 
@@ -1710,12 +1713,12 @@ class AIMetrics:
 
                 summary["by_provider_operation"][provider][operation] = {
                     "count": count,
-                    "success_rate": (success_count / count)
-                    if count > 0
-                    else 0.0,  # Avoid division by zero
-                    "avg_latency_ms": (latency_sum / count)
-                    if count > 0
-                    else 0.0,  # Avoid division by zero
+                    "success_rate": (
+                        (success_count / count) if count > 0 else 0.0
+                    ),  # Avoid division by zero
+                    "avg_latency_ms": (
+                        (latency_sum / count) if count > 0 else 0.0
+                    ),  # Avoid division by zero
                     "total_cost": cost_sum,
                 }
 

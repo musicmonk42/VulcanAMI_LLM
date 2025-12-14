@@ -33,7 +33,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import (Any, Deque, Dict, List, Optional, Tuple, Union)
+from typing import Any, Deque, Dict, List, Optional, Tuple, Union
 
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
@@ -76,12 +76,14 @@ class ValidationCategory(Enum):
 
 try:
     # Prefer repository-provided LLM validators if available
-    from src.vulcan.safety.llm_validators import (BiasValidator,
-                                                  EnhancedSafetyValidator,
-                                                  HallucinationValidator,
-                                                  PIIValidator,
-                                                  PromptInjectionValidator,
-                                                  ToxicityValidator)
+    from src.vulcan.safety.llm_validators import (
+        BiasValidator,
+        EnhancedSafetyValidator,
+        HallucinationValidator,
+        PIIValidator,
+        PromptInjectionValidator,
+        ToxicityValidator,
+    )
 except Exception:
     # Comprehensive heuristic validators with enhanced detection
 
@@ -799,7 +801,9 @@ class SafeGeneration:
                     return ok
             except Exception as e:
                 # Safety-critical: log world model validation errors
-                logger.error(f"World model sequence validation failed: {e}", exc_info=True)
+                logger.error(
+                    f"World model sequence validation failed: {e}", exc_info=True
+                )
 
         return repaired if changed else True
 
@@ -901,7 +905,9 @@ class SafeGeneration:
                     out = final
                 except Exception as e:
                     # Safety-critical: log enhanced validator failures
-                    logger.error(f"Enhanced safety validator failed: {e}", exc_info=True)
+                    logger.error(
+                        f"Enhanced safety validator failed: {e}", exc_info=True
+                    )
 
         # World model validation
         if world_model:
@@ -915,7 +921,9 @@ class SafeGeneration:
                         out = world_model.suggest_correction(out, context)
                 except Exception as e:
                     # Safety-critical: log world model validation errors
-                    logger.error(f"World model validation/correction failed: {e}", exc_info=True)
+                    logger.error(
+                        f"World model validation/correction failed: {e}", exc_info=True
+                    )
 
         # Additional heuristic checks
         if isinstance(out, str):

@@ -296,7 +296,7 @@ class ProviderClient:
         """Prepare an HTTP request."""
         # SECURITY: Validate URL scheme before creating request (CWE-22 mitigation)
         validate_url_scheme(url)
-        
+
         if headers is None:
             headers = {}
 
@@ -324,7 +324,9 @@ class ProviderClient:
                     opener = self.connection_pool.get_opener()
                     response = opener.open(req, timeout=timeout, encoding="utf-8")
                 else:
-                    response = request.urlopen(req, timeout=timeout, encoding="utf-8")  # nosec B310 - URL validated in prepare_request
+                    response = request.urlopen(
+                        req, timeout=timeout, encoding="utf-8"
+                    )  # nosec B310 - URL validated in prepare_request
 
                 response_data = response.read().decode("utf-8")
                 return json.loads(response_data)
@@ -714,7 +716,8 @@ class AICache:
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS cache (
                 key TEXT PRIMARY KEY,
                 data TEXT NOT NULL,
@@ -724,7 +727,8 @@ class AICache:
                 size_bytes INTEGER,
                 metadata TEXT
             )
-        """)
+        """
+        )
 
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_expires ON cache(expires_at)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_created ON cache(created_at)")
@@ -867,14 +871,16 @@ class AICache:
         with self.db_pool.get_connection() as conn:
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT
                     COUNT(*) as total_entries,
                     SUM(size_bytes) as total_size,
                     SUM(hit_count) as total_hits,
                     AVG(hit_count) as avg_hits
                 FROM cache
-            """)
+            """
+            )
 
             stats = cursor.fetchone()
 

@@ -8,10 +8,16 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from drift_detector import (MAX_DRIFT_THRESHOLD, MAX_EMBEDDINGS,
-                            MAX_HISTORY_SIZE, MIN_DRIFT_THRESHOLD,
-                            MIN_HISTORY_SIZE, REALIGNMENT_METHODS,
-                            DriftDetector, DriftMetrics)
+from drift_detector import (
+    MAX_DRIFT_THRESHOLD,
+    MAX_EMBEDDINGS,
+    MAX_HISTORY_SIZE,
+    MIN_DRIFT_THRESHOLD,
+    MIN_HISTORY_SIZE,
+    REALIGNMENT_METHODS,
+    DriftDetector,
+    DriftMetrics,
+)
 
 
 @pytest.fixture

@@ -1299,7 +1299,10 @@ class GraphixArena:
 
             # Default embedding function
             if embedding_func is None and NUMPY_AVAILABLE:
-                def embedding_func(p): return np.random.rand(128).astype("float32")
+
+                def embedding_func(p):
+                    return np.random.rand(128).astype("float32")
+
             elif embedding_func is None:
                 raise ValueError(
                     "NumPy not available and no embedding function provided"
@@ -1380,8 +1383,12 @@ class GraphixArena:
         import uvicorn
 
         logger.info(f"Starting Graphix Arena on http://{self.host}:{self.port}")
-        if self.host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
-            logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
+        if (
+            self.host == "0.0.0.0"
+        ):  # nosec B104 - This is a security check, not a binding
+            logger.warning(
+                "⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!"
+            )
         logger.info(
             "Security is ENABLED. Use the 'X-API-KEY' header for authentication."
         )

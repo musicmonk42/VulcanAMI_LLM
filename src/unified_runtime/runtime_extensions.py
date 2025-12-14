@@ -415,7 +415,9 @@ class SubgraphLearner:
         graph_str = json.dumps(graph_def, sort_keys=True)
         # Combine type and graph for a unique hash
         combined_str = f"{subgraph_type}:{graph_str}"
-        graph_hash = hashlib.md5(combined_str.encode(), usedforsecurity=False).hexdigest()[:12]
+        graph_hash = hashlib.md5(
+            combined_str.encode(), usedforsecurity=False
+        ).hexdigest()[:12]
         return graph_hash
 
     def _apply_evolutionary_learning(self, pattern: SubgraphPattern) -> SubgraphPattern:
@@ -875,9 +877,9 @@ class ExecutionExplainer:
         details = {
             "compute_graph": "Sequential processing pipeline",
             "memory_usage": random.randint(100, 1000),
-            "tensor_shapes": {k: str(v.shape) for k, v in tensors.items()}
-            if tensors
-            else {},
+            "tensor_shapes": (
+                {k: str(v.shape) for k, v in tensors.items()} if tensors else {}
+            ),
             "optimization_hints": ["Consider batching", "Enable caching"],
         }
 

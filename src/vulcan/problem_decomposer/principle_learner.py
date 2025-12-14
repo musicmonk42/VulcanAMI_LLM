@@ -24,46 +24,71 @@ import numpy as np
 # Import decomposer components
 try:
     from .decomposition_library import StratifiedDecompositionLibrary
-    from .problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
-                                          ProblemGraph)
+    from .problem_decomposer_core import (
+        DecompositionPlan,
+        ExecutionOutcome,
+        ProblemGraph,
+    )
 except ImportError:
     from decomposition_library import StratifiedDecompositionLibrary
-    from problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
-                                         ProblemGraph)
+    from problem_decomposer_core import (
+        DecompositionPlan,
+        ExecutionOutcome,
+        ProblemGraph,
+    )
 
 # Import knowledge crystallizer components
 try:
-    from ..knowledge_crystallizer.knowledge_crystallizer_core import \
-        ExecutionTrace as CrystallizerTrace
-    from ..knowledge_crystallizer.knowledge_crystallizer_core import \
-        KnowledgeCrystallizer
+    from ..knowledge_crystallizer.knowledge_crystallizer_core import (
+        ExecutionTrace as CrystallizerTrace,
+    )
+    from ..knowledge_crystallizer.knowledge_crystallizer_core import (
+        KnowledgeCrystallizer,
+    )
     from ..knowledge_crystallizer.knowledge_storage import (
-        KnowledgeIndex, KnowledgePruner, VersionedKnowledgeBase)
-    from ..knowledge_crystallizer.principle_extractor import (ExecutionTrace,
-                                                              Metric,
-                                                              MetricType,
-                                                              Pattern,
-                                                              PatternType,
-                                                              Principle)
-    from ..knowledge_crystallizer.validation_engine import (KnowledgeValidator,
-                                                            ValidationResult,
-                                                            ValidationResults)
+        KnowledgeIndex,
+        KnowledgePruner,
+        VersionedKnowledgeBase,
+    )
+    from ..knowledge_crystallizer.principle_extractor import (
+        ExecutionTrace,
+        Metric,
+        MetricType,
+        Pattern,
+        PatternType,
+        Principle,
+    )
+    from ..knowledge_crystallizer.validation_engine import (
+        KnowledgeValidator,
+        ValidationResult,
+        ValidationResults,
+    )
 except ImportError:
     try:
-        from knowledge_crystallizer.knowledge_crystallizer_core import \
-            ExecutionTrace as CrystallizerTrace
-        from knowledge_crystallizer.knowledge_crystallizer_core import \
-            KnowledgeCrystallizer
+        from knowledge_crystallizer.knowledge_crystallizer_core import (
+            ExecutionTrace as CrystallizerTrace,
+        )
+        from knowledge_crystallizer.knowledge_crystallizer_core import (
+            KnowledgeCrystallizer,
+        )
         from knowledge_crystallizer.knowledge_storage import (
-            KnowledgeIndex, KnowledgePruner, VersionedKnowledgeBase)
-        from knowledge_crystallizer.principle_extractor import (ExecutionTrace,
-                                                                Metric,
-                                                                MetricType,
-                                                                Pattern,
-                                                                PatternType,
-                                                                Principle)
+            KnowledgeIndex,
+            KnowledgePruner,
+            VersionedKnowledgeBase,
+        )
+        from knowledge_crystallizer.principle_extractor import (
+            ExecutionTrace,
+            Metric,
+            MetricType,
+            Pattern,
+            PatternType,
+            Principle,
+        )
         from knowledge_crystallizer.validation_engine import (
-            KnowledgeValidator, ValidationResult, ValidationResults)
+            KnowledgeValidator,
+            ValidationResult,
+            ValidationResults,
+        )
     except ImportError:
         logging.warning("Knowledge crystallizer components not available")
         KnowledgeCrystallizer = None
@@ -1033,7 +1058,9 @@ class PrincipleLearner:
                                         if hasattr(
                                             principle.core_pattern.pattern_type, "value"
                                         ):
-                                            pattern_type = principle.core_pattern.pattern_type.value
+                                            pattern_type = (
+                                                principle.core_pattern.pattern_type.value
+                                            )
                                         elif hasattr(
                                             principle.core_pattern.pattern_type, "name"
                                         ):
@@ -1158,9 +1185,9 @@ class PrincipleLearner:
                 },
                 "validation": {
                     "total_validations": self.validation_count,
-                    "validator_stats": self.validator.total_validations
-                    if self.validator
-                    else 0,
+                    "validator_stats": (
+                        self.validator.total_validations if self.validator else 0
+                    ),
                 },
                 "promotion": {
                     "total_promotions": self.promotion_count,
@@ -1176,16 +1203,16 @@ class PrincipleLearner:
                 "pattern_usage": dict(self.pattern_usage.most_common(10)),
                 "recent_learning": {
                     "sessions": len(self.learning_history),
-                    "avg_extracted": np.mean(
-                        [h["extracted"] for h in self.learning_history]
-                    )
-                    if self.learning_history
-                    else 0,
-                    "avg_promoted": np.mean(
-                        [h["promoted"] for h in self.learning_history]
-                    )
-                    if self.learning_history
-                    else 0,
+                    "avg_extracted": (
+                        np.mean([h["extracted"] for h in self.learning_history])
+                        if self.learning_history
+                        else 0
+                    ),
+                    "avg_promoted": (
+                        np.mean([h["promoted"] for h in self.learning_history])
+                        if self.learning_history
+                        else 0
+                    ),
                 },
             }
 
@@ -1362,8 +1389,11 @@ def test_principle_learning():
         learner = PrincipleLearner(library)
 
         # Create test problem
-        from problem_decomposer_core import (DecompositionPlan,
-                                             ExecutionOutcome, ProblemGraph)
+        from problem_decomposer_core import (
+            DecompositionPlan,
+            ExecutionOutcome,
+            ProblemGraph,
+        )
 
         problem = ProblemGraph(
             nodes={"A": {}, "B": {}, "C": {}},
@@ -1374,8 +1404,7 @@ def test_principle_learning():
         problem.complexity_score = 2.0
 
         # Create test plan
-        from problem_decomposer_core import (DecompositionStep,
-                                             DecompositionStrategy)
+        from problem_decomposer_core import DecompositionStep, DecompositionStrategy
 
         plan = DecompositionPlan(
             problem_signature="test_problem",

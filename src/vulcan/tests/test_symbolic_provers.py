@@ -17,15 +17,24 @@ import time
 import pytest
 
 # Import core types needed for testing
-from src.vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
-                                                Literal, ProofNode, Variable)
+from src.vulcan.reasoning.symbolic.core import (
+    Clause,
+    Constant,
+    Function,
+    Literal,
+    ProofNode,
+    Variable,
+)
+
 # Import the classes we're testing
-from src.vulcan.reasoning.symbolic.provers import (ConnectionMethodProver,
-                                                   ModelEliminationProver,
-                                                   NaturalDeductionProver,
-                                                   ParallelProver,
-                                                   ResolutionProver,
-                                                   TableauProver)
+from src.vulcan.reasoning.symbolic.provers import (
+    ConnectionMethodProver,
+    ModelEliminationProver,
+    NaturalDeductionProver,
+    ParallelProver,
+    ResolutionProver,
+    TableauProver,
+)
 
 # ============================================================================
 # HELPER FUNCTIONS

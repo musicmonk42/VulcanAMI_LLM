@@ -44,11 +44,17 @@ sys.path.insert(0, str(SRC_PATH))
 # --- Top-Level Integration Imports ---
 # This is the first test: can we import everything from the main package?
 try:
-    from vulcan.reasoning import (AnalogicalReasoner, EnhancedCausalReasoning,
-                                  MultiModalReasoningEngine,
-                                  ProbabilisticReasoner, ReasoningStrategy,
-                                  ReasoningType, SymbolicReasoner,
-                                  UnifiedReasoner)
+    from vulcan.reasoning import (
+        AnalogicalReasoner,
+        EnhancedCausalReasoning,
+        MultiModalReasoningEngine,
+        ProbabilisticReasoner,
+        ReasoningStrategy,
+        ReasoningType,
+        SymbolicReasoner,
+        UnifiedReasoner,
+    )
+
     # ModalityType is defined inside multimodal_reasoning, which is fine
     from vulcan.reasoning.multimodal_reasoning import ModalityType
 
@@ -110,9 +116,9 @@ class TestUnifiedReasoningIntegration:
 
     def test_all_modules_import_successfully(self):
         """1. [Sanity Check] Ensures all submodules are importable."""
-        assert MODULE_IMPORTS_SUCCESSFUL, (
-            f"Failed to import from vulcan.reasoning. Check __init__.py files. Error: {IMPORT_ERROR_MESSAGE}"
-        )
+        assert (
+            MODULE_IMPORTS_SUCCESSFUL
+        ), f"Failed to import from vulcan.reasoning. Check __init__.py files. Error: {IMPORT_ERROR_MESSAGE}"
 
     def test_unified_reasoner_instantiation_and_loading(self, unified_reasoner):
         """2. [Component Loading] Verifies the UnifiedReasoner loads all its sub-reasoners.
@@ -138,13 +144,13 @@ class TestUnifiedReasoningIntegration:
                 "\n[WARNING] SymbolicReasoner using MockLanguageReasoner fallback (dependencies may be missing)"
             )
             # This is acceptable - the mock is a valid fallback
-            assert symbolic_reasoner is not None, (
-                "Symbolic reasoner slot should have a mock"
-            )
+            assert (
+                symbolic_reasoner is not None
+            ), "Symbolic reasoner slot should have a mock"
         else:
-            assert isinstance(symbolic_reasoner, SymbolicReasoner), (
-                f"Expected SymbolicReasoner but got {type(symbolic_reasoner)}"
-            )
+            assert isinstance(
+                symbolic_reasoner, SymbolicReasoner
+            ), f"Expected SymbolicReasoner but got {type(symbolic_reasoner)}"
 
         assert isinstance(
             unified_reasoner.reasoners.get(ReasoningType.CAUSAL),
@@ -194,9 +200,9 @@ class TestUnifiedReasoningIntegration:
         """3. [Adaptive Selection] Tests the logic that selects a reasoner based on the query."""
         input_data = "some data"
         determined_type = unified_reasoner._determine_reasoning_type(input_data, query)
-        assert determined_type == expected_type, (
-            f"For query '{query.get('type')}', expected {expected_type}, but got {determined_type}"
-        )
+        assert (
+            determined_type == expected_type
+        ), f"For query '{query.get('type')}', expected {expected_type}, but got {determined_type}"
 
     def test_end_to_end_symbolic_reasoning(self, unified_reasoner):
         """4. [End-to-End] Runs a full symbolic proof through the UnifiedReasoner.

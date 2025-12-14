@@ -946,13 +946,17 @@ class InterventionPrioritizer:
         # Initialize safety validator - prefer shared instance
         if safety_validator is not None:
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         else:
             # Note: This component doesn't currently use safety validator in its logic
             # but accepts it for consistency with other components
             self.safety_validator = None
             if safety_config:
-                logger.debug(f"{self.__class__.__name__}: safety_config provided but not used")
+                logger.debug(
+                    f"{self.__class__.__name__}: safety_config provided but not used"
+                )
 
         # Components
         self.info_estimator = InformationGainEstimator()
@@ -1070,7 +1074,9 @@ class InterventionExecutor:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
             self.safety_initialization_successful = True
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         else:
             # FIXED: Lazily initialize safety validator in __init__ to avoid circular import
             self.safety_validator = None
@@ -1093,7 +1099,10 @@ class InterventionExecutor:
                 try:
                     # Local import to prevent circular dependency
                     from ..safety.safety_types import SafetyConfig
-                    from ..safety.safety_validator import EnhancedSafetyValidator, initialize_all_safety_components
+                    from ..safety.safety_validator import (
+                        EnhancedSafetyValidator,
+                        initialize_all_safety_components,
+                    )
 
                     # Try singleton first
                     try:
@@ -1101,7 +1110,9 @@ class InterventionExecutor:
                             config=safety_config, reuse_existing=True
                         )
                         self.safety_initialization_successful = True
-                        logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                        logger.info(
+                            f"{self.__class__.__name__}: Using singleton safety validator"
+                        )
                     except Exception as e:
                         logger.debug(f"Could not get singleton safety validator: {e}")
                         # Fallback to creating new instance
@@ -1113,12 +1124,18 @@ class InterventionExecutor:
                                 logger.error(
                                     f"InterventionExecutor: SafetyConfig.from_dict failed: {str(e)}. Using default config."
                                 )
-                                config_instance = SafetyConfig()  # Use default if dict fails
+                                config_instance = (
+                                    SafetyConfig()
+                                )  # Use default if dict fails
 
-                            self.safety_validator = EnhancedSafetyValidator(config_instance)
+                            self.safety_validator = EnhancedSafetyValidator(
+                                config_instance
+                            )
                             # ONLY set success if a config was provided and used
                             self.safety_initialization_successful = True
-                            logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                            logger.warning(
+                                f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
+                            )
 
                         # If safety_config is None (and we're in this block, meaning
                         # simulation_mode=False), we DON'T initialize a validator
@@ -1130,13 +1147,17 @@ class InterventionExecutor:
                         f"safety_validator not available: {str(e)}. InterventionExecutor operating without safety checks"
                     )
                     self.safety_validator = None
-                    self.safety_initialization_successful = False  # Explicitly set false
+                    self.safety_initialization_successful = (
+                        False  # Explicitly set false
+                    )
                 except Exception as e:
                     logger.error(
                         f"InterventionExecutor: Unexpected error initializing SafetyValidator: {str(e)}. Safety disabled."
                     )
                     self.safety_validator = None
-                    self.safety_initialization_successful = False  # Explicitly set false
+                    self.safety_initialization_successful = (
+                        False  # Explicitly set false
+                    )
 
         # CRITICAL FIX: If real execution is requested and safety is not successfully initialized, raise the critical error
         # This resolves the FAILED test case.
@@ -1227,12 +1248,16 @@ class InterventionExecutor:
                             self.safety_validator.validate_intervention(
                                 cause=correlation.var_a,
                                 effect=correlation.var_b,
-                                intervention_type=intervention_type.value
-                                if isinstance(intervention_type, InterventionType)
-                                else str(intervention_type),
-                                metadata=correlation.metadata
-                                if hasattr(correlation, "metadata")
-                                else {},
+                                intervention_type=(
+                                    intervention_type.value
+                                    if isinstance(intervention_type, InterventionType)
+                                    else str(intervention_type)
+                                ),
+                                metadata=(
+                                    correlation.metadata
+                                    if hasattr(correlation, "metadata")
+                                    else {}
+                                ),
                             )
                         )
 
@@ -1257,11 +1282,13 @@ class InterventionExecutor:
                                             "type": "intervention_blocked",
                                             "cause": correlation.var_a,
                                             "effect": correlation.var_b,
-                                            "intervention_type": intervention_type.value
-                                            if isinstance(
-                                                intervention_type, InterventionType
-                                            )
-                                            else str(intervention_type),
+                                            "intervention_type": (
+                                                intervention_type.value
+                                                if isinstance(
+                                                    intervention_type, InterventionType
+                                                )
+                                                else str(intervention_type)
+                                            ),
                                         },
                                         intervention_check,
                                     )
@@ -1376,9 +1403,9 @@ class InterventionExecutor:
             var_b=correlation.var_b,
             strength=correlation.strength,
             p_value=correlation.p_value if hasattr(correlation, "p_value") else 0.05,
-            sample_size=correlation.sample_size
-            if hasattr(correlation, "sample_size")
-            else 0,
+            sample_size=(
+                correlation.sample_size if hasattr(correlation, "sample_size") else 0
+            ),
             metadata={
                 **(correlation.metadata if hasattr(correlation, "metadata") else {}),
                 "controlled_variables": control_for,
@@ -1393,13 +1420,13 @@ class InterventionExecutor:
         # Create controlled intervention
         return InterventionCandidate(
             correlation=controlled_correlation,
-            priority=intervention.priority
-            if hasattr(intervention, "priority")
-            else 1.0,
+            priority=(
+                intervention.priority if hasattr(intervention, "priority") else 1.0
+            ),
             cost=controlled_cost,
-            info_gain=intervention.info_gain
-            if hasattr(intervention, "info_gain")
-            else 1.0,
+            info_gain=(
+                intervention.info_gain if hasattr(intervention, "info_gain") else 1.0
+            ),
             intervention_type=InterventionType.RANDOMIZED,
             metadata={"controls": control_for},
         )
@@ -1439,9 +1466,11 @@ class InterventionExecutor:
             "REAL INTERVENTION EXECUTION: %s -> %s (type: %s)",
             correlation.var_a,
             correlation.var_b,
-            intervention_type.value
-            if isinstance(intervention_type, InterventionType)
-            else str(intervention_type),
+            (
+                intervention_type.value
+                if isinstance(intervention_type, InterventionType)
+                else str(intervention_type)
+            ),
         )
 
         if self.external_interface is None:
@@ -1482,9 +1511,11 @@ class InterventionExecutor:
                     "effect": correlation.var_b,
                     "start_time": time.time(),
                     "params": intervention_params,
-                    "type": intervention_type.value
-                    if isinstance(intervention_type, InterventionType)
-                    else str(intervention_type),
+                    "type": (
+                        intervention_type.value
+                        if isinstance(intervention_type, InterventionType)
+                        else str(intervention_type)
+                    ),
                 }
 
             logger.info(
@@ -1578,9 +1609,11 @@ class InterventionExecutor:
                 metadata={
                     "method": "real_world_intervention",
                     "intervention_id": intervention_id,
-                    "intervention_type": intervention_type.value
-                    if isinstance(intervention_type, InterventionType)
-                    else str(intervention_type),
+                    "intervention_type": (
+                        intervention_type.value
+                        if isinstance(intervention_type, InterventionType)
+                        else str(intervention_type)
+                    ),
                     "execution_result": execution_result,
                     "system_status": status,
                 },
@@ -1645,9 +1678,11 @@ class InterventionExecutor:
         params = {
             "cause_variable": correlation.var_a,
             "effect_variable": correlation.var_b,
-            "intervention_type": intervention_type.value
-            if isinstance(intervention_type, InterventionType)
-            else str(intervention_type),
+            "intervention_type": (
+                intervention_type.value
+                if isinstance(intervention_type, InterventionType)
+                else str(intervention_type)
+            ),
             "expected_effect_size": correlation.strength,
             "confidence_level": self.confidence_level,
         }
@@ -1805,9 +1840,11 @@ class InterventionExecutor:
             "simulation_mode": self.simulation_mode,
             "safety_validator_enabled": self.safety_validator is not None,
             "active_interventions": len(self.active_interventions),
-            "external_interface": type(self.external_interface).__name__
-            if self.external_interface
-            else None,
+            "external_interface": (
+                type(self.external_interface).__name__
+                if self.external_interface
+                else None
+            ),
         }
 
         # Add safety validator stats if available

@@ -10,15 +10,20 @@ from unittest.mock import MagicMock, Mock, patch
 import networkx as nx
 import pytest
 
-from src.compiler.graph_compiler import (CompilationError, CompiledNode,
-                                         DataFlow, GraphCompiler,
-                                         GraphOptimizer, NodeType)
+from src.compiler.graph_compiler import (
+    CompilationError,
+    CompiledNode,
+    DataFlow,
+    GraphCompiler,
+    GraphOptimizer,
+    NodeType,
+)
 
 
 @pytest.fixture
 def compiler():
     """Create GraphCompiler instance."""
-    with patch('src.compiler.graph_compiler.LLVMBackend'):
+    with patch("src.compiler.graph_compiler.LLVMBackend"):
         return GraphCompiler(optimization_level=2)
 
 
@@ -36,13 +41,13 @@ def simple_graph():
             {"id": "input1", "type": "InputNode", "params": {"value": 1.0}},
             {"id": "const1", "type": "CONST", "params": {"value": 2.0}},
             {"id": "add1", "type": "ADD", "params": {}},
-            {"id": "output1", "type": "OutputNode", "params": {}}
+            {"id": "output1", "type": "OutputNode", "params": {}},
         ],
         "edges": [
             {"from": "input1", "to": "add1"},
             {"from": "const1", "to": "add1"},
-            {"from": "add1", "to": "output1"}
-        ]
+            {"from": "add1", "to": "output1"},
+        ],
     }
 
 
@@ -56,7 +61,7 @@ def complex_graph():
             {"id": "mul1", "type": "MUL", "params": {}},
             {"id": "add1", "type": "ADD", "params": {}},
             {"id": "relu1", "type": "RELU", "params": {}},
-            {"id": "output1", "type": "OutputNode", "params": {}}
+            {"id": "output1", "type": "OutputNode", "params": {}},
         ],
         "edges": [
             {"from": "input1", "to": "mul1"},
@@ -64,8 +69,8 @@ def complex_graph():
             {"from": "mul1", "to": "add1"},
             {"from": "input1", "to": "add1"},
             {"from": "add1", "to": "relu1"},
-            {"from": "relu1", "to": "output1"}
-        ]
+            {"from": "relu1", "to": "output1"},
+        ],
     }
 
 
@@ -94,7 +99,7 @@ class TestCompiledNode:
             node_id="test_node",
             node_type=NodeType.ADD,
             inputs=["input1", "input2"],
-            outputs=["output1"]
+            outputs=["output1"],
         )
 
         assert node.node_id == "test_node"
@@ -197,10 +202,8 @@ class TestGraphCompiler:
     def test_can_compile_with_unsupported_node(self, compiler):
         """Test compilation check with unsupported node."""
         graph = {
-            "nodes": [
-                {"id": "n1", "type": "UNSUPPORTED_NODE", "params": {}}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "UNSUPPORTED_NODE", "params": {}}],
+            "edges": [],
         }
 
         result = compiler.can_compile(graph)
@@ -212,12 +215,12 @@ class TestGraphCompiler:
         graph = {
             "nodes": [
                 {"id": "n1", "type": "ADD", "params": {}},
-                {"id": "n2", "type": "MUL", "params": {}}
+                {"id": "n2", "type": "MUL", "params": {}},
             ],
             "edges": [
                 {"from": "n1", "to": "n2"},
-                {"from": "n2", "to": "n1"}  # Creates cycle
-            ]
+                {"from": "n2", "to": "n1"},  # Creates cycle
+            ],
         }
 
         result = compiler.can_compile(graph)
@@ -237,9 +240,9 @@ class TestGraphCompiler:
         graph = {
             "nodes": [
                 {"id": "n1", "type": "ADD", "params": {"x": 1}},
-                {"id": "n2", "type": "MUL", "params": {"y": 2}}
+                {"id": "n2", "type": "MUL", "params": {"y": 2}},
             ],
-            "edges": []
+            "edges": [],
         }
 
         hash1 = compiler._compute_graph_hash(graph)
@@ -260,21 +263,21 @@ class TestGraphCompiler:
         graph = {
             "nodes": [
                 {"id": "n1", "type": "InputNode", "params": {}},
-                {"id": "n2", "type": "OutputNode", "params": {}}
+                {"id": "n2", "type": "OutputNode", "params": {}},
             ],
             "edges": [
                 {
                     "from": {"node": "n1", "port": "out"},
-                    "to": {"node": "n2", "port": "in"}
+                    "to": {"node": "n2", "port": "in"},
                 }
-            ]
+            ],
         }
 
         nx_graph = compiler._build_networkx_graph(graph)
 
         assert nx_graph.has_edge("n1", "n2")
 
-    @patch('src.compiler.graph_compiler.LLVMBackend')
+    @patch("src.compiler.graph_compiler.LLVMBackend")
     def test_compile_node_add(self, mock_backend_class, compiler):
         """Test compiling ADD node."""
         mock_backend = MagicMock()
@@ -298,7 +301,7 @@ class TestGraphCompiler:
 
     def test_compile_input_node(self, compiler):
         """Test compiling input node."""
-        with patch.object(compiler.llvm_backend, 'builder'):
+        with patch.object(compiler.llvm_backend, "builder"):
             node_data = {"id": "input1", "type": "InputNode", "value": 5.0}
 
             result = compiler._compile_input_node(node_data)
@@ -315,7 +318,7 @@ class TestGraphCompiler:
 
     def test_compile_const_node_array(self, compiler):
         """Test compiling constant node with array."""
-        with patch.object(compiler.llvm_backend, 'builder'):
+        with patch.object(compiler.llvm_backend, "builder"):
             node_data = {"id": "const1", "type": "CONST", "value": [1.0, 2.0, 3.0]}
 
             result = compiler._compile_const_node(node_data)
@@ -335,10 +338,10 @@ class TestGraphCompiler:
         subgraph_nodes = ["input1", "const1", "add1"]
 
         # Mock the compile_graph method
-        with patch.object(compiler, 'compile_graph', return_value=b'compiled'):
+        with patch.object(compiler, "compile_graph", return_value=b"compiled"):
             result = compiler.compile_subgraph(simple_graph, subgraph_nodes)
 
-        assert result == b'compiled'
+        assert result == b"compiled"
 
     def test_edge_in_subgraph(self, compiler):
         """Test checking if edge is in subgraph."""
@@ -354,7 +357,7 @@ class TestGraphCompiler:
         """Test checking edge with dictionary format."""
         edge = {
             "from": {"node": "n1", "port": "out"},
-            "to": {"node": "n2", "port": "in"}
+            "to": {"node": "n2", "port": "in"},
         }
         nodes = ["n1", "n2"]
 
@@ -366,8 +369,8 @@ class TestCompilationCaching:
 
     def test_cache_usage(self, compiler, simple_graph):
         """Test that compilation uses cache."""
-        with patch.object(compiler, '_finalize_compilation', return_value=b'code'):
-            with patch.object(compiler, '_build_networkx_graph') as mock_build:
+        with patch.object(compiler, "_finalize_compilation", return_value=b"code"):
+            with patch.object(compiler, "_build_networkx_graph") as mock_build:
                 mock_graph = MagicMock()
                 mock_graph.nodes.return_value = []
                 mock_build.return_value = mock_graph
@@ -391,19 +394,21 @@ class TestCompilationCaching:
 class TestBenchmarking:
     """Test benchmarking functionality."""
 
-    @patch('src.compiler.graph_compiler.LLVMBackend')
+    @patch("src.compiler.graph_compiler.LLVMBackend")
     def test_benchmark_compilation(self, mock_backend_class, compiler, simple_graph):
         """Test compilation benchmarking."""
         # Mock necessary methods
-        with patch.object(compiler, '_build_networkx_graph') as mock_build:
+        with patch.object(compiler, "_build_networkx_graph") as mock_build:
             mock_graph = nx.DiGraph()
             mock_graph.add_node("n1", type="ADD", params={})
             mock_build.return_value = mock_graph
 
-            with patch.object(compiler, '_compile_node'):
-                with patch.object(compiler, '_create_main_function'):
-                    with patch.object(compiler, '_link_nodes'):
-                        with patch.object(compiler, '_finalize_compilation', return_value=b'code'):
+            with patch.object(compiler, "_compile_node"):
+                with patch.object(compiler, "_create_main_function"):
+                    with patch.object(compiler, "_link_nodes"):
+                        with patch.object(
+                            compiler, "_finalize_compilation", return_value=b"code"
+                        ):
                             times = compiler.benchmark_compilation(simple_graph)
 
         assert "parse_ms" in times

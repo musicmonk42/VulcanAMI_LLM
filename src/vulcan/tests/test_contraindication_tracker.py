@@ -13,8 +13,15 @@ import pytest
 
 # Import the module components to test
 from vulcan.knowledge_crystallizer.contraindication_tracker import (
-    CascadeAnalyzer, CascadeImpact, Contraindication, ContraindicationDatabase,
-    ContraindicationGraph, FailureMode, Severity, SimpleGraph)
+    CascadeAnalyzer,
+    CascadeImpact,
+    Contraindication,
+    ContraindicationDatabase,
+    ContraindicationGraph,
+    FailureMode,
+    Severity,
+    SimpleGraph,
+)
 
 # ============================================================================
 # TEST HELPER CLASSES

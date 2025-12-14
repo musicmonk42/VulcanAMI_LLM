@@ -8,8 +8,13 @@ from unittest.mock import Mock
 import pytest
 
 from vulcan.world_model.meta_reasoning.objective_negotiator import (
-    AgentProposal, ConflictResolution, NegotiationOutcome, NegotiationResult,
-    NegotiationStrategy, ObjectiveNegotiator)
+    AgentProposal,
+    ConflictResolution,
+    NegotiationOutcome,
+    NegotiationResult,
+    NegotiationStrategy,
+    ObjectiveNegotiator,
+)
 
 
 @pytest.fixture
@@ -435,9 +440,7 @@ class TestValidateNegotiatedObjectives:
 
     def test_validate_constraint_violation_min(self, negotiator):
         """Test validation fails for min constraint violation"""
-        negotiated = {
-            "prediction_accuracy": 0.5  # Below min of 0.9
-        }
+        negotiated = {"prediction_accuracy": 0.5}  # Below min of 0.9
 
         is_valid = negotiator.validate_negotiated_objectives(negotiated)
 
@@ -445,9 +448,7 @@ class TestValidateNegotiatedObjectives:
 
     def test_validate_constraint_violation_max(self, negotiator):
         """Test validation fails for max constraint violation"""
-        negotiated = {
-            "prediction_accuracy": 1.5  # Above max of 1.0
-        }
+        negotiated = {"prediction_accuracy": 1.5}  # Above max of 1.0
 
         is_valid = negotiator.validate_negotiated_objectives(negotiated)
 

@@ -166,35 +166,73 @@ def get_bullet_symbol() -> str:
 
 try:
     # Agent lifecycle components
-    from .agent_lifecycle import (AgentCapability, AgentMetadata, AgentState,
-                                  JobProvenance, StateTransitionRules,
-                                  create_agent_metadata, create_job_provenance,
-                                  validate_state_machine)
+    from .agent_lifecycle import (
+        AgentCapability,
+        AgentMetadata,
+        AgentState,
+        JobProvenance,
+        StateTransitionRules,
+        create_agent_metadata,
+        create_job_provenance,
+        validate_state_machine,
+    )
+
     # Agent pool management
     from .agent_pool import AgentPoolManager, AutoScaler, RecoveryManager
+
     # Main orchestrator
     from .collective import ActionType, ModalityType, VULCANAGICollective
+
     # Dependencies container
-    from .dependencies import (DependencyCategory, EnhancedCollectiveDeps,
-                               create_full_deps, create_minimal_deps,
-                               print_dependency_report, validate_dependencies)
+    from .dependencies import (
+        DependencyCategory,
+        EnhancedCollectiveDeps,
+        create_full_deps,
+        create_minimal_deps,
+        print_dependency_report,
+        validate_dependencies,
+    )
+
     # Production deployment
     from .deployment import ProductionDeployment
+
     # Metrics collection
-    from .metrics import (AggregationType, EnhancedMetricsCollector,
-                          MetricType, compute_moving_average,
-                          compute_percentile, compute_rate,
-                          create_metrics_collector)
+    from .metrics import (
+        AggregationType,
+        EnhancedMetricsCollector,
+        MetricType,
+        compute_moving_average,
+        compute_percentile,
+        compute_rate,
+        create_metrics_collector,
+    )
+
     # Task queue implementations
-    from .task_queues import (CELERY_AVAILABLE, RAY_AVAILABLE, ZMQ_AVAILABLE,
-                              CeleryTaskQueue, CustomTaskQueue, QueueType,
-                              RayTaskQueue, TaskMetadata, TaskQueueInterface,
-                              TaskStatus, create_task_queue)
+    from .task_queues import (
+        CELERY_AVAILABLE,
+        RAY_AVAILABLE,
+        ZMQ_AVAILABLE,
+        CeleryTaskQueue,
+        CustomTaskQueue,
+        QueueType,
+        RayTaskQueue,
+        TaskMetadata,
+        TaskQueueInterface,
+        TaskStatus,
+        create_task_queue,
+    )
+
     # Orchestrator variants
-    from .variants import (AdaptiveOrchestrator, ExecutionError,
-                           FaultTolerantOrchestrator, ParallelOrchestrator,
-                           PerceptionError, PerformanceMonitor, ReasoningError,
-                           StrategySelector)
+    from .variants import (
+        AdaptiveOrchestrator,
+        ExecutionError,
+        FaultTolerantOrchestrator,
+        ParallelOrchestrator,
+        PerceptionError,
+        PerformanceMonitor,
+        ReasoningError,
+        StrategySelector,
+    )
 
     _imports_successful = True
 
@@ -214,10 +252,12 @@ PROBLEM_EXECUTOR_AVAILABLE = False
 
 try:
     # Import experiment generation components
-    from ..curiosity_engine.experiment_generator import (Experiment,
-                                                         ExperimentGenerator,
-                                                         ExperimentType,
-                                                         KnowledgeGap)
+    from ..curiosity_engine.experiment_generator import (
+        Experiment,
+        ExperimentGenerator,
+        ExperimentType,
+        KnowledgeGap,
+    )
 
     EXPERIMENT_GENERATOR_AVAILABLE = True
     logger.info("ExperimentGenerator components loaded successfully")
@@ -233,9 +273,11 @@ except ImportError as e:
 
 try:
     # Import problem execution components
-    from ..problem_decomposer.problem_executor import (ExecutionStrategy,
-                                                       ProblemExecutor,
-                                                       SolutionType)
+    from ..problem_decomposer.problem_executor import (
+        ExecutionStrategy,
+        ProblemExecutor,
+        SolutionType,
+    )
 
     PROBLEM_EXECUTOR_AVAILABLE = True
     logger.info("ProblemExecutor components loaded successfully")
@@ -409,9 +451,11 @@ def print_module_info():
     si_status = (
         "Fully Available"
         if si["fully_available"]
-        else "Partially Available"
-        if (si["experiment_generator"] or si["problem_executor"])
-        else "Not Available"
+        else (
+            "Partially Available"
+            if (si["experiment_generator"] or si["problem_executor"])
+            else "Not Available"
+        )
     )
     safe_print(f"  Self-Improve  {si_symbol} {si_status}")
 

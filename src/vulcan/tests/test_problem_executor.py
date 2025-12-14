@@ -10,9 +10,14 @@ import numpy as np
 import pytest
 
 from vulcan.problem_decomposer.problem_decomposer_core import (
-    DecompositionPlan, ExecutionOutcome, ProblemGraph)
-from vulcan.problem_decomposer.problem_executor import (ExecutionStrategy,
-                                                        ProblemExecutor)
+    DecompositionPlan,
+    ExecutionOutcome,
+    ProblemGraph,
+)
+from vulcan.problem_decomposer.problem_executor import (
+    ExecutionStrategy,
+    ProblemExecutor,
+)
 
 # Import or define Principle
 try:
@@ -952,9 +957,7 @@ def test_empty_plan(basic_executor, simple_problem_graph):
 def test_malformed_step(basic_executor, simple_problem_graph):
     """Test handling of malformed step"""
     bad_plan = DecompositionPlan(
-        steps=[
-            {"type": "structural_match"}  # Missing required fields
-        ],
+        steps=[{"type": "structural_match"}],  # Missing required fields
         confidence=0.5,
     )
 

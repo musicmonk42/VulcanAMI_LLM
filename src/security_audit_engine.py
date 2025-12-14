@@ -49,10 +49,8 @@ class AuditEngineError(Exception):
     """Base exception for audit engine errors."""
 
 
-
 class DatabaseCorruptionError(AuditEngineError):
     """Raised when database corruption is detected."""
-
 
 
 class ConnectionPool:
@@ -302,7 +300,8 @@ class SecurityAuditEngine:
                 cursor = conn.cursor()
 
                 # Create audit log table
-                cursor.execute("""
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS audit_log (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         timestamp TEXT NOT NULL,
@@ -310,7 +309,8 @@ class SecurityAuditEngine:
                         details TEXT,
                         severity TEXT DEFAULT 'info'
                     )
-                """)
+                """
+                )
 
                 # Create indexes for faster querying
                 cursor.execute(
@@ -324,13 +324,15 @@ class SecurityAuditEngine:
                 )
 
                 # Create metadata table for tracking
-                cursor.execute("""
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS audit_metadata (
                         key TEXT PRIMARY KEY,
                         value TEXT,
                         updated_at TEXT
                     )
-                """)
+                """
+                )
 
                 # Store initialization timestamp
                 cursor.execute(

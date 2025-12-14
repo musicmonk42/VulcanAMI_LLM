@@ -11,7 +11,7 @@ import logging
 import threading
 import time
 from collections import defaultdict, deque
-from concurrent.futures import (Future, ThreadPoolExecutor, TimeoutError)
+from concurrent.futures import Future, ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple

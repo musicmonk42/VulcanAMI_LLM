@@ -14,11 +14,22 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 # Persistent memory imports
-from persistant_memory_v46 import (GraphRAG, MerkleLSM, PackfileStore,
-                                   UnlearningEngine, ZKProver)
+from persistant_memory_v46 import (
+    GraphRAG,
+    MerkleLSM,
+    PackfileStore,
+    UnlearningEngine,
+    ZKProver,
+)
 
-from .base import (BaseMemorySystem, Memory, MemoryConfig,
-                   MemoryQuery, MemoryType, RetrievalResult)
+from .base import (
+    BaseMemorySystem,
+    Memory,
+    MemoryConfig,
+    MemoryQuery,
+    MemoryType,
+    RetrievalResult,
+)
 from .consolidation import MemoryConsolidator
 from .retrieval import AttentionMechanism, MemorySearch
 
@@ -327,9 +338,11 @@ class HierarchicalMemory(BaseMemorySystem):
         record = ToolSelectionRecord(
             record_id=self._generate_memory_id(f"{problem_description}_{time.time()}"),
             timestamp=time.time(),
-            problem_features=problem_features.copy()
-            if problem_features is not None
-            else np.zeros(self.embedding_dimension),
+            problem_features=(
+                problem_features.copy()
+                if problem_features is not None
+                else np.zeros(self.embedding_dimension)
+            ),
             problem_description=problem_description,
             selected_tools=selected_tools.copy(),
             execution_strategy=execution_strategy,
@@ -1517,10 +1530,8 @@ class SemanticMemory:
     """Semantic memory store (stub for future implementation)."""
 
 
-
 class ProceduralMemory:
     """Procedural memory store (stub for future implementation)."""
-
 
 
 @dataclass

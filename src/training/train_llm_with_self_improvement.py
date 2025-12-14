@@ -43,9 +43,14 @@ Notes:
 
 from __future__ import annotations
 from self_improving_training import SelfImprovingTraining
-from self_awareness import (awareness_summary, calculate_adaptive_ece,
-                            calculate_distinct_n, calculate_ece,
-                            calculate_mce, summarize_entropies)
+from self_awareness import (
+    awareness_summary,
+    calculate_adaptive_ece,
+    calculate_distinct_n,
+    calculate_ece,
+    calculate_mce,
+    summarize_entropies,
+)
 from gpt_model import GPTConfig, GPTModel
 from data_loader import CorpusDataLoader
 
@@ -70,11 +75,17 @@ if HERE not in sys.path:
 
 # Prefer absolute import; fallback if run directly
 try:
-    from src.training.metrics import (LossMetrics, compute_loss_metrics_eval,
-                                      compute_loss_metrics_train)
+    from src.training.metrics import (
+        LossMetrics,
+        compute_loss_metrics_eval,
+        compute_loss_metrics_train,
+    )
 except Exception:
-    from metrics import (LossMetrics, compute_loss_metrics_eval,
-                         compute_loss_metrics_train)
+    from metrics import (
+        LossMetrics,
+        compute_loss_metrics_eval,
+        compute_loss_metrics_train,
+    )
 
 TRAINER_VERSION = "v2-normalized-2025-11-18"
 

@@ -10,10 +10,14 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from src.compiler.hybrid_executor import (CompiledBinaryCache,
-                                          ExecutionMetrics, ExecutionMode,
-                                          GraphProfile, HybridExecutor,
-                                          OptimizationLevel)
+from src.compiler.hybrid_executor import (
+    CompiledBinaryCache,
+    ExecutionMetrics,
+    ExecutionMode,
+    GraphProfile,
+    HybridExecutor,
+    OptimizationLevel,
+)
 
 
 @pytest.fixture
@@ -50,11 +54,11 @@ def mock_compiler():
 def executor(mock_runtime, temp_cache_dir, mock_compiler):
     """Create HybridExecutor instance with mocked compiler."""
     # Patch the GraphCompiler import at the correct location
-    with patch('src.compiler.graph_compiler.GraphCompiler', return_value=mock_compiler):
+    with patch("src.compiler.graph_compiler.GraphCompiler", return_value=mock_compiler):
         executor = HybridExecutor(
             runtime=mock_runtime,
             cache_dir=temp_cache_dir,
-            enable_compilation=False  # Disable for most tests
+            enable_compilation=False,  # Disable for most tests
         )
         executor.compiler = mock_compiler  # Ensure compiler is set
         return executor
@@ -68,12 +72,9 @@ def simple_graph():
         "nodes": [
             {"id": "input1", "type": "InputNode", "params": {"value": 1.0}},
             {"id": "add1", "type": "ADD", "params": {}},
-            {"id": "output1", "type": "OutputNode", "params": {"size": 10}}
+            {"id": "output1", "type": "OutputNode", "params": {"size": 10}},
         ],
-        "edges": [
-            {"from": "input1", "to": "add1"},
-            {"from": "add1", "to": "output1"}
-        ]
+        "edges": [{"from": "input1", "to": "add1"}, {"from": "add1", "to": "output1"}],
     }
 
 
@@ -109,7 +110,7 @@ class TestExecutionMetrics:
             memory_mb=100.0,
             cpu_percent=50.0,
             cache_hits=5,
-            cache_misses=2
+            cache_misses=2,
         )
 
         assert metrics.mode == ExecutionMode.INTERPRETED
@@ -123,7 +124,7 @@ class TestExecutionMetrics:
             memory_mb=50.0,
             cpu_percent=30.0,
             cache_hits=10,
-            cache_misses=0
+            cache_misses=0,
         )
 
         dict_form = metrics.to_dict()
@@ -137,10 +138,7 @@ class TestGraphProfile:
 
     def test_profile_creation(self):
         """Test creating GraphProfile."""
-        profile = GraphProfile(
-            graph_id="test",
-            graph_hash="abc123"
-        )
+        profile = GraphProfile(graph_id="test", graph_hash="abc123")
 
         assert profile.graph_id == "test"
         assert profile.graph_hash == "abc123"
@@ -148,10 +146,7 @@ class TestGraphProfile:
 
     def test_update_best_mode_compiled_faster(self):
         """Test updating best mode when compiled is faster."""
-        profile = GraphProfile(
-            graph_id="test",
-            graph_hash="abc"
-        )
+        profile = GraphProfile(graph_id="test", graph_hash="abc")
 
         # Add interpreted metrics (slower)
         for _ in range(5):
@@ -162,7 +157,7 @@ class TestGraphProfile:
                     memory_mb=50.0,
                     cpu_percent=30.0,
                     cache_hits=0,
-                    cache_misses=0
+                    cache_misses=0,
                 )
             )
 
@@ -175,7 +170,7 @@ class TestGraphProfile:
                     memory_mb=40.0,
                     cpu_percent=25.0,
                     cache_hits=0,
-                    cache_misses=0
+                    cache_misses=0,
                 )
             )
 
@@ -237,24 +232,21 @@ class TestHybridExecutorInitialization:
 
     def test_initialization_basic(self, mock_runtime, temp_cache_dir):
         """Test basic initialization."""
-        with patch('src.compiler.graph_compiler.GraphCompiler'):
-            executor = HybridExecutor(
-                runtime=mock_runtime,
-                cache_dir=temp_cache_dir
-            )
+        with patch("src.compiler.graph_compiler.GraphCompiler"):
+            executor = HybridExecutor(runtime=mock_runtime, cache_dir=temp_cache_dir)
 
         assert executor.runtime == mock_runtime
         assert executor.optimization_level == OptimizationLevel.O2
 
     def test_initialization_custom_params(self, mock_runtime, temp_cache_dir):
         """Test initialization with custom parameters."""
-        with patch('src.compiler.graph_compiler.GraphCompiler'):
+        with patch("src.compiler.graph_compiler.GraphCompiler"):
             executor = HybridExecutor(
                 runtime=mock_runtime,
                 cache_dir=temp_cache_dir,
                 optimization_level=OptimizationLevel.O3,
                 profile_window=20,
-                enable_profiling=False
+                enable_profiling=False,
             )
 
         assert executor.optimization_level == OptimizationLevel.O3
@@ -279,14 +271,14 @@ class TestGraphHashing:
             "nodes": [{"id": "n1", "type": "ADD"}],
             "edges": [],
             "timestamp": "2025-01-01",
-            "metadata": {"extra": "data"}
+            "metadata": {"extra": "data"},
         }
 
         graph2 = {
             "nodes": [{"id": "n1", "type": "ADD"}],
             "edges": [],
             "timestamp": "2025-01-02",
-            "metadata": {"different": "data"}
+            "metadata": {"different": "data"},
         }
 
         hash1 = executor._compute_graph_hash(graph1)
@@ -369,8 +361,7 @@ class TestExecutionWithProfiling:
     async def test_execute_with_profiling_interpreted(self, executor, simple_graph):
         """Test profiling execution in interpreted mode."""
         result = await executor.execute_with_profiling(
-            simple_graph,
-            force_mode=ExecutionMode.INTERPRETED
+            simple_graph, force_mode=ExecutionMode.INTERPRETED
         )
 
         assert "execution_metrics" in result
@@ -404,7 +395,7 @@ class TestBenchmarking:
     async def test_benchmark_graph(self, executor, simple_graph):
         """Test graph benchmarking."""
         # Mock compilation to avoid actual compilation
-        with patch.object(executor, '_compile_graph', return_value=None):
+        with patch.object(executor, "_compile_graph", return_value=None):
             results = await executor.benchmark_graph(simple_graph, iterations=2)
 
         assert "graph_id" in results
@@ -461,11 +452,10 @@ class TestCleanup:
 
     def test_cleanup_in_destructor(self, mock_runtime, temp_cache_dir, mock_compiler):
         """Test cleanup in destructor."""
-        with patch('src.compiler.graph_compiler.GraphCompiler', return_value=mock_compiler):
-            executor = HybridExecutor(
-                runtime=mock_runtime,
-                cache_dir=temp_cache_dir
-            )
+        with patch(
+            "src.compiler.graph_compiler.GraphCompiler", return_value=mock_compiler
+        ):
+            executor = HybridExecutor(runtime=mock_runtime, cache_dir=temp_cache_dir)
 
             # Should not raise
             del executor

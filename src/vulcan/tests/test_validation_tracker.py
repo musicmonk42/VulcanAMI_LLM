@@ -14,8 +14,14 @@ from unittest.mock import Mock
 import pytest
 
 from vulcan.world_model.meta_reasoning.validation_tracker import (
-    LearningInsight, ObjectiveBlocker, PatternType, ValidationOutcome,
-    ValidationPattern, ValidationRecord, ValidationTracker)
+    LearningInsight,
+    ObjectiveBlocker,
+    PatternType,
+    ValidationOutcome,
+    ValidationPattern,
+    ValidationRecord,
+    ValidationTracker,
+)
 
 
 class TestValidationRecord:

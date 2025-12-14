@@ -1915,7 +1915,7 @@ if __name__ == '__main__':
                 stderr=subprocess.PIPE,
                 text=True,
                 preexec_fn=set_limits,
-                encoding="utf-8"
+                encoding="utf-8",
             )
 
             try:
@@ -1951,7 +1951,7 @@ if __name__ == '__main__':
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                encoding="utf-8"
+                encoding="utf-8",
             )
 
             try:

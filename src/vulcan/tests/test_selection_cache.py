@@ -15,12 +15,15 @@ import numpy as np
 import pytest
 
 # Import the cache module
-from vulcan.reasoning.selection.selection_cache import (CacheEntry, CacheStatistics,
-                                                        CompressedCache,
-                                                        LRUCache,
-                                                        MultiLevelCache,
-                                                        SelectionCache,
-                                                        sizeof)
+from vulcan.reasoning.selection.selection_cache import (
+    CacheEntry,
+    CacheStatistics,
+    CompressedCache,
+    LRUCache,
+    MultiLevelCache,
+    SelectionCache,
+    sizeof,
+)
 
 
 class TestSizeOf:

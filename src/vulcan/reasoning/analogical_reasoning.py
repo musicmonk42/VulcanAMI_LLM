@@ -988,9 +988,9 @@ class AnalogicalReasoner(AbstractReasoner):
             "cache_hits": 0,
             "average_mapping_score": 0.0,
             "semantic_enrichments": 0,
-            "embedding_method": "sentence-transformers"
-            if SENTENCE_TRANSFORMERS_AVAILABLE
-            else "tfidf",
+            "embedding_method": (
+                "sentence-transformers" if SENTENCE_TRANSFORMERS_AVAILABLE else "tfidf"
+            ),
         }
 
         # Caching
@@ -1276,7 +1276,6 @@ class AnalogicalReasoner(AbstractReasoner):
 
     def _structural_mapping(self, source: Dict, target: Dict) -> AnalogicalMapping:
         """Advanced structural mapping with semantic awareness"""
-
 
         # Find entity candidates using semantic similarity
         entity_candidates = self._find_entity_candidates_semantic(
@@ -2037,12 +2036,12 @@ class AnalogicalReasoner(AbstractReasoner):
             "domain_knowledge": self.domain_knowledge,
             "similarity_threshold": self.similarity_threshold,
             "learned_weights": self.learned_weights if self.enable_learning else None,
-            "mapping_patterns": dict(self.mapping_patterns)
-            if self.enable_learning
-            else None,
-            "domain_similarities": dict(self.domain_similarities)
-            if self.enable_learning
-            else None,
+            "mapping_patterns": (
+                dict(self.mapping_patterns) if self.enable_learning else None
+            ),
+            "domain_similarities": (
+                dict(self.domain_similarities) if self.enable_learning else None
+            ),
             "stats": self.stats,
             "max_cache_size": self.max_cache_size,
             "max_analogy_cache_size": self.max_analogy_cache_size,

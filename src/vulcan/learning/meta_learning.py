@@ -553,9 +553,9 @@ class MetaLearner:
 
         stats = {
             "trajectory": adaptation_trajectory,
-            "final_loss": adaptation_trajectory[-1]["loss"]
-            if adaptation_trajectory
-            else 0,
+            "final_loss": (
+                adaptation_trajectory[-1]["loss"] if adaptation_trajectory else 0
+            ),
             "num_steps": num_steps,
         }
 
@@ -594,9 +594,9 @@ class MetaLearner:
 
         stats = {
             "trajectory": adaptation_trajectory,
-            "final_loss": adaptation_trajectory[-1]["loss"]
-            if adaptation_trajectory
-            else 0,
+            "final_loss": (
+                adaptation_trajectory[-1]["loss"] if adaptation_trajectory else 0
+            ),
             "num_steps": num_steps,
             "algorithm": "fomaml",
         }
@@ -630,9 +630,9 @@ class MetaLearner:
 
         stats = {
             "trajectory": adaptation_trajectory,
-            "final_loss": adaptation_trajectory[-1]["loss"]
-            if adaptation_trajectory
-            else 0,
+            "final_loss": (
+                adaptation_trajectory[-1]["loss"] if adaptation_trajectory else 0
+            ),
             "num_steps": num_steps,
             "algorithm": "reptile",
         }
@@ -688,9 +688,9 @@ class MetaLearner:
 
         stats = {
             "trajectory": adaptation_trajectory,
-            "final_loss": adaptation_trajectory[-1]["loss"]
-            if adaptation_trajectory
-            else 0,
+            "final_loss": (
+                adaptation_trajectory[-1]["loss"] if adaptation_trajectory else 0
+            ),
             "num_steps": num_steps,
             "algorithm": "anil",
         }
@@ -1054,9 +1054,11 @@ class MetaLearner:
 
         return {
             "x": torch.stack(batch_x),
-            "y": torch.stack(batch_y).squeeze(-1)
-            if batch_y
-            else torch.zeros(len(batch_x), device=self.device),
+            "y": (
+                torch.stack(batch_y).squeeze(-1)
+                if batch_y
+                else torch.zeros(len(batch_x), device=self.device)
+            ),
         }
 
     def _clone_model(self) -> nn.Module:
@@ -1166,9 +1168,9 @@ class MetaLearner:
             stats = {
                 "algorithm": self.algorithm.value,
                 "num_adaptations": len(self.adaptation_history),
-                "avg_task_loss": np.mean(list(self.task_losses))
-                if self.task_losses
-                else 0,
+                "avg_task_loss": (
+                    np.mean(list(self.task_losses)) if self.task_losses else 0
+                ),
                 "online_buffer_size": len(self.online_buffer),
                 "num_task_embeddings": len(self.task_embeddings),
                 "task_learning_rates": self.task_learning_rates.copy(),

@@ -31,8 +31,7 @@ if not _TESTING_MODE:
 else:
     # Minimal imports for testing - avoid expensive initialization
     try:
-        from locust import (HttpUser, LoadTestShape, between, constant, events,
-                            task)
+        from locust import HttpUser, LoadTestShape, between, constant, events, task
         from locust.env import Environment
 
         # Only import Faker if needed, lazily
@@ -106,8 +105,12 @@ except ImportError:
 
 
 try:
-    from observability_manager import (log_to_prometheus, notify_error,
-                                       notify_success, send_metric_event)
+    from observability_manager import (
+        log_to_prometheus,
+        notify_error,
+        notify_success,
+        send_metric_event,
+    )
 
     OBSERVABILITY_AVAILABLE = True
 except ImportError:

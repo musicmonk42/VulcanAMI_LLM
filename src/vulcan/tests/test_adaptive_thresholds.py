@@ -16,9 +16,11 @@ import threading
 import pytest
 
 # Import modules to test
-from vulcan.problem_decomposer.adaptive_thresholds import (AdaptiveThresholds,
-                                                           PerformanceTracker,
-                                                           StrategyProfiler)
+from vulcan.problem_decomposer.adaptive_thresholds import (
+    AdaptiveThresholds,
+    PerformanceTracker,
+    StrategyProfiler,
+)
 
 # ============================================================
 # FIXTURES

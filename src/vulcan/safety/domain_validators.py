@@ -1116,9 +1116,11 @@ class ModelInferenceValidator:
         return {
             "safe": safe,
             "violations": violations,
-            "reason": critical_violations[0]["message"]
-            if critical_violations
-            else "Validation passed",
+            "reason": (
+                critical_violations[0]["message"]
+                if critical_violations
+                else "Validation passed"
+            ),
         }
 
 

@@ -17,20 +17,21 @@ from pathlib import Path
 
 import pytest
 
-from vulcan.safety.governance_alignment import (AlignmentConstraint,
-                                                GovernanceLevel,
-                                                GovernanceManager,
-                                                GovernancePolicy,
-                                                HumanFeedback,
-                                                HumanOversightInterface,
-                                                StakeholderType,
-                                                ValueAlignmentSystem,
-                                                ValueSystem)
+from vulcan.safety.governance_alignment import (
+    AlignmentConstraint,
+    GovernanceLevel,
+    GovernanceManager,
+    GovernancePolicy,
+    HumanFeedback,
+    HumanOversightInterface,
+    StakeholderType,
+    ValueAlignmentSystem,
+    ValueSystem,
+)
 
 # Import from safety_types (with fallback)
 try:
-    from vulcan.safety.safety_types import (ActionType, SafetyReport,
-                                            SafetyViolationType)
+    from vulcan.safety.safety_types import ActionType, SafetyReport, SafetyViolationType
 except ImportError:
     # Mock if not available
     from enum import Enum
@@ -179,10 +180,12 @@ class TestGovernanceManager:
 
         # Check tables exist
         cursor = governance_manager.conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT name FROM sqlite_master
             WHERE type='table' AND name='governance_decisions'
-        """)
+        """
+        )
         assert cursor.fetchone() is not None
 
     def test_add_policy(self, governance_manager):

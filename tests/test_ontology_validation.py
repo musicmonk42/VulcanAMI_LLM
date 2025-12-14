@@ -21,14 +21,17 @@ import pytest
 # Ontology-Based Validator Implementation
 # ============================================================================
 
+
 class OntologyValidationError(Exception):
     """Ontology validation error."""
+
     pass
 
 
 @dataclass
 class ValidationResult:
     """Result of validation."""
+
     is_valid: bool
     errors: List[str]
     warnings: List[str]
@@ -70,14 +73,16 @@ class OntologyValidator:
     def load_ontology(self, ontology_path: Path):
         """Load ontology from file."""
         try:
-            with open(ontology_path, 'r', encoding='utf-8') as f:
+            with open(ontology_path, "r", encoding="utf-8") as f:
                 self.ontology = json.load(f)
 
             # Extract valid types
             self.node_types = set(self.ontology.get("node_types", {}).keys())
             self.edge_types = set(self.ontology.get("edge_types", {}).keys())
             self.semantic_types = set(self.ontology.get("semantic_types", {}).keys())
-            self.lifecycle_statuses = set(self.ontology.get("lifecycle_statuses", {}).keys())
+            self.lifecycle_statuses = set(
+                self.ontology.get("lifecycle_statuses", {}).keys()
+            )
 
         except FileNotFoundError:
             raise OntologyValidationError(f"Ontology file not found: {ontology_path}")
@@ -167,8 +172,13 @@ class OntologyValidator:
             # Validate against ontology
             self._validate_node_type(node_id, node_type, node, result)
 
-    def _validate_node_type(self, node_id: str, node_type: str,
-                           node: Dict[str, Any], result: ValidationResult):
+    def _validate_node_type(
+        self,
+        node_id: str,
+        node_type: str,
+        node: Dict[str, Any],
+        result: ValidationResult,
+    ):
         """Validate node type against ontology."""
         if node_type not in self.node_types:
             result.add_error(
@@ -183,13 +193,9 @@ class OntologyValidator:
         # Check lifecycle status
         lifecycle = type_def.get("lifecycle_status")
         if lifecycle == "deprecated":
-            result.add_warning(
-                f"Node '{node_id}' uses deprecated type '{node_type}'"
-            )
+            result.add_warning(f"Node '{node_id}' uses deprecated type '{node_type}'")
         elif lifecycle == "experimental":
-            result.add_info(
-                f"Node '{node_id}' uses experimental type '{node_type}'"
-            )
+            result.add_info(f"Node '{node_id}' uses experimental type '{node_type}'")
         elif lifecycle == "superseded":
             result.add_error(
                 f"Node '{node_id}' uses superseded type '{node_type}' - "
@@ -199,8 +205,13 @@ class OntologyValidator:
         # Validate node-specific requirements
         self._validate_node_params(node_id, node_type, node.get("params", {}), result)
 
-    def _validate_node_params(self, node_id: str, node_type: str,
-                              params: Dict[str, Any], result: ValidationResult):
+    def _validate_node_params(
+        self,
+        node_id: str,
+        node_type: str,
+        params: Dict[str, Any],
+        result: ValidationResult,
+    ):
         """Validate node parameters based on type."""
         # Type-specific validation rules
         rules = {
@@ -238,8 +249,12 @@ class OntologyValidator:
             else:
                 # Check for reasonable constraint keys
                 valid_constraint_keys = {
-                    "max_cost_usd", "max_latency_ms", "accuracy_floor",
-                    "max_compute_cycles", "min_accuracy", "max_tokens"
+                    "max_cost_usd",
+                    "max_latency_ms",
+                    "accuracy_floor",
+                    "max_compute_cycles",
+                    "min_accuracy",
+                    "max_tokens",
                 }
                 for key in constraints.keys():
                     if key not in valid_constraint_keys:
@@ -247,8 +262,12 @@ class OntologyValidator:
                             f"Node '{node_id}' has unknown constraint key: '{key}'"
                         )
 
-    def _validate_edges(self, edges: List[Dict[str, Any]],
-                       nodes: List[Dict[str, Any]], result: ValidationResult):
+    def _validate_edges(
+        self,
+        edges: List[Dict[str, Any]],
+        nodes: List[Dict[str, Any]],
+        result: ValidationResult,
+    ):
         """Validate all edges against ontology."""
         if not edges:
             result.add_warning("Graph has no edges")
@@ -293,8 +312,9 @@ class OntologyValidator:
             if edge_kind:
                 self._validate_edge_kind(idx, edge_kind, result)
 
-    def _validate_edge_kind(self, edge_idx: int, edge_kind: str,
-                           result: ValidationResult):
+    def _validate_edge_kind(
+        self, edge_idx: int, edge_kind: str, result: ValidationResult
+    ):
         """Validate edge kind against ontology."""
         if edge_kind not in self.edge_types:
             result.add_error(
@@ -309,16 +329,13 @@ class OntologyValidator:
         # Check lifecycle status
         lifecycle = type_def.get("lifecycle_status")
         if lifecycle == "deprecated":
-            result.add_warning(
-                f"Edge {edge_idx} uses deprecated kind '{edge_kind}'"
-            )
+            result.add_warning(f"Edge {edge_idx} uses deprecated kind '{edge_kind}'")
         elif lifecycle == "experimental":
-            result.add_info(
-                f"Edge {edge_idx} uses experimental kind '{edge_kind}'"
-            )
+            result.add_info(f"Edge {edge_idx} uses experimental kind '{edge_kind}'")
 
-    def _validate_grammar_version(self, graph: Dict[str, Any],
-                                  result: ValidationResult):
+    def _validate_grammar_version(
+        self, graph: Dict[str, Any], result: ValidationResult
+    ):
         """Validate grammar version."""
         version = graph.get("grammar_version")
 
@@ -327,7 +344,7 @@ class OntologyValidator:
             return
 
         # Version format: X.Y.Z or X.Y.Z-suffix
-        pattern = r'^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$'
+        pattern = r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$"
         if not re.match(pattern, version):
             result.add_error(f"Invalid grammar_version format: '{version}'")
 
@@ -346,8 +363,9 @@ class OntologyValidator:
         Returns:
             -1 if v1 < v2, 0 if equal, 1 if v1 > v2
         """
+
         def parse(v):
-            parts = v.split('-')[0].split('.')
+            parts = v.split("-")[0].split(".")
             return tuple(int(p) for p in parts)
 
         try:
@@ -376,15 +394,13 @@ class OntologyValidator:
         has_recommended = set(metadata.keys()) & recommended
 
         if not has_recommended:
-            result.add_info(
-                f"Metadata missing recommended fields: {recommended}"
-            )
+            result.add_info(f"Metadata missing recommended fields: {recommended}")
 
         # Validate timestamp format if present
         timestamp = metadata.get("creation_timestamp")
         if timestamp:
             # ISO 8601 format check
-            iso_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$'
+            iso_pattern = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2})?$"
             if not re.match(iso_pattern, timestamp):
                 result.add_warning(
                     f"creation_timestamp '{timestamp}' not in ISO 8601 format"
@@ -396,8 +412,8 @@ class OntologyValidator:
             return []
 
         return [
-            node_type for node_type, definition in
-            self.ontology.get("node_types", {}).items()
+            node_type
+            for node_type, definition in self.ontology.get("node_types", {}).items()
             if definition.get("lifecycle_status") == status
         ]
 
@@ -407,8 +423,8 @@ class OntologyValidator:
             return []
 
         return [
-            edge_type for edge_type, definition in
-            self.ontology.get("edge_types", {}).items()
+            edge_type
+            for edge_type, definition in self.ontology.get("edge_types", {}).items()
             if definition.get("lifecycle_status") == status
         ]
 
@@ -443,6 +459,7 @@ class OntologyValidator:
 # Fixtures
 # ============================================================================
 
+
 @pytest.fixture
 def ontology_data():
     """Create sample ontology data."""
@@ -450,87 +467,87 @@ def ontology_data():
         "version": "2.4.0",
         "metadata": {
             "description": "Test ontology",
-            "base_uri": "https://graphix.ai/ontology/"
+            "base_uri": "https://graphix.ai/ontology/",
         },
         "lifecycle_statuses": {
             "active": "Fully supported",
             "deprecated": "Being phased out",
             "experimental": "Under development",
-            "superseded": "Replaced by another type"
+            "superseded": "Replaced by another type",
         },
         "node_types": {
             "CONST": {
                 "uri": "https://graphix.ai/ontology/CONST",
                 "description": "Constant value node",
                 "external_ref": "https://schema.org/DataFeedItem",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "LOAD": {
                 "uri": "https://graphix.ai/ontology/LOAD",
                 "description": "Load data node",
                 "external_ref": "https://schema.org/DataDownload",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "GenerativeNode": {
                 "uri": "https://graphix.ai/ontology/GenerativeNode",
                 "description": "Generative AI node",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "DeprecatedNode": {
                 "uri": "https://graphix.ai/ontology/DeprecatedNode",
                 "description": "Deprecated node type",
-                "lifecycle_status": "deprecated"
+                "lifecycle_status": "deprecated",
             },
             "SupersededNode": {
                 "uri": "https://graphix.ai/ontology/SupersededNode",
                 "description": "Superseded node type",
-                "lifecycle_status": "superseded"
+                "lifecycle_status": "superseded",
             },
             "ContractNode": {
                 "uri": "https://graphix.ai/ontology/ContractNode",
                 "description": "Contract definition node",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "OutputNode": {
                 "uri": "https://graphix.ai/ontology/OutputNode",
                 "description": "Output node",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "EMBED": {
                 "uri": "https://graphix.ai/ontology/EMBED",
                 "description": "Embedding node",
-                "lifecycle_status": "active"
-            }
+                "lifecycle_status": "active",
+            },
         },
         "edge_types": {
             "data": {
                 "uri": "https://graphix.ai/ontology/data",
                 "description": "Data flow edge",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "control": {
                 "uri": "https://graphix.ai/ontology/control",
                 "description": "Control flow edge",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "contract_binding": {
                 "uri": "https://graphix.ai/ontology/contract_binding",
                 "description": "Contract binding edge",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             },
             "deprecated_edge": {
                 "uri": "https://graphix.ai/ontology/deprecated_edge",
                 "description": "Deprecated edge type",
-                "lifecycle_status": "deprecated"
-            }
+                "lifecycle_status": "deprecated",
+            },
         },
         "semantic_types": {
             "computation": {
                 "uri": "https://graphix.ai/ontology/computation",
                 "description": "Computational operation",
-                "lifecycle_status": "active"
+                "lifecycle_status": "active",
             }
-        }
+        },
     }
 
 
@@ -538,7 +555,7 @@ def ontology_data():
 def validator(ontology_data, tmp_path):
     """Create validator with sample ontology."""
     ontology_file = tmp_path / "test_ontology.json"
-    with open(ontology_file, 'w', encoding='utf-8') as f:
+    with open(ontology_file, "w", encoding="utf-8") as f:
         json.dump(ontology_data, f, indent=2)
 
     validator = OntologyValidator(ontology_file)
@@ -555,42 +572,31 @@ def valid_graph():
         "metadata": {
             "author_agent": "test_agent",
             "creation_timestamp": "2025-01-15T10:00:00Z",
-            "description": "Test graph"
+            "description": "Test graph",
         },
         "nodes": [
-            {
-                "id": "const1",
-                "type": "CONST",
-                "params": {"value": 42}
-            },
-            {
-                "id": "load1",
-                "type": "LOAD",
-                "params": {"addr": "data.json"}
-            },
-            {
-                "id": "out1",
-                "type": "OutputNode",
-                "params": {}
-            }
+            {"id": "const1", "type": "CONST", "params": {"value": 42}},
+            {"id": "load1", "type": "LOAD", "params": {"addr": "data.json"}},
+            {"id": "out1", "type": "OutputNode", "params": {}},
         ],
         "edges": [
             {
                 "from": {"node": "const1", "port": "value"},
                 "to": {"node": "load1", "port": "input"},
-                "kind": "data"
+                "kind": "data",
             },
             {
                 "from": {"node": "load1", "port": "output"},
-                "to": {"node": "out1", "port": "input"}
-            }
-        ]
+                "to": {"node": "out1", "port": "input"},
+            },
+        ],
     }
 
 
 # ============================================================================
 # Test Validator Initialization
 # ============================================================================
+
 
 class TestValidatorInitialization:
     """Test validator initialization and ontology loading."""
@@ -619,7 +625,7 @@ class TestValidatorInitialization:
     def test_load_invalid_json(self, tmp_path):
         """Test loading invalid JSON."""
         ontology_file = tmp_path / "invalid.json"
-        with open(ontology_file, 'w', encoding="utf-8") as f:
+        with open(ontology_file, "w", encoding="utf-8") as f:
             f.write("{invalid json")
 
         validator = OntologyValidator()
@@ -630,6 +636,7 @@ class TestValidatorInitialization:
 # ============================================================================
 # Test Root Structure Validation
 # ============================================================================
+
 
 class TestRootStructureValidation:
     """Test root structure validation."""
@@ -650,12 +657,7 @@ class TestRootStructureValidation:
 
     def test_wrong_type(self, validator):
         """Test wrong graph type."""
-        graph = {
-            "id": "test",
-            "type": "NotAGraph",
-            "nodes": [],
-            "edges": []
-        }
+        graph = {"id": "test", "type": "NotAGraph", "nodes": [], "edges": []}
         result = validator.validate_graph(graph)
 
         assert not result.is_valid
@@ -663,12 +665,7 @@ class TestRootStructureValidation:
 
     def test_nodes_not_list(self, validator):
         """Test nodes not being a list."""
-        graph = {
-            "id": "test",
-            "type": "Graph",
-            "nodes": "not_a_list",
-            "edges": []
-        }
+        graph = {"id": "test", "type": "Graph", "nodes": "not_a_list", "edges": []}
         result = validator.validate_graph(graph)
 
         assert not result.is_valid
@@ -678,6 +675,7 @@ class TestRootStructureValidation:
 # ============================================================================
 # Test Node Validation
 # ============================================================================
+
 
 class TestNodeValidation:
     """Test node validation against ontology."""
@@ -692,10 +690,8 @@ class TestNodeValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "n1", "type": "UnknownNodeType"}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "UnknownNodeType"}],
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
@@ -707,10 +703,8 @@ class TestNodeValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "n1", "type": "DeprecatedNode"}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "DeprecatedNode"}],
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
@@ -722,10 +716,8 @@ class TestNodeValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "n1", "type": "SupersededNode"}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "SupersededNode"}],
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
@@ -739,9 +731,9 @@ class TestNodeValidation:
             "type": "Graph",
             "nodes": [
                 {"id": "n1", "type": "CONST", "params": {"value": 1}},
-                {"id": "n1", "type": "LOAD", "params": {"addr": "test"}}
+                {"id": "n1", "type": "LOAD", "params": {"addr": "test"}},
             ],
-            "edges": []
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
@@ -753,32 +745,30 @@ class TestNodeValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "const1", "type": "CONST", "params": {}}
-            ],
-            "edges": []
+            "nodes": [{"id": "const1", "type": "CONST", "params": {}}],
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
         assert not result.is_valid
-        assert any("missing required params" in err and "value" in err
-                  for err in result.errors)
+        assert any(
+            "missing required params" in err and "value" in err for err in result.errors
+        )
 
     def test_load_node_missing_addr(self, validator):
         """Test LOAD node missing addr parameter."""
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "load1", "type": "LOAD", "params": {}}
-            ],
-            "edges": []
+            "nodes": [{"id": "load1", "type": "LOAD", "params": {}}],
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
         assert not result.is_valid
-        assert any("missing required params" in err and "addr" in err
-                  for err in result.errors)
+        assert any(
+            "missing required params" in err and "addr" in err for err in result.errors
+        )
 
     def test_contract_node_validation(self, validator):
         """Test ContractNode parameter validation."""
@@ -787,10 +777,9 @@ class TestNodeValidation:
             "id": "test",
             "type": "Graph",
             "nodes": [
-                {"id": "c1", "type": "ContractNode",
-                 "params": {"constraints": {}}}
+                {"id": "c1", "type": "ContractNode", "params": {"constraints": {}}}
             ],
-            "edges": []
+            "edges": [],
         }
         result1 = validator.validate_graph(graph1)
         assert not result1.is_valid
@@ -801,10 +790,9 @@ class TestNodeValidation:
             "id": "test",
             "type": "Graph",
             "nodes": [
-                {"id": "c1", "type": "ContractNode",
-                 "params": {"target_node": "n1"}}
+                {"id": "c1", "type": "ContractNode", "params": {"target_node": "n1"}}
             ],
-            "edges": []
+            "edges": [],
         }
         result2 = validator.validate_graph(graph2)
         assert not result2.is_valid
@@ -814,6 +802,7 @@ class TestNodeValidation:
 # ============================================================================
 # Test Edge Validation
 # ============================================================================
+
 
 class TestEdgeValidation:
     """Test edge validation against ontology."""
@@ -830,15 +819,15 @@ class TestEdgeValidation:
             "type": "Graph",
             "nodes": [
                 {"id": "n1", "type": "CONST", "params": {"value": 1}},
-                {"id": "n2", "type": "OutputNode", "params": {}}
+                {"id": "n2", "type": "OutputNode", "params": {}},
             ],
             "edges": [
                 {
                     "from": {"node": "n1", "port": "out"},
                     "to": {"node": "n2", "port": "in"},
-                    "kind": "unknown_kind"
+                    "kind": "unknown_kind",
                 }
-            ]
+            ],
         }
         result = validator.validate_graph(graph)
 
@@ -852,15 +841,15 @@ class TestEdgeValidation:
             "type": "Graph",
             "nodes": [
                 {"id": "n1", "type": "CONST", "params": {"value": 1}},
-                {"id": "n2", "type": "OutputNode", "params": {}}
+                {"id": "n2", "type": "OutputNode", "params": {}},
             ],
             "edges": [
                 {
                     "from": {"node": "n1", "port": "out"},
                     "to": {"node": "n2", "port": "in"},
-                    "kind": "deprecated_edge"
+                    "kind": "deprecated_edge",
                 }
-            ]
+            ],
         }
         result = validator.validate_graph(graph)
 
@@ -872,12 +861,8 @@ class TestEdgeValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "n1", "type": "CONST", "params": {"value": 1}}
-            ],
-            "edges": [
-                {"from": {"node": "n1", "port": "out"}}
-            ]
+            "nodes": [{"id": "n1", "type": "CONST", "params": {"value": 1}}],
+            "edges": [{"from": {"node": "n1", "port": "out"}}],
         }
         result = validator.validate_graph(graph)
 
@@ -889,15 +874,8 @@ class TestEdgeValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "n1", "type": "CONST", "params": {"value": 1}}
-            ],
-            "edges": [
-                {
-                    "from": "invalid",
-                    "to": {"node": "n1", "port": "in"}
-                }
-            ]
+            "nodes": [{"id": "n1", "type": "CONST", "params": {"value": 1}}],
+            "edges": [{"from": "invalid", "to": {"node": "n1", "port": "in"}}],
         }
         result = validator.validate_graph(graph)
 
@@ -909,15 +887,13 @@ class TestEdgeValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "nodes": [
-                {"id": "n1", "type": "CONST", "params": {"value": 1}}
-            ],
+            "nodes": [{"id": "n1", "type": "CONST", "params": {"value": 1}}],
             "edges": [
                 {
                     "from": {"node": "n1", "port": "out"},
-                    "to": {"node": "nonexistent", "port": "in"}
+                    "to": {"node": "nonexistent", "port": "in"},
                 }
-            ]
+            ],
         }
         result = validator.validate_graph(graph)
 
@@ -928,6 +904,7 @@ class TestEdgeValidation:
 # ============================================================================
 # Test Version Validation
 # ============================================================================
+
 
 class TestVersionValidation:
     """Test grammar version validation."""
@@ -940,7 +917,7 @@ class TestVersionValidation:
             "10.20.30",
             "1.0.0-alpha",
             "2.3.0-beta.1",
-            "3.0.0-rc.2"
+            "3.0.0-rc.2",
         ]
 
         for version in valid_versions:
@@ -949,22 +926,17 @@ class TestVersionValidation:
                 "type": "Graph",
                 "grammar_version": version,
                 "nodes": [],
-                "edges": []
+                "edges": [],
             }
             result = validator.validate_graph(graph)
             # Should not have version format errors
-            assert not any("Invalid grammar_version format" in err
-                          for err in result.errors)
+            assert not any(
+                "Invalid grammar_version format" in err for err in result.errors
+            )
 
     def test_invalid_version_format(self, validator):
         """Test invalid version formats."""
-        invalid_versions = [
-            "1.0",
-            "1",
-            "v1.0.0",
-            "1.0.0.0",
-            "abc"
-        ]
+        invalid_versions = ["1.0", "1", "v1.0.0", "1.0.0.0", "abc"]
 
         for version in invalid_versions:
             graph = {
@@ -972,11 +944,10 @@ class TestVersionValidation:
                 "type": "Graph",
                 "grammar_version": version,
                 "nodes": [],
-                "edges": []
+                "edges": [],
             }
             result = validator.validate_graph(graph)
-            assert any("Invalid grammar_version format" in err
-                      for err in result.errors)
+            assert any("Invalid grammar_version format" in err for err in result.errors)
 
     def test_version_newer_than_ontology(self, validator):
         """Test version newer than ontology version."""
@@ -985,17 +956,17 @@ class TestVersionValidation:
             "type": "Graph",
             "grammar_version": "999.0.0",
             "nodes": [],
-            "edges": []
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
-        assert any("newer than ontology version" in warn
-                  for warn in result.warnings)
+        assert any("newer than ontology version" in warn for warn in result.warnings)
 
 
 # ============================================================================
 # Test Metadata Validation
 # ============================================================================
+
 
 class TestMetadataValidation:
     """Test metadata validation."""
@@ -1007,12 +978,7 @@ class TestMetadataValidation:
 
     def test_missing_metadata(self, validator):
         """Test graph without metadata."""
-        graph = {
-            "id": "test",
-            "type": "Graph",
-            "nodes": [],
-            "edges": []
-        }
+        graph = {"id": "test", "type": "Graph", "nodes": [], "edges": []}
         result = validator.validate_graph(graph)
         # Should be valid but may have info messages
         assert result.is_valid
@@ -1022,11 +988,9 @@ class TestMetadataValidation:
         graph = {
             "id": "test",
             "type": "Graph",
-            "metadata": {
-                "creation_timestamp": "not a timestamp"
-            },
+            "metadata": {"creation_timestamp": "not a timestamp"},
             "nodes": [],
-            "edges": []
+            "edges": [],
         }
         result = validator.validate_graph(graph)
 
@@ -1036,6 +1000,7 @@ class TestMetadataValidation:
 # ============================================================================
 # Test Lifecycle Status Queries
 # ============================================================================
+
 
 class TestLifecycleQueries:
     """Test lifecycle status query methods."""
@@ -1067,6 +1032,7 @@ class TestLifecycleQueries:
 # ============================================================================
 # Test Type Existence Checks
 # ============================================================================
+
 
 class TestTypeExistenceChecks:
     """Test type existence checking methods."""
@@ -1101,6 +1067,7 @@ class TestTypeExistenceChecks:
 # Integration Tests
 # ============================================================================
 
+
 class TestIntegrationWithRealGraphs:
     """Integration tests with real graph structures."""
 
@@ -1113,41 +1080,44 @@ class TestIntegrationWithRealGraphs:
             "metadata": {
                 "author_agent": "test",
                 "creation_timestamp": "2025-01-15T10:00:00Z",
-                "description": "Complex test"
+                "description": "Complex test",
             },
             "nodes": [
                 {"id": "input", "type": "CONST", "params": {"value": "test"}},
                 {"id": "embed", "type": "EMBED", "params": {"provider": "test"}},
                 {"id": "gen", "type": "GenerativeNode", "params": {"provider": "test"}},
-                {"id": "contract", "type": "ContractNode",
-                 "params": {
-                     "target_node": "gen",
-                     "constraints": {"max_cost_usd": 0.01}
-                 }},
-                {"id": "output", "type": "OutputNode", "params": {}}
+                {
+                    "id": "contract",
+                    "type": "ContractNode",
+                    "params": {
+                        "target_node": "gen",
+                        "constraints": {"max_cost_usd": 0.01},
+                    },
+                },
+                {"id": "output", "type": "OutputNode", "params": {}},
             ],
             "edges": [
                 {
                     "from": {"node": "input", "port": "value"},
                     "to": {"node": "embed", "port": "input"},
-                    "kind": "data"
+                    "kind": "data",
                 },
                 {
                     "from": {"node": "embed", "port": "output"},
                     "to": {"node": "gen", "port": "input"},
-                    "kind": "data"
+                    "kind": "data",
                 },
                 {
                     "from": {"node": "contract", "port": "output"},
                     "to": {"node": "gen", "port": "contract"},
-                    "kind": "contract_binding"
+                    "kind": "contract_binding",
                 },
                 {
                     "from": {"node": "gen", "port": "output"},
                     "to": {"node": "output", "port": "input"},
-                    "kind": "data"
-                }
-            ]
+                    "kind": "data",
+                },
+            ],
         }
 
         result = validator.validate_graph(graph)

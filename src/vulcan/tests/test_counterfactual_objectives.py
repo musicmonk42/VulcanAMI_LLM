@@ -8,8 +8,11 @@ from unittest.mock import Mock, patch
 import pytest
 
 from vulcan.world_model.meta_reasoning.counterfactual_objectives import (
-    CounterfactualObjectiveReasoner, CounterfactualOutcome,
-    ObjectiveComparison, ParetoPoint)
+    CounterfactualObjectiveReasoner,
+    CounterfactualOutcome,
+    ObjectiveComparison,
+    ParetoPoint,
+)
 
 
 @pytest.fixture

@@ -1,5 +1,6 @@
-from __future__ import \
-    annotations  # FIX: Added to break circular import cycle via string-based type hints
+from __future__ import (
+    annotations,
+)  # FIX: Added to break circular import cycle via string-based type hints
 
 """
 problem_executor.py - Executes decomposition plans to solve problems
@@ -67,6 +68,7 @@ except ImportError:
         test_id: str
         inputs: Dict[str, Any]
         expected_outputs: Any
+
 
 # Import decomposer components
 # FIX: Removed top-level import to break circular dependency.
@@ -214,9 +216,9 @@ class ProblemExecutor:
                         )
                         # Add rollback_config with defaults
                         rollback_cfg = {
-                            "max_snapshots": 10
-                            if safety_config.get("test_mode")
-                            else 100,
+                            "max_snapshots": (
+                                10 if safety_config.get("test_mode") else 100
+                            ),
                             "enable_storage": not safety_config.get("test_mode", False),
                             "enable_workers": not safety_config.get("test_mode", False),
                         }
@@ -243,9 +245,11 @@ class ProblemExecutor:
             self.safety_validator = EnhancedSafetyValidator(config=config_obj)
             logger.info(
                 "ProblemExecutor initialized with EnhancedSafetyValidator (test_mode=%s)",
-                safety_config.get("test_mode", False)
-                if isinstance(safety_config, dict)
-                else False,
+                (
+                    safety_config.get("test_mode", False)
+                    if isinstance(safety_config, dict)
+                    else False
+                ),
             )
         else:
             # This is required by test_executor_initialization_without_safety
@@ -287,9 +291,11 @@ class ProblemExecutor:
 
         # FIX: Defer import to break circular dependency
         try:
-            from .problem_decomposer_core import (DecompositionPlan,
-                                                  ExecutionOutcome,
-                                                  ProblemGraph)
+            from .problem_decomposer_core import (
+                DecompositionPlan,
+                ExecutionOutcome,
+                ProblemGraph,
+            )
 
             self.ExecutionOutcome = ExecutionOutcome
             self.ProblemGraph = ProblemGraph
@@ -319,7 +325,9 @@ class ProblemExecutor:
                 metadata: Dict[str, Any] = field(default_factory=dict)
 
                 def get_signature(self):
-                    return hashlib.md5(str(self.nodes).encode(), usedforsecurity=False).hexdigest()
+                    return hashlib.md5(
+                        str(self.nodes).encode(), usedforsecurity=False
+                    ).hexdigest()
 
             self.ProblemGraph = FallbackProblemGraph
 
@@ -721,8 +729,11 @@ class ProblemExecutor:
 
             except Exception as e:
                 logger.error("Failed to convert step %d to principle: %s", i, e)
+
                 # Create fallback principle
-                def fallback_logic(inputs): return {"error": str(e), "fallback": True}
+                def fallback_logic(inputs):
+                    return {"error": str(e), "fallback": True}
+
                 principle = Principle(
                     id=f"step_{i}_fallback",
                     core_pattern=step,
@@ -1789,7 +1800,9 @@ class ProblemExecutor:
     ) -> str:
         """Get cache key for problem and plan"""
         problem_sig = problem_graph.get_signature()
-        plan_sig = hashlib.md5(str(plan.steps).encode(), usedforsecurity=False).hexdigest()
+        plan_sig = hashlib.md5(
+            str(plan.steps).encode(), usedforsecurity=False
+        ).hexdigest()
         return f"{problem_sig}_{plan_sig}"
 
     def _initialize_solvers(self) -> Dict[str, Callable]:

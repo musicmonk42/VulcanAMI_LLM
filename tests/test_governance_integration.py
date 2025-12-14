@@ -20,40 +20,49 @@ from src.governance.registry_api import AgentRegistry as APIAgentRegistry
 from src.governance.registry_api import CryptoHandler, InMemoryBackend
 from src.governance.registry_api import RegistryAPI as APIRegistryAPI
 from src.governance.registry_api import SecurityEngine, SimpleKMS
+
 # Import from registry_api_server
-from src.governance.registry_api_server import \
-    AgentRegistry as ServerAgentRegistry
-from src.governance.registry_api_server import (AuditLogEntry, DatabaseManager,
-                                                DeployGrammarVersionRequest,
-                                                DeployGrammarVersionResponse,
-                                                GetFullAuditLogRequest,
-                                                GetFullAuditLogResponse,
-                                                LanguageEvolutionRegistry,
-                                                Node, QueryProposalsRequest,
-                                                QueryProposalsResponse,
-                                                RecordValidationRequest,
-                                                RecordValidationResponse,
-                                                RecordVoteRequest,
-                                                RecordVoteResponse,
-                                                RegisterGraphProposalRequest,
-                                                RegisterGraphProposalResponse)
-from src.governance.registry_api_server import \
-    RegistryAPI as ServerRegistryAPI  # <--- Added StatusCode import
+from src.governance.registry_api_server import AgentRegistry as ServerAgentRegistry
 from src.governance.registry_api_server import (
-    RegistryServicer, SecurityAuditEngine, StatusCode,
+    AuditLogEntry,
+    DatabaseManager,
+    DeployGrammarVersionRequest,
+    DeployGrammarVersionResponse,
+    GetFullAuditLogRequest,
+    GetFullAuditLogResponse,
+    LanguageEvolutionRegistry,
+    Node,
+    QueryProposalsRequest,
+    QueryProposalsResponse,
+    RecordValidationRequest,
+    RecordValidationResponse,
+    RecordVoteRequest,
+    RecordVoteResponse,
+    RegisterGraphProposalRequest,
+    RegisterGraphProposalResponse,
+)
+from src.governance.registry_api_server import (
+    RegistryAPI as ServerRegistryAPI,
+)  # <--- Added StatusCode import
+from src.governance.registry_api_server import (
+    RegistryServicer,
+    SecurityAuditEngine,
+    StatusCode,
     SubmitLanguageEvolutionProposalRequest,
-    SubmitLanguageEvolutionProposalResponse, VerifyAuditLogIntegrityRequest,
-    VerifyAuditLogIntegrityResponse)
+    SubmitLanguageEvolutionProposalResponse,
+    VerifyAuditLogIntegrityRequest,
+    VerifyAuditLogIntegrityResponse,
+)
 
 
 @pytest.fixture
 def temp_db():
     """Create temporary database file."""
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
     yield db_path
     try:
-        Path(db_path).unlink(missing_ok=True) # Use missing_ok=True
+        Path(db_path).unlink(missing_ok=True)  # Use missing_ok=True
     except Exception as e:
         print(f"Warning: Failed to delete temp db {db_path}: {e}")
 
@@ -80,25 +89,29 @@ def integrated_system(temp_db):
         registry_api=server_registry_api,
         lang_evolution_registry=lang_evolution_registry,
         agent_registry=server_agent_registry,
-        security_audit_engine=security_audit_engine
+        security_audit_engine=security_audit_engine,
     )
 
     # Register test agents
     for agent_id, roles, trust_level in [
-        ("agent-alice", ["proposer", "voter", "validator", "governor", "deployer", "auditor"], 0.9),
+        (
+            "agent-alice",
+            ["proposer", "voter", "validator", "governor", "deployer", "auditor"],
+            0.9,
+        ),
         ("agent-bob", ["proposer", "voter", "validator"], 0.7),
         ("agent-charlie", ["voter"], 0.5),
         ("agent-observer", ["observer"], 0.3),
     ]:
-        server_agent_registry.register_agent({
-            "id": agent_id,
-            "roles": roles,
-            "trust_level": trust_level
-        })
+        server_agent_registry.register_agent(
+            {"id": agent_id, "roles": roles, "trust_level": trust_level}
+        )
 
         # Also register in API agent registry
         public_key_pem = kms.get_public_key_pem(agent_id)
-        api_registry.agent_registry.register_agent(agent_id, public_key_pem, trust_level)
+        api_registry.agent_registry.register_agent(
+            agent_id, public_key_pem, trust_level
+        )
 
     return {
         "db_manager": db_manager,
@@ -108,7 +121,7 @@ def integrated_system(temp_db):
         "security_audit_engine": security_audit_engine,
         "servicer": servicer,
         "api_registry": api_registry,
-        "kms": kms
+        "kms": kms,
     }
 
 
@@ -118,9 +131,9 @@ def create_node_dict_for_auth(node: Node, agent_id: str) -> Dict:
     proposal_content_dict = {}
     if node.proposal_content:
         try:
-            proposal_content_dict = json.loads(node.proposal_content.decode('utf-8'))
+            proposal_content_dict = json.loads(node.proposal_content.decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError):
-            pass # Keep empty if invalid
+            pass  # Keep empty if invalid
 
     # Metadata handling needs to be robust for tests (can be None or dict)
     metadata_dict = node.metadata if isinstance(node.metadata, dict) else {}
@@ -131,8 +144,9 @@ def create_node_dict_for_auth(node: Node, agent_id: str) -> Dict:
         "metadata": metadata_dict,
         "proposed_by": node.proposed_by or agent_id,
         "rationale": node.rationale,
-        "proposal_content": proposal_content_dict
+        "proposal_content": proposal_content_dict,
     }
+
 
 # Helper to calculate signature based on the server's method
 def calculate_signature(data_dict: Dict) -> str:
@@ -193,7 +207,7 @@ class TestEndToEndGraphProposalWorkflow:
 
         # Create proposal content
         proposal_content = {"add": {"NewNodeType": {"description": "New type"}}}
-        proposal_content_bytes = json.dumps(proposal_content).encode('utf-8')
+        proposal_content_bytes = json.dumps(proposal_content).encode("utf-8")
 
         # Create the Node object
         node = Node(
@@ -202,7 +216,7 @@ class TestEndToEndGraphProposalWorkflow:
             proposed_by=agent_id,
             rationale="Add new graph node type",
             proposal_content=proposal_content_bytes,
-            metadata={"version": "1.0"} # Example metadata
+            metadata={"version": "1.0"},  # Example metadata
         )
 
         # **FIX: Calculate correct signature**
@@ -211,8 +225,8 @@ class TestEndToEndGraphProposalWorkflow:
 
         request = RegisterGraphProposalRequest(
             agent_id=agent_id,
-            signature=correct_signature, # Use correct signature
-            proposal_node=node
+            signature=correct_signature,  # Use correct signature
+            proposal_node=node,
         )
 
         context = MagicMock()
@@ -221,7 +235,9 @@ class TestEndToEndGraphProposalWorkflow:
         response = servicer.RegisterGraphProposal(request, context)
 
         # --- Assertions ---
-        assert response.status == "success", f"Expected 'success', got '{response.status}' with message: {response.message}"
+        assert (
+            response.status == "success"
+        ), f"Expected 'success', got '{response.status}' with message: {response.message}"
         assert len(response.proposal_id) > 0
 
         # Verify proposal was stored
@@ -230,7 +246,9 @@ class TestEndToEndGraphProposalWorkflow:
 
         assert proposal is not None
         assert proposal["node"]["id"] == "graph_proposal_1"
-        assert proposal["node"]["proposal_content"] == proposal_content # Verify content stored correctly
+        assert (
+            proposal["node"]["proposal_content"] == proposal_content
+        )  # Verify content stored correctly
 
     def test_graph_proposal_query(self, integrated_system):
         """Test querying graph proposals."""
@@ -242,7 +260,7 @@ class TestEndToEndGraphProposalWorkflow:
             proposal = {
                 "id": f"graph_prop_{i}",
                 "type": "ProposalNode",
-                "proposed_by": "agent-alice" if i % 2 == 0 else "agent-bob"
+                "proposed_by": "agent-alice" if i % 2 == 0 else "agent-bob",
             }
             # Note: Directly calling submit_proposal doesn't involve auth/server layer
             server_registry.submit_proposal(proposal)
@@ -263,17 +281,17 @@ class TestEndToEndLanguageEvolutionWorkflow:
         """Test full workflow: submit -> vote -> validate -> deploy."""
         servicer = integrated_system["servicer"]
         lang_registry = integrated_system["lang_evolution_registry"]
-        agent_id = "agent-alice" # Governor agent
+        agent_id = "agent-alice"  # Governor agent
 
         # Step 1: Submit proposal
         proposal_content = {"add": {"NewFeature": {"syntax": "new_syntax"}}}
-        proposal_content_bytes = json.dumps(proposal_content).encode('utf-8')
+        proposal_content_bytes = json.dumps(proposal_content).encode("utf-8")
         proposal_node = Node(
             id="lang_evolution_1",
             type="ProposalNode",
             proposed_by=agent_id,
             rationale="Add new language feature",
-            proposal_content=proposal_content_bytes
+            proposal_content=proposal_content_bytes,
         )
 
         # **FIX: Calculate correct signature for submit**
@@ -281,24 +299,26 @@ class TestEndToEndLanguageEvolutionWorkflow:
         submit_signature = calculate_signature(node_dict_for_auth)
 
         submit_request = SubmitLanguageEvolutionProposalRequest(
-            agent_id=agent_id,
-            signature=submit_signature,
-            proposal_node=proposal_node
+            agent_id=agent_id, signature=submit_signature, proposal_node=proposal_node
         )
 
         context = MagicMock()
-        submit_response = servicer.SubmitLanguageEvolutionProposal(submit_request, context)
+        submit_response = servicer.SubmitLanguageEvolutionProposal(
+            submit_request, context
+        )
 
-        assert submit_response.status == "success", f"Submit failed: {submit_response.message}"
+        assert (
+            submit_response.status == "success"
+        ), f"Submit failed: {submit_response.message}"
         proposal_id = submit_response.proposal_id
 
         # Step 2: Record votes
         votes_dict = {"agent-alice": "yes", "agent-bob": "yes", "agent-charlie": "yes"}
         consensus_node = Node(
-            id=proposal_id, # Can use id here as server checks both id/proposal_id
-            proposal_id=proposal_id, # Explicitly add proposal_id too
+            id=proposal_id,  # Can use id here as server checks both id/proposal_id
+            proposal_id=proposal_id,  # Explicitly add proposal_id too
             votes=votes_dict,
-            quorum=0.5
+            quorum=0.5,
         )
 
         # **FIX: Calculate correct signature for vote**
@@ -306,26 +326,26 @@ class TestEndToEndLanguageEvolutionWorkflow:
         vote_auth_dict = {
             "proposal_id": proposal_id,
             "votes": votes_dict,
-            "quorum": 0.5
+            "quorum": 0.5,
         }
         vote_signature = calculate_signature(vote_auth_dict)
 
         vote_request = RecordVoteRequest(
-            agent_id=agent_id, # Alice votes (has governor role)
+            agent_id=agent_id,  # Alice votes (has governor role)
             signature=vote_signature,
-            consensus_node=consensus_node
+            consensus_node=consensus_node,
         )
 
         vote_response = servicer.RecordVote(vote_request, context)
 
-        assert vote_response.status == "success", f"Vote failed: {vote_response.message}"
+        assert (
+            vote_response.status == "success"
+        ), f"Vote failed: {vote_response.message}"
         assert vote_response.consensus_reached is True
 
         # Step 3: Record validation
         validation_node = Node(
-            target=proposal_id,
-            validation_type="schema",
-            result=True
+            target=proposal_id, validation_type="schema", result=True
         )
 
         # **FIX: Calculate correct signature for validation**
@@ -334,19 +354,21 @@ class TestEndToEndLanguageEvolutionWorkflow:
             "target": proposal_id,
             "validation_type": "schema",
             "result": True,
-            "validator_id": agent_id # Agent performing validation
+            "validator_id": agent_id,  # Agent performing validation
         }
         validation_signature = calculate_signature(validation_auth_dict)
 
         validation_request = RecordValidationRequest(
-            agent_id=agent_id, # Alice validates (has governor role)
+            agent_id=agent_id,  # Alice validates (has governor role)
             signature=validation_signature,
-            validation_node=validation_node
+            validation_node=validation_node,
         )
 
         validation_response = servicer.RecordValidation(validation_request, context)
 
-        assert validation_response.status == "success", f"Validation failed: {validation_response.message}"
+        assert (
+            validation_response.status == "success"
+        ), f"Validation failed: {validation_response.message}"
         assert validation_response.validation_passed is True
 
         # Step 4: Deploy grammar version
@@ -356,20 +378,22 @@ class TestEndToEndLanguageEvolutionWorkflow:
         deploy_auth_dict = {
             "agent_id": agent_id,
             "proposal_id": proposal_id,
-            "new_grammar_version": new_version
+            "new_grammar_version": new_version,
         }
         deploy_signature = calculate_signature(deploy_auth_dict)
 
         deploy_request = DeployGrammarVersionRequest(
-            agent_id=agent_id, # Alice deploys (has governor role)
+            agent_id=agent_id,  # Alice deploys (has governor role)
             signature=deploy_signature,
             proposal_id=proposal_id,
-            new_grammar_version=new_version
+            new_grammar_version=new_version,
         )
 
         deploy_response = servicer.DeployGrammarVersion(deploy_request, context)
 
-        assert deploy_response.status == "success", f"Deploy failed: {deploy_response.message}"
+        assert (
+            deploy_response.status == "success"
+        ), f"Deploy failed: {deploy_response.message}"
         assert deploy_response.deployed is True
 
         # Verify grammar version updated
@@ -380,13 +404,11 @@ class TestEndToEndLanguageEvolutionWorkflow:
         servicer = integrated_system["servicer"]
         lang_registry = integrated_system["lang_evolution_registry"]
         proposer_agent_id = "agent-bob"
-        voter_agent_id = "agent-alice" # Alice votes no
+        voter_agent_id = "agent-alice"  # Alice votes no
 
         # Submit proposal
         proposal_node = Node(
-            id="rejected_proposal",
-            type="ProposalNode",
-            proposed_by=proposer_agent_id
+            id="rejected_proposal", type="ProposalNode", proposed_by=proposer_agent_id
         )
 
         # **FIX: Signature for submit**
@@ -396,35 +418,34 @@ class TestEndToEndLanguageEvolutionWorkflow:
         submit_request = SubmitLanguageEvolutionProposalRequest(
             agent_id=proposer_agent_id,
             signature=submit_signature,
-            proposal_node=proposal_node
+            proposal_node=proposal_node,
         )
 
         context = MagicMock()
-        submit_response = servicer.SubmitLanguageEvolutionProposal(submit_request, context)
+        submit_response = servicer.SubmitLanguageEvolutionProposal(
+            submit_request, context
+        )
         assert submit_response.status == "success"
         proposal_id = submit_response.proposal_id
 
         # Record negative votes
         votes_dict = {"agent-alice": "no", "agent-bob": "no", "agent-charlie": "no"}
         consensus_node = Node(
-            id=proposal_id,
-            proposal_id=proposal_id,
-            votes=votes_dict,
-            quorum=0.5
+            id=proposal_id, proposal_id=proposal_id, votes=votes_dict, quorum=0.5
         )
 
         # **FIX: Signature for vote**
         vote_auth_dict = {
             "proposal_id": proposal_id,
             "votes": votes_dict,
-            "quorum": 0.5
+            "quorum": 0.5,
         }
         vote_signature = calculate_signature(vote_auth_dict)
 
         vote_request = RecordVoteRequest(
-            agent_id=voter_agent_id, # Alice votes
+            agent_id=voter_agent_id,  # Alice votes
             signature=vote_signature,
-            consensus_node=consensus_node
+            consensus_node=consensus_node,
         )
 
         vote_response = servicer.RecordVote(vote_request, context)
@@ -432,15 +453,17 @@ class TestEndToEndLanguageEvolutionWorkflow:
         assert vote_response.status == "success"
         # Consensus should NOT be reached with 'no' votes
         proposal_data = lang_registry.db.get_record("lang_proposals", proposal_id)
-        assert proposal_data.get("status") == "rejected" # Check final status
-        assert vote_response.consensus_reached is False # API returns False if not approved
+        assert proposal_data.get("status") == "rejected"  # Check final status
+        assert (
+            vote_response.consensus_reached is False
+        )  # API returns False if not approved
 
         # Verify cannot deploy (attempt by governor Alice)
         new_version = "3.1.0"
         deploy_auth_dict = {
             "agent_id": "agent-alice",
             "proposal_id": proposal_id,
-            "new_grammar_version": new_version
+            "new_grammar_version": new_version,
         }
         deploy_signature = calculate_signature(deploy_auth_dict)
 
@@ -448,13 +471,13 @@ class TestEndToEndLanguageEvolutionWorkflow:
             agent_id="agent-alice",
             signature=deploy_signature,
             proposal_id=proposal_id,
-            new_grammar_version=new_version
+            new_grammar_version=new_version,
         )
 
         deploy_response = servicer.DeployGrammarVersion(deploy_request, context)
 
         assert deploy_response.deployed is False
-        assert deploy_response.status == "error" # Server should return error status
+        assert deploy_response.status == "error"  # Server should return error status
 
 
 class TestSecurityAndAuditIntegration:
@@ -467,12 +490,12 @@ class TestSecurityAndAuditIntegration:
 
         # Try to submit malicious proposal
         malicious_content = {"exploit": "os.system('rm -rf /')"}
-        malicious_content_bytes = json.dumps(malicious_content).encode('utf-8')
+        malicious_content_bytes = json.dumps(malicious_content).encode("utf-8")
         malicious_node = Node(
             id="malicious_proposal",
             type="ProposalNode",
             proposed_by=agent_id,
-            proposal_content=malicious_content_bytes
+            proposal_content=malicious_content_bytes,
         )
 
         # **FIX: Calculate correct signature**
@@ -481,8 +504,8 @@ class TestSecurityAndAuditIntegration:
 
         request = RegisterGraphProposalRequest(
             agent_id=agent_id,
-            signature=correct_signature, # Use correct signature
-            proposal_node=malicious_node
+            signature=correct_signature,  # Use correct signature
+            proposal_node=malicious_node,
         )
 
         context = MagicMock()
@@ -497,16 +520,14 @@ class TestSecurityAndAuditIntegration:
         """Test that audit logging works across operations."""
         servicer = integrated_system["servicer"]
         security_audit = integrated_system["security_audit_engine"]
-        agent_id = "agent-alice" # Auditor
+        agent_id = "agent-alice"  # Auditor
 
         # Perform an operation to generate logs
         proposal_node = Node(id="audit_test", type="ProposalNode", proposed_by=agent_id)
         node_dict_for_auth = create_node_dict_for_auth(proposal_node, agent_id)
         submit_signature = calculate_signature(node_dict_for_auth)
         submit_request = SubmitLanguageEvolutionProposalRequest(
-            agent_id=agent_id,
-            signature=submit_signature,
-            proposal_node=proposal_node
+            agent_id=agent_id, signature=submit_signature, proposal_node=proposal_node
         )
         context = MagicMock()
         servicer.SubmitLanguageEvolutionProposal(submit_request, context)
@@ -517,36 +538,41 @@ class TestSecurityAndAuditIntegration:
         audit_signature = calculate_signature(audit_auth_dict)
 
         audit_request = GetFullAuditLogRequest(
-            agent_id=agent_id,
-            signature=audit_signature # Use correct signature
+            agent_id=agent_id, signature=audit_signature  # Use correct signature
         )
 
         audit_response = servicer.GetFullAuditLog(audit_request, context)
 
-        assert audit_response.status == "success", f"GetAuditLog failed: {audit_response.message}"
+        assert (
+            audit_response.status == "success"
+        ), f"GetAuditLog failed: {audit_response.message}"
         # **FIX: Adjust assertion to expect >= 1 log entry from test action**
-        assert len(audit_response.audit_log) >= 1 # Expect at least the proposal submission log
+        assert (
+            len(audit_response.audit_log) >= 1
+        )  # Expect at least the proposal submission log
 
         # Verify integrity (Doesn't require signature in mock, but log action does)
         integrity_request = VerifyAuditLogIntegrityRequest(agent_id=agent_id)
-        integrity_response = servicer.VerifyAuditLogIntegrity(integrity_request, context)
+        integrity_response = servicer.VerifyAuditLogIntegrity(
+            integrity_request, context
+        )
 
         assert integrity_response.integrity_valid is True
 
         # Check that integrity check itself was logged
         final_log = security_audit.get_full_audit_log()
-        assert any(entry.get("action") == "integrity_check_requested" for entry in final_log)
+        assert any(
+            entry.get("action") == "integrity_check_requested" for entry in final_log
+        )
 
     def test_trust_level_enforcement(self, integrated_system):
         """Test that trust levels are enforced."""
         servicer = integrated_system["servicer"]
-        agent_id = "agent-observer" # Low trust agent
+        agent_id = "agent-observer"  # Low trust agent
 
         # Low trust agent tries to submit proposal
         proposal_node = Node(
-            id="low_trust_proposal",
-            type="ProposalNode",
-            proposed_by=agent_id
+            id="low_trust_proposal", type="ProposalNode", proposed_by=agent_id
         )
 
         # **FIX: Calculate correct signature**
@@ -554,9 +580,7 @@ class TestSecurityAndAuditIntegration:
         correct_signature = calculate_signature(node_dict_for_auth)
 
         request = RegisterGraphProposalRequest(
-            agent_id=agent_id,
-            signature=correct_signature,
-            proposal_node=proposal_node
+            agent_id=agent_id, signature=correct_signature, proposal_node=proposal_node
         )
 
         context = MagicMock()
@@ -565,7 +589,10 @@ class TestSecurityAndAuditIntegration:
         # Should be rejected (primarily due to missing role in this setup)
         assert response.status == "error"
         # Check if the error message reflects authorization or trust issue
-        assert "Authorization failed" in response.message or "trust level too low" in response.message
+        assert (
+            "Authorization failed" in response.message
+            or "trust level too low" in response.message
+        )
 
 
 class TestAuthenticationAuthorizationIntegration:
@@ -578,8 +605,8 @@ class TestAuthenticationAuthorizationIntegration:
         # Try with unknown agent and invalid signature
         request = SubmitLanguageEvolutionProposalRequest(
             agent_id="unknown_agent",
-            signature="invalid_signature", # Incorrect signature
-            proposal_node=Node(id="test")
+            signature="invalid_signature",  # Incorrect signature
+            proposal_node=Node(id="test"),
         )
 
         context = MagicMock()
@@ -592,10 +619,10 @@ class TestAuthenticationAuthorizationIntegration:
     def test_role_based_authorization(self, integrated_system):
         """Test role-based authorization."""
         servicer = integrated_system["servicer"]
-        agent_id = "agent-observer" # Lacks proposer role
+        agent_id = "agent-observer"  # Lacks proposer role
 
         # Observer tries to submit proposal
-        proposal_node=Node(id="test", type="ProposalNode", proposed_by=agent_id)
+        proposal_node = Node(id="test", type="ProposalNode", proposed_by=agent_id)
 
         # **FIX: Calculate correct signature**
         node_dict_for_auth = create_node_dict_for_auth(proposal_node, agent_id)
@@ -603,8 +630,8 @@ class TestAuthenticationAuthorizationIntegration:
 
         request = SubmitLanguageEvolutionProposalRequest(
             agent_id=agent_id,
-            signature=correct_signature, # Correct signature, but wrong role
-            proposal_node=proposal_node
+            signature=correct_signature,  # Correct signature, but wrong role
+            proposal_node=proposal_node,
         )
 
         context = MagicMock()
@@ -617,13 +644,11 @@ class TestAuthenticationAuthorizationIntegration:
     def test_correct_roles_authorized(self, integrated_system):
         """Test that correct roles are authorized."""
         servicer = integrated_system["servicer"]
-        agent_id = "agent-alice" # Has proposer/governor roles
+        agent_id = "agent-alice"  # Has proposer/governor roles
 
         # Alice submits proposal
-        proposal_node=Node(
-            id="authorized_proposal",
-            type="ProposalNode",
-            proposed_by=agent_id
+        proposal_node = Node(
+            id="authorized_proposal", type="ProposalNode", proposed_by=agent_id
         )
 
         # **FIX: Calculate correct signature**
@@ -632,8 +657,8 @@ class TestAuthenticationAuthorizationIntegration:
 
         request = SubmitLanguageEvolutionProposalRequest(
             agent_id=agent_id,
-            signature=correct_signature, # Correct signature and role
-            proposal_node=proposal_node
+            signature=correct_signature,  # Correct signature and role
+            proposal_node=proposal_node,
         )
 
         context = MagicMock()
@@ -651,10 +676,9 @@ class TestDatabasePersistenceIntegration:
         db_manager = integrated_system["db_manager"]
 
         # Submit proposal directly to registry component (bypasses server auth)
-        proposal_id = lang_registry.submit_proposal({
-            "id": "persist_test",
-            "type": "ProposalNode"
-        })
+        proposal_id = lang_registry.submit_proposal(
+            {"id": "persist_test", "type": "ProposalNode"}
+        )
 
         # Retrieve directly from database manager
         db_proposal = db_manager.get_record("lang_proposals", proposal_id)
@@ -672,13 +696,13 @@ class TestDatabasePersistenceIntegration:
             action="test_action",
             details={"test": "data"},
             entity_id="entity1",
-            entity_type="agent"
+            entity_type="agent",
         )
 
         # Retrieve from database manager
         audit_log = db_manager.get_full_audit_log()
 
-        assert len(audit_log) > 0 # Should have initialization logs + test_action
+        assert len(audit_log) > 0  # Should have initialization logs + test_action
         assert any(entry.get("action") == "test_action" for entry in audit_log)
 
     def test_state_survives_restart(self, temp_db):
@@ -687,17 +711,16 @@ class TestDatabasePersistenceIntegration:
         db_manager1 = DatabaseManager(temp_db)
         lang_registry1 = LanguageEvolutionRegistry(db_manager1)
 
-        proposal_id = lang_registry1.submit_proposal({
-            "id": "restart_test",
-            "type": "ProposalNode"
-        })
+        proposal_id = lang_registry1.submit_proposal(
+            {"id": "restart_test", "type": "ProposalNode"}
+        )
 
         # Simulate restart - create new instances using the *same db file*
         db_manager2 = DatabaseManager(temp_db)
         lang_registry2 = LanguageEvolutionRegistry(db_manager2)
 
         # Retrieve proposal using the second instance
-        proposals = lang_registry2.query_proposals() # Queries DB directly
+        proposals = lang_registry2.query_proposals()  # Queries DB directly
 
         assert any(p.get("id") == "restart_test" for p in proposals)
 
@@ -708,14 +731,16 @@ class TestQueryingIntegration:
     def test_query_proposals_with_filters(self, integrated_system):
         """Test querying with various filters via server."""
         servicer = integrated_system["servicer"]
-        lang_registry = integrated_system["lang_evolution_registry"] # Use this to seed data
+        lang_registry = integrated_system[
+            "lang_evolution_registry"
+        ]  # Use this to seed data
 
         # Submit proposals with different attributes directly to registry
         for i in range(5):
             proposal = {
                 "id": f"query_test_{i}",
                 "proposed_by": "agent-alice" if i < 3 else "agent-bob",
-                "type": "ProposalNode"
+                "type": "ProposalNode",
             }
             lang_registry.submit_proposal(proposal)
 
@@ -728,8 +753,7 @@ class TestQueryingIntegration:
 
         # Query by proposer via server
         request_filtered = QueryProposalsRequest(
-            agent_id="agent-alice",
-            proposed_by="agent-alice"
+            agent_id="agent-alice", proposed_by="agent-alice"
         )
         response_filtered = servicer.QueryProposals(request_filtered, context)
         assert response_filtered.status == "success"
@@ -747,7 +771,7 @@ class TestQueryingIntegration:
 
         # Query by trust level
         high_trust = agent_registry.query_agents(min_trust_level=0.8)
-        assert len(high_trust) >= 1 # Only alice has >= 0.8
+        assert len(high_trust) >= 1  # Only alice has >= 0.8
         assert all(a.get("trust_level", 0) >= 0.8 for a in high_trust)
 
 
@@ -764,14 +788,13 @@ class TestConcurrencyIntegration:
 
         def submit_proposal(index):
             try:
-                proposal_id = lang_registry.submit_proposal({
-                    "id": f"concurrent_{index}",
-                    "type": "ProposalNode"
-                })
+                proposal_id = lang_registry.submit_proposal(
+                    {"id": f"concurrent_{index}", "type": "ProposalNode"}
+                )
                 with lock:
                     results[index] = proposal_id
             except Exception as e:
-                 with lock:
+                with lock:
                     results[index] = f"Error: {e}"
 
         threads = []
@@ -784,9 +807,15 @@ class TestConcurrencyIntegration:
             t.join()
 
         # All submissions should succeed and have unique IDs
-        successful_ids = [v for v in results.values() if not isinstance(v, str) or not v.startswith("Error")]
+        successful_ids = [
+            v
+            for v in results.values()
+            if not isinstance(v, str) or not v.startswith("Error")
+        ]
         print(f"Concurrent submission results: {results}")
-        assert len(successful_ids) == 10, f"Expected 10 successful submissions, got {len(successful_ids)}"
+        assert (
+            len(successful_ids) == 10
+        ), f"Expected 10 successful submissions, got {len(successful_ids)}"
         assert len(set(successful_ids)) == 10, "Proposal IDs were not unique"
 
     def test_concurrent_voting(self, integrated_system):
@@ -796,10 +825,9 @@ class TestConcurrencyIntegration:
         lang_registry = integrated_system["lang_evolution_registry"]
 
         # Submit proposal
-        proposal_id = lang_registry.submit_proposal({
-            "id": "vote_concurrent",
-            "type": "ProposalNode"
-        })
+        proposal_id = lang_registry.submit_proposal(
+            {"id": "vote_concurrent", "type": "ProposalNode"}
+        )
 
         errors = []
         lock = threading.Lock()
@@ -808,7 +836,7 @@ class TestConcurrencyIntegration:
             try:
                 consensus_node = {
                     "proposal_id": proposal_id,
-                    "votes": {agent_id: vote} # Each thread adds its own vote
+                    "votes": {agent_id: vote},  # Each thread adds its own vote
                 }
                 lang_registry.record_vote(consensus_node)
             except Exception as e:
@@ -835,7 +863,9 @@ class TestConcurrencyIntegration:
         # Check if all votes were recorded (exact count depends on race conditions if not careful,
         # but all keys should be present if save_record is atomic enough)
         print(f"Final votes: {final_proposal['votes']}")
-        assert len(final_proposal["votes"]) == len(agent_votes), "Not all concurrent votes were recorded"
+        assert len(final_proposal["votes"]) == len(
+            agent_votes
+        ), "Not all concurrent votes were recorded"
         assert final_proposal["votes"]["agent-alice"] == "yes"
         assert final_proposal["votes"]["agent-bob"] == "yes"
         assert final_proposal["votes"]["agent-charlie"] == "no"
@@ -850,10 +880,9 @@ class TestErrorHandlingIntegration:
 
         # Try to vote on nonexistent proposal
         # Expecting it to handle gracefully and return False
-        result = lang_registry.record_vote({
-            "proposal_id": "nonexistent",
-            "votes": {"agent-alice": "yes"}
-        })
+        result = lang_registry.record_vote(
+            {"proposal_id": "nonexistent", "votes": {"agent-alice": "yes"}}
+        )
 
         assert result is False
 
@@ -864,10 +893,10 @@ class TestErrorHandlingIntegration:
 
         # Submit proposal with node having non-JSON bytes content
         malformed_node = Node(
-             id="malformed_data_test",
-             type="ProposalNode",
-             proposed_by=agent_id,
-             proposal_content=b'\x80abc' # Invalid UTF-8
+            id="malformed_data_test",
+            type="ProposalNode",
+            proposed_by=agent_id,
+            proposal_content=b"\x80abc",  # Invalid UTF-8
         )
 
         # **FIX: Calculate signature based on how server *would* parse (even if it fails later)**
@@ -875,18 +904,17 @@ class TestErrorHandlingIntegration:
         node_dict_for_auth = {
             "id": malformed_node.id,
             "type": malformed_node.type,
-            "metadata": {}, # Assume empty if not provided or invalid
+            "metadata": {},  # Assume empty if not provided or invalid
             "proposed_by": malformed_node.proposed_by or agent_id,
             "rationale": malformed_node.rationale,
-            "proposal_content": {} # Represents the failed parse result
+            "proposal_content": {},  # Represents the failed parse result
         }
         correct_signature = calculate_signature(node_dict_for_auth)
 
-
         request = RegisterGraphProposalRequest(
             agent_id=agent_id,
-            signature=correct_signature, # Signature based on expected failure state
-            proposal_node=malformed_node
+            signature=correct_signature,  # Signature based on expected failure state
+            proposal_node=malformed_node,
         )
 
         context = MagicMock()

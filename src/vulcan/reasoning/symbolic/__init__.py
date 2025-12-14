@@ -37,24 +37,56 @@ Features:
 from typing import List
 
 # --- Advanced Reasoning Systems ---
-from .advanced import (FuzzyLogicReasoner, MetaReasoner, ProofLearner,
-                       TemporalReasoner)
+from .advanced import FuzzyLogicReasoner, MetaReasoner, ProofLearner, TemporalReasoner
+
 # --- Core Data Structures ---
-from .core import (Clause, Constant, Function, Literal, ProofNode, Term,
-                   Unifier, Variable)
+from .core import (
+    Clause,
+    Constant,
+    Function,
+    Literal,
+    ProofNode,
+    Term,
+    Unifier,
+    Variable,
+)
+
 # --- Parsing Pipeline Components ---
 # All parsing logic is now in `parsing.py`
-from .parsing import (ASTConverter, ASTNode, ClauseExtractor, CNFConverter,
-                      FormulaBuilder, FormulaParser, FormulaUtils, Lexer,
-                      NodeType, Parser, PrenexConverter, SkolemFunction,
-                      Skolemizer, Token, TokenType, VariableRenamer)
+from .parsing import (
+    ASTConverter,
+    ASTNode,
+    ClauseExtractor,
+    CNFConverter,
+    FormulaBuilder,
+    FormulaParser,
+    FormulaUtils,
+    Lexer,
+    NodeType,
+    Parser,
+    PrenexConverter,
+    SkolemFunction,
+    Skolemizer,
+    Token,
+    TokenType,
+    VariableRenamer,
+)
+
 # --- Theorem Provers ---
-from .provers import (BaseProver, ConnectionMethodProver,
-                      ModelEliminationProver, NaturalDeductionProver,
-                      ParallelProver, ResolutionProver, TableauProver)
+from .provers import (
+    BaseProver,
+    ConnectionMethodProver,
+    ModelEliminationProver,
+    NaturalDeductionProver,
+    ParallelProver,
+    ResolutionProver,
+    TableauProver,
+)
+
 # --- Main Reasoner Interface ---
 # This class integrates all the above components.
 from .reasoner import HybridReasoner, ProbabilisticReasoner, SymbolicReasoner
+
 # --- Other Solvers ---
 from .solvers import BayesianNetworkReasoner, CSPSolver, VariableType
 

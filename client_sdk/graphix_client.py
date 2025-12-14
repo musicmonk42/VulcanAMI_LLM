@@ -44,19 +44,28 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 class GraphixClientError(Exception):
     """Base exception for Graphix client errors"""
+
     pass
+
 
 class RetryConfig:
     """Configuration for retry logic"""
-    def __init__(self, max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 30.0):
+
+    def __init__(
+        self, max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 30.0
+    ):
         self.max_retries = max_retries
         self.base_delay = base_delay
         self.max_delay = max_delay
+
 
 class GraphixClient:
     """
@@ -74,7 +83,7 @@ class GraphixClient:
         private_key_path: Optional[str] = None,
         api_key: Optional[str] = None,
         timeout: int = 30,
-        retry_config: Optional[RetryConfig] = None
+        retry_config: Optional[RetryConfig] = None,
     ):
         """
         Initialize Graphix client.
@@ -89,9 +98,17 @@ class GraphixClient:
             timeout: Request timeout in seconds
             retry_config: Retry configuration
         """
-        self.registry_endpoint = registry_endpoint.rstrip('/')
-        self.executor_endpoint = executor_endpoint.rstrip('/') if executor_endpoint else registry_endpoint.rstrip('/')
-        self.audit_endpoint = audit_endpoint.rstrip('/') if audit_endpoint else registry_endpoint.rstrip('/')
+        self.registry_endpoint = registry_endpoint.rstrip("/")
+        self.executor_endpoint = (
+            executor_endpoint.rstrip("/")
+            if executor_endpoint
+            else registry_endpoint.rstrip("/")
+        )
+        self.audit_endpoint = (
+            audit_endpoint.rstrip("/")
+            if audit_endpoint
+            else registry_endpoint.rstrip("/")
+        )
         self.agent_id = agent_id
         self.api_key = api_key or os.environ.get("GRAPHIX_API_KEY")
         self.timeout = timeout
@@ -111,7 +128,7 @@ class GraphixClient:
         # Load private key
         if private_key_path:
             try:
-                with open(private_key_path, 'rb') as f:
+                with open(private_key_path, "rb") as f:
                     self.private_key = serialization.load_pem_private_key(
                         f.read(), password=None
                     )
@@ -126,7 +143,7 @@ class GraphixClient:
         schema_path = client_dir.parent / "schemas" / "graph_v3_4_0.json"
         try:
             if schema_path.exists():
-                with open(schema_path, 'r') as f:
+                with open(schema_path, "r") as f:
                     self.schema = json.load(f)
         except Exception as e:
             logger.warning(f"Failed to load schema: {e}")
@@ -148,9 +165,11 @@ class GraphixClient:
         """Checks if the current auth token is expired or non-existent."""
         # Add 5 minute safety buffer to refresh token before it expires
         safety_buffer = timedelta(minutes=5)
-        return (self.auth_token is None or
-                self.token_expiry is None or
-                datetime.utcnow() >= (self.token_expiry - safety_buffer))
+        return (
+            self.auth_token is None
+            or self.token_expiry is None
+            or datetime.utcnow() >= (self.token_expiry - safety_buffer)
+        )
 
     async def _fetch_new_token(self):
         """Simulates fetching a new authentication token from an auth endpoint.
@@ -198,9 +217,14 @@ class GraphixClient:
                 return await method(*args, **kwargs)
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 if attempt == self.retry_config.max_retries:
-                    logger.error(f"Request failed after {self.retry_config.max_retries} retries: {e}")
+                    logger.error(
+                        f"Request failed after {self.retry_config.max_retries} retries: {e}"
+                    )
                     raise GraphixClientError(f"Request failed: {e}")
-                delay = min(self.retry_config.base_delay * (2 ** attempt), self.retry_config.max_delay)
+                delay = min(
+                    self.retry_config.base_delay * (2**attempt),
+                    self.retry_config.max_delay,
+                )
                 logger.warning(f"Request failed, retrying in {delay}s: {e}")
                 await asyncio.sleep(delay)
         return {}
@@ -221,10 +245,9 @@ class GraphixClient:
         signature = self.private_key.sign(
             payload_str.encode(),
             padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
+                mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
             ),
-            hashes.SHA256()
+            hashes.SHA256(),
         )
         return base64.b64encode(signature).decode()
 
@@ -256,7 +279,9 @@ class GraphixClient:
             Active ClientSession
         """
         if self.session is None or self.session.closed:
-            self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout))
+            self.session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.timeout)
+            )
         return self.session
 
     async def health_check(self) -> Dict[str, Any]:
@@ -269,14 +294,17 @@ class GraphixClient:
         cache_key = "health_check"
         async with self.cache_lock:
             cached = self.cache.get(cache_key)
-            if cached and time.time() - cached['timestamp'] < self.cache_ttl:
-                return cached['data']
+            if cached and time.time() - cached["timestamp"] < self.cache_ttl:
+                return cached["data"]
 
         session = await self._ensure_session()
+
         async def do_health_check():
             try:
                 headers = await self._get_headers()
-                async with session.get(f"{self.registry_endpoint}/health", headers=headers) as response:
+                async with session.get(
+                    f"{self.registry_endpoint}/health", headers=headers
+                ) as response:
                     if response.status == 200:
                         return await response.json()
                     raise GraphixClientError(f"Health check failed: {response.status}")
@@ -285,7 +313,7 @@ class GraphixClient:
 
         health = await self._retry_request(do_health_check)
         async with self.cache_lock:
-            self.cache[cache_key] = {'timestamp': time.time(), 'data': health}
+            self.cache[cache_key] = {"timestamp": time.time(), "data": health}
         return health
 
     async def get_status(self) -> Dict[str, Any]:
@@ -298,23 +326,28 @@ class GraphixClient:
         cache_key = "system_status"
         async with self.cache_lock:
             cached = self.cache.get(cache_key)
-            if cached and time.time() - cached['timestamp'] < self.cache_ttl:
-                return cached['data']
+            if cached and time.time() - cached["timestamp"] < self.cache_ttl:
+                return cached["data"]
 
         session = await self._ensure_session()
+
         async def do_get_status():
             try:
                 headers = await self._get_headers()
-                async with session.get(f"{self.registry_endpoint}/status", headers=headers) as response:
+                async with session.get(
+                    f"{self.registry_endpoint}/status", headers=headers
+                ) as response:
                     if response.status == 200:
                         return await response.json()
-                    raise GraphixClientError(f"Status request failed: {response.status}")
+                    raise GraphixClientError(
+                        f"Status request failed: {response.status}"
+                    )
             except aiohttp.ClientError as e:
                 raise GraphixClientError(f"Status request failed: {e}")
 
         status = await self._retry_request(do_get_status)
         async with self.cache_lock:
-            self.cache[cache_key] = {'timestamp': time.time(), 'data': status}
+            self.cache[cache_key] = {"timestamp": time.time(), "data": status}
         return status
 
     async def submit_graph_proposal(self, graph: Dict[str, Any]) -> Dict[str, Any]:
@@ -329,29 +362,40 @@ class GraphixClient:
         """
         self._validate_graph(graph)
         payload = {
-            'agent_id': self.agent_id,
-            'graph': graph,
-            'timestamp': datetime.utcnow().isoformat(),
-            'proposal_id': str(uuid.uuid4())
+            "agent_id": self.agent_id,
+            "graph": graph,
+            "timestamp": datetime.utcnow().isoformat(),
+            "proposal_id": str(uuid.uuid4()),
         }
-        payload['signature'] = self._sign_request(payload)
+        payload["signature"] = self._sign_request(payload)
 
         session = await self._ensure_session()
+
         async def do_submit():
             try:
                 headers = await self._get_headers()
-                async with session.post(f"{self.registry_endpoint}/ir/propose", json=payload, headers=headers) as response:
+                async with session.post(
+                    f"{self.registry_endpoint}/ir/propose",
+                    json=payload,
+                    headers=headers,
+                ) as response:
                     if response.status == 200:
                         return await response.json()
-                    raise GraphixClientError(f"Proposal submission failed: {response.status}")
+                    raise GraphixClientError(
+                        f"Proposal submission failed: {response.status}"
+                    )
             except aiohttp.ClientError as e:
                 raise GraphixClientError(f"Proposal submission failed: {e}")
 
         response = await self._retry_request(do_submit)
-        logger.info(f"Submitted proposal {payload['proposal_id']} for graph {graph['id']}")
+        logger.info(
+            f"Submitted proposal {payload['proposal_id']} for graph {graph['id']}"
+        )
         return response
 
-    async def vote_on_proposal(self, proposal_id: str, vote: str, rationale: str) -> Dict[str, Any]:
+    async def vote_on_proposal(
+        self, proposal_id: str, vote: str, rationale: str
+    ) -> Dict[str, Any]:
         """
         Vote on a graph proposal.
 
@@ -367,22 +411,27 @@ class GraphixClient:
             raise GraphixClientError("Vote must be 'yes' or 'no'")
 
         payload = {
-            'agent_id': self.agent_id,
-            'proposal_id': proposal_id,
-            'vote': vote,
-            'rationale': rationale,
-            'timestamp': datetime.utcnow().isoformat()
+            "agent_id": self.agent_id,
+            "proposal_id": proposal_id,
+            "vote": vote,
+            "rationale": rationale,
+            "timestamp": datetime.utcnow().isoformat(),
         }
-        payload['signature'] = self._sign_request(payload)
+        payload["signature"] = self._sign_request(payload)
 
         session = await self._ensure_session()
+
         async def do_vote():
             try:
                 headers = await self._get_headers()
-                async with session.post(f"{self.registry_endpoint}/ir/vote", json=payload, headers=headers) as response:
+                async with session.post(
+                    f"{self.registry_endpoint}/ir/vote", json=payload, headers=headers
+                ) as response:
                     if response.status == 200:
                         return await response.json()
-                    raise GraphixClientError(f"Vote submission failed: {response.status}")
+                    raise GraphixClientError(
+                        f"Vote submission failed: {response.status}"
+                    )
             except aiohttp.ClientError as e:
                 raise GraphixClientError(f"Vote submission failed: {e}")
 
@@ -402,18 +451,23 @@ class GraphixClient:
         """
         self._validate_graph(graph)
         payload = {
-            'agent_id': self.agent_id,
-            'graph': graph,
-            'timestamp': datetime.utcnow().isoformat(),
-            'execution_id': str(uuid.uuid4())
+            "agent_id": self.agent_id,
+            "graph": graph,
+            "timestamp": datetime.utcnow().isoformat(),
+            "execution_id": str(uuid.uuid4()),
         }
-        payload['signature'] = self._sign_request(payload)
+        payload["signature"] = self._sign_request(payload)
 
         session = await self._ensure_session()
+
         async def do_execute():
             try:
                 headers = await self._get_headers()
-                async with session.post(f"{self.executor_endpoint}/ir/execute", json=payload, headers=headers) as response:
+                async with session.post(
+                    f"{self.executor_endpoint}/ir/execute",
+                    json=payload,
+                    headers=headers,
+                ) as response:
                     if response.status == 200:
                         return await response.json()
                     raise GraphixClientError(f"Execution failed: {response.status}")
@@ -421,7 +475,9 @@ class GraphixClient:
                 raise GraphixClientError(f"Execution failed: {e}")
 
         response = await self._retry_request(do_execute)
-        logger.info(f"Executed graph {graph['id']} with execution ID {payload['execution_id']}")
+        logger.info(
+            f"Executed graph {graph['id']} with execution ID {payload['execution_id']}"
+        )
         return response
 
     async def get_audit_log(self, limit: int = 10, offset: int = 0) -> Dict[str, Any]:
@@ -436,21 +492,26 @@ class GraphixClient:
             Audit log dictionary
         """
         payload = {
-            'agent_id': self.agent_id,
-            'limit': limit,
-            'offset': offset,
-            'timestamp': datetime.utcnow().isoformat()
+            "agent_id": self.agent_id,
+            "limit": limit,
+            "offset": offset,
+            "timestamp": datetime.utcnow().isoformat(),
         }
-        payload['signature'] = self._sign_request(payload)
+        payload["signature"] = self._sign_request(payload)
 
         session = await self._ensure_session()
+
         async def do_get_audit():
             try:
                 headers = await self._get_headers()
-                async with session.post(f"{self.audit_endpoint}/audit/logs", json=payload, headers=headers) as response:
+                async with session.post(
+                    f"{self.audit_endpoint}/audit/logs", json=payload, headers=headers
+                ) as response:
                     if response.status == 200:
                         return await response.json()
-                    raise GraphixClientError(f"Audit log retrieval failed: {response.status}")
+                    raise GraphixClientError(
+                        f"Audit log retrieval failed: {response.status}"
+                    )
             except aiohttp.ClientError as e:
                 raise GraphixClientError(f"Audit log retrieval failed: {e}")
 
@@ -458,18 +519,26 @@ class GraphixClient:
         logger.info(f"Retrieved {len(response.get('entries', []))} audit log entries")
         return response
 
-    async def connect_websocket(self, event_handler: Callable[[Dict[str, Any]], Awaitable[None]]) -> None:
+    async def connect_websocket(
+        self, event_handler: Callable[[Dict[str, Any]], Awaitable[None]]
+    ) -> None:
         """
         Connect to WebSocket for real-time event handling.
 
         Args:
             event_handler: Async callback function to handle events
         """
+
         async def websocket_loop():
             try:
                 headers = await self._get_headers()
                 # Properly convert HTTP/HTTPS to WS/WSS
-                ws_url = self.registry_endpoint.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws'
+                ws_url = (
+                    self.registry_endpoint.replace("https://", "wss://").replace(
+                        "http://", "ws://"
+                    )
+                    + "/ws"
+                )
                 # Reuse self.session instead of creating a new one
                 session = await self._ensure_session()
                 async with session.ws_connect(ws_url, headers=headers) as ws:
@@ -516,6 +585,7 @@ class GraphixClient:
         """Async context manager exit."""
         await self.close()
 
+
 # Example usage
 async def main():
     """Comprehensive example usage of GraphixClient."""
@@ -524,7 +594,7 @@ async def main():
         executor_endpoint="http://localhost:8788",
         audit_endpoint="http://localhost:8789",
         agent_id="agent-grok",
-        private_key_path="keys/agent-grok.pem"
+        private_key_path="keys/agent-grok.pem",
     ) as client:
         # Health check
         health = await client.health_check()
@@ -540,14 +610,22 @@ async def main():
             "id": "comprehensive_test",
             "type": "Graph",
             "nodes": [
-                {"id": "input", "type": "InputNode", "value": "Hello, Production Graphix!"},
-                {"id": "process", "type": "GenerativeAINode", "prompt": "Process: {input}"},
-                {"id": "output", "type": "OutputNode"}
+                {
+                    "id": "input",
+                    "type": "InputNode",
+                    "value": "Hello, Production Graphix!",
+                },
+                {
+                    "id": "process",
+                    "type": "GenerativeAINode",
+                    "prompt": "Process: {input}",
+                },
+                {"id": "output", "type": "OutputNode"},
             ],
             "edges": [
                 {"id": "e1", "from": "input", "to": "process", "type": "data"},
-                {"id": "e2", "from": "process", "to": "output", "type": "data"}
-            ]
+                {"id": "e2", "from": "process", "to": "output", "type": "data"},
+            ],
         }
 
         # Submit with automatic validation and retry
@@ -558,9 +636,7 @@ async def main():
         # Vote on the proposal
         if response.get("status") == "success":
             vote_response = await client.vote_on_proposal(
-                test_graph["id"],
-                "approve",
-                "Comprehensive test looks good"
+                test_graph["id"], "approve", "Comprehensive test looks good"
             )
             print(f"🗳️ Vote response: {vote_response}")
 
@@ -582,6 +658,7 @@ async def main():
             await asyncio.sleep(30)  # Listen for 30 seconds
         except KeyboardInterrupt:
             print("\n👋 Shutting down...")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

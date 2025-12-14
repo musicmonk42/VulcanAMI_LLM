@@ -33,15 +33,19 @@ from unittest.mock import Mock, patch
 import pytest
 
 # Import components to test
-from vulcan.world_model.meta_reasoning import (CuriosityRewardShaper, EthicalBoundaryMonitor,
-                                               InternalCritic,
-                                               MotivationalIntrospection,
-                                               Objective,
-                                               ObjectiveNegotiator,
-                                               ObjectiveType,
-                                               PreferenceLearner,
-                                               SelfImprovementDrive, ValidationOutcome,
-                                               ValueEvolutionTracker)
+from vulcan.world_model.meta_reasoning import (
+    CuriosityRewardShaper,
+    EthicalBoundaryMonitor,
+    InternalCritic,
+    MotivationalIntrospection,
+    Objective,
+    ObjectiveNegotiator,
+    ObjectiveType,
+    PreferenceLearner,
+    SelfImprovementDrive,
+    ValidationOutcome,
+    ValueEvolutionTracker,
+)
 
 
 # Mock world_model for integration testing
@@ -201,9 +205,9 @@ def test_4_pattern_learning_and_prediction(mock_world_model, design_spec):
         tracker.record_validation(
             proposal,
             outcome,
-            actual_outcome="success"
-            if outcome == ValidationOutcome.APPROVED
-            else "failure",
+            actual_outcome=(
+                "success" if outcome == ValidationOutcome.APPROVED else "failure"
+            ),
         )
     stats = tracker.get_statistics()
     assert stats is not None

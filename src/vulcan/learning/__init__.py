@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 # Make torch import conditional to allow module import even without torch
 try:
     import torch
+
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
@@ -38,10 +39,12 @@ TORCH_DEPENDENT_COMPONENTS = [
 ]
 
 # Import torch-free components
-from .curriculum_learning import (CurriculumLearner,
-                                  LearnedDifficultyEstimator, PacingStrategy)
-from .learning_types import (FeedbackData, LearningConfig, LearningMode,
-                             TaskInfo)
+from .curriculum_learning import (
+    CurriculumLearner,
+    LearnedDifficultyEstimator,
+    PacingStrategy,
+)
+from .learning_types import FeedbackData, LearningConfig, LearningMode, TaskInfo
 from .parameter_history import ParameterHistoryManager
 
 # Import torch-dependent components conditionally
@@ -49,7 +52,7 @@ if TORCH_AVAILABLE:
     try:
         from .continual_learning import ContinualLearner, EnhancedContinualLearner
         from .meta_learning import MetaLearner, MetaLearningAlgorithm, TaskDetector
-        from .metacognition import (CompositionalUnderstanding, MetaCognitiveMonitor)
+        from .metacognition import CompositionalUnderstanding, MetaCognitiveMonitor
         from .rlhf_feedback import LiveFeedbackProcessor, RLHFManager
     except Exception as e:
         logger.error(f"Failed to import torch-dependent learning components: {e}")
@@ -103,7 +106,9 @@ class UnifiedLearningSystem:
                 use_progressive=True,
             )
         else:
-            logger.warning("EnhancedContinualLearner not available (torch not installed or import failed)")
+            logger.warning(
+                "EnhancedContinualLearner not available (torch not installed or import failed)"
+            )
             self.continual_learner = None
 
         # CRITICAL: Connect metacognitive monitor AFTER continual learner is initialized

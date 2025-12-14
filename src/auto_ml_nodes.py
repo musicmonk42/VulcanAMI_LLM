@@ -129,9 +129,9 @@ class RandomNode:
                     compression_meta = {
                         "compression": "ITU F.748.53",
                         "valid": compression_ok,
-                        "compressed_size": len(compressed)
-                        if hasattr(compressed, "__len__")
-                        else None,
+                        "compressed_size": (
+                            len(compressed) if hasattr(compressed, "__len__") else None
+                        ),
                     }
 
                     if not compression_ok:
@@ -208,12 +208,12 @@ class RandomNode:
                 "distribution": distribution,
                 "energy_nj": energy_nj,
                 "compression_ok": False,
-                "compression_meta": compression_meta
-                if compression_meta
-                else {"error": "Not attempted"},
-                "photonic_meta": photonic_meta
-                if photonic_meta
-                else {"error": "Not attempted"},
+                "compression_meta": (
+                    compression_meta if compression_meta else {"error": "Not attempted"}
+                ),
+                "photonic_meta": (
+                    photonic_meta if photonic_meta else {"error": "Not attempted"}
+                ),
                 "ethical_label": ethical_label,
                 "audit": {
                     "timestamp": datetime.utcnow().isoformat(),
@@ -310,9 +310,9 @@ class HyperParamNode:
                     compression_meta = {
                         "compression": "ITU F.748.53",
                         "valid": compression_ok,
-                        "compressed_size": len(compressed)
-                        if hasattr(compressed, "__len__")
-                        else None,
+                        "compressed_size": (
+                            len(compressed) if hasattr(compressed, "__len__") else None
+                        ),
                     }
 
                     if not compression_ok:
@@ -375,9 +375,9 @@ class HyperParamNode:
                 "search_space": None,
                 "strategy": strategy,
                 "compression_ok": False,
-                "compression_meta": compression_meta
-                if compression_meta
-                else {"error": "Not attempted"},
+                "compression_meta": (
+                    compression_meta if compression_meta else {"error": "Not attempted"}
+                ),
                 "ethical_label": ethical_label,
                 "audit": {
                     "timestamp": datetime.utcnow().isoformat(),
@@ -501,9 +501,9 @@ class SearchNode:
                     compression_meta = {
                         "compression": "ITU F.748.53",
                         "valid": compression_ok,
-                        "compressed_size": len(compressed)
-                        if hasattr(compressed, "__len__")
-                        else None,
+                        "compressed_size": (
+                            len(compressed) if hasattr(compressed, "__len__") else None
+                        ),
                     }
 
                     if not compression_ok:
@@ -580,9 +580,11 @@ class SearchNode:
                     "objective_value": float(objective_value),
                     "energy_nj": energy_nj,
                     "compression_ok": compression_ok,
-                    "kernel_audit": kernel_audit
-                    if kernel_audit and "error" not in kernel_audit
-                    else None,
+                    "kernel_audit": (
+                        kernel_audit
+                        if kernel_audit and "error" not in kernel_audit
+                        else None
+                    ),
                     "ethical_label": ethical_label,
                 },
             }
@@ -604,15 +606,15 @@ class SearchNode:
                 "algorithm": algorithm,
                 "energy_nj": energy_nj,
                 "compression_ok": False,
-                "compression_meta": compression_meta
-                if compression_meta
-                else {"error": "Not attempted"},
-                "photonic_meta": photonic_meta
-                if photonic_meta
-                else {"error": "Not attempted"},
-                "kernel_audit": kernel_audit
-                if kernel_audit
-                else {"error": "Not attempted"},
+                "compression_meta": (
+                    compression_meta if compression_meta else {"error": "Not attempted"}
+                ),
+                "photonic_meta": (
+                    photonic_meta if photonic_meta else {"error": "Not attempted"}
+                ),
+                "kernel_audit": (
+                    kernel_audit if kernel_audit else {"error": "Not attempted"}
+                ),
                 "ethical_label": ethical_label,
                 "audit": {
                     "timestamp": datetime.utcnow().isoformat(),

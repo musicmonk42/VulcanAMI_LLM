@@ -155,10 +155,17 @@ __author__ = "VULCAN-AMI Team"
 
 # Import auto_apply_policy with fallback
 try:
-    from .auto_apply_policy import (FileCheckResult, GateFailure, GateSpec,
-                                    GatesReport, Policy, PolicyError,
-                                    check_files_against_policy, load_policy,
-                                    run_gates)
+    from .auto_apply_policy import (
+        FileCheckResult,
+        GateFailure,
+        GateSpec,
+        GatesReport,
+        Policy,
+        PolicyError,
+        check_files_against_policy,
+        load_policy,
+        run_gates,
+    )
 
     _auto_apply_available = True
 except ImportError:

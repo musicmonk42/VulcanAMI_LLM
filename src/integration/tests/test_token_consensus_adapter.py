@@ -2,8 +2,11 @@
 Tests for token_consensus_adapter.py
 """
 
-from token_consensus_adapter import (ConsensusAdapterConfig, ConsensusProposal,
-                                     TokenConsensusAdapter)
+from token_consensus_adapter import (
+    ConsensusAdapterConfig,
+    ConsensusProposal,
+    TokenConsensusAdapter,
+)
 import asyncio
 import sys
 

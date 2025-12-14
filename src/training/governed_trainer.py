@@ -100,8 +100,10 @@ except ImportError:
 
 # ============================= FALLBACK MODEL ============================= #
 try:
-    from src.llm_core.graphix_transformer import (GraphixTransformer,
-                                                  GraphixTransformerConfig)
+    from src.llm_core.graphix_transformer import (
+        GraphixTransformer,
+        GraphixTransformerConfig,
+    )
 except ImportError:
 
     class GraphixTransformerConfig:
@@ -1230,9 +1232,11 @@ class GovernedTrainer:
             "loss_statistics": {
                 "min": min(self.loss_history) if self.loss_history else None,
                 "max": max(self.loss_history) if self.loss_history else None,
-                "mean": sum(self.loss_history) / len(self.loss_history)
-                if self.loss_history
-                else None,
+                "mean": (
+                    sum(self.loss_history) / len(self.loss_history)
+                    if self.loss_history
+                    else None
+                ),
             },
         }
 

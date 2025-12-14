@@ -13,15 +13,27 @@ from unittest.mock import Mock
 import pytest
 
 from vulcan.curiosity_engine.curiosity_engine_core import (
-    CuriosityEngine, ExplorationFrontier)
+    CuriosityEngine,
+    ExplorationFrontier,
+)
 from vulcan.curiosity_engine.dependency_graph import (
-    CycleAwareDependencyGraph, DependencyAnalyzer, ROICalculator)
+    CycleAwareDependencyGraph,
+    DependencyAnalyzer,
+    ROICalculator,
+)
 from vulcan.curiosity_engine.experiment_generator import (
-    Experiment, ExperimentGenerator, ExperimentType, FailureType, IterativeExperimentDesigner)
-from vulcan.curiosity_engine.exploration_budget import (CostEstimator,
-                                                        DynamicBudget,
-                                                        ResourceMonitor)
-from vulcan.curiosity_engine.gap_analyzer import (GapAnalyzer, KnowledgeGap)
+    Experiment,
+    ExperimentGenerator,
+    ExperimentType,
+    FailureType,
+    IterativeExperimentDesigner,
+)
+from vulcan.curiosity_engine.exploration_budget import (
+    CostEstimator,
+    DynamicBudget,
+    ResourceMonitor,
+)
+from vulcan.curiosity_engine.gap_analyzer import GapAnalyzer, KnowledgeGap
 
 
 class TestGapAnalyzerToGraph:
@@ -266,9 +278,9 @@ class TestExperimentGeneratorToBudget:
 
         # If we generated experiments, we should have been able to select at least one
         if len(experiments) > 0:
-            assert len(selected) > 0, (
-                f"Should have selected at least one experiment from {len(experiments)} available with budget 200.0"
-            )
+            assert (
+                len(selected) > 0
+            ), f"Should have selected at least one experiment from {len(experiments)} available with budget 200.0"
 
 
 class TestBudgetToResourceMonitor:

@@ -31,9 +31,17 @@ Example:
 from .field import CURVE_ORDER, FieldElement
 from .polynomial import Polynomial
 from .qap import QAP, compute_h_polynomial, r1cs_to_qap
-from .snark import (Circuit, Groth16Proof, Groth16Prover, ProvingKey,
-                    R1CSConstraint, VerificationKey, create_unlearning_circuit,
-                    generate_proof_for_unlearning, verify_unlearning_proof)
+from .snark import (
+    Circuit,
+    Groth16Proof,
+    Groth16Prover,
+    ProvingKey,
+    R1CSConstraint,
+    VerificationKey,
+    create_unlearning_circuit,
+    generate_proof_for_unlearning,
+    verify_unlearning_proof,
+)
 
 __all__ = [
     # Field arithmetic

@@ -21,7 +21,10 @@ from unittest.mock import Mock
 import pytest
 
 from vulcan.world_model.meta_reasoning.self_improvement_drive import (
-    FailureType, SelfImprovementDrive, SelfImprovementState)
+    FailureType,
+    SelfImprovementDrive,
+    SelfImprovementState,
+)
 
 
 @pytest.fixture
@@ -516,9 +519,7 @@ class TestTriggers:
 
     def test_should_trigger_by_priority(self, drive):
         """Test triggering by priority comparison"""
-        context = {
-            "other_drives_total_priority": 0.3  # Lower than our 0.8
-        }
+        context = {"other_drives_total_priority": 0.3}  # Lower than our 0.8
 
         result = drive.should_trigger(context)
         assert result is True

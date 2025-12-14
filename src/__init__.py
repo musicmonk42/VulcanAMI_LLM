@@ -1,5 +1,6 @@
 # src/__init__.py
 import logging
+
 _logger = logging.getLogger(__name__)
 
 try:

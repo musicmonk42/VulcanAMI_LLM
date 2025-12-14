@@ -34,14 +34,14 @@ for path in [str(project_root), str(demo_dir), str(src_dir), str(test_dir)]:
 # Store modules to mock - DON'T mock them at module level!
 # They'll be mocked by the mock_demo_modules fixture
 _MODULES_TO_MOCK = [
-    'src.graphix_client',
-    'src.tournament_manager',
-    'src.unified_runtime',
-    'src.nso_aligner',
-    'src.observability_manager',
-    'src.stdio_policy',
-    'src.hardware_dispatcher',
-    'src.security_audit_engine',
+    "src.graphix_client",
+    "src.tournament_manager",
+    "src.unified_runtime",
+    "src.nso_aligner",
+    "src.observability_manager",
+    "src.stdio_policy",
+    "src.hardware_dispatcher",
+    "src.security_audit_engine",
 ]
 
 
@@ -66,8 +66,14 @@ for mod_name in _MODULES_TO_MOCK:
 
 # Import the module under test
 import demo_graphix
-from demo_graphix import (DemoConfig, DemoPhase, EnhancedGraphixDemo,
-                          PersistentResultCache, StepResult, setup_logging)
+from demo_graphix import (
+    DemoConfig,
+    DemoPhase,
+    EnhancedGraphixDemo,
+    PersistentResultCache,
+    StepResult,
+    setup_logging,
+)
 
 # IMMEDIATELY restore original modules after import to prevent pollution
 _restore_modules(_temp_mocks)
@@ -76,6 +82,7 @@ _restore_modules(_temp_mocks)
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture(autouse=True)
 def mock_demo_modules():
@@ -121,7 +128,7 @@ def demo_config(temp_output_dir):
         registry_endpoint="http://localhost:5000",
         agent_endpoint="http://127.0.0.1:8000",
         verify_ssl=False,
-        trusted_hosts=["localhost", "127.0.0.1"]
+        trusted_hosts=["localhost", "127.0.0.1"],
     )
 
 
@@ -132,27 +139,28 @@ def mock_graph():
         "id": "test_graph_123",
         "nodes": [{"id": "n1"}, {"id": "n2"}],
         "edges": [{"from": "n1", "to": "n2"}],
-        "metadata": {
-            "goal": "test",
-            "ethical_label": "EU2025:Safe"
-        }
+        "metadata": {"goal": "test", "ethical_label": "EU2025:Safe"},
     }
 
 
 @pytest.fixture
 def mock_components():
     """Mock all external components."""
-    with patch('demo_graphix.GraphixClient') as mock_client, \
-         patch('demo_graphix.TournamentManager') as mock_tournament, \
-         patch('demo_graphix.UnifiedRuntime') as mock_runtime, \
-         patch('demo_graphix.NSOAligner') as mock_nso, \
-         patch('demo_graphix.ObservabilityManager') as mock_obs, \
-         patch('demo_graphix.HardwareDispatcher') as mock_hardware, \
-         patch('demo_graphix.SecurityAuditEngine') as mock_audit:
+    with (
+        patch("demo_graphix.GraphixClient") as mock_client,
+        patch("demo_graphix.TournamentManager") as mock_tournament,
+        patch("demo_graphix.UnifiedRuntime") as mock_runtime,
+        patch("demo_graphix.NSOAligner") as mock_nso,
+        patch("demo_graphix.ObservabilityManager") as mock_obs,
+        patch("demo_graphix.HardwareDispatcher") as mock_hardware,
+        patch("demo_graphix.SecurityAuditEngine") as mock_audit,
+    ):
 
         # Setup return values
         mock_client_instance = Mock()
-        mock_client_instance.submit_graph_proposal = AsyncMock(return_value={"id": "generated"})
+        mock_client_instance.submit_graph_proposal = AsyncMock(
+            return_value={"id": "generated"}
+        )
         mock_client.return_value = mock_client_instance
 
         mock_tournament_instance = Mock()
@@ -160,7 +168,9 @@ def mock_components():
         mock_tournament.return_value = mock_tournament_instance
 
         mock_runtime_instance = Mock()
-        mock_runtime_instance.execute_graph = AsyncMock(return_value={"status": "completed"})
+        mock_runtime_instance.execute_graph = AsyncMock(
+            return_value={"status": "completed"}
+        )
         mock_runtime.return_value = mock_runtime_instance
 
         mock_nso_instance = Mock()
@@ -173,11 +183,9 @@ def mock_components():
         mock_obs.return_value = mock_obs_instance
 
         mock_hardware_instance = Mock()
-        mock_hardware_instance.get_photonic_params = AsyncMock(return_value={
-            "energy_nj": 0.4,
-            "latency_ps": 50,
-            "source": "hardware"
-        })
+        mock_hardware_instance.get_photonic_params = AsyncMock(
+            return_value={"energy_nj": 0.4, "latency_ps": 50, "source": "hardware"}
+        )
         mock_hardware.return_value = mock_hardware_instance
 
         mock_audit_instance = Mock()
@@ -191,7 +199,7 @@ def mock_components():
             "nso": mock_nso_instance,
             "obs": mock_obs_instance,
             "hardware": mock_hardware_instance,
-            "audit": mock_audit_instance
+            "audit": mock_audit_instance,
         }
 
 
@@ -199,12 +207,15 @@ def mock_components():
 # Test PersistentResultCache
 # ============================================================================
 
+
 class TestPersistentResultCache:
     """Test cache functionality."""
 
     def test_cache_init_enabled(self, temp_output_dir):
         """Test cache initialization when enabled."""
-        cache = PersistentResultCache(enabled=True, cache_file=temp_output_dir / "cache.pkl")
+        cache = PersistentResultCache(
+            enabled=True, cache_file=temp_output_dir / "cache.pkl"
+        )
         assert cache.enabled is True
         assert cache._cache == {}
 
@@ -286,16 +297,14 @@ class TestPersistentResultCache:
 # Test DemoConfig and StepResult
 # ============================================================================
 
+
 class TestDataClasses:
     """Test data classes."""
 
     def test_demo_config_defaults(self, temp_output_dir):
         """Test DemoConfig default values."""
         config = DemoConfig(
-            graph_type="test",
-            photonic=True,
-            output_dir=temp_output_dir,
-            verbose=False
+            graph_type="test", photonic=True, output_dir=temp_output_dir, verbose=False
         )
 
         assert config.max_retries == 3
@@ -311,7 +320,7 @@ class TestDataClasses:
             duration_ms=123.45,
             data={"key": "value"},
             retries=2,
-            data_source="real"
+            data_source="real",
         )
 
         assert result.step_name == "test_step"
@@ -324,10 +333,7 @@ class TestDataClasses:
     def test_step_result_optional_fields(self):
         """Test StepResult with optional fields."""
         result = StepResult(
-            step_name="test",
-            status="failure",
-            duration_ms=100.0,
-            error="Test error"
+            step_name="test", status="failure", duration_ms=100.0, error="Test error"
         )
 
         assert result.error == "Test error"
@@ -337,6 +343,7 @@ class TestDataClasses:
 # ============================================================================
 # Test EnhancedGraphixDemo Initialization
 # ============================================================================
+
 
 class TestEnhancedGraphixDemoInit:
     """Test demo initialization."""
@@ -361,7 +368,9 @@ class TestEnhancedGraphixDemoInit:
         # Should not raise any exceptions
         assert demo.client is not None
 
-    def test_validate_endpoints_untrusted_warning(self, demo_config, mock_components, capsys):
+    def test_validate_endpoints_untrusted_warning(
+        self, demo_config, mock_components, capsys
+    ):
         """Test warning for untrusted endpoints."""
         demo_config.registry_endpoint = "http://untrusted.example.com:5000"
         demo_config.trusted_hosts = ["localhost"]
@@ -374,7 +383,7 @@ class TestEnhancedGraphixDemoInit:
 
     def test_component_init_failure_handling(self, demo_config):
         """Test graceful handling of component initialization failures."""
-        with patch('demo_graphix.GraphixClient', side_effect=Exception("Init failed")):
+        with patch("demo_graphix.GraphixClient", side_effect=Exception("Init failed")):
             demo = EnhancedGraphixDemo(demo_config)
             assert demo.client is None
 
@@ -382,6 +391,7 @@ class TestEnhancedGraphixDemoInit:
 # ============================================================================
 # Test Retry Logic
 # ============================================================================
+
 
 class TestRetryLogic:
     """Test retry mechanisms."""
@@ -399,16 +409,20 @@ class TestRetryLogic:
         assert mock_func.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_retry_async_success_after_retries(self, demo_config, mock_components):
+    async def test_retry_async_success_after_retries(
+        self, demo_config, mock_components
+    ):
         """Test async retry succeeds after failures."""
         demo = EnhancedGraphixDemo(demo_config)
         demo.config.max_retries = 3
 
-        mock_func = AsyncMock(side_effect=[
-            Exception("First failure"),
-            Exception("Second failure"),
-            "success"
-        ])
+        mock_func = AsyncMock(
+            side_effect=[
+                Exception("First failure"),
+                Exception("Second failure"),
+                "success",
+            ]
+        )
 
         result, retries = await demo._retry_async(mock_func)
 
@@ -444,11 +458,9 @@ class TestRetryLogic:
         demo = EnhancedGraphixDemo(demo_config)
         demo.config.max_retries = 3
 
-        mock_func = Mock(side_effect=[
-            Exception("Fail 1"),
-            Exception("Fail 2"),
-            "success"
-        ])
+        mock_func = Mock(
+            side_effect=[Exception("Fail 1"), Exception("Fail 2"), "success"]
+        )
 
         result, retries = demo._retry_sync(mock_func)
 
@@ -460,11 +472,14 @@ class TestRetryLogic:
 # Test Demo Phases
 # ============================================================================
 
+
 class TestGenerateGraph:
     """Test graph generation phase."""
 
     @pytest.mark.asyncio
-    async def test_generate_graph_success(self, demo_config, mock_components, mock_graph):
+    async def test_generate_graph_success(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test successful graph generation."""
         demo = EnhancedGraphixDemo(demo_config)
         mock_components["client"].submit_graph_proposal.return_value = mock_graph
@@ -477,7 +492,9 @@ class TestGenerateGraph:
         assert (demo.config.output_dir / "generated_graph.json").exists()
 
     @pytest.mark.asyncio
-    async def test_generate_graph_cached(self, demo_config, mock_components, mock_graph):
+    async def test_generate_graph_cached(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test graph generation with cache hit."""
         demo = EnhancedGraphixDemo(demo_config)
 
@@ -495,7 +512,9 @@ class TestGenerateGraph:
     async def test_generate_graph_failure(self, demo_config, mock_components):
         """Test graph generation failure."""
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["client"].submit_graph_proposal.side_effect = Exception("Generation failed")
+        mock_components["client"].submit_graph_proposal.side_effect = Exception(
+            "Generation failed"
+        )
 
         result = await demo.generate_graph()
 
@@ -506,7 +525,7 @@ class TestGenerateGraph:
     @pytest.mark.asyncio
     async def test_generate_graph_no_client(self, demo_config):
         """Test graph generation without client."""
-        with patch('demo_graphix.GraphixClient', None):
+        with patch("demo_graphix.GraphixClient", None):
             demo = EnhancedGraphixDemo(demo_config)
             demo.client = None
 
@@ -537,7 +556,9 @@ class TestEvolveGraph:
     async def test_evolve_graph_failure(self, demo_config, mock_components, mock_graph):
         """Test graph evolution failure."""
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["tournament"].run_adaptive_tournament.side_effect = Exception("Evolution failed")
+        mock_components["tournament"].run_adaptive_tournament.side_effect = Exception(
+            "Evolution failed"
+        )
 
         result = await demo.evolve_graph(mock_graph)
 
@@ -547,7 +568,7 @@ class TestEvolveGraph:
     @pytest.mark.asyncio
     async def test_evolve_graph_no_tournament(self, demo_config, mock_graph):
         """Test evolution without tournament manager."""
-        with patch('demo_graphix.TournamentManager', None):
+        with patch("demo_graphix.TournamentManager", None):
             demo = EnhancedGraphixDemo(demo_config)
             demo.tournament = None
 
@@ -560,7 +581,9 @@ class TestExecuteGraph:
     """Test graph execution phase."""
 
     @pytest.mark.asyncio
-    async def test_execute_graph_success(self, demo_config, mock_components, mock_graph):
+    async def test_execute_graph_success(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test successful graph execution."""
         demo = EnhancedGraphixDemo(demo_config)
 
@@ -572,7 +595,9 @@ class TestExecuteGraph:
         assert (demo.config.output_dir / "execution_result.json").exists()
 
     @pytest.mark.asyncio
-    async def test_execute_graph_with_photonic_hardware(self, demo_config, mock_components, mock_graph):
+    async def test_execute_graph_with_photonic_hardware(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test execution with photonic hardware."""
         demo_config.photonic = True
         demo = EnhancedGraphixDemo(demo_config)
@@ -583,11 +608,15 @@ class TestExecuteGraph:
         assert result.data["photonic_meta"]["data_source"] == "hardware"
 
     @pytest.mark.asyncio
-    async def test_execute_graph_hardware_fallback(self, demo_config, mock_components, mock_graph):
+    async def test_execute_graph_hardware_fallback(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test fallback to simulation when hardware fails."""
         demo_config.photonic = True
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["hardware"].get_photonic_params.side_effect = Exception("Hardware unavailable")
+        mock_components["hardware"].get_photonic_params.side_effect = Exception(
+            "Hardware unavailable"
+        )
 
         result = await demo.execute_graph(mock_graph)
 
@@ -595,7 +624,9 @@ class TestExecuteGraph:
         assert result.data["photonic_meta"]["data_source"] == "simulation_fallback"
 
     @pytest.mark.asyncio
-    async def test_execute_graph_timeout(self, demo_config, mock_components, mock_graph):
+    async def test_execute_graph_timeout(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test execution timeout."""
         demo = EnhancedGraphixDemo(demo_config)
         demo.config.timeout_seconds = 0.1
@@ -612,10 +643,14 @@ class TestExecuteGraph:
         assert "timeout" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_execute_graph_failure(self, demo_config, mock_components, mock_graph):
+    async def test_execute_graph_failure(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test execution failure."""
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["runtime"].execute_graph.side_effect = Exception("Execution failed")
+        mock_components["runtime"].execute_graph.side_effect = Exception(
+            "Execution failed"
+        )
 
         result = await demo.execute_graph(mock_graph)
 
@@ -626,7 +661,9 @@ class TestValidateEthics:
     """Test ethics validation phase."""
 
     @pytest.mark.asyncio
-    async def test_validate_ethics_success(self, demo_config, mock_components, mock_graph):
+    async def test_validate_ethics_success(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test successful ethics validation."""
         demo = EnhancedGraphixDemo(demo_config)
 
@@ -638,7 +675,9 @@ class TestValidateEthics:
         assert (demo.config.output_dir / "ethics_report.json").exists()
 
     @pytest.mark.asyncio
-    async def test_validate_ethics_unsafe(self, demo_config, mock_components, mock_graph):
+    async def test_validate_ethics_unsafe(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test unsafe ethics result."""
         demo = EnhancedGraphixDemo(demo_config)
         mock_components["nso"].multi_model_audit.return_value = "unsafe"
@@ -651,7 +690,9 @@ class TestValidateEthics:
         assert result.data["risk_level"] == "medium"
 
     @pytest.mark.asyncio
-    async def test_validate_ethics_with_audit(self, demo_config, mock_components, mock_graph):
+    async def test_validate_ethics_with_audit(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test ethics validation with audit logging."""
         demo = EnhancedGraphixDemo(demo_config)
 
@@ -661,7 +702,9 @@ class TestValidateEthics:
         assert mock_components["audit"].log_event.called
 
     @pytest.mark.asyncio
-    async def test_validate_ethics_failure(self, demo_config, mock_components, mock_graph):
+    async def test_validate_ethics_failure(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test ethics validation failure."""
         demo = EnhancedGraphixDemo(demo_config)
         mock_components["nso"].multi_model_audit.side_effect = Exception("Audit failed")
@@ -675,7 +718,9 @@ class TestGenerateVisualizations:
     """Test visualization generation phase."""
 
     @pytest.mark.asyncio
-    async def test_generate_visualizations_success(self, demo_config, mock_components, mock_graph):
+    async def test_generate_visualizations_success(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test successful visualization generation."""
         demo = EnhancedGraphixDemo(demo_config)
 
@@ -687,16 +732,15 @@ class TestGenerateVisualizations:
         assert (demo.config.output_dir / "visualization_metadata.json").exists()
 
     @pytest.mark.asyncio
-    async def test_generate_visualizations_with_results(self, demo_config, mock_components, mock_graph):
+    async def test_generate_visualizations_with_results(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test visualization with existing results."""
         demo = EnhancedGraphixDemo(demo_config)
 
         # Add some results
         demo.results["test_phase"] = StepResult(
-            step_name="test",
-            status="success",
-            duration_ms=100.0,
-            data_source="real"
+            step_name="test", status="success", duration_ms=100.0, data_source="real"
         )
 
         result = await demo.generate_visualizations(mock_graph)
@@ -705,7 +749,9 @@ class TestGenerateVisualizations:
         assert (demo.config.output_dir / "performance_metrics.json").exists()
 
     @pytest.mark.asyncio
-    async def test_generate_visualizations_failure(self, demo_config, mock_components, mock_graph):
+    async def test_generate_visualizations_failure(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test visualization generation failure."""
         demo = EnhancedGraphixDemo(demo_config)
         mock_components["obs"].export_dashboard.side_effect = Exception("Viz failed")
@@ -719,11 +765,14 @@ class TestGenerateVisualizations:
 # Test Parallel Execution
 # ============================================================================
 
+
 class TestParallelExecution:
     """Test parallel step execution."""
 
     @pytest.mark.asyncio
-    async def test_run_parallel_steps_success(self, demo_config, mock_components, mock_graph):
+    async def test_run_parallel_steps_success(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test successful parallel execution."""
         demo = EnhancedGraphixDemo(demo_config)
 
@@ -735,7 +784,9 @@ class TestParallelExecution:
         assert all(r.status == "success" for r in results.values())
 
     @pytest.mark.asyncio
-    async def test_run_parallel_steps_with_failure(self, demo_config, mock_components, mock_graph):
+    async def test_run_parallel_steps_with_failure(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test parallel execution with one failure."""
         demo = EnhancedGraphixDemo(demo_config)
         mock_components["runtime"].execute_graph.side_effect = Exception("Exec failed")
@@ -752,11 +803,14 @@ class TestParallelExecution:
 # Test Full Demo Run
 # ============================================================================
 
+
 class TestFullDemoRun:
     """Test complete demo execution."""
 
     @pytest.mark.asyncio
-    async def test_run_sequential_success(self, demo_config, mock_components, mock_graph):
+    async def test_run_sequential_success(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test successful sequential demo run."""
         demo_config.parallel = False
         demo = EnhancedGraphixDemo(demo_config)
@@ -785,7 +839,9 @@ class TestFullDemoRun:
     async def test_run_generation_failure_aborts(self, demo_config, mock_components):
         """Test that generation failure aborts demo."""
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["client"].submit_graph_proposal.side_effect = Exception("Gen failed")
+        mock_components["client"].submit_graph_proposal.side_effect = Exception(
+            "Gen failed"
+        )
 
         report = await demo.run()
 
@@ -795,11 +851,15 @@ class TestFullDemoRun:
         assert DemoPhase.EXECUTION.value not in demo.results
 
     @pytest.mark.asyncio
-    async def test_run_evolution_failure_continues(self, demo_config, mock_components, mock_graph):
+    async def test_run_evolution_failure_continues(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test that evolution failure allows demo to continue."""
         demo = EnhancedGraphixDemo(demo_config)
         mock_components["client"].submit_graph_proposal.return_value = mock_graph
-        mock_components["tournament"].run_adaptive_tournament.side_effect = Exception("Evo failed")
+        mock_components["tournament"].run_adaptive_tournament.side_effect = Exception(
+            "Evo failed"
+        )
 
         report = await demo.run()
 
@@ -811,6 +871,7 @@ class TestFullDemoRun:
 # ============================================================================
 # Test Resource Management
 # ============================================================================
+
 
 class TestResourceManagement:
     """Test resource cleanup and context management."""
@@ -840,6 +901,7 @@ class TestResourceManagement:
 # Test Reporting
 # ============================================================================
 
+
 class TestReporting:
     """Test report generation and summary functions."""
 
@@ -853,14 +915,14 @@ class TestReporting:
             status="success",
             duration_ms=100.0,
             retries=1,
-            data_source="real"
+            data_source="real",
         )
         demo.results["phase2"] = StepResult(
             step_name="phase2",
             status="failure",
             duration_ms=50.0,
             error="Test error",
-            data_source="error"
+            data_source="error",
         )
         demo.metrics["total_duration_ms"] = 150.0
 
@@ -875,7 +937,7 @@ class TestReporting:
 
     def test_print_summary(self, demo_config, mock_components):
         """Test summary printing."""
-        with patch('demo_graphix.safe_print') as mock_safe_print:
+        with patch("demo_graphix.safe_print") as mock_safe_print:
             demo = EnhancedGraphixDemo(demo_config)
 
             demo.results["test"] = StepResult(
@@ -883,7 +945,7 @@ class TestReporting:
                 status="success",
                 duration_ms=123.45,
                 retries=2,
-                data_source="real"
+                data_source="real",
             )
             demo.metrics["total_duration_ms"] = 123.45
             demo.metrics["cache_hits"] = 1
@@ -894,13 +956,14 @@ class TestReporting:
             # Verify safe_print was called with expected content
             assert mock_safe_print.called
             # Check that SUMMARY appears in one of the calls
-            calls_text = ' '.join(str(call) for call in mock_safe_print.call_args_list)
+            calls_text = " ".join(str(call) for call in mock_safe_print.call_args_list)
             assert "SUMMARY" in calls_text
 
 
 # ============================================================================
 # Test Simulation Functions
 # ============================================================================
+
 
 class TestSimulation:
     """Test simulation and helper functions."""
@@ -922,45 +985,52 @@ class TestSimulation:
 # Test Main and CLI
 # ============================================================================
 
+
 class TestMain:
     """Test main function and CLI."""
 
-    @patch('demo_graphix.asyncio.run')
-    @patch('sys.argv', ['demo_graphix.py', '--graph-type', 'sentiment_3d'])
+    @patch("demo_graphix.asyncio.run")
+    @patch("sys.argv", ["demo_graphix.py", "--graph-type", "sentiment_3d"])
     def test_main_basic(self, mock_asyncio_run):
         """Test main with basic arguments."""
+
         # Configure mock to properly consume the coroutine
         def consume_coro(coro):
             # Close the coroutine to prevent warning
             coro.close()
+
         mock_asyncio_run.side_effect = consume_coro
 
         demo_graphix.main()
 
         assert mock_asyncio_run.called
 
-    @patch('demo_graphix.asyncio.run')
-    @patch('sys.argv', ['demo_graphix.py', '--photonic', '--parallel', '--verbose'])
+    @patch("demo_graphix.asyncio.run")
+    @patch("sys.argv", ["demo_graphix.py", "--photonic", "--parallel", "--verbose"])
     def test_main_with_options(self, mock_asyncio_run):
         """Test main with multiple options."""
+
         # Configure mock to properly consume the coroutine
         def consume_coro(coro):
             # Close the coroutine to prevent warning
             coro.close()
+
         mock_asyncio_run.side_effect = consume_coro
 
         demo_graphix.main()
 
         assert mock_asyncio_run.called
 
-    @patch('demo_graphix.asyncio.run')
-    @patch('sys.argv', ['demo_graphix.py'])
+    @patch("demo_graphix.asyncio.run")
+    @patch("sys.argv", ["demo_graphix.py"])
     def test_main_keyboard_interrupt(self, mock_asyncio_run):
         """Test main with keyboard interrupt."""
+
         # Configure mock to properly consume the coroutine before raising
         def consume_and_raise(coro):
             coro.close()
             raise KeyboardInterrupt()
+
         mock_asyncio_run.side_effect = consume_and_raise
 
         with pytest.raises(SystemExit) as exc_info:
@@ -968,14 +1038,16 @@ class TestMain:
 
         assert exc_info.value.code == 130
 
-    @patch('demo_graphix.asyncio.run')
-    @patch('sys.argv', ['demo_graphix.py'])
+    @patch("demo_graphix.asyncio.run")
+    @patch("sys.argv", ["demo_graphix.py"])
     def test_main_exception(self, mock_asyncio_run):
         """Test main with exception."""
+
         # Configure mock to properly consume the coroutine before raising
         def consume_and_raise(coro):
             coro.close()
             raise Exception("Fatal error")
+
         mock_asyncio_run.side_effect = consume_and_raise
 
         with pytest.raises(SystemExit) as exc_info:
@@ -987,6 +1059,7 @@ class TestMain:
 # ============================================================================
 # Test Logging Setup
 # ============================================================================
+
 
 class TestLogging:
     """Test logging configuration."""
@@ -1002,6 +1075,7 @@ class TestLogging:
     def test_setup_logging_verbose(self, temp_output_dir):
         """Test verbose logging setup."""
         import logging as log_module
+
         log_file = temp_output_dir / "test_verbose.log"
         logger = setup_logging(verbose=True, log_file=str(log_file))
 
@@ -1013,14 +1087,19 @@ class TestLogging:
 # Additional Edge Cases
 # ============================================================================
 
+
 class TestEdgeCases:
     """Test edge cases and error conditions."""
 
     @pytest.mark.asyncio
-    async def test_get_photonic_metadata_failure(self, demo_config, mock_components, mock_graph):
+    async def test_get_photonic_metadata_failure(
+        self, demo_config, mock_components, mock_graph
+    ):
         """Test photonic metadata retrieval failure."""
         demo = EnhancedGraphixDemo(demo_config)
-        mock_components["hardware"].get_photonic_params.side_effect = Exception("Hardware error")
+        mock_components["hardware"].get_photonic_params.side_effect = Exception(
+            "Hardware error"
+        )
 
         with pytest.raises(Exception):
             await demo._get_photonic_metadata(mock_graph)
@@ -1031,7 +1110,7 @@ class TestEdgeCases:
         cache.set("test", {}, {"data": "test"})
 
         # Mock open to raise exception
-        with patch('builtins.open', side_effect=PermissionError("No permission")):
+        with patch("builtins.open", side_effect=PermissionError("No permission")):
             cache.save()
 
         assert "Failed to save cache" in caplog.text
@@ -1041,8 +1120,8 @@ class TestEdgeCases:
         cache_file = temp_output_dir / "corrupt.pkl"
 
         # Create corrupted cache file
-        with open(cache_file, 'wb') as f:
-            f.write(b'corrupted data')
+        with open(cache_file, "wb") as f:
+            f.write(b"corrupted data")
 
         cache = PersistentResultCache(cache_file=cache_file)
 

@@ -11,8 +11,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import numpy as np
 import pytest
-from self_optimizer import (OptimizationStrategy, PerformanceMetrics,
-                            SelfOptimizer)
+from self_optimizer import OptimizationStrategy, PerformanceMetrics, SelfOptimizer
 
 
 @pytest.fixture
@@ -25,10 +24,12 @@ def temp_dir():
 @pytest.fixture
 def mock_psutil():
     """Mock psutil for testing."""
-    with patch('self_optimizer.psutil') as mock:
+    with patch("self_optimizer.psutil") as mock:
         # Mock Process
         mock_process = MagicMock()
-        mock_process.memory_info.return_value = MagicMock(rss=1024*1024*100)  # 100MB
+        mock_process.memory_info.return_value = MagicMock(
+            rss=1024 * 1024 * 100
+        )  # 100MB
         mock_process.cpu_percent.return_value = 50.0
 
         mock.Process.return_value = mock_process
@@ -44,7 +45,7 @@ def optimizer(mock_psutil):
         target_latency_ms=100,
         target_memory_mb=1000,
         optimization_interval_s=1,
-        enable_auto_tune=True
+        enable_auto_tune=True,
     )
 
 
@@ -58,7 +59,7 @@ class TestPerformanceMetrics:
             throughput_ops=200.0,
             memory_mb=500.0,
             cpu_percent=30.0,
-            gpu_percent=20.0
+            gpu_percent=20.0,
         )
 
         assert metrics.latency_ms == 50.0
@@ -69,10 +70,7 @@ class TestPerformanceMetrics:
     def test_metrics_score_calculation(self):
         """Test performance score calculation."""
         metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         score = metrics.score()
@@ -83,17 +81,11 @@ class TestPerformanceMetrics:
     def test_metrics_score_lower_better(self):
         """Test that lower latency gives better score."""
         metrics_low = PerformanceMetrics(
-            latency_ms=10.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=10.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         metrics_high = PerformanceMetrics(
-            latency_ms=100.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=100.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         assert metrics_low.score() > metrics_high.score()
@@ -101,10 +93,7 @@ class TestPerformanceMetrics:
     def test_metrics_timestamp(self):
         """Test that timestamp is set."""
         metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         assert metrics.timestamp > 0
@@ -116,10 +105,7 @@ class TestOptimizationStrategy:
     def test_strategy_creation(self):
         """Test creating OptimizationStrategy."""
         strategy = OptimizationStrategy(
-            name="test_strategy",
-            enabled=True,
-            priority=5,
-            parameters={"param1": 10}
+            name="test_strategy", enabled=True, priority=5, parameters={"param1": 10}
         )
 
         assert strategy.name == "test_strategy"
@@ -162,7 +148,7 @@ class TestSelfOptimizerInitialization:
             target_latency_ms=200,
             target_memory_mb=2000,
             optimization_interval_s=30,
-            enable_auto_tune=False
+            enable_auto_tune=False,
         )
 
         assert optimizer.target_latency_ms == 200
@@ -175,7 +161,7 @@ class TestSelfOptimizerInitialization:
         optimizer = SelfOptimizer(
             target_latency_ms=-100,  # Invalid
             target_memory_mb=999999,  # Too high
-            optimization_interval_s=0  # Invalid
+            optimization_interval_s=0,  # Invalid
         )
 
         # Should be clamped to valid ranges
@@ -186,8 +172,12 @@ class TestSelfOptimizerInitialization:
     def test_strategies_initialized(self, optimizer):
         """Test that all strategies are initialized."""
         expected_strategies = [
-            'caching', 'batching', 'parallelization',
-            'pruning', 'quantization', 'compilation'
+            "caching",
+            "batching",
+            "parallelization",
+            "pruning",
+            "quantization",
+            "compilation",
         ]
 
         for strategy_name in expected_strategies:
@@ -196,10 +186,10 @@ class TestSelfOptimizerInitialization:
 
     def test_tunable_parameters_initialized(self, optimizer):
         """Test that tunable parameters are initialized."""
-        assert 'batch_size' in optimizer.tunable_parameters
-        assert 'num_workers' in optimizer.tunable_parameters
-        assert 'cache_size' in optimizer.tunable_parameters
-        assert 'learning_rate' in optimizer.tunable_parameters
+        assert "batch_size" in optimizer.tunable_parameters
+        assert "num_workers" in optimizer.tunable_parameters
+        assert "cache_size" in optimizer.tunable_parameters
+        assert "learning_rate" in optimizer.tunable_parameters
 
 
 class TestMetricsCollection:
@@ -215,7 +205,7 @@ class TestMetricsCollection:
 
     def test_collect_metrics_error_handling(self, optimizer):
         """Test metrics collection with errors."""
-        with patch('self_optimizer.psutil.Process', side_effect=Exception("Error")):
+        with patch("self_optimizer.psutil.Process", side_effect=Exception("Error")):
             metrics = optimizer._collect_metrics()
 
         # Should return safe defaults
@@ -232,10 +222,10 @@ class TestMetricsCollection:
         # Add some metrics to history
         for i in range(5):
             metrics = PerformanceMetrics(
-                latency_ms=50.0 + i*10,
+                latency_ms=50.0 + i * 10,
                 throughput_ops=100.0,
                 memory_mb=500.0,
-                cpu_percent=30.0
+                cpu_percent=30.0,
             )
             optimizer.metrics_history.append(metrics)
 
@@ -263,10 +253,7 @@ class TestOptimizationDecisions:
     def test_should_optimize_no_baseline(self, optimizer):
         """Test should_optimize with no baseline."""
         metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         result = optimizer._should_optimize(metrics)
@@ -276,17 +263,14 @@ class TestOptimizationDecisions:
     def test_should_optimize_high_latency(self, optimizer):
         """Test optimization needed due to high latency."""
         optimizer.baseline_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         high_latency_metrics = PerformanceMetrics(
             latency_ms=200.0,  # Much higher than target
             throughput_ops=100.0,
             memory_mb=500.0,
-            cpu_percent=30.0
+            cpu_percent=30.0,
         )
 
         result = optimizer._should_optimize(high_latency_metrics)
@@ -296,17 +280,14 @@ class TestOptimizationDecisions:
     def test_should_optimize_high_memory(self, optimizer):
         """Test optimization needed due to high memory."""
         optimizer.baseline_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         high_memory_metrics = PerformanceMetrics(
             latency_ms=50.0,
             throughput_ops=100.0,
             memory_mb=2000.0,  # Much higher than target
-            cpu_percent=30.0
+            cpu_percent=30.0,
         )
 
         result = optimizer._should_optimize(high_memory_metrics)
@@ -319,97 +300,97 @@ class TestOptimizationStrategies:
 
     def test_optimize_caching_low_hit_rate(self, optimizer):
         """Test caching optimization with low hit rate."""
-        params = {'cache_size': 1000}
-        initial_size = params['cache_size']
+        params = {"cache_size": 1000}
+        initial_size = params["cache_size"]
 
         # Mock low hit rate
-        optimizer.cache_stats['hits'] = 10
-        optimizer.cache_stats['misses'] = 90
+        optimizer.cache_stats["hits"] = 10
+        optimizer.cache_stats["misses"] = 90
 
         result = optimizer._optimize_caching(params)
 
         assert result is True
         # Should increase cache size
-        assert params['cache_size'] >= initial_size
+        assert params["cache_size"] >= initial_size
 
     def test_optimize_caching_high_hit_rate(self, optimizer):
         """Test caching optimization with high hit rate."""
-        params = {'cache_size': 5000}
-        initial_size = params['cache_size']
+        params = {"cache_size": 5000}
+        initial_size = params["cache_size"]
 
         # Mock high hit rate
-        optimizer.cache_stats['hits'] = 95
-        optimizer.cache_stats['misses'] = 5
+        optimizer.cache_stats["hits"] = 95
+        optimizer.cache_stats["misses"] = 5
 
         result = optimizer._optimize_caching(params)
 
         assert result is True
         # Should decrease cache size
-        assert params['cache_size'] <= initial_size
+        assert params["cache_size"] <= initial_size
 
     def test_optimize_batching(self, optimizer):
         """Test batching optimization."""
-        params = {'batch_size': 32}
+        params = {"batch_size": 32}
 
         result = optimizer._optimize_batching(params)
 
         assert result is True
-        assert params['batch_size'] >= SelfOptimizer.MIN_BATCH_SIZE
-        assert params['batch_size'] <= SelfOptimizer.MAX_BATCH_SIZE
+        assert params["batch_size"] >= SelfOptimizer.MIN_BATCH_SIZE
+        assert params["batch_size"] <= SelfOptimizer.MAX_BATCH_SIZE
 
     def test_optimize_parallelization_low_cpu(self, optimizer):
         """Test parallelization with low CPU usage."""
-        params = {'num_workers': 4}
+        params = {"num_workers": 4}
 
         optimizer.current_metrics = PerformanceMetrics(
             latency_ms=50.0,
             throughput_ops=100.0,
             memory_mb=500.0,
-            cpu_percent=30.0  # Low CPU
+            cpu_percent=30.0,  # Low CPU
         )
 
-        initial_workers = params['num_workers']
+        initial_workers = params["num_workers"]
         result = optimizer._optimize_parallelization(params)
 
         assert result is True
         # Should potentially increase workers
-        assert params['num_workers'] >= initial_workers
+        assert params["num_workers"] >= initial_workers
 
     def test_optimize_parallelization_high_cpu(self, optimizer):
         """Test parallelization with high CPU usage."""
-        params = {'num_workers': 8}
+        params = {"num_workers": 8}
 
         optimizer.current_metrics = PerformanceMetrics(
             latency_ms=50.0,
             throughput_ops=100.0,
             memory_mb=500.0,
-            cpu_percent=85.0  # High CPU
+            cpu_percent=85.0,  # High CPU
         )
 
-        initial_workers = params['num_workers']
+        initial_workers = params["num_workers"]
         result = optimizer._optimize_parallelization(params)
 
         assert result is True
         # Should decrease workers
-        assert params['num_workers'] < initial_workers
+        assert params["num_workers"] < initial_workers
 
     def test_optimize_pruning(self, optimizer):
         """Test pruning optimization."""
-        params = {'sparsity': 0.1}
+        params = {"sparsity": 0.1}
 
         result = optimizer._optimize_pruning(params)
 
         assert result is True
-        assert 0.0 <= params['sparsity'] <= 0.9
+        assert 0.0 <= params["sparsity"] <= 0.9
 
     def test_optimize_quantization(self, optimizer):
         """Test quantization optimization."""
-        params = {'bits': 8}
+        params = {"bits": 8}
 
         result = optimizer._optimize_quantization(params)
 
         assert result is True
-        assert 4 <= params['bits'] <= 32
+        assert 4 <= params["bits"] <= 32
 
     def test_optimize_compilation(self, optimizer):
         """Test compilation optimization."""
@@ -418,8 +399,8 @@ class TestOptimizationStrategies:
         result = optimizer._optimize_compilation(params)
 
         assert result is True
-        assert params['optimize'] is True
-        assert params['backend'] == 'jit'
+        assert params["optimize"] is True
+        assert params["backend"] == "jit"
 
 
 class TestParameterEvaluation:
@@ -448,8 +429,8 @@ class TestParameterEvaluation:
     def test_evaluate_cache_size(self, optimizer):
         """Test cache size evaluation."""
         # Set some cache stats
-        optimizer.cache_stats['hits'] = 70
-        optimizer.cache_stats['misses'] = 30
+        optimizer.cache_stats["hits"] = 70
+        optimizer.cache_stats["misses"] = 30
 
         score = optimizer._evaluate_cache_size(1000)
 
@@ -464,7 +445,7 @@ class TestParameterEvaluation:
 
     def test_evaluate_parameter_safe_unknown(self, optimizer):
         """Test safe evaluation with unknown parameter."""
-        score = optimizer._evaluate_parameter_safe('unknown_param', 0.5)
+        score = optimizer._evaluate_parameter_safe("unknown_param", 0.5)
 
         # Should return default score
         assert score == 0.0
@@ -477,32 +458,28 @@ class TestAutoTuning:
         """Test parameter auto-tuning."""
         # Set initial metrics
         optimizer.current_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
-        initial_batch_size = optimizer.tunable_parameters['batch_size']['current']
+        initial_batch_size = optimizer.tunable_parameters["batch_size"]["current"]
 
         # Run auto-tuning
         optimizer._auto_tune_parameters()
 
         # Parameters should be updated
-        new_batch_size = optimizer.tunable_parameters['batch_size']['current']
+        new_batch_size = optimizer.tunable_parameters["batch_size"]["current"]
 
         # Should stay within bounds
-        assert (optimizer.tunable_parameters['batch_size']['min'] <=
-                new_batch_size <=
-                optimizer.tunable_parameters['batch_size']['max'])
+        assert (
+            optimizer.tunable_parameters["batch_size"]["min"]
+            <= new_batch_size
+            <= optimizer.tunable_parameters["batch_size"]["max"]
+        )
 
     def test_auto_tune_respects_bounds(self, optimizer):
         """Test that auto-tuning respects parameter bounds."""
         optimizer.current_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         # Run multiple times
@@ -511,8 +488,8 @@ class TestAutoTuning:
 
         # All parameters should be within bounds
         for param_name, param_info in optimizer.tunable_parameters.items():
-            current = param_info['current']
-            assert param_info['min'] <= current <= param_info['max']
+            current = param_info["current"]
+            assert param_info["min"] <= current <= param_info["max"]
 
 
 class TestCacheManagement:
@@ -523,7 +500,7 @@ class TestCacheManagement:
         result = optimizer.cache_get("nonexistent_key")
 
         assert result is None
-        assert optimizer.cache_stats['misses'] > 0
+        assert optimizer.cache_stats["misses"] > 0
 
     def test_cache_set_and_get(self, optimizer):
         """Test cache set and get."""
@@ -531,7 +508,7 @@ class TestCacheManagement:
         result = optimizer.cache_get("test_key")
 
         assert result == "test_value"
-        assert optimizer.cache_stats['hits'] > 0
+        assert optimizer.cache_stats["hits"] > 0
 
     def test_cache_lru_eviction(self, optimizer):
         """Test LRU cache eviction."""
@@ -546,8 +523,8 @@ class TestCacheManagement:
 
     def test_cache_hit_rate(self, optimizer):
         """Test cache hit rate calculation."""
-        optimizer.cache_stats['hits'] = 70
-        optimizer.cache_stats['misses'] = 30
+        optimizer.cache_stats["hits"] = 70
+        optimizer.cache_stats["misses"] = 30
 
         hit_rate = optimizer._get_cache_hit_rate()
 
@@ -567,10 +544,7 @@ class TestOptimizationCycle:
         """Test running optimization cycle."""
         # Set up metrics
         optimizer.current_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         optimizer._run_optimization_cycle()
@@ -580,7 +554,7 @@ class TestOptimizationCycle:
 
     def test_apply_strategy(self, optimizer):
         """Test applying optimization strategy."""
-        strategy = optimizer.strategies['caching']
+        strategy = optimizer.strategies["caching"]
 
         result = optimizer._apply_strategy(strategy)
 
@@ -619,7 +593,7 @@ class TestThreading:
         """Test async start and stop."""
         await optimizer.start_async()
 
-        assert hasattr(optimizer, '_async_task')
+        assert hasattr(optimizer, "_async_task")
 
         await asyncio.sleep(0.1)
 
@@ -636,10 +610,7 @@ class TestResourceCleanup:
         # Fill history beyond threshold
         for i in range(1000):
             metrics = PerformanceMetrics(
-                latency_ms=50.0,
-                throughput_ops=100.0,
-                memory_mb=500.0,
-                cpu_percent=30.0
+                latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
             )
             optimizer.metrics_history.append(metrics)
 
@@ -651,13 +622,13 @@ class TestResourceCleanup:
     def test_cleanup_resources_cache_stats(self, optimizer):
         """Test cleanup of cache stats."""
         # Set high counters
-        optimizer.cache_stats['hits'] = 80000
-        optimizer.cache_stats['misses'] = 20000
+        optimizer.cache_stats["hits"] = 80000
+        optimizer.cache_stats["misses"] = 20000
 
         optimizer._cleanup_resources()
 
         # Should have reset counters
-        total = optimizer.cache_stats['hits'] + optimizer.cache_stats['misses']
+        total = optimizer.cache_stats["hits"] + optimizer.cache_stats["misses"]
         assert total < 100000
 
 
@@ -670,10 +641,7 @@ class TestPersistence:
 
         # Add some data
         optimizer.current_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         optimizer.save_state(str(filepath))
@@ -685,7 +653,7 @@ class TestPersistence:
         filepath = Path(temp_dir) / "optimizer_state.pkl"
 
         # Save state
-        optimizer.strategies['caching'].success_count = 10
+        optimizer.strategies["caching"].success_count = 10
         optimizer.save_state(str(filepath))
 
         # Create new optimizer and load
@@ -693,7 +661,7 @@ class TestPersistence:
         new_optimizer.load_state(str(filepath))
 
         # Should have loaded state
-        assert new_optimizer.strategies['caching'].success_count == 10
+        assert new_optimizer.strategies["caching"].success_count == 10
 
     def test_load_state_nonexistent(self, optimizer):
         """Test loading from nonexistent file."""
@@ -705,8 +673,8 @@ class TestPersistence:
         filepath = Path(temp_dir) / "state.pkl"
 
         # Set some state
-        optimizer.tunable_parameters['batch_size']['current'] = 64
-        optimizer.cache_stats['hits'] = 100
+        optimizer.tunable_parameters["batch_size"]["current"] = 64
+        optimizer.cache_stats["hits"] = 100
 
         # Save
         optimizer.save_state(str(filepath))
@@ -716,8 +684,8 @@ class TestPersistence:
         new_optimizer.load_state(str(filepath))
 
         # Should match
-        assert new_optimizer.tunable_parameters['batch_size']['current'] == 64
-        assert new_optimizer.cache_stats['hits'] == 100
+        assert new_optimizer.tunable_parameters["batch_size"]["current"] == 64
+        assert new_optimizer.cache_stats["hits"] == 100
 
 
 class TestReporting:
@@ -727,32 +695,29 @@ class TestReporting:
         """Test getting optimization report."""
         report = optimizer.get_optimization_report()
 
-        assert 'is_optimizing' in report
-        assert 'strategies' in report
-        assert 'tunable_parameters' in report
-        assert 'cache_hit_rate' in report
+        assert "is_optimizing" in report
+        assert "strategies" in report
+        assert "tunable_parameters" in report
+        assert "cache_hit_rate" in report
 
     def test_report_includes_all_strategies(self, optimizer):
         """Test that report includes all strategies."""
         report = optimizer.get_optimization_report()
 
         for strategy_name in optimizer.strategies.keys():
-            assert strategy_name in report['strategies']
+            assert strategy_name in report["strategies"]
 
     def test_report_includes_metrics(self, optimizer):
         """Test that report includes current metrics."""
         optimizer.current_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
 
         report = optimizer.get_optimization_report()
 
-        assert report['current_metrics'] is not None
-        assert 'latency_ms' in report['current_metrics']
-        assert 'score' in report['current_metrics']
+        assert report["current_metrics"] is not None
+        assert "latency_ms" in report["current_metrics"]
+        assert "score" in report["current_metrics"]
 
 
 class TestReset:
@@ -762,13 +727,10 @@ class TestReset:
         """Test resetting optimizer."""
         # Add some data
         optimizer.current_metrics = PerformanceMetrics(
-            latency_ms=50.0,
-            throughput_ops=100.0,
-            memory_mb=500.0,
-            cpu_percent=30.0
+            latency_ms=50.0, throughput_ops=100.0, memory_mb=500.0, cpu_percent=30.0
         )
         optimizer.cache_set("key", "value")
-        optimizer.strategies['caching'].success_count = 10
+        optimizer.strategies["caching"].success_count = 10
 
         # Reset
         optimizer.reset()
@@ -777,7 +739,7 @@ class TestReset:
         assert len(optimizer.metrics_history) == 0
         assert optimizer.current_metrics is None
         assert len(optimizer.cache) == 0
-        assert optimizer.strategies['caching'].success_count == 0
+        assert optimizer.strategies["caching"].success_count == 0
 
 
 class TestEdgeCases:
@@ -788,7 +750,7 @@ class TestEdgeCases:
         optimizer = SelfOptimizer(
             target_latency_ms=999999,
             target_memory_mb=-1000,
-            optimization_interval_s=999999
+            optimization_interval_s=999999,
         )
 
         # Should be bounded
@@ -806,15 +768,15 @@ class TestEdgeCases:
     def test_parameter_bounds_enforcement(self, optimizer):
         """Test that parameter bounds are enforced."""
         # Try to set invalid values
-        params = optimizer.tunable_parameters['batch_size']
+        params = optimizer.tunable_parameters["batch_size"]
 
         # Set to extreme value
-        params['current'] = 99999
+        params["current"] = 99999
 
         # Auto-tune should bring it back to valid range
         optimizer._auto_tune_parameters()
 
-        assert params['min'] <= params['current'] <= params['max']
+        assert params["min"] <= params["current"] <= params["max"]
 
 
 class TestConstants:

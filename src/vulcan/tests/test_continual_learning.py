@@ -3,9 +3,11 @@ Test suite for continual learning module
 """
 
 from vulcan.learning.learning_types import LearningConfig
-from vulcan.learning.continual_learning import (ContinualLearner,
-                                                EnhancedContinualLearner,
-                                                ProgressiveNeuralNetwork)
+from vulcan.learning.continual_learning import (
+    ContinualLearner,
+    EnhancedContinualLearner,
+    ProgressiveNeuralNetwork,
+)
 import torch.nn as nn
 import numpy as np
 import threading
@@ -396,7 +398,6 @@ class TestPackNetCapacity:
     """Test PackNet-style parameter isolation"""
 
 
-
 class TestIntegration:
     """Integration tests for the complete system"""
 
@@ -432,9 +433,9 @@ class TestIntegration:
                 experiences_processed += 1
 
                 # If the source code fix wasn't applied, this will fail
-                assert "task_id" in result, (
-                    f"Test failed, process_experience returned: {result}"
-                )
+                assert (
+                    "task_id" in result
+                ), f"Test failed, process_experience returned: {result}"
                 assert "loss" in result
                 assert result["adapted"] == True
 

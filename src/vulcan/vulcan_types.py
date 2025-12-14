@@ -14,8 +14,7 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime
 from enum import Enum, IntEnum
-from typing import (Any, Callable, Dict, List, Optional, Set, Tuple,
-                    Type, TypeVar)
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, TypeVar
 
 import numpy as np
 

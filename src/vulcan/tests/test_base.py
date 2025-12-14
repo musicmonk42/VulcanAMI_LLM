@@ -9,13 +9,22 @@ import numpy as np
 import pytest
 
 # Import the module to test
-from vulcan.memory.base import (BaseMemorySystem, CompressionType,
-                                ConsistencyLevel, Memory,
-                                MemoryCapacityException, MemoryConfig,
-                                MemoryCorruptionException, MemoryException,
-                                MemoryLockException, MemoryQuery,
-                                MemoryRetrievalException, MemoryStats,
-                                MemoryType, RetrievalResult)
+from vulcan.memory.base import (
+    BaseMemorySystem,
+    CompressionType,
+    ConsistencyLevel,
+    Memory,
+    MemoryCapacityException,
+    MemoryConfig,
+    MemoryCorruptionException,
+    MemoryException,
+    MemoryLockException,
+    MemoryQuery,
+    MemoryRetrievalException,
+    MemoryStats,
+    MemoryType,
+    RetrievalResult,
+)
 
 # ============================================================
 # FIXTURES

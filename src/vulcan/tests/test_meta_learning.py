@@ -2,8 +2,12 @@
 Test suite for meta-learning module
 """
 
-from vulcan.learning.meta_learning import (MetaLearner, MetaLearningAlgorithm,
-                                           TaskDetector, TaskStatistics)
+from vulcan.learning.meta_learning import (
+    MetaLearner,
+    MetaLearningAlgorithm,
+    TaskDetector,
+    TaskStatistics,
+)
 from vulcan.learning.learning_types import LearningConfig
 from vulcan.config import EMBEDDING_DIM, HIDDEN_DIM, ModalityType
 import torch.nn as nn

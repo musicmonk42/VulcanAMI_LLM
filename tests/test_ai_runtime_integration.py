@@ -34,9 +34,7 @@ class TestAIContract:
     def test_contract_creation(self):
         """Test creating AI contract"""
         contract = ai.AIContract(
-            max_latency_ms=500.0,
-            min_accuracy=0.95,
-            temperature=0.8
+            max_latency_ms=500.0, min_accuracy=0.95, temperature=0.8
         )
 
         assert contract.max_latency_ms == 500.0
@@ -54,9 +52,7 @@ class TestAIContract:
     def test_contract_validation_success(self):
         """Test valid contract validation"""
         contract = ai.AIContract(
-            max_latency_ms=1000.0,
-            min_accuracy=0.9,
-            temperature=1.0
+            max_latency_ms=1000.0, min_accuracy=0.9, temperature=1.0
         )
 
         valid, error = contract.validate()
@@ -81,7 +77,7 @@ class TestAIContract:
 
     def test_contract_validation_invalid_temperature(self):
         """Test validation with invalid temperature"""
-        contract = ai.AIContract(temperature=3.0) # Source allows up to 2.0 now
+        contract = ai.AIContract(temperature=3.0)  # Source allows up to 2.0 now
 
         valid, error = contract.validate()
         assert valid is False
@@ -111,7 +107,7 @@ class TestAITask:
             operation="GENERATE",
             provider="OpenAI",
             model="gpt-4",
-            payload={"prompt": "test"}
+            payload={"prompt": "test"},
         )
 
         assert task.operation == "GENERATE"
@@ -124,10 +120,7 @@ class TestAITask:
         """Test task with deadline"""
         deadline = datetime.now() + timedelta(seconds=10)
         task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada",
-            deadline=deadline
+            operation="EMBED", provider="OpenAI", model="ada", deadline=deadline
         )
 
         assert task.deadline == deadline
@@ -140,18 +133,14 @@ class TestAITask:
             operation="GENERATE",
             provider="OpenAI",
             model="gpt-4",
-            deadline=past_deadline
+            deadline=past_deadline,
         )
 
         assert task.is_expired() is True
 
     def test_task_to_dict(self):
         """Test converting task to dict"""
-        task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada"
-        )
+        task = ai.AITask(operation="EMBED", provider="OpenAI", model="ada")
 
         d = task.to_dict()
         assert "operation" in d
@@ -165,10 +154,7 @@ class TestAIResult:
     def test_result_creation(self):
         """Test creating AI result"""
         result = ai.AIResult(
-            status="SUCCESS",
-            data={"text": "response"},
-            latency_ms=150.0,
-            cost=0.002
+            status="SUCCESS", data={"text": "response"}, latency_ms=150.0, cost=0.002
         )
 
         assert result.status == "SUCCESS"
@@ -185,10 +171,7 @@ class TestAIResult:
 
     def test_result_to_dict(self):
         """Test converting result to dict"""
-        result = ai.AIResult(
-            status="SUCCESS",
-            data={"key": "value"}
-        )
+        result = ai.AIResult(status="SUCCESS", data={"key": "value"})
 
         d = result.to_dict()
         assert "status" in d
@@ -216,7 +199,7 @@ class TestMockProvider:
             operation="EMBED",
             provider="Mock",
             model="mock-model-v1",
-            payload={"text": "test"}
+            payload={"text": "test"},
         )
         contract = ai.AIContract()
 
@@ -224,7 +207,7 @@ class TestMockProvider:
 
         assert result.status == "SUCCESS"
         assert "vector" in result.data
-        assert isinstance(result.data["vector"], list) # Check it's a list
+        assert isinstance(result.data["vector"], list)  # Check it's a list
         # Don't assert exact dimension if it might vary in source
         # assert len(result.data["vector"]) == 768
         assert provider.call_count == 1
@@ -236,7 +219,7 @@ class TestMockProvider:
             operation="GENERATE",
             provider="Mock",
             model="mock-model-v1",
-            payload={"prompt": "test"}
+            payload={"prompt": "test"},
         )
         contract = ai.AIContract()
 
@@ -297,24 +280,26 @@ class TestOpenAIProvider:
             operation="EMBED",
             provider="OpenAI",
             model="text-embedding-3-small",
-            payload={"text": "test embedding"}
+            payload={"text": "test embedding"},
         )
         contract = ai.AIContract()
 
         # Mock the aiohttp response
         mock_response = AsyncMock()
         mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={
-            "data": [{"embedding": [0.1, 0.2, 0.3, 0.4, 0.5]}],
-            "usage": {"total_tokens": 10}
-        })
+        mock_response.json = AsyncMock(
+            return_value={
+                "data": [{"embedding": [0.1, 0.2, 0.3, 0.4, 0.5]}],
+                "usage": {"total_tokens": 10},
+            }
+        )
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
 
         mock_session = AsyncMock()
         mock_session.post = Mock(return_value=mock_response)
 
-        with patch.object(provider, '_get_session', return_value=mock_session):
+        with patch.object(provider, "_get_session", return_value=mock_session):
             result = await provider.execute(task, contract)
 
         assert result.status == "SUCCESS"
@@ -327,25 +312,27 @@ class TestOpenAIProvider:
         task = ai.AITask(
             operation="GENERATE",
             provider="OpenAI",
-            model="gpt-4", # Or use a model listed in the provider
-            payload={"prompt": "Hello"}
+            model="gpt-4",  # Or use a model listed in the provider
+            payload={"prompt": "Hello"},
         )
         contract = ai.AIContract()
 
         # Mock the aiohttp response
         mock_response = AsyncMock()
         mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={
-            "choices": [{"message": {"content": "Hello there!"}}],
-            "usage": {"total_tokens": 15}
-        })
+        mock_response.json = AsyncMock(
+            return_value={
+                "choices": [{"message": {"content": "Hello there!"}}],
+                "usage": {"total_tokens": 15},
+            }
+        )
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
 
         mock_session = AsyncMock()
         mock_session.post = Mock(return_value=mock_response)
 
-        with patch.object(provider, '_get_session', return_value=mock_session):
+        with patch.object(provider, "_get_session", return_value=mock_session):
             result = await provider.execute(task, contract)
 
         assert result.status == "SUCCESS"
@@ -356,10 +343,10 @@ class TestOpenAIProvider:
     async def test_execute_unsupported_operation(self, provider):
         """Test unsupported operation"""
         task = ai.AITask(
-            operation="TRANSCRIBE", # Example of unsupported
+            operation="TRANSCRIBE",  # Example of unsupported
             provider="OpenAI",
             model="gpt-4",
-            payload={}
+            payload={},
         )
         contract = ai.AIContract()
 
@@ -375,7 +362,7 @@ class TestOpenAIProvider:
             operation="EMBED",
             provider="OpenAI",
             model="text-embedding-3-small",
-            payload={} # Missing 'text'
+            payload={},  # Missing 'text'
         )
         contract = ai.AIContract()
 
@@ -410,7 +397,12 @@ class TestAnthropicProvider:
         """Test getting models"""
         models = provider.get_models()
         # Fix: Check for the exact model names listed in the source
-        expected_models = ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307", "claude-2.1"]
+        expected_models = [
+            "claude-3-opus-20240229",
+            "claude-3-sonnet-20240229",
+            "claude-3-haiku-20240307",
+            "claude-2.1",
+        ]
         assert all(m in models for m in expected_models)
         # Or a less strict check:
         # assert any("claude-3-opus" in m for m in models)
@@ -424,7 +416,7 @@ class TestAnthropicProvider:
             provider="Anthropic",
             # Use one of the actual model names
             model="claude-3-sonnet-20240229",
-            payload={"prompt": "test"}
+            payload={"prompt": "test"},
         )
         contract = ai.AIContract()
 
@@ -468,8 +460,8 @@ class TestGrokProvider:
         task = ai.AITask(
             operation="REASON",
             provider="Grok",
-            model="grok-4", # Use one of the available models
-            payload={"prompt": "test reasoning"}
+            model="grok-4",  # Use one of the available models
+            payload={"prompt": "test reasoning"},
         )
         contract = ai.AIContract()
 
@@ -500,10 +492,7 @@ class TestResultCache:
     def test_cache_put_get(self, cache):
         """Test putting and getting from cache"""
         task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada",
-            payload={"text": "test"}
+            operation="EMBED", provider="OpenAI", model="ada", payload={"text": "test"}
         )
         contract = ai.AIContract()
         result = ai.AIResult(status="SUCCESS", data={"vector": [1, 2, 3]})
@@ -518,10 +507,7 @@ class TestResultCache:
     def test_cache_miss(self, cache):
         """Test cache miss"""
         task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada",
-            payload={"text": "test"}
+            operation="EMBED", provider="OpenAI", model="ada", payload={"text": "test"}
         )
         contract = ai.AIContract()
 
@@ -533,29 +519,23 @@ class TestResultCache:
         short_cache = ai.ResultCache(max_size=10, ttl_seconds=0.1)
 
         task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada",
-            payload={"text": "test"}
+            operation="EMBED", provider="OpenAI", model="ada", payload={"text": "test"}
         )
         contract = ai.AIContract()
-        result = ai.AIResult(status="SUCCESS", data={"vector": [1]}) # Must have status
+        result = ai.AIResult(status="SUCCESS", data={"vector": [1]})  # Must have status
 
         short_cache.put(task, contract, result)
-        assert len(short_cache.cache) == 1 # Check it was added
+        assert len(short_cache.cache) == 1  # Check it was added
         time.sleep(0.2)  # Wait for TTL to expire
 
         cached = short_cache.get(task, contract)
         assert cached is None
-        assert len(short_cache.cache) == 0 # Check it was removed
+        assert len(short_cache.cache) == 0  # Check it was removed
 
     def test_cache_no_cache_when_disabled(self, cache):
         """Test that caching is disabled when contract disallows it"""
         task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada",
-            payload={"text": "test"}
+            operation="EMBED", provider="OpenAI", model="ada", payload={"text": "test"}
         )
         contract_no_cache = ai.AIContract(allow_cached=False)
         contract_allow_cache = ai.AIContract(allow_cached=True)
@@ -563,10 +543,10 @@ class TestResultCache:
 
         # Try putting with allow_cached=False
         cache.put(task, contract_no_cache, result)
-        assert len(cache.cache) == 0 # Should not have been added
+        assert len(cache.cache) == 0  # Should not have been added
 
         # Try getting with allow_cached=False (even if it existed)
-        cache.put(task, contract_allow_cache, result) # Put it first
+        cache.put(task, contract_allow_cache, result)  # Put it first
         assert len(cache.cache) == 1
         cached = cache.get(task, contract_no_cache)
         assert cached is None  # Should not return cached result
@@ -582,13 +562,13 @@ class TestResultCache:
                 operation="EMBED",
                 provider="OpenAI",
                 model="ada",
-                payload={"text": f"test{i}"}
+                payload={"text": f"test{i}"},
             )
             tasks.append(task)
             contract = ai.AIContract()
             result = ai.AIResult(status="SUCCESS", data={"i": i})
             small_cache.put(task, contract, result)
-            time.sleep(0.01) # Ensure slightly different timestamps for FIFO
+            time.sleep(0.01)  # Ensure slightly different timestamps for FIFO
 
         assert len(small_cache.cache) == 2  # Should stay at max size
 
@@ -604,13 +584,10 @@ class TestResultCache:
     def test_cache_clear(self, cache):
         """Test clearing cache"""
         task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada",
-            payload={"text": "test"}
+            operation="EMBED", provider="OpenAI", model="ada", payload={"text": "test"}
         )
         contract = ai.AIContract()
-        result = ai.AIResult(status="SUCCESS", data={"v":[1]})
+        result = ai.AIResult(status="SUCCESS", data={"v": [1]})
 
         cache.put(task, contract, result)
         assert len(cache.cache) == 1
@@ -621,13 +598,10 @@ class TestResultCache:
     def test_cache_stats(self, cache):
         """Test cache statistics"""
         task = ai.AITask(
-            operation="EMBED",
-            provider="OpenAI",
-            model="ada",
-            payload={"text": "test"}
+            operation="EMBED", provider="OpenAI", model="ada", payload={"text": "test"}
         )
         contract = ai.AIContract()
-        result = ai.AIResult(status="SUCCESS", data={"v":[1]})
+        result = ai.AIResult(status="SUCCESS", data={"v": [1]})
 
         cache.put(task, contract, result)
         stats = cache.stats()
@@ -722,7 +696,9 @@ class TestAIRuntime:
     def runtime(self):
         """Create runtime instance"""
         # Ensure lowercase 'mock' is registered and potentially default
-        runtime_instance = ai.AIRuntime(config={"cache_size": 100, "cache_ttl_seconds": 60})
+        runtime_instance = ai.AIRuntime(
+            config={"cache_size": 100, "cache_ttl_seconds": 60}
+        )
         return runtime_instance
 
     def test_runtime_creation(self, runtime):
@@ -730,7 +706,7 @@ class TestAIRuntime:
         assert runtime.cache.max_size == 100
         # Fix: Check for lowercase 'mock'
         assert "mock" in runtime.providers
-        assert "default" in runtime.providers # Should always have a default
+        assert "default" in runtime.providers  # Should always have a default
         assert isinstance(runtime.providers["mock"], ai.MockProvider)
 
     def test_register_provider(self, runtime):
@@ -748,11 +724,11 @@ class TestAIRuntime:
         """Test executing task using the async method"""
         task = ai.AITask(
             operation="EMBED",
-            provider="mock", # Use lowercase
+            provider="mock",  # Use lowercase
             model="mock-model-v1",
-            payload={"text": "test"}
+            payload={"text": "test"},
         )
-        contract = ai.AIContract() # Create contract
+        contract = ai.AIContract()  # Create contract
 
         # Fix: Call the async version and await it
         result = await runtime.execute_task_async(task, contract)
@@ -767,7 +743,7 @@ class TestAIRuntime:
             operation="EMBED",
             provider="mock",
             model="mock-model-v1",
-            payload={"text": "test cache"}
+            payload={"text": "test cache"},
         )
         contract = ai.AIContract(allow_cached=True)
 
@@ -787,10 +763,7 @@ class TestAIRuntime:
     async def test_execute_task_invalid_contract(self, runtime):
         """Test async execution with invalid contract"""
         task = ai.AITask(
-            operation="EMBED",
-            provider="mock",
-            model="mock",
-            payload={"text": "test"}
+            operation="EMBED", provider="mock", model="mock", payload={"text": "test"}
         )
         contract = ai.AIContract(temperature=5.0)  # Invalid temperature
 
@@ -808,7 +781,7 @@ class TestAIRuntime:
             provider="mock",
             model="mock",
             payload={"text": "test"},
-            deadline=datetime.now() - timedelta(seconds=1)
+            deadline=datetime.now() - timedelta(seconds=1),
         )
         # Fix: Add contract argument
         contract = ai.AIContract()
@@ -829,7 +802,7 @@ class TestAIRuntime:
                 operation="EMBED",
                 provider="mock",
                 model="mock",
-                payload={"text": f"test{i}"}
+                payload={"text": f"test{i}"},
             )
             for i in range(3)
         ]
@@ -837,16 +810,16 @@ class TestAIRuntime:
         results = await runtime.batch_execute(tasks)
 
         assert len(results) == 3
-        assert all(isinstance(r, ai.AIResult) for r in results) # Check type
+        assert all(isinstance(r, ai.AIResult) for r in results)  # Check type
         assert all(r.status == "SUCCESS" for r in results)
 
     def test_execute_task_sync(self, runtime):
         """Test synchronous execution wrapper"""
         task = ai.AITask(
             operation="EMBED",
-            provider="mock", # Use lowercase
+            provider="mock",  # Use lowercase
             model="mock",
-            payload={"text": "test sync"}
+            payload={"text": "test sync"},
         )
         contract = ai.AIContract()
 
@@ -864,7 +837,9 @@ class TestAIRuntime:
     def test_get_metrics(self, runtime):
         """Test getting runtime metrics"""
         # Execute a task to populate metrics
-        task = ai.AITask(operation="GENERATE", provider="mock", model="m", payload={"p": "1"})
+        task = ai.AITask(
+            operation="GENERATE", provider="mock", model="m", payload={"p": "1"}
+        )
         runtime.execute_task_sync(task)
 
         metrics = runtime.get_metrics()
@@ -880,7 +855,7 @@ class TestAIRuntime:
         task = ai.AITask(operation="EMBED", provider="Specific", model="m")
         provider = runtime._route_to_provider(task)
         assert isinstance(provider, ai.MockProvider)
-        assert provider == runtime.providers["specific"] # Check it's the right one
+        assert provider == runtime.providers["specific"]  # Check it's the right one
 
     def test_routing_fallback_to_default(self, runtime):
         """Test routing falls back to default if specified provider invalid"""
@@ -891,7 +866,9 @@ class TestAIRuntime:
     def test_cleanup(self, runtime):
         """Test runtime cleanup"""
         # Add something to cache first
-        task = ai.AITask(operation="GENERATE", provider="mock", model="m", payload={"p":"cleanup"})
+        task = ai.AITask(
+            operation="GENERATE", provider="mock", model="m", payload={"p": "cleanup"}
+        )
         runtime.execute_task_sync(task)
         assert len(runtime.cache.cache) > 0
 
@@ -916,11 +893,7 @@ class TestAIMetrics:
 
     def test_record_execution_success(self, metrics):
         """Test recording successful execution"""
-        result = ai.AIResult(
-            status="SUCCESS",
-            latency_ms=100.0,
-            cost=0.002
-        )
+        result = ai.AIResult(status="SUCCESS", latency_ms=100.0, cost=0.002)
 
         metrics.record_execution("OpenAI", "EMBED", result)
 
@@ -936,7 +909,7 @@ class TestAIMetrics:
             status="FAILED",
             error="API error",
             latency_ms=50.0,
-            cost=0.0 # Failed calls might have zero cost
+            cost=0.0,  # Failed calls might have zero cost
         )
 
         metrics.record_execution("Anthropic", "GENERATE", result)
@@ -958,7 +931,7 @@ class TestAIMetrics:
 
         summary = metrics.get_summary()
         # Fix: Check calculation 2 / (2+1)
-        assert summary["cache_hit_rate"] == pytest.approx(2/3)
+        assert summary["cache_hit_rate"] == pytest.approx(2 / 3)
 
     def test_get_summary(self, metrics):
         """Test getting summary"""
@@ -966,7 +939,9 @@ class TestAIMetrics:
         result_fail = ai.AIResult(status="FAILED", latency_ms=30.0, cost=0.0)
 
         metrics.record_execution("OpenAI", "EMBED", result_ok)
-        metrics.record_execution("openai", "GENERATE", result_fail) # Test case insensitivity
+        metrics.record_execution(
+            "openai", "GENERATE", result_fail
+        )  # Test case insensitivity
         metrics.record_execution("Mock", "EMBED", result_ok)
 
         summary = metrics.get_summary()
@@ -1007,11 +982,13 @@ class TestIntegration:
 
         task = ai.AITask(
             operation="GENERATE",
-            provider="mock", # Use lowercase
+            provider="mock",  # Use lowercase
             model="mock-model-v1",
-            payload={"prompt": "Hello, async world!"}
+            payload={"prompt": "Hello, async world!"},
         )
-        contract = ai.AIContract(max_latency_ms=1000.0, temperature=0.7, allow_cached=True)
+        contract = ai.AIContract(
+            max_latency_ms=1000.0, temperature=0.7, allow_cached=True
+        )
 
         # Execute async
         result1 = await runtime.execute_task_async(task, contract)
@@ -1026,7 +1003,7 @@ class TestIntegration:
         result2 = await runtime.execute_task_async(task, contract)
         assert result2.status == "SUCCESS"
         assert result2.cached is True
-        assert result2.data == result1.data # Ensure data is consistent
+        assert result2.data == result1.data  # Ensure data is consistent
 
         # Wait for cache to expire
         await asyncio.sleep(1.1)
@@ -1038,11 +1015,19 @@ class TestIntegration:
 
         # Check metrics
         metrics = runtime.get_metrics()
-        assert metrics["execution_metrics"]["total_executions"] == 3 # 2 misses, 1 hit recorded
+        assert (
+            metrics["execution_metrics"]["total_executions"] == 3
+        )  # 2 misses, 1 hit recorded
         assert metrics["execution_metrics"]["cache_hits"] == 1
         assert metrics["execution_metrics"]["cache_misses"] == 2
-        assert metrics["execution_metrics"]["by_provider_operation"]["mock"]["GENERATE"]["count"] == 3
+        assert (
+            metrics["execution_metrics"]["by_provider_operation"]["mock"]["GENERATE"][
+                "count"
+            ]
+            == 3
+        )
+
 
 # Allow running tests directly if needed
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

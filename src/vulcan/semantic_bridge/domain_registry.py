@@ -376,6 +376,7 @@ class DomainRegistry:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
@@ -389,7 +390,9 @@ class DomainRegistry:
                     )
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.warning("DomainRegistry: Created new safety validator instance (may cause duplication)")
+                logger.warning(
+                    "DomainRegistry: Created new safety validator instance (may cause duplication)"
+                )
         else:
             self.safety_validator = None
             logger.warning(
@@ -424,7 +427,9 @@ class DomainRegistry:
         self.total_domains = 0
 
         # FIXED: Effect statistics with size limit (changed from defaultdict to regular dict)
-        self.effect_statistics = {}  # category -> {'count': int, 'avg_importance': float}
+        self.effect_statistics = (
+            {}
+        )  # category -> {'count': int, 'avg_importance': float}
         self.max_effect_categories = 100
 
         # FIXED: Replace defaultdict(int) with Counter
@@ -1226,7 +1231,9 @@ class DomainRegistry:
         if domains_file.exists():
             try:
                 with open(domains_file, "rb") as f:
-                    loaded_domains = pickle.load(f)  # nosec B301 - Internal data structure
+                    loaded_domains = pickle.load(
+                        f
+                    )  # nosec B301 - Internal data structure
                     for name, profile in loaded_domains.items():
                         self.register_domain(name, profile)
             except Exception as e:

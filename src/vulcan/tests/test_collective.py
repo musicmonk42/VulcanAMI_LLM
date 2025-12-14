@@ -58,13 +58,22 @@ class MetaLearningAlgorithm(Enum):
 # Assuming src.vulcan.learning is in the path
 try:
     from src.vulcan.config import EMBEDDING_DIM
-    from src.vulcan.learning import (CurriculumLearner,
-                                     EnhancedContinualLearner, FeedbackData,
-                                     LearningConfig, LearningMode,
-                                     MetaCognitiveMonitor, MetaLearner,
-                                     PacingStrategy, ParameterHistoryManager,
-                                     PlanningAlgorithm, RLHFManager, TaskInfo,
-                                     UnifiedLearningSystem, UnifiedWorldModel)
+    from src.vulcan.learning import (
+        CurriculumLearner,
+        EnhancedContinualLearner,
+        FeedbackData,
+        LearningConfig,
+        LearningMode,
+        MetaCognitiveMonitor,
+        MetaLearner,
+        PacingStrategy,
+        ParameterHistoryManager,
+        PlanningAlgorithm,
+        RLHFManager,
+        TaskInfo,
+        UnifiedLearningSystem,
+        UnifiedWorldModel,
+    )
 except ImportError:
     # Fallback for environment where src is not in path
     print("Warning: Could not import from src.vulcan.learning. Check PYTHONPATH.")
@@ -273,12 +282,13 @@ class TestContinualLearning:
             )
             or (
                 # Fallback: just check experience processing worked
-                len(learner.replay_buffer) > 0
+                len(learner.replay_buffer)
+                > 0
             )
         )
-        assert has_consolidation, (
-            "Consolidation should have been triggered or experiences processed"
-        )
+        assert (
+            has_consolidation
+        ), "Consolidation should have been triggered or experiences processed"
 
         # Cleanup
         learner.shutdown()

@@ -85,7 +85,7 @@ class PlatformAdapter:
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 if attempt == max_retries - 1:
                     raise
-                wait = backoff ** attempt
+                wait = backoff**attempt
                 print(f"⚠️  {method} {url} failed ({e}); retrying in {wait:.1f}s")
                 await asyncio.sleep(wait)
         raise RuntimeError("Unreachable")
@@ -99,18 +99,26 @@ class PlatformAdapter:
         return urljoin(base, path)
 
     # Act 1
-    async def submit_inefficient_run(self, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def submit_inefficient_run(
+        self, payload: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         m = self.mapping["submit_run"]
         url = self._url(m["base"], m["path"])
         body = payload or {
             "spec_id": "sentiment_3d_spec",
-            "parameters": {"goal": "demo baseline", "demo_latency_ms": 8000, "complexity": "high"},
+            "parameters": {
+                "goal": "demo baseline",
+                "demo_latency_ms": 8000,
+                "complexity": "high",
+            },
         }
         resp = await self._retry(m["method"], url, json=body)
         return resp.json()
 
     # Act 2
-    async def submit_feedback(self, run_id: str, score: float = 0.1, rationale: str = "Too slow") -> Dict[str, Any]:
+    async def submit_feedback(
+        self, run_id: str, score: float = 0.1, rationale: str = "Too slow"
+    ) -> Dict[str, Any]:
         m = self.mapping["submit_feedback"]
         url = self._url(m["base"], m["path"])
         body = {
@@ -124,7 +132,11 @@ class PlatformAdapter:
         return resp.json()
 
     # Act 2.5 (optional)
-    async def improve(self, trigger: str = "performance_drop", objective_weights: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+    async def improve(
+        self,
+        trigger: str = "performance_drop",
+        objective_weights: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
         m = self.mapping.get("improve")
         if not m:
             return {"status": "noop", "reason": "improve not configured"}

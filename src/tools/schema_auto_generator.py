@@ -95,7 +95,6 @@ class ParsingError(Exception):
     """Custom exception for EBNF parsing errors."""
 
 
-
 class MultilingualSchemaGenerator:
     """
     Conceptual class to simulate multilingual schema generation.

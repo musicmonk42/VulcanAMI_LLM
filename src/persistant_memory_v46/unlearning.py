@@ -501,8 +501,7 @@ class UnlearningEngine:
 
         # Verification passes if forget score is low and retain score is high
         verification_passed = (
-            avg_forget_score < 0.3  # Forgotten
-            and avg_retain_score > 0.7  # Retained
+            avg_forget_score < 0.3 and avg_retain_score > 0.7  # Forgotten  # Retained
         )
 
         return {
@@ -673,9 +672,9 @@ class UnlearningEngine:
             "verified_removals": len(self.verified_removals),
             "shard_count": self.shard_count,
             "enable_verification": self.enable_verification,
-            "recent_operations": self.unlearning_log[-10:]
-            if self.unlearning_log
-            else [],
+            "recent_operations": (
+                self.unlearning_log[-10:] if self.unlearning_log else []
+            ),
         }
 
     def export_log(self, path: str) -> None:

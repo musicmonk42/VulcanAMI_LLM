@@ -10,10 +10,16 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from src.strategies.cost_model import (ComplexityEstimator, ComplexityLevel,
-                                       CostComponent, CostDistribution,
-                                       CostObservation, CostPredictor,
-                                       HealthMetrics, StochasticCostModel)
+from src.strategies.cost_model import (
+    ComplexityEstimator,
+    ComplexityLevel,
+    CostComponent,
+    CostDistribution,
+    CostObservation,
+    CostPredictor,
+    HealthMetrics,
+    StochasticCostModel,
+)
 
 
 @pytest.fixture
@@ -72,7 +78,7 @@ class TestDataClasses:
             component=CostComponent.TIME_MS,
             value=100.0,
             features=sample_features,
-            complexity=0.5
+            complexity=0.5,
         )
 
         assert obs.tool_name == "test_tool"
@@ -86,7 +92,7 @@ class TestDataClasses:
             component=CostComponent.TIME_MS,
             value=50.0,
             features=sample_features,
-            complexity=0.3
+            complexity=0.3,
         )
 
         assert obs.cold_start is False
@@ -105,14 +111,14 @@ class TestDataClasses:
             percentile_75=105.0,
             percentile_95=110.0,
             confidence_interval=(95.0, 105.0),
-            samples=100
+            samples=100,
         )
 
         result = dist.to_dict()
 
-        assert result['mean'] == 100.0
-        assert result['std'] == 5.0
-        assert result['samples'] == 100
+        assert result["mean"] == 100.0
+        assert result["std"] == 5.0
+        assert result["samples"] == 100
 
     def test_health_metrics_defaults(self):
         """Test HealthMetrics default values."""
@@ -150,9 +156,7 @@ class TestDataClasses:
     def test_health_metrics_score_bounds(self):
         """Test health score is bounded [0, 1]."""
         health = HealthMetrics(
-            error_rate=1.0,
-            queue_depth=1000,
-            consecutive_failures=100
+            error_rate=1.0, queue_depth=1000, consecutive_failures=100
         )
 
         score = health.health_score
@@ -219,7 +223,7 @@ class TestCostPredictor:
                 component=CostComponent.TIME_MS,
                 value=100.0,
                 features=sample_features,
-                complexity=0.5
+                complexity=0.5,
             )
         ]
 
@@ -237,7 +241,7 @@ class TestCostPredictor:
                 component=CostComponent.TIME_MS,
                 value=100.0 + i,
                 features=np.random.randn(5),
-                complexity=0.5
+                complexity=0.5,
             )
             observations.append(obs)
 
@@ -263,7 +267,7 @@ class TestCostPredictor:
                 component=CostComponent.TIME_MS,
                 value=100.0 + i * 2,
                 features=np.array([float(i)] * 5),
-                complexity=0.5
+                complexity=0.5,
             )
             observations.append(obs)
 
@@ -289,10 +293,7 @@ class TestStochasticCostModel:
 
     def test_initialization_with_config(self):
         """Test initialization with custom config."""
-        config = {
-            'max_observations': 500,
-            'cold_start_time_ms': 200
-        }
+        config = {"max_observations": 500, "cold_start_time_ms": 200}
 
         model = StochasticCostModel(config)
 
@@ -301,8 +302,8 @@ class TestStochasticCostModel:
     def test_defaults_initialized(self, cost_model):
         """Test that default distributions are initialized."""
         # Should have defaults for common tools
-        assert 'symbolic' in cost_model.distributions
-        assert 'probabilistic' in cost_model.distributions
+        assert "symbolic" in cost_model.distributions
+        assert "probabilistic" in cost_model.distributions
 
     def test_predict_cost_basic(self, cost_model, sample_features):
         """Test basic cost prediction."""
@@ -322,7 +323,7 @@ class TestStochasticCostModel:
         """Test prediction includes failure risk."""
         predictions = cost_model.predict_cost("symbolic", sample_features)
 
-        assert 'failure_risk' in predictions
+        assert "failure_risk" in predictions
 
     def test_predict_cost_confidence_interval(self, cost_model, sample_features):
         """Test prediction includes confidence intervals."""
@@ -330,22 +331,17 @@ class TestStochasticCostModel:
 
         time_pred = predictions[CostComponent.TIME_MS.value]
 
-        assert 'ci' in time_pred
-        assert len(time_pred['ci']) == 2
-        assert time_pred['ci'][0] <= time_pred['mean'] <= time_pred['ci'][1]
+        assert "ci" in time_pred
+        assert len(time_pred["ci"]) == 2
+        assert time_pred["ci"][0] <= time_pred["mean"] <= time_pred["ci"][1]
 
     def test_update_cost(self, cost_model, sample_features):
         """Test updating cost with observation."""
-        initial_count = len(cost_model.observations['test'][CostComponent.TIME_MS])
+        initial_count = len(cost_model.observations["test"][CostComponent.TIME_MS])
 
-        cost_model.update(
-            "test",
-            CostComponent.TIME_MS,
-            100.0,
-            sample_features
-        )
+        cost_model.update("test", CostComponent.TIME_MS, 100.0, sample_features)
 
-        final_count = len(cost_model.observations['test'][CostComponent.TIME_MS])
+        final_count = len(cost_model.observations["test"][CostComponent.TIME_MS])
 
         assert final_count == initial_count + 1
 
@@ -354,14 +350,9 @@ class TestStochasticCostModel:
         features = np.array([1.0, 2.0, 3.0])
 
         for i in range(10):
-            cost_model.update(
-                "test",
-                CostComponent.TIME_MS,
-                100.0 + i,
-                features
-            )
+            cost_model.update("test", CostComponent.TIME_MS, 100.0 + i, features)
 
-        observations = cost_model.observations['test'][CostComponent.TIME_MS]
+        observations = cost_model.observations["test"][CostComponent.TIME_MS]
 
         assert len(observations) == 10
 
@@ -371,23 +362,15 @@ class TestStochasticCostModel:
         features = np.array([1.0, 2.0, 3.0])
 
         for i in range(20):
-            cost_model.update(
-                "test",
-                CostComponent.TIME_MS,
-                100.0,
-                features
-            )
+            cost_model.update("test", CostComponent.TIME_MS, 100.0, features)
 
-        observations = cost_model.observations['test'][CostComponent.TIME_MS]
+        observations = cost_model.observations["test"][CostComponent.TIME_MS]
 
         assert len(observations) <= cost_model.max_observations
 
     def test_update_health_metrics(self, cost_model):
         """Test updating health metrics."""
-        cost_model.update_health("test", {
-            'error_rate': 0.1,
-            'warm': True
-        })
+        cost_model.update_health("test", {"error_rate": 0.1, "warm": True})
 
         health = cost_model.health_metrics["test"]
 
@@ -399,10 +382,7 @@ class TestStochasticCostModel:
         # Add some observations
         for i in range(20):
             cost_model.update(
-                "test",
-                CostComponent.TIME_MS,
-                100.0 + i * 5,
-                sample_features
+                "test", CostComponent.TIME_MS, 100.0 + i * 5, sample_features
             )
 
         tail_risks = cost_model.get_tail_risks("test")
@@ -418,14 +398,9 @@ class TestStochasticCostModel:
 
     def test_estimate_total_cost_with_weights(self, cost_model, sample_features):
         """Test total cost with custom weights."""
-        weights = {
-            CostComponent.TIME_MS.value: 2.0,
-            CostComponent.MEMORY_MB.value: 0.5
-        }
+        weights = {CostComponent.TIME_MS.value: 2.0, CostComponent.MEMORY_MB.value: 0.5}
 
-        total = cost_model.estimate_total_cost(
-            "symbolic", sample_features, weights
-        )
+        total = cost_model.estimate_total_cost("symbolic", sample_features, weights)
 
         assert total > 0
 
@@ -437,9 +412,9 @@ class TestStochasticCostModel:
 
         stats = cost_model.get_statistics()
 
-        assert 'total_predictions' in stats
-        assert 'total_updates' in stats
-        assert 'tools_tracked' in stats
+        assert "total_predictions" in stats
+        assert "total_updates" in stats
+        assert "tools_tracked" in stats
 
     def test_confidence_interval_calculation(self, cost_model):
         """Test confidence interval calculation."""
@@ -475,8 +450,8 @@ class TestPersistence:
 
         # Check files exist
         save_path = Path(temp_dir)
-        assert (save_path / 'distributions.json').exists()
-        assert (save_path / 'observations.pkl').exists()
+        assert (save_path / "distributions.json").exists()
+        assert (save_path / "observations.pkl").exists()
 
     def test_load_model(self, temp_dir, sample_features):
         """Test loading model."""
@@ -507,12 +482,7 @@ class TestThreadSafety:
 
         def update_cost(index):
             features = np.array([float(index)] * 5)
-            cost_model.update(
-                "test",
-                CostComponent.TIME_MS,
-                100.0 + index,
-                features
-            )
+            cost_model.update("test", CostComponent.TIME_MS, 100.0 + index, features)
 
         threads = []
         for i in range(10):
@@ -524,7 +494,7 @@ class TestThreadSafety:
             t.join()
 
         # All updates should be recorded
-        observations = cost_model.observations['test'][CostComponent.TIME_MS]
+        observations = cost_model.observations["test"][CostComponent.TIME_MS]
         assert len(observations) == 10
 
     def test_concurrent_predictions(self, cost_model):
@@ -569,29 +539,21 @@ class TestEdgeCases:
         features = np.array([1.0, 2.0, 3.0])
 
         cost_model.update(
-            "test",
-            CostComponent.TIME_MS,
-            -50.0,  # Negative cost
-            features
+            "test", CostComponent.TIME_MS, -50.0, features  # Negative cost
         )
 
         # Should still work
-        observations = cost_model.observations['test'][CostComponent.TIME_MS]
+        observations = cost_model.observations["test"][CostComponent.TIME_MS]
         assert len(observations) > 0
 
     def test_very_large_values(self, cost_model):
         """Test with very large values."""
         features = np.array([1e6, 1e7, 1e8])
 
-        cost_model.update(
-            "test",
-            CostComponent.TIME_MS,
-            1e10,
-            features
-        )
+        cost_model.update("test", CostComponent.TIME_MS, 1e10, features)
 
         # Should handle large values
-        observations = cost_model.observations['test'][CostComponent.TIME_MS]
+        observations = cost_model.observations["test"][CostComponent.TIME_MS]
         assert len(observations) > 0
 
 

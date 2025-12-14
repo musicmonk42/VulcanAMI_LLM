@@ -11,10 +11,15 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from observability_manager import (MAX_DASHBOARD_AGE_DAYS, MAX_LOG_DIR_SIZE_MB,
-                                   MAX_PLOT_AGE_DAYS, MAX_TENSOR_ELEMENTS,
-                                   MAX_TENSOR_SIZE, MIN_FREE_DISK_MB,
-                                   ObservabilityManager)
+from observability_manager import (
+    MAX_DASHBOARD_AGE_DAYS,
+    MAX_LOG_DIR_SIZE_MB,
+    MAX_PLOT_AGE_DAYS,
+    MAX_TENSOR_ELEMENTS,
+    MAX_TENSOR_SIZE,
+    MIN_FREE_DISK_MB,
+    ObservabilityManager,
+)
 
 
 @pytest.fixture
@@ -49,10 +54,7 @@ class TestObservabilityManagerInitialization:
     def test_initialization_with_notifications(self, temp_log_dir):
         """Test initialization with notification channels."""
         channels = ["slack-alerts", "email-oncall"]
-        obs = ObservabilityManager(
-            log_dir=temp_log_dir,
-            notification_channels=channels
-        )
+        obs = ObservabilityManager(log_dir=temp_log_dir, notification_channels=channels)
 
         assert obs.notification_channels == channels
 
@@ -77,7 +79,7 @@ class TestDiskSpaceManagement:
         # Should have sufficient space in temp directory
         assert result is True
 
-    @patch('shutil.disk_usage')
+    @patch("shutil.disk_usage")
     def test_check_disk_space_insufficient(self, mock_usage, obs_manager):
         """Test disk space check with insufficient space."""
         # Mock low disk space
@@ -111,6 +113,7 @@ class TestFileCleanup:
         old_time = time.time() - (MAX_DASHBOARD_AGE_DAYS + 1) * 86400
         Path(old_file).touch()
         import os
+
         os.utime(old_file, (old_time, old_time))
 
         # Run cleanup
@@ -200,8 +203,8 @@ class TestTensorValidation:
 class TestSemanticMapPlotting:
     """Test semantic map plotting."""
 
-    @patch('observability_manager.GRAPHVIZ_AVAILABLE', True)
-    @patch('observability_manager.graphviz')
+    @patch("observability_manager.GRAPHVIZ_AVAILABLE", True)
+    @patch("observability_manager.graphviz")
     def test_plot_semantic_map_success(self, mock_graphviz, obs_manager):
         """Test successful semantic map plotting."""
         tensor = np.random.rand(3, 3)
@@ -214,7 +217,7 @@ class TestSemanticMapPlotting:
 
         assert mock_dot.render.called
 
-    @patch('observability_manager.GRAPHVIZ_AVAILABLE', False)
+    @patch("observability_manager.GRAPHVIZ_AVAILABLE", False)
     def test_plot_semantic_map_no_graphviz(self, obs_manager):
         """Test plotting without graphviz."""
         tensor = np.random.rand(3, 3)
@@ -293,7 +296,7 @@ class TestMetricLogging:
 
     def test_log_counterfactual_diff_infinite(self, obs_manager):
         """Test logging infinite diff."""
-        obs_manager.log_counterfactual_diff("tensor1", float('inf'))
+        obs_manager.log_counterfactual_diff("tensor1", float("inf"))
 
         # Should log error but not raise
 
@@ -335,8 +338,7 @@ class TestDashboardExport:
     def test_export_dashboard_with_notifications(self, temp_log_dir):
         """Test dashboard export with notification channels."""
         obs = ObservabilityManager(
-            log_dir=temp_log_dir,
-            notification_channels=["test-channel"]
+            log_dir=temp_log_dir, notification_channels=["test-channel"]
         )
 
         path = obs.export_dashboard()
@@ -344,6 +346,7 @@ class TestDashboardExport:
         # Verify notification is in dashboard
         with open(path, encoding="utf-8") as f:
             import json
+
             dashboard = json.load(f)
 
         # Check if any panel has notifications
@@ -355,7 +358,7 @@ class TestDashboardExport:
 
         obs.shutdown()
 
-    @patch('observability_manager.ObservabilityManager._check_disk_space')
+    @patch("observability_manager.ObservabilityManager._check_disk_space")
     def test_export_dashboard_insufficient_space(self, mock_check, obs_manager):
         """Test dashboard export with insufficient disk space."""
         mock_check.return_value = False

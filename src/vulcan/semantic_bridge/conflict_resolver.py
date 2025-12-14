@@ -242,15 +242,20 @@ class EvidenceWeightedResolver:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info("EvidenceWeightedResolver: Using shared safety validator instance")
+            logger.info(
+                "EvidenceWeightedResolver: Using shared safety validator instance"
+            )
         elif SAFETY_VALIDATOR_AVAILABLE:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
-                logger.info("EvidenceWeightedResolver: Using singleton safety validator")
+                logger.info(
+                    "EvidenceWeightedResolver: Using singleton safety validator"
+                )
             except Exception as e:
                 logger.debug("Could not get singleton safety validator: %s", e)
                 # Last resort: create new instance (causes duplication)
@@ -260,7 +265,9 @@ class EvidenceWeightedResolver:
                     )
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.warning("EvidenceWeightedResolver: Created new safety validator instance (may cause duplication)")
+                logger.warning(
+                    "EvidenceWeightedResolver: Created new safety validator instance (may cause duplication)"
+                )
         else:
             self.safety_validator = None
             logger.warning(
@@ -510,9 +517,11 @@ class EvidenceWeightedResolver:
         # Convert to dict format for semantic_bridge compatibility
         return {
             "action": resolution.action.value,
-            "winner": existing_concepts[0]
-            if existing_concepts and resolution.action == ResolutionAction.REJECT
-            else None,
+            "winner": (
+                existing_concepts[0]
+                if existing_concepts and resolution.action == ResolutionAction.REJECT
+                else None
+            ),
             "confidence": resolution.confidence,
             "reasoning": [resolution.justification],
         }
@@ -1368,9 +1377,7 @@ class EvidenceWeightedResolver:
         # Simple concept creation - would be more sophisticated in production
         concept = type("Concept", (), {})()
 
-        concept.concept_id = (
-            f"concept_{hashlib.md5(str(pattern).encode(), usedforsecurity=False).hexdigest()[:8]}"
-        )
+        concept.concept_id = f"concept_{hashlib.md5(str(pattern).encode(), usedforsecurity=False).hexdigest()[:8]}"
         concept.pattern = pattern
         concept.features = self._extract_pattern_features(pattern)
         concept.confidence = getattr(pattern, "confidence", 0.5)

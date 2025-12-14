@@ -41,20 +41,16 @@ class PackHeaderError(Exception):
     """Base exception for pack header errors"""
 
 
-
 class InvalidMagicError(PackHeaderError):
     """Raised when header magic bytes are invalid"""
-
 
 
 class UnsupportedVersionError(PackHeaderError):
     """Raised when header version is not supported"""
 
 
-
 class HeaderValidationError(PackHeaderError):
     """Raised when header validation fails"""
-
 
 
 @dataclass
@@ -340,9 +336,11 @@ class PackHeaderV2:
             "flags": str(self.flags),
             "chunk_count": self.chunk_count,
             "index_offset": self.index_offset,
-            "merkle_root": self.pack_merkle_root.hex()
-            if self.pack_merkle_root != bytes(32)
-            else None,
+            "merkle_root": (
+                self.pack_merkle_root.hex()
+                if self.pack_merkle_root != bytes(32)
+                else None
+            ),
             "packer_version": self.packer_semver.decode(
                 "ascii", errors="replace"
             ).rstrip("\x00"),

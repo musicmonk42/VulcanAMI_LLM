@@ -13,18 +13,23 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from governance_loop import (MAX_POLICIES, MAX_POLICY_ID_LENGTH,
-                             MAX_POLICY_NAME_LENGTH, GovernanceLoop, Policy,
-                             PolicyPriority, PolicyType, PolicyViolation)
+from governance_loop import (
+    MAX_POLICIES,
+    MAX_POLICY_ID_LENGTH,
+    MAX_POLICY_NAME_LENGTH,
+    GovernanceLoop,
+    Policy,
+    PolicyPriority,
+    PolicyType,
+    PolicyViolation,
+)
 
 
 @pytest.fixture
 def governance():
     """Create governance loop."""
     loop = GovernanceLoop(
-        check_interval_s=1,
-        enable_auto_enforcement=True,
-        enable_policy_learning=True
+        check_interval_s=1, enable_auto_enforcement=True, enable_policy_learning=True
     )
     yield loop
     if loop.is_running:
@@ -41,11 +46,11 @@ def sample_policy():
         priority=PolicyPriority.HIGH,
         rules=[
             {
-                'type': 'threshold',
-                'name': 'memory_test',
-                'threshold': {'metric': 'memory_mb', 'max': 1000}
+                "type": "threshold",
+                "name": "memory_test",
+                "threshold": {"metric": "memory_mb", "max": 1000},
             }
-        ]
+        ],
     )
 
 
@@ -59,7 +64,7 @@ class TestPolicy:
             name="Test Policy",
             type=PolicyType.PERFORMANCE,
             priority=PolicyPriority.MEDIUM,
-            rules=[{'type': 'condition', 'name': 'test'}]
+            rules=[{"type": "condition", "name": "test"}],
         )
 
         assert policy.id == "test_001"
@@ -69,7 +74,7 @@ class TestPolicy:
 
     def test_evaluate_compliant(self, sample_policy):
         """Test evaluating compliant context."""
-        context = {'memory_mb': 500}
+        context = {"memory_mb": 500}
 
         compliant, reason = sample_policy.evaluate(context)
 
@@ -77,7 +82,7 @@ class TestPolicy:
 
     def test_evaluate_violation(self, sample_policy):
         """Test evaluating violation."""
-        context = {'memory_mb': 1500}
+        context = {"memory_mb": 1500}
 
         compliant, reason = sample_policy.evaluate(context)
 
@@ -93,14 +98,14 @@ class TestPolicy:
             priority=PolicyPriority.HIGH,
             rules=[
                 {
-                    'type': 'condition',
-                    'name': 'status_check',
-                    'condition': {'field': 'status', 'operator': '==', 'value': 'ok'}
+                    "type": "condition",
+                    "name": "status_check",
+                    "condition": {"field": "status", "operator": "==", "value": "ok"},
                 }
-            ]
+            ],
         )
 
-        context = {'status': 'ok'}
+        context = {"status": "ok"}
         compliant, _ = policy.evaluate(context)
 
         assert compliant is True
@@ -114,15 +119,15 @@ class TestPolicy:
             priority=PolicyPriority.HIGH,
             rules=[
                 {
-                    'type': 'condition',
-                    'name': 'test',
-                    'condition': {'field': 'value', 'operator': '>', 'value': 10}
+                    "type": "condition",
+                    "name": "test",
+                    "condition": {"field": "value", "operator": ">", "value": 10},
                 }
-            ]
+            ],
         )
 
-        assert policy.evaluate({'value': 15})[0] is True
-        assert policy.evaluate({'value': 5})[0] is False
+        assert policy.evaluate({"value": 15})[0] is True
+        assert policy.evaluate({"value": 5})[0] is False
 
 
 class TestGovernanceLoop:
@@ -133,7 +138,7 @@ class TestGovernanceLoop:
         loop = GovernanceLoop(
             check_interval_s=5,
             enable_auto_enforcement=False,
-            enable_policy_learning=False
+            enable_policy_learning=False,
         )
 
         assert loop.check_interval_s == 5
@@ -167,7 +172,7 @@ class TestGovernanceLoop:
             name="Test",
             type=PolicyType.SAFETY,
             priority=PolicyPriority.HIGH,
-            rules=[{'test': 'rule'}]
+            rules=[{"test": "rule"}],
         )
 
         with pytest.raises(ValueError, match="non-empty string"):
@@ -180,7 +185,7 @@ class TestGovernanceLoop:
             name="Test",
             type=PolicyType.SAFETY,
             priority=PolicyPriority.HIGH,
-            rules=[{'test': 'rule'}]
+            rules=[{"test": "rule"}],
         )
 
         with pytest.raises(ValueError, match="too long"):
@@ -195,7 +200,7 @@ class TestGovernanceLoop:
                 name=f"Policy {i}",
                 type=PolicyType.SAFETY,
                 priority=PolicyPriority.LOW,
-                rules=[{'test': 'rule'}]
+                rules=[{"test": "rule"}],
             )
             governance.add_policy(policy)
 
@@ -206,7 +211,7 @@ class TestGovernanceLoop:
                 name="Overflow",
                 type=PolicyType.SAFETY,
                 priority=PolicyPriority.LOW,
-                rules=[{'test': 'rule'}]
+                rules=[{"test": "rule"}],
             )
             governance.add_policy(policy)
 
@@ -247,16 +252,16 @@ class TestGovernanceLoop:
     def test_enforce_policies(self, governance):
         """Test policy enforcement."""
         action = {
-            'action_type': 'normal',
-            'memory_mb': 100,
-            'cpu_percent': 50,
-            'latency_ms': 100
+            "action_type": "normal",
+            "memory_mb": 100,
+            "cpu_percent": 50,
+            "latency_ms": 100,
         }
 
         result = governance.enforce_policies(action)
 
-        assert result['compliance_checked'] is True
-        assert 'compliance_score' in result
+        assert result["compliance_checked"] is True
+        assert "compliance_score" in result
 
     def test_enforce_policies_blocked(self, governance):
         """Test blocking action."""
@@ -268,38 +273,35 @@ class TestGovernanceLoop:
             priority=PolicyPriority.CRITICAL,
             rules=[
                 {
-                    'type': 'threshold',
-                    'name': 'strict_memory',
-                    'threshold': {'metric': 'memory_mb', 'max': 100}
+                    "type": "threshold",
+                    "name": "strict_memory",
+                    "threshold": {"metric": "memory_mb", "max": 100},
                 }
-            ]
+            ],
         )
         governance.add_policy(strict_policy)
 
-        action = {
-            'action_type': 'normal',
-            'memory_mb': 500  # Exceeds limit
-        }
+        action = {"action_type": "normal", "memory_mb": 500}  # Exceeds limit
 
         result = governance.enforce_policies(action)
 
         # Should be blocked
-        assert result.get('blocked', False)
+        assert result.get("blocked", False)
 
     def test_get_compliance_report(self, governance):
         """Test getting compliance report."""
         report = governance.get_compliance_report()
 
-        assert 'compliance_score' in report
-        assert 'total_policies' in report
-        assert 'total_violations' in report
-        assert 'recent_violations' in report
+        assert "compliance_score" in report
+        assert "total_policies" in report
+        assert "total_violations" in report
+        assert "recent_violations" in report
 
     def test_export_policies(self, governance, sample_policy):
         """Test exporting policies."""
         governance.add_policy(sample_policy)
 
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             filepath = f.name
 
         try:
@@ -319,14 +321,14 @@ class TestGovernanceLoop:
 
     def test_export_policies_permission_error(self, governance):
         """Test export with permission error."""
-        if os.name != 'nt':  # Skip on Windows
+        if os.name != "nt":  # Skip on Windows
             with pytest.raises(PermissionError):
                 governance.export_policies("/root/test.json")
 
     def test_import_policies(self, governance, sample_policy):
         """Test importing policies."""
         # Export first
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             filepath = f.name
 
         try:
@@ -350,7 +352,7 @@ class TestGovernanceLoop:
 
     def test_import_invalid_json(self, governance):
         """Test importing invalid JSON."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             f.write("{invalid json}")
             filepath = f.name
 
@@ -369,7 +371,7 @@ class TestPolicyEnforcement:
         # Safety enforcement
         safety_policy = governance.policies.get("safety_001")
         if safety_policy:
-            context = {'memory_mb': 8000}
+            context = {"memory_mb": 8000}
             success = governance._enforce_safety(safety_policy, context, "memory limit")
             assert isinstance(success, bool)
 
@@ -377,7 +379,7 @@ class TestPolicyEnforcement:
         """Test violation recording."""
         governance.add_policy(sample_policy)
 
-        context = {'memory_mb': 1500}
+        context = {"memory_mb": 1500}
 
         initial_violations = len(governance.violations)
         governance._record_violation(sample_policy, context, "Test violation")
@@ -391,8 +393,8 @@ class TestPolicyLearning:
     def test_learn_from_outcomes(self, governance):
         """Test learning from outcomes."""
         results = {
-            'test_policy': (True, "Compliant"),
-            'test_policy2': (False, "Violation")
+            "test_policy": (True, "Compliant"),
+            "test_policy2": (False, "Violation"),
         }
 
         governance._learn_from_outcomes(results)
@@ -409,8 +411,8 @@ class TestPolicyLearning:
 
         # Set up effectiveness data
         governance.policy_effectiveness[sample_policy.id] = {
-            'success': 20,
-            'total': 100
+            "success": 20,
+            "total": 100,
         }
 
         governance._adapt_policies()
@@ -423,6 +425,7 @@ class TestThreadSafety:
 
     def test_concurrent_policy_operations(self, governance):
         """Test concurrent policy operations."""
+
         def add_policies():
             for i in range(10):
                 try:
@@ -431,7 +434,7 @@ class TestThreadSafety:
                         name=f"Policy {i}",
                         type=PolicyType.OPERATIONAL,
                         priority=PolicyPriority.LOW,
-                        rules=[{'test': 'rule'}]
+                        rules=[{"test": "rule"}],
                     )
                     governance.add_policy(policy)
                 except:
@@ -452,10 +455,7 @@ class TestThreadSafety:
         results = []
 
         def enforce():
-            action = {
-                'action_type': 'test',
-                'memory_mb': 100
-            }
+            action = {"action_type": "test", "memory_mb": 100}
             result = governance.enforce_policies(action)
             results.append(result)
 
@@ -467,7 +467,7 @@ class TestThreadSafety:
             t.join()
 
         assert len(results) == 10
-        assert all(r['compliance_checked'] for r in results)
+        assert all(r["compliance_checked"] for r in results)
 
 
 if __name__ == "__main__":

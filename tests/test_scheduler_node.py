@@ -8,9 +8,13 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from scheduler_node import (SchedulerNode, TaskManager, _check_async_context,
-                            async_dispatch_scheduler_node,
-                            dispatch_scheduler_node)
+from scheduler_node import (
+    SchedulerNode,
+    TaskManager,
+    _check_async_context,
+    async_dispatch_scheduler_node,
+    dispatch_scheduler_node,
+)
 
 
 @pytest.fixture
@@ -28,11 +32,7 @@ def scheduler_node():
 @pytest.fixture
 def context():
     """Create test context."""
-    return {
-        'audit_log': [],
-        'running': True,
-        'tasks': {}
-    }
+    return {"audit_log": [], "running": True, "tasks": {}}
 
 
 class TestTaskManager:
@@ -49,6 +49,7 @@ class TestTaskManager:
     @pytest.mark.asyncio
     async def test_register_task(self, task_manager):
         """Test registering a task."""
+
         async def dummy_task():
             await asyncio.sleep(0.1)
             return "done"
@@ -65,6 +66,7 @@ class TestTaskManager:
     @pytest.mark.asyncio
     async def test_register_duplicate_task(self, task_manager):
         """Test registering duplicate task cancels old one."""
+
         async def dummy_task():
             await asyncio.sleep(1)
 
@@ -83,6 +85,7 @@ class TestTaskManager:
     @pytest.mark.asyncio
     async def test_cancel_task(self, task_manager):
         """Test cancelling a task."""
+
         async def long_task():
             await asyncio.sleep(10)
 
@@ -104,6 +107,7 @@ class TestTaskManager:
     @pytest.mark.asyncio
     async def test_cancel_all_tasks(self, task_manager):
         """Test cancelling all tasks."""
+
         async def dummy_task():
             await asyncio.sleep(10)
 
@@ -118,6 +122,7 @@ class TestTaskManager:
     @pytest.mark.asyncio
     async def test_get_task_status(self, task_manager):
         """Test getting task status."""
+
         async def dummy_task():
             await asyncio.sleep(0.1)
 
@@ -135,6 +140,7 @@ class TestTaskManager:
     @pytest.mark.asyncio
     async def test_get_all_tasks_status(self, task_manager):
         """Test getting all tasks status."""
+
         async def dummy_task():
             await asyncio.sleep(0.1)
 
@@ -163,16 +169,16 @@ class TestSchedulerNode:
     async def test_execute_periodic_task(self, scheduler_node, context):
         """Test executing periodic task."""
         params = {
-            'trigger': 'periodic',
-            'interval_ms': 100,
-            'task_id': 'periodic_test',
-            'max_iterations': 2
+            "trigger": "periodic",
+            "interval_ms": 100,
+            "task_id": "periodic_test",
+            "max_iterations": 2,
         }
 
         result = await scheduler_node.execute(params, context)
 
-        assert result['status'] == 'scheduled'
-        assert result['task_id'] == 'periodic_test'
+        assert result["status"] == "scheduled"
+        assert result["task_id"] == "periodic_test"
 
         # Wait for task to complete
         await asyncio.sleep(0.3)
@@ -183,17 +189,14 @@ class TestSchedulerNode:
     @pytest.mark.asyncio
     async def test_execute_event_task(self, scheduler_node, context):
         """Test executing event-triggered task."""
-        context['event_signal'] = 'test_event'
+        context["event_signal"] = "test_event"
 
-        params = {
-            'trigger': 'event',
-            'task_id': 'event_test'
-        }
+        params = {"trigger": "event", "task_id": "event_test"}
 
         result = await scheduler_node.execute(params, context)
 
-        assert result['status'] == 'scheduled'
-        assert result['task_id'] == 'event_test'
+        assert result["status"] == "scheduled"
+        assert result["task_id"] == "event_test"
 
         # Wait for task
         await asyncio.sleep(0.1)
@@ -203,10 +206,7 @@ class TestSchedulerNode:
     @pytest.mark.asyncio
     async def test_execute_invalid_trigger(self, scheduler_node, context):
         """Test executing with invalid trigger."""
-        params = {
-            'trigger': 'invalid_trigger',
-            'task_id': 'test'
-        }
+        params = {"trigger": "invalid_trigger", "task_id": "test"}
 
         with pytest.raises(ValueError):
             await scheduler_node.execute(params, context)
@@ -214,13 +214,10 @@ class TestSchedulerNode:
     @pytest.mark.asyncio
     async def test_execute_event_without_signal(self, scheduler_node, context):
         """Test event trigger without event signal."""
-        params = {
-            'trigger': 'event',
-            'task_id': 'test'
-        }
+        params = {"trigger": "event", "task_id": "test"}
 
         # Remove event_signal from context
-        context.pop('event_signal', None)
+        context.pop("event_signal", None)
 
         with pytest.raises(ValueError):
             await scheduler_node.execute(params, context)
@@ -228,15 +225,11 @@ class TestSchedulerNode:
     @pytest.mark.asyncio
     async def test_cancel_task(self, scheduler_node, context):
         """Test cancelling a scheduled task."""
-        params = {
-            'trigger': 'periodic',
-            'interval_ms': 100,
-            'task_id': 'cancel_test'
-        }
+        params = {"trigger": "periodic", "interval_ms": 100, "task_id": "cancel_test"}
 
         await scheduler_node.execute(params, context)
 
-        result = await scheduler_node.cancel_task('cancel_test')
+        result = await scheduler_node.cancel_task("cancel_test")
 
         assert result is True
 
@@ -246,18 +239,18 @@ class TestSchedulerNode:
     async def test_get_task_status(self, scheduler_node, context):
         """Test getting task status."""
         params = {
-            'trigger': 'periodic',
-            'interval_ms': 100,
-            'task_id': 'status_test',
-            'max_iterations': 2
+            "trigger": "periodic",
+            "interval_ms": 100,
+            "task_id": "status_test",
+            "max_iterations": 2,
         }
 
         await scheduler_node.execute(params, context)
 
-        status = scheduler_node.get_task_status('status_test')
+        status = scheduler_node.get_task_status("status_test")
 
         assert status is not None
-        assert status['task_id'] == 'status_test'
+        assert status["task_id"] == "status_test"
 
         await scheduler_node.shutdown()
 
@@ -266,11 +259,7 @@ class TestSchedulerNode:
         """Test graceful shutdown."""
         # Start multiple tasks
         for i in range(3):
-            params = {
-                'trigger': 'periodic',
-                'interval_ms': 100,
-                'task_id': f'task_{i}'
-            }
+            params = {"trigger": "periodic", "interval_ms": 100, "task_id": f"task_{i}"}
             await scheduler_node.execute(params, context)
 
         # Shutdown should cancel all
@@ -286,26 +275,23 @@ class TestDispatchFunctions:
     async def test_async_dispatch_scheduler_node(self, context):
         """Test async dispatch."""
         node = {
-            'type': 'SchedulerNode',
-            'params': {
-                'trigger': 'periodic',
-                'interval_ms': 100,
-                'task_id': 'async_test',
-                'max_iterations': 1
-            }
+            "type": "SchedulerNode",
+            "params": {
+                "trigger": "periodic",
+                "interval_ms": 100,
+                "task_id": "async_test",
+                "max_iterations": 1,
+            },
         }
 
         result = await async_dispatch_scheduler_node(node, context)
 
-        assert result['status'] == 'scheduled'
+        assert result["status"] == "scheduled"
 
     @pytest.mark.asyncio
     async def test_async_dispatch_invalid_type(self, context):
         """Test async dispatch with invalid node type."""
-        node = {
-            'type': 'InvalidNode',
-            'params': {}
-        }
+        node = {"type": "InvalidNode", "params": {}}
 
         with pytest.raises(ValueError):
             await async_dispatch_scheduler_node(node, context)
@@ -313,25 +299,25 @@ class TestDispatchFunctions:
     def test_dispatch_scheduler_node(self, context):
         """Test sync dispatch."""
         node = {
-            'type': 'SchedulerNode',
-            'params': {
-                'trigger': 'periodic',
-                'interval_ms': 100,
-                'task_id': 'sync_test',
-                'max_iterations': 1
-            }
+            "type": "SchedulerNode",
+            "params": {
+                "trigger": "periodic",
+                "interval_ms": 100,
+                "task_id": "sync_test",
+                "max_iterations": 1,
+            },
         }
 
         result = dispatch_scheduler_node(node, context)
 
-        assert result['status'] == 'scheduled'
+        assert result["status"] == "scheduled"
 
     @pytest.mark.asyncio
     async def test_dispatch_from_async_context_raises(self, context):
         """Test that sync dispatch raises from async context."""
         node = {
-            'type': 'SchedulerNode',
-            'params': {'trigger': 'periodic', 'task_id': 'test'}
+            "type": "SchedulerNode",
+            "params": {"trigger": "periodic", "task_id": "test"},
         }
 
         # Should raise when called from async context

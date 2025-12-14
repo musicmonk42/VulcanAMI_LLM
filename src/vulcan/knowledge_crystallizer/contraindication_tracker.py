@@ -1027,9 +1027,11 @@ class ContraindicationGraph:
                 "total_edges": num_edges,
                 "critical_nodes": len(critical_nodes),
                 "cache_size": len(self.cascade_cache),
-                "avg_impact": np.mean(list(self.impact_weights.values()))
-                if self.impact_weights
-                else 0,
+                "avg_impact": (
+                    np.mean(list(self.impact_weights.values()))
+                    if self.impact_weights
+                    else 0
+                ),
             }
 
     def save(self, path: Optional[Path] = None):
@@ -1437,9 +1439,11 @@ class CascadeAnalyzer:
 
             return {
                 "total_principles": len(self.graph.principle_nodes),
-                "total_edges": self.graph.graph.number_of_edges()
-                if hasattr(self.graph.graph, "number_of_edges")
-                else 0,
+                "total_edges": (
+                    self.graph.graph.number_of_edges()
+                    if hasattr(self.graph.graph, "number_of_edges")
+                    else 0
+                ),
                 "avg_cascade_risk": np.mean(all_risks) if all_risks else 0,
                 "max_cascade_risk": np.max(all_risks) if all_risks else 0,
                 "high_risk_principles": sum(1 for r in all_risks if r > 0.7),

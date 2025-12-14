@@ -12,15 +12,24 @@ import numpy as np
 import pytest
 
 # Skip entire module if torch is not available
-torch = pytest.importorskip("torch", reason="PyTorch required for analog photonic emulator tests")
+torch = pytest.importorskip(
+    "torch", reason="PyTorch required for analog photonic emulator tests"
+)
 
-from analog_photonic_emulator import (MAX_TENSOR_SIZE, AnalogPhotonicEmulator,
-                                      CalibrationData, HardwareAccelerator,
-                                      MemristorEmulator, MultiplexingMode,
-                                      NoiseModel, PhotonicBackend,
-                                      PhotonicNoise, PhotonicParameters,
-                                      QuantumPhotonicProcessor,
-                                      WaveguideSimulator)
+from analog_photonic_emulator import (
+    MAX_TENSOR_SIZE,
+    AnalogPhotonicEmulator,
+    CalibrationData,
+    HardwareAccelerator,
+    MemristorEmulator,
+    MultiplexingMode,
+    NoiseModel,
+    PhotonicBackend,
+    PhotonicNoise,
+    PhotonicParameters,
+    QuantumPhotonicProcessor,
+    WaveguideSimulator,
+)
 
 
 @pytest.fixture
@@ -40,10 +49,7 @@ def photonic_params():
 @pytest.fixture
 def emulator():
     """Create emulator."""
-    em = AnalogPhotonicEmulator(
-        backend=PhotonicBackend.CPU,
-        noise_seed=42
-    )
+    em = AnalogPhotonicEmulator(backend=PhotonicBackend.CPU, noise_seed=42)
     yield em
     em.shutdown()
 
@@ -131,8 +137,7 @@ class TestPhotonicNoise:
         signal = np.ones(100, dtype=np.float32)
 
         noisy = noise_gen.apply_realistic_noise(
-            signal,
-            [NoiseModel.SHOT, NoiseModel.THERMAL]
+            signal, [NoiseModel.SHOT, NoiseModel.THERMAL]
         )
 
         assert noisy.shape == signal.shape
@@ -178,7 +183,7 @@ class TestWaveguideSimulator:
         waveguide = WaveguideSimulator(photonic_params)
         field = np.ones(100, dtype=complex)
 
-        output = waveguide.mzi(field, phase_shift=np.pi/2)
+        output = waveguide.mzi(field, phase_shift=np.pi / 2)
 
         assert output.shape == field.shape
 
@@ -251,7 +256,9 @@ class TestMemristorEmulator:
         memristor2.load_state(str(filepath))
 
         # State should be restored
-        assert memristor2.conductance_matrix[5, 5] == memristor1.conductance_matrix[5, 5]
+        assert (
+            memristor2.conductance_matrix[5, 5] == memristor1.conductance_matrix[5, 5]
+        )
 
 
 class TestQuantumPhotonicProcessor:
@@ -283,7 +290,7 @@ class TestQuantumPhotonicProcessor:
         """Test phase shifter."""
         quantum = QuantumPhotonicProcessor(num_modes=4)
 
-        phase = quantum.phase_shifter(0, np.pi/2)
+        phase = quantum.phase_shifter(0, np.pi / 2)
 
         assert isinstance(phase, complex)
 
@@ -402,7 +409,9 @@ class TestAnalogPhotonicEmulator:
         """Test polarization multiplexing."""
         tensor = torch.randn(5, 10)
 
-        multiplexed = emulator._apply_multiplexing(tensor, MultiplexingMode.POLARIZATION)
+        multiplexed = emulator._apply_multiplexing(
+            tensor, MultiplexingMode.POLARIZATION
+        )
 
         # Should be complex
         assert torch.is_complex(multiplexed)

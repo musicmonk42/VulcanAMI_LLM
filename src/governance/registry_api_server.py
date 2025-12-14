@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional
 # --- gRPC Imports (Optional) ---
 try:
     import grpc
+
     # Import specific protobuf types if available
     from google.protobuf.json_format import MessageToDict
     from google.protobuf.timestamp_pb2 import Timestamp
@@ -399,31 +400,39 @@ class DatabaseManager:
             with self.pool.get_connection() as conn:
                 cursor = conn.cursor()
                 # Use IF NOT EXISTS for idempotency
-                cursor.execute("""
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS graph_proposals (
                         id TEXT PRIMARY KEY,
                         data TEXT NOT NULL
                     )
-                """)
-                cursor.execute("""
+                """
+                )
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS lang_proposals (
                         id TEXT PRIMARY KEY,
                         data TEXT NOT NULL
                     )
-                """)
-                cursor.execute("""
+                """
+                )
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS agents (
                         agent_id TEXT PRIMARY KEY,
                         profile_data TEXT NOT NULL
                     )
-                """)
-                cursor.execute("""
+                """
+                )
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS audit_log (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         timestamp TEXT NOT NULL,
                         data TEXT NOT NULL
                     )
-                """)
+                """
+                )
                 # Add index on audit log timestamp for faster ordering
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)"
@@ -441,16 +450,18 @@ class DatabaseManager:
 
     # Security: Allowlist for table and column names to prevent SQL injection
     ALLOWED_TABLES = {
-        'graph_proposals': {'id_column': 'id', 'data_column': 'data'},
-        'lang_proposals': {'id_column': 'id', 'data_column': 'data'},
-        'agents': {'id_column': 'agent_id', 'data_column': 'profile_data'},
-        'audit_log': {'id_column': 'id', 'data_column': 'data'}
+        "graph_proposals": {"id_column": "id", "data_column": "data"},
+        "lang_proposals": {"id_column": "id", "data_column": "data"},
+        "agents": {"id_column": "agent_id", "data_column": "profile_data"},
+        "audit_log": {"id_column": "id", "data_column": "data"},
     }
 
     def _validate_table_name(self, table_name: str) -> str:
         """Validate table name against allowlist to prevent SQL injection."""
         if table_name not in self.ALLOWED_TABLES:
-            raise ValueError(f"Invalid table name: {table_name}. Allowed tables: {list(self.ALLOWED_TABLES.keys())}")
+            raise ValueError(
+                f"Invalid table name: {table_name}. Allowed tables: {list(self.ALLOWED_TABLES.keys())}"
+            )
         return table_name
 
     def _get_column_names(self, table_name: str) -> Dict[str, str]:
@@ -504,8 +515,8 @@ class DatabaseManager:
         # Validate table name to prevent SQL injection
         validated_table = self._validate_table_name(table_name)
         columns = self._get_column_names(validated_table)
-        id_column = columns['id_column']
-        data_column = columns['data_column']
+        id_column = columns["id_column"]
+        data_column = columns["data_column"]
 
         try:
             # nosec B608: table/column names validated above via _validate_table_name
@@ -534,8 +545,8 @@ class DatabaseManager:
         # Validate table name to prevent SQL injection
         validated_table = self._validate_table_name(table_name)
         columns = self._get_column_names(validated_table)
-        id_column = columns['id_column']
-        data_column = columns['data_column']
+        id_column = columns["id_column"]
+        data_column = columns["data_column"]
 
         try:
             self._exec_query(
@@ -543,7 +554,9 @@ class DatabaseManager:
                 (record_id, json.dumps(data)),
             )
         except Exception as e:
-            self.logger.error(f"Error saving record {record_id} to {validated_table}: {e}")
+            self.logger.error(
+                f"Error saving record {record_id} to {validated_table}: {e}"
+            )
             # Optionally re-raise depending on desired error handling
 
     def query_records(
@@ -558,8 +571,8 @@ class DatabaseManager:
         # Validate table name to prevent SQL injection
         validated_table = self._validate_table_name(table_name)
         columns = self._get_column_names(validated_table)
-        data_column = columns['data_column']
-        id_column = columns['id_column']
+        data_column = columns["data_column"]
+        id_column = columns["id_column"]
 
         # nosec B608: table/column names validated above via _validate_table_name
         query = f"SELECT {data_column} FROM {validated_table}"  # nosec B608
@@ -1484,9 +1497,9 @@ class RegistryServicer(RegistryServiceServicer):
         self.logger.info(f"Received QueryProposals request from {agent_id}")
         filters = {
             "status": request.status if request.HasField("status") else None,
-            "proposed_by": request.proposed_by
-            if request.HasField("proposed_by")
-            else None,
+            "proposed_by": (
+                request.proposed_by if request.HasField("proposed_by") else None
+            ),
         }
         self.security_audit_engine.log_audit(
             "proposals_queried",
@@ -1497,9 +1510,9 @@ class RegistryServicer(RegistryServiceServicer):
         try:
             proposals_data = self.lang_evolution_registry.query_proposals(
                 status=request.status if request.HasField("status") else None,
-                proposed_by=request.proposed_by
-                if request.HasField("proposed_by")
-                else None,
+                proposed_by=(
+                    request.proposed_by if request.HasField("proposed_by") else None
+                ),
                 limit=request.limit if request.HasField("limit") else None,
                 offset=request.offset if request.HasField("offset") else 0,
             )
@@ -1662,8 +1675,7 @@ def serve(port: int = 50051, db_path: str = DB_PATH):
         # e.g., from src.governance import registry_pb2_grpc
         # Adjust relative import based on actual file structure
         # For this example, let's assume it's in the same package 'src.governance'
-        from . import \
-            registry_pb2_grpc  # Requires __init__.py and compiled protos
+        from . import registry_pb2_grpc  # Requires __init__.py and compiled protos
 
         registry_pb2_grpc.add_RegistryServiceServicer_to_server(
             RegistryServicer(

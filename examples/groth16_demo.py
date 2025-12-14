@@ -35,18 +35,10 @@ def main():
 
     print("1. Defining Circuit")
     print("-" * 40)
-    constraints = [
-        R1CSConstraint(
-            A=[0, 0, 1],  # x
-            B=[0, 0, 1],  # x
-            C=[0, 1, 0]   # y
-        )
-    ]
+    constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]  # x  # x  # y
 
     circuit = Circuit(
-        constraints=constraints,
-        num_variables=3,
-        num_public_inputs=1  # y is public
+        constraints=constraints, num_variables=3, num_public_inputs=1  # y is public
     )
     print(f"   Circuit: x² = y")
     print(f"   Variables: {circuit.num_variables}")

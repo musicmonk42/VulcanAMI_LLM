@@ -18,11 +18,19 @@ from unittest.mock import Mock
 import pytest
 
 from vulcan.curiosity_engine.curiosity_engine_core import (
-    CuriosityEngine, ExperimentManager, ExperimentResult, ExplorationFrontier,
-    ExplorationValueEstimator, GapPrioritizer, KnowledgeIntegrator,
-    KnowledgeRegion, RegionManager, SafeExperimentExecutor, StrategySelector)
-from vulcan.curiosity_engine.experiment_generator import (Experiment,
-                                                          ExperimentType)
+    CuriosityEngine,
+    ExperimentManager,
+    ExperimentResult,
+    ExplorationFrontier,
+    ExplorationValueEstimator,
+    GapPrioritizer,
+    KnowledgeIntegrator,
+    KnowledgeRegion,
+    RegionManager,
+    SafeExperimentExecutor,
+    StrategySelector,
+)
+from vulcan.curiosity_engine.experiment_generator import Experiment, ExperimentType
 from vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
 
 # ============================================================================
@@ -157,9 +165,9 @@ class TestRegionManager:
         # BUG FIX: These should be DIFFERENT regions
         # The bug would make them the same due to: (not patterns or best_overlap > ...)
         # After fix with: (patterns and best_overlap > ...), they should differ
-        assert region_id1 != region_id2, (
-            "Empty patterns should not match existing regions"
-        )
+        assert (
+            region_id1 != region_id2
+        ), "Empty patterns should not match existing regions"
 
     def test_region_merging(self, region_manager):
         """Test that similar regions get merged"""
