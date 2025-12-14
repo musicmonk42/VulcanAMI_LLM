@@ -763,6 +763,7 @@ cp .env.example .env
 # Edit .env with secrets
 
 # Run services
+uvicorn src.full_platform:app --host 0.0.0.0 --port 8000 --reload
 python app.py                           # Registry API (Flask)
 uvicorn src.graphix_arena:app --reload # Arena API (FastAPI)
 python src/minimal_executor.py          # Executor demo
