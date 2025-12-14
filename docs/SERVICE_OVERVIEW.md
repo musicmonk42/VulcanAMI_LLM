@@ -12,10 +12,10 @@ This document provides a high-level overview of all services in the VulcanAMI LL
 ## Platform Statistics
 
 - **Total Services:** 71 distinct service modules
-- **Total Python Files:** 557 files
-- **Total Functions:** 21,523 functions
-- **Total Classes:** 4,353 classes
-- **Lines of Code:** ~407,000 LOC
+- **Total Python Files:** 557 files (312 production, 245 test)
+- **Total Functions:** 21,523 functions (11,811 test functions = 54.9% coverage)
+- **Total Classes:** 4,353 classes (2,361 test classes = 54.2% coverage)
+- **Lines of Code:** 506,329 total lines (373,289 code, 35,835 comments, 97,205 blank)
 
 ---
 
