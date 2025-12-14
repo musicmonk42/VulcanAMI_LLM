@@ -595,11 +595,12 @@ class TestParameterLearning:
         bn.add_variable("Y", VariableType.GAUSSIAN, parents=["X"])
 
         # Generate data: Y = 2 + 0.5*X + noise
-        np.random.seed(42)
+        # Use local random state to avoid interference from other tests
+        rng = np.random.RandomState(42)
         data = []
         for _ in range(100):
-            x = np.random.normal(0, 1)
-            y = 2 + 0.5 * x + np.random.normal(0, 0.1)
+            x = rng.normal(0, 1)
+            y = 2 + 0.5 * x + rng.normal(0, 0.1)
             data.append({"X": x, "Y": y})
 
         bn.learn_parameters_mle(data)
