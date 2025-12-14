@@ -736,7 +736,7 @@ class TamperEvidentLogger:
                                 json.dumps(syslog_data, ensure_ascii=False),
                             )
                         except Exception as e:
-                            logger.debug(f"Operation failed: {e}")
+                            self._logger.debug(f"Operation failed: {e}")
 
                 if self._metrics:
                     self._metrics["batch_size"].set(len(self._batch_queue))
@@ -958,7 +958,7 @@ class TamperEvidentLogger:
             try:
                 await self._batch_task
             except asyncio.CancelledError:
-                logger.debug(f"Operation failed: {e}")
+                pass  # Expected during shutdown
 
         # Flush any remaining batched entries
         async with self._lock:
@@ -981,7 +981,7 @@ class TamperEvidentLogger:
             try:
                 handler.close()
             except Exception as e:
-                logger.debug(f"Operation failed: {e}")
+                self._logger.debug(f"Operation failed: {e}")
             self._logger.removeHandler(handler)
 
 
