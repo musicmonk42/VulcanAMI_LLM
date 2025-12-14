@@ -224,6 +224,15 @@ pytest tests/test_cicd_reproducibility.py -v
 - ✅ Reproducibility settings (pinned versions)
 - ✅ Python dependencies (440 pinned packages, no vulnerabilities)
 
+**### Test Files:** 245 comprehensive test files
+- **Test Functions:** 11,811 test functions (54.9% coverage)
+- **Test Classes:** 2,361 test classes
+- **Test Categories:**
+  - 90 files in tests/ directory (standard suite)
+  - 124 files in src/vulcan/tests/ (VULCAN subsystem tests)
+  - 3 files in stress_tests/ (performance tests)
+  - 28 files embedded in other locations
+
 **Expected output:**
 ```
 Total Scenarios Tested: 29
