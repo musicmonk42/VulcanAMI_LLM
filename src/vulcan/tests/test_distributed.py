@@ -212,7 +212,9 @@ class TestRPCClient:
         with patch("vulcan.memory.distributed.ZMQ_AVAILABLE", False):
             # Create multiple mock sockets to handle concurrent socket creations
             # (e.g., from network quality checks in other code)
-            mock_socks = [MagicMock() for _ in range(10)]
+            # Use enough mocks to handle typical concurrent socket operations during tests
+            NUM_MOCK_SOCKETS = 10
+            mock_socks = [MagicMock() for _ in range(NUM_MOCK_SOCKETS)]
             
             with patch("socket.socket", side_effect=mock_socks):
                 result = rpc_client.connect("node_1", "localhost", 5555)
