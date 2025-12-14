@@ -368,9 +368,9 @@ class CausalContext:
             "causal_context": top_scored,
             "concepts": concepts,
             "causal_related": causal_related,
-            "causal_graph": self._serialize_causal_graph(causal_graph)
-            if causal_graph
-            else None,
+            "causal_graph": (
+                self._serialize_causal_graph(causal_graph) if causal_graph else None
+            ),
             "interventions": [asdict(i) for i in list(self._interventions)[-10:]],
             "confounders": confounders,
             "mediators": mediators,
@@ -475,9 +475,11 @@ class CausalContext:
         if hasattr(world_model, "compute_intervention_effect"):
             try:
                 original_outcome = world_model.compute_intervention_effect(
-                    intervention
-                    if isinstance(intervention, dict)
-                    else {variable: original_value},
+                    (
+                        intervention
+                        if isinstance(intervention, dict)
+                        else {variable: original_value}
+                    ),
                     outcome_variable,
                 )
                 cf_outcome = world_model.compute_intervention_effect(

@@ -14,6 +14,7 @@ Usage:
   python inspect_pt.py --checkpoint ./logs/run1/llm_last_model.pt
 """
 
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", required=True)
@@ -40,11 +41,15 @@ def main():
         return
 
     # Case 2: dict with 'state_dict'
-    if isinstance(obj, dict) and "state_dict" in obj and isinstance(obj["state_dict"], dict):
+    if (
+        isinstance(obj, dict)
+        and "state_dict" in obj
+        and isinstance(obj["state_dict"], dict)
+    ):
         sd = obj["state_dict"]
         keys = list(sd.keys())
         print(f"[info] Dict with 'state_dict' containing {len(keys)} keys.")
-        for k in keys[:args.limit]:
+        for k in keys[: args.limit]:
             print("  ", k)
         return
 
@@ -54,14 +59,17 @@ def main():
         tensor_keys = [k for k, v in obj.items() if isinstance(v, torch.Tensor)]
         if len(tensor_keys) > 10:
             print(f"[info] Raw state_dict with {len(tensor_keys)} tensor entries.")
-            for k in tensor_keys[:args.limit]:
+            for k in tensor_keys[: args.limit]:
                 print("  ", k)
             return
         else:
-            print("[warn] Dict but not a typical state_dict. Keys:", list(obj.keys())[:20])
+            print(
+                "[warn] Dict but not a typical state_dict. Keys:", list(obj.keys())[:20]
+            )
             return
 
     print("[warn] Unrecognized format; may need original training script.")
+
 
 if __name__ == "__main__":
     main()

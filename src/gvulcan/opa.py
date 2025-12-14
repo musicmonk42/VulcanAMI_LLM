@@ -87,9 +87,9 @@ class PolicyEvaluation:
         return {
             "policy_name": self.policy_name,
             "input_data": self.input_data,
-            "result": self.result
-            if isinstance(self.result, dict)
-            else str(self.result),
+            "result": (
+                self.result if isinstance(self.result, dict) else str(self.result)
+            ),
             "evaluation_time": self.evaluation_time.isoformat(),
             "cache_hit": self.cache_hit,
             "metadata": self.metadata,

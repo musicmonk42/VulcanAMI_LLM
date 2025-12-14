@@ -40,8 +40,16 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Set, Tuple
 
-from .core import (Clause, Constant, Function, Literal, ProofNode, Term,
-                   Unifier, Variable)
+from .core import (
+    Clause,
+    Constant,
+    Function,
+    Literal,
+    ProofNode,
+    Term,
+    Unifier,
+    Variable,
+)
 
 logger = logging.getLogger(__name__)
 

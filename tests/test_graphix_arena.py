@@ -10,12 +10,23 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from graphix_arena import (MAX_AGENT_ID_LENGTH, MAX_FEEDBACK_LOG_SIZE,
-                           MAX_GRAPH_ID_LENGTH, MAX_PAYLOAD_SIZE,
-                           MAX_REBERT_THRESHOLD, MIN_REBERT_THRESHOLD,
-                           AgentNotFoundException, BiasDetectedException, Edge,
-                           GraphixArena, GraphixIRGraph, GraphSpec, Node, app,
-                           rebert_prune)
+from graphix_arena import (
+    MAX_AGENT_ID_LENGTH,
+    MAX_FEEDBACK_LOG_SIZE,
+    MAX_GRAPH_ID_LENGTH,
+    MAX_PAYLOAD_SIZE,
+    MAX_REBERT_THRESHOLD,
+    MIN_REBERT_THRESHOLD,
+    AgentNotFoundException,
+    BiasDetectedException,
+    Edge,
+    GraphixArena,
+    GraphixIRGraph,
+    GraphSpec,
+    Node,
+    app,
+    rebert_prune,
+)
 
 
 @pytest.fixture
@@ -33,10 +44,7 @@ def arena():
 @pytest.fixture
 def valid_graph_spec():
     """Create valid graph spec."""
-    return {
-        "spec_id": "test_spec_123",
-        "parameters": {"param1": "value1"}
-    }
+    return {"spec_id": "test_spec_123", "parameters": {"param1": "value1"}}
 
 
 @pytest.fixture
@@ -46,12 +54,10 @@ def valid_graph():
         "graph_id": "test_graph_123",
         "nodes": [
             {"id": "node1", "label": "Node 1", "properties": {}},
-            {"id": "node2", "label": "Node 2", "properties": {}}
+            {"id": "node2", "label": "Node 2", "properties": {}},
         ],
-        "edges": [
-            {"source_id": "node1", "target_id": "node2", "weight": 1.0}
-        ],
-        "metadata": {}
+        "edges": [{"source_id": "node1", "target_id": "node2", "weight": 1.0}],
+        "metadata": {},
     }
 
 
@@ -115,7 +121,7 @@ class TestPydanticModels:
         invalid_graph = {
             "graph_id": "invalid!@#",
             "nodes": [{"id": "n1", "label": "N1"}],
-            "edges": []
+            "edges": [],
         }
 
         with pytest.raises(ValidationError):
@@ -128,10 +134,7 @@ class TestPydanticModels:
 
     def test_graphix_ir_graph_too_many_nodes(self):
         """Test GraphixIRGraph with too many nodes."""
-        many_nodes = [
-            {"id": f"node{i}", "label": f"Node {i}"}
-            for i in range(10001)
-        ]
+        many_nodes = [{"id": f"node{i}", "label": f"Node {i}"} for i in range(10001)]
 
         with pytest.raises(ValidationError, match="cannot have more than"):
             GraphixIRGraph(graph_id="test", nodes=many_nodes, edges=[])
@@ -241,29 +244,24 @@ class TestGraphixArena:
 
     def test_run_transparent_task(self, arena):
         """Test transparent task execution."""
-        payload = {
-            "input_tensor": [[1.0, 2.0], [3.0, 4.0]]
-        }
+        payload = {"input_tensor": [[1.0, 2.0], [3.0, 4.0]]}
 
         result = arena.run_transparent_task("test_agent", "test task", payload)
 
         assert isinstance(result, dict)
-        assert 'interpretability' in result
-        assert 'audit' in result
-        assert 'observability' in result
+        assert "interpretability" in result
+        assert "audit" in result
+        assert "observability" in result
 
     @pytest.mark.asyncio
     async def test_run_shadow_task(self, arena):
         """Test shadow task execution."""
-        payload = {
-            "graph_id": "test_graph",
-            "data": "test"
-        }
+        payload = {"graph_id": "test_graph", "data": "test"}
 
         result = await arena.run_shadow_task("test_agent", "test task", payload)
 
         assert isinstance(result, dict)
-        assert 'status' in result
+        assert "status" in result
 
     @pytest.mark.asyncio
     async def test_rollback_failed_task(self, arena):
@@ -272,32 +270,36 @@ class TestGraphixArena:
 
         result = await arena.rollback_failed_task(payload, reason="test failure")
 
-        assert result['status'] == 'rollback'
-        assert result['reason'] == "test failure"
+        assert result["status"] == "rollback"
+        assert result["reason"] == "test failure"
 
     @pytest.mark.asyncio
     async def test_feedback_ingestion_valid(self, arena):
         """Test valid feedback ingestion."""
         request = Mock()
-        request.json = AsyncMock(return_value={
-            "graph_id": "test_graph",
-            "agent_id": "test_agent",
-            "score": 0.9,
-            "rationale": "Good performance"
-        })
+        request.json = AsyncMock(
+            return_value={
+                "graph_id": "test_graph",
+                "agent_id": "test_agent",
+                "score": 0.9,
+                "rationale": "Good performance",
+            }
+        )
 
         result = await arena.feedback_ingestion(request)
 
-        assert result['status'] == 'ok'
+        assert result["status"] == "ok"
 
     @pytest.mark.asyncio
     async def test_feedback_ingestion_missing_fields(self, arena):
         """Test feedback ingestion with missing fields."""
         request = Mock()
-        request.json = AsyncMock(return_value={
-            "graph_id": "test_graph"
-            # Missing agent_id and score
-        })
+        request.json = AsyncMock(
+            return_value={
+                "graph_id": "test_graph"
+                # Missing agent_id and score
+            }
+        )
 
         with pytest.raises(Exception):  # HTTPException 422
             await arena.feedback_ingestion(request)
@@ -306,11 +308,13 @@ class TestGraphixArena:
     async def test_feedback_ingestion_invalid_score(self, arena):
         """Test feedback ingestion with invalid score."""
         request = Mock()
-        request.json = AsyncMock(return_value={
-            "graph_id": "test_graph",
-            "agent_id": "test_agent",
-            "score": "invalid"
-        })
+        request.json = AsyncMock(
+            return_value={
+                "graph_id": "test_graph",
+                "agent_id": "test_agent",
+                "score": "invalid",
+            }
+        )
 
         with pytest.raises(Exception):  # HTTPException 422
             await arena.feedback_ingestion(request)
@@ -319,15 +323,17 @@ class TestGraphixArena:
     async def test_feedback_ingestion_negative_score(self, arena):
         """Test feedback with negative score triggers rollback."""
         request = Mock()
-        request.json = AsyncMock(return_value={
-            "graph_id": "test_graph",
-            "agent_id": "test_agent",
-            "score": -0.5
-        })
+        request.json = AsyncMock(
+            return_value={
+                "graph_id": "test_graph",
+                "agent_id": "test_agent",
+                "score": -0.5,
+            }
+        )
 
         result = await arena.feedback_ingestion(request)
 
-        assert result['status'] == 'ok'
+        assert result["status"] == "ok"
 
     def test_feedback_log_bounded(self, arena):
         """Test feedback log is bounded."""
@@ -343,10 +349,12 @@ class TestGraphixArena:
         import numpy as np
 
         request = Mock()
-        request.json = AsyncMock(return_value={
-            "proposals": ["graph1", "graph2", "graph3"],
-            "fitness": [0.8, 0.9, 0.7]
-        })
+        request.json = AsyncMock(
+            return_value={
+                "proposals": ["graph1", "graph2", "graph3"],
+                "fitness": [0.8, 0.9, 0.7],
+            }
+        )
 
         # Mock tournament manager
         if arena.tournament_manager:
@@ -361,10 +369,7 @@ class TestGraphixArena:
     async def test_tournament_task_empty_proposals(self, arena):
         """Test tournament with empty proposals."""
         request = Mock()
-        request.json = AsyncMock(return_value={
-            "proposals": [],
-            "fitness": []
-        })
+        request.json = AsyncMock(return_value={"proposals": [], "fitness": []})
 
         if arena.tournament_manager:
             with pytest.raises(Exception):  # HTTPException 400
@@ -374,10 +379,9 @@ class TestGraphixArena:
     async def test_tournament_task_length_mismatch(self, arena):
         """Test tournament with length mismatch."""
         request = Mock()
-        request.json = AsyncMock(return_value={
-            "proposals": ["g1", "g2"],
-            "fitness": [0.5]  # Mismatch
-        })
+        request.json = AsyncMock(
+            return_value={"proposals": ["g1", "g2"], "fitness": [0.5]}  # Mismatch
+        )
 
         if arena.tournament_manager:
             with pytest.raises(Exception):  # HTTPException 400
@@ -407,8 +411,8 @@ class TestGraphixArena:
 
         try:
             # Mock GraphixLLMClient to raise an exception with empty message
-            with patch('graphix_arena.GraphixLLMClient') as mock_client:
-                mock_client.side_effect = RuntimeError('')
+            with patch("graphix_arena.GraphixLLMClient") as mock_client:
+                mock_client.side_effect = RuntimeError("")
 
                 # Create new arena - should catch exception and log it
                 arena = GraphixArena(port=8186)
@@ -422,12 +426,14 @@ class TestGraphixArena:
 
                 # Check that the error message includes exception type
                 error_messages = [r.getMessage() for r in error_records]
-                assert any('RuntimeError' in msg for msg in error_messages), \
-                    f"Expected RuntimeError in error messages, got: {error_messages}"
+                assert any(
+                    "RuntimeError" in msg for msg in error_messages
+                ), f"Expected RuntimeError in error messages, got: {error_messages}"
 
                 # Check that exc_info was captured
-                assert any(r.exc_info is not None for r in error_records), \
-                    "Expected exc_info to be captured in error log"
+                assert any(
+                    r.exc_info is not None for r in error_records
+                ), "Expected exc_info to be captured in error log"
         finally:
             graphix_logger.removeHandler(handler)
 
@@ -448,7 +454,7 @@ class TestExceptionHandlers:
             agent_id="test_agent",
             graph_id="test_graph",
             label="risky",
-            message="Bias detected"
+            message="Bias detected",
         )
 
         assert exc.agent_id == "test_agent"

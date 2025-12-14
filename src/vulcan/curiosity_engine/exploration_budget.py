@@ -226,9 +226,9 @@ class BudgetTracker:
                     "reserved": self.reserved_budget,
                     "total_consumed": self.total_consumed,
                     "total_reserved": self.total_reserved,
-                    "consumption_rate": np.mean(recent_consumption)
-                    if recent_consumption
-                    else 0,
+                    "consumption_rate": (
+                        np.mean(recent_consumption) if recent_consumption else 0
+                    ),
                     "budget_utilization": 1.0
                     - (self.current_budget / max(self.current_budget, 1)),
                 }

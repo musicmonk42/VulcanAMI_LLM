@@ -139,7 +139,9 @@ class SafetyReport:
     reasons: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     audit_id: str = field(
-        default_factory=lambda: hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:16]
+        default_factory=lambda: hashlib.md5(
+            str(time.time()).encode(), usedforsecurity=False
+        ).hexdigest()[:16]
     )
 
     def merge(self, other: "SafetyReport") -> "SafetyReport":
@@ -257,10 +259,14 @@ class SafetyConfig:
         }
     )
     rollback_config: Dict[str, Any] = field(
-        default_factory=lambda: {"storage_path": "/tmp/rollback"}  # nosec B108 - test fixture default
+        default_factory=lambda: {
+            "storage_path": "/tmp/rollback"
+        }  # nosec B108 - test fixture default
     )
     audit_config: Dict[str, Any] = field(
-        default_factory=lambda: {"log_path": "/tmp/audit"}  # nosec B108 - test fixture default
+        default_factory=lambda: {
+            "log_path": "/tmp/audit"
+        }  # nosec B108 - test fixture default
     )
 
 
@@ -710,8 +716,8 @@ class RollbackManager:
     def create_snapshot(self, state: Dict, action_log: List) -> str:
         with self._lock:
             snapshot_id = hashlib.md5(
-                f"{time.time()}{len(self.snapshots)}".encode()
-                , usedforsecurity=False).hexdigest()[:16]
+                f"{time.time()}{len(self.snapshots)}".encode(), usedforsecurity=False
+            ).hexdigest()[:16]
             snapshot = RollbackSnapshot(
                 snapshot_id=snapshot_id,
                 timestamp=time.time(),
@@ -746,9 +752,9 @@ class RollbackManager:
         self, action: Dict, reason: str, duration_seconds: float = 3600
     ) -> str:
         with self._lock:
-            quarantine_id = hashlib.md5(f"{time.time()}{action}".encode(), usedforsecurity=False).hexdigest()[
-                :16
-            ]
+            quarantine_id = hashlib.md5(
+                f"{time.time()}{action}".encode(), usedforsecurity=False
+            ).hexdigest()[:16]
             self.quarantine[quarantine_id] = {
                 "action": action,
                 "reason": reason,
@@ -785,7 +791,9 @@ class RollbackManager:
 
 
 class AuditLogger:
-    def __init__(self, log_path: str = "/tmp/audit", config: Dict = None):  # nosec B108 - test fixture default
+    def __init__(
+        self, log_path: str = "/tmp/audit", config: Dict = None
+    ):  # nosec B108 - test fixture default
         self.log_path = log_path
         self.config = config or {}
         self.redact_sensitive = config.get("redact_sensitive", True) if config else True
@@ -795,7 +803,9 @@ class AuditLogger:
 
     def log_safety_decision(self, decision: Dict, report: SafetyReport) -> str:
         with self._lock:
-            entry_id = hashlib.md5(f"{time.time()}{decision}".encode(), usedforsecurity=False).hexdigest()[:16]
+            entry_id = hashlib.md5(
+                f"{time.time()}{decision}".encode(), usedforsecurity=False
+            ).hexdigest()[:16]
             self.entries.append(
                 {
                     "entry_id": entry_id,
@@ -810,9 +820,9 @@ class AuditLogger:
 
     def log_event(self, event_type: str, data: Dict, severity: str = "info") -> str:
         with self._lock:
-            entry_id = hashlib.md5(f"{time.time()}{event_type}".encode(), usedforsecurity=False).hexdigest()[
-                :16
-            ]
+            entry_id = hashlib.md5(
+                f"{time.time()}{event_type}".encode(), usedforsecurity=False
+            ).hexdigest()[:16]
             self.entries.append(
                 {
                     "entry_id": entry_id,
@@ -861,9 +871,9 @@ class GovernanceManager:
 
     def request_approval(self, action: Dict) -> Dict:
         with self._lock:
-            decision_id = hashlib.md5(f"{time.time()}{action}".encode(), usedforsecurity=False).hexdigest()[
-                :16
-            ]
+            decision_id = hashlib.md5(
+                f"{time.time()}{action}".encode(), usedforsecurity=False
+            ).hexdigest()[:16]
             risk_score = action.get("risk_score", 0.5)
 
             # Determine policy
@@ -972,7 +982,9 @@ class HumanOversightInterface:
         self, alert_type: str, message: str, severity: str = "medium"
     ) -> str:
         with self._lock:
-            alert_id = hashlib.md5(f"{time.time()}{message}".encode(), usedforsecurity=False).hexdigest()[:16]
+            alert_id = hashlib.md5(
+                f"{time.time()}{message}".encode(), usedforsecurity=False
+            ).hexdigest()[:16]
             self.alerts[alert_id] = {
                 "type": alert_type,
                 "message": message,
@@ -1063,9 +1075,11 @@ class EnhancedExplainabilityNode:
     def get_explanation_stats(self) -> Dict:
         return {
             "total_explanations": len(self.explanations),
-            "avg_quality": np.mean([e["quality_score"] for e in self.explanations])
-            if self.explanations
-            else 0,
+            "avg_quality": (
+                np.mean([e["quality_score"] for e in self.explanations])
+                if self.explanations
+                else 0
+            ),
         }
 
     def shutdown(self):
@@ -1136,7 +1150,9 @@ class EnhancedSafetyValidator:
 
         self.audit_logger = (
             AuditLogger(
-                log_path=self.config.audit_config.get("log_path", "/tmp/audit"),  # nosec B108 - test fixture, uses config value
+                log_path=self.config.audit_config.get(
+                    "log_path", "/tmp/audit"
+                ),  # nosec B108 - test fixture, uses config value
                 config=self.config.audit_config,
             )
             if self.config.enable_audit_logging

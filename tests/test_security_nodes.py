@@ -13,46 +13,55 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 # Skip entire module if torch is not available (security_nodes imports nso_aligner which requires torch)
-torch = pytest.importorskip("torch", reason="PyTorch required for security_nodes tests (via nso_aligner)")
+torch = pytest.importorskip(
+    "torch", reason="PyTorch required for security_nodes tests (via nso_aligner)"
+)
 
-from security_nodes import (MAX_DATA_SIZE, MAX_STRING_LENGTH,
-                            MAX_TENSOR_ELEMENTS, EncryptNode, PolicyNode,
-                            SecurityNodeError, dispatch_security_node)
+from security_nodes import (
+    MAX_DATA_SIZE,
+    MAX_STRING_LENGTH,
+    MAX_TENSOR_ELEMENTS,
+    EncryptNode,
+    PolicyNode,
+    SecurityNodeError,
+    dispatch_security_node,
+)
 
 
 @pytest.fixture
 def context():
     """Create test context."""
-    return {
-        'audit_log': [],
-        'ethical_label': 'EU2025:Safe'
-    }
+    return {"audit_log": [], "ethical_label": "EU2025:Safe"}
 
 
 @pytest.fixture
 def encrypt_node():
     """Create EncryptNode instance."""
-    with patch('security_nodes.KeyManager'), \
-         patch('security_nodes.NSOAligner'), \
-         patch('security_nodes.LLMCompressor', None), \
-         patch('security_nodes.HardwareDispatcher', None), \
-         patch('security_nodes.GrokKernelAudit', None):
+    with (
+        patch("security_nodes.KeyManager"),
+        patch("security_nodes.NSOAligner"),
+        patch("security_nodes.LLMCompressor", None),
+        patch("security_nodes.HardwareDispatcher", None),
+        patch("security_nodes.GrokKernelAudit", None),
+    ):
         return EncryptNode(agent_id="test_agent")
 
 
 @pytest.fixture
 def policy_node():
     """Create PolicyNode instance."""
-    with patch('security_nodes.NSOAligner'), \
-         patch('security_nodes.LLMCompressor', None):
+    with (
+        patch("security_nodes.NSOAligner"),
+        patch("security_nodes.LLMCompressor", None),
+    ):
         return PolicyNode()
 
 
 class TestEncryptNodeInitialization:
     """Test EncryptNode initialization."""
 
-    @patch('security_nodes.KeyManager')
-    @patch('security_nodes.NSOAligner')
+    @patch("security_nodes.KeyManager")
+    @patch("security_nodes.NSOAligner")
     def test_initialization(self, mock_nso, mock_key_manager):
         """Test basic initialization."""
         node = EncryptNode(agent_id="test_agent")
@@ -60,8 +69,8 @@ class TestEncryptNodeInitialization:
         assert node.agent_id == "test_agent"
         mock_key_manager.assert_called_once_with("test_agent")
 
-    @patch('security_nodes.KeyManager')
-    @patch('security_nodes.NSOAligner')
+    @patch("security_nodes.KeyManager")
+    @patch("security_nodes.NSOAligner")
     def test_initialization_default_agent_id(self, mock_nso, mock_key_manager):
         """Test initialization with default agent_id."""
         node = EncryptNode()
@@ -165,14 +174,12 @@ class TestKeyRetrieval:
         """Test RSA key retrieval."""
         # Generate RSA key
         private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
+            public_exponent=65537, key_size=2048, backend=default_backend()
         )
         pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
 
         encrypt_node.key_manager.get_key = Mock(return_value=pem)
@@ -192,8 +199,8 @@ class TestKeyRetrieval:
 class TestEncryptNodeExecution:
     """Test EncryptNode execution."""
 
-    @patch('security_nodes.NSOAligner')
-    @patch('security_nodes.KeyManager')
+    @patch("security_nodes.NSOAligner")
+    @patch("security_nodes.KeyManager")
     def test_execute_aes_encryption(self, mock_key_manager, mock_nso, context):
         """Test AES encryption."""
         # Setup
@@ -216,20 +223,18 @@ class TestEncryptNodeExecution:
         assert result["encrypted_data"] is not None
         assert result["audit"]["status"] == "success"
 
-    @patch('security_nodes.NSOAligner')
-    @patch('security_nodes.KeyManager')
+    @patch("security_nodes.NSOAligner")
+    @patch("security_nodes.KeyManager")
     def test_execute_rsa_encryption(self, mock_key_manager, mock_nso, context):
         """Test RSA encryption."""
         # Generate RSA key
         private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
+            public_exponent=65537, key_size=2048, backend=default_backend()
         )
         pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
 
         mock_km_instance = MagicMock()
@@ -254,14 +259,12 @@ class TestEncryptNodeExecution:
         """Test RSA encryption with data too large."""
         # Generate valid RSA key
         private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
+            public_exponent=65537, key_size=2048, backend=default_backend()
         )
         pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
 
         encrypt_node.key_manager.get_key = Mock(return_value=pem)
@@ -290,7 +293,7 @@ class TestEncryptNodeExecution:
 class TestPolicyNodeExecution:
     """Test PolicyNode execution."""
 
-    @patch('security_nodes.NSOAligner')
+    @patch("security_nodes.NSOAligner")
     def test_execute_gdpr_compliant(self, mock_nso, policy_node, context):
         """Test GDPR policy with compliant data."""
         data = {"name": "John", "age": 30}
@@ -301,7 +304,7 @@ class TestPolicyNodeExecution:
         assert result["compliance"] == "compliant"
         assert result["audit"]["status"] == "success"
 
-    @patch('security_nodes.NSOAligner')
+    @patch("security_nodes.NSOAligner")
     def test_execute_gdpr_pii_detected(self, mock_nso, policy_node, context):
         """Test GDPR policy with PII."""
         data = {"email": "test@example.com"}
@@ -310,7 +313,7 @@ class TestPolicyNodeExecution:
         with pytest.raises(ValueError, match="Non-compliant"):
             policy_node.execute(data, params, context)
 
-    @patch('security_nodes.NSOAligner')
+    @patch("security_nodes.NSOAligner")
     def test_execute_ccpa(self, mock_nso, policy_node, context):
         """Test CCPA policy."""
         data = {"data": "clean"}
@@ -320,7 +323,7 @@ class TestPolicyNodeExecution:
 
         assert result["compliance"] == "compliant"
 
-    @patch('security_nodes.NSOAligner')
+    @patch("security_nodes.NSOAligner")
     def test_execute_itu_f_748_47(self, mock_nso, policy_node, context):
         """Test ITU F.748.47 policy."""
         mock_nso_instance = MagicMock()
@@ -354,7 +357,7 @@ class TestPolicyNodeExecution:
 class TestDispatchSecurityNode:
     """Test dispatch_security_node function."""
 
-    @patch('security_nodes.EncryptNode')
+    @patch("security_nodes.EncryptNode")
     def test_dispatch_encrypt_node(self, mock_encrypt_class, context):
         """Test dispatching EncryptNode."""
         mock_instance = MagicMock()
@@ -364,7 +367,7 @@ class TestDispatchSecurityNode:
         node = {
             "type": "EncryptNode",
             "agent_id": "test_agent",
-            "params": {"algorithm": "AES", "key_id": "key1"}
+            "params": {"algorithm": "AES", "key_id": "key1"},
         }
 
         result = dispatch_security_node(node, "data", context)
@@ -372,17 +375,14 @@ class TestDispatchSecurityNode:
         assert result == {"result": "encrypted"}
         mock_encrypt_class.assert_called_once_with("test_agent")
 
-    @patch('security_nodes.PolicyNode')
+    @patch("security_nodes.PolicyNode")
     def test_dispatch_policy_node(self, mock_policy_class, context):
         """Test dispatching PolicyNode."""
         mock_instance = MagicMock()
         mock_instance.execute = Mock(return_value={"compliance": "passed"})
         mock_policy_class.return_value = mock_instance
 
-        node = {
-            "type": "PolicyNode",
-            "params": {"policy": "GDPR"}
-        }
+        node = {"type": "PolicyNode", "params": {"policy": "GDPR"}}
 
         result = dispatch_security_node(node, "data", context)
 
@@ -395,7 +395,7 @@ class TestDispatchSecurityNode:
         with pytest.raises(ValueError, match="Unknown security node type"):
             dispatch_security_node(node, "data", context)
 
-    @patch('security_nodes.EncryptNode')
+    @patch("security_nodes.EncryptNode")
     def test_dispatch_context_isolation(self, mock_encrypt_class, context):
         """Test that context is properly isolated."""
         mock_instance = MagicMock()
@@ -406,7 +406,7 @@ class TestDispatchSecurityNode:
             "type": "EncryptNode",
             "params": {},
             "tensor": [[1, 2]],
-            "kernel": "code"
+            "kernel": "code",
         }
 
         dispatch_security_node(node, "data", context)

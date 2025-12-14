@@ -11,21 +11,26 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 import numpy as np
 import pytest
 
-from hardware_dispatcher import (AI_ERRORS, MAX_MATRIX_DIMENSION,
-                                 MAX_NOISE_STD, MAX_PHOTONIC_NOISE_STD,
-                                 MAX_TENSOR_SIZE, MIN_NOISE_STD,
-                                 CircuitBreaker, HardwareBackend,
-                                 HardwareCapabilities, HardwareDispatcher,
-                                 OperationMetrics)
+from hardware_dispatcher import (
+    AI_ERRORS,
+    MAX_MATRIX_DIMENSION,
+    MAX_NOISE_STD,
+    MAX_PHOTONIC_NOISE_STD,
+    MAX_TENSOR_SIZE,
+    MIN_NOISE_STD,
+    CircuitBreaker,
+    HardwareBackend,
+    HardwareCapabilities,
+    HardwareDispatcher,
+    OperationMetrics,
+)
 
 
 @pytest.fixture
 def dispatcher():
     """Create dispatcher in mock mode."""
     return HardwareDispatcher(
-        use_mock=True,
-        enable_metrics=True,
-        enable_health_checks=False
+        use_mock=True, enable_metrics=True, enable_health_checks=False
     )
 
 
@@ -156,7 +161,7 @@ class TestHardwareDispatcher:
             lightmatter_api_key="test_key",
             aim_api_key="test_key2",
             use_mock=False,
-            enable_health_checks=False
+            enable_health_checks=False,
         )
 
         assert disp.lightmatter_api_key == "test_key"
@@ -173,8 +178,8 @@ class TestHardwareDispatcher:
 
         assert isinstance(hardware_list, list)
         assert len(hardware_list) > 0
-        assert all('backend' in hw for hw in hardware_list)
-        assert all('capabilities' in hw for hw in hardware_list)
+        assert all("backend" in hw for hw in hardware_list)
+        assert all("capabilities" in hw for hw in hardware_list)
 
     def test_validate_photonic_params_valid(self, dispatcher):
         """Test validating valid photonic params."""
@@ -183,7 +188,7 @@ class TestHardwareDispatcher:
             "multiplexing": "wavelength",
             "compression": "ITU-F.748-quantized",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         error = dispatcher.validate_photonic_params(params)
@@ -217,7 +222,7 @@ class TestHardwareDispatcher:
             "multiplexing": "wavelength",
             "compression": "ITU-F.748",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         error = dispatcher.validate_photonic_params(params)
@@ -232,7 +237,7 @@ class TestHardwareDispatcher:
             "multiplexing": "wavelength",
             "compression": "ITU-F.748",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         error = dispatcher.validate_photonic_params(params)
@@ -247,7 +252,7 @@ class TestHardwareDispatcher:
             "multiplexing": "wavelength",
             "compression": "ITU-F.748",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         error = dispatcher.validate_photonic_params(params)
@@ -262,7 +267,7 @@ class TestHardwareDispatcher:
             "multiplexing": "wavelength",
             "compression": "invalid-mode",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         error = dispatcher.validate_photonic_params(params)
@@ -277,7 +282,7 @@ class TestHardwareDispatcher:
             "multiplexing": "invalid-mode",
             "compression": "ITU-F.748",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         error = dispatcher.validate_photonic_params(params)
@@ -287,11 +292,7 @@ class TestHardwareDispatcher:
 
     def test_validate_rlhf_params_valid(self, dispatcher):
         """Test validating valid RLHF params."""
-        params = {
-            "temperature": 0.7,
-            "max_tokens": 1000,
-            "rlhf_train": True
-        }
+        params = {"temperature": 0.7, "max_tokens": 1000, "rlhf_train": True}
 
         error = dispatcher.validate_rlhf_params(params)
 
@@ -318,7 +319,7 @@ class TestHardwareDispatcher:
         params = {
             "temperature": 3.0,  # Out of range
             "max_tokens": 1000,
-            "rlhf_train": True
+            "rlhf_train": True,
         }
 
         error = dispatcher.validate_rlhf_params(params)
@@ -328,11 +329,7 @@ class TestHardwareDispatcher:
 
     def test_validate_rlhf_params_invalid_max_tokens(self, dispatcher):
         """Test invalid max_tokens."""
-        params = {
-            "temperature": 0.7,
-            "max_tokens": 0,  # Invalid
-            "rlhf_train": True
-        }
+        params = {"temperature": 0.7, "max_tokens": 0, "rlhf_train": True}  # Invalid
 
         error = dispatcher.validate_rlhf_params(params)
 
@@ -341,11 +338,7 @@ class TestHardwareDispatcher:
 
     def test_validate_rlhf_params_invalid_rlhf_train_type(self, dispatcher):
         """Test invalid rlhf_train type."""
-        params = {
-            "temperature": 0.7,
-            "max_tokens": 1000,
-            "rlhf_train": "not a bool"
-        }
+        params = {"temperature": 0.7, "max_tokens": 1000, "rlhf_train": "not a bool"}
 
         error = dispatcher.validate_rlhf_params(params)
 
@@ -368,7 +361,9 @@ class TestHardwareDispatcher:
 
     def test_dispatch_to_emulator(self, dispatcher, matrix, vector):
         """Test dispatch to emulator."""
-        result = dispatcher._dispatch_to_emulator("photonic_mvm", matrix, vector, params={})
+        result = dispatcher._dispatch_to_emulator(
+            "photonic_mvm", matrix, vector, params={}
+        )
 
         assert isinstance(result, np.ndarray)
         assert result.shape == (4,)
@@ -378,7 +373,9 @@ class TestHardwareDispatcher:
         disp = HardwareDispatcher(use_mock=True, enable_health_checks=False)
         disp.emulator = None
 
-        result = disp._dispatch_to_emulator("photonic_mvm", np.eye(2), np.ones(2), params={})
+        result = disp._dispatch_to_emulator(
+            "photonic_mvm", np.eye(2), np.ones(2), params={}
+        )
 
         assert isinstance(result, dict)
         assert result["error_code"] == AI_ERRORS.AI_HARDWARE_UNAVAILABLE
@@ -393,6 +390,7 @@ class TestHardwareDispatcher:
 
     def test_dispatch_tensor_too_large(self, dispatcher):
         """Test dispatch with oversized tensor."""
+
         # Create a mock object with size attribute
         class LargeTensor:
             size = MAX_TENSOR_SIZE + 1
@@ -418,7 +416,7 @@ class TestHardwareDispatcher:
             "multiplexing": "wavelength",
             "compression": "ITU-F.748-quantized",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         result = dispatcher.dispatch("photonic_mvm", matrix, vector, params=params)
@@ -433,7 +431,7 @@ class TestHardwareDispatcher:
             "multiplexing": "wavelength",
             "compression": "ITU-F.748",
             "bandwidth_ghz": 100,
-            "latency_ps": 50
+            "latency_ps": 50,
         }
 
         result = dispatcher.dispatch("photonic_mvm", matrix, vector, params=params)
@@ -446,7 +444,7 @@ class TestHardwareDispatcher:
         result = dispatcher.run_photonic_mvm(matrix)
 
         assert isinstance(result, dict)
-        assert 'result' in result or 'error_code' in result
+        assert "result" in result or "error_code" in result
 
     def test_run_photonic_mvm_none_input(self, dispatcher):
         """Test run_photonic_mvm with None input."""
@@ -458,13 +456,18 @@ class TestHardwareDispatcher:
     def test_get_metrics_summary(self, dispatcher, matrix, vector):
         """Test getting metrics summary."""
         # Run some operations
-        dispatcher.dispatch("photonic_mvm", matrix, vector, params={
-            "noise_std": 0.01,
-            "multiplexing": "wavelength",
-            "compression": "ITU-F.748",
-            "bandwidth_ghz": 100,
-            "latency_ps": 50
-        })
+        dispatcher.dispatch(
+            "photonic_mvm",
+            matrix,
+            vector,
+            params={
+                "noise_std": 0.01,
+                "multiplexing": "wavelength",
+                "compression": "ITU-F.748",
+                "bandwidth_ghz": 100,
+                "latency_ps": 50,
+            },
+        )
 
         summary = dispatcher.get_metrics_summary()
 
@@ -474,7 +477,9 @@ class TestHardwareDispatcher:
 
     def test_get_metrics_summary_disabled(self):
         """Test metrics summary when disabled."""
-        disp = HardwareDispatcher(use_mock=True, enable_metrics=False, enable_health_checks=False)
+        disp = HardwareDispatcher(
+            use_mock=True, enable_metrics=False, enable_health_checks=False
+        )
 
         summary = disp.get_metrics_summary()
 
@@ -483,28 +488,35 @@ class TestHardwareDispatcher:
     def test_get_last_metrics(self, dispatcher, matrix, vector):
         """Test getting last metrics."""
         # Run operation
-        dispatcher.dispatch("photonic_mvm", matrix, vector, params={
-            "noise_std": 0.01,
-            "multiplexing": "wavelength",
-            "compression": "ITU-F.748",
-            "bandwidth_ghz": 100,
-            "latency_ps": 50
-        })
+        dispatcher.dispatch(
+            "photonic_mvm",
+            matrix,
+            vector,
+            params={
+                "noise_std": 0.01,
+                "multiplexing": "wavelength",
+                "compression": "ITU-F.748",
+                "bandwidth_ghz": 100,
+                "latency_ps": 50,
+            },
+        )
 
         metrics = dispatcher.get_last_metrics("photonic_mvm")
 
         assert isinstance(metrics, dict)
-        assert 'energy_nj' in metrics
-        assert 'latency_ms' in metrics
+        assert "energy_nj" in metrics
+        assert "latency_ms" in metrics
 
     def test_get_last_metrics_no_metrics(self):
         """Test getting metrics when none exist."""
-        disp = HardwareDispatcher(use_mock=True, enable_metrics=True, enable_health_checks=False)
+        disp = HardwareDispatcher(
+            use_mock=True, enable_metrics=True, enable_health_checks=False
+        )
 
         metrics = disp.get_last_metrics("test_key")
 
-        assert 'message' in metrics
-        assert 'No metrics available' in metrics['message']
+        assert "message" in metrics
+        assert "No metrics available" in metrics["message"]
 
     def test_shutdown(self, dispatcher):
         """Test dispatcher shutdown."""
@@ -527,7 +539,7 @@ class TestMetricsCollection:
             throughput_ops_per_sec=1000.0,
             input_size=(4, 4),
             output_size=(4,),
-            success=True
+            success=True,
         )
 
         dispatcher._record_metrics(metrics)
@@ -536,7 +548,9 @@ class TestMetricsCollection:
 
     def test_metrics_bounded(self):
         """Test metrics history is bounded."""
-        disp = HardwareDispatcher(use_mock=True, enable_metrics=True, enable_health_checks=False)
+        disp = HardwareDispatcher(
+            use_mock=True, enable_metrics=True, enable_health_checks=False
+        )
 
         # Add many metrics
         for i in range(15000):
@@ -550,7 +564,7 @@ class TestMetricsCollection:
                 throughput_ops_per_sec=1.0,
                 input_size=(2,),
                 output_size=(2,),
-                success=True
+                success=True,
             )
             disp._record_metrics(metrics)
 
@@ -587,13 +601,18 @@ class TestErrorHandling:
         """Test dispatch falls back on error."""
         # Force primary backend to fail by making it unavailable
         # Then verify fallback works
-        result = dispatcher.dispatch("photonic_mvm", matrix, vector, params={
-            "noise_std": 0.01,
-            "multiplexing": "wavelength",
-            "compression": "ITU-F.748",
-            "bandwidth_ghz": 100,
-            "latency_ps": 50
-        })
+        result = dispatcher.dispatch(
+            "photonic_mvm",
+            matrix,
+            vector,
+            params={
+                "noise_std": 0.01,
+                "multiplexing": "wavelength",
+                "compression": "ITU-F.748",
+                "bandwidth_ghz": 100,
+                "latency_ps": 50,
+            },
+        )
 
         # Should get a result (from fallback if needed)
         assert result is not None

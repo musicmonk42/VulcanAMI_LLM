@@ -97,11 +97,11 @@ class TestValidateURLScheme:
     def test_custom_allowed_schemes(self):
         """Test that custom allowed schemes can be specified."""
         # Should pass with custom scheme
-        validate_url_scheme("http://example.com", allowed_schemes={'http'})
-        
+        validate_url_scheme("http://example.com", allowed_schemes={"http"})
+
         # Should fail with https when only http is allowed
         with pytest.raises(URLValidationError):
-            validate_url_scheme("https://example.com", allowed_schemes={'http'})
+            validate_url_scheme("https://example.com", allowed_schemes={"http"})
 
     def test_case_sensitivity(self):
         """Test URL scheme case handling."""
@@ -162,7 +162,7 @@ class TestSafeURLOpen:
     def test_safe_urlopen_custom_schemes(self):
         """Test that safe_urlopen respects custom allowed schemes."""
         with pytest.raises(URLValidationError):
-            safe_urlopen("https://example.com", allowed_schemes={'http'})
+            safe_urlopen("https://example.com", allowed_schemes={"http"})
 
 
 class TestSecurityScenarios:
@@ -207,7 +207,7 @@ class TestConstants:
 
     def test_allowed_schemes_constant(self):
         """Test that ALLOWED_SCHEMES contains expected values."""
-        assert ALLOWED_SCHEMES == {'http', 'https'}
+        assert ALLOWED_SCHEMES == {"http", "https"}
         assert isinstance(ALLOWED_SCHEMES, set)
 
 

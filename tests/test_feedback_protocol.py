@@ -13,12 +13,21 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from feedback_protocol import (MAX_PROPOSAL_ID_LENGTH, MAX_RATIONALE_LENGTH,
-                               MAX_SCORE, MAX_TENSOR_SIZE, MIN_SCORE,
-                               RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW,
-                               FeedbackProtocol, FeedbackQueryNode,
-                               FeedbackRateLimiter, FeedbackValidator,
-                               RateLimitEntry, dispatch_feedback_protocol)
+from feedback_protocol import (
+    MAX_PROPOSAL_ID_LENGTH,
+    MAX_RATIONALE_LENGTH,
+    MAX_SCORE,
+    MAX_TENSOR_SIZE,
+    MIN_SCORE,
+    RATE_LIMIT_MAX_REQUESTS,
+    RATE_LIMIT_WINDOW,
+    FeedbackProtocol,
+    FeedbackQueryNode,
+    FeedbackRateLimiter,
+    FeedbackValidator,
+    RateLimitEntry,
+    dispatch_feedback_protocol,
+)
 
 
 @pytest.fixture
@@ -42,7 +51,7 @@ def temp_db():
     This fixture ensures all FeedbackProtocol instances are cleaned up before
     attempting to delete the database file.
     """
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.db') as f:
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".db") as f:
         db_path = f.name
 
     yield db_path
@@ -51,9 +60,9 @@ def temp_db():
     # This is critical on Windows where file handles may still be open
     try:
         # Clear the singleton instances to trigger cleanup
-        if hasattr(FeedbackProtocol, '_instances'):
+        if hasattr(FeedbackProtocol, "_instances"):
             for instance in list(FeedbackProtocol._instances.values()):
-                if hasattr(instance, 'cleanup'):
+                if hasattr(instance, "cleanup"):
                     try:
                         instance.cleanup()
                     except Exception as e:
@@ -69,7 +78,9 @@ def temp_db():
     except PermissionError as e:
         # On Windows, this can happen if file is still locked
         print(f"Warning: Could not delete temporary database {db_path}: {e}")
-        print("This is a known Windows file locking issue and does not affect test validity.")
+        print(
+            "This is a known Windows file locking issue and does not affect test validity."
+        )
     except Exception as e:
         print(f"Warning: Unexpected error during temp_db cleanup: {e}")
 
@@ -78,10 +89,10 @@ def temp_db():
 def context():
     """Create test context."""
     return {
-        'audit_log': [],
-        'tensor': [[0.1, 0.2], [0.3, 0.4]],
-        'kernel': 'def process(x):\n    return x * 2',
-        'ethical_label': 'EU2025:Safe'
+        "audit_log": [],
+        "tensor": [[0.1, 0.2], [0.3, 0.4]],
+        "kernel": "def process(x):\n    return x * 2",
+        "ethical_label": "EU2025:Safe",
     }
 
 
@@ -362,12 +373,12 @@ class TestFeedbackProtocol:
             proposal_id="test_proposal",
             score=0.8,
             rationale="Good performance",
-            context=context
+            context=context,
         )
 
-        assert result['status'] == 'submitted'
-        assert result['score'] == 0.8
-        assert len(context['audit_log']) == 1
+        assert result["status"] == "submitted"
+        assert result["score"] == 0.8
+        assert len(context["audit_log"]) == 1
 
     def test_submit_score_clamping(self, temp_db, context):
         """Test score clamping in submission."""
@@ -377,10 +388,10 @@ class TestFeedbackProtocol:
             proposal_id="test_proposal",
             score=1.5,
             rationale="Too high",
-            context=context
+            context=context,
         )
 
-        assert result['score'] == MAX_SCORE
+        assert result["score"] == MAX_SCORE
 
     def test_submit_invalid_score(self, temp_db, context):
         """Test submission with invalid score."""
@@ -391,7 +402,7 @@ class TestFeedbackProtocol:
                 proposal_id="test_proposal",
                 score=None,
                 rationale="Test",
-                context=context
+                context=context,
             )
 
     def test_submit_invalid_proposal_id(self, temp_db, context):
@@ -400,10 +411,7 @@ class TestFeedbackProtocol:
 
         with pytest.raises(ValueError, match="Invalid proposal_id"):
             protocol.submit(
-                proposal_id="",
-                score=0.5,
-                rationale="Test",
-                context=context
+                proposal_id="", score=0.5, rationale="Test", context=context
             )
 
     def test_submit_rate_limited(self, temp_db, context):
@@ -417,7 +425,7 @@ class TestFeedbackProtocol:
                 proposal_id=proposal_id,
                 score=0.5,
                 rationale="Test",
-                context={'audit_log': []}
+                context={"audit_log": []},
             )
 
         # Next should be rate limited
@@ -426,7 +434,7 @@ class TestFeedbackProtocol:
                 proposal_id=proposal_id,
                 score=0.5,
                 rationale="Test",
-                context={'audit_log': []}
+                context={"audit_log": []},
             )
 
     def test_cleanup(self, temp_db):
@@ -456,26 +464,26 @@ class TestFeedbackQueryNode:
         """Test basic query execution."""
         node = FeedbackQueryNode(db_path=temp_db)
 
-        context = {'audit_log': []}
-        params = {'proposal_id': 'test_proposal', 'limit': 5}
+        context = {"audit_log": []}
+        params = {"proposal_id": "test_proposal", "limit": 5}
 
         result = node.execute(params, context)
 
-        assert result['audit']['status'] == 'success'
-        assert len(context['audit_log']) == 1
+        assert result["audit"]["status"] == "success"
+        assert len(context["audit_log"]) == 1
 
     def test_execute_invalid_proposal_id(self, temp_db):
         """Test query with invalid proposal ID."""
         node = FeedbackQueryNode(db_path=temp_db)
 
-        context = {'audit_log': []}
+        context = {"audit_log": []}
         # Use None to trigger validation (empty string is falsy and skips validation in current code)
-        params = {'proposal_id': None, 'limit': 5}
+        params = {"proposal_id": None, "limit": 5}
 
         # This test actually tests that None is handled gracefully
         # The execute method treats None as "no filter" which is valid behavior
         result = node.execute(params, context)
-        assert result['audit']['status'] == 'success'
+        assert result["audit"]["status"] == "success"
 
 
 class TestDispatchFunction:
@@ -484,36 +492,32 @@ class TestDispatchFunction:
     def test_dispatch_feedback_protocol(self, temp_db, context):
         """Test dispatching to FeedbackProtocol."""
         node = {
-            'type': 'FeedbackProtocol',
-            'proposal_id': 'test_proposal',
-            'score': 0.9,
-            'rationale': 'Excellent'
+            "type": "FeedbackProtocol",
+            "proposal_id": "test_proposal",
+            "score": 0.9,
+            "rationale": "Excellent",
         }
 
         result = dispatch_feedback_protocol(node, context)
 
-        assert result['status'] == 'submitted'
-        assert result['score'] == 0.9
+        assert result["status"] == "submitted"
+        assert result["score"] == 0.9
 
     def test_dispatch_query_node(self, temp_db):
         """Test dispatching to FeedbackQueryNode."""
         node = {
-            'type': 'FeedbackQueryNode',
-            'params': {'proposal_id': 'test', 'limit': 10}
+            "type": "FeedbackQueryNode",
+            "params": {"proposal_id": "test", "limit": 10},
         }
 
-        context = {'audit_log': []}
+        context = {"audit_log": []}
         result = dispatch_feedback_protocol(node, context)
 
-        assert result['audit']['status'] == 'success'
+        assert result["audit"]["status"] == "success"
 
     def test_dispatch_unknown_node(self, context):
         """Test dispatching to unknown node type."""
-        node = {
-            'type': 'UnknownNode',
-            'proposal_id': 'test',
-            'score': 0.5
-        }
+        node = {"type": "UnknownNode", "proposal_id": "test", "score": 0.5}
 
         with pytest.raises(ValueError, match="Unknown node type"):
             dispatch_feedback_protocol(node, context)
@@ -521,8 +525,8 @@ class TestDispatchFunction:
     def test_dispatch_missing_required_fields(self, context):
         """Test dispatching without required fields."""
         node = {
-            'type': 'FeedbackProtocol',
-            'proposal_id': 'test'
+            "type": "FeedbackProtocol",
+            "proposal_id": "test",
             # Missing score
         }
 
@@ -542,12 +546,12 @@ class TestThreadSafety:
 
         def submit():
             try:
-                context = {'audit_log': []}
+                context = {"audit_log": []}
                 result = protocol.submit(
                     proposal_id=f"proposal_{threading.current_thread().ident}",
                     score=0.7,
                     rationale="Test",
-                    context=context
+                    context=context,
                 )
                 results.append(result)
             except Exception as e:

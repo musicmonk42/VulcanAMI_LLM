@@ -6,7 +6,9 @@ kernel selection, and numerical stability fixes.
 """
 
 from vulcan.reasoning.probabilistic_reasoning import (
-    EnhancedProbabilisticReasoner, ProbabilisticReasoner)
+    EnhancedProbabilisticReasoner,
+    ProbabilisticReasoner,
+)
 import shutil
 import tempfile
 import warnings

@@ -614,10 +614,8 @@ class WarmStartPool:
                         if hasattr(tool_instance, "warm_time"):
                             # MockTool specifically - has name and warm_time
                             warm_time = getattr(tool_instance, "warm_time", 0.01)
-                            factory = (
-                                lambda n=tool_name_arg,
-                                w=warm_time,
-                                cls=tool_class: cls(n, w)
+                            factory = lambda n=tool_name_arg, w=warm_time, cls=tool_class: cls(
+                                n, w
                             )
                         elif hasattr(tool_instance, "config"):
                             # Has config attribute
@@ -629,26 +627,33 @@ class WarmStartPool:
                             )
                         else:
                             # Just name
-                            def factory(n=tool_name_arg, cls=tool_class): return cls(n)
+                            def factory(n=tool_name_arg, cls=tool_class):
+                                return cls(n)
+
                     elif hasattr(tool_instance, "config"):
                         # Config-based tool without name attribute
                         config = getattr(tool_instance, "config", {})
 
-                        def factory(n=tool_name, c=config, cls=tool_class): return cls(
-                            n, c
-                        )
+                        def factory(n=tool_name, c=config, cls=tool_class):
+                            return cls(n, c)
+
                     else:
                         # Default: try no-arg constructor or use instance as singleton
                         try:
                             # Try creating with no args to test
                             tool_class()
-                            def factory(cls=tool_class): return cls()
+
+                            def factory(cls=tool_class):
+                                return cls()
+
                         except Exception:
                             # Can't instantiate - use as singleton (not ideal but safe)
                             logger.warning(
                                 f"Using {tool_name} as singleton - factory creation failed"
                             )
-                            def factory(inst=tool_instance): return inst
+
+                            def factory(inst=tool_instance):
+                                return inst
 
                 # Create pool
                 pool = ToolPool(
@@ -668,21 +673,27 @@ class WarmStartPool:
 
         # Tool-specific warm-up functions
         warm_up_funcs = {
-            "symbolic": lambda tool: tool.reason("A → B, A ⊢ B")
-            if hasattr(tool, "reason")
-            else None,
-            "probabilistic": lambda tool: tool.reason({"data": [1, 2, 3]})
-            if hasattr(tool, "reason")
-            else None,
-            "causal": lambda tool: tool.reason({"graph": {"A": ["B"]}})
-            if hasattr(tool, "reason")
-            else None,
-            "analogical": lambda tool: tool.reason({"source": "A", "target": "B"})
-            if hasattr(tool, "reason")
-            else None,
-            "multimodal": lambda tool: tool.reason({"modalities": ["text", "image"]})
-            if hasattr(tool, "reason")
-            else None,
+            "symbolic": lambda tool: (
+                tool.reason("A → B, A ⊢ B") if hasattr(tool, "reason") else None
+            ),
+            "probabilistic": lambda tool: (
+                tool.reason({"data": [1, 2, 3]}) if hasattr(tool, "reason") else None
+            ),
+            "causal": lambda tool: (
+                tool.reason({"graph": {"A": ["B"]}})
+                if hasattr(tool, "reason")
+                else None
+            ),
+            "analogical": lambda tool: (
+                tool.reason({"source": "A", "target": "B"})
+                if hasattr(tool, "reason")
+                else None
+            ),
+            "multimodal": lambda tool: (
+                tool.reason({"modalities": ["text", "image"]})
+                if hasattr(tool, "reason")
+                else None
+            ),
         }
 
         return warm_up_funcs.get(tool_name)

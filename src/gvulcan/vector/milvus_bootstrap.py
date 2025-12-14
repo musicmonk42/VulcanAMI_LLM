@@ -13,8 +13,15 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
-from pymilvus import (Collection, CollectionSchema, DataType, FieldSchema,
-                      MilvusException, connections, utility)
+from pymilvus import (
+    Collection,
+    CollectionSchema,
+    DataType,
+    FieldSchema,
+    MilvusException,
+    connections,
+    utility,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +30,12 @@ class BootstrapError(Exception):
     """Base exception for bootstrap errors"""
 
 
-
 class ConfigurationError(BootstrapError):
     """Raised when configuration is invalid"""
 
 
-
 class CollectionCreationError(BootstrapError):
     """Raised when collection creation fails"""
-
 
 
 def _field(name: str, dtype: DataType, **kwargs) -> FieldSchema:

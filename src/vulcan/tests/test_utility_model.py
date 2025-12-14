@@ -14,16 +14,18 @@ import numpy as np
 import pytest
 
 # Import the utility model module
-from vulcan.reasoning.selection.utility_model import (ContextMode,
-                                                      ExponentialUtility,
-                                                      LinearUtility,
-                                                      LogarithmicUtility,
-                                                      SigmoidUtility,
-                                                      ThresholdUtility,
-                                                      UtilityComponents,
-                                                      UtilityContext,
-                                                      UtilityModel,
-                                                      UtilityWeights)
+from vulcan.reasoning.selection.utility_model import (
+    ContextMode,
+    ExponentialUtility,
+    LinearUtility,
+    LogarithmicUtility,
+    SigmoidUtility,
+    ThresholdUtility,
+    UtilityComponents,
+    UtilityContext,
+    UtilityModel,
+    UtilityWeights,
+)
 
 
 class TestUtilityWeights:

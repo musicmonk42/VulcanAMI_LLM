@@ -783,9 +783,11 @@ class HybridExecutor:
             "compiled_graphs": sum(
                 1 for p in self.profiles.values() if p.compilation_success
             ),
-            "average_speedup": np.mean([p.speedup for p in self.profiles.values()])
-            if self.profiles
-            else 1.0,
+            "average_speedup": (
+                np.mean([p.speedup for p in self.profiles.values()])
+                if self.profiles
+                else 1.0
+            ),
         }
 
         # Mode distribution

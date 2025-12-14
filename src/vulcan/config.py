@@ -461,6 +461,7 @@ if WATCHDOG_AVAILABLE:
             except Exception as e:
                 logger.error(f"Failed to reload configuration: {e}")
 
+
 # ============================================================
 # LEGACY DATACLASSES
 # ============================================================
@@ -1918,13 +1919,10 @@ class ConfigurationAPI:
         # Use secure temporary file (CWE-377 mitigation)
         try:
             with tempfile.NamedTemporaryFile(
-                mode='w',
-                suffix=f'.{format}',
-                delete=False,
-                encoding='utf-8'
+                mode="w", suffix=f".{format}", delete=False, encoding="utf-8"
             ) as tmp_file:
                 file_path = Path(tmp_file.name)
-            
+
             success = self.config_manager.export(file_path)
 
             if success:

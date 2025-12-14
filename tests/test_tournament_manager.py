@@ -7,8 +7,12 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from tournament_manager import (TournamentError, TournamentManager,
-                                ValidationError, trace_id)
+from tournament_manager import (
+    TournamentError,
+    TournamentManager,
+    ValidationError,
+    trace_id,
+)
 
 
 @pytest.fixture
@@ -18,17 +22,14 @@ def tournament_manager():
         similarity_threshold=0.8,
         diversity_penalty=0.2,
         winner_percentage=0.1,
-        adaptive=False  # Disable for predictable testing
+        adaptive=False,  # Disable for predictable testing
     )
 
 
 @pytest.fixture
 def sample_proposals():
     """Create sample proposals."""
-    return [
-        {"id": i, "data": f"proposal_{i}"}
-        for i in range(20)
-    ]
+    return [{"id": i, "data": f"proposal_{i}"} for i in range(20)]
 
 
 @pytest.fixture
@@ -40,11 +41,13 @@ def sample_fitness():
 @pytest.fixture
 def embedding_func():
     """Create embedding function."""
+
     def embed(proposal):
         # Simple embedding based on id
         emb = np.zeros(16)
         emb[proposal["id"] % 16] = 1.0
         return emb + np.random.normal(0, 0.1, 16)
+
     return embed
 
 
@@ -66,7 +69,7 @@ class TestTournamentManagerInitialization:
             diversity_penalty=0.3,
             winner_percentage=0.15,
             min_winners=2,
-            max_winners=10
+            max_winners=10,
         )
 
         assert tm.similarity_threshold == 0.7
@@ -118,24 +121,24 @@ class TestInputValidation:
         with pytest.raises(ValidationError, match="cannot be empty"):
             tournament_manager.run_adaptive_tournament([], [], embedding_func)
 
-    def test_validate_length_mismatch(self, tournament_manager, sample_proposals, embedding_func):
+    def test_validate_length_mismatch(
+        self, tournament_manager, sample_proposals, embedding_func
+    ):
         """Test validation with length mismatch."""
         with pytest.raises(ValidationError, match="length mismatch"):
             tournament_manager.run_adaptive_tournament(
-                sample_proposals,
-                [0.5] * 10,  # Wrong length
-                embedding_func
+                sample_proposals, [0.5] * 10, embedding_func  # Wrong length
             )
 
-    def test_validate_invalid_fitness(self, tournament_manager, sample_proposals, embedding_func):
+    def test_validate_invalid_fitness(
+        self, tournament_manager, sample_proposals, embedding_func
+    ):
         """Test validation with invalid fitness values."""
-        invalid_fitness = [0.5] * 19 + [float('nan')]
+        invalid_fitness = [0.5] * 19 + [float("nan")]
 
         with pytest.raises(ValidationError, match="Invalid fitness"):
             tournament_manager.run_adaptive_tournament(
-                sample_proposals,
-                invalid_fitness,
-                embedding_func
+                sample_proposals, invalid_fitness, embedding_func
             )
 
 
@@ -174,17 +177,11 @@ class TestTournamentExecution:
     """Test tournament execution."""
 
     def test_run_adaptive_tournament_basic(
-        self,
-        tournament_manager,
-        sample_proposals,
-        sample_fitness,
-        embedding_func
+        self, tournament_manager, sample_proposals, sample_fitness, embedding_func
     ):
         """Test basic tournament execution."""
         winners = tournament_manager.run_adaptive_tournament(
-            sample_proposals,
-            sample_fitness,
-            embedding_func
+            sample_proposals, sample_fitness, embedding_func
         )
 
         assert len(winners) > 0
@@ -192,20 +189,13 @@ class TestTournamentExecution:
         assert all(isinstance(w, int) for w in winners)
 
     def test_run_adaptive_tournament_with_meta(
-        self,
-        tournament_manager,
-        sample_proposals,
-        sample_fitness,
-        embedding_func
+        self, tournament_manager, sample_proposals, sample_fitness, embedding_func
     ):
         """Test tournament with metadata collection."""
         meta = {}
 
         winners = tournament_manager.run_adaptive_tournament(
-            sample_proposals,
-            sample_fitness,
-            embedding_func,
-            meta=meta
+            sample_proposals, sample_fitness, embedding_func, meta=meta
         )
 
         assert "trace_id" in meta
@@ -215,38 +205,38 @@ class TestTournamentExecution:
         assert "diversity" in meta
         assert meta["num_proposals"] == len(sample_proposals)
 
-    def test_run_adaptive_tournament_min_winners(self, sample_proposals, sample_fitness, embedding_func):
+    def test_run_adaptive_tournament_min_winners(
+        self, sample_proposals, sample_fitness, embedding_func
+    ):
         """Test that min_winners is respected."""
         tm = TournamentManager(min_winners=5, winner_percentage=0.01)
 
         winners = tm.run_adaptive_tournament(
-            sample_proposals,
-            sample_fitness,
-            embedding_func
+            sample_proposals, sample_fitness, embedding_func
         )
 
         assert len(winners) >= 5
 
-    def test_run_adaptive_tournament_max_winners(self, sample_proposals, sample_fitness, embedding_func):
+    def test_run_adaptive_tournament_max_winners(
+        self, sample_proposals, sample_fitness, embedding_func
+    ):
         """Test that max_winners is respected."""
         tm = TournamentManager(max_winners=3, winner_percentage=0.5)
 
         winners = tm.run_adaptive_tournament(
-            sample_proposals,
-            sample_fitness,
-            embedding_func
+            sample_proposals, sample_fitness, embedding_func
         )
 
         assert len(winners) <= 3
 
-    def test_run_adaptive_tournament_winner_percentage(self, sample_proposals, sample_fitness, embedding_func):
+    def test_run_adaptive_tournament_winner_percentage(
+        self, sample_proposals, sample_fitness, embedding_func
+    ):
         """Test winner percentage selection."""
         tm = TournamentManager(winner_percentage=0.2)
 
         winners = tm.run_adaptive_tournament(
-            sample_proposals,
-            sample_fitness,
-            embedding_func
+            sample_proposals, sample_fitness, embedding_func
         )
 
         # Should select approximately 20% (4 out of 20)
@@ -314,9 +304,7 @@ class TestAdaptivePenalty:
     def test_adapt_penalty_below_target(self):
         """Test penalty adaptation when below target."""
         tm = TournamentManager(
-            diversity_penalty=0.2,
-            adaptive=True,
-            target_innovation=0.7
+            diversity_penalty=0.2, adaptive=True, target_innovation=0.7
         )
 
         # Set last innovation below target
@@ -331,9 +319,7 @@ class TestAdaptivePenalty:
     def test_adapt_penalty_above_target(self):
         """Test penalty adaptation when above target."""
         tm = TournamentManager(
-            diversity_penalty=0.2,
-            adaptive=True,
-            target_innovation=0.5
+            diversity_penalty=0.2, adaptive=True, target_innovation=0.5
         )
 
         # Set last innovation above target
@@ -348,9 +334,7 @@ class TestAdaptivePenalty:
     def test_adapt_penalty_clamping(self):
         """Test that penalty is clamped to reasonable range."""
         tm = TournamentManager(
-            diversity_penalty=0.2,
-            adaptive=True,
-            target_innovation=0.9
+            diversity_penalty=0.2, adaptive=True, target_innovation=0.9
         )
 
         # Force extreme adaptation
@@ -418,7 +402,7 @@ class TestStatistics:
 class TestDistributedSharder:
     """Test distributed sharder integration."""
 
-    @patch('tournament_manager.DistributedSharder')
+    @patch("tournament_manager.DistributedSharder")
     def test_with_sharder_available(self, mock_sharder_class):
         """Test with sharder available."""
         mock_sharder = MagicMock()
@@ -428,24 +412,22 @@ class TestDistributedSharder:
 
         assert tm.sharder is not None
 
-    @patch('tournament_manager.DistributedSharder', None)
+    @patch("tournament_manager.DistributedSharder", None)
     def test_without_sharder(self):
         """Test without sharder."""
         tm = TournamentManager()
 
         assert tm.sharder is None
 
-    @patch('tournament_manager.DistributedSharder')
+    @patch("tournament_manager.DistributedSharder")
     def test_sharder_usage_threshold(
-        self,
-        mock_sharder_class,
-        sample_proposals,
-        sample_fitness,
-        embedding_func
+        self, mock_sharder_class, sample_proposals, sample_fitness, embedding_func
     ):
         """Test that sharder is used above threshold."""
         mock_sharder = MagicMock()
-        mock_sharder.map = Mock(return_value=[embedding_func(p) for p in sample_proposals])
+        mock_sharder.map = Mock(
+            return_value=[embedding_func(p) for p in sample_proposals]
+        )
         mock_sharder_class.return_value = mock_sharder
 
         tm = TournamentManager(sharder_threshold=10)

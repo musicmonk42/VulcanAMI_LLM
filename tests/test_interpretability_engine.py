@@ -13,14 +13,22 @@ import numpy as np
 import pytest
 
 # Skip entire module if torch is not available
-torch = pytest.importorskip("torch", reason="PyTorch required for interpretability engine tests")
+torch = pytest.importorskip(
+    "torch", reason="PyTorch required for interpretability engine tests"
+)
 
 # FIX: Import the module to access the internal _SingletonMeta
 import interpretability_engine as ie
-from interpretability_engine import (MAX_EPSILON, MAX_PERTURBATION,
-                                     MAX_TENSOR_SIZE, MAX_THRESHOLD,
-                                     MIN_PERTURBATION, MIN_THRESHOLD,
-                                     InterpretabilityEngine, cosine_similarity)
+from interpretability_engine import (
+    MAX_EPSILON,
+    MAX_PERTURBATION,
+    MAX_TENSOR_SIZE,
+    MAX_THRESHOLD,
+    MIN_PERTURBATION,
+    MIN_THRESHOLD,
+    InterpretabilityEngine,
+    cosine_similarity,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +36,7 @@ def reset_singleton():
     """Fixture to reset the Singleton instance before each test."""
     ie._SingletonMeta._reset_singleton()
     yield
-    ie._SingletonMeta._reset_singleton() # Ensure it's reset after
+    ie._SingletonMeta._reset_singleton()  # Ensure it's reset after
 
 
 @pytest.fixture
@@ -40,7 +48,7 @@ def temp_log_dir():
     try:
         shutil.rmtree(temp_dir, ignore_errors=True)
     except:
-        pass # Ignore errors during cleanup
+        pass  # Ignore errors during cleanup
 
 
 @pytest.fixture
@@ -143,9 +151,7 @@ class TestInterpretabilityEngineInit:
     def test_initialization_with_model(self, temp_log_dir, simple_model):
         """Test initialization with model."""
         engine = InterpretabilityEngine(
-            model=simple_model,
-            device="cpu",
-            log_dir=temp_log_dir
+            model=simple_model, device="cpu", log_dir=temp_log_dir
         )
 
         assert engine.model is not None
@@ -206,7 +212,11 @@ class TestExplainTensor:
         """Test with integrated gradients method."""
         result = engine.explain_tensor(tensor, method="integrated_gradients")
 
-        assert result["method"] in ["integrated_gradients", "abs_norm", "abs_norm_fallback"]
+        assert result["method"] in [
+            "integrated_gradients",
+            "abs_norm",
+            "abs_norm_fallback",
+        ]
 
     def test_explain_tensor_saliency(self, engine, tensor):
         """Test with saliency method."""
@@ -260,10 +270,7 @@ class TestVisualizeAttention:
     def test_visualize_basic(self, engine):
         """Test basic attention visualization."""
         subgraph = {
-            "nodes": [
-                {"id": "n1", "label": "Node 1"},
-                {"id": "n2", "label": "Node 2"}
-            ]
+            "nodes": [{"id": "n1", "label": "Node 1"}, {"id": "n2", "label": "Node 2"}]
         }
 
         # Should not raise
@@ -271,21 +278,14 @@ class TestVisualizeAttention:
 
     def test_visualize_with_weights(self, engine):
         """Test visualization with attention weights."""
-        subgraph = {
-            "nodes": [
-                {"id": "n1", "label": "A"},
-                {"id": "n2", "label": "B"}
-            ]
-        }
+        subgraph = {"nodes": [{"id": "n1", "label": "A"}, {"id": "n2", "label": "B"}]}
         attn_weights = np.random.rand(2, 2)
 
         engine.visualize_attention(subgraph, attn_weights=attn_weights, show=False)
 
     def test_visualize_save_path(self, engine, temp_log_dir):
         """Test saving visualization."""
-        subgraph = {
-            "nodes": [{"id": "n1", "label": "A"}]
-        }
+        subgraph = {"nodes": [{"id": "n1", "label": "A"}]}
         save_path = os.path.join(temp_log_dir, "test_vis.png")
 
         engine.visualize_attention(subgraph, save_path=save_path, show=False)
@@ -313,12 +313,7 @@ class TestVisualizeAttention:
 
     def test_visualize_wrong_weights_shape(self, engine):
         """Test with wrong attention weights shape."""
-        subgraph = {
-            "nodes": [
-                {"id": "n1", "label": "A"},
-                {"id": "n2", "label": "B"}
-            ]
-        }
+        subgraph = {"nodes": [{"id": "n1", "label": "A"}, {"id": "n2", "label": "B"}]}
         # Wrong shape - not square
         attn_weights = np.random.rand(2, 3)
 
@@ -327,12 +322,7 @@ class TestVisualizeAttention:
 
     def test_visualize_size_mismatch(self, engine):
         """Test with size mismatch between nodes and weights."""
-        subgraph = {
-            "nodes": [
-                {"id": "n1", "label": "A"},
-                {"id": "n2", "label": "B"}
-            ]
-        }
+        subgraph = {"nodes": [{"id": "n1", "label": "A"}, {"id": "n2", "label": "B"}]}
         # 3x3 weights for 2 nodes
         attn_weights = np.random.rand(3, 3)
 
@@ -462,11 +452,7 @@ class TestTraceRelations:
 
     def test_trace_relations_basic(self, engine, tensor):
         """Test basic relation tracing."""
-        graph = {
-            "nodes": [
-                {"id": "n1", "embedding": np.random.rand(10).tolist()}
-            ]
-        }
+        graph = {"nodes": [{"id": "n1", "embedding": np.random.rand(10).tolist()}]}
 
         result = engine.trace_relations(tensor, graph, save_json=False)
 
@@ -476,11 +462,7 @@ class TestTraceRelations:
 
     def test_trace_relations_with_threshold(self, engine, tensor):
         """Test with custom threshold."""
-        graph = {
-            "nodes": [
-                {"id": "n1", "embedding": tensor.tolist()}  # Identical
-            ]
-        }
+        graph = {"nodes": [{"id": "n1", "embedding": tensor.tolist()}]}  # Identical
 
         result = engine.trace_relations(tensor, graph, threshold=0.99, save_json=False)
 
@@ -529,10 +511,7 @@ class TestTraceRelations:
         """Test with invalid embedding function type."""
         with pytest.raises(TypeError, match="embedding_func must be callable"):
             engine.trace_relations(
-                tensor,
-                None,
-                embedding_func="not callable",
-                save_json=False
+                tensor, None, embedding_func="not callable", save_json=False
             )
 
     def test_trace_relations_no_graph(self, engine, tensor):
@@ -551,11 +530,7 @@ class TestTraceRelations:
 
     def test_trace_relations_nodes_without_embeddings(self, engine, tensor):
         """Test with nodes without embeddings."""
-        graph = {
-            "nodes": [
-                {"id": "n1", "label": "No embedding"}
-            ]
-        }
+        graph = {"nodes": [{"id": "n1", "label": "No embedding"}]}
 
         result = engine.trace_relations(tensor, graph, save_json=False)
 
@@ -574,11 +549,7 @@ class TestExplainAndTrace:
 
     def test_explain_and_trace_with_graph(self, engine, tensor):
         """Test with graph."""
-        graph = {
-            "nodes": [
-                {"id": "n1", "embedding": np.random.rand(10).tolist()}
-            ]
-        }
+        graph = {"nodes": [{"id": "n1", "embedding": np.random.rand(10).tolist()}]}
 
         result = engine.explain_and_trace(tensor, graph=graph)
 
@@ -607,7 +578,8 @@ class TestSaveJson:
 
         # Verify content
         import json
-        with open(path, 'r', encoding="utf-8") as f:
+
+        with open(path, "r", encoding="utf-8") as f:
             loaded = json.load(f)
 
         assert loaded == data

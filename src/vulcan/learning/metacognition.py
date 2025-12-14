@@ -1227,9 +1227,9 @@ class CompositionalUnderstanding:
             "best_composition": best_composition,
             "decomposition": decomposed,
             "decomposition_error": decomp_error,
-            "compositionality_score": 1.0 / (1.0 + best_error)
-            if best_composition
-            else 0.0,
+            "compositionality_score": (
+                1.0 / (1.0 + best_error) if best_composition else 0.0
+            ),
             "num_compositions_tried": len(compositions_tried),
             "is_primitive": best_error > 0.5,
         }

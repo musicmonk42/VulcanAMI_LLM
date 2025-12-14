@@ -13,9 +13,12 @@ from pathlib import Path
 
 import pytest
 
-from vulcan.safety.rollback_audit import (AuditLogger, MemoryBoundedDeque,
-                                          RollbackManager)
-from vulcan.safety.safety_types import (SafetyReport, SafetyViolationType)
+from vulcan.safety.rollback_audit import (
+    AuditLogger,
+    MemoryBoundedDeque,
+    RollbackManager,
+)
+from vulcan.safety.safety_types import SafetyReport, SafetyViolationType
 
 # ============================================================
 # FIXTURES

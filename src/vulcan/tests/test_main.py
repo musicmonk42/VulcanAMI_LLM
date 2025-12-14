@@ -307,7 +307,9 @@ class _FakeHttpClient:
         if path == "/v1/checkpoint" and method == "POST":
             if deployment:
                 deployment.save_checkpoint()
-            return MockResponse(200, {"status": "saved", "path": "/tmp/checkpoint"})  # nosec B108 - mock response, not actual file operation
+            return MockResponse(
+                200, {"status": "saved", "path": "/tmp/checkpoint"}
+            )  # nosec B108 - mock response, not actual file operation
 
         # OPTIONS for CORS
         if method == "OPTIONS":
@@ -517,7 +519,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="test")
     parser.add_argument("--profile", default="testing")
-    parser.add_argument("--host", default="127.0.0.1")  # Default to localhost for security
+    parser.add_argument(
+        "--host", default="127.0.0.1"
+    )  # Default to localhost for security
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--benchmark-iterations", type=int, default=100)

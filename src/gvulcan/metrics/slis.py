@@ -628,12 +628,16 @@ class SLITracker:
             "min": min(values),
             "max": max(values),
             "p50": sorted_values[int(len(values) * 0.50)],
-            "p95": sorted_values[int(len(values) * 0.95)]
-            if len(values) > 1
-            else sorted_values[0],
-            "p99": sorted_values[int(len(values) * 0.99)]
-            if len(values) > 1
-            else sorted_values[0],
+            "p95": (
+                sorted_values[int(len(values) * 0.95)]
+                if len(values) > 1
+                else sorted_values[0]
+            ),
+            "p99": (
+                sorted_values[int(len(values) * 0.99)]
+                if len(values) > 1
+                else sorted_values[0]
+            ),
             "stddev": statistics.stdev(values) if len(values) > 1 else 0.0,
         }
 

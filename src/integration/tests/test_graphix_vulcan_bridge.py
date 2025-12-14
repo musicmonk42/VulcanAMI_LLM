@@ -2,8 +2,12 @@
 Comprehensive tests for graphix_vulcan_bridge.py
 """
 
-from graphix_vulcan_bridge import (BridgeConfig, GraphixVulcanBridge,
-                                   HierarchicalMemory, WorldModelCore)
+from graphix_vulcan_bridge import (
+    BridgeConfig,
+    GraphixVulcanBridge,
+    HierarchicalMemory,
+    WorldModelCore,
+)
 import sys
 
 import pytest

@@ -26,8 +26,12 @@ import threading
 import pytest
 
 from vulcan.world_model.meta_reasoning.internal_critic import (
-    ComparisonResult, Evaluation, EvaluationPerspective, InternalCritic,
-    RiskCategory)
+    ComparisonResult,
+    Evaluation,
+    EvaluationPerspective,
+    InternalCritic,
+    RiskCategory,
+)
 
 # ---------------------------
 # Dependency stubs

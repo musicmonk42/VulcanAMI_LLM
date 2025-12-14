@@ -13,12 +13,24 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from agent_registry import (AGENT_ID_MAX_LENGTH, LOCKOUT_DURATION,
-                            MAX_FAILED_ATTEMPTS, AgentCertificate, AgentKey,
-                            AgentProfile, AgentRegistry, AgentRole,
-                            AuditLogger, CalibrationData, CertificateAuthority,
-                            DatabaseConnectionPool, KeyAlgorithm, KeyManager,
-                            RateLimiter, RegistryEvent)
+from agent_registry import (
+    AGENT_ID_MAX_LENGTH,
+    LOCKOUT_DURATION,
+    MAX_FAILED_ATTEMPTS,
+    AgentCertificate,
+    AgentKey,
+    AgentProfile,
+    AgentRegistry,
+    AgentRole,
+    AuditLogger,
+    CalibrationData,
+    CertificateAuthority,
+    DatabaseConnectionPool,
+    KeyAlgorithm,
+    KeyManager,
+    RateLimiter,
+    RegistryEvent,
+)
 
 
 @pytest.fixture
@@ -40,7 +52,7 @@ def cert_authority(temp_dir):
     """Create certificate authority."""
     return CertificateAuthority(
         ca_key_path=str(temp_dir / "ca_key.pem"),
-        ca_cert_path=str(temp_dir / "ca_cert.pem")
+        ca_cert_path=str(temp_dir / "ca_cert.pem"),
     )
 
 
@@ -64,7 +76,7 @@ def agent_registry(temp_dir):
         key_store_dir=str(temp_dir / "keys"),
         audit_log_dir=str(temp_dir / "audit"),
         ca_key_path=str(temp_dir / "ca_key.pem"),
-        ca_cert_path=str(temp_dir / "ca_cert.pem")
+        ca_cert_path=str(temp_dir / "ca_cert.pem"),
     )
     yield registry
     registry.shutdown_registry()
@@ -139,8 +151,12 @@ class TestKeyManager:
 
         signature = key_manager.sign_message(message, private, KeyAlgorithm.RSA_2048)
 
-        assert key_manager.verify_signature(message, signature, public, KeyAlgorithm.RSA_2048)
-        assert not key_manager.verify_signature(b"Different message", signature, public, KeyAlgorithm.RSA_2048)
+        assert key_manager.verify_signature(
+            message, signature, public, KeyAlgorithm.RSA_2048
+        )
+        assert not key_manager.verify_signature(
+            b"Different message", signature, public, KeyAlgorithm.RSA_2048
+        )
 
     def test_sign_and_verify_ed25519(self, key_manager):
         """Test ED25519 signing and verification."""
@@ -149,8 +165,12 @@ class TestKeyManager:
 
         signature = key_manager.sign_message(message, private, KeyAlgorithm.ED25519)
 
-        assert key_manager.verify_signature(message, signature, public, KeyAlgorithm.ED25519)
-        assert not key_manager.verify_signature(b"Different message", signature, public, KeyAlgorithm.ED25519)
+        assert key_manager.verify_signature(
+            message, signature, public, KeyAlgorithm.ED25519
+        )
+        assert not key_manager.verify_signature(
+            b"Different message", signature, public, KeyAlgorithm.ED25519
+        )
 
     def test_encrypt_decrypt_key(self, key_manager):
         """Test key encryption and decryption."""
@@ -245,7 +265,7 @@ class TestAuditLogger:
             "test_agent",
             {"name": "Test Agent"},
             success=True,
-            ip_address="127.0.0.1"
+            ip_address="127.0.0.1",
         )
 
         events = audit_logger.get_recent_events(count=1)
@@ -342,7 +362,7 @@ class TestAgentRegistry:
             name="Test Agent",
             roles=[AgentRole.EXECUTOR],
             algorithm=KeyAlgorithm.ED25519,
-            issue_certificate=True
+            issue_certificate=True,
         )
 
         assert result["agent_id"] == "test_agent_001"
@@ -353,25 +373,19 @@ class TestAgentRegistry:
     def test_register_duplicate_agent(self, agent_registry):
         """Test registering duplicate agent fails."""
         agent_registry.register_agent(
-            agent_id="duplicate_agent",
-            name="Agent",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="duplicate_agent", name="Agent", roles=[AgentRole.EXECUTOR]
         )
 
         with pytest.raises(ValueError, match="already registered"):
             agent_registry.register_agent(
-                agent_id="duplicate_agent",
-                name="Agent",
-                roles=[AgentRole.EXECUTOR]
+                agent_id="duplicate_agent", name="Agent", roles=[AgentRole.EXECUTOR]
             )
 
     def test_register_invalid_agent_id(self, agent_registry):
         """Test registering with invalid agent ID."""
         with pytest.raises(ValueError, match="Invalid agent ID"):
             agent_registry.register_agent(
-                agent_id="invalid@agent!id",
-                name="Agent",
-                roles=[AgentRole.EXECUTOR]
+                agent_id="invalid@agent!id", name="Agent", roles=[AgentRole.EXECUTOR]
             )
 
     def test_register_too_long_agent_id(self, agent_registry):
@@ -380,9 +394,7 @@ class TestAgentRegistry:
 
         with pytest.raises(ValueError, match="Invalid agent ID"):
             agent_registry.register_agent(
-                agent_id=long_id,
-                name="Agent",
-                roles=[AgentRole.EXECUTOR]
+                agent_id=long_id, name="Agent", roles=[AgentRole.EXECUTOR]
             )
 
     def test_verify_signature_valid(self, agent_registry):
@@ -391,24 +403,21 @@ class TestAgentRegistry:
             agent_id="signer_agent",
             name="Signer",
             roles=[AgentRole.EXECUTOR],
-            algorithm=KeyAlgorithm.ED25519
+            algorithm=KeyAlgorithm.ED25519,
         )
 
         import base64
+
         private_key = base64.b64decode(result["private_key"])
 
         message = "Test message"
         signature = agent_registry.key_manager.sign_message(
-            message.encode(),
-            private_key,
-            KeyAlgorithm.ED25519
+            message.encode(), private_key, KeyAlgorithm.ED25519
         )
         signature_b64 = base64.b64encode(signature).decode()
 
         is_valid = agent_registry.verify_signature(
-            agent_id="signer_agent",
-            message=message,
-            signature=signature_b64
+            agent_id="signer_agent", message=message, signature=signature_b64
         )
 
         assert is_valid
@@ -419,13 +428,13 @@ class TestAgentRegistry:
             agent_id="signer_agent",
             name="Signer",
             roles=[AgentRole.EXECUTOR],
-            algorithm=KeyAlgorithm.ED25519
+            algorithm=KeyAlgorithm.ED25519,
         )
 
         is_valid = agent_registry.verify_signature(
             agent_id="signer_agent",
             message="Test message",
-            signature="invalid_signature_base64=="
+            signature="invalid_signature_base64==",
         )
 
         assert not is_valid
@@ -436,24 +445,23 @@ class TestAgentRegistry:
             agent_id="signer_agent",
             name="Signer",
             roles=[AgentRole.EXECUTOR],
-            algorithm=KeyAlgorithm.ED25519
+            algorithm=KeyAlgorithm.ED25519,
         )
 
         import base64
+
         private_key = base64.b64decode(result["private_key"])
 
         message = "Original message"
         signature = agent_registry.key_manager.sign_message(
-            message.encode(),
-            private_key,
-            KeyAlgorithm.ED25519
+            message.encode(), private_key, KeyAlgorithm.ED25519
         )
         signature_b64 = base64.b64encode(signature).decode()
 
         is_valid = agent_registry.verify_signature(
             agent_id="signer_agent",
             message="Different message",
-            signature=signature_b64
+            signature=signature_b64,
         )
 
         assert not is_valid
@@ -461,17 +469,13 @@ class TestAgentRegistry:
     def test_lockout_after_failed_attempts(self, agent_registry):
         """Test agent lockout after failed attempts."""
         agent_registry.register_agent(
-            agent_id="lockout_agent",
-            name="Lockout Test",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="lockout_agent", name="Lockout Test", roles=[AgentRole.EXECUTOR]
         )
 
         # Make MAX_FAILED_ATTEMPTS failed attempts
         for _ in range(MAX_FAILED_ATTEMPTS):
             agent_registry.verify_signature(
-                agent_id="lockout_agent",
-                message="test",
-                signature="invalid"
+                agent_id="lockout_agent", message="test", signature="invalid"
             )
 
         # Agent should be locked
@@ -481,9 +485,7 @@ class TestAgentRegistry:
     def test_rotate_key(self, agent_registry):
         """Test key rotation."""
         agent_registry.register_agent(
-            agent_id="rotate_agent",
-            name="Rotate Test",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="rotate_agent", name="Rotate Test", roles=[AgentRole.EXECUTOR]
         )
 
         result = agent_registry.rotate_key("rotate_agent", KeyAlgorithm.RSA_2048)
@@ -495,9 +497,7 @@ class TestAgentRegistry:
     def test_revoke_key(self, agent_registry):
         """Test key revocation."""
         result = agent_registry.register_agent(
-            agent_id="revoke_agent",
-            name="Revoke Test",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="revoke_agent", name="Revoke Test", roles=[AgentRole.EXECUTOR]
         )
 
         key_id = result["key_id"]
@@ -509,9 +509,7 @@ class TestAgentRegistry:
     def test_grant_permission(self, agent_registry):
         """Test granting permission."""
         agent_registry.register_agent(
-            agent_id="perm_agent",
-            name="Permission Test",
-            roles=[AgentRole.VIEWER]
+            agent_id="perm_agent", name="Permission Test", roles=[AgentRole.VIEWER]
         )
 
         agent_registry.grant_permission("perm_agent", "execute_graph", "admin")
@@ -521,9 +519,7 @@ class TestAgentRegistry:
     def test_revoke_permission(self, agent_registry):
         """Test revoking permission."""
         agent_registry.register_agent(
-            agent_id="perm_agent",
-            name="Permission Test",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="perm_agent", name="Permission Test", roles=[AgentRole.EXECUTOR]
         )
 
         # Should have execute permission by default
@@ -536,9 +532,7 @@ class TestAgentRegistry:
     def test_admin_has_all_permissions(self, agent_registry):
         """Test admin role has all permissions."""
         agent_registry.register_agent(
-            agent_id="admin_agent",
-            name="Admin",
-            roles=[AgentRole.ADMIN]
+            agent_id="admin_agent", name="Admin", roles=[AgentRole.ADMIN]
         )
 
         assert agent_registry.check_permission("admin_agent", "execute_graph")
@@ -548,9 +542,7 @@ class TestAgentRegistry:
     def test_get_agent_info(self, agent_registry):
         """Test getting agent info."""
         agent_registry.register_agent(
-            agent_id="info_agent",
-            name="Info Test",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="info_agent", name="Info Test", roles=[AgentRole.EXECUTOR]
         )
 
         info = agent_registry.get_agent_info("info_agent")
@@ -563,14 +555,10 @@ class TestAgentRegistry:
     def test_list_agents(self, agent_registry):
         """Test listing agents."""
         agent_registry.register_agent(
-            agent_id="agent1",
-            name="Agent 1",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="agent1", name="Agent 1", roles=[AgentRole.EXECUTOR]
         )
         agent_registry.register_agent(
-            agent_id="agent2",
-            name="Agent 2",
-            roles=[AgentRole.ADMIN]
+            agent_id="agent2", name="Agent 2", roles=[AgentRole.ADMIN]
         )
 
         all_agents = agent_registry.list_agents()
@@ -590,9 +578,7 @@ class TestAgentRegistry:
     def test_get_audit_logs(self, agent_registry):
         """Test getting audit logs."""
         agent_registry.register_agent(
-            agent_id="audit_agent",
-            name="Audit Test",
-            roles=[AgentRole.EXECUTOR]
+            agent_id="audit_agent", name="Audit Test", roles=[AgentRole.EXECUTOR]
         )
 
         logs = agent_registry.get_audit_logs(limit=10)
@@ -614,15 +600,14 @@ class TestThreadSafety:
                 result = agent_registry.register_agent(
                     agent_id=agent_id,
                     name=f"Agent {agent_id}",
-                    roles=[AgentRole.EXECUTOR]
+                    roles=[AgentRole.EXECUTOR],
                 )
                 results.append(result)
             except Exception as e:
                 errors.append(e)
 
         threads = [
-            threading.Thread(target=register, args=(f"agent_{i}",))
-            for i in range(10)
+            threading.Thread(target=register, args=(f"agent_{i}",)) for i in range(10)
         ]
 
         for t in threads:
@@ -639,17 +624,16 @@ class TestThreadSafety:
             agent_id="verify_agent",
             name="Verify Test",
             roles=[AgentRole.EXECUTOR],
-            algorithm=KeyAlgorithm.ED25519
+            algorithm=KeyAlgorithm.ED25519,
         )
 
         import base64
+
         private_key = base64.b64decode(result["private_key"])
 
         message = "Test message"
         signature = agent_registry.key_manager.sign_message(
-            message.encode(),
-            private_key,
-            KeyAlgorithm.ED25519
+            message.encode(), private_key, KeyAlgorithm.ED25519
         )
         signature_b64 = base64.b64encode(signature).decode()
 
@@ -657,9 +641,7 @@ class TestThreadSafety:
 
         def verify():
             is_valid = agent_registry.verify_signature(
-                agent_id="verify_agent",
-                message=message,
-                signature=signature_b64
+                agent_id="verify_agent", message=message, signature=signature_b64
             )
             results.append(is_valid)
 
@@ -682,7 +664,7 @@ class TestAgentKey:
             key_id="test_key",
             algorithm=KeyAlgorithm.ED25519,
             public_key=b"public",
-            expires_at=datetime.utcnow() - timedelta(hours=1)
+            expires_at=datetime.utcnow() - timedelta(hours=1),
         )
 
         assert expired_key.is_expired()
@@ -691,7 +673,7 @@ class TestAgentKey:
             key_id="test_key",
             algorithm=KeyAlgorithm.ED25519,
             public_key=b"public",
-            expires_at=datetime.utcnow() + timedelta(hours=1)
+            expires_at=datetime.utcnow() + timedelta(hours=1),
         )
 
         assert not valid_key.is_expired()
@@ -702,7 +684,7 @@ class TestAgentKey:
             key_id="test_key",
             algorithm=KeyAlgorithm.ED25519,
             public_key=b"public_key_data",
-            private_key=b"private_key_data"
+            private_key=b"private_key_data",
         )
 
         data = key.to_dict()

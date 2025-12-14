@@ -607,8 +607,7 @@ class ConsensusManager:
         - Future cancellation on completion
         - Bounded retries
         """
-        from concurrent.futures import (FIRST_COMPLETED, ThreadPoolExecutor,
-                                        wait)
+        from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
         yes = 0
         attempts = {a: 0 for a in agents}

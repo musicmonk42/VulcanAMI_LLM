@@ -9,8 +9,12 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from superoptimizer import (KernelGenerationError, Superoptimizer,
-                            SuperoptimizerError, ValidationError)
+from superoptimizer import (
+    KernelGenerationError,
+    Superoptimizer,
+    SuperoptimizerError,
+    ValidationError,
+)
 
 
 @pytest.fixture
@@ -23,11 +27,7 @@ def temp_cache_dir():
 @pytest.fixture
 def optimizer(temp_cache_dir):
     """Create Superoptimizer instance."""
-    return Superoptimizer(
-        cache_dir=temp_cache_dir,
-        use_llm=False,
-        use_emulator=False
-    )
+    return Superoptimizer(cache_dir=temp_cache_dir, use_llm=False, use_emulator=False)
 
 
 @pytest.fixture
@@ -37,12 +37,9 @@ def sample_subgraph():
         "nodes": [
             {"id": "n1", "type": "MVM", "params": {"shape": [4, 4]}},
             {"id": "n2", "type": "ADD", "params": {}},
-            {"id": "n3", "type": "MUL", "params": {}}
+            {"id": "n3", "type": "MUL", "params": {}},
         ],
-        "edges": [
-            {"from": "n1", "to": "n2"},
-            {"from": "n2", "to": "n3"}
-        ]
+        "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
     }
 
 
@@ -59,12 +56,9 @@ class TestSuperoptimizerInitialization:
 
     def test_initialization_with_llm(self, temp_cache_dir):
         """Test initialization with LLM."""
-        with patch('superoptimizer.LLM_AVAILABLE', True):
-            with patch('superoptimizer.LLMClient'):
-                optimizer = Superoptimizer(
-                    cache_dir=temp_cache_dir,
-                    use_llm=True
-                )
+        with patch("superoptimizer.LLM_AVAILABLE", True):
+            with patch("superoptimizer.LLMClient"):
+                optimizer = Superoptimizer(cache_dir=temp_cache_dir, use_llm=True)
 
                 # LLM usage depends on availability
                 assert isinstance(optimizer.use_llm, bool)
@@ -131,11 +125,7 @@ class TestKernelGeneration:
 
     def test_generate_kernel_with_optimization_level(self, optimizer, sample_subgraph):
         """Test kernel generation with optimization level."""
-        result = optimizer.generate_kernel(
-            sample_subgraph,
-            "cpu",
-            optimization_level=3
-        )
+        result = optimizer.generate_kernel(sample_subgraph, "cpu", optimization_level=3)
 
         assert result["metadata"]["optimization_level"] == 3
 
@@ -267,10 +257,8 @@ class TestTensorSizeInference:
     def test_infer_tensor_size_from_shape(self, optimizer):
         """Test inference from shape hint."""
         subgraph = {
-            "nodes": [
-                {"id": "n1", "type": "MVM", "params": {"shape": [8, 8]}}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "type": "MVM", "params": {"shape": [8, 8]}}],
+            "edges": [],
         }
 
         size = optimizer._infer_tensor_size(subgraph)
@@ -281,7 +269,7 @@ class TestTensorSizeInference:
         """Test inference with many nodes."""
         subgraph = {
             "nodes": [{"id": f"n{i}", "type": "ADD", "params": {}} for i in range(15)],
-            "edges": []
+            "edges": [],
         }
 
         size = optimizer._infer_tensor_size(subgraph)
@@ -290,10 +278,7 @@ class TestTensorSizeInference:
 
     def test_infer_tensor_size_few_nodes(self, optimizer):
         """Test inference with few nodes."""
-        subgraph = {
-            "nodes": [{"id": "n1", "type": "ADD", "params": {}}],
-            "edges": []
-        }
+        subgraph = {"nodes": [{"id": "n1", "type": "ADD", "params": {}}], "edges": []}
 
         size = optimizer._infer_tensor_size(subgraph)
 
@@ -309,9 +294,9 @@ class TestTensorOperations:
             "nodes": [
                 {"id": "n1", "type": "MVM", "params": {}},
                 {"id": "n2", "type": "ADD", "params": {}},
-                {"id": "n3", "type": "Input", "params": {}}
+                {"id": "n3", "type": "Input", "params": {}},
             ],
-            "edges": []
+            "edges": [],
         }
 
         ops = optimizer._extract_tensor_ops(subgraph)
@@ -324,9 +309,9 @@ class TestTensorOperations:
         subgraph = {
             "nodes": [
                 {"id": "n1", "type": "Input", "params": {}},
-                {"id": "n2", "type": "Output", "params": {}}
+                {"id": "n2", "type": "Output", "params": {}},
             ],
-            "edges": []
+            "edges": [],
         }
 
         ops = optimizer._extract_tensor_ops(subgraph)
@@ -337,22 +322,28 @@ class TestTensorOperations:
 class TestEmulatorIntegration:
     """Test hardware emulator integration."""
 
-    @patch('superoptimizer.EMULATOR_AVAILABLE', True)
-    @patch('superoptimizer.analog_photonic_emulator')
-    def test_test_kernel_with_emulator_photonic(self, mock_emulator, optimizer, sample_subgraph):
+    @patch("superoptimizer.EMULATOR_AVAILABLE", True)
+    @patch("superoptimizer.analog_photonic_emulator")
+    def test_test_kernel_with_emulator_photonic(
+        self, mock_emulator, optimizer, sample_subgraph
+    ):
         """Test photonic kernel with emulator."""
         mock_emulator.emulate_photonic_mvm = Mock(return_value=MagicMock(shape=(4, 1)))
 
         kernel_code = "void photonic_mvm() {}"
-        result = optimizer.test_kernel_with_emulator(kernel_code, sample_subgraph, "photonic")
+        result = optimizer.test_kernel_with_emulator(
+            kernel_code, sample_subgraph, "photonic"
+        )
 
         assert result["tested"] is True
 
-    @patch('superoptimizer.EMULATOR_AVAILABLE', False)
+    @patch("superoptimizer.EMULATOR_AVAILABLE", False)
     def test_test_kernel_without_emulator(self, optimizer, sample_subgraph):
         """Test kernel testing without emulator for photonic backend."""
         kernel_code = "void photonic_mvm() {}"
-        result = optimizer.test_kernel_with_emulator(kernel_code, sample_subgraph, "photonic")
+        result = optimizer.test_kernel_with_emulator(
+            kernel_code, sample_subgraph, "photonic"
+        )
 
         assert result["tested"] is False
         assert "not available" in result["errors"][0].lower()
@@ -360,7 +351,9 @@ class TestEmulatorIntegration:
     def test_test_kernel_cuda_simulation(self, optimizer, sample_subgraph):
         """Test CUDA kernel simulation."""
         kernel_code = "__global__ void kernel() {}"
-        result = optimizer.test_kernel_with_emulator(kernel_code, sample_subgraph, "cuda")
+        result = optimizer.test_kernel_with_emulator(
+            kernel_code, sample_subgraph, "cuda"
+        )
 
         assert result["tested"] is True
         assert "performance" in result
@@ -369,11 +362,13 @@ class TestEmulatorIntegration:
 class TestLLMIntegration:
     """Test LLM integration."""
 
-    @patch('superoptimizer.LLM_AVAILABLE', True)
+    @patch("superoptimizer.LLM_AVAILABLE", True)
     def test_generate_with_llm_success(self, optimizer):
         """Test successful LLM generation."""
         mock_client = MagicMock()
-        mock_client.generate = Mock(return_value="```cuda\n__global__ void kernel() {}\n```")
+        mock_client.generate = Mock(
+            return_value="```cuda\n__global__ void kernel() {}\n```"
+        )
         optimizer.llm_client = mock_client
         optimizer.use_llm = True
 
@@ -382,7 +377,7 @@ class TestLLMIntegration:
         assert result is not None
         assert "__global__" in result
 
-    @patch('superoptimizer.LLM_AVAILABLE', True)
+    @patch("superoptimizer.LLM_AVAILABLE", True)
     def test_generate_with_llm_failure(self, optimizer):
         """Test LLM generation failure."""
         mock_client = MagicMock()

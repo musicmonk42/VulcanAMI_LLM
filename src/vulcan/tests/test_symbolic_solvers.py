@@ -11,16 +11,19 @@ Tests cover:
 All tests validate the FIXED implementations.
 """
 
-
 import numpy as np
 import pytest
 
 # Import the classes we're testing
-from src.vulcan.reasoning.symbolic.solvers import (CPT,
-                                                   BayesianNetworkReasoner,
-                                                   CSPSolver, Factor,
-                                                   GaussianCPD, RandomVariable,
-                                                   VariableType)
+from src.vulcan.reasoning.symbolic.solvers import (
+    CPT,
+    BayesianNetworkReasoner,
+    CSPSolver,
+    Factor,
+    GaussianCPD,
+    RandomVariable,
+    VariableType,
+)
 
 # ============================================================================
 # DATA STRUCTURE TESTS

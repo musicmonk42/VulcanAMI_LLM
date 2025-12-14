@@ -7,9 +7,16 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from data_augmentor import (MAX_BATCH_SIZE, MAX_COMPLEXITY, MAX_EDGES,
-                            MAX_NODES, AugmentationMetrics, DataAugmentor,
-                            GraphValidator, SemanticMutator)
+from data_augmentor import (
+    MAX_BATCH_SIZE,
+    MAX_COMPLEXITY,
+    MAX_EDGES,
+    MAX_NODES,
+    AugmentationMetrics,
+    DataAugmentor,
+    GraphValidator,
+    SemanticMutator,
+)
 
 
 @pytest.fixture
@@ -20,13 +27,13 @@ def base_graph():
         "nodes": [
             {"id": "n1", "label": "Sentiment", "properties": {}},
             {"id": "n2", "label": "Score", "properties": {}},
-            {"id": "n3", "label": "Data", "properties": {}}
+            {"id": "n3", "label": "Data", "properties": {}},
         ],
         "edges": [
             {"from": "n1", "to": "n2", "weight": 0.5, "properties": {}},
-            {"from": "n2", "to": "n3", "weight": 0.7, "properties": {}}
+            {"from": "n2", "to": "n3", "weight": 0.7, "properties": {}},
         ],
-        "metadata": {}
+        "metadata": {},
     }
 
 
@@ -73,10 +80,7 @@ class TestGraphValidator:
 
     def test_validate_too_many_nodes(self):
         """Test validating graph with too many nodes."""
-        graph = {
-            "nodes": [{"id": f"n{i}"} for i in range(MAX_NODES + 1)],
-            "edges": []
-        }
+        graph = {"nodes": [{"id": f"n{i}"} for i in range(MAX_NODES + 1)], "edges": []}
 
         valid, error = GraphValidator.validate_graph(graph)
 
@@ -86,11 +90,8 @@ class TestGraphValidator:
     def test_validate_duplicate_node_ids(self):
         """Test validating graph with duplicate node IDs."""
         graph = {
-            "nodes": [
-                {"id": "n1", "label": "Node1"},
-                {"id": "n1", "label": "Node2"}
-            ],
-            "edges": []
+            "nodes": [{"id": "n1", "label": "Node1"}, {"id": "n1", "label": "Node2"}],
+            "edges": [],
         }
 
         valid, error = GraphValidator.validate_graph(graph)
@@ -102,7 +103,7 @@ class TestGraphValidator:
         """Test validating graph with invalid edge."""
         graph = {
             "nodes": [{"id": "n1"}],
-            "edges": [{"from": "n1", "to": "nonexistent"}]
+            "edges": [{"from": "n1", "to": "nonexistent"}],
         }
 
         valid, error = GraphValidator.validate_graph(graph)
@@ -167,7 +168,9 @@ class TestSemanticMutator:
         """Test creating edge with specific relation."""
         rng = random.Random(42)
 
-        edge = SemanticMutator.create_semantic_edge("n1", "n2", rng, relation_type="depends_on")
+        edge = SemanticMutator.create_semantic_edge(
+            "n1", "n2", rng, relation_type="depends_on"
+        )
 
         assert edge["relation_type"] == "depends_on"
 
@@ -214,7 +217,7 @@ class TestDataAugmentor:
         is_dup2 = augmentor._check_duplicate(hash1)
 
         assert is_dup1 is False  # First time
-        assert is_dup2 is True   # Second time (duplicate)
+        assert is_dup2 is True  # Second time (duplicate)
         assert augmentor.metrics.duplicates_detected == 1
 
     def test_calculate_quality_score(self, augmentor, base_graph):
@@ -245,7 +248,9 @@ class TestDataAugmentor:
             augmentor.generate_synthetic_proposal(base_graph, complexity=0)
 
         with pytest.raises(ValueError, match="Complexity must be"):
-            augmentor.generate_synthetic_proposal(base_graph, complexity=MAX_COMPLEXITY + 1)
+            augmentor.generate_synthetic_proposal(
+                base_graph, complexity=MAX_COMPLEXITY + 1
+            )
 
     def test_counterfactual_proposal(self, augmentor, base_graph):
         """Test counterfactual proposal generation."""
@@ -406,6 +411,7 @@ class TestThreadSafety:
                 errors.append(e)
 
         import threading
+
         threads = [threading.Thread(target=generate) for _ in range(10)]
 
         for t in threads:

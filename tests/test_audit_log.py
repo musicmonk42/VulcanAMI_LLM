@@ -12,6 +12,7 @@ import gzip
 import json
 import os
 import secrets
+
 # Import the module under test
 import sys
 import tempfile
@@ -23,11 +24,11 @@ from unittest.mock import AsyncMock, MagicMock, Mock, call, patch
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 # FIXED: Use fixture-based mocking instead of global module pollution
-@pytest.fixture(autouse=True, scope='function')
+@pytest.fixture(autouse=True, scope="function")
 def mock_optional_dependencies(monkeypatch):
     """Mock optional dependencies for all tests in this file"""
     # Create mock modules
@@ -45,18 +46,30 @@ def mock_optional_dependencies(monkeypatch):
     prometheus_client_mock = MagicMock()
 
     # Set up the mocks in sys.modules using monkeypatch (auto-cleanup)
-    monkeypatch.setitem(sys.modules, 'cryptography', crypto_mock)
-    monkeypatch.setitem(sys.modules, 'cryptography.fernet', crypto_fernet_mock)
-    monkeypatch.setitem(sys.modules, 'cryptography.hazmat', crypto_hazmat_mock)
-    monkeypatch.setitem(sys.modules, 'cryptography.hazmat.primitives', crypto_hazmat_primitives_mock)
-    monkeypatch.setitem(sys.modules, 'cryptography.hazmat.primitives.kdf', crypto_hazmat_primitives_kdf_mock)
-    monkeypatch.setitem(sys.modules, 'cryptography.hazmat.primitives.kdf.pbkdf2', crypto_hazmat_primitives_kdf_pbkdf2_mock)
-    monkeypatch.setitem(sys.modules, 'opentelemetry', opentelemetry_mock)
-    monkeypatch.setitem(sys.modules, 'opentelemetry.trace', opentelemetry_trace_mock)
-    monkeypatch.setitem(sys.modules, 'opentelemetry.metrics', opentelemetry_metrics_mock)
-    monkeypatch.setitem(sys.modules, 'plugins', plugins_mock)
-    monkeypatch.setitem(sys.modules, 'plugins.dlt_backend', plugins_dlt_backend_mock)
-    monkeypatch.setitem(sys.modules, 'prometheus_client', prometheus_client_mock)
+    monkeypatch.setitem(sys.modules, "cryptography", crypto_mock)
+    monkeypatch.setitem(sys.modules, "cryptography.fernet", crypto_fernet_mock)
+    monkeypatch.setitem(sys.modules, "cryptography.hazmat", crypto_hazmat_mock)
+    monkeypatch.setitem(
+        sys.modules, "cryptography.hazmat.primitives", crypto_hazmat_primitives_mock
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "cryptography.hazmat.primitives.kdf",
+        crypto_hazmat_primitives_kdf_mock,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "cryptography.hazmat.primitives.kdf.pbkdf2",
+        crypto_hazmat_primitives_kdf_pbkdf2_mock,
+    )
+    monkeypatch.setitem(sys.modules, "opentelemetry", opentelemetry_mock)
+    monkeypatch.setitem(sys.modules, "opentelemetry.trace", opentelemetry_trace_mock)
+    monkeypatch.setitem(
+        sys.modules, "opentelemetry.metrics", opentelemetry_metrics_mock
+    )
+    monkeypatch.setitem(sys.modules, "plugins", plugins_mock)
+    monkeypatch.setitem(sys.modules, "plugins.dlt_backend", plugins_dlt_backend_mock)
+    monkeypatch.setitem(sys.modules, "prometheus_client", prometheus_client_mock)
 
     yield
     # monkeypatch automatically cleans up after the test
@@ -68,26 +81,34 @@ from src.audit_log import (
     AuditLoggerConfig,
     RotationType,
     CompressionType,
-    SizedTimedRotatingFileHandler
+    SizedTimedRotatingFileHandler,
 )
 
 
 # Helper function for cleanup
 def cleanup_singleton():
     """Synchronous cleanup of singleton."""
-    if TamperEvidentLogger._instance is not None and hasattr(TamperEvidentLogger._instance, '_initialized'):
+    if TamperEvidentLogger._instance is not None and hasattr(
+        TamperEvidentLogger._instance, "_initialized"
+    ):
         if TamperEvidentLogger._instance._initialized:
             try:
                 # Cancel batch task
-                if hasattr(TamperEvidentLogger._instance, '_batch_task') and TamperEvidentLogger._instance._batch_task:
+                if (
+                    hasattr(TamperEvidentLogger._instance, "_batch_task")
+                    and TamperEvidentLogger._instance._batch_task
+                ):
                     TamperEvidentLogger._instance._batch_task.cancel()
 
                 # Shutdown executor
-                if hasattr(TamperEvidentLogger._instance, '_executor') and TamperEvidentLogger._instance._executor:
+                if (
+                    hasattr(TamperEvidentLogger._instance, "_executor")
+                    and TamperEvidentLogger._instance._executor
+                ):
                     TamperEvidentLogger._instance._executor.shutdown(wait=False)
 
                 # Close handlers
-                if hasattr(TamperEvidentLogger._instance, '_logger'):
+                if hasattr(TamperEvidentLogger._instance, "_logger"):
                     for handler in TamperEvidentLogger._instance._logger.handlers[:]:
                         try:
                             handler.close()
@@ -120,7 +141,7 @@ def basic_config(temp_log_dir):
         async_logging=True,
         metrics_enabled=False,
         batch_size=10,
-        batch_timeout=1.0
+        batch_timeout=1.0,
     )
 
 
@@ -134,7 +155,7 @@ def encrypted_config(temp_log_dir):
         dlt_enabled=False,
         syslog_enabled=False,
         metrics_enabled=False,
-        async_logging=True
+        async_logging=True,
     )
 
 
@@ -161,12 +182,12 @@ class TestAuditLoggerConfig:
     def test_config_from_environment(self, temp_log_dir):
         """Test configuration from environment variables."""
         env_vars = {
-            'AUDIT_LOG_PATH': str(temp_log_dir / "env.jsonl"),
-            'AUDIT_LOG_ROTATION': 'h',
-            'AUDIT_LOG_INTERVAL': '6',
-            'AUDIT_LOG_RETENTION': '10',
-            'AUDIT_LOG_BATCH_SIZE': '50',
-            'AUDIT_LOG_ENCRYPT': 'true'
+            "AUDIT_LOG_PATH": str(temp_log_dir / "env.jsonl"),
+            "AUDIT_LOG_ROTATION": "h",
+            "AUDIT_LOG_INTERVAL": "6",
+            "AUDIT_LOG_RETENTION": "10",
+            "AUDIT_LOG_BATCH_SIZE": "50",
+            "AUDIT_LOG_ENCRYPT": "true",
         }
         with patch.dict(os.environ, env_vars):
             config = AuditLoggerConfig()
@@ -180,57 +201,43 @@ class TestAuditLoggerConfig:
         """Test validation of invalid rotation type."""
         with pytest.raises(ValueError, match="Invalid rotation_type"):
             AuditLoggerConfig(
-                log_path=temp_log_dir / "test.jsonl",
-                rotation_type="invalid"
+                log_path=temp_log_dir / "test.jsonl", rotation_type="invalid"
             )
 
     def test_invalid_compression_type(self, temp_log_dir):
         """Test validation of invalid compression type."""
         with pytest.raises(ValueError, match="Invalid compression_type"):
             AuditLoggerConfig(
-                log_path=temp_log_dir / "test.jsonl",
-                compression_type="bzip2"
+                log_path=temp_log_dir / "test.jsonl", compression_type="bzip2"
             )
 
     def test_negative_retention_count(self, temp_log_dir):
         """Test validation of negative retention count."""
         with pytest.raises(ValueError, match="retention_count must be non-negative"):
-            AuditLoggerConfig(
-                log_path=temp_log_dir / "test.jsonl",
-                retention_count=-1
-            )
+            AuditLoggerConfig(log_path=temp_log_dir / "test.jsonl", retention_count=-1)
 
     def test_invalid_batch_size(self, temp_log_dir):
         """Test validation of invalid batch size."""
         with pytest.raises(ValueError, match="batch_size must be positive"):
-            AuditLoggerConfig(
-                log_path=temp_log_dir / "test.jsonl",
-                batch_size=0
-            )
+            AuditLoggerConfig(log_path=temp_log_dir / "test.jsonl", batch_size=0)
 
     def test_invalid_batch_timeout(self, temp_log_dir):
         """Test validation of invalid batch timeout."""
         with pytest.raises(ValueError, match="batch_timeout must be positive"):
-            AuditLoggerConfig(
-                log_path=temp_log_dir / "test.jsonl",
-                batch_timeout=-1.0
-            )
+            AuditLoggerConfig(log_path=temp_log_dir / "test.jsonl", batch_timeout=-1.0)
 
     def test_encryption_without_cryptography(self, temp_log_dir):
         """Test that encryption fails gracefully without cryptography module."""
-        with patch('src.audit_log.Fernet', None):
+        with patch("src.audit_log.Fernet", None):
             with pytest.raises(ValueError, match="cryptography module required"):
                 AuditLoggerConfig(
-                    log_path=temp_log_dir / "test.jsonl",
-                    encrypt_logs=True
+                    log_path=temp_log_dir / "test.jsonl", encrypt_logs=True
                 )
 
     def test_auto_key_generation(self, temp_log_dir):
         """Test automatic encryption key generation."""
         config = AuditLoggerConfig(
-            log_path=temp_log_dir / "test.jsonl",
-            encrypt_logs=True,
-            encryption_key=None
+            log_path=temp_log_dir / "test.jsonl", encrypt_logs=True, encryption_key=None
         )
         assert config.encryption_key is not None
         assert len(config.encryption_key) > 0
@@ -263,7 +270,9 @@ class TestLoggerInitialization:
     async def test_creates_log_directory(self, temp_log_dir, reset_singleton):
         """Test that log directory is created if it doesn't exist."""
         log_path = temp_log_dir / "nested" / "dir" / "audit.jsonl"
-        config = AuditLoggerConfig(log_path=log_path, dlt_enabled=False, metrics_enabled=False)
+        config = AuditLoggerConfig(
+            log_path=log_path, dlt_enabled=False, metrics_enabled=False
+        )
         logger = TamperEvidentLogger(config)
 
         # Check the actual path that was created
@@ -274,29 +283,33 @@ class TestLoggerInitialization:
     @pytest.mark.asyncio
     async def test_agent_info_extraction(self, temp_log_dir, reset_singleton):
         """Test agent information extraction."""
-        env_vars = {'AGENT_ID': 'test-agent', 'APP_VERSION': '1.0.0'}
+        env_vars = {"AGENT_ID": "test-agent", "APP_VERSION": "1.0.0"}
         with patch.dict(os.environ, env_vars):
             config = AuditLoggerConfig(
                 log_path=temp_log_dir / "audit.jsonl",
                 dlt_enabled=False,
-                metrics_enabled=False
+                metrics_enabled=False,
             )
             logger = TamperEvidentLogger(config)
-            assert logger._agent_info['agent_id'] == 'test-agent'
-            assert logger._agent_info['version'] == '1.0.0'
-            assert 'hostname' in logger._agent_info
-            assert 'pid' in logger._agent_info
+            assert logger._agent_info["agent_id"] == "test-agent"
+            assert logger._agent_info["version"] == "1.0.0"
+            assert "hostname" in logger._agent_info
+            assert "pid" in logger._agent_info
             await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_dlt_client_initialization_failure(self, temp_log_dir, reset_singleton):
+    async def test_dlt_client_initialization_failure(
+        self, temp_log_dir, reset_singleton
+    ):
         """Test graceful DLT client initialization failure."""
         config = AuditLoggerConfig(
             log_path=temp_log_dir / "audit.jsonl",
             dlt_enabled=True,
-            metrics_enabled=False
+            metrics_enabled=False,
         )
-        with patch('src.audit_log.AuditLedgerClient', side_effect=Exception("DLT unavailable")):
+        with patch(
+            "src.audit_log.AuditLedgerClient", side_effect=Exception("DLT unavailable")
+        ):
             logger = TamperEvidentLogger(config)
             assert logger._dlt_client is None
             await logger.shutdown()
@@ -389,7 +402,7 @@ class TestEncryption:
     @pytest.mark.asyncio
     async def test_encryption_enabled(self, encrypted_config, reset_singleton):
         """Test that sensitive fields are encrypted."""
-        with patch('src.audit_log.Fernet') as mock_fernet:
+        with patch("src.audit_log.Fernet") as mock_fernet:
             mock_cipher = MagicMock()
             mock_cipher.encrypt.return_value = b"encrypted_data"
             mock_fernet.return_value = mock_cipher
@@ -404,7 +417,9 @@ class TestEncryption:
             await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_decryption_with_encryption_disabled(self, basic_config, reset_singleton):
+    async def test_decryption_with_encryption_disabled(
+        self, basic_config, reset_singleton
+    ):
         """Test decryption when encryption is disabled."""
         logger = TamperEvidentLogger(basic_config)
         entry = {"details": {"data": "value"}}
@@ -415,7 +430,7 @@ class TestEncryption:
     @pytest.mark.asyncio
     async def test_decryption_failure_handling(self, encrypted_config, reset_singleton):
         """Test graceful handling of decryption failures."""
-        with patch('src.audit_log.Fernet') as mock_fernet:
+        with patch("src.audit_log.Fernet") as mock_fernet:
             mock_cipher = MagicMock()
             mock_cipher.decrypt.side_effect = Exception("Decryption failed")
             mock_fernet.return_value = mock_cipher
@@ -438,7 +453,9 @@ class TestEventLogging:
         logger = TamperEvidentLogger(basic_config)
 
         details = {"action": "test_action", "result": "success"}
-        hash_val = await logger.emit_audit_event("test_event", details, user_id="user123")
+        hash_val = await logger.emit_audit_event(
+            "test_event", details, user_id="user123"
+        )
 
         assert hash_val is not None
         assert len(hash_val) == 64
@@ -458,13 +475,15 @@ class TestEventLogging:
         await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_log_event_with_valid_event_types(self, temp_log_dir, reset_singleton):
+    async def test_log_event_with_valid_event_types(
+        self, temp_log_dir, reset_singleton
+    ):
         """Test event type validation."""
         config = AuditLoggerConfig(
             log_path=temp_log_dir / "audit.jsonl",
             valid_event_types=["allowed_event"],
             dlt_enabled=False,
-            metrics_enabled=False
+            metrics_enabled=False,
         )
         logger = TamperEvidentLogger(config)
 
@@ -482,7 +501,7 @@ class TestEventLogging:
             log_path=temp_log_dir / "audit.jsonl",
             max_details_size=100,
             dlt_enabled=False,
-            metrics_enabled=False
+            metrics_enabled=False,
         )
         logger = TamperEvidentLogger(config)
 
@@ -506,7 +525,7 @@ class TestEventLogging:
             max_details_size=100,
             alert_callback=alert_callback,
             dlt_enabled=False,
-            metrics_enabled=False
+            metrics_enabled=False,
         )
         logger = TamperEvidentLogger(config)
 
@@ -520,14 +539,18 @@ class TestEventLogging:
         await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_log_event_critical_immediate_flush(self, basic_config, reset_singleton):
+    async def test_log_event_critical_immediate_flush(
+        self, basic_config, reset_singleton
+    ):
         """Test that critical events trigger immediate flush."""
         basic_config.batch_size = 100
         logger = TamperEvidentLogger(basic_config)
 
         logger._log_to_file_async = AsyncMock()
 
-        await logger.emit_audit_event("critical_event", {"level": "high"}, critical=True)
+        await logger.emit_audit_event(
+            "critical_event", {"level": "high"}, critical=True
+        )
 
         await asyncio.sleep(0.1)
         assert logger._log_to_file_async.called or True
@@ -589,15 +612,23 @@ class TestFileOperations:
         logger = TamperEvidentLogger(basic_config)
 
         entries = [
-            {"event": "test1", "current_hash": "hash1", "timestamp": datetime.now().isoformat()},
-            {"event": "test2", "current_hash": "hash2", "timestamp": datetime.now().isoformat()}
+            {
+                "event": "test1",
+                "current_hash": "hash1",
+                "timestamp": datetime.now().isoformat(),
+            },
+            {
+                "event": "test2",
+                "current_hash": "hash2",
+                "timestamp": datetime.now().isoformat(),
+            },
         ]
 
         logger._log_to_file_sync(entries)
 
         actual_path = logger._get_actual_log_path()
         assert actual_path.exists()
-        with open(actual_path, 'r', encoding="utf-8") as f:
+        with open(actual_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             assert len(lines) >= 2
         await logger.shutdown()
@@ -608,7 +639,11 @@ class TestFileOperations:
         logger = TamperEvidentLogger(basic_config)
 
         entries = [
-            {"event": "test1", "current_hash": "hash1", "timestamp": datetime.now().isoformat()},
+            {
+                "event": "test1",
+                "current_hash": "hash1",
+                "timestamp": datetime.now().isoformat(),
+            },
         ]
 
         await logger._log_to_file_async(entries)
@@ -629,7 +664,7 @@ class TestIntegrityVerification:
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write empty file
-        with open(actual_path, 'w', encoding="utf-8") as f:
+        with open(actual_path, "w", encoding="utf-8") as f:
             pass
 
         is_valid, line, file = await logger.verify_log_integrity()
@@ -692,7 +727,7 @@ class TestIntegrityVerification:
         # Set WRONG hash instead of computing correct one
         entry2["current_hash"] = "wrong_hash_intentionally_corrupted"
 
-        with open(actual_path, 'w', encoding="utf-8") as f:
+        with open(actual_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(entry1) + "\n")
             f.write(json.dumps(entry2) + "\n")
 
@@ -702,22 +737,35 @@ class TestIntegrityVerification:
         await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_verify_integrity_with_rotated_files(self, temp_log_dir, reset_singleton):
+    async def test_verify_integrity_with_rotated_files(
+        self, temp_log_dir, reset_singleton
+    ):
         """Test integrity verification across rotated files."""
         log_path = temp_log_dir / "audit.jsonl"
-        config = AuditLoggerConfig(log_path=log_path, dlt_enabled=False, metrics_enabled=False)
+        config = AuditLoggerConfig(
+            log_path=log_path, dlt_enabled=False, metrics_enabled=False
+        )
         logger = TamperEvidentLogger(config)
 
         await logger.emit_audit_event("event1", {"data": "1"})
         await asyncio.sleep(1.5)
 
         rotated_path = temp_log_dir / "audit.jsonl.1"
-        entry_data = {"event_type": "test", "event": "test", "details": {}, "timestamp": datetime.now().isoformat(), "user_id": "anonymous", "app_instance_id": logger.app_instance_id, "agent": logger._agent_info, "critical": False}
+        entry_data = {
+            "event_type": "test",
+            "event": "test",
+            "details": {},
+            "timestamp": datetime.now().isoformat(),
+            "user_id": "anonymous",
+            "app_instance_id": logger.app_instance_id,
+            "agent": logger._agent_info,
+            "critical": False,
+        }
         entry = entry_data.copy()
         entry["previous_hash"] = None
         entry["current_hash"] = logger._hash_entry(None, entry_data)
 
-        with open(rotated_path, 'w', encoding="utf-8") as f:
+        with open(rotated_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
 
         is_valid, line, file = await logger.verify_log_integrity()
@@ -741,16 +789,26 @@ class TestAuditTrailLoading:
         await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_load_audit_trail_filter_by_event_type(self, basic_config, reset_singleton):
+    async def test_load_audit_trail_filter_by_event_type(
+        self, basic_config, reset_singleton
+    ):
         """Test filtering by event type."""
         logger = TamperEvidentLogger(basic_config)
 
         actual_path = logger._get_actual_log_path()
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(actual_path, 'w', encoding="utf-8") as f:
-            entry1 = {"event_type": "login", "timestamp": datetime.now().isoformat(), "details": {}}
-            entry2 = {"event_type": "logout", "timestamp": datetime.now().isoformat(), "details": {}}
+        with open(actual_path, "w", encoding="utf-8") as f:
+            entry1 = {
+                "event_type": "login",
+                "timestamp": datetime.now().isoformat(),
+                "details": {},
+            }
+            entry2 = {
+                "event_type": "logout",
+                "timestamp": datetime.now().isoformat(),
+                "details": {},
+            }
             f.write(json.dumps(entry1) + "\n")
             f.write(json.dumps(entry2) + "\n")
 
@@ -767,9 +825,19 @@ class TestAuditTrailLoading:
         actual_path = logger._get_actual_log_path()
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(actual_path, 'w', encoding="utf-8") as f:
-            entry1 = {"event_type": "test", "user_id": "user1", "timestamp": datetime.now().isoformat(), "details": {}}
-            entry2 = {"event_type": "test", "user_id": "user2", "timestamp": datetime.now().isoformat(), "details": {}}
+        with open(actual_path, "w", encoding="utf-8") as f:
+            entry1 = {
+                "event_type": "test",
+                "user_id": "user1",
+                "timestamp": datetime.now().isoformat(),
+                "details": {},
+            }
+            entry2 = {
+                "event_type": "test",
+                "user_id": "user2",
+                "timestamp": datetime.now().isoformat(),
+                "details": {},
+            }
             f.write(json.dumps(entry1) + "\n")
             f.write(json.dumps(entry2) + "\n")
 
@@ -790,8 +858,12 @@ class TestAuditTrailLoading:
         past = now - timedelta(hours=2)
         future = now + timedelta(hours=2)
 
-        with open(actual_path, 'w', encoding="utf-8") as f:
-            entry1 = {"event_type": "test", "timestamp": past.isoformat(), "details": {}}
+        with open(actual_path, "w", encoding="utf-8") as f:
+            entry1 = {
+                "event_type": "test",
+                "timestamp": past.isoformat(),
+                "details": {},
+            }
             entry2 = {"event_type": "test", "timestamp": now.isoformat(), "details": {}}
             f.write(json.dumps(entry1) + "\n")
             f.write(json.dumps(entry2) + "\n")
@@ -801,14 +873,22 @@ class TestAuditTrailLoading:
         await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_load_audit_trail_compressed_files(self, temp_log_dir, reset_singleton):
+    async def test_load_audit_trail_compressed_files(
+        self, temp_log_dir, reset_singleton
+    ):
         """Test loading from compressed log files."""
         log_path = temp_log_dir / "audit.jsonl.gz"
-        config = AuditLoggerConfig(log_path=log_path, dlt_enabled=False, metrics_enabled=False)
+        config = AuditLoggerConfig(
+            log_path=log_path, dlt_enabled=False, metrics_enabled=False
+        )
         logger = TamperEvidentLogger(config)
 
-        entry = {"event_type": "test", "timestamp": datetime.now().isoformat(), "details": {}}
-        with gzip.open(log_path, 'wt', encoding="utf-8") as f:
+        entry = {
+            "event_type": "test",
+            "timestamp": datetime.now().isoformat(),
+            "details": {},
+        }
+        with gzip.open(log_path, "wt", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
 
         entries = list(logger.load_audit_trail())
@@ -822,11 +902,11 @@ class TestFileRotation:
         """Test creation of size-based rotating handler."""
         handler = SizedTimedRotatingFileHandler(
             filename=str(temp_log_dir / "test.log"),
-            when='midnight',
+            when="midnight",
             interval=1,
             backupCount=5,
             maxBytes=1024,
-            compression_type=CompressionType.GZIP
+            compression_type=CompressionType.GZIP,
         )
         assert handler.maxBytes == 1024
         assert handler.compression_type == CompressionType.GZIP
@@ -837,14 +917,14 @@ class TestFileRotation:
         log_file = temp_log_dir / "test.log"
         handler = SizedTimedRotatingFileHandler(
             filename=str(log_file),
-            when='h',
+            when="h",
             interval=1,
             backupCount=5,
             maxBytes=100,
-            compression_type=CompressionType.NONE
+            compression_type=CompressionType.NONE,
         )
 
-        with open(log_file, 'w', encoding="utf-8") as f:
+        with open(log_file, "w", encoding="utf-8") as f:
             f.write("x" * 150)
 
         record = MagicMock()
@@ -860,7 +940,7 @@ class TestDLTIntegration:
         """Test successful DLT anchoring."""
         basic_config.dlt_enabled = True
 
-        with patch('src.audit_log.AuditLedgerClient') as mock_client_class:
+        with patch("src.audit_log.AuditLedgerClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.log_event_batch.return_value = ["tx_id_123"]
             mock_client_class.return_value = mock_client
@@ -875,12 +955,14 @@ class TestDLTIntegration:
             await logger.shutdown()
 
     @pytest.mark.asyncio
-    async def test_dlt_anchoring_failure_with_retry(self, basic_config, reset_singleton):
+    async def test_dlt_anchoring_failure_with_retry(
+        self, basic_config, reset_singleton
+    ):
         """Test DLT anchoring with retry on failure."""
         basic_config.dlt_enabled = True
         basic_config.dlt_retry_count = 2
 
-        with patch('src.audit_log.AuditLedgerClient') as mock_client_class:
+        with patch("src.audit_log.AuditLedgerClient") as mock_client_class:
             mock_client = MagicMock()
             mock_client.log_event_batch.side_effect = Exception("DLT unavailable")
             mock_client_class.return_value = mock_client
@@ -901,14 +983,14 @@ class TestDLTIntegration:
 class TestOpenTelemetryIntegration:
     def test_get_trace_ids_no_tracing(self):
         """Test trace ID extraction when tracing is unavailable."""
-        with patch('src.audit_log.trace', None):
+        with patch("src.audit_log.trace", None):
             trace_id, span_id = TamperEvidentLogger._get_trace_ids()
             assert trace_id is None
             assert span_id is None
 
     def test_get_trace_ids_with_valid_span(self):
         """Test trace ID extraction with valid span."""
-        with patch('src.audit_log.trace') as mock_trace:
+        with patch("src.audit_log.trace") as mock_trace:
             mock_span = MagicMock()
             mock_context = MagicMock()
             mock_context.is_valid = True
@@ -931,10 +1013,10 @@ class TestMetrics:
         config = AuditLoggerConfig(
             log_path=temp_log_dir / "audit.jsonl",
             metrics_enabled=True,
-            dlt_enabled=False
+            dlt_enabled=False,
         )
 
-        with patch('src.audit_log.prometheus_client') as mock_prom:
+        with patch("src.audit_log.prometheus_client") as mock_prom:
             mock_counter = MagicMock()
             mock_prom.Counter.return_value = mock_counter
             mock_prom.Histogram.return_value = MagicMock()
@@ -957,7 +1039,7 @@ class TestErrorHandling:
         actual_path = logger._get_actual_log_path()
         actual_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(actual_path, 'w', encoding="utf-8") as f:
+        with open(actual_path, "w", encoding="utf-8") as f:
             f.write("not valid json\n")
             f.write('{"valid": "json"}\n')
 
@@ -970,7 +1052,9 @@ class TestErrorHandling:
         """Test handling of missing log file."""
         logger = TamperEvidentLogger(basic_config)
 
-        is_valid, line, file = await logger.verify_log_integrity(Path("/nonexistent/file.log"))
+        is_valid, line, file = await logger.verify_log_integrity(
+            Path("/nonexistent/file.log")
+        )
         assert is_valid is True
         await logger.shutdown()
 
@@ -1012,10 +1096,10 @@ class TestSyslogIntegration:
             syslog_enabled=True,
             dlt_enabled=False,
             metrics_enabled=False,
-            batch_size=1
+            batch_size=1,
         )
 
-        with patch('src.audit_log.syslog') as mock_syslog:
+        with patch("src.audit_log.syslog") as mock_syslog:
             logger = TamperEvidentLogger(config)
             await logger.emit_audit_event("test", {"data": "test"})
             await asyncio.sleep(2.0)
@@ -1031,14 +1115,14 @@ class TestOmniCoreIntegration:
         """Test posting audit events to OmniCore."""
         logger = TamperEvidentLogger(basic_config)
 
-        with patch('aiohttp.ClientSession') as mock_session:
+        with patch("aiohttp.ClientSession") as mock_session:
             mock_post = AsyncMock()
             mock_session.return_value.__aenter__.return_value.post = mock_post
 
             await logger.emit_audit_event(
                 "test_event",
                 {"data": "test"},
-                omnicore_url="http://omnicore.example.com"
+                omnicore_url="http://omnicore.example.com",
             )
 
             await asyncio.sleep(0.2)
@@ -1184,7 +1268,7 @@ class TestShutdown:
 
         actual_path = logger._get_actual_log_path()
         if actual_path.exists():
-            with open(actual_path, 'r', encoding="utf-8") as f:
+            with open(actual_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
                 assert len(lines) >= 1
 
@@ -1215,4 +1299,12 @@ class TestShutdown:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--cov=src.audit_log", "--cov-report=term-missing", "--cov-report=html"])
+    pytest.main(
+        [
+            __file__,
+            "-v",
+            "--cov=src.audit_log",
+            "--cov-report=term-missing",
+            "--cov-report=html",
+        ]
+    )

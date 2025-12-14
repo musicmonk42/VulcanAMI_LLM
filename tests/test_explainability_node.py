@@ -7,11 +7,17 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from explainability_node import (ALLOWED_METHODS, MAX_TENSOR_DIM,
-                                 MAX_TENSOR_SIZE, MIN_TENSOR_DIM,
-                                 CounterfactualNode, ExplainabilityNode,
-                                 ExplainabilityValidator, ExplanationResult,
-                                 dispatch_explainability_node)
+from explainability_node import (
+    ALLOWED_METHODS,
+    MAX_TENSOR_DIM,
+    MAX_TENSOR_SIZE,
+    MIN_TENSOR_DIM,
+    CounterfactualNode,
+    ExplainabilityNode,
+    ExplainabilityValidator,
+    ExplanationResult,
+    dispatch_explainability_node,
+)
 
 
 @pytest.fixture
@@ -30,9 +36,9 @@ def explain_node():
 def context():
     """Create test context."""
     return {
-        'audit_log': [],
-        'input_tensor': [[1.0, 2.0, 3.0, 4.0, 5.0]],  # Changed to 2D
-        'ethical_label': 'EU2025:Safe'
+        "audit_log": [],
+        "input_tensor": [[1.0, 2.0, 3.0, 4.0, 5.0]],  # Changed to 2D
+        "ethical_label": "EU2025:Safe",
     }
 
 
@@ -44,40 +50,40 @@ class TestExplanationResult:
         from datetime import datetime
 
         result = ExplanationResult(
-            explanation={'test': 'data'},
+            explanation={"test": "data"},
             coverage=0.8,
             compression_ok=True,
             compression_meta={},
             kernel_audit=None,
             photonic_drift={},
-            ethical_label='Safe',
-            method='shap'
+            ethical_label="Safe",
+            method="shap",
         )
 
         assert result.coverage == 0.8
         assert result.compression_ok
-        assert result.method == 'shap'
+        assert result.method == "shap"
 
     def test_to_dict(self):
         """Test conversion to dict."""
         from datetime import datetime
 
         result = ExplanationResult(
-            explanation={'test': 'data'},
+            explanation={"test": "data"},
             coverage=0.5,
             compression_ok=False,
-            compression_meta={'valid': False},
-            kernel_audit={'result': 'ok'},
-            photonic_drift={'drift': 0.1},
-            ethical_label='Safe',
-            method='lime'
+            compression_meta={"valid": False},
+            kernel_audit={"result": "ok"},
+            photonic_drift={"drift": 0.1},
+            ethical_label="Safe",
+            method="lime",
         )
 
         d = result.to_dict()
 
-        assert d['coverage'] == 0.5
-        assert d['method'] == 'lime'
-        assert 'timestamp' in d
+        assert d["coverage"] == 0.5
+        assert d["method"] == "lime"
+        assert "timestamp" in d
 
 
 class TestExplainabilityValidator:
@@ -184,15 +190,15 @@ class TestExplainabilityValidator:
     def test_validate_drift_data(self, validator):
         """Test validating drift data."""
         drift_data = {
-            'drift': 0.5,
-            'timestamp': '2025-01-01',
-            'metrics': {'value': 1.0}
+            "drift": 0.5,
+            "timestamp": "2025-01-01",
+            "metrics": {"value": 1.0},
         }
 
         is_valid, validated = validator.validate_drift_data(drift_data)
 
         assert is_valid is True
-        assert validated['drift'] == 0.5
+        assert validated["drift"] == 0.5
 
 
 class TestExplainabilityNode:
@@ -207,29 +213,29 @@ class TestExplainabilityNode:
     def test_execute_basic(self, explain_node, context):
         """Test basic execution."""
         params = {
-            'method': 'integrated_gradients',
-            'baseline': [[0.0, 0.0, 0.0, 0.0, 0.0]]  # Changed to 2D
+            "method": "integrated_gradients",
+            "baseline": [[0.0, 0.0, 0.0, 0.0, 0.0]],  # Changed to 2D
         }
 
-        tensor = np.array(context['input_tensor'])
+        tensor = np.array(context["input_tensor"])
 
         result = explain_node.execute(tensor, params, context)
 
-        assert 'audit' in result
-        assert result['audit']['status'] == 'success'
-        assert len(context['audit_log']) == 1
+        assert "audit" in result
+        assert result["audit"]["status"] == "success"
+        assert len(context["audit_log"]) == 1
 
     def test_execute_invalid_method(self, explain_node, context):
         """Test execution with invalid method."""
-        params = {'method': 'invalid'}
-        tensor = np.array(context['input_tensor'])
+        params = {"method": "invalid"}
+        tensor = np.array(context["input_tensor"])
 
         with pytest.raises(ValueError, match="Invalid method"):
             explain_node.execute(tensor, params, context)
 
     def test_execute_invalid_tensor(self, explain_node, context):
         """Test execution with invalid tensor."""
-        params = {'method': 'shap'}
+        params = {"method": "shap"}
         tensor = "not a tensor"
 
         with pytest.raises(ValueError, match="Invalid tensor"):
@@ -237,30 +243,24 @@ class TestExplainabilityNode:
 
     def test_execute_baseline_mismatch(self, explain_node, context):
         """Test execution with baseline shape mismatch."""
-        params = {
-            'method': 'lime',
-            'baseline': [[0.0, 0.0]]  # Wrong size
-        }
-        tensor = np.array(context['input_tensor'])
+        params = {"method": "lime", "baseline": [[0.0, 0.0]]}  # Wrong size
+        tensor = np.array(context["input_tensor"])
 
         with pytest.raises(ValueError, match="Invalid baseline"):
             explain_node.execute(tensor, params, context)
 
     def test_execute_with_all_methods(self, explain_node, context):
         """Test execution with all allowed methods."""
-        tensor = np.array(context['input_tensor'])
+        tensor = np.array(context["input_tensor"])
 
         for method in ALLOWED_METHODS:
-            context_copy = {
-                'audit_log': [],
-                'input_tensor': context['input_tensor']
-            }
+            context_copy = {"audit_log": [], "input_tensor": context["input_tensor"]}
 
-            params = {'method': method}
+            params = {"method": method}
 
             try:
                 result = explain_node.execute(tensor, params, context_copy)
-                assert result['method'] == method
+                assert result["method"] == method
             except Exception as e:
                 # Some methods may fail without proper setup, that's ok
                 pass
@@ -279,25 +279,22 @@ class TestCounterfactualNode:
         """Test basic execution."""
         node = CounterfactualNode()
 
-        params = {
-            'target_class': 1,
-            'perturbation_scale': 0.1
-        }
+        params = {"target_class": 1, "perturbation_scale": 0.1}
 
-        tensor = np.array(context['input_tensor'])
+        tensor = np.array(context["input_tensor"])
 
         result = node.execute(tensor, params, context)
 
-        assert 'counterfactual' in result
-        assert 'original' in result
-        assert result['target_class'] == 1
-        assert len(context['audit_log']) == 1
+        assert "counterfactual" in result
+        assert "original" in result
+        assert result["target_class"] == 1
+        assert len(context["audit_log"]) == 1
 
     def test_execute_invalid_tensor(self, context):
         """Test execution with invalid tensor."""
         node = CounterfactualNode()
 
-        params = {'target_class': 0}
+        params = {"target_class": 0}
         tensor = "not a tensor"
 
         with pytest.raises(ValueError):
@@ -309,43 +306,31 @@ class TestDispatchFunction:
 
     def test_dispatch_explainability_node(self, context):
         """Test dispatching to ExplainabilityNode."""
-        node = {
-            'type': 'ExplainabilityNode',
-            'params': {'method': 'saliency'}
-        }
+        node = {"type": "ExplainabilityNode", "params": {"method": "saliency"}}
 
         result = dispatch_explainability_node(node, context)
 
-        assert 'audit' in result
-        assert result['method'] == 'saliency'
+        assert "audit" in result
+        assert result["method"] == "saliency"
 
     def test_dispatch_counterfactual_node(self, context):
         """Test dispatching to CounterfactualNode."""
-        node = {
-            'type': 'CounterfactualNode',
-            'params': {'target_class': 1}
-        }
+        node = {"type": "CounterfactualNode", "params": {"target_class": 1}}
 
         result = dispatch_explainability_node(node, context)
 
-        assert 'counterfactual' in result
+        assert "counterfactual" in result
 
     def test_dispatch_unknown_node(self, context):
         """Test dispatching to unknown node type."""
-        node = {
-            'type': 'UnknownNode',
-            'params': {}
-        }
+        node = {"type": "UnknownNode", "params": {}}
 
         with pytest.raises(ValueError, match="Unknown node type"):
             dispatch_explainability_node(node, context)
 
     def test_dispatch_missing_tensor(self):
         """Test dispatching without tensor in context."""
-        node = {
-            'type': 'ExplainabilityNode',
-            'params': {'method': 'shap'}
-        }
+        node = {"type": "ExplainabilityNode", "params": {"method": "shap"}}
 
         context = {}  # No input_tensor
 
@@ -358,34 +343,31 @@ class TestAuditLogging:
 
     def test_audit_log_success(self, explain_node, context):
         """Test audit log on success."""
-        params = {'method': 'gradcam'}
-        tensor = np.array(context['input_tensor'])
+        params = {"method": "gradcam"}
+        tensor = np.array(context["input_tensor"])
 
         explain_node.execute(tensor, params, context)
 
-        assert len(context['audit_log']) == 1
-        assert context['audit_log'][0]['status'] == 'success'
-        assert context['audit_log'][0]['node_type'] == 'ExplainabilityNode'
+        assert len(context["audit_log"]) == 1
+        assert context["audit_log"][0]["status"] == "success"
+        assert context["audit_log"][0]["node_type"] == "ExplainabilityNode"
 
     def test_audit_log_error(self, explain_node, context):
         """Test audit log on error."""
-        params = {'method': 'invalid'}
-        tensor = np.array(context['input_tensor'])
+        params = {"method": "invalid"}
+        tensor = np.array(context["input_tensor"])
 
         try:
             explain_node.execute(tensor, params, context)
         except:
             pass
 
-        assert len(context['audit_log']) == 1
-        assert context['audit_log'][0]['status'] == 'error'
+        assert len(context["audit_log"]) == 1
+        assert context["audit_log"][0]["status"] == "error"
 
     def test_audit_log_multiple_calls(self, context):
         """Test audit log accumulation."""
-        node = {
-            'type': 'ExplainabilityNode',
-            'params': {'method': 'attention'}
-        }
+        node = {"type": "ExplainabilityNode", "params": {"method": "attention"}}
 
         # Call multiple times
         for _ in range(3):
@@ -394,7 +376,7 @@ class TestAuditLogging:
             except:
                 pass
 
-        assert len(context['audit_log']) == 3
+        assert len(context["audit_log"]) == 3
 
 
 class TestContextImmutability:
@@ -403,20 +385,20 @@ class TestContextImmutability:
     def test_context_not_polluted(self, explain_node):
         """Test context is not polluted with node data."""
         context = {
-            'audit_log': [],
-            'input_tensor': [[1.0, 2.0, 3.0]],  # Changed to 2D
-            'original_key': 'original_value'
+            "audit_log": [],
+            "input_tensor": [[1.0, 2.0, 3.0]],  # Changed to 2D
+            "original_key": "original_value",
         }
 
-        params = {'method': 'deeplift'}
-        tensor = np.array(context['input_tensor'])
+        params = {"method": "deeplift"}
+        tensor = np.array(context["input_tensor"])
 
         explain_node.execute(tensor, params, context)
 
         # Original key should still be there
-        assert context['original_key'] == 'original_value'
+        assert context["original_key"] == "original_value"
         # audit_log should be updated
-        assert len(context['audit_log']) > 0
+        assert len(context["audit_log"]) > 0
 
 
 if __name__ == "__main__":

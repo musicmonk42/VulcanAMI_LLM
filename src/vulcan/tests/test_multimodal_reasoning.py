@@ -6,13 +6,17 @@ and numerical stability fixes.
 """
 
 from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
-from vulcan.reasoning.multimodal_reasoning import (TORCH_AVAILABLE,
-                                                   AttentionFusion,
-                                                   CrossModalAlignment,
-                                                   CrossModalReasoner,
-                                                   FusionStrategy, GatedFusion,
-                                                   ModalityData, ModalityType,
-                                                   MultiModalReasoningEngine)
+from vulcan.reasoning.multimodal_reasoning import (
+    TORCH_AVAILABLE,
+    AttentionFusion,
+    CrossModalAlignment,
+    CrossModalReasoner,
+    FusionStrategy,
+    GatedFusion,
+    ModalityData,
+    ModalityType,
+    MultiModalReasoningEngine,
+)
 import numpy as np
 from unittest.mock import Mock
 import warnings

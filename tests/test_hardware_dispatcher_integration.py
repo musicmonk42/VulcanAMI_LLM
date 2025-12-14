@@ -50,7 +50,7 @@ class TestHardwareProfile:
             latency_ms=10.0,
             energy_per_op_nj=5.0,
             accuracy=0.99,
-            throughput_tops=1.0
+            throughput_tops=1.0,
         )
 
         assert profile.backend == hdi.HardwareBackend.CPU
@@ -65,13 +65,13 @@ class TestHardwareProfile:
             latency_ms=1.0,
             energy_per_op_nj=3.0,
             accuracy=0.999,
-            throughput_tops=10.0
+            throughput_tops=10.0,
         )
 
         d = profile.to_dict()
-        assert 'backend' in d
-        assert 'latency_ms' in d
-        assert d['max_tensor_size_mb'] == 2048.0
+        assert "backend" in d
+        assert "latency_ms" in d
+        assert d["max_tensor_size_mb"] == 2048.0
 
 
 class TestDispatchResult:
@@ -82,7 +82,7 @@ class TestDispatchResult:
         result = hdi.DispatchResult(
             backend=hdi.HardwareBackend.PHOTONIC,
             result={"data": "output"},
-            latency_ms=0.5
+            latency_ms=0.5,
         )
 
         assert result.backend == hdi.HardwareBackend.PHOTONIC
@@ -95,7 +95,7 @@ class TestDispatchResult:
             backend=hdi.HardwareBackend.CPU,
             result=None,
             latency_ms=10.0,
-            error="Computation failed"
+            error="Computation failed",
         )
 
         assert result.error == "Computation failed"
@@ -136,7 +136,7 @@ class TestHardwareProfileManager:
             hdi.HardwareBackend.CPU,
             health_score=0.8,
             temperature_c=65.0,
-            utilization_percent=75.0
+            utilization_percent=75.0,
         )
 
         profile = manager.get_profile(hdi.HardwareBackend.CPU)
@@ -165,8 +165,7 @@ class TestHardwareProfileManager:
     def test_select_backend_fastest(self, manager):
         """Test selecting fastest backend"""
         backend = manager.select_backend(
-            tensor_size_mb=100.0,
-            strategy=hdi.DispatchStrategy.FASTEST
+            tensor_size_mb=100.0, strategy=hdi.DispatchStrategy.FASTEST
         )
 
         assert backend is not None
@@ -178,8 +177,7 @@ class TestHardwareProfileManager:
     def test_select_backend_lowest_energy(self, manager):
         """Test selecting lowest energy backend"""
         backend = manager.select_backend(
-            tensor_size_mb=100.0,
-            strategy=hdi.DispatchStrategy.LOWEST_ENERGY
+            tensor_size_mb=100.0, strategy=hdi.DispatchStrategy.LOWEST_ENERGY
         )
 
         assert backend is not None
@@ -187,8 +185,7 @@ class TestHardwareProfileManager:
     def test_select_backend_best_accuracy(self, manager):
         """Test selecting best accuracy backend"""
         backend = manager.select_backend(
-            tensor_size_mb=100.0,
-            strategy=hdi.DispatchStrategy.BEST_ACCURACY
+            tensor_size_mb=100.0, strategy=hdi.DispatchStrategy.BEST_ACCURACY
         )
 
         assert backend is not None
@@ -196,8 +193,7 @@ class TestHardwareProfileManager:
     def test_select_backend_balanced(self, manager):
         """Test selecting balanced backend"""
         backend = manager.select_backend(
-            tensor_size_mb=100.0,
-            strategy=hdi.DispatchStrategy.BALANCED
+            tensor_size_mb=100.0, strategy=hdi.DispatchStrategy.BALANCED
         )
 
         assert backend is not None
@@ -206,8 +202,7 @@ class TestHardwareProfileManager:
         """Test selection with tensor too large for any backend"""
         # Use impossibly large tensor
         backend = manager.select_backend(
-            tensor_size_mb=999999999.0,
-            strategy=hdi.DispatchStrategy.FASTEST
+            tensor_size_mb=999999999.0, strategy=hdi.DispatchStrategy.FASTEST
         )
 
         # Should return None or fallback
@@ -222,12 +217,12 @@ class TestHardwareProfileManager:
                 "energy_per_op_nj": 8.0,
                 "accuracy": 1.0,
                 "throughput_tops": 0.5,
-                "available": True
+                "available": True,
             }
         }
 
         profiles_file = tmp_path / "profiles.json"
-        with open(profiles_file, 'w', encoding="utf-8") as f:
+        with open(profiles_file, "w", encoding="utf-8") as f:
             json.dump(profiles_data, f)
 
         manager = hdi.HardwareProfileManager(str(profiles_file))
@@ -243,8 +238,7 @@ class TestHardwareDispatcherIntegration:
     def dispatcher(self):
         """Create dispatcher instance"""
         return hdi.HardwareDispatcherIntegration(
-            enable_hardware=False,  # Disable hardware for testing
-            enable_emulator=True
+            enable_hardware=False, enable_emulator=True  # Disable hardware for testing
         )
 
     def test_dispatcher_creation(self, dispatcher):
@@ -256,7 +250,9 @@ class TestHardwareDispatcherIntegration:
     @pytest.mark.asyncio
     async def test_dispatch_to_hardware_fallback(self, dispatcher):
         """Test dispatch with fallback to emulator"""
-        result = await dispatcher.dispatch_to_hardware("photonic_mvm", [[1, 2]], [[3], [4]])
+        result = await dispatcher.dispatch_to_hardware(
+            "photonic_mvm", [[1, 2]], [[3], [4]]
+        )
 
         assert isinstance(result, hdi.DispatchResult)
         assert result.backend is not None
@@ -319,15 +315,11 @@ class TestHardwareDispatcherIntegration:
                 {
                     "id": "n1",
                     "type": "CONST",
-                    "params": {"value": np.array([[1, 2], [3, 4]])}
+                    "params": {"value": np.array([[1, 2], [3, 4]])},
                 },
-                {
-                    "id": "n2",
-                    "type": "CONST",
-                    "params": {"value": np.array([5, 6])}
-                }
+                {"id": "n2", "type": "CONST", "params": {"value": np.array([5, 6])}},
             ],
-            "edges": []
+            "edges": [],
         }
 
         result = await dispatcher.dispatch_to_emulator(subgraph, backend="photonic")
@@ -338,12 +330,14 @@ class TestHardwareDispatcherIntegration:
     def test_estimate_tensor_size(self, dispatcher):
         """Test tensor size estimation"""
         subgraph = {
-            "nodes": [{
-                "id": "n1",
-                "type": "CONST",
-                "params": {"value": np.array([[1, 2], [3, 4]])}
-            }],
-            "edges": []
+            "nodes": [
+                {
+                    "id": "n1",
+                    "type": "CONST",
+                    "params": {"value": np.array([[1, 2], [3, 4]])},
+                }
+            ],
+            "edges": [],
         }
 
         size_mb = dispatcher._estimate_tensor_size(subgraph)
@@ -352,10 +346,7 @@ class TestHardwareDispatcherIntegration:
 
     def test_identify_operation_type(self, dispatcher):
         """Test operation type identification"""
-        subgraph = {
-            "nodes": [{"id": "n1", "type": "PhotonicMVMNode"}],
-            "edges": []
-        }
+        subgraph = {"nodes": [{"id": "n1", "type": "PhotonicMVMNode"}], "edges": []}
 
         op_type = dispatcher._identify_operation_type(subgraph)
 
@@ -395,9 +386,7 @@ class TestHardwareDispatcherIntegration:
     def test_update_cache(self, dispatcher):
         """Test cache update"""
         result = hdi.DispatchResult(
-            backend=hdi.HardwareBackend.CPU,
-            result={"data": "test"},
-            latency_ms=10.0
+            backend=hdi.HardwareBackend.CPU, result={"data": "test"}, latency_ms=10.0
         )
 
         dispatcher._update_cache("test_key", result)
@@ -412,9 +401,7 @@ class TestHardwareDispatcherIntegration:
         # Add 3 items
         for i in range(3):
             result = hdi.DispatchResult(
-                backend=hdi.HardwareBackend.CPU,
-                result=i,
-                latency_ms=1.0
+                backend=hdi.HardwareBackend.CPU, result=i, latency_ms=1.0
             )
             dispatcher._update_cache(f"key{i}", result)
 
@@ -424,10 +411,7 @@ class TestHardwareDispatcherIntegration:
     def test_update_metrics(self, dispatcher):
         """Test metrics update"""
         result = hdi.DispatchResult(
-            backend=hdi.HardwareBackend.CPU,
-            result={},
-            latency_ms=10.0,
-            energy_nj=50.0
+            backend=hdi.HardwareBackend.CPU, result={}, latency_ms=10.0, energy_nj=50.0
         )
 
         initial_latency = dispatcher.total_latency_ms
@@ -457,8 +441,7 @@ class TestEmulationEdgeCases:
     @pytest.fixture
     def dispatcher(self):
         return hdi.HardwareDispatcherIntegration(
-            enable_hardware=False,
-            enable_emulator=True
+            enable_hardware=False, enable_emulator=True
         )
 
     @pytest.mark.asyncio
@@ -481,7 +464,7 @@ class TestEmulationEdgeCases:
         """Test emulator dispatch with insufficient tensors"""
         subgraph = {
             "nodes": [{"id": "n1", "type": "CONST", "params": {"value": [1, 2]}}],
-            "edges": []
+            "edges": [],
         }
 
         # Skip this test if emulator is not available (falls back to CPU without raising)
@@ -497,9 +480,9 @@ class TestEmulationEdgeCases:
         subgraph = {
             "nodes": [
                 {"id": "n1", "type": "CONST", "params": {"value": np.array([[1, 2]])}},
-                {"id": "n2", "type": "CONST", "params": {"value": np.array([3, 4])}}
+                {"id": "n2", "type": "CONST", "params": {"value": np.array([3, 4])}},
             ],
-            "edges": []
+            "edges": [],
         }
         metrics = {"latency_critical": False}
 
@@ -521,17 +504,16 @@ class TestModuleLevelFunctions:
     @pytest.mark.asyncio
     async def test_dispatch_to_emulator_fallback_function(self):
         """Test module-level dispatch_to_emulator_fallback"""
-        result = await hdi.dispatch_to_emulator_fallback("photonic_mvm", [[1, 2]], [[3], [4]])
+        result = await hdi.dispatch_to_emulator_fallback(
+            "photonic_mvm", [[1, 2]], [[3], [4]]
+        )
 
         assert result is not None
 
     @pytest.mark.asyncio
     async def test_emulate_memristor_mvm_function(self):
         """Test module-level emulate_memristor_mvm"""
-        result = await hdi.emulate_memristor_mvm(
-            np.array([[1, 2]]),
-            np.array([3, 4])
-        )
+        result = await hdi.emulate_memristor_mvm(np.array([[1, 2]]), np.array([3, 4]))
 
         assert result is not None
 
@@ -541,9 +523,9 @@ class TestModuleLevelFunctions:
         subgraph = {
             "nodes": [
                 {"id": "n1", "type": "CONST", "params": {"value": np.array([[1, 2]])}},
-                {"id": "n2", "type": "CONST", "params": {"value": np.array([3, 4])}}
+                {"id": "n2", "type": "CONST", "params": {"value": np.array([3, 4])}},
             ],
-            "edges": []
+            "edges": [],
         }
 
         result = await hdi.dispatch_to_emulator(subgraph)
@@ -558,8 +540,7 @@ class TestIntegration:
     async def test_complete_dispatch_workflow(self):
         """Test complete dispatch workflow"""
         dispatcher = hdi.HardwareDispatcherIntegration(
-            enable_hardware=False,
-            enable_emulator=True
+            enable_hardware=False, enable_emulator=True
         )
 
         # Create operation
@@ -584,9 +565,7 @@ class TestIntegration:
     async def test_caching_workflow(self):
         """Test that caching works across multiple calls"""
         dispatcher = hdi.HardwareDispatcherIntegration(
-            enable_hardware=False,
-            enable_emulator=True,
-            cache_size=10
+            enable_hardware=False, enable_emulator=True, cache_size=10
         )
 
         matrix = np.array([[1, 2]])
@@ -612,5 +591,5 @@ class TestIntegration:
         dispatcher.cleanup()
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

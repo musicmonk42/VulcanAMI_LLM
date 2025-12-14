@@ -17,11 +17,23 @@ import time
 import pytest
 
 from vulcan.curiosity_engine.experiment_generator import (
-    Constraint, DomainSimilarityCalculator, Experiment, ExperimentBuilder,
-    ExperimentCache, ExperimentGenerator, ExperimentTemplates,
-    ExperimentTracker, ExperimentType, FailureAnalysis, FailureAnalyzer,
-    FailureType, IterativeExperimentDesigner, KnowledgeGap, ParameterAdjuster,
-    SyntheticDataGenerator)
+    Constraint,
+    DomainSimilarityCalculator,
+    Experiment,
+    ExperimentBuilder,
+    ExperimentCache,
+    ExperimentGenerator,
+    ExperimentTemplates,
+    ExperimentTracker,
+    ExperimentType,
+    FailureAnalysis,
+    FailureAnalyzer,
+    FailureType,
+    IterativeExperimentDesigner,
+    KnowledgeGap,
+    ParameterAdjuster,
+    SyntheticDataGenerator,
+)
 
 # ============================================================================
 # Fixtures

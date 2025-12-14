@@ -22,7 +22,10 @@ import threading
 
 
 from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
-    CuriosityMethod, CuriosityRewardShaper, NoveltyLevel)
+    CuriosityMethod,
+    CuriosityRewardShaper,
+    NoveltyLevel,
+)
 
 # ---------------------------
 # Lightweight stubs for integrations

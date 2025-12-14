@@ -2,13 +2,21 @@
 Tests for parallel_candidate_scorer.py
 """
 
-from parallel_candidate_scorer import (CacheConfig, DeviceConfig, DeviceType,
-                                       EmbeddingArchitecture, EmbeddingConfig,
-                                       PenaltyConfig, PerformanceConfig,
-                                       ScoringConfig, ScoringStrategy,
-                                       VulcanCandidateScorer,
-                                       VulcanScorerConfig, get_global_scorer,
-                                       score_candidate_sync)
+from parallel_candidate_scorer import (
+    CacheConfig,
+    DeviceConfig,
+    DeviceType,
+    EmbeddingArchitecture,
+    EmbeddingConfig,
+    PenaltyConfig,
+    PerformanceConfig,
+    ScoringConfig,
+    ScoringStrategy,
+    VulcanCandidateScorer,
+    VulcanScorerConfig,
+    get_global_scorer,
+    score_candidate_sync,
+)
 import sys
 
 import pytest

@@ -17,9 +17,17 @@ import time
 import pytest
 
 from vulcan.curiosity_engine.dependency_graph import (
-    CacheManager, CycleAwareDependencyGraph, CycleDetector, DependencyAnalyzer,
-    DependencyEdge, DependencyType, GraphStorage, PathFinder, ROICalculator,
-    TopologicalSorter)
+    CacheManager,
+    CycleAwareDependencyGraph,
+    CycleDetector,
+    DependencyAnalyzer,
+    DependencyEdge,
+    DependencyType,
+    GraphStorage,
+    PathFinder,
+    ROICalculator,
+    TopologicalSorter,
+)
 from vulcan.curiosity_engine.gap_analyzer import KnowledgeGap
 
 # ============================================================================

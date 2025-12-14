@@ -632,7 +632,9 @@ class EnhancedResourceMonitor:
         except Exception as e:
             try:
                 logger.error(f"Error during cleanup in destructor: {e}", exc_info=True)
-            except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+            except (
+                Exception
+            ):  # nosec B110 - Logger may be unavailable during interpreter shutdown
                 pass
 
 
@@ -1029,9 +1031,9 @@ class PowerManager:
                     "on_battery": self.on_battery_power,
                     "battery_percent": self.battery_percent,
                     "power_warning": power_warning,
-                    "time_remaining": battery.secsleft
-                    if hasattr(battery, "secsleft")
-                    else None,
+                    "time_remaining": (
+                        battery.secsleft if hasattr(battery, "secsleft") else None
+                    ),
                     "actions": actions,
                 }
         except Exception as e:
@@ -2050,7 +2052,9 @@ class PlanLibrary:
     def _make_key(self, goal: str, context: Dict) -> str:
         """Create key for plan lookup."""
         context_str = json.dumps(context, sort_keys=True, default=str)
-        return hashlib.md5(f"{goal}_{context_str}".encode(), usedforsecurity=False).hexdigest()
+        return hashlib.md5(
+            f"{goal}_{context_str}".encode(), usedforsecurity=False
+        ).hexdigest()
 
     def _evict_lru(self):
         """Evict least recently used plan."""

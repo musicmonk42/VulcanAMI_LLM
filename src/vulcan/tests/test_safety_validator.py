@@ -25,12 +25,18 @@ import time
 
 import pytest
 
-from vulcan.safety.safety_types import (SafetyConfig, SafetyConstraint,
-                                        SafetyReport, SafetyViolationType)
-from vulcan.safety.safety_validator import (ConstraintManager,
-                                            EnhancedExplainabilityNode,
-                                            EnhancedSafetyValidator,
-                                            ExplanationQualityScorer)
+from vulcan.safety.safety_types import (
+    SafetyConfig,
+    SafetyConstraint,
+    SafetyReport,
+    SafetyViolationType,
+)
+from vulcan.safety.safety_validator import (
+    ConstraintManager,
+    EnhancedExplainabilityNode,
+    EnhancedSafetyValidator,
+    ExplanationQualityScorer,
+)
 
 # ============================================================
 # FIXTURES - OPTIMIZED WITH MODULE SCOPE

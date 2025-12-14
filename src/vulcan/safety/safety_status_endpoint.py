@@ -24,10 +24,8 @@ async def get_safety_status() -> Dict[str, Any]:
     """
     try:
         # Import here to avoid circular dependencies
-        from .domain_validators import (_DOMAIN_VALIDATORS_INIT_DONE,
-                                        validator_registry)
-        from .safety_validator import (_SAFETY_SINGLETON_BUNDLE,
-                                       _SAFETY_SINGLETON_READY)
+        from .domain_validators import _DOMAIN_VALIDATORS_INIT_DONE, validator_registry
+        from .safety_validator import _SAFETY_SINGLETON_BUNDLE, _SAFETY_SINGLETON_READY
 
         # Get singleton validator
         validator = _SAFETY_SINGLETON_BUNDLE

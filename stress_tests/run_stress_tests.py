@@ -34,8 +34,7 @@ import pytest
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -59,38 +58,45 @@ ALLOWED_COMPONENT_PATHS = {
     "policy_engine": [],
     "security_scanner": [],
     "mutation_tester": [],
-    "pr_creator": []
+    "pr_creator": [],
 }
 
 # ---------------------------
 # Enums and Constants
 # ---------------------------
 
+
 class ComponentType(Enum):
     """Types of components that can be loaded."""
+
     POLICY_ENGINE = "policy_engine"
     SECURITY_SCANNER = "security_scanner"
     MUTATION_TESTER = "mutation_tester"
     PR_CREATOR = "pr_creator"
     CUSTOM = "custom"
 
+
 class PolicyDecision(Enum):
     """Policy evaluation decisions."""
+
     ALLOW = "allow"
     REJECT = "reject"
     REVIEW = "review"
+
 
 # ---------------------------
 # Data Classes
 # ---------------------------
 
+
 @dataclass
 class OrchestratorResult:
     """Result of an orchestrator run."""
-    status: str               # "success", "rejected", "error", "timeout"
-    details: Dict[str, Any]   # arbitrary payload about the run
+
+    status: str  # "success", "rejected", "error", "timeout"
+    details: Dict[str, Any]  # arbitrary payload about the run
     duration_ms: float = 0.0  # execution time in milliseconds
-    retries: int = 0          # number of retries attempted
+    retries: int = 0  # number of retries attempted
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     correlation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
@@ -102,26 +108,30 @@ class OrchestratorResult:
             "duration_ms": self.duration_ms,
             "retries": self.retries,
             "timestamp": self.timestamp,
-            "correlation_id": self.correlation_id
+            "correlation_id": self.correlation_id,
         }
+
 
 @dataclass
 class PerformanceMetrics:
     """Performance metrics for stress testing (thread-safe)."""
+
     total_runs: int = 0
     successful_runs: int = 0
     failed_runs: int = 0
     rejected_runs: int = 0
     timeout_runs: int = 0
     total_duration_ms: float = 0.0
-    min_duration_ms: float = float('inf')
+    min_duration_ms: float = float("inf")
     max_duration_ms: float = 0.0
     avg_duration_ms: float = 0.0
     p50_duration_ms: float = 0.0
     p95_duration_ms: float = 0.0
     p99_duration_ms: float = 0.0
     errors_by_type: Dict[str, int] = field(default_factory=dict)
-    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    _lock: threading.Lock = field(
+        default_factory=threading.Lock, init=False, repr=False
+    )
 
     def update(self, result: OrchestratorResult):
         """Update metrics with a new result (thread-safe)."""
@@ -140,7 +150,9 @@ class PerformanceMetrics:
             else:
                 self.failed_runs += 1
                 error_type = result.details.get("error_type", "unknown")
-                self.errors_by_type[error_type] = self.errors_by_type.get(error_type, 0) + 1
+                self.errors_by_type[error_type] = (
+                    self.errors_by_type.get(error_type, 0) + 1
+                )
 
     def calculate_percentiles(self, durations: List[float]):
         """Calculate percentile metrics from duration list (thread-safe)."""
@@ -163,20 +175,28 @@ class PerformanceMetrics:
                 "failed_runs": self.failed_runs,
                 "rejected_runs": self.rejected_runs,
                 "timeout_runs": self.timeout_runs,
-                "success_rate": (self.successful_runs / self.total_runs * 100) if self.total_runs > 0 else 0,
+                "success_rate": (
+                    (self.successful_runs / self.total_runs * 100)
+                    if self.total_runs > 0
+                    else 0
+                ),
                 "total_duration_ms": self.total_duration_ms,
-                "min_duration_ms": self.min_duration_ms if self.min_duration_ms != float('inf') else 0,
+                "min_duration_ms": (
+                    self.min_duration_ms if self.min_duration_ms != float("inf") else 0
+                ),
                 "max_duration_ms": self.max_duration_ms,
                 "avg_duration_ms": self.avg_duration_ms,
                 "p50_duration_ms": self.p50_duration_ms,
                 "p95_duration_ms": self.p95_duration_ms,
                 "p99_duration_ms": self.p99_duration_ms,
-                "errors_by_type": dict(self.errors_by_type)
+                "errors_by_type": dict(self.errors_by_type),
             }
+
 
 # ---------------------------
 # Input Validation
 # ---------------------------
+
 
 class SpecValidator:
     """Validates specs before processing for security."""
@@ -201,7 +221,9 @@ class SpecValidator:
             spec_str = json.dumps(spec)
             size_kb = len(spec_str) / 1024
             if size_kb > MAX_SPEC_SIZE_KB:
-                issues.append(f"Spec too large: {size_kb:.2f}KB (max {MAX_SPEC_SIZE_KB}KB)")
+                issues.append(
+                    f"Spec too large: {size_kb:.2f}KB (max {MAX_SPEC_SIZE_KB}KB)"
+                )
         except Exception as e:
             issues.append(f"Spec not JSON-serializable: {e}")
 
@@ -211,14 +233,20 @@ class SpecValidator:
                 issues.append(f"Too many nodes: {len(spec['nodes'])} (max {MAX_NODES})")
 
         # Don't allow user to set their own risk level
-        if "risk" in spec and isinstance(spec["risk"], (int, float)) and spec["risk"] < 0:
+        if (
+            "risk" in spec
+            and isinstance(spec["risk"], (int, float))
+            and spec["risk"] < 0
+        ):
             issues.append("Risk level cannot be negative")
 
         return len(issues) == 0, issues
 
+
 # ---------------------------
 # Component Implementations
 # ---------------------------
+
 
 class PolicyEngine:
     """Production policy engine implementation."""
@@ -266,7 +294,9 @@ class PolicyEngine:
             spec_str = json.dumps(spec)
             for pattern in blacklist_patterns:
                 # Use word boundaries to avoid false positives
-                if re.search(r'\b' + re.escape(pattern) + r'\b', spec_str, re.IGNORECASE):
+                if re.search(
+                    r"\b" + re.escape(pattern) + r"\b", spec_str, re.IGNORECASE
+                ):
                     reasons.append(f"blacklisted_pattern:{pattern}")
                     risk_score += 10
 
@@ -295,7 +325,11 @@ class PolicyEngine:
                 "allowed": allowed,
                 "reasons": reasons,
                 "risk_score": risk_score,
-                "decision": PolicyDecision.ALLOW.value if allowed else PolicyDecision.REJECT.value
+                "decision": (
+                    PolicyDecision.ALLOW.value
+                    if allowed
+                    else PolicyDecision.REJECT.value
+                ),
             }
 
         except Exception as e:
@@ -304,8 +338,9 @@ class PolicyEngine:
                 "allowed": False,
                 "reasons": [f"evaluation_error:{str(e)}"],
                 "risk_score": 999,
-                "decision": PolicyDecision.REJECT.value
+                "decision": PolicyDecision.REJECT.value,
             }
+
 
 class SecurityScanner:
     """Production security scanner implementation."""
@@ -336,7 +371,7 @@ class SecurityScanner:
                 ("Command", ["; rm", "&& cat", "| nc", "`cmd`", "$(cmd)"]),
                 ("XSS", ["<script>", "javascript:", "onerror=", "onload="]),
                 ("Path", ["../", "..\\", "/etc/passwd", "C:\\Windows"]),
-                ("Template", ["{{", "{%", "${", "#{"])
+                ("Template", ["{{", "{%", "${", "#{"]),
             ]
 
             for attack_type, patterns in injection_patterns:
@@ -344,24 +379,28 @@ class SecurityScanner:
                     if pattern.lower() in spec_str.lower():
                         finding_key = f"{attack_type}:{pattern}"
                         if finding_key not in seen_findings:
-                            findings.append({
-                                "type": "security",
-                                "severity": "high",
-                                "category": f"{attack_type}_injection",
-                                "message": f"Potential {attack_type} injection detected: {pattern}",
-                                "location": "spec_content"
-                            })
+                            findings.append(
+                                {
+                                    "type": "security",
+                                    "severity": "high",
+                                    "category": f"{attack_type}_injection",
+                                    "message": f"Potential {attack_type} injection detected: {pattern}",
+                                    "location": "spec_content",
+                                }
+                            )
                             seen_findings.add(finding_key)
 
             # Check for oversized data
             if len(spec_str) > 1024 * 100:  # 100KB
-                findings.append({
-                    "type": "security",
-                    "severity": "medium",
-                    "category": "resource_exhaustion",
-                    "message": f"Large spec size: {len(spec_str) / 1024:.2f}KB",
-                    "location": "spec_size"
-                })
+                findings.append(
+                    {
+                        "type": "security",
+                        "severity": "medium",
+                        "category": "resource_exhaustion",
+                        "message": f"Large spec size: {len(spec_str) / 1024:.2f}KB",
+                        "location": "spec_size",
+                    }
+                )
 
             # Check for deeply nested structures
             def check_depth(obj, current_depth=0, max_depth=20):
@@ -378,23 +417,27 @@ class SecurityScanner:
                 return False
 
             if check_depth(spec):
-                findings.append({
-                    "type": "security",
-                    "severity": "medium",
-                    "category": "complexity",
-                    "message": "Deeply nested structure detected",
-                    "location": "spec_structure"
-                })
+                findings.append(
+                    {
+                        "type": "security",
+                        "severity": "medium",
+                        "category": "complexity",
+                        "message": "Deeply nested structure detected",
+                        "location": "spec_structure",
+                    }
+                )
 
             # Check for null bytes and control characters
-            if '\x00' in spec_str or '\r' in spec_str or '\x1b' in spec_str:
-                findings.append({
-                    "type": "security",
-                    "severity": "high",
-                    "category": "malformed_input",
-                    "message": "Control characters detected in spec",
-                    "location": "spec_content"
-                })
+            if "\x00" in spec_str or "\r" in spec_str or "\x1b" in spec_str:
+                findings.append(
+                    {
+                        "type": "security",
+                        "severity": "high",
+                        "category": "malformed_input",
+                        "message": "Control characters detected in spec",
+                        "location": "spec_content",
+                    }
+                )
 
             # Deep scan mode
             if self.scan_depth == "deep":
@@ -409,52 +452,66 @@ class SecurityScanner:
 
                 for edge in edges:
                     if edge.get("from") == edge.get("to"):
-                        findings.append({
-                            "type": "info",
-                            "severity": "low",
-                            "category": "structure",
-                            "message": f"Self-loop detected: {edge.get('from')}",
-                            "location": "edges"
-                        })
+                        findings.append(
+                            {
+                                "type": "info",
+                                "severity": "low",
+                                "category": "structure",
+                                "message": f"Self-loop detected: {edge.get('from')}",
+                                "location": "edges",
+                            }
+                        )
 
-                    if edge.get("from") not in node_ids or edge.get("to") not in node_ids:
-                        findings.append({
-                            "type": "warning",
-                            "severity": "medium",
-                            "category": "integrity",
-                            "message": f"Edge references non-existent node",
-                            "location": f"edge:{edge}"
-                        })
+                    if (
+                        edge.get("from") not in node_ids
+                        or edge.get("to") not in node_ids
+                    ):
+                        findings.append(
+                            {
+                                "type": "warning",
+                                "severity": "medium",
+                                "category": "integrity",
+                                "message": f"Edge references non-existent node",
+                                "location": f"edge:{edge}",
+                            }
+                        )
 
             # If no findings, report clean
             if not findings:
-                findings.append({
-                    "type": "info",
-                    "severity": "info",
-                    "category": "clean",
-                    "message": "No security issues detected",
-                    "location": "overall"
-                })
+                findings.append(
+                    {
+                        "type": "info",
+                        "severity": "info",
+                        "category": "clean",
+                        "message": "No security issues detected",
+                        "location": "overall",
+                    }
+                )
 
         except asyncio.TimeoutError:
-            findings.append({
-                "type": "error",
-                "severity": "critical",
-                "category": "timeout",
-                "message": f"Security scan timeout after {self.timeout}s",
-                "location": "scanner"
-            })
+            findings.append(
+                {
+                    "type": "error",
+                    "severity": "critical",
+                    "category": "timeout",
+                    "message": f"Security scan timeout after {self.timeout}s",
+                    "location": "scanner",
+                }
+            )
         except Exception as e:
             logger.error(f"Security scanner error: {e}")
-            findings.append({
-                "type": "error",
-                "severity": "critical",
-                "category": "scanner_error",
-                "message": f"Scanner error: {str(e)}",
-                "location": "scanner"
-            })
+            findings.append(
+                {
+                    "type": "error",
+                    "severity": "critical",
+                    "category": "scanner_error",
+                    "message": f"Scanner error: {str(e)}",
+                    "location": "scanner",
+                }
+            )
 
         return findings
+
 
 class MutationTester:
     """
@@ -466,7 +523,9 @@ class MutationTester:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
         self.mutation_count = self.config.get("mutation_count", MUTATION_COUNT)
-        self.strategies = self.config.get("strategies", ["field_swap", "type_change", "value_mutation"])
+        self.strategies = self.config.get(
+            "strategies", ["field_swap", "type_change", "value_mutation"]
+        )
 
     async def run_mutations(self, spec: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -499,7 +558,7 @@ class MutationTester:
                     "id": f"mutation_{i}",
                     "strategy": strategy,
                     "killed": killed,
-                    "execution_time_ms": (hash(f"{strategy}_{i}") % 50) / 10.0
+                    "execution_time_ms": (hash(f"{strategy}_{i}") % 50) / 10.0,
                 }
 
                 mutations_performed.append(mutation_result)
@@ -508,7 +567,9 @@ class MutationTester:
                 else:
                     mutations_survived += 1
 
-            mutation_score = mutations_killed / self.mutation_count if self.mutation_count > 0 else 0
+            mutation_score = (
+                mutations_killed / self.mutation_count if self.mutation_count > 0 else 0
+            )
 
             return {
                 "score": mutation_score,
@@ -518,7 +579,7 @@ class MutationTester:
                 "strategies_used": list(set(self.strategies)),
                 "mutations": mutations_performed[:5],  # Include first 5 for detail
                 "quality": "good" if mutation_score > 0.7 else "needs_improvement",
-                "note": "Simulation - real implementation would test actual validators"
+                "note": "Simulation - real implementation would test actual validators",
             }
 
         except Exception as e:
@@ -528,8 +589,9 @@ class MutationTester:
                 "killed": 0,
                 "survived": 0,
                 "total": 0,
-                "error": str(e)
+                "error": str(e),
             }
+
 
 class PRCreator:
     """Production PR creator implementation."""
@@ -544,10 +606,16 @@ class PRCreator:
         if api_key:
             self.headers["X-API-KEY"] = api_key
         else:
-            logger.warning("PRCreator: GRAPHIX_API_KEY environment variable not set. Real API calls would fail.")
+            logger.warning(
+                "PRCreator: GRAPHIX_API_KEY environment variable not set. Real API calls would fail."
+            )
 
-    async def open_pr(self, spec: Dict[str, Any], report: Dict[str, Any],
-                     idempotency_key: Optional[str] = None) -> Dict[str, Any]:
+    async def open_pr(
+        self,
+        spec: Dict[str, Any],
+        report: Dict[str, Any],
+        idempotency_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Create a pull request based on spec and analysis report.
         Uses idempotency key to avoid duplicate PR creation on retries.
@@ -558,7 +626,9 @@ class PRCreator:
         try:
             # Check idempotency
             if idempotency_key and idempotency_key in self.created_prs:
-                logger.info(f"PR already created for key {idempotency_key}, returning cached result")
+                logger.info(
+                    f"PR already created for key {idempotency_key}, returning cached result"
+                )
                 return self.created_prs[idempotency_key]
 
             # Simulate async PR creation
@@ -569,7 +639,9 @@ class PRCreator:
 
             # Generate PR details
             pr_id = random.randint(1000, 9999)
-            spec_hash = hashlib.md5(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:8]
+            spec_hash = hashlib.md5(
+                json.dumps(spec, sort_keys=True).encode()
+            ).hexdigest()[:8]
 
             pr_info = {
                 "url": f"{self.base_url}/pull/{pr_id}",
@@ -581,11 +653,14 @@ class PRCreator:
                 "report_summary": {
                     "findings_count": len(report.get("findings", [])),
                     "mutation_score": report.get("mutation_report", {}).get("score", 0),
-                    "policy_decision": report.get("policy", {}).get("decision", "unknown")
+                    "policy_decision": report.get("policy", {}).get(
+                        "decision", "unknown"
+                    ),
                 },
                 "created_at": datetime.now().isoformat(),
-                "auto_merge_eligible": self.auto_merge and report.get("mutation_report", {}).get("score", 0) > 0.9,
-                "idempotency_key": idempotency_key
+                "auto_merge_eligible": self.auto_merge
+                and report.get("mutation_report", {}).get("score", 0) > 0.9,
+                "idempotency_key": idempotency_key,
             }
 
             # Simulate potential failures (5% failure rate)
@@ -604,12 +679,14 @@ class PRCreator:
                 "url": None,
                 "error": str(e),
                 "status": "failed",
-                "idempotency_key": idempotency_key
+                "idempotency_key": idempotency_key,
             }
+
 
 # ---------------------------
 # Orchestrator Implementation
 # ---------------------------
+
 
 class GenerationOrchestrator:
     """
@@ -625,8 +702,13 @@ class GenerationOrchestrator:
         self.config = config or {}
         self.components = {}
         self.metrics = PerformanceMetrics()
-        self.retry_config = self.config.get("retry", {"max_retries": DEFAULT_MAX_RETRIES, "backoff_ms": DEFAULT_BACKOFF_MS})
-        self.timeout_seconds = self.config.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS)
+        self.retry_config = self.config.get(
+            "retry",
+            {"max_retries": DEFAULT_MAX_RETRIES, "backoff_ms": DEFAULT_BACKOFF_MS},
+        )
+        self.timeout_seconds = self.config.get(
+            "timeout_seconds", DEFAULT_TIMEOUT_SECONDS
+        )
         self.validator = SpecValidator()
         self._initialize_components()
 
@@ -634,9 +716,15 @@ class GenerationOrchestrator:
         """Initialize default components if not in test mode."""
         if not self.config.get("test_mode", False):
             try:
-                self.components["policy_engine"] = PolicyEngine(self.config.get("policy", {}))
-                self.components["security_scanner"] = SecurityScanner(self.config.get("security", {}))
-                self.components["mutation_tester"] = MutationTester(self.config.get("mutation", {}))
+                self.components["policy_engine"] = PolicyEngine(
+                    self.config.get("policy", {})
+                )
+                self.components["security_scanner"] = SecurityScanner(
+                    self.config.get("security", {})
+                )
+                self.components["mutation_tester"] = MutationTester(
+                    self.config.get("mutation", {})
+                )
                 self.components["pr_creator"] = PRCreator(self.config.get("pr", {}))
                 logger.info("Components initialized successfully")
             except Exception as e:
@@ -677,7 +765,9 @@ class GenerationOrchestrator:
                         f"Allowed paths: {allowed_paths}"
                     )
 
-                return self._load_from_module(abs_path, component_name, component_config)
+                return self._load_from_module(
+                    abs_path, component_name, component_config
+                )
 
             # Load built-in component
             if component_name == "policy_engine":
@@ -702,16 +792,24 @@ class GenerationOrchestrator:
                     # Security: Validate plugin path
                     if os.path.exists(plugin_path):
                         allowed_paths = ALLOWED_COMPONENT_PATHS.get(component_name, [])
-                        if any(plugin_path.startswith(allowed) for allowed in allowed_paths):
-                            return self._load_from_file(plugin_path, component_name, component_config)
+                        if any(
+                            plugin_path.startswith(allowed) for allowed in allowed_paths
+                        ):
+                            return self._load_from_file(
+                                plugin_path, component_name, component_config
+                            )
 
-                raise NotImplementedError(f"No implementation found for component: {component_name}")
+                raise NotImplementedError(
+                    f"No implementation found for component: {component_name}"
+                )
 
         except Exception as e:
             logger.error(f"Failed to load component {component_name}: {e}")
             raise
 
-    def _load_from_module(self, module_path: str, component_name: str, config: Dict[str, Any]) -> Any:
+    def _load_from_module(
+        self, module_path: str, component_name: str, config: Dict[str, Any]
+    ) -> Any:
         """Load a component from a Python module (security-hardened)."""
         try:
             # Additional security: verify file exists and is readable
@@ -726,7 +824,9 @@ class GenerationOrchestrator:
             spec.loader.exec_module(module)
 
             # Try to instantiate the component
-            class_name = config.get("class_name", component_name.title().replace("_", ""))
+            class_name = config.get(
+                "class_name", component_name.title().replace("_", "")
+            )
             if hasattr(module, class_name):
                 component_class = getattr(module, class_name)
                 instance = component_class(config)
@@ -738,7 +838,9 @@ class GenerationOrchestrator:
             logger.error(f"Failed to load module {module_path}: {e}")
             raise
 
-    def _load_from_file(self, file_path: str, component_name: str, config: Dict[str, Any]) -> Any:
+    def _load_from_file(
+        self, file_path: str, component_name: str, config: Dict[str, Any]
+    ) -> Any:
         """Load a component from a Python file."""
         return self._load_from_module(file_path, component_name, config)
 
@@ -762,14 +864,16 @@ class GenerationOrchestrator:
                 "rejected",
                 {
                     "validation_errors": validation_issues,
-                    "reason": "input_validation_failed"
+                    "reason": "input_validation_failed",
                 },
                 duration_ms,
                 0,
-                correlation_id=correlation_id
+                correlation_id=correlation_id,
             )
             self.metrics.update(result)
-            logger.warning(f"[{correlation_id}] Spec validation failed: {validation_issues}")
+            logger.warning(
+                f"[{correlation_id}] Spec validation failed: {validation_issues}"
+            )
             return result
 
         # Generate idempotency key for PR creation
@@ -781,7 +885,7 @@ class GenerationOrchestrator:
                 # Wrap entire pipeline in timeout
                 result = await asyncio.wait_for(
                     self._run_pipeline(spec, idempotency_key, correlation_id),
-                    timeout=self.timeout_seconds
+                    timeout=self.timeout_seconds,
                 )
                 duration_ms = (time.time() - start_time) * 1000
                 result.duration_ms = duration_ms
@@ -797,10 +901,12 @@ class GenerationOrchestrator:
                     {"error": f"Pipeline timeout after {self.timeout_seconds}s"},
                     duration_ms,
                     retries,
-                    correlation_id=correlation_id
+                    correlation_id=correlation_id,
                 )
                 self.metrics.update(result)
-                logger.error(f"[{correlation_id}] Pipeline timeout after {self.timeout_seconds}s")
+                logger.error(
+                    f"[{correlation_id}] Pipeline timeout after {self.timeout_seconds}s"
+                )
                 return result
 
             except Exception as e:
@@ -812,97 +918,127 @@ class GenerationOrchestrator:
                         {
                             "exception": str(e),
                             "traceback": traceback.format_exc(),
-                            "error_type": type(e).__name__
+                            "error_type": type(e).__name__,
                         },
                         duration_ms,
                         retries - 1,
-                        correlation_id=correlation_id
+                        correlation_id=correlation_id,
                     )
                     self.metrics.update(result)
-                    logger.error(f"[{correlation_id}] Pipeline failed after {retries-1} retries: {e}")
+                    logger.error(
+                        f"[{correlation_id}] Pipeline failed after {retries-1} retries: {e}"
+                    )
                     return result
 
                 # Exponential backoff
-                await asyncio.sleep(backoff_ms * (2 ** retries) / 1000)
-                logger.info(f"[{correlation_id}] Retrying after error (attempt {retries}/{max_retries}): {e}")
+                await asyncio.sleep(backoff_ms * (2**retries) / 1000)
+                logger.info(
+                    f"[{correlation_id}] Retrying after error (attempt {retries}/{max_retries}): {e}"
+                )
 
-    async def _run_pipeline(self, spec: Dict[str, Any], idempotency_key: str,
-                          correlation_id: str) -> OrchestratorResult:
+    async def _run_pipeline(
+        self, spec: Dict[str, Any], idempotency_key: str, correlation_id: str
+    ) -> OrchestratorResult:
         """Execute the actual pipeline steps."""
         try:
-            logger.info(f"[{correlation_id}] Starting pipeline for spec: {spec.get('id', 'unknown')}")
+            logger.info(
+                f"[{correlation_id}] Starting pipeline for spec: {spec.get('id', 'unknown')}"
+            )
 
             # Policy evaluation
             policy_engine = self._load_component("policy_engine", "policy")
-            if hasattr(policy_engine, 'evaluate'):
+            if hasattr(policy_engine, "evaluate"):
                 policy = policy_engine.evaluate
             else:
-                return OrchestratorResult("error", {"error": "policy_engine missing evaluate() method"})
+                return OrchestratorResult(
+                    "error", {"error": "policy_engine missing evaluate() method"}
+                )
 
             policy_decision = policy(spec)
-            if not isinstance(policy_decision, dict) or "allowed" not in policy_decision:
-                return OrchestratorResult("error", {"error": "policy_engine returned invalid shape"})
+            if (
+                not isinstance(policy_decision, dict)
+                or "allowed" not in policy_decision
+            ):
+                return OrchestratorResult(
+                    "error", {"error": "policy_engine returned invalid shape"}
+                )
 
             if not policy_decision.get("allowed", False):
-                logger.info(f"[{correlation_id}] Policy rejected spec: {policy_decision.get('reasons', [])}")
+                logger.info(
+                    f"[{correlation_id}] Policy rejected spec: {policy_decision.get('reasons', [])}"
+                )
                 return OrchestratorResult("rejected", {"policy": policy_decision})
 
             # Security scanning
             security_scanner = self._load_component("security_scanner", "security")
-            if hasattr(security_scanner, 'scan_async'):
+            if hasattr(security_scanner, "scan_async"):
                 scan_async = security_scanner.scan_async
             else:
-                return OrchestratorResult("error", {"error": "security_scanner missing scan_async() method"})
+                return OrchestratorResult(
+                    "error", {"error": "security_scanner missing scan_async() method"}
+                )
 
             findings = await scan_async(spec)
 
             # Check for critical findings that should halt pipeline (case-insensitive)
-            critical_findings = [f for f in findings if f.get("severity", "").lower() == "critical"]
+            critical_findings = [
+                f for f in findings if f.get("severity", "").lower() == "critical"
+            ]
             if critical_findings and self.config.get("halt_on_critical", True):
-                logger.warning(f"[{correlation_id}] Critical security findings detected")
+                logger.warning(
+                    f"[{correlation_id}] Critical security findings detected"
+                )
                 return OrchestratorResult(
                     "rejected",
                     {
                         "policy": policy_decision,
                         "findings": findings,
                         "halt_reason": "critical_security_findings",
-                        "critical_findings": critical_findings
-                    }
+                        "critical_findings": critical_findings,
+                    },
                 )
 
             # Mutation testing
             mutation_tester = self._load_component("mutation_tester", "mutation")
-            if hasattr(mutation_tester, 'run_mutations'):
+            if hasattr(mutation_tester, "run_mutations"):
                 run_mutations = mutation_tester.run_mutations
             else:
-                return OrchestratorResult("error", {"error": "mutation_tester missing run_mutations() method"})
+                return OrchestratorResult(
+                    "error", {"error": "mutation_tester missing run_mutations() method"}
+                )
 
             mutation_report = await run_mutations(spec)
 
             # PR creation (with idempotency key)
             pr_creator = self._load_component("pr_creator", "pr")
-            if hasattr(pr_creator, 'open_pr'):
+            if hasattr(pr_creator, "open_pr"):
                 open_pr = pr_creator.open_pr
             else:
-                return OrchestratorResult("error", {"error": "pr_creator missing open_pr() method"})
+                return OrchestratorResult(
+                    "error", {"error": "pr_creator missing open_pr() method"}
+                )
 
             pr_info = await open_pr(
                 spec,
                 {"findings": findings, "mutation_report": mutation_report},
-                idempotency_key=idempotency_key
+                idempotency_key=idempotency_key,
             )
 
             # Check for PR creation failure (explicit check for None)
             if pr_info.get("error") or pr_info.get("url") is None:
-                logger.error(f"[{correlation_id}] PR creation failed: {pr_info.get('error', 'No URL returned')}")
+                logger.error(
+                    f"[{correlation_id}] PR creation failed: {pr_info.get('error', 'No URL returned')}"
+                )
                 return OrchestratorResult(
                     "error",
                     {
                         "policy": policy_decision,
                         "findings": findings,
                         "mutation_report": mutation_report,
-                        "pr_error": pr_info.get("error", "PR creation failed - no URL returned")
-                    }
+                        "pr_error": pr_info.get(
+                            "error", "PR creation failed - no URL returned"
+                        ),
+                    },
                 )
 
             logger.info(f"[{correlation_id}] Pipeline completed successfully")
@@ -957,7 +1093,7 @@ class GenerationOrchestrator:
         # Gather all tasks and check for exceptions
         task_results = await asyncio.gather(
             *[asyncio.create_task(_task(i, spec)) for i, spec in enumerate(specs)],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         # Check for exceptions in results
@@ -970,8 +1106,8 @@ class GenerationOrchestrator:
                         "error",
                         {
                             "exception": str(task_result),
-                            "error_type": type(task_result).__name__
-                        }
+                            "error_type": type(task_result).__name__,
+                        },
                     )
 
         # Calculate final metrics
@@ -985,7 +1121,7 @@ class GenerationOrchestrator:
         self,
         base_spec: Dict[str, Any],
         chaos_iterations: int = 100,
-        chaos_strategies: Optional[List[str]] = None
+        chaos_strategies: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Run chaos testing by applying random mutations to a base spec.
@@ -1006,14 +1142,16 @@ class GenerationOrchestrator:
                 "null_values",
                 "oversized_values",
                 "circular_references",
-                "injection_patterns"
+                "injection_patterns",
             ]
 
         chaos_results = {
             "total_iterations": chaos_iterations,
             "strategies_used": chaos_strategies,
-            "results_by_strategy": defaultdict(lambda: {"success": 0, "rejected": 0, "error": 0}),
-            "interesting_failures": []
+            "results_by_strategy": defaultdict(
+                lambda: {"success": 0, "rejected": 0, "error": 0}
+            ),
+            "interesting_failures": [],
         }
 
         for i in range(chaos_iterations):
@@ -1021,7 +1159,9 @@ class GenerationOrchestrator:
             strategy = chaos_strategies[i % len(chaos_strategies)]
 
             # Apply chaos mutation (deep copy to avoid modifying original)
-            mutated_spec = self._apply_chaos_mutation(copy.deepcopy(base_spec), strategy)
+            mutated_spec = self._apply_chaos_mutation(
+                copy.deepcopy(base_spec), strategy
+            )
 
             # Run the mutated spec
             result = await self.run_once(mutated_spec)
@@ -1031,16 +1171,22 @@ class GenerationOrchestrator:
 
             # Collect interesting failures
             if result.status == "error" and "exception" in result.details:
-                chaos_results["interesting_failures"].append({
-                    "iteration": i,
-                    "strategy": strategy,
-                    "error": result.details["exception"][:200],  # Truncate for readability
-                    "spec_sample": str(mutated_spec)[:200]
-                })
+                chaos_results["interesting_failures"].append(
+                    {
+                        "iteration": i,
+                        "strategy": strategy,
+                        "error": result.details["exception"][
+                            :200
+                        ],  # Truncate for readability
+                        "spec_sample": str(mutated_spec)[:200],
+                    }
+                )
 
         return chaos_results
 
-    def _apply_chaos_mutation(self, spec: Dict[str, Any], strategy: str) -> Dict[str, Any]:
+    def _apply_chaos_mutation(
+        self, spec: Dict[str, Any], strategy: str
+    ) -> Dict[str, Any]:
         """
         Apply a chaos mutation strategy to a spec.
         Note: Spec should be deep copied before calling this method.
@@ -1089,12 +1235,14 @@ class GenerationOrchestrator:
 
         elif strategy == "injection_patterns":
             # Add injection patterns to fields
-            injection = random.choice([
-                "'; DROP TABLE users; --",
-                "<script>alert('xss')</script>",
-                "../../etc/passwd",
-                "{{7*7}}"
-            ])
+            injection = random.choice(
+                [
+                    "'; DROP TABLE users; --",
+                    "<script>alert('xss')</script>",
+                    "../../etc/passwd",
+                    "{{7*7}}",
+                ]
+            )
             spec["injected_field"] = injection
 
         return spec
@@ -1107,21 +1255,26 @@ class GenerationOrchestrator:
             "config": {
                 "timeout_seconds": self.timeout_seconds,
                 "retry_config": self.retry_config,
-                "components": list(self.components.keys())
-            }
+                "components": list(self.components.keys()),
+            },
         }
+
 
 # ---------------------------
 # Custom Exceptions
 # ---------------------------
 
+
 class SecurityError(Exception):
     """Raised when a security constraint is violated."""
+
     pass
+
 
 # ---------------------------
 # Test Fixtures and Utilities
 # ---------------------------
+
 
 @pytest.fixture
 def orchestrator(monkeypatch) -> GenerationOrchestrator:
@@ -1134,12 +1287,23 @@ def orchestrator(monkeypatch) -> GenerationOrchestrator:
     # Create mock components that match production types
     class MockPolicyEngine:
         def evaluate(self, spec):
-            return {"allowed": True, "reasons": ["meets_minimum_requirements"], "risk_score": 3}
+            return {
+                "allowed": True,
+                "reasons": ["meets_minimum_requirements"],
+                "risk_score": 3,
+            }
 
     class MockSecurityScanner:
         async def scan_async(self, spec):
             await asyncio.sleep(0.001)
-            return [{"type": "info", "severity": "low", "message": "no critical issues", "location": "overall"}]
+            return [
+                {
+                    "type": "info",
+                    "severity": "low",
+                    "message": "no critical issues",
+                    "location": "overall",
+                }
+            ]
 
     class MockMutationTester:
         async def run_mutations(self, spec):
@@ -1170,6 +1334,7 @@ def orchestrator(monkeypatch) -> GenerationOrchestrator:
     )
     return orch
 
+
 @pytest.fixture
 def production_orchestrator() -> GenerationOrchestrator:
     """Provide a production orchestrator with real components."""
@@ -1181,26 +1346,27 @@ def production_orchestrator() -> GenerationOrchestrator:
             "strict_mode": False,
             "max_risk_level": 7,
             "max_nodes": 100,
-            "blacklist_patterns": ["DROP TABLE", "rm -rf"]
+            "blacklist_patterns": ["DROP TABLE", "rm -rf"],
         },
-        "security": {
-            "scan_depth": "deep",
-            "timeout_seconds": 10
-        },
+        "security": {"scan_depth": "deep", "timeout_seconds": 10},
         "mutation": {
             "mutation_count": 20,
-            "strategies": ["field_swap", "type_change", "value_mutation", "structure_change"]
+            "strategies": [
+                "field_swap",
+                "type_change",
+                "value_mutation",
+                "structure_change",
+            ],
         },
-        "pr": {
-            "base_url": "https://github.com/test/repo",
-            "auto_merge": False
-        }
+        "pr": {"base_url": "https://github.com/test/repo", "auto_merge": False},
     }
     return GenerationOrchestrator(config)
+
 
 # ---------------------------
 # Tests
 # ---------------------------
+
 
 @pytest.mark.asyncio
 async def test_run_once_success(orchestrator: GenerationOrchestrator):
@@ -1224,7 +1390,11 @@ async def test_run_once_policy_reject(monkeypatch):
 
     class MockPolicyEngine:
         def evaluate(self, spec):
-            return {"allowed": False, "reasons": ["forbidden_by_policy"], "risk_score": 15}
+            return {
+                "allowed": False,
+                "reasons": ["forbidden_by_policy"],
+                "risk_score": 15,
+            }
 
     class MockSecurityScanner:
         async def scan_async(self, spec):
@@ -1249,7 +1419,9 @@ async def test_run_once_policy_reject(monkeypatch):
             return MockPRCreator()
         raise NotImplementedError()
 
-    monkeypatch.setattr(GenerationOrchestrator, "_load_component", mock_load_component, raising=True)
+    monkeypatch.setattr(
+        GenerationOrchestrator, "_load_component", mock_load_component, raising=True
+    )
 
     res = await orch.run_once({"name": "blocked-spec"})
     assert res.status == "rejected"
@@ -1281,15 +1453,23 @@ async def test_missing_component_produces_error(monkeypatch):
 
     res = await orch.run_once({"name": "incomplete-pipeline"})
     assert res.status == "error"
-    assert "missing" in str(res.details.get("error", "")).lower() or "method" in str(res.details.get("error", "")).lower()
+    assert (
+        "missing" in str(res.details.get("error", "")).lower()
+        or "method" in str(res.details.get("error", "")).lower()
+    )
 
 
 @pytest.mark.asyncio
 async def test_stress_concurrency(orchestrator: GenerationOrchestrator):
     """Test concurrent execution with stress load."""
     # 50 lightweight specs, run at concurrency 10
-    specs = [{"id": f"spec-{i}", "name": f"spec-{i}", "nodes": [], "edges": []} for i in range(50)]
-    results, metrics = await orchestrator.run_stress_batch(specs, concurrency=10, collect_metrics=True)
+    specs = [
+        {"id": f"spec-{i}", "name": f"spec-{i}", "nodes": [], "edges": []}
+        for i in range(50)
+    ]
+    results, metrics = await orchestrator.run_stress_batch(
+        specs, concurrency=10, collect_metrics=True
+    )
 
     assert len(results) == len(specs)
     assert all(r is not None for r in results)
@@ -1306,10 +1486,9 @@ async def test_stress_concurrency(orchestrator: GenerationOrchestrator):
 @pytest.mark.asyncio
 async def test_retry_mechanism(monkeypatch):
     """Test retry mechanism on transient failures."""
-    orch = GenerationOrchestrator({
-        "test_mode": True,
-        "retry": {"max_retries": 3, "backoff_ms": 10}
-    })
+    orch = GenerationOrchestrator(
+        {"test_mode": True, "retry": {"max_retries": 3, "backoff_ms": 10}}
+    )
 
     call_count = {"count": 0}
 
@@ -1343,7 +1522,9 @@ async def test_retry_mechanism(monkeypatch):
             return MockPRCreator()
         raise NotImplementedError()
 
-    monkeypatch.setattr(GenerationOrchestrator, "_load_component", mock_load_component, raising=True)
+    monkeypatch.setattr(
+        GenerationOrchestrator, "_load_component", mock_load_component, raising=True
+    )
 
     res = await orch.run_once({"id": "test", "name": "retry-test"})
     assert res.status == "success" or res.status == "error"
@@ -1353,10 +1534,9 @@ async def test_retry_mechanism(monkeypatch):
 @pytest.mark.asyncio
 async def test_timeout_handling(monkeypatch):
     """Test timeout handling."""
-    orch = GenerationOrchestrator({
-        "test_mode": True,
-        "timeout_seconds": 0.1  # Very short timeout
-    })
+    orch = GenerationOrchestrator(
+        {"test_mode": True, "timeout_seconds": 0.1}  # Very short timeout
+    )
 
     class MockPolicyEngine:
         def evaluate(self, spec):
@@ -1386,7 +1566,9 @@ async def test_timeout_handling(monkeypatch):
             return MockPRCreator()
         raise NotImplementedError()
 
-    monkeypatch.setattr(GenerationOrchestrator, "_load_component", mock_load_component, raising=True)
+    monkeypatch.setattr(
+        GenerationOrchestrator, "_load_component", mock_load_component, raising=True
+    )
 
     res = await orch.run_once({"id": "test", "name": "timeout-test"})
     assert res.status == "timeout"
@@ -1419,7 +1601,7 @@ async def test_production_components():
     pr_info = await pr_creator.open_pr(
         {"id": "test"},
         {"findings": [], "mutation_report": {"score": 0.8}},
-        idempotency_key="test-key"
+        idempotency_key="test-key",
     )
     assert "url" in pr_info or "error" in pr_info
 
@@ -1432,17 +1614,15 @@ async def test_chaos_testing(production_orchestrator: GenerationOrchestrator):
         "type": "Graph",
         "nodes": [
             {"id": "n1", "type": "InputNode"},
-            {"id": "n2", "type": "OutputNode"}
+            {"id": "n2", "type": "OutputNode"},
         ],
-        "edges": [
-            {"from": "n1", "to": "n2"}
-        ]
+        "edges": [{"from": "n1", "to": "n2"}],
     }
 
     chaos_results = await production_orchestrator.run_chaos_test(
         base_spec,
         chaos_iterations=10,
-        chaos_strategies=["remove_fields", "null_values", "injection_patterns"]
+        chaos_strategies=["remove_fields", "null_values", "injection_patterns"],
     )
 
     assert "total_iterations" in chaos_results
@@ -1460,9 +1640,7 @@ async def test_metrics_collection(production_orchestrator: GenerationOrchestrato
     ]
 
     results, metrics = await production_orchestrator.run_stress_batch(
-        specs,
-        concurrency=5,
-        collect_metrics=True
+        specs, concurrency=5, collect_metrics=True
     )
 
     assert metrics is not None
@@ -1481,10 +1659,7 @@ async def test_metrics_collection(production_orchestrator: GenerationOrchestrato
 @pytest.mark.asyncio
 async def test_critical_findings_halt(monkeypatch):
     """Test that critical security findings halt the pipeline."""
-    orch = GenerationOrchestrator({
-        "test_mode": True,
-        "halt_on_critical": True
-    })
+    orch = GenerationOrchestrator({"test_mode": True, "halt_on_critical": True})
 
     class MockPolicyEngine:
         def evaluate(self, spec):
@@ -1493,8 +1668,12 @@ async def test_critical_findings_halt(monkeypatch):
     class MockSecurityScanner:
         async def scan_async(self, spec):
             return [
-                {"type": "security", "severity": "critical", "message": "Critical vulnerability found"},
-                {"type": "info", "severity": "low", "message": "Minor issue"}
+                {
+                    "type": "security",
+                    "severity": "critical",
+                    "message": "Critical vulnerability found",
+                },
+                {"type": "info", "severity": "low", "message": "Minor issue"},
             ]
 
     class MockMutationTester:
@@ -1516,7 +1695,9 @@ async def test_critical_findings_halt(monkeypatch):
             return MockPRCreator()
         raise NotImplementedError()
 
-    monkeypatch.setattr(GenerationOrchestrator, "_load_component", mock_load_component, raising=True)
+    monkeypatch.setattr(
+        GenerationOrchestrator, "_load_component", mock_load_component, raising=True
+    )
 
     res = await orch.run_once({"id": "test", "name": "critical-test"})
     assert res.status == "rejected"
@@ -1550,28 +1731,27 @@ if __name__ == "__main__":
         print("-" * 60)
 
         # Initialize production orchestrator
-        orchestrator = GenerationOrchestrator({
-            "timeout_seconds": 30,
-            "retry": {"max_retries": 2, "backoff_ms": 100},
-            "policy": {"max_risk_level": 7},
-            "security": {"scan_depth": "deep"},
-            "mutation": {"mutation_count": 10},
-            "pr": {"auto_merge": False}
-        })
+        orchestrator = GenerationOrchestrator(
+            {
+                "timeout_seconds": 30,
+                "retry": {"max_retries": 2, "backoff_ms": 100},
+                "policy": {"max_risk_level": 7},
+                "security": {"scan_depth": "deep"},
+                "mutation": {"mutation_count": 10},
+                "pr": {"auto_merge": False},
+            }
+        )
 
         # Generate test specs
         test_specs = [
             {
                 "id": f"stress-{i}",
                 "type": "Graph",
-                "nodes": [
-                    {"id": f"n{j}", "type": "Node"}
-                    for j in range(i % 10 + 1)
-                ],
+                "nodes": [{"id": f"n{j}", "type": "Node"} for j in range(i % 10 + 1)],
                 "edges": [
                     {"from": f"n{j}", "to": f"n{(j+1) % (i % 10 + 1)}"}
                     for j in range(i % 5)
-                ]
+                ],
             }
             for i in range(100)
         ]
@@ -1586,10 +1766,7 @@ if __name__ == "__main__":
         start = time.time()
 
         results, metrics = await orchestrator.run_stress_batch(
-            test_specs,
-            concurrency=20,
-            on_progress=on_progress,
-            collect_metrics=True
+            test_specs, concurrency=20, on_progress=on_progress, collect_metrics=True
         )
 
         duration = time.time() - start
@@ -1625,12 +1802,11 @@ if __name__ == "__main__":
             "id": "chaos-base",
             "type": "Graph",
             "nodes": [{"id": "n1", "type": "Node"}],
-            "edges": []
+            "edges": [],
         }
 
         chaos_results = await orchestrator.run_chaos_test(
-            base_spec,
-            chaos_iterations=50
+            base_spec, chaos_iterations=50
         )
 
         print(f"Chaos iterations: {chaos_results['total_iterations']}")
@@ -1639,7 +1815,9 @@ if __name__ == "__main__":
             print(f"  {strategy}: {results_dict}")
 
         if chaos_results["interesting_failures"]:
-            print(f"\nFound {len(chaos_results['interesting_failures'])} interesting failures")
+            print(
+                f"\nFound {len(chaos_results['interesting_failures'])} interesting failures"
+            )
             for failure in chaos_results["interesting_failures"][:3]:
                 print(f"  - Strategy: {failure['strategy']}")
                 print(f"    Error: {failure['error'][:100]}...")
@@ -1652,7 +1830,7 @@ if __name__ == "__main__":
         report["test_results"] = {
             "total_specs": len(test_specs),
             "duration_seconds": duration,
-            "chaos_test": chaos_results
+            "chaos_test": chaos_results,
         }
 
         with open("stress_test_report.json", "w") as f:

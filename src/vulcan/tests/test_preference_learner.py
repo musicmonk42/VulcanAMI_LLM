@@ -20,8 +20,14 @@ import pytest
 
 # Import the module under test.
 from src.vulcan.world_model.meta_reasoning.preference_learner import (
-    BanditArm, Preference, PreferenceLearner, PreferencePrediction,
-    PreferenceSignal, PreferenceSignalType, PreferenceStrength)
+    BanditArm,
+    Preference,
+    PreferenceLearner,
+    PreferencePrediction,
+    PreferenceSignal,
+    PreferenceSignalType,
+    PreferenceStrength,
+)
 
 # ---------------------------
 # Fixtures and Helpers

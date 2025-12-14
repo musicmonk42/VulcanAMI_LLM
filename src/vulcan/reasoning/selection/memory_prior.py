@@ -904,9 +904,11 @@ class BayesianMemoryPrior:
                     total_attempts = data["successes"] + data["failures"]
 
                     stats[tool] = {
-                        "success_rate": data["successes"] / total_attempts
-                        if total_attempts > 0
-                        else 0.0,
+                        "success_rate": (
+                            data["successes"] / total_attempts
+                            if total_attempts > 0
+                            else 0.0
+                        ),
                         "avg_time": data["total_time"] / data["count"],
                         "avg_energy": data["total_energy"] / data["count"],
                         "usage_count": data["count"],

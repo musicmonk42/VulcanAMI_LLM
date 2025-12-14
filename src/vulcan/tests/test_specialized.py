@@ -10,13 +10,25 @@ Tests cover:
 - Edge cases and error handling
 """
 
-from vulcan.memory.specialized import (Concept, Episode, EpisodicMemory,
-                                       ProceduralMemory, SemanticMemory,
-                                       Skill, ToolPerformanceConcept,
-                                       WorkingMemory)
-from vulcan.memory.base import (Memory, MemoryConfig, MemoryQuery, MemoryType,
-                                RetrievalResult)
+from vulcan.memory.specialized import (
+    Concept,
+    Episode,
+    EpisodicMemory,
+    ProceduralMemory,
+    SemanticMemory,
+    Skill,
+    ToolPerformanceConcept,
+    WorkingMemory,
+)
+from vulcan.memory.base import (
+    Memory,
+    MemoryConfig,
+    MemoryQuery,
+    MemoryType,
+    RetrievalResult,
+)
 import shutil
+
 # Import the module under test
 import sys
 import tempfile
@@ -302,7 +314,9 @@ class TestEpisodicMemory:
 
         assert len(similar) >= 2
         # Should prefer coding episodes
-        coding_episodes = [item for item in similar if item.context.get("task") == "coding"]
+        coding_episodes = [
+            item for item in similar if item.context.get("task") == "coding"
+        ]
         assert len(coding_episodes) >= 2
 
     def test_recall_by_tags(self, memory_config):

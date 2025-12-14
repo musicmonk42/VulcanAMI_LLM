@@ -9,15 +9,24 @@ import time
 
 import pytest
 
-from vulcan.reasoning.reasoning_types import (CalibrationData, CostEstimate,
-                                              DistributionShift, ModalityType,
-                                              MonitoringData, PortfolioResult,
-                                              PortfolioStrategy,
-                                              ReasoningChain, ReasoningResult,
-                                              ReasoningStep, ReasoningType,
-                                              SafetyAssessment, SelectionMode,
-                                              SelectionResult, UtilityContext,
-                                              ValueOfInformation)
+from vulcan.reasoning.reasoning_types import (
+    CalibrationData,
+    CostEstimate,
+    DistributionShift,
+    ModalityType,
+    MonitoringData,
+    PortfolioResult,
+    PortfolioStrategy,
+    ReasoningChain,
+    ReasoningResult,
+    ReasoningStep,
+    ReasoningType,
+    SafetyAssessment,
+    SelectionMode,
+    SelectionResult,
+    UtilityContext,
+    ValueOfInformation,
+)
 
 
 # Enum Tests

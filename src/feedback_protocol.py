@@ -630,9 +630,9 @@ class FeedbackProtocol:
                 "status": "error",
                 "proposal_id": proposal_id,
                 "compression_ok": compression_ok,
-                "compression_meta": compression_meta
-                if compression_meta
-                else {"error": "Not attempted"},
+                "compression_meta": (
+                    compression_meta if compression_meta else {"error": "Not attempted"}
+                ),
                 "photonic_meta": photonic_meta if photonic_meta else {},
                 "kernel_audit": kernel_audit_result,
                 "audit": {
@@ -679,7 +679,9 @@ class FeedbackProtocol:
         except Exception as e:
             try:
                 logger.error(f"Error during cleanup in destructor: {e}", exc_info=True)
-            except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+            except (
+                Exception
+            ):  # nosec B110 - Logger may be unavailable during interpreter shutdown
                 pass
 
 

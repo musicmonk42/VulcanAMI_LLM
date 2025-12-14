@@ -148,9 +148,7 @@ class Concept:
             grounded_effects: List of measurable grounded effects
             confidence: Initial confidence in the concept
         """
-        self.concept_id = (
-            f"concept_{hashlib.md5(pattern_signature.encode(), usedforsecurity=False).hexdigest()[:8]}"
-        )
+        self.concept_id = f"concept_{hashlib.md5(pattern_signature.encode(), usedforsecurity=False).hexdigest()[:8]}"
         self.pattern_signature = pattern_signature
         self.grounded_effects = grounded_effects
         self.confidence = confidence
@@ -472,6 +470,7 @@ class ConceptMapper:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
@@ -485,7 +484,9 @@ class ConceptMapper:
                     )
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.warning("ConceptMapper: Created new safety validator instance (may cause duplication)")
+                logger.warning(
+                    "ConceptMapper: Created new safety validator instance (may cause duplication)"
+                )
         else:
             self.safety_validator = None
             logger.warning(

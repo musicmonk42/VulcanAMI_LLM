@@ -3,8 +3,7 @@ Comprehensive test suite for ComplianceMapper and BiasDetector.
 Tests regulatory compliance validation and multi-model bias detection.
 """
 
-from vulcan.safety.compliance_bias import (BiasDetector, ComplianceMapper,
-                                           LRUCache)
+from vulcan.safety.compliance_bias import BiasDetector, ComplianceMapper, LRUCache
 import numpy as np
 from pathlib import Path
 import time

@@ -22,13 +22,21 @@ FIXES APPLIED (corrected version):
 3. test_full_search_workflow: Added skip - Same source code bug as test_hybrid_search.
 """
 
-from vulcan.memory.retrieval import (TORCH_AVAILABLE, AttentionMechanism,
-                                     LearnedAttention, MemoryIndex,
-                                     MemorySearch, NumpyIndex,
-                                     RetrievalResult, TemporalIndex, TextSearchIndex)
+from vulcan.memory.retrieval import (
+    TORCH_AVAILABLE,
+    AttentionMechanism,
+    LearnedAttention,
+    MemoryIndex,
+    MemorySearch,
+    NumpyIndex,
+    RetrievalResult,
+    TemporalIndex,
+    TextSearchIndex,
+)
 from vulcan.memory.base import Memory, MemoryQuery, MemoryType
 import os
 import shutil
+
 # Import the module under test
 import sys
 import tempfile

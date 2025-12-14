@@ -53,8 +53,13 @@ except ImportError:
     print("⚠️  httpx not available - health checks will be limited")
 
 try:
-    from prometheus_client import (CONTENT_TYPE_LATEST, Counter, Gauge,
-                                   Histogram, generate_latest)
+    from prometheus_client import (
+        CONTENT_TYPE_LATEST,
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
+    )
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
@@ -185,7 +190,7 @@ class UnifiedPlatformSettings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:8000",
         "http://127.0.0.1:8000",
-        "null"
+        "null",
     ]
 
     # Health checks
@@ -787,9 +792,9 @@ class AsyncServiceManager:
                     "mount_path": service.get("mount_path"),
                     "health_path": service.get("health_path"),
                     "import_path": service.get("import_path"),
-                    "docs_url": service.get("docs_url")
-                    if service.get("mounted")
-                    else None,
+                    "docs_url": (
+                        service.get("docs_url") if service.get("mounted") else None
+                    ),
                     "error": service.get("error"),
                 }
                 for name, service in self.services.items()
@@ -1088,7 +1093,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start Unified Platform: {e}", exc_info=True)
         raise
-
 
     try:
         yield
@@ -1498,6 +1502,7 @@ if PROMETHEUS_AVAILABLE:
         """Aggregated Prometheus metrics."""
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+
 # =============================================================================
 # ARENA API ENDPOINTS (INTEGRATED)
 # =============================================================================
@@ -1521,8 +1526,7 @@ def get_arena_instance():
     _arena_instance_initialized = True
 
     try:
-        from src.graphix_arena import (_ARENA_INSTANCE, GraphixArena,
-                                       register_routes)
+        from src.graphix_arena import _ARENA_INSTANCE, GraphixArena, register_routes
 
         if _ARENA_INSTANCE is not None:
             logger.info("✅ Using existing Arena instance from src.graphix_arena")
@@ -1609,8 +1613,7 @@ async def arena_feedback_dispatch(
         raise HTTPException(status_code=503, detail="Arena not available")
 
     try:
-        from src.graphix_arena import (MAX_PAYLOAD_SIZE,
-                                       dispatch_feedback_protocol)
+        from src.graphix_arena import MAX_PAYLOAD_SIZE, dispatch_feedback_protocol
 
         data = await request.json()
 

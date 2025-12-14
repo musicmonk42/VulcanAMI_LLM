@@ -28,9 +28,14 @@ from typing import Any, Callable, Dict, List, Optional
 import numpy as np
 
 from .reasoning_explainer import ReasoningExplainer, SafetyAwareReasoning
+
 # Core reasoning imports
-from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
-                              ReasoningType)
+from .reasoning_types import (
+    ReasoningChain,
+    ReasoningResult,
+    ReasoningStep,
+    ReasoningType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,17 +73,23 @@ def _load_selection_components():
 
     try:
         # Prefer package-root re-exports from vulcan.reasoning.selection
-        from vulcan.reasoning.selection import (ContextMode, CostComponent,
-                                                ExecutionMonitor,
-                                                ExecutionStrategy,
-                                                PortfolioExecutor,
-                                                SafetyGovernor, SelectionCache,
-                                                SelectionMode,
-                                                SelectionRequest,
-                                                SelectionResult,
-                                                StochasticCostModel,
-                                                ToolSelector, UtilityContext,
-                                                UtilityModel, WarmStartPool)
+        from vulcan.reasoning.selection import (
+            ContextMode,
+            CostComponent,
+            ExecutionMonitor,
+            ExecutionStrategy,
+            PortfolioExecutor,
+            SafetyGovernor,
+            SelectionCache,
+            SelectionMode,
+            SelectionRequest,
+            SelectionResult,
+            StochasticCostModel,
+            ToolSelector,
+            UtilityContext,
+            UtilityModel,
+            WarmStartPool,
+        )
 
         # NUCLEAR FIX: Apply monkey-patch IMMEDIATELY after import, before any instantiation
         if not hasattr(SelectionCache, "_original_init_patched"):
@@ -111,8 +122,9 @@ def _load_selection_components():
 
         # Optional: only if you later add it; don't hard-require it
         try:
-            from vulcan.reasoning.selection.confidence_calibration import \
-                CalibratedDecisionMaker
+            from vulcan.reasoning.selection.confidence_calibration import (
+                CalibratedDecisionMaker,
+            )
         except Exception:
             CalibratedDecisionMaker = None
 
@@ -150,8 +162,7 @@ def _load_reasoning_components():
     _REASONING_COMPONENTS = {}
 
     try:
-        from vulcan.reasoning.probabilistic_reasoning import \
-            ProbabilisticReasoner
+        from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
 
         _REASONING_COMPONENTS["ProbabilisticReasoner"] = ProbabilisticReasoner
     except ImportError as e:
@@ -189,8 +200,7 @@ def _load_reasoning_components():
         logger.warning(f"AnalogicalReasoner not available: {e}")
 
     try:
-        from vulcan.reasoning.multimodal_reasoning import \
-            MultiModalReasoningEngine
+        from vulcan.reasoning.multimodal_reasoning import MultiModalReasoningEngine
 
         _REASONING_COMPONENTS["MultiModalReasoningEngine"] = MultiModalReasoningEngine
     except ImportError as e:
@@ -1428,9 +1438,11 @@ class UnifiedReasoner:
                 step_id=f"portfolio_{uuid.uuid4().hex[:8]}",
                 step_type=ReasoningType.HYBRID,
                 input_data=None,
-                output_data=exec_result.primary_result
-                if hasattr(exec_result, "primary_result")
-                else None,
+                output_data=(
+                    exec_result.primary_result
+                    if hasattr(exec_result, "primary_result")
+                    else None
+                ),
                 confidence=0.7,
                 explanation="Portfolio execution",
             )
@@ -1439,9 +1451,11 @@ class UnifiedReasoner:
                 chain_id=str(uuid.uuid4()),
                 steps=[initial_step],
                 initial_query={},
-                final_conclusion=exec_result.primary_result
-                if hasattr(exec_result, "primary_result")
-                else None,
+                final_conclusion=(
+                    exec_result.primary_result
+                    if hasattr(exec_result, "primary_result")
+                    else None
+                ),
                 total_confidence=0.7,
                 reasoning_types_used=set(),
                 modalities_involved=set(),
@@ -1450,9 +1464,11 @@ class UnifiedReasoner:
             )
 
             return ReasoningResult(
-                conclusion=exec_result.primary_result
-                if hasattr(exec_result, "primary_result")
-                else None,
+                conclusion=(
+                    exec_result.primary_result
+                    if hasattr(exec_result, "primary_result")
+                    else None
+                ),
                 confidence=0.7,
                 reasoning_type=ReasoningType.HYBRID,
                 reasoning_chain=chain,
@@ -1509,27 +1525,33 @@ class UnifiedReasoner:
                 step_id=f"cf_{uuid.uuid4().hex[:8]}",
                 step_type=ReasoningType.COUNTERFACTUAL,
                 input_data={"factual": factual_state, "intervention": intervention},
-                output_data=cf_result.counterfactual
-                if hasattr(cf_result, "counterfactual")
-                else None,
-                confidence=cf_result.probability
-                if hasattr(cf_result, "probability")
-                else 0.5,
-                explanation=cf_result.explanation
-                if hasattr(cf_result, "explanation")
-                else "Counterfactual reasoning",
+                output_data=(
+                    cf_result.counterfactual
+                    if hasattr(cf_result, "counterfactual")
+                    else None
+                ),
+                confidence=(
+                    cf_result.probability if hasattr(cf_result, "probability") else 0.5
+                ),
+                explanation=(
+                    cf_result.explanation
+                    if hasattr(cf_result, "explanation")
+                    else "Counterfactual reasoning"
+                ),
             )
 
             chain = ReasoningChain(
                 chain_id=str(uuid.uuid4()),
                 steps=[initial_step],
                 initial_query={"factual": factual_state, "intervention": intervention},
-                final_conclusion=cf_result.counterfactual
-                if hasattr(cf_result, "counterfactual")
-                else None,
-                total_confidence=cf_result.probability
-                if hasattr(cf_result, "probability")
-                else 0.5,
+                final_conclusion=(
+                    cf_result.counterfactual
+                    if hasattr(cf_result, "counterfactual")
+                    else None
+                ),
+                total_confidence=(
+                    cf_result.probability if hasattr(cf_result, "probability") else 0.5
+                ),
                 reasoning_types_used={ReasoningType.COUNTERFACTUAL},
                 modalities_involved=set(),
                 safety_checks=[],
@@ -1537,17 +1559,21 @@ class UnifiedReasoner:
             )
 
             return ReasoningResult(
-                conclusion=cf_result.counterfactual
-                if hasattr(cf_result, "counterfactual")
-                else None,
-                confidence=cf_result.probability
-                if hasattr(cf_result, "probability")
-                else 0.5,
+                conclusion=(
+                    cf_result.counterfactual
+                    if hasattr(cf_result, "counterfactual")
+                    else None
+                ),
+                confidence=(
+                    cf_result.probability if hasattr(cf_result, "probability") else 0.5
+                ),
                 reasoning_type=ReasoningType.COUNTERFACTUAL,
                 reasoning_chain=chain,
-                explanation=cf_result.explanation
-                if hasattr(cf_result, "explanation")
-                else "Counterfactual reasoning",
+                explanation=(
+                    cf_result.explanation
+                    if hasattr(cf_result, "explanation")
+                    else "Counterfactual reasoning"
+                ),
             )
         except Exception as e:
             logger.error(f"Counterfactual reasoning failed: {e}")
@@ -2306,13 +2332,17 @@ class UnifiedReasoner:
 
                 result = ReasoningResult(
                     conclusion=query_result,
-                    confidence=query_result.get("confidence", 0.0)
-                    if isinstance(query_result, dict)
-                    else 0.0,
+                    confidence=(
+                        query_result.get("confidence", 0.0)
+                        if isinstance(query_result, dict)
+                        else 0.0
+                    ),
                     reasoning_type=task.task_type,
-                    explanation=str(query_result.get("proof"))
-                    if isinstance(query_result, dict)
-                    else str(query_result),
+                    explanation=(
+                        str(query_result.get("proof"))
+                        if isinstance(query_result, dict)
+                        else str(query_result)
+                    ),
                 )
 
             elif task.task_type == ReasoningType.CAUSAL:
@@ -2321,9 +2351,11 @@ class UnifiedReasoner:
 
                     result = ReasoningResult(
                         conclusion=result_dict,
-                        confidence=result_dict.get("confidence", 0.5)
-                        if isinstance(result_dict, dict)
-                        else 0.5,
+                        confidence=(
+                            result_dict.get("confidence", 0.5)
+                            if isinstance(result_dict, dict)
+                            else 0.5
+                        ),
                         reasoning_type=task.task_type,
                         explanation=f"Causal analysis performed",
                     )
@@ -2346,12 +2378,16 @@ class UnifiedReasoner:
                         result = raw_result
                     else:  # Assume dict
                         result = ReasoningResult(
-                            conclusion=raw_result.get("conclusion")
-                            if isinstance(raw_result, dict)
-                            else raw_result,
-                            confidence=raw_result.get("confidence", 0.5)
-                            if isinstance(raw_result, dict)
-                            else 0.5,
+                            conclusion=(
+                                raw_result.get("conclusion")
+                                if isinstance(raw_result, dict)
+                                else raw_result
+                            ),
+                            confidence=(
+                                raw_result.get("confidence", 0.5)
+                                if isinstance(raw_result, dict)
+                                else 0.5
+                            ),
                             reasoning_type=task.task_type,
                             explanation=str(raw_result),
                         )
@@ -2722,9 +2758,11 @@ class UnifiedReasoner:
                 "elapsed_time": elapsed_time,
                 "conclusion_type": type(result.conclusion).__name__,
                 "safety_applied": self.enable_safety,
-                "utility_context": task.utility_context.mode.value
-                if task.utility_context and hasattr(task.utility_context, "mode")
-                else None,
+                "utility_context": (
+                    task.utility_context.mode.value
+                    if task.utility_context and hasattr(task.utility_context, "mode")
+                    else None
+                ),
             }
 
             self.audit_trail.append(audit_entry)

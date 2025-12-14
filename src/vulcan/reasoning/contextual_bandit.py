@@ -29,8 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Advanced ML imports
 try:
-    from sklearn.ensemble import (GradientBoostingRegressor,
-                                  RandomForestRegressor)
+    from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
     from sklearn.linear_model import Ridge
     from sklearn.model_selection import KFold, cross_val_score
     from sklearn.neural_network import MLPRegressor
@@ -651,9 +650,11 @@ class ContextualBandit:
                 tool_name=self._get_tool_name(action_id),
                 action_id=action_id,
                 expected_reward=float(q_values[action_id]),
-                exploration_bonus=float(ucb_values[action_id] - q_values[action_id])
-                if np.isfinite(ucb_values[action_id])
-                else self.max_exploration_bonus,
+                exploration_bonus=(
+                    float(ucb_values[action_id] - q_values[action_id])
+                    if np.isfinite(ucb_values[action_id])
+                    else self.max_exploration_bonus
+                ),
                 probability=self._compute_action_probability(action_id, context),
             )
         except Exception as e:
@@ -1339,15 +1340,21 @@ class AdaptiveBanditOrchestrator:
                     with open(save_path / f"{name}_state.pkl", "wb") as f:
                         pickle.dump(
                             {
-                                "q_values": dict(bandit.q_values)
-                                if hasattr(bandit, "q_values")
-                                else {},
-                                "action_counts": bandit.action_counts.tolist()
-                                if hasattr(bandit, "action_counts")
-                                else [],
-                                "stats": dict(bandit.stats)
-                                if hasattr(bandit, "stats")
-                                else {},
+                                "q_values": (
+                                    dict(bandit.q_values)
+                                    if hasattr(bandit, "q_values")
+                                    else {}
+                                ),
+                                "action_counts": (
+                                    bandit.action_counts.tolist()
+                                    if hasattr(bandit, "action_counts")
+                                    else []
+                                ),
+                                "stats": (
+                                    dict(bandit.stats)
+                                    if hasattr(bandit, "stats")
+                                    else {}
+                                ),
                             },
                             f,
                         )
@@ -1376,12 +1383,16 @@ class AdaptiveBanditOrchestrator:
                 if hasattr(bandit, "load_state_dict"):
                     model_file = load_path / f"{name}_model.pt"
                     if model_file.exists():
-                        bandit.load_state_dict(torch.load(model_file, weights_only=True))
+                        bandit.load_state_dict(
+                            torch.load(model_file, weights_only=True)
+                        )
                 else:
                     state_file = load_path / f"{name}_state.pkl"
                     if state_file.exists():
                         with open(state_file, "rb") as f:
-                            state = pickle.load(f)  # nosec B301 - Internal data structure
+                            state = pickle.load(
+                                f
+                            )  # nosec B301 - Internal data structure
                             if hasattr(bandit, "q_values"):
                                 bandit.q_values = defaultdict(
                                     lambda: np.zeros(self.n_actions), state["q_values"]

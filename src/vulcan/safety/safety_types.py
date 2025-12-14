@@ -326,9 +326,9 @@ class SafetyConstraint:
             "threshold": self.threshold,
             "priority": self.priority,
             "active": self.active,
-            "compliance_standard": self.compliance_standard.value
-            if self.compliance_standard
-            else None,
+            "compliance_standard": (
+                self.compliance_standard.value if self.compliance_standard else None
+            ),
             "description": self.description,
             "metadata": self.metadata,
         }

@@ -12,8 +12,11 @@ import pytest
 # Import the module to test
 try:
     from vulcan.world_model.confidence_calibrator import (
-        CalibrationBin, ConfidenceCalibrator, ModelConfidenceTracker,
-        PredictionRecord)
+        CalibrationBin,
+        ConfidenceCalibrator,
+        ModelConfidenceTracker,
+        PredictionRecord,
+    )
 
     CALIBRATOR_AVAILABLE = True
 except ImportError:

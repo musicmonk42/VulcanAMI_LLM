@@ -135,52 +135,122 @@ import logging
 from typing import Any, Dict
 
 # Import core causal graph components
-from .causal_graph import (CausalDAG, CausalEdge, CausalPath, CycleDetector,
-                           DSeparationChecker, EvidenceType, GraphStructure,
-                           PathFinder, ProbabilityDistribution,
-                           TopologicalSorter)
+from .causal_graph import (
+    CausalDAG,
+    CausalEdge,
+    CausalPath,
+    CycleDetector,
+    DSeparationChecker,
+    EvidenceType,
+    GraphStructure,
+    PathFinder,
+    ProbabilityDistribution,
+    TopologicalSorter,
+)
+
 # Import confidence calibration components
-from .confidence_calibrator import (CalibrationBin, ConfidenceCalibrator,
-                                    ModelConfidenceTracker, PredictionRecord)
+from .confidence_calibrator import (
+    CalibrationBin,
+    ConfidenceCalibrator,
+    ModelConfidenceTracker,
+    PredictionRecord,
+)
+
 # Import correlation tracking components
-from .correlation_tracker import (BaselineTracker, CausalityTracker,
-                                  ChangeDetector, CorrelationCalculator,
-                                  CorrelationEntry, CorrelationMatrix,
-                                  CorrelationMethod, CorrelationStorage,
-                                  CorrelationTracker, DataBuffer,
-                                  StatisticsTracker)
+from .correlation_tracker import (
+    BaselineTracker,
+    CausalityTracker,
+    ChangeDetector,
+    CorrelationCalculator,
+    CorrelationEntry,
+    CorrelationMatrix,
+    CorrelationMethod,
+    CorrelationStorage,
+    CorrelationTracker,
+    DataBuffer,
+    StatisticsTracker,
+)
+
 # Import dynamics modeling components
-from .dynamics_model import (Condition, DynamicsApplier, DynamicsModel,
-                             ModelFitter, PatternDetector, PatternType, State,
-                             StateClusterer, StateTransition, TemporalPattern,
-                             TimeSeriesAnalyzer, TransitionLearner)
+from .dynamics_model import (
+    Condition,
+    DynamicsApplier,
+    DynamicsModel,
+    ModelFitter,
+    PatternDetector,
+    PatternType,
+    State,
+    StateClusterer,
+    StateTransition,
+    TemporalPattern,
+    TimeSeriesAnalyzer,
+    TransitionLearner,
+)
+
 # Import intervention management components
-from .intervention_manager import (ConfounderDetector, Correlation,
-                                   CostEstimator, InformationGainEstimator,
-                                   InterventionCandidate, InterventionExecutor,
-                                   InterventionPrioritizer, InterventionResult,
-                                   InterventionScheduler,
-                                   InterventionSimulator, InterventionType)
+from .intervention_manager import (
+    ConfounderDetector,
+    Correlation,
+    CostEstimator,
+    InformationGainEstimator,
+    InterventionCandidate,
+    InterventionExecutor,
+    InterventionPrioritizer,
+    InterventionResult,
+    InterventionScheduler,
+    InterventionSimulator,
+    InterventionType,
+)
+
 # Import invariant detection components
-from .invariant_detector import (ConservationLawDetector, Invariant,
-                                 InvariantDetector, InvariantEvaluator,
-                                 InvariantIndexer, InvariantRegistry,
-                                 InvariantType, InvariantValidator,
-                                 LinearRelationshipDetector)
+from .invariant_detector import (
+    ConservationLawDetector,
+    Invariant,
+    InvariantDetector,
+    InvariantEvaluator,
+    InvariantIndexer,
+    InvariantRegistry,
+    InvariantType,
+    InvariantValidator,
+    LinearRelationshipDetector,
+)
+
 # Import prediction engine components
-from .prediction_engine import (CombinationMethod, EnsemblePredictor,
-                                MonteCarloSampler, Path, PathAnalyzer,
-                                PathCluster, PathClusterer,
-                                PathEffectCalculator, PathTracer, Prediction,
-                                PredictionCombiner)
+from .prediction_engine import (
+    CombinationMethod,
+    EnsemblePredictor,
+    MonteCarloSampler,
+    Path,
+    PathAnalyzer,
+    PathCluster,
+    PathClusterer,
+    PathEffectCalculator,
+    PathTracer,
+    Prediction,
+    PredictionCombiner,
+)
+
 # Import world model core and router
-from .world_model_core import (ConsistencyValidator, InterventionManager,
-                               ModelContext, Observation, ObservationProcessor,
-                               PredictionManager, WorldModel)
-from .world_model_router import (CostModel, ObservationSignature,
-                                 PatternLearner, UpdateDependencyGraph,
-                                 UpdatePlan, UpdatePriority, UpdateStrategy,
-                                 UpdateType, WorldModelRouter)
+from .world_model_core import (
+    ConsistencyValidator,
+    InterventionManager,
+    ModelContext,
+    Observation,
+    ObservationProcessor,
+    PredictionManager,
+    WorldModel,
+)
+from .world_model_router import (
+    CostModel,
+    ObservationSignature,
+    PatternLearner,
+    UpdateDependencyGraph,
+    UpdatePlan,
+    UpdatePriority,
+    UpdateStrategy,
+    UpdateType,
+    WorldModelRouter,
+)
 
 # Try to import additional components if they exist
 _optional_imports_success = {}

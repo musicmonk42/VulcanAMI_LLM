@@ -14,13 +14,21 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from adversarial_tester import (GRADIENT_EPSILON, MAX_TENSOR_SIZE,
-                                PHOTONIC_NOISE_FLOOR, AdversarialResult,
-                                AdversarialTester, AlignmentResult,
-                                AnomalyType, AttackType,
-                                DatabaseConnectionPool, InterpretabilityEngine,
-                                InterpretabilityResult, NSOAligner,
-                                SafetyLevel)
+from adversarial_tester import (
+    GRADIENT_EPSILON,
+    MAX_TENSOR_SIZE,
+    PHOTONIC_NOISE_FLOOR,
+    AdversarialResult,
+    AdversarialTester,
+    AlignmentResult,
+    AnomalyType,
+    AttackType,
+    DatabaseConnectionPool,
+    InterpretabilityEngine,
+    InterpretabilityResult,
+    NSOAligner,
+    SafetyLevel,
+)
 
 
 @pytest.fixture
@@ -55,9 +63,7 @@ def simple_model():
 def interpret_engine(sample_data, simple_model):
     """Create interpretability engine."""
     return InterpretabilityEngine(
-        model=simple_model,
-        background_data=sample_data,
-        cache_size=100
+        model=simple_model, background_data=sample_data, cache_size=100
     )
 
 
@@ -73,7 +79,7 @@ def adversarial_tester(interpret_engine, nso_aligner, temp_dir):
     return AdversarialTester(
         interpret_engine=interpret_engine,
         nso_aligner=nso_aligner,
-        log_dir=str(temp_dir / "logs")
+        log_dir=str(temp_dir / "logs"),
     )
 
 
@@ -144,10 +150,7 @@ class TestInterpretabilityEngine:
 
     def test_initialization(self, sample_data, simple_model):
         """Test engine initialization."""
-        engine = InterpretabilityEngine(
-            model=simple_model,
-            background_data=sample_data
-        )
+        engine = InterpretabilityEngine(model=simple_model, background_data=sample_data)
 
         assert engine.model is not None
         assert engine.background_data is not None
@@ -220,7 +223,9 @@ class TestInterpretabilityEngine:
     def test_anomaly_detection_normal(self, interpret_engine, sample_data):
         """Test anomaly detection on normal data."""
         normal_sample = sample_data[0]
-        is_anomaly, anomaly_type, confidence = interpret_engine.detect_anomaly(normal_sample)
+        is_anomaly, anomaly_type, confidence = interpret_engine.detect_anomaly(
+            normal_sample
+        )
 
         # Should not be anomalous
         assert isinstance(is_anomaly, bool)
@@ -262,7 +267,7 @@ class TestNSOAligner:
         safe_proposal = {
             "id": "safe_001",
             "code": "print('Hello, World!')",
-            "description": "Safe greeting"
+            "description": "Safe greeting",
         }
 
         result = nso_aligner.audit_proposal(safe_proposal)
@@ -276,7 +281,7 @@ class TestNSOAligner:
         """Test detection of dangerous code."""
         dangerous_proposal = {
             "id": "danger_001",
-            "code": "import os; os.system('rm -rf /')"
+            "code": "import os; os.system('rm -rf /')",
         }
 
         result = nso_aligner.audit_proposal(dangerous_proposal)
@@ -287,10 +292,7 @@ class TestNSOAligner:
 
     def test_eval_exec_detection(self, nso_aligner):
         """Test detection of eval/exec."""
-        eval_proposal = {
-            "id": "eval_001",
-            "code": "eval(user_input)"
-        }
+        eval_proposal = {"id": "eval_001", "code": "eval(user_input)"}
 
         result = nso_aligner.audit_proposal(eval_proposal)
 
@@ -299,10 +301,7 @@ class TestNSOAligner:
 
     def test_sql_injection_detection(self, nso_aligner):
         """Test detection of SQL injection patterns."""
-        sql_proposal = {
-            "id": "sql_001",
-            "code": "DROP TABLE users"
-        }
+        sql_proposal = {"id": "sql_001", "code": "DROP TABLE users"}
 
         result = nso_aligner.audit_proposal(sql_proposal)
 
@@ -325,13 +324,15 @@ class TestNSOAligner:
         """Test oversized proposal."""
         large_proposal = {
             "id": "large_001",
-            "code": "x = 1\n" * 1000000  # Very large code
+            "code": "x = 1\n" * 1000000,  # Very large code
         }
 
         result = nso_aligner.audit_proposal(large_proposal)
 
         # Should detect size issue
-        assert "excessive_size" in result.risks or result.safety_level != SafetyLevel.SAFE
+        assert (
+            "excessive_size" in result.risks or result.safety_level != SafetyLevel.SAFE
+        )
 
     def test_multi_model_audit(self, nso_aligner):
         """Test multi-model audit wrapper."""
@@ -386,10 +387,7 @@ class TestAdversarialTester:
     def test_fgsm_attack(self, adversarial_tester, sample_tensor):
         """Test FGSM attack."""
         adv_tensor, divergence = adversarial_tester.generate_adversarial_tensor(
-            sample_tensor,
-            attack_type=AttackType.FGSM,
-            steps=5,
-            epsilon=0.1
+            sample_tensor, attack_type=AttackType.FGSM, steps=5, epsilon=0.1
         )
 
         assert adv_tensor.shape == sample_tensor.shape
@@ -399,10 +397,7 @@ class TestAdversarialTester:
     def test_pgd_attack(self, adversarial_tester, sample_tensor):
         """Test PGD attack."""
         adv_tensor, divergence = adversarial_tester.generate_adversarial_tensor(
-            sample_tensor,
-            attack_type=AttackType.PGD,
-            steps=5,
-            epsilon=0.1
+            sample_tensor, attack_type=AttackType.PGD, steps=5, epsilon=0.1
         )
 
         assert adv_tensor.shape == sample_tensor.shape
@@ -411,10 +406,7 @@ class TestAdversarialTester:
     def test_random_attack(self, adversarial_tester, sample_tensor):
         """Test random attack."""
         adv_tensor, divergence = adversarial_tester.generate_adversarial_tensor(
-            sample_tensor,
-            attack_type=AttackType.RANDOM,
-            steps=10,
-            epsilon=0.1
+            sample_tensor, attack_type=AttackType.RANDOM, steps=10, epsilon=0.1
         )
 
         assert adv_tensor.shape == sample_tensor.shape
@@ -427,7 +419,7 @@ class TestAdversarialTester:
                 sample_tensor,
                 attack_type=AttackType.PGD,
                 steps=10000,  # Many steps
-                timeout=1  # Short timeout
+                timeout=1,  # Short timeout
             )
 
     def test_oversized_tensor_rejection(self, adversarial_tester):
@@ -436,8 +428,7 @@ class TestAdversarialTester:
 
         with pytest.raises(ValueError, match="Tensor too large"):
             adversarial_tester.generate_adversarial_tensor(
-                huge_tensor,
-                attack_type=AttackType.FGSM
+                huge_tensor, attack_type=AttackType.FGSM
             )
 
     def test_too_many_iterations(self, adversarial_tester, sample_tensor):
@@ -448,7 +439,7 @@ class TestAdversarialTester:
             adversarial_tester.generate_adversarial_tensor(
                 sample_tensor,
                 attack_type=AttackType.FGSM,
-                steps=MAX_ATTACK_ITERATIONS + 1
+                steps=MAX_ATTACK_ITERATIONS + 1,
             )
 
     def test_photonic_noise(self, adversarial_tester, sample_tensor):
@@ -466,9 +457,7 @@ class TestAdversarialTester:
         """Test OOD tensor generation."""
         for distribution in ["uniform", "gaussian", "laplace", "cauchy", "exponential"]:
             ood = adversarial_tester.generate_ood_tensor(
-                shape=(10,),
-                distribution=distribution,
-                scale=5.0
+                shape=(10,), distribution=distribution, scale=5.0
             )
 
             assert ood.shape == (10,)
@@ -476,28 +465,27 @@ class TestAdversarialTester:
 
     def test_audit_resilience(self, adversarial_tester):
         """Test audit resilience testing."""
-        proposal = {
-            "id": "test_proposal",
-            "code": "print('hello')"
-        }
+        proposal = {"id": "test_proposal", "code": "print('hello')"}
 
         results = adversarial_tester.test_audit_resilience(proposal)
 
         assert len(results) > 0
         for perturbed, label in results:
-            assert label in ["safe", "low_risk", "medium_risk", "high_risk", "critical", "error"]
+            assert label in [
+                "safe",
+                "low_risk",
+                "medium_risk",
+                "high_risk",
+                "critical",
+                "error",
+            ]
 
     def test_adversarial_search(self, adversarial_tester):
         """Test adversarial search."""
-        safe_proposal = {
-            "id": "safe_search",
-            "code": "x = 1 + 1"
-        }
+        safe_proposal = {"id": "safe_search", "code": "x = 1 + 1"}
 
         result_proposal, steps = adversarial_tester.adversarial_search(
-            safe_proposal,
-            max_steps=10,
-            target_label="critical"
+            safe_proposal, max_steps=10, target_label="critical"
         )
 
         assert steps >= 0
@@ -531,9 +519,7 @@ class TestAdversarialTester:
         for attack_type in [AttackType.FGSM, AttackType.PGD]:
             try:
                 adversarial_tester.generate_adversarial_tensor(
-                    sample_tensor,
-                    attack_type=attack_type,
-                    steps=2
+                    sample_tensor, attack_type=attack_type, steps=2
                 )
             except:
                 pass
@@ -551,9 +537,7 @@ class TestAdversarialTester:
         def run_attack():
             try:
                 adv, div = adversarial_tester.generate_adversarial_tensor(
-                    sample_tensor,
-                    attack_type=AttackType.FGSM,
-                    steps=3
+                    sample_tensor, attack_type=AttackType.FGSM, steps=3
                 )
                 results.append(div)
             except Exception as e:
@@ -592,6 +576,7 @@ class TestThreadSafety:
 
     def test_audit_history_thread_safety(self, nso_aligner):
         """Test audit history thread safety."""
+
         def audit():
             proposal = {"id": f"thread_{threading.get_ident()}", "code": "pass"}
             nso_aligner.audit_proposal(proposal)

@@ -1,10 +1,16 @@
 """Comprehensive test suite for governed_unlearning.py"""
 
-from governed_unlearning import (GovernanceResult, GovernedUnlearning,
-                                 IRProposal, ProposalStatus,
-                                 UnlearningAuditLogger, UnlearningMethod,
-                                 UnlearningMetrics, UnlearningTask,
-                                 UrgencyLevel)
+from governed_unlearning import (
+    GovernanceResult,
+    GovernedUnlearning,
+    IRProposal,
+    ProposalStatus,
+    UnlearningAuditLogger,
+    UnlearningMethod,
+    UnlearningMetrics,
+    UnlearningTask,
+    UrgencyLevel,
+)
 import sys
 import threading
 import time

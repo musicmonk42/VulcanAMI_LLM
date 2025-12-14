@@ -696,9 +696,11 @@ class PerformanceTracker:
                 "total_failures": total_failures,
                 "reasons": dict(self.failure_reasons),
                 "percentages": reason_percentages,
-                "top_reason": max(self.failure_reasons, key=self.failure_reasons.get)
-                if self.failure_reasons
-                else None,
+                "top_reason": (
+                    max(self.failure_reasons, key=self.failure_reasons.get)
+                    if self.failure_reasons
+                    else None
+                ),
             }
 
     def get_statistics(self) -> Dict[str, Any]:

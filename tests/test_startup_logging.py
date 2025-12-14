@@ -27,7 +27,9 @@ def test_startup_logging_sequence():
     log_capture = StringIO()
     handler = logging.StreamHandler(log_capture)
     handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     handler.setFormatter(formatter)
 
     # Configure root logger
@@ -42,14 +44,19 @@ def test_startup_logging_sequence():
         from vulcan.memory import retrieval
 
         # Verify modules are accessible and have expected attributes
-        assert hasattr(persistant_memory_v46, '__version__') or hasattr(persistant_memory_v46, '__name__'), \
-            "persistant_memory_v46 module not properly loaded"
+        assert hasattr(persistant_memory_v46, "__version__") or hasattr(
+            persistant_memory_v46, "__name__"
+        ), "persistant_memory_v46 module not properly loaded"
 
-        assert hasattr(retrieval, 'RetrievalResult') or hasattr(retrieval, '__name__') or 'retrieval' in str(type(retrieval)), \
-            "vulcan.memory.retrieval module not properly loaded"
+        assert (
+            hasattr(retrieval, "RetrievalResult")
+            or hasattr(retrieval, "__name__")
+            or "retrieval" in str(type(retrieval))
+        ), "vulcan.memory.retrieval module not properly loaded"
 
-        assert hasattr(orchestrator, '__name__') or 'orchestrator' in str(type(orchestrator)), \
-            "vulcan.orchestrator module not properly loaded"
+        assert hasattr(orchestrator, "__name__") or "orchestrator" in str(
+            type(orchestrator)
+        ), "vulcan.orchestrator module not properly loaded"
 
         # Get captured logs (may be empty if modules were pre-imported)
         log_output = log_capture.getvalue()

@@ -8,11 +8,18 @@ from unittest.mock import MagicMock, Mock
 
 import numpy as np
 import pytest
-from value_of_information import (CostEstimator, DecisionState,
-                                  InformationCost, InformationGainCalculator,
-                                  InformationSource, InformationValue,
-                                  UncertaintyEstimator, ValueCalculator,
-                                  ValueOfInformationGate, VOIAction)
+from value_of_information import (
+    CostEstimator,
+    DecisionState,
+    InformationCost,
+    InformationGainCalculator,
+    InformationSource,
+    InformationValue,
+    UncertaintyEstimator,
+    ValueCalculator,
+    ValueOfInformationGate,
+    VOIAction,
+)
 
 
 @pytest.fixture
@@ -84,10 +91,7 @@ class TestDataClasses:
     def test_information_cost_creation(self):
         """Test creating InformationCost."""
         cost = InformationCost(
-            time_ms=100.0,
-            energy_mj=10.0,
-            monetary=1.0,
-            opportunity=0.5
+            time_ms=100.0, energy_mj=10.0, monetary=1.0, opportunity=0.5
         )
 
         assert cost.time_ms == 100.0
@@ -96,10 +100,7 @@ class TestDataClasses:
     def test_information_cost_total(self):
         """Test calculating total cost."""
         cost = InformationCost(
-            time_ms=100.0,
-            energy_mj=10.0,
-            monetary=1.0,
-            opportunity=0.5
+            time_ms=100.0, energy_mj=10.0, monetary=1.0, opportunity=0.5
         )
 
         total = cost.total_cost()
@@ -115,7 +116,7 @@ class TestDataClasses:
             net_value=5.0,
             recommendation=VOIAction.GATHER_MORE,
             source=InformationSource.TIER2_FEATURES,
-            confidence=0.8
+            confidence=0.8,
         )
 
         assert value.expected_value == 10.0
@@ -127,7 +128,7 @@ class TestDataClasses:
             features=sample_features,
             uncertainty=0.5,
             current_best_tool="tool1",
-            current_confidence=0.7
+            current_confidence=0.7,
         )
 
         assert state.uncertainty == 0.5
@@ -141,18 +142,21 @@ class TestUncertaintyEstimator:
         """Test estimator initialization."""
         assert uncertainty_estimator is not None
 
-    def test_estimate_uncertainty_features_only(self, uncertainty_estimator, sample_features):
+    def test_estimate_uncertainty_features_only(
+        self, uncertainty_estimator, sample_features
+    ):
         """Test estimating uncertainty from features only."""
         uncertainty = uncertainty_estimator.estimate_uncertainty(sample_features)
 
         assert isinstance(uncertainty, float)
         assert 0 <= uncertainty <= 1
 
-    def test_estimate_uncertainty_with_predictions(self, uncertainty_estimator, sample_features, sample_predictions):
+    def test_estimate_uncertainty_with_predictions(
+        self, uncertainty_estimator, sample_features, sample_predictions
+    ):
         """Test estimating uncertainty with predictions."""
         uncertainty = uncertainty_estimator.estimate_uncertainty(
-            sample_features,
-            sample_predictions
+            sample_features, sample_predictions
         )
 
         assert isinstance(uncertainty, float)
@@ -263,7 +267,7 @@ class TestCostEstimator:
 
     def test_estimate_cost_with_context(self, cost_estimator):
         """Test cost estimation with context."""
-        context = {'complexity': 0.5, 'urgency': 0.8}
+        context = {"complexity": 0.5, "urgency": 0.8}
 
         cost = cost_estimator.estimate_cost(InformationSource.TIER2_FEATURES, context)
 
@@ -321,17 +325,17 @@ class TestValueOfInformationGate:
         assert voi_gate is not None
         assert voi_gate.uncertainty_estimator is not None
 
-    def test_should_probe_deeper_low_uncertainty(self, voi_gate, sample_features, sample_predictions):
+    def test_should_probe_deeper_low_uncertainty(
+        self, voi_gate, sample_features, sample_predictions
+    ):
         """Test decision with low uncertainty."""
-        budget = {'time_ms': 1000, 'energy_mj': 100}
+        budget = {"time_ms": 1000, "energy_mj": 100}
 
         # With high confidence predictions
         confident_predictions = np.array([0.95, 0.03, 0.02])
 
         should_gather, action = voi_gate.should_probe_deeper(
-            sample_features,
-            confident_predictions,
-            budget
+            sample_features, confident_predictions, budget
         )
 
         # Should probably not gather more
@@ -339,28 +343,26 @@ class TestValueOfInformationGate:
 
     def test_should_probe_deeper_high_uncertainty(self, voi_gate, sample_features):
         """Test decision with high uncertainty."""
-        budget = {'time_ms': 1000, 'energy_mj': 100}
+        budget = {"time_ms": 1000, "energy_mj": 100}
 
         # With uncertain predictions
         uncertain_predictions = np.array([0.4, 0.3, 0.3])
 
         should_gather, action = voi_gate.should_probe_deeper(
-            sample_features,
-            uncertain_predictions,
-            budget
+            sample_features, uncertain_predictions, budget
         )
 
         # Decision depends on VOI calculation
         assert isinstance(should_gather, bool)
 
-    def test_should_probe_deeper_limited_budget(self, voi_gate, sample_features, sample_predictions):
+    def test_should_probe_deeper_limited_budget(
+        self, voi_gate, sample_features, sample_predictions
+    ):
         """Test decision with limited budget."""
-        budget = {'time_ms': 10, 'energy_mj': 1}  # Very limited
+        budget = {"time_ms": 10, "energy_mj": 1}  # Very limited
 
         should_gather, action = voi_gate.should_probe_deeper(
-            sample_features,
-            sample_predictions,
-            budget
+            sample_features, sample_predictions, budget
         )
 
         # Should probably not gather with limited budget
@@ -371,17 +373,16 @@ class TestValueOfInformationGate:
         state = DecisionState(
             features=sample_features,
             uncertainty=0.5,
-            remaining_budget={'time_ms': 1000, 'energy_mj': 100}
+            remaining_budget={"time_ms": 1000, "energy_mj": 100},
         )
 
         value = voi_gate.evaluate_information_source(
-            state,
-            InformationSource.TIER2_FEATURES
+            state, InformationSource.TIER2_FEATURES
         )
 
         if value:
             assert isinstance(value, InformationValue)
-            assert hasattr(value, 'net_value')
+            assert hasattr(value, "net_value")
 
     def test_calculate_evpi(self, voi_gate):
         """Test EVPI calculation."""
@@ -407,7 +408,7 @@ class TestValueOfInformationGate:
         state = DecisionState(
             features=sample_features,
             uncertainty=0.5,
-            remaining_budget={'time_ms': 1000}
+            remaining_budget={"time_ms": 1000},
         )
 
         sequence = voi_gate.multi_stage_voi(state, horizon=3)
@@ -418,29 +419,25 @@ class TestValueOfInformationGate:
         """Test updating with actual outcome."""
         actual_cost = InformationCost(120.0, 12.0)
 
-        voi_gate.update_with_outcome(
-            InformationSource.TIER2_FEATURES,
-            0.4,
-            actual_cost
-        )
+        voi_gate.update_with_outcome(InformationSource.TIER2_FEATURES, 0.4, actual_cost)
 
         # Should not crash
 
     def test_get_statistics(self, voi_gate, sample_features, sample_predictions):
         """Test getting statistics."""
         # Make some decisions
-        budget = {'time_ms': 1000, 'energy_mj': 100}
+        budget = {"time_ms": 1000, "energy_mj": 100}
         voi_gate.should_probe_deeper(sample_features, sample_predictions, budget)
 
         stats = voi_gate.get_statistics()
 
-        assert 'total_decisions' in stats
-        assert 'gather_rate' in stats
+        assert "total_decisions" in stats
+        assert "gather_rate" in stats
 
     def test_visualize_decisions(self, voi_gate, sample_features, sample_predictions):
         """Test visualization data."""
         # Make some decisions
-        budget = {'time_ms': 1000, 'energy_mj': 100}
+        budget = {"time_ms": 1000, "energy_mj": 100}
         for i in range(10):
             voi_gate.should_probe_deeper(sample_features, sample_predictions, budget)
 
@@ -455,19 +452,19 @@ class TestPersistence:
     def test_save_state(self, voi_gate, temp_dir, sample_features, sample_predictions):
         """Test saving VOI state."""
         # Make some decisions
-        budget = {'time_ms': 1000, 'energy_mj': 100}
+        budget = {"time_ms": 1000, "energy_mj": 100}
         voi_gate.should_probe_deeper(sample_features, sample_predictions, budget)
 
         voi_gate.save_state(temp_dir)
 
         save_path = Path(temp_dir)
-        assert (save_path / 'voi_state.json').exists()
+        assert (save_path / "voi_state.json").exists()
 
     def test_load_state(self, temp_dir, sample_features, sample_predictions):
         """Test loading VOI state."""
         # Create and save
         gate1 = ValueOfInformationGate()
-        budget = {'time_ms': 1000, 'energy_mj': 100}
+        budget = {"time_ms": 1000, "energy_mj": 100}
         gate1.should_probe_deeper(sample_features, sample_predictions, budget)
         gate1.save_state(temp_dir)
 
@@ -485,12 +482,10 @@ class TestEdgeCases:
     def test_zero_predictions(self, voi_gate, sample_features):
         """Test with zero predictions."""
         zero_predictions = np.array([0.0, 0.0, 0.0])
-        budget = {'time_ms': 1000}
+        budget = {"time_ms": 1000}
 
         should_gather, action = voi_gate.should_probe_deeper(
-            sample_features,
-            zero_predictions,
-            budget
+            sample_features, zero_predictions, budget
         )
 
         assert isinstance(should_gather, bool)
@@ -500,9 +495,7 @@ class TestEdgeCases:
         empty_budget = {}
 
         should_gather, action = voi_gate.should_probe_deeper(
-            sample_features,
-            sample_predictions,
-            empty_budget
+            sample_features, sample_predictions, empty_budget
         )
 
         assert isinstance(should_gather, bool)

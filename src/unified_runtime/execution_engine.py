@@ -15,8 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import (Any, AsyncIterator, Callable, Dict, List, Optional, Set,
-                    Union)
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set, Union
 
 try:
     import networkx as nx
@@ -95,7 +94,9 @@ class ExecutionContext:
         if not self.execution_id:
             # Generate unique execution ID
             exec_data = f"{id(self.graph)}_{time.time()}"
-            self.execution_id = hashlib.md5(exec_data.encode(), usedforsecurity=False).hexdigest()[:16]
+            self.execution_id = hashlib.md5(
+                exec_data.encode(), usedforsecurity=False
+            ).hexdigest()[:16]
 
     def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
         """Get node by ID"""
@@ -187,9 +188,11 @@ class GraphExecutionResult:
             "duration_ms": self.duration_ms,
             "nodes_executed": self.nodes_executed,
             "metadata": self.metadata,
-            "metrics": self.metrics.to_dict()
-            if self.metrics and hasattr(self.metrics, "to_dict")
-            else None,
+            "metrics": (
+                self.metrics.to_dict()
+                if self.metrics and hasattr(self.metrics, "to_dict")
+                else None
+            ),
             # Audit log is often large, optionally exclude from simple dict conversion
             # 'audit_log': self.audit_log
         }
@@ -1325,8 +1328,9 @@ class ExecutionEngine:
                 # Simple representation: hash the JSON string
                 try:
                     input_repr = hashlib.md5(
-                        json.dumps(input_val, sort_keys=True, default=str).encode()
-                        , usedforsecurity=False).hexdigest()[:8]
+                        json.dumps(input_val, sort_keys=True, default=str).encode(),
+                        usedforsecurity=False,
+                    ).hexdigest()[:8]
                 except (TypeError, ValueError) as e:
                     # If value can't be hashed, use type representation
                     logger.debug(f"Could not hash input value: {e}")

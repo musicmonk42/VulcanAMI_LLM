@@ -51,10 +51,8 @@ class SetupError(Exception):
     """Base exception for setup errors."""
 
 
-
 class ValidationError(SetupError):
     """Raised when input validation fails."""
-
 
 
 def validate_agent_id(agent_id: str) -> None:

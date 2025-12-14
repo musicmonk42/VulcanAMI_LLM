@@ -54,9 +54,13 @@ except ImportError:
 
 # Optional observability_manager
 try:
-    from observability_manager import (get_prometheus_metrics, notify_anomaly,
-                                       notify_error, notify_success,
-                                       send_metric_event)
+    from observability_manager import (
+        get_prometheus_metrics,
+        notify_anomaly,
+        notify_error,
+        notify_success,
+        send_metric_event,
+    )
 
     OBSERVABILITY_AVAILABLE = True
 except ImportError:
@@ -94,8 +98,12 @@ except ImportError:
 
 # Optional nso_aligner
 try:
-    from nso_aligner import (get_bias_examples, get_bias_taxonomy,
-                             get_bias_taxonomy_schema, get_bias_trends)
+    from nso_aligner import (
+        get_bias_examples,
+        get_bias_taxonomy,
+        get_bias_taxonomy_schema,
+        get_bias_trends,
+    )
 
     NSO_ALIGNER_AVAILABLE = True
 except ImportError:

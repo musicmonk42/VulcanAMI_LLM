@@ -10,11 +10,20 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from registry_api import (DEFAULT_GRAMMAR_VERSION, AbstractBackend,
-                          AbstractKMS, AgentRegistry, CryptoHandler,
-                          InMemoryBackend, RegistryAPI, SecurityEngine,
-                          SimpleKMS, build_merkle_tree, get_merkle_root,
-                          hash_data)
+from registry_api import (
+    DEFAULT_GRAMMAR_VERSION,
+    AbstractBackend,
+    AbstractKMS,
+    AgentRegistry,
+    CryptoHandler,
+    InMemoryBackend,
+    RegistryAPI,
+    SecurityEngine,
+    SimpleKMS,
+    build_merkle_tree,
+    get_merkle_root,
+    hash_data,
+)
 
 
 @pytest.fixture
@@ -61,7 +70,7 @@ def sample_proposal():
         "type": "ProposalNode",
         "proposed_by": "agent-alice",
         "rationale": "Test proposal",
-        "proposal_content": {"test": "data"}
+        "proposal_content": {"test": "data"},
     }
 
 
@@ -315,7 +324,7 @@ class TestCryptoHandler:
         """Test verifying valid signature."""
         data = b"test data"
         signature = crypto_handler.sign_data(data)
-        public_key_pem = simple_kms.get_public_key_pem("test_key").encode('utf-8')
+        public_key_pem = simple_kms.get_public_key_pem("test_key").encode("utf-8")
 
         result = crypto_handler.verify_signature(data, signature, public_key_pem)
 
@@ -325,7 +334,7 @@ class TestCryptoHandler:
         """Test verifying invalid signature."""
         data = b"test data"
         wrong_signature = "invalid_signature_hex"
-        public_key_pem = simple_kms.get_public_key_pem("test_key").encode('utf-8')
+        public_key_pem = simple_kms.get_public_key_pem("test_key").encode("utf-8")
 
         result = crypto_handler.verify_signature(data, wrong_signature, public_key_pem)
 
@@ -342,10 +351,7 @@ class TestSecurityEngine:
 
     def test_enforce_policies_clean_proposal(self, security_engine):
         """Test enforcing policies on clean proposal."""
-        clean_proposal = {
-            "type": "ProposalNode",
-            "content": "safe content"
-        }
+        clean_proposal = {"type": "ProposalNode", "content": "safe content"}
 
         result = security_engine.enforce_policies(clean_proposal)
 
@@ -353,7 +359,7 @@ class TestSecurityEngine:
 
     def test_enforce_policies_dangerous_patterns(self, security_engine):
         """Test detecting dangerous patterns."""
-        dangerous_patterns = ['os.system', 'exec', 'eval', '__import__']
+        dangerous_patterns = ["os.system", "exec", "eval", "__import__"]
 
         for pattern in dangerous_patterns:
             proposal = {"code": pattern}
@@ -473,10 +479,7 @@ class TestRegistryAPI:
 
     def test_submit_proposal_security_violation(self, registry_api):
         """Test submitting proposal with security violation."""
-        dangerous_proposal = {
-            "id": "dangerous",
-            "content": "os.system('rm -rf /')"
-        }
+        dangerous_proposal = {"id": "dangerous", "content": "os.system('rm -rf /')"}
 
         with pytest.raises(ValueError, match="security policy"):
             registry_api.submit_proposal(dangerous_proposal)
@@ -506,7 +509,7 @@ class TestRegistryAPI:
         consensus_node = {
             "proposal_id": proposal_id,
             "votes": {"agent-alice": "yes"},
-            "quorum": 0.5
+            "quorum": 0.5,
         }
 
         result = registry_api.record_vote(consensus_node)
@@ -515,10 +518,7 @@ class TestRegistryAPI:
 
     def test_record_vote_nonexistent_proposal(self, registry_api):
         """Test recording vote for nonexistent proposal."""
-        consensus_node = {
-            "proposal_id": "nonexistent",
-            "votes": {"agent1": "yes"}
-        }
+        consensus_node = {"proposal_id": "nonexistent", "votes": {"agent1": "yes"}}
 
         with pytest.raises(ValueError, match="not found"):
             registry_api.record_vote(consensus_node)
@@ -530,7 +530,7 @@ class TestRegistryAPI:
         validation_node = {
             "target": proposal_id,
             "validation_type": "schema",
-            "result": True
+            "result": True,
         }
 
         result = registry_api.record_validation(validation_node)
@@ -544,7 +544,7 @@ class TestRegistryAPI:
         validation_node = {
             "target": proposal_id,
             "validation_type": "schema",
-            "result": False
+            "result": False,
         }
 
         result = registry_api.record_validation(validation_node)
@@ -562,7 +562,7 @@ class TestRegistryAPI:
         consensus_node = {
             "proposal_id": proposal_id,
             "votes": {"agent-alice": "yes"},
-            "quorum": 0.5
+            "quorum": 0.5,
         }
         registry_api.record_vote(consensus_node)
 
@@ -586,7 +586,7 @@ class TestRegistryAPI:
             proposal = {
                 "id": f"proposal_{i}",
                 "type": "ProposalNode",
-                "proposed_by": "agent1"
+                "proposed_by": "agent1",
             }
             registry_api.submit_proposal(proposal)
 
@@ -627,12 +627,24 @@ class TestRegistryAPI:
 
     def test_version_increment_validation(self, registry_api):
         """Test semantic version increment validation."""
-        assert registry_api._is_valid_version_increment("2.3.0", "2.3.1") is True  # Patch
-        assert registry_api._is_valid_version_increment("2.3.0", "2.4.0") is True  # Minor
-        assert registry_api._is_valid_version_increment("2.3.0", "3.0.0") is True  # Major
-        assert registry_api._is_valid_version_increment("2.3.0", "2.3.0") is False  # Same
-        assert registry_api._is_valid_version_increment("2.3.0", "2.2.0") is False  # Backward
-        assert registry_api._is_valid_version_increment("2.3.0", "3.0.1") is False  # Invalid major
+        assert (
+            registry_api._is_valid_version_increment("2.3.0", "2.3.1") is True
+        )  # Patch
+        assert (
+            registry_api._is_valid_version_increment("2.3.0", "2.4.0") is True
+        )  # Minor
+        assert (
+            registry_api._is_valid_version_increment("2.3.0", "3.0.0") is True
+        )  # Major
+        assert (
+            registry_api._is_valid_version_increment("2.3.0", "2.3.0") is False
+        )  # Same
+        assert (
+            registry_api._is_valid_version_increment("2.3.0", "2.2.0") is False
+        )  # Backward
+        assert (
+            registry_api._is_valid_version_increment("2.3.0", "3.0.1") is False
+        )  # Invalid major
 
 
 if __name__ == "__main__":

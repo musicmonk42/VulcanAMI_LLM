@@ -42,17 +42,24 @@ def _docker_available_with_network() -> bool:
         # Skip Docker build tests in CI environments where they often fail
         # due to SSL certificate issues or network restrictions
         # Check for common CI environment variables
-        ci_vars = ['CI', 'CONTINUOUS_INTEGRATION', 'GITHUB_ACTIONS', 'TRAVIS',
-                   'CIRCLECI', 'JENKINS_URL', 'GITLAB_CI', 'BUILDKITE']
-        if any(os.environ.get(var, '').lower() in ('true', '1', 'yes') for var in ci_vars):
+        ci_vars = [
+            "CI",
+            "CONTINUOUS_INTEGRATION",
+            "GITHUB_ACTIONS",
+            "TRAVIS",
+            "CIRCLECI",
+            "JENKINS_URL",
+            "GITLAB_CI",
+            "BUILDKITE",
+        ]
+        if any(
+            os.environ.get(var, "").lower() in ("true", "1", "yes") for var in ci_vars
+        ):
             return False
 
         # Check if docker command exists
         result = subprocess.run(
-            ["docker", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["docker", "--version"], capture_output=True, text=True, timeout=5
         )
         if result.returncode != 0:
             return False
@@ -63,10 +70,15 @@ def _docker_available_with_network() -> bool:
             ["docker", "images", "--format", "{{.Repository}}"],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
         return result.returncode == 0
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError, OSError) as e:
+    except (
+        subprocess.TimeoutExpired,
+        subprocess.SubprocessError,
+        FileNotFoundError,
+        OSError,
+    ) as e:
         return False
 
 
@@ -92,26 +104,27 @@ class TestDockerConfigurations:
     def test_dockerfile_security_features(self):
         """Verify Dockerfile has security best practices"""
         dockerfile = REPO_ROOT / "Dockerfile"
-        content = dockerfile.read_text(encoding='utf-8')
+        content = dockerfile.read_text(encoding="utf-8")
 
         # Check for non-root user
-        assert "USER graphix" in content or "USER 1001" in content, \
-            "Dockerfile should run as non-root user"
+        assert (
+            "USER graphix" in content or "USER 1001" in content
+        ), "Dockerfile should run as non-root user"
 
         # Check for healthcheck
-        assert "HEALTHCHECK" in content, \
-            "Dockerfile should include HEALTHCHECK"
+        assert "HEALTHCHECK" in content, "Dockerfile should include HEALTHCHECK"
 
         # Check for JWT secret validation
-        assert "JWT_SECRET" in content or "REJECT_INSECURE_JWT" in content, \
-            "Dockerfile should validate JWT configuration"
+        assert (
+            "JWT_SECRET" in content or "REJECT_INSECURE_JWT" in content
+        ), "Dockerfile should validate JWT configuration"
 
     def test_dockerignore_exists(self):
         """Verify .dockerignore exists and has necessary exclusions"""
         dockerignore = REPO_ROOT / ".dockerignore"
         assert dockerignore.exists(), ".dockerignore file not found"
 
-        content = dockerignore.read_text(encoding='utf-8')
+        content = dockerignore.read_text(encoding="utf-8")
         critical_patterns = [".git", "__pycache__", "*.pyc", ".env"]
 
         for pattern in critical_patterns:
@@ -123,7 +136,9 @@ class TestDockerConfigurations:
 
         for service in expected_services:
             dockerfile = DOCKER_DIR / service / "Dockerfile"
-            assert dockerfile.exists(), f"Dockerfile for {service} not found at {dockerfile}"
+            assert (
+                dockerfile.exists()
+            ), f"Dockerfile for {service} not found at {dockerfile}"
 
     def test_docker_compose_dev_valid(self):
         """Verify docker-compose.dev.yml is valid"""
@@ -131,7 +146,7 @@ class TestDockerConfigurations:
         assert compose_file.exists(), "docker-compose.dev.yml not found"
 
         # Validate YAML structure
-        with open(compose_file, encoding='utf-8') as f:
+        with open(compose_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         assert "services" in config, "docker-compose.dev.yml missing services"
@@ -141,10 +156,11 @@ class TestDockerConfigurations:
             ["docker", "compose", "-f", str(compose_file), "config"],
             capture_output=True,
             text=True,
-            cwd=REPO_ROOT
+            cwd=REPO_ROOT,
         )
-        assert result.returncode == 0, \
-            f"docker-compose.dev.yml validation failed: {result.stderr}"
+        assert (
+            result.returncode == 0
+        ), f"docker-compose.dev.yml validation failed: {result.stderr}"
 
     def test_docker_compose_prod_valid(self):
         """Verify docker-compose.prod.yml is valid"""
@@ -152,7 +168,7 @@ class TestDockerConfigurations:
         assert compose_file.exists(), "docker-compose.prod.yml not found"
 
         # Validate YAML structure
-        with open(compose_file, encoding='utf-8') as f:
+        with open(compose_file, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         assert "services" in config, "docker-compose.prod.yml missing services"
@@ -160,39 +176,42 @@ class TestDockerConfigurations:
         # Validate with docker compose config
         # Set dummy env vars to avoid interpolation errors
         env = os.environ.copy()
-        env.update({
-            "POSTGRES_PASSWORD": "dummy",
-            "REDIS_PASSWORD": "dummy",
-            "MINIO_ROOT_PASSWORD": "dummy",
-            "MINIO_ROOT_USER": "dummy",
-            "JWT_SECRET_KEY": "dummy",
-            "BOOTSTRAP_KEY": "dummy",
-            "GRAFANA_PASSWORD": "dummy",
-            "GRAFANA_USER": "dummy",
-        })
+        env.update(
+            {
+                "POSTGRES_PASSWORD": "dummy",
+                "REDIS_PASSWORD": "dummy",
+                "MINIO_ROOT_PASSWORD": "dummy",
+                "MINIO_ROOT_USER": "dummy",
+                "JWT_SECRET_KEY": "dummy",
+                "BOOTSTRAP_KEY": "dummy",
+                "GRAFANA_PASSWORD": "dummy",
+                "GRAFANA_USER": "dummy",
+            }
+        )
 
         result = subprocess.run(
             ["docker", "compose", "-f", str(compose_file), "config"],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,
-            env=env
+            env=env,
         )
-        assert result.returncode == 0, \
-            f"docker-compose.prod.yml validation failed: {result.stderr}"
+        assert (
+            result.returncode == 0
+        ), f"docker-compose.prod.yml validation failed: {result.stderr}"
 
     def test_entrypoint_script_exists_and_executable(self):
         """Verify entrypoint.sh exists and is executable"""
         entrypoint = REPO_ROOT / "entrypoint.sh"
         assert entrypoint.exists(), "entrypoint.sh not found"
         # On Windows, executability check may not work the same way
-        if sys.platform != 'win32':
+        if sys.platform != "win32":
             assert os.access(entrypoint, os.X_OK), "entrypoint.sh is not executable"
 
     def test_entrypoint_validates_secrets(self):
         """Verify entrypoint.sh validates JWT secrets"""
         entrypoint = REPO_ROOT / "entrypoint.sh"
-        content = entrypoint.read_text(encoding='utf-8')
+        content = entrypoint.read_text(encoding="utf-8")
 
         # Should check for JWT secret environment variables
         jwt_vars = ["JWT_SECRET", "JWT_SECRET_KEY", "GRAPHIX_JWT_SECRET"]
@@ -211,25 +230,29 @@ class TestDependencyManagement:
     def test_requirements_hashed_exists(self):
         """Verify requirements-hashed.txt exists for reproducibility"""
         hashed_req = REPO_ROOT / "requirements-hashed.txt"
-        assert hashed_req.exists(), \
-            "requirements-hashed.txt not found (needed for reproducible builds)"
+        assert (
+            hashed_req.exists()
+        ), "requirements-hashed.txt not found (needed for reproducible builds)"
 
     def test_requirements_have_hashes(self):
         """Verify requirements-hashed.txt contains actual hashes"""
         hashed_req = REPO_ROOT / "requirements-hashed.txt"
-        content = hashed_req.read_text(encoding='utf-8')
+        content = hashed_req.read_text(encoding="utf-8")
 
         # Should contain SHA256 hashes
-        assert "sha256:" in content, \
-            "requirements-hashed.txt should contain SHA256 hashes"
+        assert (
+            "sha256:" in content
+        ), "requirements-hashed.txt should contain SHA256 hashes"
 
         # Count number of hashed entries (non-comment, non-empty lines with hashes)
         hashed_lines = [
-            line for line in content.split("\n")
+            line
+            for line in content.split("\n")
             if line.strip() and not line.strip().startswith("#") and "sha256:" in line
         ]
-        assert len(hashed_lines) > 50, \
-            f"requirements-hashed.txt should have many hashed packages, found {len(hashed_lines)}"
+        assert (
+            len(hashed_lines) > 50
+        ), f"requirements-hashed.txt should have many hashed packages, found {len(hashed_lines)}"
 
 
 class TestCICDWorkflows:
@@ -243,12 +266,14 @@ class TestCICDWorkflows:
     def test_workflows_valid_yaml(self):
         """Verify all workflow files are valid YAML"""
         workflows_dir = REPO_ROOT / ".github" / "workflows"
-        workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
+        workflow_files = list(workflows_dir.glob("*.yml")) + list(
+            workflows_dir.glob("*.yaml")
+        )
 
         assert len(workflow_files) > 0, "No workflow files found"
 
         for workflow_file in workflow_files:
-            with open(workflow_file, encoding='utf-8') as f:
+            with open(workflow_file, encoding="utf-8") as f:
                 try:
                     yaml.safe_load(f)
                 except yaml.YAMLError as e:
@@ -257,13 +282,18 @@ class TestCICDWorkflows:
     def test_workflows_use_docker_compose_v2(self):
         """Verify workflows use Docker Compose V2 syntax"""
         workflows_dir = REPO_ROOT / ".github" / "workflows"
-        workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
+        workflow_files = list(workflows_dir.glob("*.yml")) + list(
+            workflows_dir.glob("*.yaml")
+        )
 
         for workflow_file in workflow_files:
-            content = workflow_file.read_text(encoding='utf-8')
+            content = workflow_file.read_text(encoding="utf-8")
 
             # Should use 'docker compose' not 'docker-compose'
-            if "docker-compose" in content.lower() and "docker compose" not in content.lower():
+            if (
+                "docker-compose" in content.lower()
+                and "docker compose" not in content.lower()
+            ):
                 pytest.fail(
                     f"{workflow_file.name} uses deprecated docker-compose command. "
                     "Use 'docker compose' (V2) instead"
@@ -272,10 +302,12 @@ class TestCICDWorkflows:
     def test_workflows_have_timeout(self):
         """Verify workflows have timeout-minutes set"""
         workflows_dir = REPO_ROOT / ".github" / "workflows"
-        workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
+        workflow_files = list(workflows_dir.glob("*.yml")) + list(
+            workflows_dir.glob("*.yaml")
+        )
 
         for workflow_file in workflow_files:
-            with open(workflow_file, encoding='utf-8') as f:
+            with open(workflow_file, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
 
             # Check if any job has timeout-minutes
@@ -283,7 +315,9 @@ class TestCICDWorkflows:
                 for job_name, job_config in config["jobs"].items():
                     if "timeout-minutes" not in job_config:
                         # Just warn, don't fail - timeout is optional but recommended
-                        print(f"Warning: Job '{job_name}' in {workflow_file.name} has no timeout-minutes")
+                        print(
+                            f"Warning: Job '{job_name}' in {workflow_file.name} has no timeout-minutes"
+                        )
 
 
 class TestKubernetesConfigs:
@@ -306,17 +340,17 @@ class TestKubernetesConfigs:
             pytest.skip("No Kubernetes YAML files found")
 
         for yaml_file in yaml_files:
-            with open(yaml_file, encoding='utf-8') as f:
+            with open(yaml_file, encoding="utf-8") as f:
                 try:
                     configs = list(yaml.safe_load_all(f))
 
                     # Basic validation
                     for config in configs:
                         if config:  # Skip empty documents
-                            assert "apiVersion" in config, \
-                                f"{yaml_file.name} missing apiVersion"
-                            assert "kind" in config, \
-                                f"{yaml_file.name} missing kind"
+                            assert (
+                                "apiVersion" in config
+                            ), f"{yaml_file.name} missing apiVersion"
+                            assert "kind" in config, f"{yaml_file.name} missing kind"
                 except yaml.YAMLError as e:
                     pytest.fail(f"Invalid YAML in {yaml_file}: {e}")
 
@@ -338,8 +372,9 @@ class TestHelmCharts:
         chart_yamls = list(HELM_DIR.glob("*/Chart.yaml"))
         chart_yamls.extend(HELM_DIR.glob("Chart.yaml"))  # Also check root level
 
-        assert len(chart_yamls) > 0, \
-            f"Chart.yaml not found in helm directory or its subdirectories"
+        assert (
+            len(chart_yamls) > 0
+        ), f"Chart.yaml not found in helm directory or its subdirectories"
 
     def test_helm_values_yaml_exists(self):
         """Verify values.yaml exists for each chart"""
@@ -356,8 +391,9 @@ class TestHelmCharts:
         # For each chart, verify values.yaml exists
         for chart_yaml in chart_yamls:
             values_yaml = chart_yaml.parent / "values.yaml"
-            assert values_yaml.exists(), \
-                f"values.yaml not found for chart in {chart_yaml.parent.name}"
+            assert (
+                values_yaml.exists()
+            ), f"values.yaml not found for chart in {chart_yaml.parent.name}"
 
     def test_helm_chart_metadata_valid(self):
         """Verify Chart.yaml has required metadata fields"""
@@ -370,15 +406,23 @@ class TestHelmCharts:
         if len(chart_yamls) == 0:
             pytest.skip("No Chart.yaml found")
 
-        required_fields = ["apiVersion", "name", "description", "type", "version", "appVersion"]
+        required_fields = [
+            "apiVersion",
+            "name",
+            "description",
+            "type",
+            "version",
+            "appVersion",
+        ]
 
         for chart_yaml in chart_yamls:
-            with open(chart_yaml, encoding='utf-8') as f:
+            with open(chart_yaml, encoding="utf-8") as f:
                 chart_data = yaml.safe_load(f)
 
             for field in required_fields:
-                assert field in chart_data, \
-                    f"Chart.yaml in {chart_yaml.parent.name} missing required field: {field}"
+                assert (
+                    field in chart_data
+                ), f"Chart.yaml in {chart_yaml.parent.name} missing required field: {field}"
 
     def test_helm_values_security_config(self):
         """Verify values.yaml has security best practices"""
@@ -396,20 +440,22 @@ class TestHelmCharts:
             if not values_yaml.exists():
                 continue
 
-            with open(values_yaml, encoding='utf-8') as f:
+            with open(values_yaml, encoding="utf-8") as f:
                 values_data = yaml.safe_load(f)
 
             # Check for security context
             if "podSecurityContext" in values_data:
                 pod_sec = values_data["podSecurityContext"]
-                assert "runAsNonRoot" in pod_sec or "runAsUser" in pod_sec, \
-                    f"values.yaml in {chart_yaml.parent.name} should specify non-root user"
+                assert (
+                    "runAsNonRoot" in pod_sec or "runAsUser" in pod_sec
+                ), f"values.yaml in {chart_yaml.parent.name} should specify non-root user"
 
             # Check that image tag is not 'latest'
             if "image" in values_data and "tag" in values_data["image"]:
                 image_tag = values_data["image"]["tag"]
-                assert image_tag != "latest", \
-                    f"values.yaml in {chart_yaml.parent.name} should not use 'latest' image tag"
+                assert (
+                    image_tag != "latest"
+                ), f"values.yaml in {chart_yaml.parent.name} should not use 'latest' image tag"
 
     def test_helm_chart_valid(self):
         """Verify Helm chart is valid using helm lint"""
@@ -430,13 +476,12 @@ class TestHelmCharts:
         for chart_yaml in chart_yamls:
             chart_dir = chart_yaml.parent
             result = subprocess.run(
-                ["helm", "lint", str(chart_dir)],
-                capture_output=True,
-                text=True
+                ["helm", "lint", str(chart_dir)], capture_output=True, text=True
             )
 
-            assert result.returncode == 0, \
-                f"Helm chart validation failed for {chart_dir.name}: {result.stderr}"
+            assert (
+                result.returncode == 0
+            ), f"Helm chart validation failed for {chart_dir.name}: {result.stderr}"
 
 
 class TestSecurityConfiguration:
@@ -450,7 +495,7 @@ class TestSecurityConfiguration:
     def test_gitignore_has_critical_patterns(self):
         """Verify .gitignore excludes sensitive files"""
         gitignore = REPO_ROOT / ".gitignore"
-        content = gitignore.read_text(encoding='utf-8')
+        content = gitignore.read_text(encoding="utf-8")
 
         critical_patterns = [
             ".env",
@@ -465,8 +510,7 @@ class TestSecurityConfiguration:
             if pattern not in content:
                 missing.append(pattern)
 
-        assert len(missing) == 0, \
-            f".gitignore missing critical patterns: {missing}"
+        assert len(missing) == 0, f".gitignore missing critical patterns: {missing}"
 
     def test_no_committed_env_files(self):
         """Verify no .env files are committed to git"""
@@ -476,19 +520,20 @@ class TestSecurityConfiguration:
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
 
         if result.returncode != 0:
             pytest.skip("Git not available or not a git repository")
 
-        tracked_files = result.stdout.strip().split('\n') if result.stdout.strip() else []
+        tracked_files = (
+            result.stdout.strip().split("\n") if result.stdout.strip() else []
+        )
 
         # Filter to only files named exactly .env (not .env.example or other variants)
-        env_files = [f for f in tracked_files if f.endswith('/.env') or f == '.env']
+        env_files = [f for f in tracked_files if f.endswith("/.env") or f == ".env"]
 
-        assert len(env_files) == 0, \
-            f"Found committed .env files in git: {env_files}"
+        assert len(env_files) == 0, f"Found committed .env files in git: {env_files}"
 
     def test_no_hardcoded_secrets_in_code(self):
         """Scan for potential hardcoded secrets in Python files"""
@@ -503,16 +548,22 @@ class TestSecurityConfiguration:
 
         for py_file in SRC_DIR.glob("**/*.py"):
             try:
-                content = py_file.read_text(encoding='utf-8').lower()
+                content = py_file.read_text(encoding="utf-8").lower()
 
                 for pattern in secret_patterns:
                     if pattern in content:
                         # Check if it's not a configuration or placeholder
                         lines = content.split("\n")
                         for i, line in enumerate(lines):
-                            if pattern in line and "os.environ" not in line and "config" not in line:
+                            if (
+                                pattern in line
+                                and "os.environ" not in line
+                                and "config" not in line
+                            ):
                                 # Likely hardcoded secret
-                                suspicious_files.append((py_file, i + 1, line.strip()[:80]))
+                                suspicious_files.append(
+                                    (py_file, i + 1, line.strip()[:80])
+                                )
             except (UnicodeDecodeError, PermissionError):
                 # Skip files that can't be read (might be binary or permission issues)
                 continue
@@ -520,7 +571,9 @@ class TestSecurityConfiguration:
         # This is informational - we allow some false positives
         if suspicious_files:
             # Just log warning, don't fail
-            print(f"\nWarning: Found {len(suspicious_files)} potential hardcoded secrets")
+            print(
+                f"\nWarning: Found {len(suspicious_files)} potential hardcoded secrets"
+            )
             for file, line_no, line in suspicious_files[:5]:
                 print(f"  {file.name}:{line_no}: {line}")
 
@@ -537,16 +590,19 @@ class TestReproducibility:
     def test_python_version_pinned_in_dockerfile(self):
         """Verify Dockerfile uses specific Python version"""
         dockerfile = REPO_ROOT / "Dockerfile"
-        content = dockerfile.read_text(encoding='utf-8')
+        content = dockerfile.read_text(encoding="utf-8")
 
         # Should not use :latest
-        assert ":latest" not in content or "python:latest" not in content.lower(), \
-            "Dockerfile should not use :latest tag (non-reproducible)"
+        assert (
+            ":latest" not in content or "python:latest" not in content.lower()
+        ), "Dockerfile should not use :latest tag (non-reproducible)"
 
         # Should have specific version (3.10, 3.11, 3.12, etc.)
         import re
-        assert re.search(r'python:3\.\d+', content.lower()), \
-            "Dockerfile should specify exact Python version (e.g., python:3.10.11)"
+
+        assert re.search(
+            r"python:3\.\d+", content.lower()
+        ), "Dockerfile should specify exact Python version (e.g., python:3.10.11)"
 
     def test_makefile_exists(self):
         """Verify Makefile exists for consistent build commands"""
@@ -556,7 +612,7 @@ class TestReproducibility:
     def test_makefile_has_common_targets(self):
         """Verify Makefile has common targets"""
         makefile = REPO_ROOT / "Makefile"
-        content = makefile.read_text(encoding='utf-8')
+        content = makefile.read_text(encoding="utf-8")
 
         required_targets = ["install", "test", "docker-build"]
         missing = []
@@ -566,8 +622,7 @@ class TestReproducibility:
             if f"{target}:" not in content:
                 missing.append(target)
 
-        assert len(missing) == 0, \
-            f"Makefile missing targets: {missing}"
+        assert len(missing) == 0, f"Makefile missing targets: {missing}"
 
     def test_documentation_exists(self):
         """Verify key documentation files exist"""
@@ -582,8 +637,7 @@ class TestReproducibility:
             if not (REPO_ROOT / doc).exists():
                 missing.append(doc)
 
-        assert len(missing) == 0, \
-            f"Missing documentation files: {missing}"
+        assert len(missing) == 0, f"Missing documentation files: {missing}"
 
 
 class TestValidationScripts:
@@ -598,9 +652,10 @@ class TestValidationScripts:
         """Verify validation script is executable"""
         validation_script = REPO_ROOT / "validate_cicd_docker.sh"
         # On Windows, executability check may not work the same way
-        if sys.platform != 'win32':
-            assert os.access(validation_script, os.X_OK), \
-                "validate_cicd_docker.sh is not executable"
+        if sys.platform != "win32":
+            assert os.access(
+                validation_script, os.X_OK
+            ), "validate_cicd_docker.sh is not executable"
 
     def test_comprehensive_test_script_exists(self):
         """Verify comprehensive test runner exists"""
@@ -611,9 +666,10 @@ class TestValidationScripts:
         """Verify comprehensive test script is executable"""
         test_script = REPO_ROOT / "run_comprehensive_tests.sh"
         # On Windows, executability check may not work the same way
-        if sys.platform != 'win32':
-            assert os.access(test_script, os.X_OK), \
-                "run_comprehensive_tests.sh is not executable"
+        if sys.platform != "win32":
+            assert os.access(
+                test_script, os.X_OK
+            ), "run_comprehensive_tests.sh is not executable"
 
 
 class TestEndToEnd:
@@ -628,20 +684,23 @@ class TestEndToEnd:
 
         result = subprocess.run(
             [
-                "docker", "build",
-                "--build-arg", "REJECT_INSECURE_JWT=ack",
-                "-t", "vulcanami-test:latest",
-                "-f", str(REPO_ROOT / "Dockerfile"),
-                str(REPO_ROOT)
+                "docker",
+                "build",
+                "--build-arg",
+                "REJECT_INSECURE_JWT=ack",
+                "-t",
+                "vulcanami-test:latest",
+                "-f",
+                str(REPO_ROOT / "Dockerfile"),
+                str(REPO_ROOT),
             ],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,
-            timeout=600  # 10 minutes timeout for Docker build
+            timeout=600,  # 10 minutes timeout for Docker build
         )
 
-        assert result.returncode == 0, \
-            f"Docker build failed: {result.stderr}"
+        assert result.returncode == 0, f"Docker build failed: {result.stderr}"
 
     @pytest.mark.slow
     @pytest.mark.timeout(600)  # 10 minutes timeout for Docker build and run
@@ -653,16 +712,20 @@ class TestEndToEnd:
         # First ensure image is built
         build_result = subprocess.run(
             [
-                "docker", "build",
-                "--build-arg", "REJECT_INSECURE_JWT=ack",
-                "-t", "vulcanami-test:latest",
-                "-f", str(REPO_ROOT / "Dockerfile"),
-                str(REPO_ROOT)
+                "docker",
+                "build",
+                "--build-arg",
+                "REJECT_INSECURE_JWT=ack",
+                "-t",
+                "vulcanami-test:latest",
+                "-f",
+                str(REPO_ROOT / "Dockerfile"),
+                str(REPO_ROOT),
             ],
             capture_output=True,
             text=True,
             cwd=REPO_ROOT,
-            timeout=600  # 10 minutes timeout for Docker build
+            timeout=600,  # 10 minutes timeout for Docker build
         )
 
         if build_result.returncode != 0:
@@ -670,24 +733,31 @@ class TestEndToEnd:
 
         # Generate secure JWT secret
         import secrets
+
         jwt_secret = secrets.token_urlsafe(48)
 
         # Try to run container and check it starts
         result = subprocess.run(
             [
-                "docker", "run", "--rm",
-                "-e", f"JWT_SECRET_KEY={jwt_secret}",
-                "-e", f"BOOTSTRAP_KEY={secrets.token_urlsafe(32)}",
+                "docker",
+                "run",
+                "--rm",
+                "-e",
+                f"JWT_SECRET_KEY={jwt_secret}",
+                "-e",
+                f"BOOTSTRAP_KEY={secrets.token_urlsafe(32)}",
                 "vulcanami-test:latest",
-                "python", "--version"
+                "python",
+                "--version",
             ],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
         )
 
-        assert result.returncode == 0, \
-            f"Docker container failed to run: {result.stderr}"
+        assert (
+            result.returncode == 0
+        ), f"Docker container failed to run: {result.stderr}"
 
 
 if __name__ == "__main__":

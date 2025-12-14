@@ -363,7 +363,9 @@ class DecompositionLibrary:
                 # Check cache
                 cache_key = (
                     pattern_id,
-                    hashlib.md5(str(query_features).encode(), usedforsecurity=False).hexdigest(),
+                    hashlib.md5(
+                        str(query_features).encode(), usedforsecurity=False
+                    ).hexdigest(),
                 )
 
                 if cache_key in self.similarity_cache:
@@ -413,9 +415,11 @@ class DecompositionLibrary:
             perf.update(
                 success=performance > 0.5,
                 execution_time=0,  # Would be provided in real implementation
-                domain=decomposition.get("domain", "general")
-                if isinstance(decomposition, dict)
-                else "general",
+                domain=(
+                    decomposition.get("domain", "general")
+                    if isinstance(decomposition, dict)
+                    else "general"
+                ),
             )
 
             # If pattern exists, update its metadata
@@ -621,7 +625,9 @@ class DecompositionLibrary:
                     structure_info["features"] = sorted(features.keys())
 
                 content = json.dumps(structure_info, sort_keys=True)
-                signature = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
+                signature = hashlib.md5(
+                    content.encode(), usedforsecurity=False
+                ).hexdigest()
 
             # Index by signature
             self.pattern_index[signature] = pattern_id
@@ -1053,14 +1059,18 @@ class StratifiedDecompositionLibrary(DecompositionLibrary):
         # This would return actual strategy objects in full implementation
         # For now, return a mock strategy
         try:
-            from .decomposition_strategies import (ExactDecomposition,
-                                                   SemanticDecomposition,
-                                                   StructuralDecomposition)
+            from .decomposition_strategies import (
+                ExactDecomposition,
+                SemanticDecomposition,
+                StructuralDecomposition,
+            )
         except ImportError:
             try:
-                from decomposition_strategies import (ExactDecomposition,
-                                                      SemanticDecomposition,
-                                                      StructuralDecomposition)
+                from decomposition_strategies import (
+                    ExactDecomposition,
+                    SemanticDecomposition,
+                    StructuralDecomposition,
+                )
             except ImportError:
                 logger.warning("Could not import decomposition strategies")
                 return None
@@ -1141,9 +1151,9 @@ class StratifiedDecompositionLibrary(DecompositionLibrary):
 
                 stats[domain] = {
                     "pattern_count": len(pattern_ids),
-                    "avg_success_rate": np.mean(success_rates)
-                    if success_rates
-                    else 0.5,
+                    "avg_success_rate": (
+                        np.mean(success_rates) if success_rates else 0.5
+                    ),
                     "category": self._categorize_domain(domain, len(pattern_ids)),
                 }
 

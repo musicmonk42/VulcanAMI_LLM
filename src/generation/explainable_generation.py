@@ -1318,9 +1318,7 @@ class ExplainableGeneration:
             conf_label = (
                 "high"
                 if summary.confidence > 0.7
-                else "moderate"
-                if summary.confidence > 0.4
-                else "low"
+                else "moderate" if summary.confidence > 0.4 else "low"
             )
             parts.append(f"with {conf_label} confidence ({summary.confidence:.2f})")
 
@@ -1384,14 +1382,16 @@ class ExplainableGeneration:
         parts = [
             f"Token: {summary.token_str} (ID: {summary.token})",
             f"Probability: {summary.prob:.6f}" if summary.prob else "Probability: N/A",
-            f"Logit: {summary.confidence:.6f}"
-            if summary.confidence
-            else "",  # Placeholder
+            (
+                f"Logit: {summary.confidence:.6f}" if summary.confidence else ""
+            ),  # Placeholder
             f"Entropy: {summary.entropy:.4f}" if summary.entropy else "",
             f"Perplexity: {summary.perplexity:.4f}" if summary.perplexity else "",
-            f"Calibration: {summary.calibration_score:.4f}"
-            if summary.calibration_score
-            else "",
+            (
+                f"Calibration: {summary.calibration_score:.4f}"
+                if summary.calibration_score
+                else ""
+            ),
         ]
 
         # Attributions

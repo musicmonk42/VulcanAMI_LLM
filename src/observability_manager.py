@@ -9,8 +9,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from prometheus_client import (CollectorRegistry, Counter, Gauge, Histogram,
-                               generate_latest)
+from prometheus_client import (
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 
 try:
     import graphviz
@@ -898,9 +903,11 @@ class ObservabilityManager:
                 "plot_count": plot_count,
                 "free_disk_mb": free_mb,
                 "cleanup_enabled": self.enable_cleanup,
-                "last_cleanup": self.last_cleanup.isoformat()
-                if isinstance(self.last_cleanup, datetime)
-                else datetime.fromtimestamp(self.last_cleanup).isoformat(),
+                "last_cleanup": (
+                    self.last_cleanup.isoformat()
+                    if isinstance(self.last_cleanup, datetime)
+                    else datetime.fromtimestamp(self.last_cleanup).isoformat()
+                ),
                 "notification_channels": len(self.notification_channels),
             }
 

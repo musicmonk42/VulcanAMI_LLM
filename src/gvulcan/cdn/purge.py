@@ -92,10 +92,8 @@ class PurgeError(Exception):
     """Base exception for purge operations"""
 
 
-
 class CloudFrontRateLimitError(PurgeError):
     """Raised when CloudFront rate limits are hit"""
-
 
 
 class SmartPurger:

@@ -18,13 +18,23 @@ except ImportError:
     # Handle path issues if running directly
     import os
     import sys
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src', 'unified_runtime')))
+
+    sys.path.append(
+        os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "src", "unified_runtime")
+        )
+    )
     import node_handlers as nh
     from node_handlers import AI_ERRORS, NodeContext
 
 
 # Helper function to create a mock context for tests
-def create_mock_context(runtime_mock: Any = "DEFAULT", node_map_mock: Optional[Dict] = None, outputs_mock: Optional[Dict] = None, recursion_depth: int = 0):
+def create_mock_context(
+    runtime_mock: Any = "DEFAULT",
+    node_map_mock: Optional[Dict] = None,
+    outputs_mock: Optional[Dict] = None,
+    recursion_depth: int = 0,
+):
     """
     Creates a mock context dictionary for testing.
     This returns a dictionary, simulating ExecutionContext.to_dict()
@@ -36,14 +46,14 @@ def create_mock_context(runtime_mock: Any = "DEFAULT", node_map_mock: Optional[D
     runtime_to_use = Mock() if runtime_mock == "DEFAULT" else runtime_mock
 
     mock_context_dict = {
-        'execution_id': 'test_exec_id',
-        'recursion_depth': recursion_depth,
-        'metadata': {},
-        'runtime': runtime_to_use, # Use the determined runtime
-        'graph': {}, # Default graph
-        'node_map': node_map_mock if node_map_mock is not None else {},
-        'audit_log': [], # Ensure audit_log is a list
-        'inputs': {} # Default graph-level inputs
+        "execution_id": "test_exec_id",
+        "recursion_depth": recursion_depth,
+        "metadata": {},
+        "runtime": runtime_to_use,  # Use the determined runtime
+        "graph": {},  # Default graph
+        "node_map": node_map_mock if node_map_mock is not None else {},
+        "audit_log": [],  # Ensure audit_log is a list
+        "inputs": {},  # Default graph-level inputs
     }
     return mock_context_dict
 
@@ -63,12 +73,7 @@ class TestNodeContext:
     def test_context_creation(self):
         """Test creating node context"""
         # Test with the actual dataclass
-        context = nh.NodeContext(
-            runtime=None,
-            graph={},
-            node_map={},
-            outputs={}
-        )
+        context = nh.NodeContext(runtime=None, graph={}, node_map={}, outputs={})
 
         assert context.recursion_depth == 0
         assert context.audit_log is not None
@@ -110,7 +115,7 @@ class TestCoreNodeHandlers:
     async def test_add_node_missing_inputs(self):
         """Test ADD node with missing inputs"""
         node = {}
-        inputs = {"val1": 5} # val2 is missing
+        inputs = {"val1": 5}  # val2 is missing
 
         # Fix: Assert that the correct error is raised
         with pytest.raises(nh.NodeExecutorError) as e:
@@ -144,7 +149,7 @@ class TestCoreNodeHandlers:
     async def test_multiply_node_missing_inputs(self):
         """Test MULTIPLY node with missing inputs"""
         node = {}
-        inputs = {} # Both val1 and val2 are missing
+        inputs = {}  # Both val1 and val2 are missing
 
         # Fix: Assert that the correct error is raised
         with pytest.raises(nh.NodeExecutorError) as e:
@@ -174,20 +179,9 @@ class TestCoreNodeHandlers:
     @pytest.mark.asyncio
     async def test_get_property_node(self):
         """Test GET_PROPERTY node"""
-        node = {
-            "params": {
-                "target_node": "n1",
-                "property_path": "data.value"
-            }
-        }
+        node = {"params": {"target_node": "n1", "property_path": "data.value"}}
         # Fix: Create a mock context dict with the required 'node_map'
-        mock_map = {
-            "n1": {
-                "params": {
-                    "data": {"value": 123}
-                }
-            }
-        }
+        mock_map = {"n1": {"params": {"data": {"value": 123}}}}
         context = create_mock_context(node_map_mock=mock_map)
 
         result = await nh.get_property_node(node, context, {})
@@ -218,12 +212,7 @@ class TestAINodeHandlers:
     @pytest.mark.asyncio
     async def test_embed_node_basic(self):
         """Test EMBED node basic functionality"""
-        node = {
-            "params": {
-                "provider": "test",
-                "model": "test-model"
-            }
-        }
+        node = {"params": {"provider": "test", "model": "test-model"}}
         inputs = {"text": "test text"}
 
         # Fix: Create a mock runtime and context dict
@@ -232,9 +221,9 @@ class TestAINodeHandlers:
         mock_ai_runtime.execute_task = Mock(
             return_value=Mock(
                 status="SUCCESS",
-                is_success=lambda: True, # Add is_success method
+                is_success=lambda: True,  # Add is_success method
                 data={"vector": [0.1, 0.2]},
-                metadata={}
+                metadata={},
             )
         )
         mock_runtime = Mock(ai_runtime=mock_ai_runtime)
@@ -261,11 +250,7 @@ class TestAINodeHandlers:
     async def test_generative_node_handler(self):
         """Test GenerativeNode"""
         node = {
-            "params": {
-                "prompt": "Test prompt",
-                "provider": "test",
-                "temperature": 0.7
-            }
+            "params": {"prompt": "Test prompt", "provider": "test", "temperature": 0.7}
         }
 
         # Fix: Create mock context dict (default helper provides a Mock runtime)
@@ -292,7 +277,7 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_load_tensor_node_missing_torch(self):
         """Test LOAD_TENSOR without PyTorch"""
-        with patch('node_handlers.TORCH_AVAILABLE', False):
+        with patch("node_handlers.TORCH_AVAILABLE", False):
             node = {"params": {"filepath": "test.safetensors", "key": "tensor"}}
             result = await nh.load_tensor_node(node, create_mock_context(), {})
 
@@ -302,13 +287,12 @@ class TestHardwareNodeHandlers:
     async def test_memristor_mvm_node(self):
         """Test MEMRISTOR_MVM node"""
         node = {}
-        inputs = {
-            "tensor1": np.array([[1, 2], [3, 4]]),
-            "tensor2": np.array([5, 6])
-        }
+        inputs = {"tensor1": np.array([[1, 2], [3, 4]]), "tensor2": np.array([5, 6])}
 
         # Fix: Create mock context dict
-        context = create_mock_context(runtime_mock=Mock(hardware_dispatcher=None)) # Test fallback
+        context = create_mock_context(
+            runtime_mock=Mock(hardware_dispatcher=None)
+        )  # Test fallback
         result = await nh.memristor_mvm_node(node, context, inputs)
 
         # Fix: Check for 'product' key
@@ -328,20 +312,13 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_photonic_mvm_node(self):
         """Test PhotonicMVMNode"""
-        node = {
-            "params": {
-                "photonic_params": {
-                    "noise_std": 0.01
-                }
-            }
-        }
-        inputs = {
-            "matrix": np.array([[1.0, 2.0]]),
-            "vector": np.array([3.0, 4.0])
-        }
+        node = {"params": {"photonic_params": {"noise_std": 0.01}}}
+        inputs = {"matrix": np.array([[1.0, 2.0]]), "vector": np.array([3.0, 4.0])}
 
         # Fix: Create mock context dict
-        context = create_mock_context(runtime_mock=Mock(hardware_dispatcher=None)) # Test fallback
+        context = create_mock_context(
+            runtime_mock=Mock(hardware_dispatcher=None)
+        )  # Test fallback
         result = await nh.photonic_mvm_node(node, context, inputs)
 
         assert "output" in result
@@ -351,17 +328,8 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_photonic_mvm_node_invalid_compression(self):
         """Test PhotonicMVMNode with invalid compression"""
-        node = {
-            "params": {
-                "photonic_params": {
-                    "compression": "invalid"
-                }
-            }
-        }
-        inputs = {
-            "matrix": np.array([[1, 2]]),
-            "vector": np.array([3, 4])
-        }
+        node = {"params": {"photonic_params": {"compression": "invalid"}}}
+        inputs = {"matrix": np.array([[1, 2]]), "vector": np.array([3, 4])}
 
         result = await nh.photonic_mvm_node(node, create_mock_context(), inputs)
 
@@ -370,17 +338,8 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_photonic_mvm_node_high_noise(self):
         """Test PhotonicMVMNode with excessive noise"""
-        node = {
-            "params": {
-                "photonic_params": {
-                    "noise_std": 0.1  # Too high
-                }
-            }
-        }
-        inputs = {
-            "matrix": np.array([[1, 2]]),
-            "vector": np.array([3, 4])
-        }
+        node = {"params": {"photonic_params": {"noise_std": 0.1}}}  # Too high
+        inputs = {"matrix": np.array([[1, 2]]), "vector": np.array([3, 4])}
 
         result = await nh.photonic_mvm_node(node, create_mock_context(), inputs)
 
@@ -389,9 +348,9 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_sparse_mvm_node(self):
         """Test SPARSE_MVM node"""
-        with patch('node_handlers.TORCH_AVAILABLE', False):
+        with patch("node_handlers.TORCH_AVAILABLE", False):
             node = {}
-            inputs = {"matrix": [1], "vector": [1]} # Need to provide inputs
+            inputs = {"matrix": [1], "vector": [1]}  # Need to provide inputs
 
             result = await nh.sparse_mvm_node(node, create_mock_context(), inputs)
 
@@ -401,8 +360,10 @@ class TestHardwareNodeHandlers:
     @pytest.mark.asyncio
     async def test_fused_kernel_node(self):
         """Test FUSED_KERNEL node"""
-        with patch('node_handlers.HIDET_AVAILABLE', False):
-            node = {"params": {"subgraph": {"nodes": [], "edges": []}}} # Need valid subgraph
+        with patch("node_handlers.HIDET_AVAILABLE", False):
+            node = {
+                "params": {"subgraph": {"nodes": [], "edges": []}}
+            }  # Need valid subgraph
 
             result = await nh.fused_kernel_node(node, create_mock_context(), {})
 
@@ -477,10 +438,7 @@ class TestMetaNodeHandlers:
         # Mock the config attribute on the runtime
         mock_runtime.config = Mock(max_recursion_depth=20)
 
-        context = create_mock_context(
-            runtime_mock=mock_runtime,
-            recursion_depth=25
-        )
+        context = create_mock_context(runtime_mock=mock_runtime, recursion_depth=25)
 
         result = await nh.meta_graph_node(node, context, {})
 
@@ -499,7 +457,7 @@ class TestAutoMLNodeHandlers:
                 "distribution": "uniform",
                 "low": 0.0,
                 "high": 1.0,
-                "shape": [10]
+                "shape": [10],
             }
         }
 
@@ -512,12 +470,7 @@ class TestAutoMLNodeHandlers:
     async def test_random_node_normal(self):
         """Test RandomNode with normal distribution"""
         node = {
-            "params": {
-                "distribution": "normal",
-                "loc": 0.0,
-                "scale": 1.0,
-                "shape": [5]
-            }
+            "params": {"distribution": "normal", "loc": 0.0, "scale": 1.0, "shape": [5]}
         }
 
         result = await nh.random_node(node, create_mock_context(), {})
@@ -527,12 +480,7 @@ class TestAutoMLNodeHandlers:
     @pytest.mark.asyncio
     async def test_random_node_unsupported_distribution(self):
         """Test RandomNode with unsupported distribution"""
-        node = {
-            "params": {
-                "distribution": "unsupported",
-                "shape": [5]
-            }
-        }
+        node = {"params": {"distribution": "unsupported", "shape": [5]}}
 
         result = await nh.random_node(node, create_mock_context(), {})
 
@@ -544,7 +492,7 @@ class TestAutoMLNodeHandlers:
         node = {
             "params": {
                 "distribution": "uniform",
-                "shape": [1000001]  # Too large (limit is 1M)
+                "shape": [1000001],  # Too large (limit is 1M)
             }
         }
 
@@ -581,7 +529,9 @@ class TestGovernanceNodeHandlers:
         inputs = {"proposal": {"content": "test"}}
 
         # Fix: Create context dict with a runtime that *lacks* 'extensions'
-        context = create_mock_context(runtime_mock=Mock(spec=[])) # Mock with no attributes
+        context = create_mock_context(
+            runtime_mock=Mock(spec=[])
+        )  # Mock with no attributes
         result = await nh.contract_node(node, context, inputs)
 
         # The node should now skip alignment and approve
@@ -592,12 +542,7 @@ class TestGovernanceNodeHandlers:
     @pytest.mark.asyncio
     async def test_proposal_node(self):
         """Test ProposalNode"""
-        node = {
-            "id": "p1",
-            "params": {
-                "proposal_content": {"action": "update"}
-            }
-        }
+        node = {"id": "p1", "params": {"proposal_content": {"action": "update"}}}
 
         result = await nh.proposal_node(node, create_mock_context(), {})
 
@@ -619,13 +564,7 @@ class TestGovernanceNodeHandlers:
     async def test_consensus_node_approved(self):
         """Test ConsensusNode with approval"""
         node = {"params": {"threshold": 0.5}}
-        inputs = {
-            "votes": [
-                {"approve": True},
-                {"approve": True},
-                {"approve": False}
-            ]
-        }
+        inputs = {"votes": [{"approve": True}, {"approve": True}, {"approve": False}]}
 
         result = await nh.consensus_node(node, create_mock_context(), inputs)
 
@@ -646,12 +585,7 @@ class TestGovernanceNodeHandlers:
     async def test_validation_node_valid_graph(self):
         """Test ValidationNode with valid graph"""
         node = {}
-        inputs = {
-            "graph": {
-                "nodes": [{"id": "n1", "type": "Test"}],
-                "edges": []
-            }
-        }
+        inputs = {"graph": {"nodes": [{"id": "n1", "type": "Test"}], "edges": []}}
 
         # *** FIX: Create a mock runtime dict that *lacks* 'validate_graph' ***
         # This tests the fallback logic in the handler
@@ -666,10 +600,7 @@ class TestGovernanceNodeHandlers:
     @pytest.mark.asyncio
     async def test_audit_node(self):
         """Test AuditNode"""
-        node = {
-            "id": "a1",
-            "params": {"audit_type": "security"}
-        }
+        node = {"id": "a1", "params": {"audit_type": "security"}}
         inputs = {"data": {"action": "test"}}
 
         # Fix: Create a mock context dict
@@ -679,9 +610,9 @@ class TestGovernanceNodeHandlers:
         assert result["audit"] == "logged"
         assert result["audit_type"] == "security"
         # Check that the log was actually written to the dict
-        assert len(context['audit_log']) == 1
+        assert len(context["audit_log"]) == 1
         # *** FIX: Check the correct key "type" ***
-        assert context['audit_log'][0]["type"] == "security"
+        assert context["audit_log"][0]["type"] == "security"
 
     @pytest.mark.asyncio
     async def test_execute_node_disabled(self):
@@ -713,9 +644,9 @@ class TestSchedulerNodeHandlers:
             "id": "s1",
             "params": {
                 "subgraph": {"nodes": [], "edges": []},
-                "interval_ms": 10, # Use short interval for testing
-                "max_iterations": 1
-            }
+                "interval_ms": 10,  # Use short interval for testing
+                "max_iterations": 1,
+            },
         }
 
         # Fix: Mock the runtime and its execute_graph method
@@ -726,7 +657,7 @@ class TestSchedulerNodeHandlers:
         result = await nh.scheduler_node(node, context, {})
 
         assert result["status"] == "scheduled"
-        assert result["interval_ms"] == 100 # Check that it was clamped to min
+        assert result["interval_ms"] == 100  # Check that it was clamped to min
 
         # Give the background task time to run once
         await asyncio.sleep(0.2)
@@ -804,23 +735,23 @@ class TestNodeRegistry:
         """Test registry contains core nodes"""
         handlers = nh.get_node_handlers()
 
-        assert 'CONST' in handlers
-        assert 'ADD' in handlers
-        assert 'MUL' in handlers
+        assert "CONST" in handlers
+        assert "ADD" in handlers
+        assert "MUL" in handlers
 
     def test_registry_has_ai_nodes(self):
         """Test registry contains AI nodes"""
         handlers = nh.get_node_handlers()
 
-        assert 'EMBED' in handlers
-        assert 'GenerativeNode' in handlers # Check one of the keys
+        assert "EMBED" in handlers
+        assert "GenerativeNode" in handlers  # Check one of the keys
 
     def test_registry_has_hardware_nodes(self):
         """Test registry contains hardware nodes"""
         handlers = nh.get_node_handlers()
 
-        assert 'PHOTONIC_MVM' in handlers
-        assert 'MEMRISTOR_MVM' in handlers
+        assert "PHOTONIC_MVM" in handlers
+        assert "MEMRISTOR_MVM" in handlers
 
     def test_registry_handlers_are_callable(self):
         """Test that all handlers are callable"""
@@ -831,6 +762,7 @@ class TestNodeRegistry:
 
     def test_validate_node_handler_valid(self):
         """Test validating a valid handler"""
+
         async def valid_handler(node, context, inputs):
             return {}
 
@@ -839,6 +771,7 @@ class TestNodeRegistry:
 
     def test_validate_node_handler_not_async(self):
         """Test validating a non-async handler"""
+
         def invalid_handler(node, context, inputs):
             return {}
 
@@ -847,6 +780,7 @@ class TestNodeRegistry:
 
     def test_validate_node_handler_wrong_params(self):
         """Test validating handler with wrong number of params"""
+
         async def invalid_handler(node, context):
             return {}
 
@@ -867,17 +801,13 @@ class TestIntegration:
 
         # Use const output in add
         add_result = await nh.add_node(
-            {},
-            mock_context,
-            {"val1": const_result["value"], "val2": 5}
+            {}, mock_context, {"val1": const_result["value"], "val2": 5}
         )
 
         # Use add output in multiply
         # Fix: Check for 'result' key from add_node
         mul_result = await nh.multiply_node(
-            {},
-            mock_context,
-            {"val1": add_result["result"], "val2": 2}
+            {}, mock_context, {"val1": add_result["result"], "val2": 2}
         )
 
         # Fix: Check for 'result' key from multiply_node
@@ -943,5 +873,5 @@ class TestEdgeCases:
         assert result["output"] == [0.0, 0.0, 0.0, 0.0]
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

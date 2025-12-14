@@ -17,16 +17,21 @@ from typing import Any, Dict, List, Optional
 # Import all decomposition components
 try:
     from .adaptive_thresholds import AdaptiveThresholds
-    from .decomposition_library import (Context, DecompositionPrinciple,
-                                        Pattern,
-                                        StratifiedDecompositionLibrary)
-    from .decomposition_strategies import (AnalogicalDecomposition,
-                                           BruteForceSearch,
-                                           DecompositionStrategy,
-                                           ExactDecomposition,
-                                           SemanticDecomposition,
-                                           StructuralDecomposition,
-                                           SyntheticBridging)
+    from .decomposition_library import (
+        Context,
+        DecompositionPrinciple,
+        Pattern,
+        StratifiedDecompositionLibrary,
+    )
+    from .decomposition_strategies import (
+        AnalogicalDecomposition,
+        BruteForceSearch,
+        DecompositionStrategy,
+        ExactDecomposition,
+        SemanticDecomposition,
+        StructuralDecomposition,
+        SyntheticBridging,
+    )
     from .fallback_chain import FallbackChain
     from .problem_decomposer_core import ProblemDecomposer, ProblemGraph
 except ImportError as e:
@@ -461,7 +466,7 @@ class DecomposerBootstrap:
             # Extract safety_validator from config if present, or use passed parameter
             if safety_validator is None and config and "safety_validator" in config:
                 safety_validator = config.pop("safety_validator")
-            
+
             decomposer = ProblemDecomposer(
                 semantic_bridge=semantic_bridge,
                 vulcan_memory=vulcan_memory,

@@ -9,11 +9,14 @@ import time
 
 import pytest
 
-from vulcan.safety.safety_types import (Condition, SafetyReport,
-                                        SafetyViolationType,
-                                        ToolSafetyContract, ToolSafetyLevel)
-from vulcan.safety.tool_safety import (TokenBucket, ToolSafetyGovernor,
-                                       ToolSafetyManager)
+from vulcan.safety.safety_types import (
+    Condition,
+    SafetyReport,
+    SafetyViolationType,
+    ToolSafetyContract,
+    ToolSafetyLevel,
+)
+from vulcan.safety.tool_safety import TokenBucket, ToolSafetyGovernor, ToolSafetyManager
 
 # ============================================================
 # FIXTURES

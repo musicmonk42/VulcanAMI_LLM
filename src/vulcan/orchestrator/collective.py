@@ -418,8 +418,7 @@ class VULCANAGICollective:
         try:
             # Try to import from curiosity_engine
             try:
-                from ..curiosity_engine.experiment_generator import \
-                    KnowledgeGap
+                from ..curiosity_engine.experiment_generator import KnowledgeGap
             except ImportError:
                 # Fallback: try from curiosity_engine directly
                 from curiosity_engine.experiment_generator import KnowledgeGap
@@ -935,9 +934,11 @@ class VULCANAGICollective:
                         memory_key,
                         embedding,
                         {
-                            "modality": modality
-                            if isinstance(modality, str)
-                            else modality.value,
+                            "modality": (
+                                modality
+                                if isinstance(modality, str)
+                                else modality.value
+                            ),
                             "uncertainty": getattr(perception, "uncertainty", 0.5),
                             "cycle": self.cycle_count,
                         },
@@ -950,9 +951,9 @@ class VULCANAGICollective:
             self.reasoning_trace.append(
                 {
                     "phase": "perception",
-                    "modality": modality.value
-                    if hasattr(modality, "value")
-                    else str(modality),
+                    "modality": (
+                        modality.value if hasattr(modality, "value") else str(modality)
+                    ),
                     "uncertainty": getattr(perception, "uncertainty", 0.5),
                 }
             )
@@ -1394,7 +1395,9 @@ class VULCANAGICollective:
                 graph_id=f"graph_{self.sys.step}",
                 agent_version="VULCAN_AGI_1.0",
                 policy_versions=self.sys.policies,
-                input_hash=hashlib.md5(str(result).encode(), usedforsecurity=False).hexdigest(),
+                input_hash=hashlib.md5(
+                    str(result).encode(), usedforsecurity=False
+                ).hexdigest(),
                 kernel_sig=None,
                 explainer_uri="",
                 ecdsa_sig="",
@@ -1497,10 +1500,10 @@ class VULCANAGICollective:
                     "experiments_run": self.improvement_experiments_run,
                     "successes": self.improvement_successes,
                     "success_rate": (
-                        self.improvement_successes / self.improvement_experiments_run
-                    )
-                    if self.improvement_experiments_run > 0
-                    else 0.0,
+                        (self.improvement_successes / self.improvement_experiments_run)
+                        if self.improvement_experiments_run > 0
+                        else 0.0
+                    ),
                 }
             else:
                 status["self_improvement"] = {"enabled": False}

@@ -13,11 +13,20 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from agent_interface import (DEFAULT_TIMEOUT, MAX_BATCH_SIZE, MAX_GRAPH_DEPTH,
-                             AgentInterface, CommunicationMode,
-                             ConnectionConfig, ExecutionState, GraphPriority,
-                             GraphSubmission, HTTPCommunicator, ResultCache,
-                             TelemetryCollector)
+from agent_interface import (
+    DEFAULT_TIMEOUT,
+    MAX_BATCH_SIZE,
+    MAX_GRAPH_DEPTH,
+    AgentInterface,
+    CommunicationMode,
+    ConnectionConfig,
+    ExecutionState,
+    GraphPriority,
+    GraphSubmission,
+    HTTPCommunicator,
+    ResultCache,
+    TelemetryCollector,
+)
 
 
 @pytest.fixture
@@ -37,11 +46,7 @@ def local_config():
 @pytest.fixture
 def http_config():
     """Create HTTP mode configuration."""
-    return ConnectionConfig(
-        mode=CommunicationMode.HTTP,
-        host="localhost",
-        port=8080
-    )
+    return ConnectionConfig(mode=CommunicationMode.HTTP, host="localhost", port=8080)
 
 
 @pytest.fixture
@@ -63,12 +68,9 @@ def valid_graph():
         "nodes": [
             {"id": "node1", "type": "InputNode"},
             {"id": "node2", "type": "ComputeNode"},
-            {"id": "node3", "type": "OutputNode"}
+            {"id": "node3", "type": "OutputNode"},
         ],
-        "edges": [
-            {"from": "node1", "to": "node2"},
-            {"from": "node2", "to": "node3"}
-        ]
+        "edges": [{"from": "node1", "to": "node2"}, {"from": "node2", "to": "node3"}],
     }
 
 
@@ -228,7 +230,7 @@ class TestConnectionConfig:
             port=9090,
             mode=CommunicationMode.WEBSOCKET,
             secure=True,
-            api_key="test_key"
+            api_key="test_key",
         )
 
         assert config.host == "example.com"
@@ -269,10 +271,7 @@ class TestAgentInterface:
 
     def test_submit_graph_basic(self, agent_interface, valid_graph):
         """Test basic graph submission."""
-        submission = agent_interface.submit_graph(
-            valid_graph,
-            wait_for_result=False
-        )
+        submission = agent_interface.submit_graph(valid_graph, wait_for_result=False)
 
         assert isinstance(submission, GraphSubmission)
         assert submission.submission_id is not None
@@ -281,9 +280,7 @@ class TestAgentInterface:
     def test_submit_graph_with_result(self, agent_interface, valid_graph):
         """Test graph submission with waiting for result."""
         result = agent_interface.submit_graph(
-            valid_graph,
-            wait_for_result=True,
-            timeout=5
+            valid_graph, wait_for_result=True, timeout=5
         )
 
         assert isinstance(result, dict)
@@ -300,7 +297,7 @@ class TestAgentInterface:
         """Test graph with missing required fields."""
         incomplete_graph = {
             "grammar_version": "1.0.0",
-            "id": "incomplete"
+            "id": "incomplete",
             # Missing nodes, edges, type
         }
 
@@ -310,9 +307,7 @@ class TestAgentInterface:
     def test_submit_with_priority(self, agent_interface, valid_graph):
         """Test submission with different priorities."""
         submission = agent_interface.submit_graph(
-            valid_graph,
-            priority=GraphPriority.HIGH,
-            wait_for_result=False
+            valid_graph, priority=GraphPriority.HIGH, wait_for_result=False
         )
 
         assert submission.priority == GraphPriority.HIGH
@@ -347,10 +342,7 @@ class TestAgentInterface:
 
     def test_batch_submit(self, agent_interface, valid_graph):
         """Test batch submission."""
-        graphs = [
-            {**valid_graph, "id": f"batch_graph_{i}"}
-            for i in range(5)
-        ]
+        graphs = [{**valid_graph, "id": f"batch_graph_{i}"} for i in range(5)]
 
         submissions = agent_interface.batch_submit(graphs, parallel=False)
 
@@ -359,10 +351,7 @@ class TestAgentInterface:
 
     def test_batch_submit_parallel(self, agent_interface, valid_graph):
         """Test parallel batch submission."""
-        graphs = [
-            {**valid_graph, "id": f"parallel_graph_{i}"}
-            for i in range(3)
-        ]
+        graphs = [{**valid_graph, "id": f"parallel_graph_{i}"} for i in range(3)]
 
         submissions = agent_interface.batch_submit(graphs, parallel=True)
 
@@ -434,7 +423,9 @@ class TestAgentInterface:
         assert "mode" in metrics
         assert "submissions" in metrics
 
-    def test_state_save_load(self, agent_interface, valid_graph, temp_dir, local_config):
+    def test_state_save_load(
+        self, agent_interface, valid_graph, temp_dir, local_config
+    ):
         """Test state save and load."""
         # Submit something
         agent_interface.submit_graph(valid_graph, wait_for_result=False)
@@ -478,7 +469,7 @@ class TestGraphValidation:
             "id": "test",
             "type": "Graph",
             "nodes": "not a list",
-            "edges": []
+            "edges": [],
         }
 
         result = agent_interface._validate_graph(invalid)
@@ -494,9 +485,9 @@ class TestGraphValidation:
             "type": "Graph",
             "nodes": [
                 {"id": "node1", "type": "Node"},
-                {"id": "node1", "type": "Node"}  # Duplicate
+                {"id": "node1", "type": "Node"},  # Duplicate
             ],
-            "edges": []
+            "edges": [],
         }
 
         result = agent_interface._validate_graph(invalid)
@@ -511,7 +502,7 @@ class TestGraphValidation:
             "id": "test",
             "type": "Graph",
             "nodes": [{"id": "node1", "type": "Node"}],
-            "edges": [{"from": "node1", "to": "nonexistent"}]
+            "edges": [{"from": "node1", "to": "nonexistent"}],
         }
 
         result = agent_interface._validate_graph(invalid)
@@ -527,7 +518,7 @@ class TestGraphValidation:
             "id": "deep",
             "type": "Graph",
             "nodes": [],
-            "edges": []
+            "edges": [],
         }
 
         current = deep_graph
@@ -547,7 +538,7 @@ class TestGraphValidation:
             "id": "huge",
             "type": "Graph",
             "nodes": [{"id": f"node_{i}", "type": "Node"} for i in range(10000)],
-            "edges": []
+            "edges": [],
         }
 
         result = agent_interface._validate_graph(huge_graph)
@@ -560,7 +551,7 @@ class TestGraphValidation:
 class TestHTTPCommunicator:
     """Test HTTP communicator (mock tests)."""
 
-    @patch('urllib.request.urlopen')
+    @patch("urllib.request.urlopen")
     def test_successful_request(self, mock_urlopen, http_config):
         """Test successful HTTP request."""
         # Mock response
@@ -575,7 +566,7 @@ class TestHTTPCommunicator:
 
         assert result["status"] == "ok"
 
-    @patch('urllib.request.urlopen')
+    @patch("urllib.request.urlopen")
     def test_http_error(self, mock_urlopen, http_config):
         """Test HTTP error handling."""
         import urllib.error
@@ -589,7 +580,7 @@ class TestHTTPCommunicator:
         with pytest.raises(RuntimeError, match="HTTP 500"):
             communicator._make_request("test", "GET")
 
-    @patch('urllib.request.urlopen')
+    @patch("urllib.request.urlopen")
     def test_connection_error(self, mock_urlopen, http_config):
         """Test connection error handling."""
         import urllib.error
@@ -613,7 +604,7 @@ class TestConcurrency:
             try:
                 sub = agent_interface.submit_graph(
                     {**valid_graph, "id": f"concurrent_{threading.get_ident()}"},
-                    wait_for_result=False
+                    wait_for_result=False,
                 )
                 results.append(sub)
             except Exception as e:

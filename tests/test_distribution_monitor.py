@@ -10,12 +10,19 @@ from unittest.mock import MagicMock, Mock, patch
 
 import numpy as np
 import pytest
-from distribution_monitor import (DetectionMethod, DistributionMonitor,
-                                  DistributionSnapshot, DriftDetection,
-                                  DriftSeverity, DriftType,
-                                  KolmogorovSmirnovDetector, MMDDetector,
-                                  PageHinkleyDetector, WassersteinDetector,
-                                  WindowedDistribution)
+from distribution_monitor import (
+    DetectionMethod,
+    DistributionMonitor,
+    DistributionSnapshot,
+    DriftDetection,
+    DriftSeverity,
+    DriftType,
+    KolmogorovSmirnovDetector,
+    MMDDetector,
+    PageHinkleyDetector,
+    WassersteinDetector,
+    WindowedDistribution,
+)
 
 
 @pytest.fixture
@@ -76,7 +83,7 @@ class TestDataClasses:
             statistic=0.5,
             p_value=0.01,
             threshold=0.05,
-            detected=True
+            detected=True,
         )
 
         assert detection.drift_type == DriftType.FEATURE_DRIFT
@@ -92,7 +99,7 @@ class TestDataClasses:
             labels=None,
             timestamp=time.time(),
             sample_count=2,
-            feature_stats={}
+            feature_stats={},
         )
 
         assert snapshot.sample_count == 2
@@ -145,10 +152,10 @@ class TestWindowedDistribution:
 
         stats = window.get_statistics()
 
-        assert 'mean' in stats
-        assert 'std' in stats
-        assert 'min' in stats
-        assert 'max' in stats
+        assert "mean" in stats
+        assert "std" in stats
+        assert "min" in stats
+        assert "max" in stats
 
     def test_statistics_empty_window(self):
         """Test statistics with empty window."""
@@ -156,7 +163,7 @@ class TestWindowedDistribution:
 
         stats = window.get_statistics()
 
-        assert stats['mean'] is None
+        assert stats["mean"] is None
 
 
 class TestKolmogorovSmirnovDetector:
@@ -273,7 +280,7 @@ class TestMMDDetector:
         detector = MMDDetector(threshold=0.05)
 
         assert detector.threshold == 0.05
-        assert detector.kernel == 'rbf'
+        assert detector.kernel == "rbf"
 
     def test_set_reference(self, reference_data):
         """Test setting reference distribution."""
@@ -370,10 +377,7 @@ class TestDistributionMonitor:
 
     def test_initialization_with_config(self):
         """Test initialization with custom config."""
-        config = {
-            'window_size': 500,
-            'detection_threshold': 0.01
-        }
+        config = {"window_size": 500, "detection_threshold": 0.01}
 
         monitor = DistributionMonitor(config)
 
@@ -424,7 +428,9 @@ class TestDistributionMonitor:
 
         assert shift_detected is False
 
-    def test_detect_shift_with_drift(self, distribution_monitor, reference_data, shifted_data):
+    def test_detect_shift_with_drift(
+        self, distribution_monitor, reference_data, shifted_data
+    ):
         """Test shift detection with actual drift."""
         distribution_monitor.set_reference(reference_data)
 
@@ -443,10 +449,12 @@ class TestDistributionMonitor:
         """Test drift summary with no drift."""
         summary = distribution_monitor.get_drift_summary()
 
-        assert 'drift_detected' in summary
-        assert summary['drift_detected'] is False
+        assert "drift_detected" in summary
+        assert summary["drift_detected"] is False
 
-    def test_get_drift_summary_with_drift(self, distribution_monitor, reference_data, shifted_data):
+    def test_get_drift_summary_with_drift(
+        self, distribution_monitor, reference_data, shifted_data
+    ):
         """Test drift summary with drift."""
         distribution_monitor.set_reference(reference_data)
 
@@ -458,8 +466,8 @@ class TestDistributionMonitor:
 
         summary = distribution_monitor.get_drift_summary()
 
-        assert 'total_checks' in summary
-        assert 'total_drifts' in summary
+        assert "total_checks" in summary
+        assert "total_drifts" in summary
 
     def test_analyze_feature_importance(self, distribution_monitor):
         """Test feature importance analysis."""
@@ -476,9 +484,9 @@ class TestDistributionMonitor:
 
         stats = distribution_monitor.get_statistics()
 
-        assert 'total_samples' in stats
-        assert 'total_checks' in stats
-        assert 'reference_set' in stats
+        assert "total_samples" in stats
+        assert "total_checks" in stats
+        assert "reference_set" in stats
 
     def test_calculate_trend_insufficient_data(self, distribution_monitor):
         """Test trend calculation with insufficient data."""
@@ -523,8 +531,8 @@ class TestPersistence:
         distribution_monitor.save_state(temp_dir)
 
         save_path = Path(temp_dir)
-        assert (save_path / 'reference_distribution.npy').exists()
-        assert (save_path / 'statistics.json').exists()
+        assert (save_path / "reference_distribution.npy").exists()
+        assert (save_path / "statistics.json").exists()
 
     def test_load_state(self, temp_dir, reference_data):
         """Test loading monitor state."""

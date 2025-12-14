@@ -200,9 +200,9 @@ class LRUCache:
                     "size_bytes": self.size_bytes,
                     "max_size": self.max_size,
                     "max_bytes": self.max_bytes,
-                    "utilization": len(self.cache) / self.max_size
-                    if self.max_size > 0
-                    else 0,
+                    "utilization": (
+                        len(self.cache) / self.max_size if self.max_size > 0 else 0
+                    ),
                 }
             except Exception as e:
                 logger.error(f"Get stats failed: {e}")
@@ -227,7 +227,9 @@ class CompressedCache:
             if isinstance(compressed, bytes):
                 # Decompress
                 try:
-                    decompressed = pickle.loads(zlib.decompress(compressed))  # nosec B301 - Internal data structure
+                    decompressed = pickle.loads(
+                        zlib.decompress(compressed)
+                    )  # nosec B301 - Internal data structure
                     return decompressed
                 except Exception as e:
                     logger.warning(f"Decompression failed: {e}")
@@ -556,9 +558,11 @@ class MultiLevelCache:
                     {
                         "size_mb": self.l3_current_size_mb,
                         "max_size_mb": self.l3_max_size_mb,
-                        "utilization": self.l3_current_size_mb / self.l3_max_size_mb
-                        if self.l3_max_size_mb > 0
-                        else 0,
+                        "utilization": (
+                            self.l3_current_size_mb / self.l3_max_size_mb
+                            if self.l3_max_size_mb > 0
+                            else 0
+                        ),
                     }
                 )
 

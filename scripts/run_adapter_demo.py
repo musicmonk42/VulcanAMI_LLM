@@ -67,7 +67,11 @@ async def main() -> int:
     print(f"  Arena Base:    {cfg.arena_base}")
     print(f"  VULCAN Base:   {cfg.vulcan_base}")
     print(f"  Demo Seed:     {cfg.demo_seed}")
-    print(f"  API Key:       {cfg.api_key[:8]}..." if len(cfg.api_key) > 8 else f"  API Key: {cfg.api_key}")
+    print(
+        f"  API Key:       {cfg.api_key[:8]}..."
+        if len(cfg.api_key) > 8
+        else f"  API Key: {cfg.api_key}"
+    )
 
     adapter = PlatformAdapter(cfg, mapping)
     start = time.time()
@@ -75,14 +79,24 @@ async def main() -> int:
         banner("ACT 1: Submit Inefficient/Baseline Run")
         run_resp = await adapter.submit_inefficient_run()
         print("📤 Submit response:", json.dumps(run_resp, indent=2))
-        run_id = run_resp.get("run_id") or run_resp.get("id") or run_resp.get("proposal_id") or "unknown"
+        run_id = (
+            run_resp.get("run_id")
+            or run_resp.get("id")
+            or run_resp.get("proposal_id")
+            or "unknown"
+        )
 
         banner("ACT 2: Submit Negative Feedback")
-        fb = await adapter.submit_feedback(run_id, score=0.1, rationale="High latency; please optimize")
+        fb = await adapter.submit_feedback(
+            run_id, score=0.1, rationale="High latency; please optimize"
+        )
         print("📝 Feedback response:", json.dumps(fb, indent=2))
 
         banner("ACT 2.5: Trigger Improve (preference = latency)")
-        imp = await adapter.improve(trigger="performance_drop", objective_weights={"speed": 0.7, "accuracy": 0.3})
+        imp = await adapter.improve(
+            trigger="performance_drop",
+            objective_weights={"speed": 0.7, "accuracy": 0.3},
+        )
         print("🚀 Improve response:", json.dumps(imp, indent=2))
         change_id = imp.get("change_id", "")
 
@@ -95,7 +109,10 @@ async def main() -> int:
 
         banner("ACT 4: Query Metrics/Health")
         met = await adapter.query_metrics()
-        print("📈 Metrics/Health:", json.dumps(met, indent=2) if isinstance(met, dict) else met)
+        print(
+            "📈 Metrics/Health:",
+            json.dumps(met, indent=2) if isinstance(met, dict) else met,
+        )
 
         if change_id:
             banner("BONUS: Undo last safe change")

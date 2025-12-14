@@ -785,9 +785,9 @@ class HardwareDispatcherIntegration:
             else:
                 result = analog_photonic_emulator.emulate_memristor_cim(
                     tensor1,
-                    op=lambda t: np.dot(t, tensor2)
-                    if np
-                    else self._emulate_mvm_pure(t, tensor2),
+                    op=lambda t: (
+                        np.dot(t, tensor2) if np else self._emulate_mvm_pure(t, tensor2)
+                    ),
                 )
         else:
             raise ValueError(f"Unknown emulator backend: {backend}")
@@ -990,7 +990,9 @@ class HardwareDispatcherIntegration:
             if k != "params":  # Skip variable params
                 key_parts.append(f"{k}={v}")
 
-        return hashlib.md5("|".join(key_parts).encode(), usedforsecurity=False).hexdigest()
+        return hashlib.md5(
+            "|".join(key_parts).encode(), usedforsecurity=False
+        ).hexdigest()
 
     def _update_cache(self, key: str, result: DispatchResult):
         """Update result cache with LRU eviction"""

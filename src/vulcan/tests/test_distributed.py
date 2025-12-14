@@ -7,12 +7,24 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from vulcan.memory.base import (ConsistencyLevel, Memory, MemoryConfig,
-                                MemoryQuery, MemoryType, RetrievalResult)
+from vulcan.memory.base import (
+    ConsistencyLevel,
+    Memory,
+    MemoryConfig,
+    MemoryQuery,
+    MemoryType,
+    RetrievalResult,
+)
+
 # Import the module to test
-from vulcan.memory.distributed import (DistributedMemory, MemoryFederation,
-                                       MemoryNode, RPCClient, RPCMessage,
-                                       RPCServer)
+from vulcan.memory.distributed import (
+    DistributedMemory,
+    MemoryFederation,
+    MemoryNode,
+    RPCClient,
+    RPCMessage,
+    RPCServer,
+)
 
 # Try importing optional dependencies
 try:

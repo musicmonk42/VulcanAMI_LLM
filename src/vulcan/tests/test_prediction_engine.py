@@ -23,14 +23,19 @@ import numpy as np
 import pytest
 
 # Import from prediction_engine
-from vulcan.world_model.prediction_engine import (CombinationMethod,
-                                                  EnsemblePredictor,
-                                                  MonteCarloSampler, Path,
-                                                  PathAnalyzer, PathCluster,
-                                                  PathClusterer,
-                                                  PathEffectCalculator,
-                                                  PathTracer, Prediction,
-                                                  PredictionCombiner)
+from vulcan.world_model.prediction_engine import (
+    CombinationMethod,
+    EnsemblePredictor,
+    MonteCarloSampler,
+    Path,
+    PathAnalyzer,
+    PathCluster,
+    PathClusterer,
+    PathEffectCalculator,
+    PathTracer,
+    Prediction,
+    PredictionCombiner,
+)
 
 # Test constants
 TEST_RANDOM_SEED = 42  # Fixed seed for reproducible randomness tests
@@ -463,9 +468,9 @@ class TestPathEffectCalculator:
             effects.append(effect)
 
         # Effects should vary due to noise - check with standard deviation
-        assert np.std(effects) > 0.01, (
-            "Effects should show variation when noise is added"
-        )
+        assert (
+            np.std(effects) > 0.01
+        ), "Effects should show variation when noise is added"
 
     def test_effect_with_moderators(self, effect_calculator, simple_path):
         """Test effect calculation with moderators"""

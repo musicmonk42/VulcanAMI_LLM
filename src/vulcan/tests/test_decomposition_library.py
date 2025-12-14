@@ -12,8 +12,14 @@ Tests:
 """
 
 from problem_decomposer.decomposition_library import (
-    Context, DecompositionLibrary, DecompositionPrinciple, Pattern,
-    PatternPerformance, PatternStatus, StratifiedDecompositionLibrary)
+    Context,
+    DecompositionLibrary,
+    DecompositionPrinciple,
+    Pattern,
+    PatternPerformance,
+    PatternStatus,
+    StratifiedDecompositionLibrary,
+)
 import logging
 import sys
 import tempfile

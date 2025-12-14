@@ -3,12 +3,14 @@ Test suite for curriculum learning module
 """
 
 from vulcan.learning.learning_types import LearningConfig
-from vulcan.learning.curriculum_learning import (CompositeDifficultyEstimator,
-                                                 CurriculumLearner,
-                                                 CurriculumMetrics,
-                                                 DifficultyEstimator,
-                                                 LearnedDifficultyEstimator,
-                                                 PacingStrategy)
+from vulcan.learning.curriculum_learning import (
+    CompositeDifficultyEstimator,
+    CurriculumLearner,
+    CurriculumMetrics,
+    DifficultyEstimator,
+    LearnedDifficultyEstimator,
+    PacingStrategy,
+)
 import numpy as np
 from unittest.mock import Mock
 from pathlib import Path

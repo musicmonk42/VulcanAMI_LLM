@@ -6,15 +6,17 @@ rate limiting, and bounded storage.
 """
 
 # Import the module to test
-from vulcan.reasoning.selection.safety_governor import (ConsistencyChecker,
-                                                        SafetyAction,
-                                                        SafetyContext,
-                                                        SafetyGovernor,
-                                                        SafetyLevel,
-                                                        SafetyValidator,
-                                                        SafetyViolation,
-                                                        ToolContract,
-                                                        VetoReason)
+from vulcan.reasoning.selection.safety_governor import (
+    ConsistencyChecker,
+    SafetyAction,
+    SafetyContext,
+    SafetyGovernor,
+    SafetyLevel,
+    SafetyValidator,
+    SafetyViolation,
+    ToolContract,
+    VetoReason,
+)
 import sys
 import threading
 import time

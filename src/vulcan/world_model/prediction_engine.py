@@ -42,8 +42,7 @@ try:
     from sklearn.cluster import DBSCAN, OPTICS, AgglomerativeClustering, KMeans
     from sklearn.decomposition import PCA
     from sklearn.metrics import calinski_harabasz_score, silhouette_score
-    from sklearn.preprocessing import (MinMaxScaler, RobustScaler,
-                                       StandardScaler)
+    from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -353,9 +352,11 @@ if not SKLEARN_AVAILABLE:
                     # Update centers
                     new_centers = np.array(
                         [
-                            X[labels == i].mean(axis=0)
-                            if np.any(labels == i)
-                            else centers[i]
+                            (
+                                X[labels == i].mean(axis=0)
+                                if np.any(labels == i)
+                                else centers[i]
+                            )
                             for i in range(self.n_clusters)
                         ]
                     )
@@ -1818,20 +1819,27 @@ class EnsemblePredictor:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         else:
             # Lazy-load safety validator here
             self.safety_validator = None
             try:
                 from ..safety.safety_types import SafetyConfig
-                from ..safety.safety_validator import EnhancedSafetyValidator, initialize_all_safety_components
+                from ..safety.safety_validator import (
+                    EnhancedSafetyValidator,
+                    initialize_all_safety_components,
+                )
 
                 # Try singleton first
                 try:
                     self.safety_validator = initialize_all_safety_components(
                         config=safety_config, reuse_existing=True
                     )
-                    logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                    logger.info(
+                        f"{self.__class__.__name__}: Using singleton safety validator"
+                    )
                 except Exception as e:
                     logger.debug(f"Could not get singleton safety validator: {e}")
                     # Fallback: Use original logic for config handling
@@ -1841,7 +1849,9 @@ class EnsemblePredictor:
                         )
                     else:
                         self.safety_validator = EnhancedSafetyValidator()
-                    logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                    logger.warning(
+                        f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
+                    )
             except ImportError as e:
                 logger.warning(
                     f"safety_validator not available: {str(e)}. Operating without safety checks"

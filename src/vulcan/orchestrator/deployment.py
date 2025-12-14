@@ -35,11 +35,17 @@ from unittest.mock import MagicMock
 
 from .agent_lifecycle import AgentState
 from .collective import VULCANAGICollective
-from .dependencies import (EnhancedCollectiveDeps, print_dependency_report,
-                           validate_dependencies)
+from .dependencies import (
+    EnhancedCollectiveDeps,
+    print_dependency_report,
+    validate_dependencies,
+)
 from .metrics import EnhancedMetricsCollector
-from .variants import (AdaptiveOrchestrator, FaultTolerantOrchestrator,
-                       ParallelOrchestrator)
+from .variants import (
+    AdaptiveOrchestrator,
+    FaultTolerantOrchestrator,
+    ParallelOrchestrator,
+)
 from ..security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
@@ -286,8 +292,7 @@ class ProductionDeployment:
 
         # --- Load Multimodal Reasoner ---
         try:
-            from vulcan.reasoning.multimodal_reasoning import \
-                MultimodalReasoner
+            from vulcan.reasoning.multimodal_reasoning import MultimodalReasoner
 
             components["multimodal_reasoner"] = MultimodalReasoner()
             logger.info("MultimodalReasoner loaded")
@@ -296,8 +301,7 @@ class ProductionDeployment:
 
         # --- Load Probabilistic Reasoner ---
         try:
-            from vulcan.reasoning.probabilistic_reasoning import \
-                ProbabilisticReasoner
+            from vulcan.reasoning.probabilistic_reasoning import ProbabilisticReasoner
 
             components["probabilistic"] = ProbabilisticReasoner()
             logger.info("ProbabilisticReasoner loaded")
@@ -307,8 +311,7 @@ class ProductionDeployment:
         # --- Load Causal Reasoner ---
         try:
             # Assuming path based on project structure
-            from vulcan.reasoning.causal_reasoning import \
-                EnhancedCausalReasoning
+            from vulcan.reasoning.causal_reasoning import EnhancedCausalReasoning
 
             components["causal"] = EnhancedCausalReasoning()
             logger.info("EnhancedCausalReasoning loaded")
@@ -318,8 +321,7 @@ class ProductionDeployment:
         # --- Load Analogical (Abstract) Reasoner ---
         # FIXED: Import from analogical_reasoning not analogical
         try:
-            from vulcan.reasoning.analogical_reasoning import \
-                AnalogicalReasoner
+            from vulcan.reasoning.analogical_reasoning import AnalogicalReasoner
 
             components["abstract"] = AnalogicalReasoner()
             logger.info("AnalogicalReasoner loaded")
@@ -328,8 +330,7 @@ class ProductionDeployment:
 
         # --- Load Cross-Modal Reasoner ---
         try:
-            from vulcan.reasoning.multimodal_reasoning import \
-                CrossModalReasoner
+            from vulcan.reasoning.multimodal_reasoning import CrossModalReasoner
 
             # FIXED: Use correct key 'multimodal' not 'multimodal_processor'
             multimodal_processor = components.get("multimodal")
@@ -485,7 +486,9 @@ class ProductionDeployment:
                     components["continual"],
                     components["meta_cognitive"],
                     components["compositional"],
-                    components["world_model"],  # Count any world_model (CausalWorldModel or UnifiedWorldModel)
+                    components[
+                        "world_model"
+                    ],  # Count any world_model (CausalWorldModel or UnifiedWorldModel)
                 ]
                 if v is not None
             )
@@ -509,9 +512,11 @@ class ProductionDeployment:
 
         # Planning - FIXED: Import from vulcan.planning
         try:
-            from vulcan.planning import (DistributedCoordinator,
-                                         HierarchicalGoalSystem,
-                                         ResourceAwareCompute)
+            from vulcan.planning import (
+                DistributedCoordinator,
+                HierarchicalGoalSystem,
+                ResourceAwareCompute,
+            )
 
             components["goal_system"] = HierarchicalGoalSystem()
             components["resource_compute"] = ResourceAwareCompute()
@@ -536,9 +541,11 @@ class ProductionDeployment:
 
         # Safety - FIXED: Pass None instead of self.config to avoid AgentConfig.to_dict() error
         try:
-            from vulcan.safety.safety_types import (ExplainabilityNode,
-                                                    GovernanceOrchestrator,
-                                                    NSOAligner)
+            from vulcan.safety.safety_types import (
+                ExplainabilityNode,
+                GovernanceOrchestrator,
+                NSOAligner,
+            )
             from vulcan.safety.safety_validator import EnhancedSafetyValidator
 
             # Pass None to use default SafetyConfig - avoids AgentConfig.to_dict() error
@@ -571,7 +578,7 @@ class ProductionDeployment:
 
         # Memory - Import from parent directory (vulcan/) with proper config handling
         try:
-            from ..memory import (EpisodicMemory, MemoryIndex, MemoryPersistence)
+            from ..memory import EpisodicMemory, MemoryIndex, MemoryPersistence
 
             # Create memory config with safe attribute access
             try:
@@ -627,8 +634,7 @@ class ProductionDeployment:
 
         # Curiosity Engine (Experiment Generator)
         try:
-            from vulcan.curiosity_engine.experiment_generator import \
-                ExperimentGenerator
+            from vulcan.curiosity_engine.experiment_generator import ExperimentGenerator
 
             components["experiment_generator"] = ExperimentGenerator()
             logger.info("ExperimentGenerator loaded successfully")
@@ -641,8 +647,7 @@ class ProductionDeployment:
 
         # Problem Decomposer (Problem Executor)
         try:
-            from vulcan.problem_decomposer.problem_executor import \
-                ProblemExecutor
+            from vulcan.problem_decomposer.problem_executor import ProblemExecutor
 
             components["problem_executor"] = ProblemExecutor()
             logger.info("ProblemExecutor loaded successfully")
@@ -655,14 +660,13 @@ class ProductionDeployment:
 
         # Semantic Bridge (Core) - Initialize before components that need it
         try:
-            from vulcan.semantic_bridge.semantic_bridge_core import \
-                SemanticBridge
+            from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
 
             # Pass world model, memory, and safety config
             components["semantic_bridge"] = SemanticBridge(
                 world_model=components.get("world_model"),
                 vulcan_memory=components.get("am"),  # EpisodicMemory
-                safety_config=None  # Will use singleton safety validator
+                safety_config=None,  # Will use singleton safety validator
             )
             logger.info("SemanticBridge initialized successfully")
         except ImportError as e:
@@ -674,13 +678,14 @@ class ProductionDeployment:
 
         # Knowledge Crystallizer (Core)
         try:
-            from vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
-                KnowledgeCrystallizer
+            from vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
+                KnowledgeCrystallizer,
+            )
 
             # Pass memory and semantic bridge
             components["knowledge_crystallizer"] = KnowledgeCrystallizer(
                 vulcan_memory=components.get("am"),  # EpisodicMemory
-                semantic_bridge=components.get("semantic_bridge")  # Now available
+                semantic_bridge=components.get("semantic_bridge"),  # Now available
             )
             logger.info("KnowledgeCrystallizer initialized successfully")
         except ImportError as e:
@@ -692,14 +697,13 @@ class ProductionDeployment:
 
         # Curiosity Engine (Core)
         try:
-            from vulcan.curiosity_engine.curiosity_engine_core import \
-                CuriosityEngine
+            from vulcan.curiosity_engine.curiosity_engine_core import CuriosityEngine
 
             # Pass knowledge crystallizer, decomposer, and world model if available
             components["curiosity_engine"] = CuriosityEngine(
                 knowledge=components.get("knowledge_crystallizer"),
                 decomposer=None,  # Will be set after ProblemDecomposer is created
-                world_model=components.get("world_model")
+                world_model=components.get("world_model"),
             )
             logger.info("CuriosityEngine initialized successfully")
         except ImportError as e:
@@ -711,8 +715,7 @@ class ProductionDeployment:
 
         # Problem Decomposer (Core) - Use bootstrap for proper initialization
         try:
-            from vulcan.problem_decomposer.decomposer_bootstrap import \
-                create_decomposer
+            from vulcan.problem_decomposer.decomposer_bootstrap import create_decomposer
 
             # Use factory function to create fully initialized decomposer with:
             # - All strategies registered
@@ -724,15 +727,19 @@ class ProductionDeployment:
                 validator=None,
                 storage_path=None,  # Use default in-memory for now
                 config=None,  # No special config needed
-                safety_validator=components.get("safety_validator")  # Pass as separate parameter
+                safety_validator=components.get(
+                    "safety_validator"
+                ),  # Pass as separate parameter
             )
             logger.info("ProblemDecomposer initialized successfully with bootstrap")
-            
+
             # Now update CuriosityEngine with the decomposer
             if components.get("curiosity_engine"):
-                components["curiosity_engine"].decomposer = components["problem_decomposer"]
+                components["curiosity_engine"].decomposer = components[
+                    "problem_decomposer"
+                ]
                 logger.info("CuriosityEngine linked to ProblemDecomposer")
-                
+
         except ImportError as e:
             logger.error(f"Failed to import ProblemDecomposer bootstrap: {e}")
             components["problem_decomposer"] = None
@@ -743,7 +750,9 @@ class ProductionDeployment:
         # --- END ADDED IMPORTS ---
 
         # Log component summary
-        total_components = 27  # Total expected components (was 26, added SemanticBridge)
+        total_components = (
+            27  # Total expected components (was 26, added SemanticBridge)
+        )
         available_components = sum(1 for v in components.values() if v is not None)
         logger.info(
             f"Component loading complete: {available_components}/{total_components} components available"
@@ -768,45 +777,69 @@ class ProductionDeployment:
         world_model = components.get("world_model")
         if world_model and not isinstance(world_model, MagicMock):
             # Get motivational_introspection which contains most meta-reasoning components as properties
-            motivational_intro = getattr(world_model, "motivational_introspection", None)
+            motivational_intro = getattr(
+                world_model, "motivational_introspection", None
+            )
             self_improvement = getattr(world_model, "self_improvement_drive", None)
-            
+
             meta_components = {
                 # Top-level world_model attributes
                 "self_improvement_drive": self_improvement,
                 "motivational_introspection": motivational_intro,
                 "validation_tracker": getattr(world_model, "validation_tracker", None),
-                "transparency_interface": getattr(world_model, "transparency_interface", None),
-                "value_evolution_tracker": getattr(world_model, "value_evolution_tracker", None),
+                "transparency_interface": getattr(
+                    world_model, "transparency_interface", None
+                ),
+                "value_evolution_tracker": getattr(
+                    world_model, "value_evolution_tracker", None
+                ),
             }
-            
+
             # Extract components from motivational_introspection properties
             if motivational_intro and not isinstance(motivational_intro, MagicMock):
-                meta_components.update({
-                    "objective_hierarchy": getattr(motivational_intro, "objective_hierarchy", None),
-                    "objective_negotiator": getattr(motivational_intro, "objective_negotiator", None),
-                    "goal_conflict_detector": getattr(motivational_intro, "conflict_detector", None),
-                    "counterfactual_objectives": getattr(motivational_intro, "counterfactual_reasoner", None),
-                })
+                meta_components.update(
+                    {
+                        "objective_hierarchy": getattr(
+                            motivational_intro, "objective_hierarchy", None
+                        ),
+                        "objective_negotiator": getattr(
+                            motivational_intro, "objective_negotiator", None
+                        ),
+                        "goal_conflict_detector": getattr(
+                            motivational_intro, "conflict_detector", None
+                        ),
+                        "counterfactual_objectives": getattr(
+                            motivational_intro, "counterfactual_reasoner", None
+                        ),
+                    }
+                )
             else:
                 # If motivational_introspection not available, set these to None
-                meta_components.update({
-                    "objective_hierarchy": None,
-                    "objective_negotiator": None,
-                    "goal_conflict_detector": None,
-                    "counterfactual_objectives": None,
-                })
-            
+                meta_components.update(
+                    {
+                        "objective_hierarchy": None,
+                        "objective_negotiator": None,
+                        "goal_conflict_detector": None,
+                        "counterfactual_objectives": None,
+                    }
+                )
+
             # Components that may not be implemented yet (setting to None to avoid missing keys)
-            meta_components.update({
-                "preference_learner": None,
-                "ethical_boundary_monitor": None,
-                "curiosity_reward_shaper": None,
-                "internal_critic": None,
-                # Note: Accessing private attribute _auto_apply_policy because SelfImprovementDrive
-                # doesn't expose a public property for this. Consider adding public accessor if needed.
-                "auto_apply_policy": getattr(self_improvement, "_auto_apply_policy", None) if self_improvement else None,
-            })
+            meta_components.update(
+                {
+                    "preference_learner": None,
+                    "ethical_boundary_monitor": None,
+                    "curiosity_reward_shaper": None,
+                    "internal_critic": None,
+                    # Note: Accessing private attribute _auto_apply_policy because SelfImprovementDrive
+                    # doesn't expose a public property for this. Consider adding public accessor if needed.
+                    "auto_apply_policy": (
+                        getattr(self_improvement, "_auto_apply_policy", None)
+                        if self_improvement
+                        else None
+                    ),
+                }
+            )
         else:
             meta_components = {}
 
@@ -867,7 +900,9 @@ class ProductionDeployment:
             else:
                 policies = {}
 
-            system_state = SystemState(CID=f"vulcan_agi_{int(time.time())}", policies=policies)
+            system_state = SystemState(
+                CID=f"vulcan_agi_{int(time.time())}", policies=policies
+            )
 
             return system_state
 
@@ -1609,7 +1644,9 @@ class ProductionDeployment:
         except Exception as e:
             try:
                 logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
-            except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+            except (
+                Exception
+            ):  # nosec B110 - Logger may be unavailable during interpreter shutdown
                 pass
 
 

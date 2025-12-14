@@ -655,7 +655,9 @@ def run_listener(
         max_requests_per_minute: Rate limit per client
     """
     if host == "0.0.0.0":  # nosec B104 - This is a security check, not a binding
-        logger.warning("⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!")
+        logger.warning(
+            "⚠️ Binding to 0.0.0.0 (all interfaces) - ensure firewall is configured!"
+        )
 
     listener = GraphixListener(
         host=host,
@@ -673,7 +675,9 @@ if __name__ == "__main__":
         description="Graphix IR Listener - Secure HTTP server for graph submission"
     )
     parser.add_argument(
-        "--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1, use 0.0.0.0 for all interfaces)"
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to (default: 127.0.0.1, use 0.0.0.0 for all interfaces)",
     )
     parser.add_argument(
         "--port", type=int, default=8181, help="Port to listen on (default: 8181)"

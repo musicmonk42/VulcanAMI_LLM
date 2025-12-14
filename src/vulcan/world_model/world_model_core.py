@@ -28,8 +28,9 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from pathlib import \
-    Path as FilePath  # <-- FIX: Use alias 'FilePath' to avoid name conflict
+from pathlib import (
+    Path as FilePath,
+)  # <-- FIX: Use alias 'FilePath' to avoid name conflict
 from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import MagicMock
 
@@ -144,19 +145,16 @@ def _lazy_import_causal_graph():
 
 
 def _lazy_import_intervention_manager():
-    global \
-        Correlation, \
-        InterventionPrioritizer, \
-        InterventionExecutor, \
-        InterventionResult, \
-        InterventionCandidate
+    global Correlation, InterventionPrioritizer, InterventionExecutor, InterventionResult, InterventionCandidate
     if Correlation is None:
         try:
-            from .intervention_manager import (Correlation,
-                                               InterventionCandidate,
-                                               InterventionExecutor,
-                                               InterventionPrioritizer,
-                                               InterventionResult)
+            from .intervention_manager import (
+                Correlation,
+                InterventionCandidate,
+                InterventionExecutor,
+                InterventionPrioritizer,
+                InterventionResult,
+            )
 
             logger.info("Intervention manager components lazy loaded successfully")
             return True
@@ -190,8 +188,12 @@ def _lazy_import_invariant_detector():
     global InvariantRegistry, InvariantDetector, Invariant, InvariantType
     if InvariantRegistry is None:
         try:
-            from .invariant_detector import (Invariant, InvariantDetector,
-                                             InvariantRegistry, InvariantType)
+            from .invariant_detector import (
+                Invariant,
+                InvariantDetector,
+                InvariantRegistry,
+                InvariantType,
+            )
 
             logger.info("InvariantDetector components imported successfully")
         except ImportError as e:
@@ -204,8 +206,10 @@ def _lazy_import_confidence_calibrator():
     global ConfidenceCalibrator, ModelConfidenceTracker
     if ConfidenceCalibrator is None:
         try:
-            from .confidence_calibrator import (ConfidenceCalibrator,
-                                                ModelConfidenceTracker)
+            from .confidence_calibrator import (
+                ConfidenceCalibrator,
+                ModelConfidenceTracker,
+            )
 
             logger.info("ConfidenceCalibrator components imported successfully")
         except ImportError as e:
@@ -228,28 +232,21 @@ def _lazy_import_world_model_router():
 
 
 def _lazy_import_meta_reasoning():
-    global \
-        MotivationalIntrospection, \
-        ObjectiveHierarchy, \
-        CounterfactualObjectiveReasoner, \
-        GoalConflictDetector, \
-        ObjectiveNegotiator, \
-        ValidationTracker, \
-        TransparencyInterface, \
-        SelfImprovementDrive, \
-        TriggerType, \
-        ImprovementObjective
+    global MotivationalIntrospection, ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ObjectiveNegotiator, ValidationTracker, TransparencyInterface, SelfImprovementDrive, TriggerType, ImprovementObjective
     if MotivationalIntrospection is None:
         try:
-            from .meta_reasoning import (CounterfactualObjectiveReasoner,
-                                         GoalConflictDetector,
-                                         ImprovementObjective,
-                                         MotivationalIntrospection,
-                                         ObjectiveHierarchy,
-                                         ObjectiveNegotiator,
-                                         SelfImprovementDrive,
-                                         TransparencyInterface, TriggerType,
-                                         ValidationTracker)
+            from .meta_reasoning import (
+                CounterfactualObjectiveReasoner,
+                GoalConflictDetector,
+                ImprovementObjective,
+                MotivationalIntrospection,
+                ObjectiveHierarchy,
+                ObjectiveNegotiator,
+                SelfImprovementDrive,
+                TransparencyInterface,
+                TriggerType,
+                ValidationTracker,
+            )
 
             logger.info("Meta-reasoning components lazy loaded successfully")
         except ImportError as e:
@@ -289,14 +286,7 @@ META_REASONING_AVAILABLE = False
 
 
 def check_component_availability():
-    global \
-        CAUSAL_GRAPH_AVAILABLE, \
-        INTERVENTION_MANAGER_AVAILABLE, \
-        PREDICTION_ENGINE_AVAILABLE, \
-        INVARIANT_DETECTOR_AVAILABLE, \
-        CONFIDENCE_CALIBRATOR_AVAILABLE, \
-        ROUTER_AVAILABLE, \
-        META_REASONING_AVAILABLE
+    global CAUSAL_GRAPH_AVAILABLE, INTERVENTION_MANAGER_AVAILABLE, PREDICTION_ENGINE_AVAILABLE, INVARIANT_DETECTOR_AVAILABLE, CONFIDENCE_CALIBRATOR_AVAILABLE, ROUTER_AVAILABLE, META_REASONING_AVAILABLE
     CAUSAL_GRAPH_AVAILABLE = _lazy_import_causal_graph()
     INTERVENTION_MANAGER_AVAILABLE = _lazy_import_intervention_manager()
     PREDICTION_ENGINE_AVAILABLE = _lazy_import_prediction_engine()
@@ -324,7 +314,6 @@ def check_component_availability():
 
 class ComponentIntegrationError(Exception):
     """Raised when critical component integration fails"""
-
 
 
 @dataclass
@@ -711,12 +700,16 @@ class InterventionManager:
                             self.world_model.safety_validator.validate_intervention(
                                 candidate.correlation.var_a,
                                 candidate.correlation.var_b,
-                                candidate.intervention_type
-                                if hasattr(candidate, "intervention_type")
-                                else "simulated",
-                                candidate.metadata
-                                if hasattr(candidate, "metadata")
-                                else {},
+                                (
+                                    candidate.intervention_type
+                                    if hasattr(candidate, "intervention_type")
+                                    else "simulated"
+                                ),
+                                (
+                                    candidate.metadata
+                                    if hasattr(candidate, "metadata")
+                                    else {}
+                                ),
                             )
                         )
 
@@ -1092,9 +1085,9 @@ class PredictionManager:
                         {
                             "domain": context.domain,
                             "targets": context.targets,
-                            "target_variable": context.targets[0]
-                            if context.targets
-                            else "unknown",
+                            "target_variable": (
+                                context.targets[0] if context.targets else "unknown"
+                            ),
                         },
                     )
 
@@ -1198,9 +1191,9 @@ class PredictionManager:
 
         return self.world_model.ensemble_predictor.predict_with_path_ensemble(
             action,
-            context.to_dict()
-            if hasattr(context, "to_dict")
-            else context,  # Pass context
+            (
+                context.to_dict() if hasattr(context, "to_dict") else context
+            ),  # Pass context
             converted_paths,  # <-- Use the new list of converted paths
         )
 
@@ -1354,9 +1347,11 @@ class ConsistencyValidator:
             "issues": issues,
             "model_version": self.world_model.model_version,
             "observation_count": self.world_model.observation_count,
-            "intervention_count": self.world_model.intervention_manager.intervention_count
-            if INTERVENTION_MANAGER_AVAILABLE
-            else 0,
+            "intervention_count": (
+                self.world_model.intervention_manager.intervention_count
+                if INTERVENTION_MANAGER_AVAILABLE
+                else 0
+            ),
         }
 
     def _check_structural_issues(self) -> List[Dict[str, Any]]:
@@ -1412,7 +1407,9 @@ class ConsistencyValidator:
         issues = []
 
         if CONFIDENCE_CALIBRATOR_AVAILABLE and self.world_model.confidence_calibrator:
-            calibration_error = self.world_model.confidence_calibrator.calculate_expected_calibration_error()
+            calibration_error = (
+                self.world_model.confidence_calibrator.calculate_expected_calibration_error()
+            )
             if calibration_error > 0.15:
                 issues.append(
                     {
@@ -1611,8 +1608,7 @@ class WorldModel:
         if EnhancedSafetyValidator and SafetyConfig:
             try:
                 # Import singleton initializer
-                from ..safety.safety_validator import \
-                    initialize_all_safety_components
+                from ..safety.safety_validator import initialize_all_safety_components
 
                 safety_config = config.get("safety_config", {})
                 self.safety_validator = initialize_all_safety_components(
@@ -1859,12 +1855,12 @@ class WorldModel:
         ):
             try:
                 # Runtime diagnostics: Verify required methods exist before initialization
-                assert hasattr(self.__class__, "_handle_improvement_alert"), (
-                    "Missing required method: _handle_improvement_alert in WorldModel"
-                )
-                assert hasattr(self.__class__, "_check_improvement_approval"), (
-                    "Missing required method: _check_improvement_approval in WorldModel"
-                )
+                assert hasattr(
+                    self.__class__, "_handle_improvement_alert"
+                ), "Missing required method: _handle_improvement_alert in WorldModel"
+                assert hasattr(
+                    self.__class__, "_check_improvement_approval"
+                ), "Missing required method: _check_improvement_approval in WorldModel"
 
                 logger.debug("Self-healing diagnostics: WorldModel methods verified")
                 logger.debug(
@@ -2803,9 +2799,11 @@ class WorldModel:
                 return {
                     "status": "success",
                     "valid": validation.valid,
-                    "overall_status": validation.overall_status.value
-                    if hasattr(validation.overall_status, "value")
-                    else str(validation.overall_status),
+                    "overall_status": (
+                        validation.overall_status.value
+                        if hasattr(validation.overall_status, "value")
+                        else str(validation.overall_status)
+                    ),
                     "confidence": validation.confidence,
                     "reasoning": validation.reasoning,
                     "conflicts": [
@@ -2900,9 +2898,11 @@ class WorldModel:
             # Add invariant information
             if self.invariants:
                 structure["invariants"] = {
-                    "count": len(self.invariants.invariants)
-                    if hasattr(self.invariants, "invariants")
-                    else 0,
+                    "count": (
+                        len(self.invariants.invariants)
+                        if hasattr(self.invariants, "invariants")
+                        else 0
+                    ),
                     "types": self.invariants.get_invariant_types(),
                 }
 
@@ -2990,7 +2990,9 @@ class WorldModel:
             # Add meta-reasoning validation if available
             if self.meta_reasoning_enabled:
                 try:
-                    objective_consistency = self.motivational_introspection.objective_hierarchy.check_consistency()
+                    objective_consistency = (
+                        self.motivational_introspection.objective_hierarchy.check_consistency()
+                    )
                     consistency_result["meta_reasoning_validation"] = {
                         "enabled": True,
                         "objective_consistency": objective_consistency,
@@ -3054,9 +3056,11 @@ class WorldModel:
                     correlation.var_b,
                     corr_strength,
                     correlation.p_value if hasattr(correlation, "p_value") else 0.0,
-                    correlation.sample_size
-                    if hasattr(correlation, "sample_size")
-                    else 0,
+                    (
+                        correlation.sample_size
+                        if hasattr(correlation, "sample_size")
+                        else 0
+                    ),
                     correlation.metadata if hasattr(correlation, "metadata") else {},
                 )
 
@@ -3157,7 +3161,9 @@ class WorldModel:
                     ),
                 }
 
-                with open(save_path / "meta_reasoning_state.json", "w", encoding="utf-8") as f:
+                with open(
+                    save_path / "meta_reasoning_state.json", "w", encoding="utf-8"
+                ) as f:
                     json.dump(meta_reasoning_state, f, indent=2, default=str)
             except Exception as e:
                 logger.error("Error saving meta-reasoning state: %s", e)
@@ -3208,7 +3214,9 @@ class WorldModel:
             and (load_path / "meta_reasoning_state.json").exists()
         ):
             try:
-                with open(load_path / "meta_reasoning_state.json", "r", encoding="utf-8") as f:
+                with open(
+                    load_path / "meta_reasoning_state.json", "r", encoding="utf-8"
+                ) as f:
                     json.load(f)
                 logger.info("Meta-reasoning state loaded")
             except Exception as e:
@@ -3230,18 +3238,18 @@ class WorldModel:
             "bootstrap_mode": self.bootstrap_mode,
             "meta_reasoning_enabled": self.meta_reasoning_enabled,
             "self_improvement_enabled": self.self_improvement_enabled,
-            "improvement_running": self.improvement_running
-            if self.self_improvement_enabled
-            else False,
+            "improvement_running": (
+                self.improvement_running if self.self_improvement_enabled else False
+            ),
             "components": {
                 "causal_graph": {
                     "available": CAUSAL_GRAPH_AVAILABLE,
-                    "nodes": len(self.causal_graph.nodes)
-                    if CAUSAL_GRAPH_AVAILABLE
-                    else 0,
-                    "edges": len(self.causal_graph.edges)
-                    if CAUSAL_GRAPH_AVAILABLE
-                    else 0,
+                    "nodes": (
+                        len(self.causal_graph.nodes) if CAUSAL_GRAPH_AVAILABLE else 0
+                    ),
+                    "edges": (
+                        len(self.causal_graph.edges) if CAUSAL_GRAPH_AVAILABLE else 0
+                    ),
                 },
                 "correlation_tracker": {"available": CorrelationTracker is not None},
                 "intervention_manager": {

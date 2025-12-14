@@ -705,9 +705,9 @@ class HardwareDispatcher:
                         "success": metric.success,
                         "input_size": metric.input_size,
                         "output_size": metric.output_size,
-                        "timestamp": metric.end_time.isoformat()
-                        if metric.end_time
-                        else None,
+                        "timestamp": (
+                            metric.end_time.isoformat() if metric.end_time else None
+                        ),
                     }
 
             # Return last metric if no match
@@ -1630,9 +1630,7 @@ class HardwareDispatcher:
         input_size = (
             args[0].shape
             if hasattr(args[0], "shape")
-            else (len(args[0]),)
-            if hasattr(args[0], "__len__")
-            else (1,)
+            else (len(args[0]),) if hasattr(args[0], "__len__") else (1,)
         )
 
         # Select backend

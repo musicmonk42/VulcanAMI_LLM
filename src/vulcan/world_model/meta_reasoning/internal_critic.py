@@ -53,6 +53,7 @@ import time  # Moved import
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import time # Original import
 # import numpy as np # Original import
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -402,9 +403,9 @@ class InternalCritic:
         self.stats["initialized_at"] = time.time()
 
         # Learning parameters
-        self.critique_effectiveness: Dict[
-            str, float
-        ] = {}  # critique_type -> effectiveness
+        self.critique_effectiveness: Dict[str, float] = (
+            {}
+        )  # critique_type -> effectiveness
         self.adaptive_weights: bool = True
 
         # Evaluation criteria (can be customized)

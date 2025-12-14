@@ -904,7 +904,9 @@ class StochasticCostModel:
                 model_path = self.model_save_path / f"cost_model_{name}.pkl"
                 if model_path.exists():
                     with open(model_path, "rb") as f:
-                        self.models[name] = pickle.load(f)  # nosec B301 - Internal data structure
+                        self.models[name] = pickle.load(
+                            f
+                        )  # nosec B301 - Internal data structure
 
             # Load EWMA statistics
             ewma_path = self.model_save_path / "cost_model_ewma.pkl"
@@ -918,7 +920,9 @@ class StochasticCostModel:
                 cal_path = self.model_save_path / f"cost_model_cal_{name}.pkl"
                 if cal_path.exists():
                     with open(cal_path, "rb") as f:
-                        self.calibrators[name] = pickle.load(f)  # nosec B301 - Internal data structure
+                        self.calibrators[name] = pickle.load(
+                            f
+                        )  # nosec B301 - Internal data structure
 
             logger.info(f"Loaded cost models from {self.model_save_path}")
         except Exception as e:

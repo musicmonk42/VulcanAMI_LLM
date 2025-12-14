@@ -12,11 +12,14 @@ Tests:
 """
 
 from problem_decomposer.problem_decomposer_core import ProblemGraph
-from problem_decomposer.fallback_chain import (ComponentType,
-                                               DecompositionComponent,
-                                               DecompositionFailure,
-                                               ExecutionPlan, FallbackChain,
-                                               StrategyStatus)
+from problem_decomposer.fallback_chain import (
+    ComponentType,
+    DecompositionComponent,
+    DecompositionFailure,
+    ExecutionPlan,
+    FallbackChain,
+    StrategyStatus,
+)
 import logging
 import sys
 import time

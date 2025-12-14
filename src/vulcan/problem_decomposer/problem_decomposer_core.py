@@ -546,17 +546,23 @@ class StrategyProfiler:
 
         profile = {
             "name": strategy.name if hasattr(strategy, "name") else "unknown",
-            "type": strategy.strategy_type
-            if hasattr(strategy, "strategy_type")
-            else "unknown",
+            "type": (
+                strategy.strategy_type
+                if hasattr(strategy, "strategy_type")
+                else "unknown"
+            ),
             "complexity_range": self._estimate_complexity_range(strategy),
             "domain_suitability": self._estimate_domain_suitability(strategy),
-            "parallelizable": strategy.is_parallelizable()
-            if hasattr(strategy, "is_parallelizable")
-            else False,
-            "deterministic": strategy.is_deterministic()
-            if hasattr(strategy, "is_deterministic")
-            else True,
+            "parallelizable": (
+                strategy.is_parallelizable()
+                if hasattr(strategy, "is_parallelizable")
+                else False
+            ),
+            "deterministic": (
+                strategy.is_deterministic()
+                if hasattr(strategy, "is_deterministic")
+                else True
+            ),
             "resource_requirements": self._estimate_resource_requirements(strategy),
         }
 
@@ -641,9 +647,14 @@ class StrategyProfiler:
         """Estimate resource requirements"""
         return {
             "memory": "medium",  # Could be calculated based on strategy
-            "cpu": "high"
-            if (hasattr(strategy, "is_parallelizable") and strategy.is_parallelizable())
-            else "medium",
+            "cpu": (
+                "high"
+                if (
+                    hasattr(strategy, "is_parallelizable")
+                    and strategy.is_parallelizable()
+                )
+                else "medium"
+            ),
             "time": "variable",
         }
 
@@ -682,6 +693,7 @@ class ProblemDecomposer:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 # Try singleton first
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
@@ -707,7 +719,9 @@ class ProblemDecomposer:
                         # Complex config - filter test_mode before passing to from_dict
                         try:
                             safety_config_filtered = {
-                                k: v for k, v in safety_config.items() if k != "test_mode"
+                                k: v
+                                for k, v in safety_config.items()
+                                if k != "test_mode"
                             }
                             config_obj = (
                                 SafetyConfig.from_dict(safety_config_filtered)
@@ -716,11 +730,15 @@ class ProblemDecomposer:
                             )
                             # Add rollback_config with full config (including test_mode) and defaults
                             rollback_cfg = {
-                                "max_snapshots": 10
-                                if safety_config.get("test_mode")
-                                else 100,
-                                "enable_storage": not safety_config.get("test_mode", False),
-                                "enable_workers": not safety_config.get("test_mode", False),
+                                "max_snapshots": (
+                                    10 if safety_config.get("test_mode") else 100
+                                ),
+                                "enable_storage": not safety_config.get(
+                                    "test_mode", False
+                                ),
+                                "enable_workers": not safety_config.get(
+                                    "test_mode", False
+                                ),
                             }
                             rollback_cfg.update(safety_config)
                             if (
@@ -744,7 +762,9 @@ class ProblemDecomposer:
                             self.safety_validator = EnhancedSafetyValidator(config_obj)
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.warning("ProblemDecomposer: Created new safety validator instance (may cause duplication)")
+                logger.warning(
+                    "ProblemDecomposer: Created new safety validator instance (may cause duplication)"
+                )
         else:
             self.safety_validator = None
             logger.warning(
@@ -946,9 +966,9 @@ class ProblemDecomposer:
         self.prediction_history.append(
             {
                 "signature": signature,
-                "predicted_strategy": strategy.name
-                if hasattr(strategy, "name")
-                else "unknown",
+                "predicted_strategy": (
+                    strategy.name if hasattr(strategy, "name") else "unknown"
+                ),
                 "confidence": plan.confidence,
                 "timestamp": time.time(),
             }
@@ -1843,9 +1863,11 @@ class ProblemDecomposer:
                 / max(1, self.total_decompositions),
                 "cached_plans": len(self.decomposition_cache),
             },
-            "execution_stats": self.executor.get_statistics()
-            if hasattr(self.executor, "get_statistics")
-            else {},
+            "execution_stats": (
+                self.executor.get_statistics()
+                if hasattr(self.executor, "get_statistics")
+                else {}
+            ),
             "performance_stats": {
                 "complexity_accuracy": self.performance_tracker.get_complexity_estimation_accuracy(),
                 "execution_history_size": len(

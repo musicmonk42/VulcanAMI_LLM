@@ -52,15 +52,12 @@ class PersistenceError(Exception):
     """Base exception for persistence layer errors."""
 
 
-
 class IntegrityError(PersistenceError):
     """Raised when data integrity check fails."""
 
 
-
 class KeyManagementError(PersistenceError):
     """Raised when key management operations fail."""
-
 
 
 class CacheEntry:
@@ -423,7 +420,8 @@ class PersistenceLayer:
             cursor = conn.cursor()
 
             # Graphs table with integrated index features
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS graphs (
                     graph_id TEXT PRIMARY KEY,
                     agent_id TEXT,
@@ -433,10 +431,12 @@ class PersistenceLayer:
                     signature TEXT NOT NULL,
                     signature_verified INTEGER DEFAULT 0
                 )
-            """)
+            """
+            )
 
             # Evolution records table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS evolutions (
                     evolution_id TEXT PRIMARY KEY,
                     created_at TEXT NOT NULL,
@@ -444,10 +444,12 @@ class PersistenceLayer:
                     signature TEXT NOT NULL,
                     signature_verified INTEGER DEFAULT 0
                 )
-            """)
+            """
+            )
 
             # Knowledge records table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS knowledge (
                     knowledge_id TEXT PRIMARY KEY,
                     category TEXT NOT NULL,
@@ -456,10 +458,12 @@ class PersistenceLayer:
                     signature TEXT NOT NULL,
                     signature_verified INTEGER DEFAULT 0
                 )
-            """)
+            """
+            )
 
             # Session data table
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS sessions (
                     session_id TEXT PRIMARY KEY,
                     created_at TEXT NOT NULL,
@@ -467,7 +471,8 @@ class PersistenceLayer:
                     signature TEXT NOT NULL,
                     signature_verified INTEGER DEFAULT 0
                 )
-            """)
+            """
+            )
 
             # Create indexes for performance (fixes critical bug #4 & #5)
             indexes = [
@@ -543,9 +548,7 @@ class PersistenceLayer:
                 # Only verify unverified entries unless force is True
                 where_clause = "" if force else " WHERE signature_verified = 0"
                 # nosec B608: table/column names from hardcoded tables_and_cols dict
-                query = (
-                    f"SELECT {id_col}, {data_col}, signature FROM {table}{where_clause}"  # nosec B608
-                )
+                query = f"SELECT {id_col}, {data_col}, signature FROM {table}{where_clause}"  # nosec B608
 
                 for item_id, data, signature in cursor.execute(query).fetchall():
                     if self._verify_signature(
@@ -741,9 +744,9 @@ class PersistenceLayer:
             "node_count": len(nodes),
             "edge_count": len(edges),
             "node_types": sorted(list(set(node_types))),
-            "has_cycles": self._detect_cycles(nodes, edges)
-            if NETWORKX_AVAILABLE
-            else None,
+            "has_cycles": (
+                self._detect_cycles(nodes, edges) if NETWORKX_AVAILABLE else None
+            ),
         }
 
     def _detect_cycles(self, nodes: List[Dict], edges: List[Dict]) -> bool:

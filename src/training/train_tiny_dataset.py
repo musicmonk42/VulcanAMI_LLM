@@ -198,9 +198,9 @@ class TinyTextDataset:
         ]
 
     def _sequence_to_batch(self, seq: List[int]) -> Dict[str, Any]:
-        assert len(seq) == self.seq_len + 1, (
-            "Internal: sequence length must be seq_len+1"
-        )
+        assert (
+            len(seq) == self.seq_len + 1
+        ), "Internal: sequence length must be seq_len+1"
         inputs = seq[:-1]
         targets = seq[1:]
 

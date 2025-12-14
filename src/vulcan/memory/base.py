@@ -423,25 +423,20 @@ class MemoryException(Exception):
     """Base exception for memory operations."""
 
 
-
 class MemoryCapacityException(MemoryException):
     """Raised when memory capacity is exceeded."""
-
 
 
 class MemoryRetrievalException(MemoryException):
     """Raised when memory retrieval fails."""
 
 
-
 class MemoryCorruptionException(MemoryException):
     """Raised when memory data is corrupted."""
 
 
-
 class MemoryLockException(MemoryException):
     """Raised when memory lock cannot be acquired."""
-
 
 
 # ============================================================

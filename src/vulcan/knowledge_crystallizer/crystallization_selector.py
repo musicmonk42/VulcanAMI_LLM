@@ -171,9 +171,11 @@ class StandardStrategy(SelectionStrategy):
             score -= 0.1
 
         parameters = {
-            "validation_level": "basic"
-            if characteristics.complexity == TraceComplexity.SIMPLE
-            else "comprehensive"
+            "validation_level": (
+                "basic"
+                if characteristics.complexity == TraceComplexity.SIMPLE
+                else "comprehensive"
+            )
         }
 
         return max(0.0, min(1.0, score)), parameters
@@ -253,9 +255,9 @@ class IncrementalStrategy(SelectionStrategy):
 
         parameters = {
             # FIX: Handle None iteration_count in parameters
-            "merge_strategy": "weighted"
-            if (characteristics.iteration_count or 0) > 5
-            else "simple",
+            "merge_strategy": (
+                "weighted" if (characteristics.iteration_count or 0) > 5 else "simple"
+            ),
             "iteration_weight_decay": 0.9,
             "keep_history": True,
             "max_iterations": 100,
@@ -296,9 +298,9 @@ class BatchStrategy(SelectionStrategy):
         parameters = {
             "batch_size": max(characteristics.batch_size, batch_available),
             "parallel_processing": characteristics.batch_size > 10,
-            "aggregation_method": "voting"
-            if characteristics.batch_size > 5
-            else "averaging",
+            "aggregation_method": (
+                "voting" if characteristics.batch_size > 5 else "averaging"
+            ),
             "outlier_detection": True,
         }
 
@@ -339,9 +341,9 @@ class AdaptiveStrategy(SelectionStrategy):
 
         parameters = {
             "adaptation_rate": 0.1,
-            "exploration_ratio": 0.2
-            if characteristics.domain_type == DomainType.NOVEL
-            else 0.1,
+            "exploration_ratio": (
+                0.2 if characteristics.domain_type == DomainType.NOVEL else 0.1
+            ),
             "feedback_integration": True,
             "dynamic_thresholds": True,
         }

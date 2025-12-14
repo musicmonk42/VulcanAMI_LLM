@@ -3,13 +3,16 @@
 # Comprehensive test suite for agent_lifecycle.py
 # ============================================================
 
-from vulcan.orchestrator.agent_lifecycle import (AgentCapability,
-                                                 AgentMetadata, AgentState,
-                                                 JobProvenance,
-                                                 StateTransitionRules,
-                                                 create_agent_metadata,
-                                                 create_job_provenance,
-                                                 validate_state_machine)
+from vulcan.orchestrator.agent_lifecycle import (
+    AgentCapability,
+    AgentMetadata,
+    AgentState,
+    JobProvenance,
+    StateTransitionRules,
+    create_agent_metadata,
+    create_job_provenance,
+    validate_state_machine,
+)
 import sys
 import time
 import unittest

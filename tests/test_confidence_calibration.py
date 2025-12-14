@@ -11,14 +11,16 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from src.conformal.confidence_calibration import (BetaCalibration,
-                                                  CalibratedDecisionMaker,
-                                                  CalibrationData,
-                                                  CalibrationMetrics,
-                                                  ConformalPredictor,
-                                                  IsotonicCalibration,
-                                                  PlattScaling,
-                                                  TemperatureScaling)
+from src.conformal.confidence_calibration import (
+    BetaCalibration,
+    CalibratedDecisionMaker,
+    CalibrationData,
+    CalibrationMetrics,
+    ConformalPredictor,
+    IsotonicCalibration,
+    PlattScaling,
+    TemperatureScaling,
+)
 
 
 @pytest.fixture
@@ -53,11 +55,7 @@ class TestCalibrationData:
 
     def test_calibration_data_creation(self):
         """Test creating CalibrationData."""
-        data = CalibrationData(
-            prediction=0.8,
-            actual=True,
-            tool_name="test_tool"
-        )
+        data = CalibrationData(prediction=0.8, actual=True, tool_name="test_tool")
 
         assert data.prediction == 0.8
         assert data.actual is True
@@ -67,11 +65,7 @@ class TestCalibrationData:
         """Test CalibrationData with features."""
         features = np.array([1.0, 2.0, 3.0])
 
-        data = CalibrationData(
-            prediction=0.7,
-            actual=False,
-            features=features
-        )
+        data = CalibrationData(prediction=0.7, actual=False, features=features)
 
         assert np.array_equal(data.features, features)
 
@@ -95,7 +89,7 @@ class TestCalibrationMetrics:
             reliability=0.02,
             resolution=0.08,
             uncertainty=0.25,
-            sharpness=0.2
+            sharpness=0.2,
         )
 
         assert metrics.ece == 0.05
@@ -111,7 +105,7 @@ class TestCalibrationMetrics:
             reliability=0.02,
             resolution=0.08,
             uncertainty=0.25,
-            sharpness=0.2
+            sharpness=0.2,
         )
 
         metrics_dict = metrics.to_dict()
@@ -393,9 +387,7 @@ class TestCalibratedDecisionMaker:
     def test_add_observation(self, calibrated_decision_maker):
         """Test adding observations."""
         calibrated_decision_maker.add_observation(
-            tool_name="tool1",
-            prediction=0.8,
-            actual=True
+            tool_name="tool1", prediction=0.8, actual=True
         )
 
         assert len(calibrated_decision_maker.calibration_data["tool1"]) == 1
@@ -405,9 +397,7 @@ class TestCalibratedDecisionMaker:
         """Test adding multiple observations."""
         for i in range(10):
             calibrated_decision_maker.add_observation(
-                tool_name="tool1",
-                prediction=0.5 + i * 0.05,
-                actual=bool(i % 2)
+                tool_name="tool1", prediction=0.5 + i * 0.05, actual=bool(i % 2)
             )
 
         assert len(calibrated_decision_maker.calibration_data["tool1"]) == 10
@@ -417,9 +407,7 @@ class TestCalibratedDecisionMaker:
         # Add only a few observations
         for i in range(10):
             calibrated_decision_maker.add_observation(
-                tool_name="tool1",
-                prediction=0.5,
-                actual=True
+                tool_name="tool1", prediction=0.5, actual=True
             )
 
         # Should warn about insufficient data
@@ -437,7 +425,7 @@ class TestCalibratedDecisionMaker:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         try:
@@ -457,7 +445,7 @@ class TestCalibratedDecisionMaker:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         # Use isotonic which doesn't require optimization
@@ -468,8 +456,7 @@ class TestCalibratedDecisionMaker:
     def test_calibrate_confidence_no_calibrator(self, calibrated_decision_maker):
         """Test calibration with no calibrator."""
         calibrated = calibrated_decision_maker.calibrate_confidence(
-            tool_name="unknown_tool",
-            raw_confidence=0.7
+            tool_name="unknown_tool", raw_confidence=0.7
         )
 
         # Should return unchanged
@@ -484,7 +471,7 @@ class TestCalibratedDecisionMaker:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         # Use isotonic to avoid optimization
@@ -492,9 +479,7 @@ class TestCalibratedDecisionMaker:
 
         # Calibrate confidence
         calibrated = calibrated_decision_maker.calibrate_confidence(
-            tool_name="tool1",
-            raw_confidence=0.7,
-            method="isotonic"
+            tool_name="tool1", raw_confidence=0.7, method="isotonic"
         )
 
         assert 0 < calibrated < 1
@@ -507,15 +492,13 @@ class TestCalibratedDecisionMaker:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         calibrated_decision_maker.fit_calibration("tool1", method="isotonic")
 
         calibrated = calibrated_decision_maker.calibrate_confidence(
-            tool_name="tool1",
-            raw_confidence=0.99,
-            method="isotonic"
+            tool_name="tool1", raw_confidence=0.99, method="isotonic"
         )
 
         # Should be clipped to avoid extreme values
@@ -527,22 +510,19 @@ class TestMetricsComputation:
 
     def test_compute_metrics_empty_arrays(self, calibrated_decision_maker):
         """Test metrics with empty arrays."""
-        metrics = calibrated_decision_maker.compute_metrics(
-            np.array([]),
-            np.array([])
-        )
+        metrics = calibrated_decision_maker.compute_metrics(np.array([]), np.array([]))
 
         # Should handle gracefully
         assert metrics.ece == 0.0
         assert metrics.mce == 0.0
-        assert metrics.log_loss == float('inf')
+        assert metrics.log_loss == float("inf")
 
-    def test_compute_metrics_normal(self, calibrated_decision_maker,
-                                    sample_predictions, sample_labels):
+    def test_compute_metrics_normal(
+        self, calibrated_decision_maker, sample_predictions, sample_labels
+    ):
         """Test metrics computation with normal data."""
         metrics = calibrated_decision_maker.compute_metrics(
-            sample_predictions,
-            sample_labels
+            sample_predictions, sample_labels
         )
 
         assert 0 <= metrics.ece <= 1
@@ -563,10 +543,7 @@ class TestMetricsComputation:
 
     def test_ece_empty_array(self, calibrated_decision_maker):
         """Test ECE with empty array."""
-        ece = calibrated_decision_maker._compute_ece(
-            np.array([]),
-            np.array([])
-        )
+        ece = calibrated_decision_maker._compute_ece(np.array([]), np.array([]))
 
         assert ece == 0.0
 
@@ -581,19 +558,16 @@ class TestMetricsComputation:
 
     def test_mce_empty_array(self, calibrated_decision_maker):
         """Test MCE with empty array."""
-        mce = calibrated_decision_maker._compute_mce(
-            np.array([]),
-            np.array([])
-        )
+        mce = calibrated_decision_maker._compute_mce(np.array([]), np.array([]))
 
         assert mce == 0.0
 
-    def test_reliability_resolution_uncertainty(self, calibrated_decision_maker,
-                                               sample_predictions, sample_labels):
+    def test_reliability_resolution_uncertainty(
+        self, calibrated_decision_maker, sample_predictions, sample_labels
+    ):
         """Test reliability-resolution-uncertainty decomposition."""
         rel, res, unc = calibrated_decision_maker._reliability_resolution_uncertainty(
-            sample_predictions,
-            sample_labels
+            sample_predictions, sample_labels
         )
 
         assert rel >= 0
@@ -603,8 +577,7 @@ class TestMetricsComputation:
     def test_reliability_empty_array(self, calibrated_decision_maker):
         """Test reliability with empty array."""
         rel, res, unc = calibrated_decision_maker._reliability_resolution_uncertainty(
-            np.array([]),
-            np.array([])
+            np.array([]), np.array([])
         )
 
         assert rel == 0.0
@@ -655,7 +628,7 @@ class TestPersistence:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         # Use isotonic to avoid optimization timeout
@@ -679,7 +652,7 @@ class TestPersistence:
             cdm1.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         cdm1.fit_calibration("tool1", method="isotonic")
@@ -699,7 +672,7 @@ class TestPersistence:
 class TestVisualization:
     """Test visualization functionality."""
 
-    @patch('src.conformal.confidence_calibration.plt')
+    @patch("src.conformal.confidence_calibration.plt")
     def test_plot_reliability_diagram(self, mock_plt, calibrated_decision_maker):
         """Test plotting reliability diagram."""
         # Configure mock to return proper structure
@@ -714,7 +687,7 @@ class TestVisualization:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         # Plot (mocked)
@@ -748,7 +721,7 @@ class TestStatistics:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         calibrated_decision_maker.fit_calibration("tool1", method="isotonic")
@@ -766,9 +739,10 @@ class TestConformalPrediction:
 
     def test_get_prediction_set_no_calibrator(self, calibrated_decision_maker):
         """Test prediction set without calibrator."""
-        include_neg, include_pos, p_value = calibrated_decision_maker.get_prediction_set(
-            tool_name="unknown_tool",
-            confidence=0.7
+        include_neg, include_pos, p_value = (
+            calibrated_decision_maker.get_prediction_set(
+                tool_name="unknown_tool", confidence=0.7
+            )
         )
 
         # Should return conservative prediction
@@ -784,15 +758,15 @@ class TestConformalPrediction:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         calibrated_decision_maker.fit_calibration("tool1", method="isotonic")
 
-        include_neg, include_pos, p_value = calibrated_decision_maker.get_prediction_set(
-            tool_name="tool1",
-            confidence=0.7,
-            alpha=0.1
+        include_neg, include_pos, p_value = (
+            calibrated_decision_maker.get_prediction_set(
+                tool_name="tool1", confidence=0.7, alpha=0.1
+            )
         )
 
         assert isinstance(include_neg, (bool, np.bool_))
@@ -811,14 +785,18 @@ class TestEdgeCases:
             calibrated_decision_maker.add_observation(
                 tool_name="tool1",
                 prediction=np.random.uniform(0.1, 0.9),
-                actual=bool(np.random.randint(0, 2))
+                actual=bool(np.random.randint(0, 2)),
             )
 
         calibrated_decision_maker.fit_calibration("tool1", method="isotonic")
 
         # Test extreme values
-        very_low = calibrated_decision_maker.calibrate_confidence("tool1", 0.001, method="isotonic")
-        very_high = calibrated_decision_maker.calibrate_confidence("tool1", 0.999, method="isotonic")
+        very_low = calibrated_decision_maker.calibrate_confidence(
+            "tool1", 0.001, method="isotonic"
+        )
+        very_high = calibrated_decision_maker.calibrate_confidence(
+            "tool1", 0.999, method="isotonic"
+        )
 
         assert 0 < very_low < 1
         assert 0 < very_high < 1
@@ -829,9 +807,7 @@ class TestEdgeCases:
         # All positive
         for i in range(100):
             calibrated_decision_maker.add_observation(
-                tool_name="tool1",
-                prediction=0.5,
-                actual=True
+                tool_name="tool1", prediction=0.5, actual=True
             )
 
         # Should handle gracefully
@@ -847,9 +823,7 @@ class TestEdgeCases:
         np.random.seed(42)
         for i in range(100):
             calibrated_decision_maker.add_observation(
-                tool_name="tool1",
-                prediction=0.5,
-                actual=bool(np.random.randint(0, 2))
+                tool_name="tool1", prediction=0.5, actual=bool(np.random.randint(0, 2))
             )
 
         try:

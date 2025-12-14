@@ -217,7 +217,9 @@ class Experiment:
         if not self.experiment_id:
             # FIX: Exclude timestamp for determinism
             content = f"{self.gap.id}_{self.experiment_type.value}_{self.iteration}"
-            self.experiment_id = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:12]
+            self.experiment_id = hashlib.md5(
+                content.encode(), usedforsecurity=False
+            ).hexdigest()[:12]
 
             # Store timestamp in metadata instead
             if "created_at" not in self.metadata:
@@ -899,25 +901,36 @@ class ExperimentGenerator:
         # Initialize real SafetyValidator
         try:
             from vulcan.safety.safety_validator import SafetyValidator
+
             self.safety_validator = SafetyValidator(config=None)
             logger.info("SafetyValidator loaded successfully")
         except ImportError as e:
             logger.error(f"Failed to import SafetyValidator: {e}")
-            logger.error("CRITICAL: SafetyValidator is required for experiment generation")
+            logger.error(
+                "CRITICAL: SafetyValidator is required for experiment generation"
+            )
+
             # Use a minimal fallback validator that rejects everything
             class MinimalSafetyValidator:
                 def validate(self, *args, **kwargs):
                     return False, ["SafetyValidator not available"]
+
             self.safety_validator = MinimalSafetyValidator()
-            logger.warning("Using minimal fallback SafetyValidator - all experiments will be rejected")
+            logger.warning(
+                "Using minimal fallback SafetyValidator - all experiments will be rejected"
+            )
         except Exception as e:
             logger.error(f"Failed to initialize SafetyValidator: {e}")
+
             class MinimalSafetyValidator:
                 def validate(self, *args, **kwargs):
                     return False, ["SafetyValidator initialization failed"]
+
             self.safety_validator = MinimalSafetyValidator()
-            logger.warning("Using minimal fallback SafetyValidator - all experiments will be rejected")
-        
+            logger.warning(
+                "Using minimal fallback SafetyValidator - all experiments will be rejected"
+            )
+
         logger.info("ExperimentGenerator initialized")
 
     def generate_for_gap(
@@ -1100,12 +1113,12 @@ class ExperimentGenerator:
                         "strategy": strategy,
                         "exploration_depth": 50,
                         "min_cluster_size": 5 if strategy == "clustering" else None,
-                        "contamination": 0.1
-                        if strategy == "anomaly_detection"
-                        else None,
-                        "embedding_dim": 32
-                        if strategy == "representation_learning"
-                        else None,
+                        "contamination": (
+                            0.1 if strategy == "anomaly_detection" else None
+                        ),
+                        "embedding_dim": (
+                            32 if strategy == "representation_learning" else None
+                        ),
                     },
                 )
                 experiments.append(experiment)

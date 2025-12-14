@@ -100,9 +100,11 @@ class PrincipleVersion:
 
         # Apply diff to reconstruct
         base_str = json.dumps(
-            asdict(base_principle)
-            if hasattr(base_principle, "__dataclass_fields__")
-            else vars(base_principle),
+            (
+                asdict(base_principle)
+                if hasattr(base_principle, "__dataclass_fields__")
+                else vars(base_principle)
+            ),
             sort_keys=True,
         )
 
@@ -993,7 +995,9 @@ class VersionedKnowledgeBase:
                 # Compress if requested
                 if self.compression == CompressionType.GZIP:
                     with open(path, "rb") as f_in:
-                        with gzip.open(path.with_suffix(".gz", encoding="utf-8"), "wb") as f_out:
+                        with gzip.open(
+                            path.with_suffix(".gz", encoding="utf-8"), "wb"
+                        ) as f_out:
                             shutil.copyfileobj(f_in, f_out)
                     path.unlink()  # Remove uncompressed file
                     logger.info(
@@ -1029,7 +1033,9 @@ class VersionedKnowledgeBase:
                     try:
                         data = json.loads(content)
                     except Exception:
-                        data = pickle.loads(content)  # nosec B301 - Internal data structure
+                        data = pickle.loads(
+                            content
+                        )  # nosec B301 - Internal data structure
                 else:
                     # Load based on extension
                     if path.suffix == ".json":
@@ -1087,9 +1093,9 @@ class VersionedKnowledgeBase:
                 "total_principles": self.total_principles,
                 "total_versions": self.total_versions,
                 "total_storage_size_bytes": self.total_storage_size,
-                "avg_versions_per_principle": np.mean(version_counts)
-                if version_counts
-                else 0,
+                "avg_versions_per_principle": (
+                    np.mean(version_counts) if version_counts else 0
+                ),
                 "max_versions": max(version_counts) if version_counts else 0,
                 "storage_backend": self.backend.value,
                 "compression": self.compression.value,
@@ -1171,7 +1177,8 @@ class VersionedKnowledgeBase:
 
         # Create tables using first connection
         conn = self.conn_pool[0]
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS principles (
                 id TEXT PRIMARY KEY,
                 data BLOB,
@@ -1181,17 +1188,23 @@ class VersionedKnowledgeBase:
                 domain TEXT,
                 confidence REAL
             )
-        """)
+        """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_domain ON principles(domain)
-        """)
+        """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_confidence ON principles(confidence)
-        """)
+        """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS versions (
                 principle_id TEXT,
                 version INTEGER,
@@ -1203,11 +1216,14 @@ class VersionedKnowledgeBase:
                 PRIMARY KEY (principle_id, version),
                 FOREIGN KEY (principle_id) REFERENCES principles(id)
             )
-        """)
+        """
+        )
 
-        conn.execute("""
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_author ON versions(author)
-        """)
+        """
+        )
 
         conn.commit()
 
@@ -1305,25 +1321,31 @@ class VersionedKnowledgeBase:
             idx, conn = self._get_connection()
             try:
                 # Load principles
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT id, data, created_at, updated_at, access_count
                     FROM principles
-                """)
+                """
+                )
 
                 for row in cursor:
                     principle_id, data, created_at, updated_at, access_count = row
-                    principle = pickle.loads(data)  # nosec B301 - Internal data structure
+                    principle = pickle.loads(
+                        data
+                    )  # nosec B301 - Internal data structure
                     self.principles[principle_id] = principle
                     self.creation_times[principle_id] = created_at
                     self.update_times[principle_id] = updated_at
                     self.access_counts[principle_id] = access_count
 
                 # Load versions
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT principle_id, version, data, timestamp, changes, author, message
                     FROM versions
                     ORDER BY principle_id, version
-                """)
+                """
+                )
 
                 for row in cursor:
                     (
@@ -1337,7 +1359,9 @@ class VersionedKnowledgeBase:
                     ) = row
 
                     try:
-                        principle_data = pickle.loads(data)  # nosec B301 - Internal data structure
+                        principle_data = pickle.loads(
+                            data
+                        )  # nosec B301 - Internal data structure
 
                         # Check if it's a diff or full principle
                         if (

@@ -101,20 +101,16 @@ class PatternMatcherError(Exception):
     """Base exception for PatternMatcher errors."""
 
 
-
 class GraphValidationError(PatternMatcherError):
     """Raised when graph validation fails."""
-
 
 
 class MatchingTimeoutError(PatternMatcherError):
     """Raised when matching operation times out."""
 
 
-
 class GraphSizeLimitError(PatternMatcherError):
     """Raised when graph exceeds size limits."""
-
 
 
 class PatternMatcher:

@@ -1799,8 +1799,9 @@ class BiasDetector:
         cache_key = hashlib.md5(
             json.dumps(
                 {"action": action, "context": context}, sort_keys=True, default=str
-            ).encode()
-            , usedforsecurity=False).hexdigest()
+            ).encode(),
+            usedforsecurity=False,
+        ).hexdigest()
 
         # Check cache
         cached_result = self.prediction_cache.get(cache_key)
@@ -2423,9 +2424,9 @@ class BiasDetector:
             "bias_detected": bias_detected,
             "bias_scores": bias_scores.copy(),
             "confidence": confidence,
-            "max_bias_type": max(bias_scores.items(), key=lambda x: x[1])[0]
-            if bias_scores
-            else None,
+            "max_bias_type": (
+                max(bias_scores.items(), key=lambda x: x[1])[0] if bias_scores else None
+            ),
             "max_bias_score": max(bias_scores.values()) if bias_scores else 0,
         }
 

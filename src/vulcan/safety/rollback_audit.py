@@ -23,8 +23,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .safety_types import (ActionType, RollbackSnapshot, SafetyReport,
-                           SafetyViolationType)
+from .safety_types import (
+    ActionType,
+    RollbackSnapshot,
+    SafetyReport,
+    SafetyViolationType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -262,7 +266,8 @@ class RollbackManager:
             except sqlite3.Error as e:
                 logger.warning(f"Could not enable WAL mode: {e}")
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS snapshots (
                     snapshot_id TEXT PRIMARY KEY,
                     timestamp REAL,
@@ -273,9 +278,11 @@ class RollbackManager:
                     file_path TEXT,
                     metadata TEXT
                 )
-            """)
+            """
+            )
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS quarantine (
                     quarantine_id TEXT PRIMARY KEY,
                     action TEXT,
@@ -287,9 +294,11 @@ class RollbackManager:
                     reviewer TEXT,
                     review_time REAL
                 )
-            """)
+            """
+            )
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS rollback_history (
                     rollback_id TEXT PRIMARY KEY,
                     snapshot_id TEXT,
@@ -298,18 +307,23 @@ class RollbackManager:
                     success INTEGER,
                     error_message TEXT
                 )
-            """)
+            """
+            )
 
             # Create indexes
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_snapshots_timestamp
                 ON snapshots(timestamp)
-            """)
+            """
+            )
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_quarantine_expiry
                 ON quarantine(expiry)
-            """)
+            """
+            )
 
             self.conn.commit()
 
@@ -381,7 +395,9 @@ class RollbackManager:
                         data = f.read()
                         if row[5]:  # compressed
                             data = zlib.decompress(data)
-                        snapshot_data = pickle.loads(data)  # nosec B301 - Internal data structure
+                        snapshot_data = pickle.loads(
+                            data
+                        )  # nosec B301 - Internal data structure
 
                     snapshot = RollbackSnapshot(
                         snapshot_id=snapshot_id,
@@ -1224,7 +1240,8 @@ class AuditLogger:
             except sqlite3.Error as e:
                 logger.warning(f"Could not enable WAL mode: {e}")
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS audit_entries (
                     entry_id TEXT PRIMARY KEY,
                     timestamp REAL,
@@ -1237,19 +1254,26 @@ class AuditLogger:
                     line_number INTEGER,
                     hash TEXT
                 )
-            """)
+            """
+            )
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_timestamp ON audit_entries(timestamp)
-            """)
+            """
+            )
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_type ON audit_entries(entry_type)
-            """)
+            """
+            )
 
-            self.conn.execute("""
+            self.conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_severity ON audit_entries(severity)
-            """)
+            """
+            )
 
             self.conn.commit()
 
@@ -1431,9 +1455,11 @@ class AuditLogger:
             "iso_timestamp": datetime.fromtimestamp(timestamp).isoformat(),
             "entry_type": event_type,
             "severity": severity,
-            "event_data": self._redact_sensitive(event_data)
-            if self.redact_sensitive
-            else event_data,
+            "event_data": (
+                self._redact_sensitive(event_data)
+                if self.redact_sensitive
+                else event_data
+            ),
         }
 
         # Add hash chain
@@ -1877,9 +1903,11 @@ class AuditLogger:
                 "verified": broken_at is None,
                 "entries_checked": len(entries),
                 "broken_at": broken_at,
-                "error": f"Chain broken at entry {broken_at}"
-                if broken_at is not None
-                else None,
+                "error": (
+                    f"Chain broken at entry {broken_at}"
+                    if broken_at is not None
+                    else None
+                ),
             }
 
     def get_metrics(self) -> Dict[str, Any]:

@@ -12,10 +12,16 @@ Tests all components:
 Run with: pytest src/vulcan/tests/test_symbolic_parsing.py -v
 """
 
-from vulcan.reasoning.symbolic.parsing import (ASTNode, CNFConverter,
-                                               FormulaParser, FormulaUtils,
-                                               Lexer, NodeType,
-                                               Parser, TokenType)
+from vulcan.reasoning.symbolic.parsing import (
+    ASTNode,
+    CNFConverter,
+    FormulaParser,
+    FormulaUtils,
+    Lexer,
+    NodeType,
+    Parser,
+    TokenType,
+)
 import sys
 from pathlib import Path
 

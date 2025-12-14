@@ -10,23 +10,44 @@ from typing import Any, Dict
 import pytest
 
 from src.vulcan.knowledge_crystallizer.contraindication_tracker import (
-    CascadeAnalyzer, Contraindication, ContraindicationDatabase,
-    ContraindicationGraph, FailureMode)
+    CascadeAnalyzer,
+    Contraindication,
+    ContraindicationDatabase,
+    ContraindicationGraph,
+    FailureMode,
+)
 from src.vulcan.knowledge_crystallizer.crystallization_selector import (
-    CrystallizationMethod, CrystallizationSelector)
-from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
-    ExecutionTrace as CoreExecutionTrace
-from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import \
-    KnowledgeCrystallizer
+    CrystallizationMethod,
+    CrystallizationSelector,
+)
+from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
+    ExecutionTrace as CoreExecutionTrace,
+)
+from src.vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
+    KnowledgeCrystallizer,
+)
 from src.vulcan.knowledge_crystallizer.knowledge_storage import (
-    CompressionType, KnowledgeIndex, KnowledgePruner, StorageBackend,
-    VersionedKnowledgeBase)
+    CompressionType,
+    KnowledgeIndex,
+    KnowledgePruner,
+    StorageBackend,
+    VersionedKnowledgeBase,
+)
+
 # Import all components with correct paths
 from src.vulcan.knowledge_crystallizer.principle_extractor import (
-    ExecutionTrace, ExtractionStrategy, Metric, MetricType, Pattern,
-    PatternType, PrincipleExtractor)
+    ExecutionTrace,
+    ExtractionStrategy,
+    Metric,
+    MetricType,
+    Pattern,
+    PatternType,
+    PrincipleExtractor,
+)
 from src.vulcan.knowledge_crystallizer.validation_engine import (
-    KnowledgeValidator, Principle)
+    KnowledgeValidator,
+    Principle,
+)
 
 # ============================================================================
 # MODULE-LEVEL FUNCTION (REQUIRED FOR PICKLING)

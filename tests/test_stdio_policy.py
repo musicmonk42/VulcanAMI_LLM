@@ -13,15 +13,23 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from stdio_policy import (StdIOConfig, StdIOHandle, _is_windows,
-                          _normalize_text, _should_disable_color, install,
-                          json_print, safe_print, self_test)
+from stdio_policy import (
+    StdIOConfig,
+    StdIOHandle,
+    _is_windows,
+    _normalize_text,
+    _should_disable_color,
+    install,
+    json_print,
+    safe_print,
+    self_test,
+)
 
 
 @pytest.fixture
 def temp_jsonl_file():
     """Create temporary JSONL file."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
         path = f.name
     yield path
     # Cleanup
@@ -48,7 +56,7 @@ class TestStdIOConfig:
             replace_builtins=False,
             normalize_newlines=False,
             newline="\r\n",
-            max_len=500
+            max_len=500,
         )
 
         assert config.replace_builtins is False
@@ -157,10 +165,10 @@ class TestSafePrint:
 
     def test_safe_print_to_file(self, temp_jsonl_file):
         """Test printing to file."""
-        with open(temp_jsonl_file, 'w', encoding="utf-8") as f:
+        with open(temp_jsonl_file, "w", encoding="utf-8") as f:
             safe_print("Test output", file=f)
 
-        with open(temp_jsonl_file, 'r', encoding="utf-8") as f:
+        with open(temp_jsonl_file, "r", encoding="utf-8") as f:
             content = f.read()
 
         assert "Test output" in content
@@ -184,7 +192,7 @@ class TestSafePrint:
         assert "Test Message" in output.getvalue()
 
         # Check JSONL file
-        with open(temp_jsonl_file, 'r', encoding="utf-8") as f:
+        with open(temp_jsonl_file, "r", encoding="utf-8") as f:
             line = f.readline()
             entry = json.loads(line)
 
@@ -289,8 +297,12 @@ class TestInstallation:
 
     def test_install_basic(self):
         """Test basic installation."""
-        handle = install(replace_builtins=False, patch_ray=False,
-                        patch_colorama=False, patch_tqdm=False)
+        handle = install(
+            replace_builtins=False,
+            patch_ray=False,
+            patch_colorama=False,
+            patch_tqdm=False,
+        )
 
         try:
             assert isinstance(handle, StdIOHandle)
@@ -311,6 +323,7 @@ class TestInstallation:
     def test_install_replace_builtins(self):
         """Test replacing builtins.print."""
         import builtins
+
         original_print = builtins.print
 
         with install(replace_builtins=True):
@@ -332,7 +345,7 @@ class TestInstallation:
             handle1.restore()
             handle2.restore()
 
-    @patch('stdio_policy._patch_colorama')
+    @patch("stdio_policy._patch_colorama")
     def test_install_patches_colorama(self, mock_patch):
         """Test Colorama patching."""
         mock_patch.return_value = True
@@ -340,7 +353,7 @@ class TestInstallation:
         with install(patch_colorama=True):
             assert mock_patch.called
 
-    @patch('stdio_policy._patch_ray')
+    @patch("stdio_policy._patch_ray")
     def test_install_patches_ray(self, mock_patch):
         """Test Ray patching."""
         mock_patch.return_value = True
@@ -348,7 +361,7 @@ class TestInstallation:
         with install(patch_ray=True):
             assert mock_patch.called
 
-    @patch('stdio_policy._patch_tqdm')
+    @patch("stdio_policy._patch_tqdm")
     def test_install_patches_tqdm(self, mock_patch):
         """Test tqdm patching."""
         mock_patch.return_value = True
@@ -383,9 +396,7 @@ class TestThreadSafety:
     def test_concurrent_jsonl_writing(self, temp_jsonl_file):
         """Test concurrent JSONL writing."""
         config = StdIOConfig(
-            jsonl_path=temp_jsonl_file,
-            lock_print=True,
-            replace_builtins=False
+            jsonl_path=temp_jsonl_file, lock_print=True, replace_builtins=False
         )
 
         def write_many(thread_id):
@@ -401,7 +412,7 @@ class TestThreadSafety:
             t.join()
 
         # Check that all lines are valid JSON
-        with open(temp_jsonl_file, 'r', encoding="utf-8") as f:
+        with open(temp_jsonl_file, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         assert len(lines) == 15  # 3 threads * 5 messages
@@ -457,13 +468,16 @@ class TestEdgeCases:
 
         # Should not raise, should fall back to sys.__stdout__
         from stdio_policy import _write
+
         _write(mock_stream, "test", config)
 
     def test_jsonl_write_failure(self):
         """Test handling of JSONL write failure."""
         output = StringIO()
         # Use invalid path
-        config = StdIOConfig(jsonl_path="/invalid/path/test.jsonl", replace_builtins=False)
+        config = StdIOConfig(
+            jsonl_path="/invalid/path/test.jsonl", replace_builtins=False
+        )
 
         # Should not crash, just log warning
         safe_print("Test", cfg=config, file=output)
@@ -495,8 +509,9 @@ class TestPatching:
         mock_colorama.deinit = Mock()
 
         # Patch colorama in sys.modules so the import inside _patch_colorama finds it
-        with patch.dict('sys.modules', {'colorama': mock_colorama}):
+        with patch.dict("sys.modules", {"colorama": mock_colorama}):
             from stdio_policy import _patch_colorama
+
             config = StdIOConfig()
 
             result = _patch_colorama(config)
@@ -507,8 +522,9 @@ class TestPatching:
     def test_patch_colorama_not_available(self):
         """Test Colorama patching when not available."""
         # Make the import fail
-        with patch.dict('sys.modules', {'colorama': None}):
+        with patch.dict("sys.modules", {"colorama": None}):
             from stdio_policy import _patch_colorama
+
             config = StdIOConfig()
 
             result = _patch_colorama(config)
@@ -521,8 +537,9 @@ class TestPatching:
         mock_tqdm = MagicMock()
 
         # Patch tqdm in sys.modules
-        with patch.dict('sys.modules', {'tqdm': mock_tqdm}):
+        with patch.dict("sys.modules", {"tqdm": mock_tqdm}):
             from stdio_policy import _patch_tqdm
+
             config = StdIOConfig()
 
             result = _patch_tqdm(config)

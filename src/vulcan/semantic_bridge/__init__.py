@@ -8,24 +8,49 @@ from .cache_manager import CacheManager
 from .concept_mapper import Concept, ConceptMapper
 from .concept_mapper import EffectType as MapperEffectType
 from .concept_mapper import GroundingStatus, MeasurableEffect, PatternOutcome
-from .conflict_resolver import (ConflictResolution, ConflictType, Evidence,
-                                EvidenceType, EvidenceWeightedResolver,
-                                ResolutionAction)
+from .conflict_resolver import (
+    ConflictResolution,
+    ConflictType,
+    Evidence,
+    EvidenceType,
+    EvidenceWeightedResolver,
+    ResolutionAction,
+)
 from .domain_registry import (  # Removed: DomainCharacteristics - doesn't exist in domain_registry
-    DomainCriticality, DomainEffect, DomainProfile, DomainRegistry,
-    DomainRelationship, EffectCategory, Pattern, PatternType, RiskAdjuster)
+    DomainCriticality,
+    DomainEffect,
+    DomainProfile,
+    DomainRegistry,
+    DomainRelationship,
+    EffectCategory,
+    Pattern,
+    PatternType,
+    RiskAdjuster,
+)
+
 # Core components
-from .semantic_bridge_core import (ConceptConflict, ConceptType,
-                                   ConceptVersion, PatternSignature,
-                                   SemanticBridge, TransferCompatibility,
-                                   TransferStatus, retry_on_failure)
-from .transfer_engine import \
-    DomainCharacteristics  # This one exists in transfer_engine
+from .semantic_bridge_core import (
+    ConceptConflict,
+    ConceptType,
+    ConceptVersion,
+    PatternSignature,
+    SemanticBridge,
+    TransferCompatibility,
+    TransferStatus,
+    retry_on_failure,
+)
+from .transfer_engine import DomainCharacteristics  # This one exists in transfer_engine
 from .transfer_engine import ConceptEffect, Constraint, ConstraintType
 from .transfer_engine import EffectType as TransferEffectType
-from .transfer_engine import (Mitigation, MitigationLearner, MitigationType,
-                              PartialTransferEngine, TransferDecision,
-                              TransferEngine, TransferType)
+from .transfer_engine import (
+    Mitigation,
+    MitigationLearner,
+    MitigationType,
+    PartialTransferEngine,
+    TransferDecision,
+    TransferEngine,
+    TransferType,
+)
 
 # Define public API
 __all__ = [

@@ -15,14 +15,24 @@ import time
 import pytest
 
 # Import the classes we're testing
-from src.vulcan.reasoning.symbolic.advanced import (FuzzyLogicReasoner,
-                                                    MetaReasoner,
-                                                    ProofLearner,
-                                                    ProofPattern, TemporalReasoner,
-                                                    TimeInterval)
+from src.vulcan.reasoning.symbolic.advanced import (
+    FuzzyLogicReasoner,
+    MetaReasoner,
+    ProofLearner,
+    ProofPattern,
+    TemporalReasoner,
+    TimeInterval,
+)
+
 # Import core types needed for testing
-from src.vulcan.reasoning.symbolic.core import (Clause, Constant, Function,
-                                                Literal, ProofNode, Variable)
+from src.vulcan.reasoning.symbolic.core import (
+    Clause,
+    Constant,
+    Function,
+    Literal,
+    ProofNode,
+    Variable,
+)
 
 # ============================================================================
 # FUZZY LOGIC REASONER TESTS

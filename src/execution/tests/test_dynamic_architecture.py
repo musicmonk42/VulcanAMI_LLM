@@ -13,10 +13,16 @@ Tests all major functionality including:
 - Error handling
 """
 
-from dynamic_architecture import (ArchChangeResult, ArchitectureStats,
-                                  Constraints, DynamicArchConfig, DynamicArchitecture,
-                                  ValidationResult, create_default_controller,
-                                  create_strict_controller)
+from dynamic_architecture import (
+    ArchChangeResult,
+    ArchitectureStats,
+    Constraints,
+    DynamicArchConfig,
+    DynamicArchitecture,
+    ValidationResult,
+    create_default_controller,
+    create_strict_controller,
+)
 import json
 import sys
 import tempfile

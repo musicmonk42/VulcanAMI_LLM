@@ -163,9 +163,9 @@ class ZKProof:
             "circuit_hash": self.circuit_hash,
             "proof_bytes": self.proof_bytes.hex() if self.proof_bytes else None,
             "public_inputs": self.public_inputs,
-            "verification_key": self.verification_key.hex()
-            if self.verification_key
-            else None,
+            "verification_key": (
+                self.verification_key.hex() if self.verification_key else None
+            ),
             "prover_id": self.prover_id,
             "timestamp": self.timestamp,
             "metadata": self.metadata,
@@ -178,13 +178,15 @@ class ZKProof:
             type=data["type"],
             statement=data["statement"],
             circuit_hash=data["circuit_hash"],
-            proof_bytes=bytes.fromhex(data["proof_bytes"])
-            if data.get("proof_bytes")
-            else None,
+            proof_bytes=(
+                bytes.fromhex(data["proof_bytes"]) if data.get("proof_bytes") else None
+            ),
             public_inputs=data.get("public_inputs", []),
-            verification_key=bytes.fromhex(data["verification_key"])
-            if data.get("verification_key")
-            else None,
+            verification_key=(
+                bytes.fromhex(data["verification_key"])
+                if data.get("verification_key")
+                else None
+            ),
             prover_id=data.get("prover_id"),
             timestamp=data.get("timestamp", time.time()),
             metadata=data.get("metadata", {}),

@@ -12,15 +12,18 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from security_audit_engine import (AuditEngineError, ConnectionPool,
-                                   DatabaseCorruptionError,
-                                   SecurityAuditEngine)
+from security_audit_engine import (
+    AuditEngineError,
+    ConnectionPool,
+    DatabaseCorruptionError,
+    SecurityAuditEngine,
+)
 
 
 @pytest.fixture
 def temp_db():
     """Create temporary database."""
-    with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
     yield db_path
     # Cleanup
@@ -131,9 +134,7 @@ class TestSecurityAuditEngineInitialization:
 
         with engine._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
 
         assert "audit_log" in tables
@@ -177,7 +178,9 @@ class TestLogEvent:
         audit_engine.slack_client = MagicMock()
         audit_engine.slack_channel = "#test"
 
-        audit_engine.log_event("integrity_failure", {"error": "test"}, severity="critical")
+        audit_engine.log_event(
+            "integrity_failure", {"error": "test"}, severity="critical"
+        )
 
         events = audit_engine.query_events(event_type="integrity_failure")
 
@@ -236,9 +239,7 @@ class TestQueryEvents:
         end_time = datetime.utcnow().isoformat()
 
         events = audit_engine.query_events(
-            event_type="timed_event",
-            start_time=start_time,
-            end_time=end_time
+            event_type="timed_event", start_time=start_time, end_time=end_time
         )
 
         assert len(events) >= 1
@@ -256,7 +257,7 @@ class TestQueryEvents:
 class TestAlertSending:
     """Test alert sending."""
 
-    @patch('security_audit_engine.SLACK_AVAILABLE', True)
+    @patch("security_audit_engine.SLACK_AVAILABLE", True)
     def test_send_alert_success(self, audit_engine):
         """Test successful alert sending."""
         mock_client = MagicMock()
@@ -267,7 +268,7 @@ class TestAlertSending:
 
         assert mock_client.chat_postMessage.called
 
-    @patch('security_audit_engine.SLACK_AVAILABLE', True)
+    @patch("security_audit_engine.SLACK_AVAILABLE", True)
     def test_send_alert_failure(self, audit_engine):
         """Test alert sending failure."""
         mock_client = MagicMock()
@@ -343,6 +344,7 @@ class TestThreadSafety:
 
     def test_concurrent_logging(self, audit_engine):
         """Test concurrent event logging."""
+
         def log_events(thread_id):
             for i in range(10):
                 audit_engine.log_event("concurrent", {"thread": thread_id, "i": i})
@@ -400,8 +402,10 @@ class TestDatabaseIntegrity:
         try:
             with audit_engine._transaction() as conn:
                 cursor = conn.cursor()
-                cursor.execute("INSERT INTO audit_log (timestamp, event_type, details) VALUES (?, ?, ?)",
-                             ("2025-01-01T00:00:00Z", "test", "{}"))
+                cursor.execute(
+                    "INSERT INTO audit_log (timestamp, event_type, details) VALUES (?, ?, ?)",
+                    ("2025-01-01T00:00:00Z", "test", "{}"),
+                )
                 # Cause error
                 raise Exception("Test error")
         except:

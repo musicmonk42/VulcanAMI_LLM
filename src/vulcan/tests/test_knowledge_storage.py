@@ -15,8 +15,14 @@ import pytest
 
 # Import the module under test
 from vulcan.knowledge_crystallizer.knowledge_storage import (
-    IndexEntry, KnowledgeIndex, KnowledgePruner, PrincipleVersion,
-    SimpleVectorIndex, StorageBackend, VersionedKnowledgeBase)
+    IndexEntry,
+    KnowledgeIndex,
+    KnowledgePruner,
+    PrincipleVersion,
+    SimpleVectorIndex,
+    StorageBackend,
+    VersionedKnowledgeBase,
+)
 
 
 # Mock Principle class for testing

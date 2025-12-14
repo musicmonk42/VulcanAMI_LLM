@@ -253,7 +253,8 @@ class GovernanceManager:
                 )
 
                 # Create tables
-                self.conn.execute("""
+                self.conn.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS governance_decisions (
                         decision_id TEXT PRIMARY KEY,
                         action_id TEXT,
@@ -263,9 +264,11 @@ class GovernanceManager:
                         timestamp REAL,
                         metadata TEXT
                     )
-                """)
+                """
+                )
 
-                self.conn.execute("""
+                self.conn.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS stakeholder_feedback (
                         feedback_id TEXT PRIMARY KEY,
                         action_id TEXT,
@@ -276,9 +279,11 @@ class GovernanceManager:
                         reasoning TEXT,
                         timestamp REAL
                     )
-                """)
+                """
+                )
 
-                self.conn.execute("""
+                self.conn.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS escalations (
                         escalation_id TEXT PRIMARY KEY,
                         decision_id TEXT,
@@ -288,18 +293,23 @@ class GovernanceManager:
                         resolution TEXT,
                         timestamp REAL
                     )
-                """)
+                """
+                )
 
                 # Create indexes for performance
-                self.conn.execute("""
+                self.conn.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_decisions_timestamp
                     ON governance_decisions(timestamp)
-                """)
+                """
+                )
 
-                self.conn.execute("""
+                self.conn.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_feedback_timestamp
                     ON stakeholder_feedback(timestamp)
-                """)
+                """
+                )
 
                 self.conn.commit()
             except sqlite3.Error as e:

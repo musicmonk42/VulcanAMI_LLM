@@ -7,17 +7,26 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from minimal_executor import (DEFAULT_GRAPH_TIMEOUT, DEFAULT_NODE_TIMEOUT,
-                              MAX_EDGE_COUNT, MAX_GRAPH_SIZE, AuditLogger,
-                              CycleDetectedError, ExecutionError,
-                              GraphValidator, MinimalExecutor,
-                              ThreadSafeContext, TimeoutError, ValidationError)
+from minimal_executor import (
+    DEFAULT_GRAPH_TIMEOUT,
+    DEFAULT_NODE_TIMEOUT,
+    MAX_EDGE_COUNT,
+    MAX_GRAPH_SIZE,
+    AuditLogger,
+    CycleDetectedError,
+    ExecutionError,
+    GraphValidator,
+    MinimalExecutor,
+    ThreadSafeContext,
+    TimeoutError,
+    ValidationError,
+)
 
 
 @pytest.fixture
 def mock_observability():
     """Mock the ObservabilityManager."""
-    with patch('minimal_executor.ObservabilityManager') as mock_obs:
+    with patch("minimal_executor.ObservabilityManager") as mock_obs:
         mock_instance = MagicMock()
         mock_instance.log_graph_execution = MagicMock()
         mock_instance.log_node_execution = MagicMock()
@@ -39,11 +48,9 @@ def simple_graph():
         "id": "test_graph",
         "nodes": [
             {"id": "in1", "type": "InputNode", "value": "Hello"},
-            {"id": "out1", "type": "OutputNode", "in": "in1"}
+            {"id": "out1", "type": "OutputNode", "in": "in1"},
         ],
-        "edges": [
-            {"from": "in1", "to": "out1"}
-        ]
+        "edges": [{"from": "in1", "to": "out1"}],
     }
 
 
@@ -170,8 +177,10 @@ class TestGraphValidator:
     def test_validate_too_many_nodes(self):
         """Test graph with too many nodes."""
         graph = {
-            "nodes": [{"id": f"n{i}", "type": "InputNode"} for i in range(MAX_GRAPH_SIZE + 1)],
-            "edges": []
+            "nodes": [
+                {"id": f"n{i}", "type": "InputNode"} for i in range(MAX_GRAPH_SIZE + 1)
+            ],
+            "edges": [],
         }
 
         is_valid, error = GraphValidator.validate_graph(graph)
@@ -184,9 +193,9 @@ class TestGraphValidator:
         graph = {
             "nodes": [
                 {"id": "n1", "type": "InputNode"},
-                {"id": "n1", "type": "OutputNode"}
+                {"id": "n1", "type": "OutputNode"},
             ],
-            "edges": []
+            "edges": [],
         }
 
         is_valid, error = GraphValidator.validate_graph(graph)
@@ -198,7 +207,7 @@ class TestGraphValidator:
         """Test edge referencing non-existent node."""
         graph = {
             "nodes": [{"id": "n1", "type": "InputNode"}],
-            "edges": [{"from": "n1", "to": "nonexistent"}]
+            "edges": [{"from": "n1", "to": "nonexistent"}],
         }
 
         is_valid, error = GraphValidator.validate_graph(graph)
@@ -210,7 +219,7 @@ class TestGraphValidator:
         """Test cycle detection with no cycle."""
         nodes = {
             "n1": {"id": "n1", "type": "InputNode"},
-            "n2": {"id": "n2", "type": "OutputNode"}
+            "n2": {"id": "n2", "type": "OutputNode"},
         }
         edges = [{"from": "n1", "to": "n2"}]
 
@@ -224,12 +233,12 @@ class TestGraphValidator:
         nodes = {
             "n1": {"id": "n1", "type": "InputNode"},
             "n2": {"id": "n2", "type": "GenerativeNode"},
-            "n3": {"id": "n3", "type": "OutputNode"}
+            "n3": {"id": "n3", "type": "OutputNode"},
         }
         edges = [
             {"from": "n1", "to": "n2"},
             {"from": "n2", "to": "n3"},
-            {"from": "n3", "to": "n1"}
+            {"from": "n3", "to": "n1"},
         ]
 
         has_cycle, cycle = GraphValidator.detect_cycles(nodes, edges)
@@ -247,9 +256,7 @@ class TestMinimalExecutor:
         log_path = tmp_path / "audit.jsonl"
 
         executor = MinimalExecutor(
-            audit_log_path=str(log_path),
-            node_timeout=10.0,
-            graph_timeout=60.0
+            audit_log_path=str(log_path), node_timeout=10.0, graph_timeout=60.0
         )
 
         assert executor.node_timeout == 10.0
@@ -282,7 +289,12 @@ class TestMinimalExecutor:
     @pytest.mark.asyncio
     async def test_execute_generative_node(self, executor):
         """Test executing GenerativeNode."""
-        node = {"id": "gen1", "type": "GenerativeNode", "prompt": "Summarize:", "in": "in1"}
+        node = {
+            "id": "gen1",
+            "type": "GenerativeNode",
+            "prompt": "Summarize:",
+            "in": "in1",
+        }
         context = ThreadSafeContext()
         context["in1"] = "test input"
 
@@ -317,7 +329,12 @@ class TestMinimalExecutor:
     @pytest.mark.asyncio
     async def test_execute_transform_node(self, executor):
         """Test executing TransformNode."""
-        node = {"id": "trans1", "type": "TransformNode", "in": "in1", "transform": "uppercase"}
+        node = {
+            "id": "trans1",
+            "type": "TransformNode",
+            "in": "in1",
+            "transform": "uppercase",
+        }
         context = ThreadSafeContext()
         context["in1"] = "hello"
 
@@ -349,13 +366,13 @@ class TestMinimalExecutor:
             "nodes": [
                 {"id": "n1", "type": "InputNode", "value": "A"},
                 {"id": "n2", "type": "GenerativeNode", "prompt": "B", "in": "n1"},
-                {"id": "n3", "type": "GenerativeNode", "prompt": "C", "in": "n2"}
+                {"id": "n3", "type": "GenerativeNode", "prompt": "C", "in": "n2"},
             ],
             "edges": [
                 {"from": "n1", "to": "n2"},
                 {"from": "n2", "to": "n3"},
-                {"from": "n3", "to": "n1"}
-            ]
+                {"from": "n3", "to": "n1"},
+            ],
         }
 
         with pytest.raises(CycleDetectedError):
@@ -369,18 +386,28 @@ class TestMinimalExecutor:
             "nodes": [
                 {"id": "in1", "type": "InputNode", "value": "A"},
                 {"id": "in2", "type": "InputNode", "value": "B"},
-                {"id": "gen1", "type": "GenerativeNode", "prompt": "Process", "in": "in1"},
-                {"id": "gen2", "type": "GenerativeNode", "prompt": "Process", "in": "in2"},
+                {
+                    "id": "gen1",
+                    "type": "GenerativeNode",
+                    "prompt": "Process",
+                    "in": "in1",
+                },
+                {
+                    "id": "gen2",
+                    "type": "GenerativeNode",
+                    "prompt": "Process",
+                    "in": "in2",
+                },
                 {"id": "combine", "type": "CombineNode", "in": ["gen1", "gen2"]},
-                {"id": "out", "type": "OutputNode", "in": "combine"}
+                {"id": "out", "type": "OutputNode", "in": "combine"},
             ],
             "edges": [
                 {"from": "in1", "to": "gen1"},
                 {"from": "in2", "to": "gen2"},
                 {"from": "gen1", "to": "combine"},
                 {"from": "gen2", "to": "combine"},
-                {"from": "combine", "to": "out"}
-            ]
+                {"from": "combine", "to": "out"},
+            ],
         }
 
         result = await executor.execute_graph(parallel_graph)

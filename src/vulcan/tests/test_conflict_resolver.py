@@ -241,9 +241,9 @@ class MockEvidenceWeightedResolver:
                 "action": action,
                 "confidence": confidence,
                 "new_concept": new_concept.concept_id if new_concept else None,
-                "existing_concept": existing_concept.concept_id
-                if existing_concept
-                else None,
+                "existing_concept": (
+                    existing_concept.concept_id if existing_concept else None
+                ),
                 "timestamp": time.time(),
             }
             self.resolution_history.append(resolution_record)

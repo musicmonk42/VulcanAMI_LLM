@@ -45,8 +45,15 @@ except ImportError:
 
 
 # Import missing MemoryType
-from .base import (BaseMemorySystem, ConsistencyLevel, Memory, MemoryConfig,
-                   MemoryQuery, MemoryType, RetrievalResult)
+from .base import (
+    BaseMemorySystem,
+    ConsistencyLevel,
+    Memory,
+    MemoryConfig,
+    MemoryQuery,
+    MemoryType,
+    RetrievalResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -624,7 +631,9 @@ class DistributedMemory(BaseMemorySystem):
         if self.redis_client:
             try:
                 key = f"mem:{memory.id}"
-                mem_copy = pickle.loads(pickle.dumps(memory))  # nosec B301 - Internal data structure
+                mem_copy = pickle.loads(
+                    pickle.dumps(memory)
+                )  # nosec B301 - Internal data structure
                 if self.cipher:
                     serialized_content = pickle.dumps(mem_copy.content)
                     mem_copy.content = self.cipher.encrypt(serialized_content)
@@ -639,7 +648,9 @@ class DistributedMemory(BaseMemorySystem):
                 # Continue anyway
 
         # Create encrypted copy for storage/replication
-        encrypted_memory = pickle.loads(pickle.dumps(memory))  # nosec B301 - Internal data structure
+        encrypted_memory = pickle.loads(
+            pickle.dumps(memory)
+        )  # nosec B301 - Internal data structure
 
         # Encrypt content before storing and replicating
         if self.cipher:
@@ -723,7 +734,9 @@ class DistributedMemory(BaseMemorySystem):
                 if mem.metadata.get("encrypted") and isinstance(mem.content, bytes):
                     try:
                         decrypted_content = self.cipher.decrypt(mem.content)
-                        mem.content = pickle.loads(decrypted_content)  # nosec B301 - Internal data structure
+                        mem.content = pickle.loads(
+                            decrypted_content
+                        )  # nosec B301 - Internal data structure
                         mem.metadata["encrypted"] = False
                     except Exception as e:
                         logger.warning(
@@ -802,9 +815,9 @@ class DistributedMemory(BaseMemorySystem):
                 "id": memory.id,
                 "type": memory.type.value,
                 "content": memory.content,
-                "embedding": memory.embedding.tolist()
-                if memory.embedding is not None
-                else None,
+                "embedding": (
+                    memory.embedding.tolist() if memory.embedding is not None else None
+                ),
                 "timestamp": memory.timestamp,
                 "importance": memory.importance,
                 "metadata": memory.metadata,
@@ -867,9 +880,9 @@ class DistributedMemory(BaseMemorySystem):
         query_data = {
             "query_type": query.query_type,
             "content": query.content,
-            "embedding": query.embedding.tolist()
-            if query.embedding is not None
-            else None,
+            "embedding": (
+                query.embedding.tolist() if query.embedding is not None else None
+            ),
             "filters": query.filters,
             "time_range": query.time_range,
             "limit": query.limit,
@@ -1120,9 +1133,11 @@ class DistributedMemory(BaseMemorySystem):
                         "id": memory.id,
                         "type": memory.type.value,
                         "content": memory.content,
-                        "embedding": memory.embedding.tolist()
-                        if memory.embedding is not None
-                        else None,
+                        "embedding": (
+                            memory.embedding.tolist()
+                            if memory.embedding is not None
+                            else None
+                        ),
                         "timestamp": memory.timestamp,
                         "importance": memory.importance,
                         "metadata": memory.metadata,
@@ -1157,9 +1172,9 @@ class DistributedMemory(BaseMemorySystem):
             query = MemoryQuery(
                 query_type=data.get("query_type", "similarity"),
                 content=data.get("content"),
-                embedding=np.array(data["embedding"])
-                if data.get("embedding")
-                else None,
+                embedding=(
+                    np.array(data["embedding"]) if data.get("embedding") else None
+                ),
                 filters=data.get("filters", {}),
                 time_range=data.get("time_range"),
                 limit=data.get("limit", 10),
@@ -1176,9 +1191,11 @@ class DistributedMemory(BaseMemorySystem):
                     "id": memory.id,
                     "type": memory.type.value,
                     "content": memory.content,
-                    "embedding": memory.embedding.tolist()
-                    if memory.embedding is not None
-                    else None,
+                    "embedding": (
+                        memory.embedding.tolist()
+                        if memory.embedding is not None
+                        else None
+                    ),
                     "timestamp": memory.timestamp,
                     "importance": memory.importance,
                     "metadata": memory.metadata,

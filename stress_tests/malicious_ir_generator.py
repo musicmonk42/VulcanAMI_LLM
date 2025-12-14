@@ -21,6 +21,7 @@ DEFAULT_BUFFER_SIZE_KB = 100
 DEFAULT_NESTING_DEPTH = 50
 MAX_SAFE_RECURSION_DEPTH = 50
 
+
 class PatternGenerator:
     """Generates obfuscated test patterns to avoid creating weaponizable exploits."""
 
@@ -31,7 +32,7 @@ class PatternGenerator:
             "' OR '1'='1",
             "UNION SELECT",
             "DROP_TABLE_PATTERN",
-            "'; EXEC_CMD --"
+            "'; EXEC_CMD --",
         ]
         return patterns[index % len(patterns)]
 
@@ -42,7 +43,7 @@ class PatternGenerator:
             "; COMMAND_HERE",
             "&& COMMAND_HERE",
             "| PIPE_COMMAND",
-            "`BACKTICK_CMD`"
+            "`BACKTICK_CMD`",
         ]
         return patterns[index % len(patterns)]
 
@@ -53,7 +54,7 @@ class PatternGenerator:
             "<SCRIPT_TAG>alert()</SCRIPT_TAG>",
             "javascript:void(0)",
             "onerror=HANDLER",
-            "onload=HANDLER"
+            "onload=HANDLER",
         ]
         return patterns[index % len(patterns)]
 
@@ -64,7 +65,7 @@ class PatternGenerator:
             "../PARENT_DIR",
             "..\\PARENT_DIR",
             "/etc/CONFIG_FILE",
-            "C:\\Windows\\SYSTEM_FILE"
+            "C:\\Windows\\SYSTEM_FILE",
         ]
         return patterns[index % len(patterns)]
 
@@ -75,9 +76,10 @@ class PatternGenerator:
             "{{TEMPLATE_VAR}}",
             "{%TEMPLATE_CMD%}",
             "${TEMPLATE_EXPR}",
-            "#{TEMPLATE_REF}"
+            "#{TEMPLATE_REF}",
         ]
         return patterns[index % len(patterns)]
+
 
 class IRGenerator:
     """
@@ -117,8 +119,13 @@ class IRGenerator:
         self.buffer_size_kb = DEFAULT_BUFFER_SIZE_KB
         self.nesting_depth = DEFAULT_NESTING_DEPTH
 
-    def configure(self, oversized_nodes: int = None, oversized_edges: int = None,
-                 buffer_size_kb: int = None, nesting_depth: int = None):
+    def configure(
+        self,
+        oversized_nodes: int = None,
+        oversized_edges: int = None,
+        buffer_size_kb: int = None,
+        nesting_depth: int = None,
+    ):
         """Configure generator parameters."""
         if oversized_nodes is not None:
             self.oversized_nodes = oversized_nodes
@@ -148,7 +155,7 @@ class IRGenerator:
             self._generate_unicode_exploit_graph,
             self._generate_type_confusion_graph,
             self._generate_oversized_graph,
-            self._generate_malformed_json_graph
+            self._generate_malformed_json_graph,
         ]
 
         strategy = random.choice(strategies)
@@ -171,19 +178,22 @@ class IRGenerator:
             "type": "Graph",
             "nodes": [
                 {"id": "node1", "type": "InvalidType"},
-                {"id": "node2"}  # Missing type
+                {"id": "node2"},  # Missing type
             ],
             "edges": [
                 {"from": "node1", "to": "node3"},  # Missing node3
-                {"to": "node2"}  # Missing from field
-            ]
+                {"to": "node2"},  # Missing from field
+            ],
         }
 
         # Deterministically remove fields based on seed
         fields_to_remove = ["grammar_version", "type", "nodes", "edges"]
         # Use generator count for determinism
         remove_count = (self.generated_count % 2) + 1
-        remove_indices = [(self.generated_count + i) % len(fields_to_remove) for i in range(remove_count)]
+        remove_indices = [
+            (self.generated_count + i) % len(fields_to_remove)
+            for i in range(remove_count)
+        ]
 
         for idx in sorted(remove_indices, reverse=True):
             field = fields_to_remove[idx]
@@ -205,7 +215,7 @@ class IRGenerator:
                 "id": graph_id,
                 "type": 123,  # Number instead of string
                 "nodes": "not_an_array",
-                "edges": {"edge1": {"from": "a", "to": "b"}}
+                "edges": {"edge1": {"from": "a", "to": "b"}},
             }
         elif type_index == 1:
             return {
@@ -213,7 +223,7 @@ class IRGenerator:
                 "id": 12345,  # Number instead of string
                 "type": True,  # Boolean instead of string
                 "nodes": [{"id": 123, "type": True}],
-                "edges": [{"from": 123, "to": False}]
+                "edges": [{"from": 123, "to": False}],
             }
         elif type_index == 2:
             return {
@@ -221,7 +231,7 @@ class IRGenerator:
                 "id": graph_id,
                 "type": "Graph",
                 "nodes": [{"id": ["n1"], "type": {"nested": "obj"}}],
-                "edges": [{"from": True, "to": None}]
+                "edges": [{"from": True, "to": None}],
             }
         else:
             return {
@@ -229,7 +239,7 @@ class IRGenerator:
                 "id": {"complex": "id"},
                 "type": [["nested", "array"]],
                 "nodes": 999,
-                "edges": "string_edges"
+                "edges": "string_edges",
             }
 
     def _generate_circular_dependency_graph(self) -> Dict[str, Any]:
@@ -244,57 +254,70 @@ class IRGenerator:
         edges.append({"from": "self_loop", "to": "self_loop"})
 
         # Two-node cycle
-        nodes.extend([
-            {"id": "cycle_a", "type": "ComputeNode"},
-            {"id": "cycle_b", "type": "ComputeNode"}
-        ])
-        edges.extend([
-            {"from": "cycle_a", "to": "cycle_b"},
-            {"from": "cycle_b", "to": "cycle_a"}
-        ])
+        nodes.extend(
+            [
+                {"id": "cycle_a", "type": "ComputeNode"},
+                {"id": "cycle_b", "type": "ComputeNode"},
+            ]
+        )
+        edges.extend(
+            [{"from": "cycle_a", "to": "cycle_b"}, {"from": "cycle_b", "to": "cycle_a"}]
+        )
 
         # Three-node cycle
-        nodes.extend([
-            {"id": "tri_1", "type": "ComputeNode"},
-            {"id": "tri_2", "type": "ComputeNode"},
-            {"id": "tri_3", "type": "ComputeNode"}
-        ])
-        edges.extend([
-            {"from": "tri_1", "to": "tri_2"},
-            {"from": "tri_2", "to": "tri_3"},
-            {"from": "tri_3", "to": "tri_1"}
-        ])
+        nodes.extend(
+            [
+                {"id": "tri_1", "type": "ComputeNode"},
+                {"id": "tri_2", "type": "ComputeNode"},
+                {"id": "tri_3", "type": "ComputeNode"},
+            ]
+        )
+        edges.extend(
+            [
+                {"from": "tri_1", "to": "tri_2"},
+                {"from": "tri_2", "to": "tri_3"},
+                {"from": "tri_3", "to": "tri_1"},
+            ]
+        )
 
         # Complex cycle with multiple paths (5-node strongly connected component)
-        nodes.extend([
-            {"id": "scc_1", "type": "ComputeNode"},
-            {"id": "scc_2", "type": "ComputeNode"},
-            {"id": "scc_3", "type": "ComputeNode"},
-            {"id": "scc_4", "type": "ComputeNode"},
-            {"id": "scc_5", "type": "ComputeNode"}
-        ])
-        edges.extend([
-            {"from": "scc_1", "to": "scc_2"},
-            {"from": "scc_2", "to": "scc_3"},
-            {"from": "scc_3", "to": "scc_4"},
-            {"from": "scc_4", "to": "scc_5"},
-            {"from": "scc_5", "to": "scc_1"},
-            {"from": "scc_1", "to": "scc_3"},  # Shortcut
-            {"from": "scc_3", "to": "scc_5"},  # Another shortcut
-        ])
+        nodes.extend(
+            [
+                {"id": "scc_1", "type": "ComputeNode"},
+                {"id": "scc_2", "type": "ComputeNode"},
+                {"id": "scc_3", "type": "ComputeNode"},
+                {"id": "scc_4", "type": "ComputeNode"},
+                {"id": "scc_5", "type": "ComputeNode"},
+            ]
+        )
+        edges.extend(
+            [
+                {"from": "scc_1", "to": "scc_2"},
+                {"from": "scc_2", "to": "scc_3"},
+                {"from": "scc_3", "to": "scc_4"},
+                {"from": "scc_4", "to": "scc_5"},
+                {"from": "scc_5", "to": "scc_1"},
+                {"from": "scc_1", "to": "scc_3"},  # Shortcut
+                {"from": "scc_3", "to": "scc_5"},  # Another shortcut
+            ]
+        )
 
         # Nested cycles (two cycles sharing a node)
-        nodes.extend([
-            {"id": "shared", "type": "ComputeNode"},
-            {"id": "cycle1_node", "type": "ComputeNode"},
-            {"id": "cycle2_node", "type": "ComputeNode"}
-        ])
-        edges.extend([
-            {"from": "shared", "to": "cycle1_node"},
-            {"from": "cycle1_node", "to": "shared"},
-            {"from": "shared", "to": "cycle2_node"},
-            {"from": "cycle2_node", "to": "shared"}
-        ])
+        nodes.extend(
+            [
+                {"id": "shared", "type": "ComputeNode"},
+                {"id": "cycle1_node", "type": "ComputeNode"},
+                {"id": "cycle2_node", "type": "ComputeNode"},
+            ]
+        )
+        edges.extend(
+            [
+                {"from": "shared", "to": "cycle1_node"},
+                {"from": "cycle1_node", "to": "shared"},
+                {"from": "shared", "to": "cycle2_node"},
+                {"from": "cycle2_node", "to": "shared"},
+            ]
+        )
 
         return {
             "grammar_version": "1.0.0",
@@ -304,9 +327,15 @@ class IRGenerator:
             "edges": edges,
             "metadata": {
                 "contains_cycles": True,
-                "cycle_types": ["self_loop", "2_node", "3_node", "complex_scc", "nested"],
-                "cycle_count": 6
-            }
+                "cycle_types": [
+                    "self_loop",
+                    "2_node",
+                    "3_node",
+                    "complex_scc",
+                    "nested",
+                ],
+                "cycle_count": 6,
+            },
         }
 
     def _generate_duplicate_ids_graph(self) -> Dict[str, Any]:
@@ -328,9 +357,17 @@ class IRGenerator:
 
         edges = [
             {"id": "edge1", "from": duplicate_id, "to": "unique_node_1"},
-            {"id": "edge1", "from": "unique_node_1", "to": duplicate_id},  # Duplicate edge ID
+            {
+                "id": "edge1",
+                "from": "unique_node_1",
+                "to": duplicate_id,
+            },  # Duplicate edge ID
             {"id": "edge2", "from": "unique_node_2", "to": "unique_node_3"},
-            {"id": "edge1", "from": "unique_node_3", "to": "unique_node_2"},  # Another duplicate
+            {
+                "id": "edge1",
+                "from": "unique_node_3",
+                "to": "unique_node_2",
+            },  # Another duplicate
         ]
 
         return {
@@ -338,7 +375,7 @@ class IRGenerator:
             "id": graph_id,
             "type": "Graph",
             "nodes": nodes,
-            "edges": edges
+            "edges": edges,
         }
 
     def _generate_invalid_references_graph(self) -> Dict[str, Any]:
@@ -348,7 +385,7 @@ class IRGenerator:
         nodes = [
             {"id": "existing_1", "type": "InputNode"},
             {"id": "existing_2", "type": "OutputNode"},
-            {"id": "existing_3", "type": "ComputeNode"}
+            {"id": "existing_3", "type": "ComputeNode"},
         ]
 
         # Test various types of invalid references
@@ -368,7 +405,7 @@ class IRGenerator:
             "id": graph_id,
             "type": "Graph",
             "nodes": nodes,
-            "edges": edges
+            "edges": edges,
         }
 
     def _generate_buffer_overflow_graph(self) -> Dict[str, Any]:
@@ -389,25 +426,17 @@ class IRGenerator:
                 "data": overflow_string,
                 "metadata": {
                     "description": overflow_string,
-                    "nested": {
-                        "deeply": {
-                            "nested": {
-                                "value": overflow_string
-                            }
-                        }
-                    }
-                }
+                    "nested": {"deeply": {"nested": {"value": overflow_string}}},
+                },
             },
             {
                 "id": "array_overflow",
                 "type": "Node",
-                "large_array": ["x" * 1000 for _ in range(100)]
-            }
+                "large_array": ["x" * 1000 for _ in range(100)],
+            },
         ]
 
-        edges = [
-            {"from": long_id, "to": "normal", "label": overflow_string}
-        ]
+        edges = [{"from": long_id, "to": "normal", "label": overflow_string}]
 
         return {
             "grammar_version": "1.0.0",
@@ -418,8 +447,8 @@ class IRGenerator:
             "description": overflow_string,
             "metadata": {
                 "buffer_size_kb": self.buffer_size_kb,
-                "test_type": "buffer_overflow"
-            }
+                "test_type": "buffer_overflow",
+            },
         }
 
     def _generate_injection_attempt_graph(self) -> Dict[str, Any]:
@@ -436,18 +465,23 @@ class IRGenerator:
                 "type": "ComputeNode",
                 "expression": self.patterns.get_template_pattern(0),
                 "query": self.patterns.get_sql_pattern(1),
-                "filter": self.patterns.get_command_pattern(1)
+                "filter": self.patterns.get_command_pattern(1),
             },
             {
                 "id": "encoded_patterns",
                 "type": "Node",
-                "data": base64.b64encode(self.patterns.get_xss_pattern(1).encode()).decode()
-            }
+                "data": base64.b64encode(
+                    self.patterns.get_xss_pattern(1).encode()
+                ).decode(),
+            },
         ]
 
         edges = [
-            {"from": self.patterns.get_sql_pattern(0), "to": self.patterns.get_command_pattern(0)},
-            {"from": "normal_node", "to": self.patterns.get_path_pattern(0)}
+            {
+                "from": self.patterns.get_sql_pattern(0),
+                "to": self.patterns.get_command_pattern(0),
+            },
+            {"from": "normal_node", "to": self.patterns.get_path_pattern(0)},
         ]
 
         return {
@@ -462,9 +496,9 @@ class IRGenerator:
                     "command_injection",
                     "xss",
                     "path_traversal",
-                    "template_injection"
+                    "template_injection",
                 ]
-            }
+            },
         }
 
     def _generate_deeply_nested_graph(self) -> Dict[str, Any]:
@@ -475,20 +509,13 @@ class IRGenerator:
         def create_nested_structure_iterative(depth: int) -> Dict[str, Any]:
             result = {"value": "bottom", "depth": 0}
             for i in range(1, depth + 1):
-                result = {
-                    "level": i,
-                    "nested": result
-                }
+                result = {"level": i, "nested": result}
             return result
 
         deep_structure = create_nested_structure_iterative(self.nesting_depth)
 
         nodes = [
-            {
-                "id": "nested_node",
-                "type": "ComputeNode",
-                "metadata": deep_structure
-            }
+            {"id": "nested_node", "type": "ComputeNode", "metadata": deep_structure}
         ]
 
         # Create nested array structure iteratively
@@ -510,8 +537,8 @@ class IRGenerator:
             "deep_object": deep_structure,
             "metadata": {
                 "nesting_depth": self.nesting_depth,
-                "test_type": "deep_nesting"
-            }
+                "test_type": "deep_nesting",
+            },
         }
 
     def _generate_null_fields_graph(self) -> Dict[str, Any]:
@@ -527,15 +554,15 @@ class IRGenerator:
                 {"id": None, "type": "ComputeNode"},
                 {"id": "node1", "type": None},
                 {"id": "node2", "type": "Node", "data": None},
-                {"id": "node3", "type": "Node", "metadata": None, "attributes": None}
+                {"id": "node3", "type": "Node", "metadata": None, "attributes": None},
             ],
             "edges": [
                 None,
                 {"from": None, "to": None},
                 {"from": "node1", "to": None},
-                {"from": None, "to": "node2", "type": None}
+                {"from": None, "to": "node2", "type": None},
             ],
-            "metadata": None
+            "metadata": None,
         }
 
     def _generate_empty_graph(self) -> Dict[str, Any]:
@@ -549,7 +576,13 @@ class IRGenerator:
             {},  # Completely empty
             {"nodes": [], "edges": []},  # Empty arrays
             {"id": graph_id},  # Only ID
-            {"grammar_version": "1.0.0", "id": "", "type": "", "nodes": [], "edges": []}  # Empty strings
+            {
+                "grammar_version": "1.0.0",
+                "id": "",
+                "type": "",
+                "nodes": [],
+                "edges": [],
+            },  # Empty strings
         ]
 
         return empty_variants[variant_index]
@@ -562,7 +595,9 @@ class IRGenerator:
         rtl_override = "\u202E"  # Right-to-left override
         zero_width = "\u200B"  # Zero-width space
         replacement = "\uFFFD"  # Replacement character
-        combining_chars = "a\u0300\u0301\u0302\u0303\u0304"  # Multiple combining characters
+        combining_chars = (
+            "a\u0300\u0301\u0302\u0303\u0304"  # Multiple combining characters
+        )
         emoji_spam = "🔥" * 1000
         mixed_scripts = "ЛатинtекстÐ中文עברית"
 
@@ -571,7 +606,11 @@ class IRGenerator:
 
         nodes = [
             {"id": f"node{rtl_override}1", "type": "ComputeNode"},
-            {"id": f"node{null_byte_marker}2", "type": "InputNode", "has_null_byte": True},
+            {
+                "id": f"node{null_byte_marker}2",
+                "type": "InputNode",
+                "has_null_byte": True,
+            },
             {"id": f"{zero_width}invisible{zero_width}", "type": "OutputNode"},
             {"id": combining_chars * 10, "type": "Node"},
             {"id": emoji_spam, "type": "Node"},
@@ -583,8 +622,8 @@ class IRGenerator:
                 "zero_width": zero_width,
                 "combining": combining_chars,
                 "emoji": "🔥🔥🔥",
-                "mixed": mixed_scripts
-            }
+                "mixed": mixed_scripts,
+            },
         ]
 
         edges = [
@@ -600,8 +639,8 @@ class IRGenerator:
             "description": f"Test{null_byte_marker}Graph{replacement}",
             "metadata": {
                 "test_type": "unicode_exploit",
-                "null_byte_marker": null_byte_marker
-            }
+                "null_byte_marker": null_byte_marker,
+            },
         }
 
     def _generate_type_confusion_graph(self) -> Dict[str, Any]:
@@ -617,22 +656,26 @@ class IRGenerator:
             "type": "Graph",
             "nodes": [
                 {"id": "str_1", "type": "Node", "value": "1"},  # String "1"
-                {"id": "num_1", "type": "Node", "value": 1},    # Number 1
+                {"id": "num_1", "type": "Node", "value": 1},  # Number 1
                 {"id": "str_true", "type": "Node", "value": "true"},  # String "true"
-                {"id": "bool_true", "type": "Node", "value": True},   # Boolean true
+                {"id": "bool_true", "type": "Node", "value": True},  # Boolean true
                 {"id": "str_null", "type": "Node", "value": "null"},  # String "null"
-                {"id": "actual_null", "type": "Node", "value": None}, # Actual null
-                {"id": "str_0", "type": "Node", "value": "0"},    # String "0"
-                {"id": "num_0", "type": "Node", "value": 0},      # Number 0
-                {"id": "bool_false", "type": "Node", "value": False}, # Boolean false
+                {"id": "actual_null", "type": "Node", "value": None},  # Actual null
+                {"id": "str_0", "type": "Node", "value": "0"},  # String "0"
+                {"id": "num_0", "type": "Node", "value": 0},  # Number 0
+                {"id": "bool_false", "type": "Node", "value": False},  # Boolean false
                 {"id": "empty_str", "type": "Node", "value": ""},  # Empty string
                 {"id": "str_obj", "type": "Node", "value": "{}"},  # String "{}"
-                {"id": "actual_obj", "type": "Node", "value": {}}, # Actual empty object
+                {
+                    "id": "actual_obj",
+                    "type": "Node",
+                    "value": {},
+                },  # Actual empty object
             ],
             "edges": [
                 {"from": "str_1", "to": "num_1"},
                 {"from": "str_true", "to": "bool_true"},
-                {"from": "str_0", "to": "bool_false"}
+                {"from": "str_0", "to": "bool_false"},
             ],
             "metadata": {
                 "test_type": "type_confusion",
@@ -640,9 +683,9 @@ class IRGenerator:
                     {"string": "1", "number": 1},
                     {"string": "true", "boolean": True},
                     {"string": "null", "null": None},
-                    {"string": "0", "number": 0, "boolean": False}
-                ]
-            }
+                    {"string": "0", "number": 0, "boolean": False},
+                ],
+            },
         }
 
     def _generate_oversized_graph(self) -> Dict[str, Any]:
@@ -651,25 +694,29 @@ class IRGenerator:
 
         nodes = []
         for i in range(self.oversized_nodes):
-            nodes.append({
-                "id": f"node_{i}",
-                "type": random.choice(["InputNode", "OutputNode", "ComputeNode"]),
-                "data": "x" * 1000,  # 1KB of data per node
-                "metadata": {
-                    "index": i,
-                    "random": random.random(),
-                    "description": f"This is node {i} with some padding text" * 10
+            nodes.append(
+                {
+                    "id": f"node_{i}",
+                    "type": random.choice(["InputNode", "OutputNode", "ComputeNode"]),
+                    "data": "x" * 1000,  # 1KB of data per node
+                    "metadata": {
+                        "index": i,
+                        "random": random.random(),
+                        "description": f"This is node {i} with some padding text" * 10,
+                    },
                 }
-            })
+            )
 
         edges = []
         for i in range(self.oversized_edges):
-            edges.append({
-                "from": f"node_{random.randint(0, self.oversized_nodes-1)}",
-                "to": f"node_{random.randint(0, self.oversized_nodes-1)}",
-                "weight": random.random(),
-                "type": random.choice(["data", "control", "dependency"])
-            })
+            edges.append(
+                {
+                    "from": f"node_{random.randint(0, self.oversized_nodes-1)}",
+                    "to": f"node_{random.randint(0, self.oversized_nodes-1)}",
+                    "weight": random.random(),
+                    "type": random.choice(["data", "control", "dependency"]),
+                }
+            )
 
         return {
             "grammar_version": "1.0.0",
@@ -681,8 +728,8 @@ class IRGenerator:
                 "size": "oversized",
                 "node_count": self.oversized_nodes,
                 "edge_count": self.oversized_edges,
-                "approximate_size_mb": (self.oversized_nodes * 2) / 1024
-            }
+                "approximate_size_mb": (self.oversized_nodes * 2) / 1024,
+            },
         }
 
     def _generate_malformed_json_graph(self) -> Dict[str, Any]:
@@ -705,31 +752,32 @@ class IRGenerator:
                     "data": "backslash\\test\\path",
                     "quotes": "test\"with'quotes",
                     "special_floats": {
-                        "infinity": float('inf'),
-                        "nan": float('nan'),
-                        "negative_infinity": float('-inf')
-                    }
+                        "infinity": float("inf"),
+                        "nan": float("nan"),
+                        "negative_infinity": float("-inf"),
+                    },
                 }
             ],
             "edges": [
-                {
-                    "from": "node\rwith\rcarriage\rreturn",
-                    "to": "node\fwith\fform\ffeed"
-                }
+                {"from": "node\rwith\rcarriage\rreturn", "to": "node\fwith\fform\ffeed"}
             ],
             "metadata": {
                 "test_type": "special_json_values",
-                "contains_special_floats": True
-            }
+                "contains_special_floats": True,
+            },
         }
 
     def _generate_id(self, prefix: str = "graph") -> str:
         """Generate a unique ID for graphs."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        random_suffix = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
+        random_suffix = "".join(
+            random.choices(string.ascii_letters + string.digits, k=6)
+        )
         return f"{prefix}_{timestamp}_{random_suffix}"
 
-    def generate_batch(self, count: int = 10, shuffle: bool = True) -> List[Dict[str, Any]]:
+    def generate_batch(
+        self, count: int = 10, shuffle: bool = True
+    ) -> List[Dict[str, Any]]:
         """
         Generate a batch of invalid graphs with various malicious patterns.
         Ensures at least one of each type is generated.
@@ -758,7 +806,7 @@ class IRGenerator:
             self._generate_unicode_exploit_graph,
             self._generate_type_confusion_graph,
             self._generate_oversized_graph,
-            self._generate_malformed_json_graph
+            self._generate_malformed_json_graph,
         ]
 
         # Generate at least one of each type if count allows
@@ -803,15 +851,21 @@ class IRGenerator:
                 if isinstance(obj, float):
                     if obj != obj:  # NaN
                         return "NaN"
-                    elif obj == float('inf'):
+                    elif obj == float("inf"):
                         return "Infinity"
-                    elif obj == float('-inf'):
+                    elif obj == float("-inf"):
                         return "-Infinity"
                 return obj
 
             # Use separate variable for error file to avoid scope confusion
-            with open(file_path, "w", encoding='utf-8') as output_file:
-                json.dump(graph, output_file, indent=2, ensure_ascii=False, default=json_encoder)
+            with open(file_path, "w", encoding="utf-8") as output_file:
+                json.dump(
+                    graph,
+                    output_file,
+                    indent=2,
+                    ensure_ascii=False,
+                    default=json_encoder,
+                )
 
             if self.verbose:
                 print(f"Saved graph to: {file_path}")
@@ -819,16 +873,18 @@ class IRGenerator:
         except Exception as e:
             print(f"Error saving graph: {e}")
             # Save as .txt if JSON serialization fails - use different variable name
-            error_file_path = file_path.replace('.json', '_error.txt')
+            error_file_path = file_path.replace(".json", "_error.txt")
             try:
-                with open(error_file_path, "w", encoding='utf-8') as error_file:
+                with open(error_file_path, "w", encoding="utf-8") as error_file:
                     error_file.write(f"Error: {e}\n")
                     error_file.write(f"Graph content:\n{str(graph)}")
                 print(f"Saved error details to: {error_file_path}")
             except Exception as save_error:
                 print(f"Failed to save error file: {save_error}")
 
-    def save_batch(self, graphs: List[Dict[str, Any]], output_dir: Optional[str] = None):
+    def save_batch(
+        self, graphs: List[Dict[str, Any]], output_dir: Optional[str] = None
+    ):
         """
         Save a batch of graphs to files.
 
@@ -855,7 +911,7 @@ class IRGenerator:
                 "oversized_nodes": self.oversized_nodes,
                 "oversized_edges": self.oversized_edges,
                 "buffer_size_kb": self.buffer_size_kb,
-                "nesting_depth": self.nesting_depth
+                "nesting_depth": self.nesting_depth,
             },
             "test_categories": [
                 "missing_fields",
@@ -871,9 +927,9 @@ class IRGenerator:
                 "unicode_exploits",
                 "type_confusion",
                 "oversized_graphs",
-                "malformed_json"
+                "malformed_json",
             ],
-            "security_note": "All injection patterns are obfuscated for safety"
+            "security_note": "All injection patterns are obfuscated for safety",
         }
 
     def validate_generated_graphs(self, graphs: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -889,7 +945,7 @@ class IRGenerator:
         validation_results = {
             "total_graphs": len(graphs),
             "violations_found": defaultdict(int),
-            "graphs_by_type": defaultdict(int)
+            "graphs_by_type": defaultdict(int),
         }
 
         for graph in graphs:
@@ -921,6 +977,7 @@ class IRGenerator:
 
         return dict(validation_results)
 
+
 def main():
     """
     Main function to generate a comprehensive test suite of malicious graphs.
@@ -930,10 +987,7 @@ def main():
 
     # Configure generator
     generator.configure(
-        oversized_nodes=1000,
-        oversized_edges=2000,
-        buffer_size_kb=100,
-        nesting_depth=50
+        oversized_nodes=1000, oversized_edges=2000, buffer_size_kb=100, nesting_depth=50
     )
 
     print(f"Starting malicious IR generation with seed: {generator.seed}")
@@ -967,6 +1021,7 @@ def main():
     print(f"Report saved to: {report_path}")
     print(f"Seed for reproducibility: {generator.seed}")
     print("\nSecurity Note: All injection patterns are obfuscated and safe for storage")
+
 
 if __name__ == "__main__":
     main()

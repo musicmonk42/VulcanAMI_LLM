@@ -138,7 +138,9 @@ class KnowledgeGap:
         if not self.gap_id and not self.id:
             # Generate unique ID
             content = f"{self.type}_{self.domain}_{self.timestamp}"
-            hash_val = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[:8]
+            hash_val = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()[
+                :8
+            ]
             self.gap_id = f"{self.type}_{hash_val}"
             self.id = self.gap_id
         elif self.gap_id and not self.id:
@@ -530,9 +532,9 @@ class DecompositionAnalyzer:
                             type="decomposition",
                             domain=domain,
                             priority=min(1.0, frequency * 0.8),
-                            estimated_cost=20 * np.mean(complexities)
-                            if complexities
-                            else 20,
+                            estimated_cost=(
+                                20 * np.mean(complexities) if complexities else 20
+                            ),
                             missing_capability=f"decompose_{pattern_key}",
                             complexity=np.mean(complexities) if complexities else 0.5,
                             metadata={
@@ -711,9 +713,11 @@ class PredictionAnalyzer:
                                 metadata={
                                     "mean_error": mean_error,
                                     "std_error": std_error,
-                                    "error_type": "over_prediction"
-                                    if mean_error > 0
-                                    else "under_prediction",
+                                    "error_type": (
+                                        "over_prediction"
+                                        if mean_error > 0
+                                        else "under_prediction"
+                                    ),
                                     "sample_count": len(signed_errors),
                                 },
                             )
@@ -981,14 +985,16 @@ class AnomalyAnalyzer:
                                     "index": original_idx,
                                     "value": value,
                                     "z_score": z_score,
-                                    "frequency": 1 / len(features)
-                                    if len(features) > 0
-                                    else 0.1,
+                                    "frequency": (
+                                        1 / len(features) if len(features) > 0 else 0.1
+                                    ),
                                     "confidence": min(0.99, z_score / 10),
                                     "score": z_score / 10,
-                                    "components": [observations[original_idx]]
-                                    if original_idx < len(observations)
-                                    else [],
+                                    "components": (
+                                        [observations[original_idx]]
+                                        if original_idx < len(observations)
+                                        else []
+                                    ),
                                 }
                             )
 

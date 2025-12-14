@@ -59,7 +59,7 @@ class TestFieldArithmetic:
     def test_field_exponentiation(self):
         """Test field element exponentiation."""
         a = FieldElement(2)
-        result = a ** 10
+        result = a**10
         assert result == FieldElement(1024)
 
     def test_field_zero_one(self):
@@ -184,7 +184,7 @@ class TestLagrangeInterpolation:
         points = [
             (FieldElement(1), FieldElement(2)),
             (FieldElement(2), FieldElement(3)),
-            (FieldElement(3), FieldElement(5))
+            (FieldElement(3), FieldElement(5)),
         ]
 
         p = Polynomial.lagrange_interpolation(points)
@@ -215,17 +215,11 @@ class TestR1CSToQAP:
         # Constraint: x * x = y  =>  A=[0,0,1], B=[0,0,1], C=[0,1,0]
 
         constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],  # x
-                B=[0, 0, 1],  # x
-                C=[0, 1, 0]   # y
-            )
+            R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])  # x  # x  # y
         ]
 
         circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1  # y is public
+            constraints=constraints, num_variables=3, num_public_inputs=1  # y is public
         )
 
         qap = r1cs_to_qap(circuit)
@@ -245,19 +239,9 @@ class TestR1CSToQAP:
     def test_qap_satisfiability(self):
         """Test that valid witness produces divisible polynomial."""
         # Circuit: x * x = y
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         qap = r1cs_to_qap(circuit)
 
@@ -270,19 +254,9 @@ class TestR1CSToQAP:
 
     def test_qap_invalid_witness(self):
         """Test that invalid witness raises error."""
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         qap = r1cs_to_qap(circuit)
 
@@ -302,37 +276,19 @@ class TestSimpleCircuit:
         # Circuit: x * x = y
         # Variables: [1, y, x]
         constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],  # x
-                B=[0, 0, 1],  # x
-                C=[0, 1, 0]   # y
-            )
+            R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])  # x  # x  # y
         ]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         assert len(circuit.constraints) == 1
         assert circuit.num_variables == 3
 
     def test_circuit_satisfaction(self):
         """Test circuit constraint satisfaction."""
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         # Valid witness: x=3, y=9
         valid_witness = [1, 9, 3]
@@ -351,26 +307,19 @@ class TestFullGroth16:
     # Tests run successfully on Linux/Unix systems with larger default stack sizes.
     # See: https://github.com/ethereum/py_ecc for upstream tracking
 
-    @pytest.mark.skipif(sys.platform == 'win32', reason="Stack overflow due to py_ecc recursive __pow__ on Windows - works on Linux/Unix")
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Stack overflow due to py_ecc recursive __pow__ on Windows - works on Linux/Unix",
+    )
     def test_groth16_setup_prove_verify(self):
         """Test complete Groth16 flow: setup, prove, verify."""
         # Circuit: x * x = y (prove knowledge of square root)
         # Public: y = 9
         # Private: x = 3
 
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         # Create prover
         prover = Groth16Prover(circuit)
@@ -394,22 +343,15 @@ class TestFullGroth16:
         # Proof should be valid
         assert is_valid
 
-    @pytest.mark.skipif(sys.platform == 'win32', reason="Stack overflow due to py_ecc recursive __pow__ on Windows - works on Linux/Unix")
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Stack overflow due to py_ecc recursive __pow__ on Windows - works on Linux/Unix",
+    )
     def test_groth16_invalid_witness_rejected(self):
         """Test that invalid witness is rejected during prove."""
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         prover = Groth16Prover(circuit)
         prover.setup()
@@ -421,28 +363,24 @@ class TestFullGroth16:
         with pytest.raises(ValueError):
             prover.prove(invalid_witness)
 
-    @pytest.mark.skip(reason="Known issue with multiple constraints - verification equation needs refinement")
+    @pytest.mark.skip(
+        reason="Known issue with multiple constraints - verification equation needs refinement"
+    )
     def test_groth16_multiple_constraints(self):
         """Test Groth16 with multiple constraints."""
         # Circuit: x * y = z, z * 1 = w
         # Variables: [1, w, x, y, z] (constant, public, private...)
         constraints = [
             R1CSConstraint(
-                A=[0, 0, 1, 0, 0],  # x
-                B=[0, 0, 0, 1, 0],  # y
-                C=[0, 0, 0, 0, 1]   # z
+                A=[0, 0, 1, 0, 0], B=[0, 0, 0, 1, 0], C=[0, 0, 0, 0, 1]  # x  # y  # z
             ),
             R1CSConstraint(
-                A=[0, 0, 0, 0, 1],  # z
-                B=[1, 0, 0, 0, 0],  # 1
-                C=[0, 1, 0, 0, 0]   # w
-            )
+                A=[0, 0, 0, 0, 1], B=[1, 0, 0, 0, 0], C=[0, 1, 0, 0, 0]  # z  # 1  # w
+            ),
         ]
 
         circuit = Circuit(
-            constraints=constraints,
-            num_variables=5,
-            num_public_inputs=1  # w is public
+            constraints=constraints, num_variables=5, num_public_inputs=1  # w is public
         )
 
         prover = Groth16Prover(circuit)
@@ -460,19 +398,9 @@ class TestFullGroth16:
 
     def test_groth16_proof_size(self):
         """Test that proof has expected size."""
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         prover = Groth16Prover(circuit)
         prover.setup()
@@ -517,19 +445,9 @@ class TestEdgeCases:
 
     def test_circuit_wrong_witness_size(self):
         """Test error when witness has wrong size."""
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         # Wrong size witness
         wrong_witness = [1, 9]  # Too short
@@ -537,19 +455,9 @@ class TestEdgeCases:
 
     def test_prove_without_setup(self):
         """Test that proving without setup raises error."""
-        constraints = [
-            R1CSConstraint(
-                A=[0, 0, 1],
-                B=[0, 0, 1],
-                C=[0, 1, 0]
-            )
-        ]
+        constraints = [R1CSConstraint(A=[0, 0, 1], B=[0, 0, 1], C=[0, 1, 0])]
 
-        circuit = Circuit(
-            constraints=constraints,
-            num_variables=3,
-            num_public_inputs=1
-        )
+        circuit = Circuit(constraints=constraints, num_variables=3, num_public_inputs=1)
 
         prover = Groth16Prover(circuit)
 

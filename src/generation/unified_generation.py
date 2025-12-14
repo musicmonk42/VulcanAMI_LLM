@@ -730,9 +730,9 @@ class UnifiedGeneration:
                                 "weight": w,
                             }
                         ],
-                        "module_agreement": 1
-                        if entry is None
-                        else entry["module_agreement"] + 1,
+                        "module_agreement": (
+                            1 if entry is None else entry["module_agreement"] + 1
+                        ),
                     }
 
         return fused

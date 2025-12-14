@@ -3,14 +3,19 @@
 # Comprehensive test suite for variants.py
 # ============================================================
 
-from vulcan.orchestrator.variants import (PYTHON_VERSION,
-                                          SUPPORTS_EXECUTOR_TIMEOUT,
-                                          AdaptiveOrchestrator, ExecutionError,
-                                          FaultTolerantOrchestrator,
-                                          ParallelOrchestrator,
-                                          PerceptionError, PerformanceMonitor,
-                                          ReasoningError, StrategySelector,
-                                          shutdown_executor_with_timeout)
+from vulcan.orchestrator.variants import (
+    PYTHON_VERSION,
+    SUPPORTS_EXECUTOR_TIMEOUT,
+    AdaptiveOrchestrator,
+    ExecutionError,
+    FaultTolerantOrchestrator,
+    ParallelOrchestrator,
+    PerceptionError,
+    PerformanceMonitor,
+    ReasoningError,
+    StrategySelector,
+    shutdown_executor_with_timeout,
+)
 import sys
 import threading
 import time

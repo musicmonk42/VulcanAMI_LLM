@@ -5,12 +5,16 @@ Tests Bayesian priors, similarity search, memory indexing, cache management,
 and all prior computation strategies.
 """
 
-from vulcan.reasoning.selection.memory_prior import (AdaptivePriorSelector,
-                                                     BayesianMemoryPrior,
-                                                     MemoryEntry, MemoryIndex,
-                                                     PriorDistribution,
-                                                     PriorType,
-                                                     SimilarityMetric)
+from vulcan.reasoning.selection.memory_prior import (
+    AdaptivePriorSelector,
+    BayesianMemoryPrior,
+    MemoryEntry,
+    MemoryIndex,
+    PriorDistribution,
+    PriorType,
+    SimilarityMetric,
+)
+
 # Import the module to test
 import sys
 import threading
@@ -835,9 +839,9 @@ class TestPerformance:
 
         # The fully cached run should be significantly faster than the run with the initial cache miss.
         # Add a small epsilon to prevent floating point comparison issues.
-        assert second_run_time < (first_run_time * 0.9), (
-            f"Cached time ({second_run_time:.6f}) was not faster than uncached time ({first_run_time:.6f})"
-        )
+        assert second_run_time < (
+            first_run_time * 0.9
+        ), f"Cached time ({second_run_time:.6f}) was not faster than uncached time ({first_run_time:.6f})"
 
 
 # Run tests

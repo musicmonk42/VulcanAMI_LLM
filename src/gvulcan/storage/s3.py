@@ -45,7 +45,6 @@ class S3Error(Exception):
     """Base exception for S3 operations"""
 
 
-
 class S3Store:
     """
     S3 storage interface with comprehensive operations.

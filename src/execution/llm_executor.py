@@ -27,12 +27,11 @@ import threading
 import time
 import traceback
 from collections import OrderedDict
-from concurrent.futures import (ProcessPoolExecutor, ThreadPoolExecutor)
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import (Any, Callable, Dict, List, Optional, Set, Tuple,
-                    TypeVar, Union)
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union
 
 try:
     import torch
@@ -804,9 +803,11 @@ class LLMExecutor:
                         layer_idx=layer_idx,
                         hidden_state=current_hidden,
                         attention_mask=attention_mask,
-                        cache_key=self.cache._make_key(layer_idx, current_hidden)
-                        if self.config.enable_cache
-                        else None,
+                        cache_key=(
+                            self.cache._make_key(layer_idx, current_hidden)
+                            if self.config.enable_cache
+                            else None
+                        ),
                     )
 
                     current_hidden, layer_meta = self.layer_executor.execute_layer(

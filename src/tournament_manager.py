@@ -141,10 +141,8 @@ class TournamentError(Exception):
     """Base exception for tournament errors."""
 
 
-
 class ValidationError(TournamentError):
     """Raised when input validation fails."""
-
 
 
 class TournamentManager:

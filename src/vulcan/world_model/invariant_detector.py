@@ -40,8 +40,7 @@ def _lazy_load_safety_validator():
     if EnhancedSafetyValidator is None:
         try:
             from ..safety.safety_types import SafetyConfig as _SC
-            from ..safety.safety_validator import \
-                EnhancedSafetyValidator as _ESV
+            from ..safety.safety_validator import EnhancedSafetyValidator as _ESV
 
             EnhancedSafetyValidator = _ESV
             SafetyConfig = _SC
@@ -57,8 +56,10 @@ try:
     import sympy as sp
     from sympy.core.sympify import SympifyError
     from sympy.parsing.sympy_parser import (
-        implicit_multiplication_application, parse_expr,
-        standard_transformations)
+        implicit_multiplication_application,
+        parse_expr,
+        standard_transformations,
+    )
 
     SYMPY_AVAILABLE = True
 except ImportError:
@@ -81,10 +82,8 @@ class ExpressionComplexityError(Exception):
     """Raised when expression complexity exceeds limits"""
 
 
-
 class ExpressionSafetyError(Exception):
     """Raised when expression contains unsafe operations"""
-
 
 
 class SymbolicExpressionSystem:
@@ -1303,15 +1302,20 @@ class InvariantRegistry:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         elif SAFETY_VALIDATOR_AVAILABLE:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
-                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                logger.info(
+                    f"{self.__class__.__name__}: Using singleton safety validator"
+                )
             except Exception as e:
                 logger.debug(f"Could not get singleton safety validator: {e}")
                 # Last resort: create new instance
@@ -1321,7 +1325,9 @@ class InvariantRegistry:
                     )
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                logger.warning(
+                    f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
+                )
         else:
             self.safety_validator = None
             logger.warning(
@@ -1788,15 +1794,20 @@ class InvariantDetector:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         elif SAFETY_VALIDATOR_AVAILABLE:
             # Fallback: try to get singleton, or create new instance
             try:
                 from ..safety.safety_validator import initialize_all_safety_components
+
                 self.safety_validator = initialize_all_safety_components(
                     config=safety_config, reuse_existing=True
                 )
-                logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                logger.info(
+                    f"{self.__class__.__name__}: Using singleton safety validator"
+                )
             except Exception as e:
                 logger.debug(f"Could not get singleton safety validator: {e}")
                 # Last resort: create new instance
@@ -1806,7 +1817,9 @@ class InvariantDetector:
                     )
                 else:
                     self.safety_validator = EnhancedSafetyValidator()
-                logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                logger.warning(
+                    f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
+                )
         else:
             self.safety_validator = None
             logger.warning(

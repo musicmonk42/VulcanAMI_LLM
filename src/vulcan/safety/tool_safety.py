@@ -18,8 +18,13 @@ import time
 from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Tuple
 
-from .safety_types import (Condition, SafetyReport, SafetyViolationType,
-                           ToolSafetyContract, ToolSafetyLevel)
+from .safety_types import (
+    Condition,
+    SafetyReport,
+    SafetyViolationType,
+    ToolSafetyContract,
+    ToolSafetyLevel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1107,9 +1112,11 @@ class ToolSafetyGovernor:
             "veto_report": veto_report.to_audit_log(),
             "governance_record": governance_record,
             "high_risk_tools": high_risk_tools,
-            "consensus_achieved": len(consensus_tools) == len(allowed_tools)
-            if self.require_consensus
-            else True,
+            "consensus_achieved": (
+                len(consensus_tools) == len(allowed_tools)
+                if self.require_consensus
+                else True
+            ),
         }
 
     def validate_execution_result(

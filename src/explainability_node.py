@@ -504,9 +504,9 @@ class ExplainabilityNode:
                 "explanation": explanation,
                 "coverage": coverage,
                 "compression_ok": compression_ok,
-                "compression_meta": compression_meta
-                if compression_meta
-                else {"error": "Not attempted"},
+                "compression_meta": (
+                    compression_meta if compression_meta else {"error": "Not attempted"}
+                ),
                 "kernel_audit": kernel_audit_result,
                 "photonic_drift": photonic_drift_meta if photonic_drift_meta else {},
                 "ethical_label": context.get("ethical_label"),

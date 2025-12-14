@@ -418,7 +418,7 @@ class WorldModelRouter:
     ):
         """
         Initialize WorldModelRouter - FIXED: Added safety_validator parameter
-        
+
         Args:
             world_model: The world model instance to route updates for
             config: Optional configuration dictionary
@@ -482,7 +482,9 @@ class WorldModelRouter:
         if safety_validator is not None:
             # Use provided shared instance (PREFERRED - prevents duplication)
             self.safety_validator = safety_validator
-            logger.info(f"{self.__class__.__name__}: Using shared safety validator instance")
+            logger.info(
+                f"{self.__class__.__name__}: Using shared safety validator instance"
+            )
         else:
             # Fallback: try to get from world_model, or lazy import and create
             if (
@@ -490,7 +492,9 @@ class WorldModelRouter:
                 and world_model.safety_validator
             ):
                 self.safety_validator = world_model.safety_validator
-                logger.info(f"{self.__class__.__name__}: Using world model's safety validator instance")
+                logger.info(
+                    f"{self.__class__.__name__}: Using world model's safety validator instance"
+                )
             else:
                 # Initialize safety validator (using lazy imports to avoid circular import issues)
                 EnhancedSafetyValidator = _get_safety_validator()
@@ -499,23 +503,32 @@ class WorldModelRouter:
                 if EnhancedSafetyValidator is not None and SafetyConfig is not None:
                     # Try singleton first
                     try:
-                        from ..safety.safety_validator import initialize_all_safety_components
+                        from ..safety.safety_validator import (
+                            initialize_all_safety_components,
+                        )
+
                         self.safety_validator = initialize_all_safety_components(
                             config=config.get("safety_config") if config else None,
-                            reuse_existing=True
+                            reuse_existing=True,
                         )
-                        logger.info(f"{self.__class__.__name__}: Using singleton safety validator")
+                        logger.info(
+                            f"{self.__class__.__name__}: Using singleton safety validator"
+                        )
                     except Exception as e:
                         logger.debug(f"Could not get singleton safety validator: {e}")
                         # Last resort: create new instance
-                        safety_config = config.get("safety_config", {}) if config else {}
+                        safety_config = (
+                            config.get("safety_config", {}) if config else {}
+                        )
                         if isinstance(safety_config, dict) and safety_config:
                             self.safety_validator = EnhancedSafetyValidator(
                                 SafetyConfig.from_dict(safety_config)
                             )
                         else:
                             self.safety_validator = EnhancedSafetyValidator()
-                        logger.warning(f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)")
+                        logger.warning(
+                            f"{self.__class__.__name__}: Created new safety validator instance (may cause duplication)"
+                        )
                 else:
                     self.safety_validator = None
                     logger.warning(
@@ -1068,14 +1081,16 @@ class WorldModelRouter:
                 try:
                     self.validation_tracker.record_validation(
                         proposal=proposal,
-                        validation_result=vr
-                        if vr is not None
-                        else {
-                            "proposal_id": proposal["id"],
-                            "valid": True,
-                            "confidence": 0.0,
-                            "reasoning": "No pre-validation run.",
-                        },
+                        validation_result=(
+                            vr
+                            if vr is not None
+                            else {
+                                "proposal_id": proposal["id"],
+                                "valid": True,
+                                "confidence": 0.0,
+                                "reasoning": "No pre-validation run.",
+                            }
+                        ),
                         actual_outcome="success" if success else "partial",
                     )
                 except Exception as e:

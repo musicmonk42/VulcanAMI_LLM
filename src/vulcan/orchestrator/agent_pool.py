@@ -33,9 +33,14 @@ except ImportError:
         "psutil not available, system resource monitoring will be disabled"
     )
 
-from .agent_lifecycle import (AgentCapability, AgentMetadata, AgentState,
-                              create_agent_metadata, create_job_provenance)
-from .task_queues import (TaskQueueInterface, create_task_queue)
+from .agent_lifecycle import (
+    AgentCapability,
+    AgentMetadata,
+    AgentState,
+    create_agent_metadata,
+    create_job_provenance,
+)
+from .task_queues import TaskQueueInterface, create_task_queue
 
 # ============================================================
 # CONSTANTS

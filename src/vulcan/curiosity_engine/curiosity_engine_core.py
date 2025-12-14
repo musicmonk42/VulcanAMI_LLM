@@ -17,9 +17,13 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import numpy as np
 
 from .dependency_graph import CycleAwareDependencyGraph, DependencyAnalyzer
-from .experiment_generator import (Experiment, ExperimentGenerator,
-                                   IterativeExperimentDesigner)
+from .experiment_generator import (
+    Experiment,
+    ExperimentGenerator,
+    IterativeExperimentDesigner,
+)
 from .exploration_budget import DynamicBudget, ResourceMonitor
+
 # Import other curiosity_engine components
 from .gap_analyzer import GapAnalyzer, KnowledgeGap
 
@@ -1479,9 +1483,9 @@ class CuriosityEngine:
                     "gaps_identified": len(gaps),
                     "experiments_run": experiments_run,
                     "successful_experiments": success_count,
-                    "success_rate": success_count / experiments_run
-                    if experiments_run > 0
-                    else 0,
+                    "success_rate": (
+                        success_count / experiments_run if experiments_run > 0 else 0
+                    ),
                     "cycle_time": cycle_time,
                     "learning_rate": self.learning_rate,
                     "budget_remaining": self.exploration_budget.get_available(),

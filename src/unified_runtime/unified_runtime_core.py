@@ -40,8 +40,7 @@ except ImportError:
     HardwareDispatcherIntegration = None
 
 try:
-    from .graph_validator import (GraphValidator, ResourceLimits,
-                                  ValidationResult)
+    from .graph_validator import GraphValidator, ResourceLimits, ValidationResult
 except ImportError:
     GraphValidator = None
     ResourceLimits = None
@@ -55,8 +54,12 @@ except ImportError:
     AIContract = None
 
 try:
-    from .execution_engine import (ExecutionContext, ExecutionEngine,
-                                   ExecutionMode, ExecutionStatus)
+    from .execution_engine import (
+        ExecutionContext,
+        ExecutionEngine,
+        ExecutionMode,
+        ExecutionStatus,
+    )
 except ImportError:
     ExecutionEngine = None
     ExecutionContext = None
@@ -447,8 +450,7 @@ class UnifiedRuntime:
         Enable VULCAN integration for this runtime
         """
         try:
-            from .vulcan_integration import \
-                enable_vulcan_integration as enable_vulcan
+            from .vulcan_integration import enable_vulcan_integration as enable_vulcan
 
             self.vulcan_bridge = enable_vulcan(self, config)
             logger.info("VULCAN integration enabled")

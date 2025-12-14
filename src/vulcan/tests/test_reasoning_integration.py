@@ -12,9 +12,9 @@ import pytest
 
 # Import from reasoning_types module
 from vulcan.reasoning.reasoning_types import ReasoningResult, ReasoningType
+
 # CORRECT IMPORTS based on actual unified_reasoning.py
-from vulcan.reasoning.unified_reasoning import (ReasoningStrategy,
-                                                UnifiedReasoner)
+from vulcan.reasoning.unified_reasoning import ReasoningStrategy, UnifiedReasoner
 
 
 class TestUnifiedReasoningIntegration:
@@ -93,9 +93,9 @@ class TestUnifiedReasoningIntegration:
         print(f"✅ Conclusion type: {type(result.conclusion).__name__}")
 
         # Verify basic properties
-        assert 0.0 <= result.confidence <= 1.0, (
-            f"Confidence {result.confidence} out of range"
-        )
+        assert (
+            0.0 <= result.confidence <= 1.0
+        ), f"Confidence {result.confidence} out of range"
 
     # =========================================================================
     # TEST 2: Different Reasoning Types
@@ -462,9 +462,9 @@ class TestUnifiedReasoningIntegration:
             "Result returned": result is not None,
             "Has conclusion": result.conclusion is not None if result else False,
             "Has confidence": (0 <= result.confidence <= 1) if result else False,
-            "Has reasoning type": result.reasoning_type is not None
-            if result
-            else False,
+            "Has reasoning type": (
+                result.reasoning_type is not None if result else False
+            ),
             "Has explanation": result.explanation is not None if result else False,
         }
 

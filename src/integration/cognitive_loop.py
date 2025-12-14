@@ -9,8 +9,17 @@ import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import (Any, AsyncGenerator, Callable, Dict, List, Optional,
-                    Sequence, Tuple, Union)
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
@@ -281,14 +290,7 @@ class CognitiveLoop:
 
         async def _generator() -> AsyncGenerator[Dict[str, Any], None]:
             # ADD generated TO nonlocal (critical fix)
-            nonlocal \
-                temperature, \
-                top_k, \
-                errors, \
-                beam_metadata, \
-                speculative_stats, \
-                safety_interventions, \
-                generated
+            nonlocal temperature, top_k, errors, beam_metadata, speculative_stats, safety_interventions, generated
 
             last_reasoning_meta: Dict[str, Any] = {}
 

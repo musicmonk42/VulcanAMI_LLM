@@ -27,12 +27,7 @@ def simple_params():
 @pytest.fixture
 def matrix_params():
     """Create matrix multiplication parameters."""
-    return {
-        "m": 4,
-        "n": 4,
-        "k": 4,
-        "output_size": (4, 4)
-    }
+    return {"m": 4, "n": 4, "k": 4, "output_size": (4, 4)}
 
 
 class TestDataType:
@@ -59,7 +54,7 @@ class TestCompiledFunction:
             llvm_func=None,
             entry_point="test_func",
             input_types=[DataType.FLOAT64],
-            output_type=DataType.FLOAT64
+            output_type=DataType.FLOAT64,
         )
 
         assert compiled.name == "test_func"
@@ -307,7 +302,7 @@ class TestCompilationOutput:
         backend.compile_node("ADD", {})
 
         # Create temporary file
-        with tempfile.NamedTemporaryFile(suffix='.o', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".o", delete=False) as f:
             output_path = f.name
 
         try:
@@ -318,6 +313,7 @@ class TestCompilationOutput:
             assert len(object_code) > 0
         finally:
             import os
+
             if os.path.exists(output_path):
                 os.unlink(output_path)
 
@@ -368,11 +364,7 @@ class TestComplexNodes:
 
     def test_compile_conv2d(self, backend):
         """Test compiling Conv2D."""
-        params = {
-            "kernel_size": 3,
-            "stride": 1,
-            "padding": 0
-        }
+        params = {"kernel_size": 3, "stride": 1, "padding": 0}
 
         compiled = backend._compile_conv2d(params)
 

@@ -4,14 +4,19 @@ Comprehensive tests for neural_safety.py module.
 Tests neural network models, validators, and safety assessment functionality.
 """
 
-from vulcan.safety.safety_types import (ActionType, SafetyReport)
-from vulcan.safety.neural_safety import (AnomalyDetector, BayesianSafetyNet,
-                                         GraphSafetyNetwork,
-                                         MemoryBoundedDeque, ModelConfig,
-                                         ModelType, NeuralSafetyValidator,
-                                         SafetyClassifier,
-                                         TransformerSafetyModel,
-                                         VariationalSafetyAutoencoder)
+from vulcan.safety.safety_types import ActionType, SafetyReport
+from vulcan.safety.neural_safety import (
+    AnomalyDetector,
+    BayesianSafetyNet,
+    GraphSafetyNetwork,
+    MemoryBoundedDeque,
+    ModelConfig,
+    ModelType,
+    NeuralSafetyValidator,
+    SafetyClassifier,
+    TransformerSafetyModel,
+    VariationalSafetyAutoencoder,
+)
 import torch.nn as nn
 import numpy as np
 from pathlib import Path

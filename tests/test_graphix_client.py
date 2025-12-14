@@ -10,6 +10,7 @@ import asyncio
 import base64
 import json
 import os
+
 # Import the client (adjust import path as needed)
 import sys
 import tempfile
@@ -24,9 +25,8 @@ import pytest_asyncio  # Add this import
 from aiohttp import web
 
 # Add the parent directory to sys.path to import from client_sdk
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from client_sdk.graphix_client import (GraphixClient, GraphixClientError,
-                                       RetryConfig)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from client_sdk.graphix_client import GraphixClient, GraphixClientError, RetryConfig
 
 
 # Test fixtures
@@ -35,10 +35,9 @@ def mock_private_key():
     """Generate a mock RSA private key."""
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives.asymmetric import rsa
+
     return rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-        backend=default_backend()
+        public_exponent=65537, key_size=2048, backend=default_backend()
     )
 
 
@@ -46,11 +45,12 @@ def mock_private_key():
 def temp_private_key_file(mock_private_key):
     """Create a temporary private key file."""
     from cryptography.hazmat.primitives import serialization
-    with tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pem') as f:
+
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as f:
         pem = mock_private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
         f.write(pem)
         temp_path = f.name
@@ -67,11 +67,9 @@ def sample_graph():
         "type": "Graph",
         "nodes": [
             {"id": "node1", "type": "InputNode", "value": "test"},
-            {"id": "node2", "type": "OutputNode"}
+            {"id": "node2", "type": "OutputNode"},
         ],
-        "edges": [
-            {"id": "e1", "from": "node1", "to": "node2", "type": "data"}
-        ]
+        "edges": [{"id": "e1", "from": "node1", "to": "node2", "type": "data"}],
     }
 
 
@@ -86,8 +84,8 @@ def mock_schema():
             "id": {"type": "string"},
             "type": {"type": "string"},
             "nodes": {"type": "array"},
-            "edges": {"type": "array"}
-        }
+            "edges": {"type": "array"},
+        },
     }
 
 
@@ -104,7 +102,9 @@ async def mock_server():
 
     async def propose_handler(request):
         data = await request.json()
-        return web.json_response({"status": "success", "proposal_id": data.get("proposal_id")})
+        return web.json_response(
+            {"status": "success", "proposal_id": data.get("proposal_id")}
+        )
 
     async def vote_handler(request):
         data = await request.json()
@@ -112,22 +112,24 @@ async def mock_server():
 
     async def execute_handler(request):
         data = await request.json()
-        return web.json_response({"status": "success", "execution_id": data.get("execution_id")})
+        return web.json_response(
+            {"status": "success", "execution_id": data.get("execution_id")}
+        )
 
     async def audit_handler(request):
         data = await request.json()
         return web.json_response({"entries": [{"id": "1", "action": "test"}]})
 
-    app.router.add_get('/health', health_handler)
-    app.router.add_get('/status', status_handler)
-    app.router.add_post('/ir/propose', propose_handler)
-    app.router.add_post('/ir/vote', vote_handler)
-    app.router.add_post('/ir/execute', execute_handler)
-    app.router.add_post('/audit/logs', audit_handler)
+    app.router.add_get("/health", health_handler)
+    app.router.add_get("/status", status_handler)
+    app.router.add_post("/ir/propose", propose_handler)
+    app.router.add_post("/ir/vote", vote_handler)
+    app.router.add_post("/ir/execute", execute_handler)
+    app.router.add_post("/audit/logs", audit_handler)
 
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, 'localhost', 8765)
+    site = web.TCPSite(runner, "localhost", 8765)
     await site.start()
 
     yield "http://localhost:8765"
@@ -167,7 +169,7 @@ class TestGraphixClientInit:
         client = GraphixClient(
             registry_endpoint="http://registry:8787/",
             executor_endpoint="http://executor:8788/",
-            audit_endpoint="http://audit:8789/"
+            audit_endpoint="http://audit:8789/",
         )
         assert client.registry_endpoint == "http://registry:8787"
         assert client.executor_endpoint == "http://executor:8788"
@@ -181,7 +183,7 @@ class TestGraphixClientInit:
 
     def test_init_with_env_api_key(self):
         """Test client initialization with environment API key."""
-        with patch.dict(os.environ, {'GRAPHIX_API_KEY': 'env-key-456'}):
+        with patch.dict(os.environ, {"GRAPHIX_API_KEY": "env-key-456"}):
             client = GraphixClient()
             assert client.api_key == "env-key-456"
 
@@ -192,7 +194,7 @@ class TestGraphixClientInit:
 
     def test_init_with_invalid_private_key(self):
         """Test client initialization with invalid private key."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.pem') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".pem") as f:
             f.write("invalid key data")
             temp_path = f.name
 
@@ -210,8 +212,8 @@ class TestGraphixClientInit:
 
     def test_schema_loading(self, mock_schema):
         """Test schema loading on initialization."""
-        with patch('builtins.open', mock_open(read_data=json.dumps(mock_schema))):
-            with patch('pathlib.Path.exists', return_value=True):
+        with patch("builtins.open", mock_open(read_data=json.dumps(mock_schema))):
+            with patch("pathlib.Path.exists", return_value=True):
                 client = GraphixClient()
                 assert client.schema is not None
 
@@ -429,11 +431,12 @@ class TestStatusEndpoint:
 # Test Graph Proposal
 class TestGraphProposal:
     @pytest.mark.asyncio
-    async def test_submit_proposal_success(self, mock_server, sample_graph, temp_private_key_file):
+    async def test_submit_proposal_success(
+        self, mock_server, sample_graph, temp_private_key_file
+    ):
         """Test successful graph proposal submission."""
         client = GraphixClient(
-            registry_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            registry_endpoint=mock_server, private_key_path=temp_private_key_file
         )
         response = await client.submit_graph_proposal(sample_graph)
         assert response["status"] == "success"
@@ -441,11 +444,12 @@ class TestGraphProposal:
         await client.close()
 
     @pytest.mark.asyncio
-    async def test_submit_proposal_validation_failure(self, mock_server, mock_schema, temp_private_key_file):
+    async def test_submit_proposal_validation_failure(
+        self, mock_server, mock_schema, temp_private_key_file
+    ):
         """Test proposal submission with validation failure."""
         client = GraphixClient(
-            registry_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            registry_endpoint=mock_server, private_key_path=temp_private_key_file
         )
         client.schema = mock_schema
         invalid_graph = {"id": "test"}
@@ -460,8 +464,7 @@ class TestVoting:
     async def test_vote_approve(self, mock_server, temp_private_key_file):
         """Test voting to approve a proposal."""
         client = GraphixClient(
-            registry_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            registry_endpoint=mock_server, private_key_path=temp_private_key_file
         )
         response = await client.vote_on_proposal("test-id", "yes", "Looks good")
         assert response["status"] == "success"
@@ -472,8 +475,7 @@ class TestVoting:
     async def test_vote_reject(self, mock_server, temp_private_key_file):
         """Test voting to reject a proposal."""
         client = GraphixClient(
-            registry_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            registry_endpoint=mock_server, private_key_path=temp_private_key_file
         )
         response = await client.vote_on_proposal("test-id", "no", "Needs work")
         assert response["status"] == "success"
@@ -492,11 +494,12 @@ class TestVoting:
 # Test Graph Execution
 class TestGraphExecution:
     @pytest.mark.asyncio
-    async def test_execute_graph_success(self, mock_server, sample_graph, temp_private_key_file):
+    async def test_execute_graph_success(
+        self, mock_server, sample_graph, temp_private_key_file
+    ):
         """Test successful graph execution."""
         client = GraphixClient(
-            executor_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            executor_endpoint=mock_server, private_key_path=temp_private_key_file
         )
         response = await client.execute_graph(sample_graph)
         assert response["status"] == "success"
@@ -509,8 +512,7 @@ class TestAuditLog:
     async def test_get_audit_log_success(self, mock_server, temp_private_key_file):
         """Test successful audit log retrieval."""
         client = GraphixClient(
-            audit_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            audit_endpoint=mock_server, private_key_path=temp_private_key_file
         )
         response = await client.get_audit_log(limit=10, offset=0)
         assert "entries" in response
@@ -521,8 +523,7 @@ class TestAuditLog:
     async def test_get_audit_log_pagination(self, mock_server, temp_private_key_file):
         """Test audit log pagination."""
         client = GraphixClient(
-            audit_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            audit_endpoint=mock_server, private_key_path=temp_private_key_file
         )
         response = await client.get_audit_log(limit=5, offset=10)
         assert "entries" in response
@@ -538,6 +539,7 @@ class TestRetryLogic:
         client.retry_config = RetryConfig(max_retries=2, base_delay=0.1, max_delay=1.0)
 
         call_count = 0
+
         async def failing_method():
             nonlocal call_count
             call_count += 1
@@ -556,6 +558,7 @@ class TestRetryLogic:
         client.retry_config = RetryConfig(max_retries=3, base_delay=0.1, max_delay=1.0)
 
         call_times = []
+
         async def failing_method():
             call_times.append(asyncio.get_event_loop().time())
             raise aiohttp.ClientError("Test error")
@@ -576,11 +579,12 @@ class TestWebSocket:
         client = GraphixClient()
 
         events_received = []
+
         async def handler(event):
             events_received.append(event)
 
         # Mock WebSocket connection
-        with patch('aiohttp.ClientSession.ws_connect') as mock_ws:
+        with patch("aiohttp.ClientSession.ws_connect") as mock_ws:
             mock_ws_obj = AsyncMock()
             mock_ws_obj.__aenter__ = AsyncMock(return_value=mock_ws_obj)
             mock_ws_obj.__aexit__ = AsyncMock()
@@ -654,13 +658,15 @@ class TestCloseAndCleanup:
 # Integration Tests
 class TestIntegration:
     @pytest.mark.asyncio
-    async def test_full_workflow(self, mock_server, sample_graph, temp_private_key_file):
+    async def test_full_workflow(
+        self, mock_server, sample_graph, temp_private_key_file
+    ):
         """Test complete workflow: health check, propose, vote, execute, audit."""
         async with GraphixClient(
             registry_endpoint=mock_server,
             executor_endpoint=mock_server,
             audit_endpoint=mock_server,
-            private_key_path=temp_private_key_file
+            private_key_path=temp_private_key_file,
         ) as client:
             # Health check
             health = await client.health_check()

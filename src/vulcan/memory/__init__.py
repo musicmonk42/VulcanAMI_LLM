@@ -3,20 +3,34 @@ VULCAN-AGI Memory Module
 Hierarchical, distributed memory with multiple specialized types
 """
 
-from .base import (Memory, MemoryConfig, MemoryException, MemoryQuery,
-                   MemoryStats, MemoryType)
-from .consolidation import (ConsolidationStrategy, MemoryConsolidator,
-                            MemoryOptimizer)
-from .distributed import (ConsistencyLevel, DistributedMemory,
-                          MemoryFederation, MemoryNode)
+from .base import (
+    Memory,
+    MemoryConfig,
+    MemoryException,
+    MemoryQuery,
+    MemoryStats,
+    MemoryType,
+)
+from .consolidation import ConsolidationStrategy, MemoryConsolidator, MemoryOptimizer
+from .distributed import (
+    ConsistencyLevel,
+    DistributedMemory,
+    MemoryFederation,
+    MemoryNode,
+)
 from .hierarchical import HierarchicalMemory, MemoryLevel
-from .persistence import (CompressionType, MemoryPersistence,
-                          MemoryVersionControl)
-from .retrieval import (AttentionMechanism, MemoryIndex, MemorySearch,
-                        RetrievalResult)
-from .specialized import (Concept, Episode, EpisodicMemory, ProceduralMemory,
-                          SemanticMemory, Skill, WorkingMemory,
-                          WorkingMemoryBuffer)
+from .persistence import CompressionType, MemoryPersistence, MemoryVersionControl
+from .retrieval import AttentionMechanism, MemoryIndex, MemorySearch, RetrievalResult
+from .specialized import (
+    Concept,
+    Episode,
+    EpisodicMemory,
+    ProceduralMemory,
+    SemanticMemory,
+    Skill,
+    WorkingMemory,
+    WorkingMemoryBuffer,
+)
 
 __all__ = [
     # Base

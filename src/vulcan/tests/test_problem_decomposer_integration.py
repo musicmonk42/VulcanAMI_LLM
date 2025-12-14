@@ -216,12 +216,28 @@ ExecutionPlan = DecompositionPlan
 # Strategy aliases
 
 
-def ExactDecomposition(): return MockStrategy("exact")
-def SemanticDecomposition(): return MockStrategy("semantic")
-def StructuralDecomposition(): return MockStrategy("structural")
-def SyntheticBridging(): return MockStrategy("synthetic")
-def AnalogicalDecomposition(): return MockStrategy("analogical")
-def BruteForceSearch(): return MockStrategy("brute_force")
+def ExactDecomposition():
+    return MockStrategy("exact")
+
+
+def SemanticDecomposition():
+    return MockStrategy("semantic")
+
+
+def StructuralDecomposition():
+    return MockStrategy("structural")
+
+
+def SyntheticBridging():
+    return MockStrategy("synthetic")
+
+
+def AnalogicalDecomposition():
+    return MockStrategy("analogical")
+
+
+def BruteForceSearch():
+    return MockStrategy("brute_force")
 
 
 # ============================================================================

@@ -38,13 +38,22 @@ class MetaLearningAlgorithm(Enum):
 # Assuming src.vulcan.learning is in the path
 try:
     from src.vulcan.config import EMBEDDING_DIM
-    from src.vulcan.learning import (CurriculumLearner,
-                                     EnhancedContinualLearner, FeedbackData,
-                                     LearningConfig, LearningMode,
-                                     MetaCognitiveMonitor, MetaLearner,
-                                     PacingStrategy, ParameterHistoryManager,
-                                     PlanningAlgorithm, RLHFManager, TaskInfo,
-                                     UnifiedLearningSystem, UnifiedWorldModel)
+    from src.vulcan.learning import (
+        CurriculumLearner,
+        EnhancedContinualLearner,
+        FeedbackData,
+        LearningConfig,
+        LearningMode,
+        MetaCognitiveMonitor,
+        MetaLearner,
+        PacingStrategy,
+        ParameterHistoryManager,
+        PlanningAlgorithm,
+        RLHFManager,
+        TaskInfo,
+        UnifiedLearningSystem,
+        UnifiedWorldModel,
+    )
 except ImportError:
     # Fallback for environment where src is not in path
     print("Warning: Could not import from src.vulcan.learning. Check PYTHONPATH.")

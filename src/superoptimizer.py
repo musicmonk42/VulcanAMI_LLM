@@ -73,15 +73,12 @@ class SuperoptimizerError(Exception):
     """Base exception for superoptimizer errors."""
 
 
-
 class KernelGenerationError(SuperoptimizerError):
     """Raised when kernel generation fails."""
 
 
-
 class ValidationError(SuperoptimizerError):
     """Raised when kernel validation fails."""
-
 
 
 class Superoptimizer:

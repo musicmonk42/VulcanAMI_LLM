@@ -51,7 +51,9 @@ class Individual:
     mutations: List[str] = field(default_factory=list)
     parent_ids: List[str] = field(default_factory=list)
     id: str = field(
-        default_factory=lambda: hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8]
+        default_factory=lambda: hashlib.md5(
+            str(time.time()).encode(), usedforsecurity=False
+        ).hexdigest()[:8]
     )
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -1226,9 +1228,9 @@ class EvolutionEngine:
         with self.lock:
             return {
                 "generation": self.generation,
-                "best_fitness": self.best_individual.fitness
-                if self.best_individual
-                else 0,
+                "best_fitness": (
+                    self.best_individual.fitness if self.best_individual else 0
+                ),
                 "population_size": len(self.population),
                 "diversity": self._calculate_diversity(),
                 "cache_stats": self.get_cache_stats(),
@@ -1269,15 +1271,17 @@ class EvolutionEngine:
                         }
                         for ind in self.population
                     ],
-                    "best_individual": {
-                        "graph": self.best_individual.graph,
-                        "fitness": self.best_individual.fitness,
-                        "generation": self.best_individual.generation,
-                        "id": self.best_individual.id,
-                        "metadata": self.best_individual.metadata,
-                    }
-                    if self.best_individual
-                    else None,
+                    "best_individual": (
+                        {
+                            "graph": self.best_individual.graph,
+                            "fitness": self.best_individual.fitness,
+                            "generation": self.best_individual.generation,
+                            "id": self.best_individual.id,
+                            "metadata": self.best_individual.metadata,
+                        }
+                        if self.best_individual
+                        else None
+                    ),
                     "config": {
                         "population_size": self.population_size,
                         "mutation_rate": self.mutation_rate,
@@ -1345,7 +1349,9 @@ class EvolutionEngine:
                             parent_ids=ind_data.get("parent_ids", []),
                             id=ind_data.get(
                                 "id",
-                                hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8],
+                                hashlib.md5(
+                                    str(time.time()).encode(), usedforsecurity=False
+                                ).hexdigest()[:8],
                             ),
                             metadata=ind_data.get("metadata", {}),
                         )
@@ -1360,7 +1366,9 @@ class EvolutionEngine:
                             generation=best_data["generation"],
                             id=best_data.get(
                                 "id",
-                                hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8],
+                                hashlib.md5(
+                                    str(time.time()).encode(), usedforsecurity=False
+                                ).hexdigest()[:8],
                             ),
                             metadata=best_data.get("metadata", {}),
                         )

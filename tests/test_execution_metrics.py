@@ -23,6 +23,7 @@ import unified_runtime.execution_metrics as em
 # Helpers
 # -----------------------------------------------------------------------------
 
+
 def approx_equal(a: float, b: float, tol: float = 1e-6) -> bool:
     """Tiny helper for float comparisons that shouldn't require pytest.approx everywhere."""
     return abs(a - b) <= tol
@@ -31,6 +32,7 @@ def approx_equal(a: float, b: float, tol: float = 1e-6) -> bool:
 # -----------------------------------------------------------------------------
 # NodeExecutionStats tests
 # -----------------------------------------------------------------------------
+
 
 class TestNodeExecutionStats:
     def test_creation_defaults_and_finalize(self):
@@ -91,6 +93,7 @@ class TestNodeExecutionStats:
 # -----------------------------------------------------------------------------
 # ExecutionMetrics tests
 # -----------------------------------------------------------------------------
+
 
 class TestExecutionMetrics:
     def test_initial_state(self):
@@ -284,12 +287,21 @@ class TestExecutionMetrics:
 
         # The dict must contain all of these top-level keys
         for key in [
-            "cache_hits", "cache_misses", "cache_hit_rate",
-            "nodes_executed", "nodes_succeeded", "nodes_failed", "success_rate",
-            "total_latency_ms", "avg_latency_per_node_ms", "throughput_nodes_per_sec",
+            "cache_hits",
+            "cache_misses",
+            "cache_hit_rate",
+            "nodes_executed",
+            "nodes_succeeded",
+            "nodes_failed",
+            "success_rate",
+            "total_latency_ms",
+            "avg_latency_per_node_ms",
+            "throughput_nodes_per_sec",
             "execution_count",
-            "graph_start_ms", "graph_end_ms",
-            "resource_start", "resource_end",
+            "graph_start_ms",
+            "graph_end_ms",
+            "resource_start",
+            "resource_end",
             "metadata",
             "node_details",
         ]:
@@ -347,6 +359,7 @@ class TestExecutionMetrics:
 # -----------------------------------------------------------------------------
 # MetricsAggregator tests
 # -----------------------------------------------------------------------------
+
 
 class TestMetricsAggregator:
     def test_initial_state(self):
@@ -495,6 +508,7 @@ class TestMetricsAggregator:
 # psutil / resource snapshot behavior
 # -----------------------------------------------------------------------------
 
+
 class TestResourceSnapshotBehavior:
     def test_collect_resource_snapshot_without_psutil(self, monkeypatch):
         """
@@ -554,6 +568,7 @@ class TestResourceSnapshotBehavior:
 # -----------------------------------------------------------------------------
 # _safe_div tests
 # -----------------------------------------------------------------------------
+
 
 class TestSafeDiv:
     def test_safe_div_normal(self):

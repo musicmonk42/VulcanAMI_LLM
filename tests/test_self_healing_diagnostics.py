@@ -18,24 +18,24 @@ def test_worldmodel_has_required_methods():
     from vulcan.world_model.world_model_core import WorldModel
 
     required_methods = [
-        '_handle_improvement_alert',
-        '_check_improvement_approval',
-        'start_autonomous_improvement',
-        'stop_autonomous_improvement',
-        'get_improvement_status',
-        'report_error',
-        'update_performance_metric',
-        '_execute_improvement',
-        '_build_improvement_context'
+        "_handle_improvement_alert",
+        "_check_improvement_approval",
+        "start_autonomous_improvement",
+        "stop_autonomous_improvement",
+        "get_improvement_status",
+        "report_error",
+        "update_performance_metric",
+        "_execute_improvement",
+        "_build_improvement_context",
     ]
 
     for method_name in required_methods:
-        assert hasattr(WorldModel, method_name), \
-            f"WorldModel missing required method: {method_name}"
+        assert hasattr(
+            WorldModel, method_name
+        ), f"WorldModel missing required method: {method_name}"
 
         method = getattr(WorldModel, method_name)
-        assert callable(method), \
-            f"{method_name} exists but is not callable"
+        assert callable(method), f"{method_name} exists but is not callable"
 
     print("✓ All required methods exist and are callable")
 
@@ -56,8 +56,11 @@ def test_validate_self_healing_setup():
 def test_diagnostic_functions_callable():
     """Test that diagnostic functions are callable"""
     from vulcan.world_model.world_model_core import (
-        print_diagnostics, print_self_healing_diagnostics,
-        validate_component_installation, validate_self_healing_setup)
+        print_diagnostics,
+        print_self_healing_diagnostics,
+        validate_component_installation,
+        validate_self_healing_setup,
+    )
 
     # Test validate_self_healing_setup
     is_working, issues = validate_self_healing_setup()
@@ -93,23 +96,29 @@ def test_method_signatures():
     from vulcan.world_model.world_model_core import WorldModel
 
     # Test _handle_improvement_alert signature
-    method = getattr(WorldModel, '_handle_improvement_alert')
+    method = getattr(WorldModel, "_handle_improvement_alert")
     sig = inspect.signature(method)
     params = list(sig.parameters.keys())
 
     # Should have: self, severity, alert_data
-    assert 'self' in params, "_handle_improvement_alert missing 'self' parameter"
-    assert 'severity' in params, "_handle_improvement_alert missing 'severity' parameter"
-    assert 'alert_data' in params, "_handle_improvement_alert missing 'alert_data' parameter"
+    assert "self" in params, "_handle_improvement_alert missing 'self' parameter"
+    assert (
+        "severity" in params
+    ), "_handle_improvement_alert missing 'severity' parameter"
+    assert (
+        "alert_data" in params
+    ), "_handle_improvement_alert missing 'alert_data' parameter"
 
     # Test _check_improvement_approval signature
-    method = getattr(WorldModel, '_check_improvement_approval')
+    method = getattr(WorldModel, "_check_improvement_approval")
     sig = inspect.signature(method)
     params = list(sig.parameters.keys())
 
     # Should have: self, approval_id
-    assert 'self' in params, "_check_improvement_approval missing 'self' parameter"
-    assert 'approval_id' in params, "_check_improvement_approval missing 'approval_id' parameter"
+    assert "self" in params, "_check_improvement_approval missing 'self' parameter"
+    assert (
+        "approval_id" in params
+    ), "_check_improvement_approval missing 'approval_id' parameter"
 
     print("✓ Method signatures are correct")
 

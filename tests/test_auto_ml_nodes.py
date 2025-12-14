@@ -7,15 +7,22 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-from auto_ml_nodes import (MAX_KERNEL_LENGTH, MAX_SPACE_DIMENSIONS,
-                           MAX_TENSOR_SIZE, OPTUNA_AVAILABLE, HyperParamNode,
-                           RandomNode, SearchNode, dispatch_auto_ml_node)
+from auto_ml_nodes import (
+    MAX_KERNEL_LENGTH,
+    MAX_SPACE_DIMENSIONS,
+    MAX_TENSOR_SIZE,
+    OPTUNA_AVAILABLE,
+    HyperParamNode,
+    RandomNode,
+    SearchNode,
+    dispatch_auto_ml_node,
+)
 
 
 @pytest.fixture
 def context():
     """Create execution context."""
-    return {'audit_log': []}
+    return {"audit_log": []}
 
 
 class TestRandomNode:
@@ -25,54 +32,42 @@ class TestRandomNode:
         """Test uniform distribution."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'uniform',
-            'range': [0.0, 1.0]
-        }
+        params = {"distribution": "uniform", "range": [0.0, 1.0]}
 
         result = node.execute(params, context)
 
-        assert 'value' in result
-        assert 0.0 <= result['value'] <= 1.0
-        assert result['distribution'] == 'uniform'
-        assert len(context['audit_log']) == 1
+        assert "value" in result
+        assert 0.0 <= result["value"] <= 1.0
+        assert result["distribution"] == "uniform"
+        assert len(context["audit_log"]) == 1
 
     def test_normal_distribution(self, context):
         """Test normal distribution."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'normal',
-            'range': [0.0, 1.0]  # mean, std
-        }
+        params = {"distribution": "normal", "range": [0.0, 1.0]}  # mean, std
 
         result = node.execute(params, context)
 
-        assert 'value' in result
-        assert result['distribution'] == 'normal'
+        assert "value" in result
+        assert result["distribution"] == "normal"
 
     def test_discrete_distribution(self, context):
         """Test discrete distribution."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'discrete',
-            'range': [1, 2, 3, 4, 5]
-        }
+        params = {"distribution": "discrete", "range": [1, 2, 3, 4, 5]}
 
         result = node.execute(params, context)
 
-        assert 'value' in result
-        assert result['value'] in [1, 2, 3, 4, 5]
+        assert "value" in result
+        assert result["value"] in [1, 2, 3, 4, 5]
 
     def test_invalid_distribution(self, context):
         """Test invalid distribution raises error."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'invalid',
-            'range': [0.0, 1.0]
-        }
+        params = {"distribution": "invalid", "range": [0.0, 1.0]}
 
         with pytest.raises(ValueError, match="Unsupported distribution"):
             node.execute(params, context)
@@ -81,10 +76,7 @@ class TestRandomNode:
         """Test invalid range raises error."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'uniform',
-            'range': [0.0]  # Too short
-        }
+        params = {"distribution": "uniform", "range": [0.0]}  # Too short
 
         with pytest.raises(ValueError, match="Range must be"):
             node.execute(params, context)
@@ -94,15 +86,15 @@ class TestRandomNode:
         node = RandomNode()
 
         params = {
-            'distribution': 'uniform',
-            'range': [0.0, 1.0],
-            'tensor': [[0.1, 0.2], [0.3, 0.4]]
+            "distribution": "uniform",
+            "range": [0.0, 1.0],
+            "tensor": [[0.1, 0.2], [0.3, 0.4]],
         }
 
         result = node.execute(params, context)
 
-        assert 'value' in result
-        assert 'compression_meta' in result
+        assert "value" in result
+        assert "compression_meta" in result
 
     def test_tensor_too_large(self, context):
         """Test tensor size validation."""
@@ -111,9 +103,9 @@ class TestRandomNode:
         large_tensor = np.ones(MAX_TENSOR_SIZE + 1)
 
         params = {
-            'distribution': 'uniform',
-            'range': [0.0, 1.0],
-            'tensor': large_tensor
+            "distribution": "uniform",
+            "range": [0.0, 1.0],
+            "tensor": large_tensor,
         }
 
         with pytest.raises(ValueError, match="Tensor too large"):
@@ -124,24 +116,21 @@ class TestRandomNode:
         node = RandomNode()
 
         params = {
-            'distribution': 'uniform',
-            'range': [0.0, 1.0],
-            'ethical_label': 'EU2025:Safe'
+            "distribution": "uniform",
+            "range": [0.0, 1.0],
+            "ethical_label": "EU2025:Safe",
         }
 
         result = node.execute(params, context)
 
-        assert result['ethical_label'] == 'EU2025:Safe'
-        assert result['audit']['ethical_label'] == 'EU2025:Safe'
+        assert result["ethical_label"] == "EU2025:Safe"
+        assert result["audit"]["ethical_label"] == "EU2025:Safe"
 
     def test_normal_negative_std(self, context):
         """Test normal distribution with negative std."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'normal',
-            'range': [0.0, -1.0]
-        }
+        params = {"distribution": "normal", "range": [0.0, -1.0]}
 
         with pytest.raises(ValueError, match="Standard deviation must be positive"):
             node.execute(params, context)
@@ -155,28 +144,22 @@ class TestHyperParamNode:
         node = HyperParamNode()
 
         params = {
-            'space': {
-                'learning_rate': [0.001, 0.1],
-                'dropout': [0.1, 0.5]
-            },
-            'strategy': 'grid'
+            "space": {"learning_rate": [0.001, 0.1], "dropout": [0.1, 0.5]},
+            "strategy": "grid",
         }
 
         result = node.execute(params, context)
 
-        assert result['dimensions'] == 2
-        assert result['strategy'] == 'grid'
-        assert 'search_space' in result
-        assert len(context['audit_log']) == 1
+        assert result["dimensions"] == 2
+        assert result["strategy"] == "grid"
+        assert "search_space" in result
+        assert len(context["audit_log"]) == 1
 
     def test_empty_space(self, context):
         """Test empty search space raises error."""
         node = HyperParamNode()
 
-        params = {
-            'space': {},
-            'strategy': 'grid'
-        }
+        params = {"space": {}, "strategy": "grid"}
 
         with pytest.raises(ValueError, match="Invalid or empty search space"):
             node.execute(params, context)
@@ -186,10 +169,8 @@ class TestHyperParamNode:
         node = HyperParamNode()
 
         params = {
-            'space': {
-                'learning_rate': [0.001]  # Only one value
-            },
-            'strategy': 'grid'
+            "space": {"learning_rate": [0.001]},  # Only one value
+            "strategy": "grid",
         }
 
         with pytest.raises(ValueError, match="Invalid range"):
@@ -200,10 +181,8 @@ class TestHyperParamNode:
         node = HyperParamNode()
 
         params = {
-            'space': {
-                'learning_rate': [0.1, 0.001]  # min > max
-            },
-            'strategy': 'grid'
+            "space": {"learning_rate": [0.1, 0.001]},  # min > max
+            "strategy": "grid",
         }
 
         with pytest.raises(ValueError, match="min must be < max"):
@@ -213,12 +192,9 @@ class TestHyperParamNode:
         """Test too many dimensions."""
         node = HyperParamNode()
 
-        space = {f'param{i}': [0, 1] for i in range(MAX_SPACE_DIMENSIONS + 1)}
+        space = {f"param{i}": [0, 1] for i in range(MAX_SPACE_DIMENSIONS + 1)}
 
-        params = {
-            'space': space,
-            'strategy': 'grid'
-        }
+        params = {"space": space, "strategy": "grid"}
 
         with pytest.raises(ValueError, match="Too many dimensions"):
             node.execute(params, context)
@@ -227,10 +203,7 @@ class TestHyperParamNode:
         """Test invalid strategy."""
         node = HyperParamNode()
 
-        params = {
-            'space': {'lr': [0.001, 0.1]},
-            'strategy': 'invalid_strategy'
-        }
+        params = {"space": {"lr": [0.001, 0.1]}, "strategy": "invalid_strategy"}
 
         with pytest.raises(ValueError, match="Invalid strategy"):
             node.execute(params, context)
@@ -239,17 +212,14 @@ class TestHyperParamNode:
         """Test search space stored in context."""
         node = HyperParamNode()
 
-        space = {'learning_rate': [0.001, 0.1]}
+        space = {"learning_rate": [0.001, 0.1]}
 
-        params = {
-            'space': space,
-            'strategy': 'bayesian'
-        }
+        params = {"space": space, "strategy": "bayesian"}
 
         node.execute(params, context)
 
-        assert context['search_space'] == space
-        assert context['search_strategy'] == 'bayesian'
+        assert context["search_space"] == space
+        assert context["search_strategy"] == "bayesian"
 
 
 class TestSearchNode:
@@ -260,32 +230,25 @@ class TestSearchNode:
         node = SearchNode()
 
         params = {
-            'algorithm': 'bayesian',
-            'objective': 'accuracy',
-            'space': {
-                'learning_rate': [0.001, 0.1],
-                'dropout': [0.1, 0.5]
-            },
-            'n_trials': 5
+            "algorithm": "bayesian",
+            "objective": "accuracy",
+            "space": {"learning_rate": [0.001, 0.1], "dropout": [0.1, 0.5]},
+            "n_trials": 5,
         }
 
         result = node.execute(params, context)
 
-        assert 'optimal_params' in result
-        assert 'objective_value' in result
-        assert result['algorithm'] == 'bayesian'
-        assert result['n_trials'] == 5
-        assert len(context['audit_log']) == 1
+        assert "optimal_params" in result
+        assert "objective_value" in result
+        assert result["algorithm"] == "bayesian"
+        assert result["n_trials"] == 5
+        assert len(context["audit_log"]) == 1
 
     def test_no_search_space(self, context):
         """Test search without space raises error."""
         node = SearchNode()
 
-        params = {
-            'algorithm': 'bayesian',
-            'objective': 'accuracy',
-            'n_trials': 5
-        }
+        params = {"algorithm": "bayesian", "objective": "accuracy", "n_trials": 5}
 
         with pytest.raises(ValueError, match="No search space provided"):
             node.execute(params, context)
@@ -294,10 +257,7 @@ class TestSearchNode:
         """Test invalid n_trials."""
         node = SearchNode()
 
-        params = {
-            'space': {'lr': [0.001, 0.1]},
-            'n_trials': -1
-        }
+        params = {"space": {"lr": [0.001, 0.1]}, "n_trials": -1}
 
         with pytest.raises(ValueError, match="positive integer"):
             node.execute(params, context)
@@ -306,10 +266,7 @@ class TestSearchNode:
         """Test n_trials too large."""
         node = SearchNode()
 
-        params = {
-            'space': {'lr': [0.001, 0.1]},
-            'n_trials': 2000
-        }
+        params = {"space": {"lr": [0.001, 0.1]}, "n_trials": 2000}
 
         with pytest.raises(ValueError, match="too large"):
             node.execute(params, context)
@@ -319,23 +276,23 @@ class TestSearchNode:
         node = SearchNode()
 
         params = {
-            'space': {'lr': [0.001, 0.1]},
-            'n_trials': 5,
-            'kernel': 'def optimize(): return 1.0'
+            "space": {"lr": [0.001, 0.1]},
+            "n_trials": 5,
+            "kernel": "def optimize(): return 1.0",
         }
 
         result = node.execute(params, context)
 
-        assert 'kernel_audit' in result
+        assert "kernel_audit" in result
 
     def test_kernel_too_long(self, context):
         """Test kernel length validation."""
         node = SearchNode()
 
         params = {
-            'space': {'lr': [0.001, 0.1]},
-            'n_trials': 5,
-            'kernel': 'x' * (MAX_KERNEL_LENGTH + 1)
+            "space": {"lr": [0.001, 0.1]},
+            "n_trials": 5,
+            "kernel": "x" * (MAX_KERNEL_LENGTH + 1),
         }
 
         with pytest.raises(ValueError, match="Kernel too long"):
@@ -345,10 +302,7 @@ class TestSearchNode:
         """Test invalid space type."""
         node = SearchNode()
 
-        params = {
-            'space': "not a dict",
-            'n_trials': 5
-        }
+        params = {"space": "not a dict", "n_trials": 5}
 
         with pytest.raises(ValueError, match="must be a dictionary"):
             node.execute(params, context)
@@ -358,16 +312,12 @@ class TestSearchNode:
         """Test Optuna integration when available."""
         node = SearchNode()
 
-        params = {
-            'algorithm': 'bayesian',
-            'space': {'lr': [0.001, 0.1]},
-            'n_trials': 3
-        }
+        params = {"algorithm": "bayesian", "space": {"lr": [0.001, 0.1]}, "n_trials": 3}
 
         result = node.execute(params, context)
 
-        assert result['optimal_params'] is not None
-        assert 'lr' in result['optimal_params']
+        assert result["optimal_params"] is not None
+        assert "lr" in result["optimal_params"]
 
 
 class TestDispatchFunction:
@@ -376,51 +326,39 @@ class TestDispatchFunction:
     def test_dispatch_random_node(self, context):
         """Test dispatching to RandomNode."""
         node = {
-            'type': 'RandomNode',
-            'params': {
-                'distribution': 'uniform',
-                'range': [0.0, 1.0]
-            }
+            "type": "RandomNode",
+            "params": {"distribution": "uniform", "range": [0.0, 1.0]},
         }
 
         result = dispatch_auto_ml_node(node, context)
 
-        assert 'value' in result
+        assert "value" in result
 
     def test_dispatch_hyperparam_node(self, context):
         """Test dispatching to HyperParamNode."""
         node = {
-            'type': 'HyperParamNode',
-            'params': {
-                'space': {'lr': [0.001, 0.1]},
-                'strategy': 'grid'
-            }
+            "type": "HyperParamNode",
+            "params": {"space": {"lr": [0.001, 0.1]}, "strategy": "grid"},
         }
 
         result = dispatch_auto_ml_node(node, context)
 
-        assert 'search_space' in result
+        assert "search_space" in result
 
     def test_dispatch_search_node(self, context):
         """Test dispatching to SearchNode."""
         node = {
-            'type': 'SearchNode',
-            'params': {
-                'space': {'lr': [0.001, 0.1]},
-                'n_trials': 3
-            }
+            "type": "SearchNode",
+            "params": {"space": {"lr": [0.001, 0.1]}, "n_trials": 3},
         }
 
         result = dispatch_auto_ml_node(node, context)
 
-        assert 'optimal_params' in result
+        assert "optimal_params" in result
 
     def test_dispatch_unknown_node(self, context):
         """Test dispatching to unknown node type."""
-        node = {
-            'type': 'UnknownNode',
-            'params': {}
-        }
+        node = {"type": "UnknownNode", "params": {}}
 
         with pytest.raises(ValueError, match="Unknown AutoML node type"):
             dispatch_auto_ml_node(node, context)
@@ -428,28 +366,28 @@ class TestDispatchFunction:
     def test_dispatch_with_tensor(self, context):
         """Test dispatch with tensor in node."""
         node = {
-            'type': 'RandomNode',
-            'params': {'distribution': 'uniform', 'range': [0, 1]},
-            'tensor': [[0.1, 0.2]]
+            "type": "RandomNode",
+            "params": {"distribution": "uniform", "range": [0, 1]},
+            "tensor": [[0.1, 0.2]],
         }
 
         result = dispatch_auto_ml_node(node, context)
 
-        assert 'compression_meta' in result
+        assert "compression_meta" in result
 
     def test_context_initialization(self):
         """Test context audit log initialization."""
         context = {}
 
         node = {
-            'type': 'RandomNode',
-            'params': {'distribution': 'uniform', 'range': [0, 1]}
+            "type": "RandomNode",
+            "params": {"distribution": "uniform", "range": [0, 1]},
         }
 
         dispatch_auto_ml_node(node, context)
 
-        assert 'audit_log' in context
-        assert len(context['audit_log']) > 0
+        assert "audit_log" in context
+        assert len(context["audit_log"]) > 0
 
 
 class TestAuditLogging:
@@ -459,53 +397,47 @@ class TestAuditLogging:
         """Test audit log entry created."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'uniform',
-            'range': [0.0, 1.0]
-        }
+        params = {"distribution": "uniform", "range": [0.0, 1.0]}
 
         node.execute(params, context)
 
-        assert len(context['audit_log']) == 1
-        assert context['audit_log'][0]['node_type'] == 'RandomNode'
-        assert context['audit_log'][0]['status'] == 'success'
+        assert len(context["audit_log"]) == 1
+        assert context["audit_log"][0]["node_type"] == "RandomNode"
+        assert context["audit_log"][0]["status"] == "success"
 
     def test_audit_on_error(self, context):
         """Test audit log on error."""
         node = RandomNode()
 
-        params = {
-            'distribution': 'invalid',
-            'range': [0.0, 1.0]
-        }
+        params = {"distribution": "invalid", "range": [0.0, 1.0]}
 
         try:
             node.execute(params, context)
         except:
             pass
 
-        assert len(context['audit_log']) == 1
-        assert context['audit_log'][0]['status'] == 'error'
-        assert 'error' in context['audit_log'][0]
+        assert len(context["audit_log"]) == 1
+        assert context["audit_log"][0]["status"] == "error"
+        assert "error" in context["audit_log"][0]
 
     def test_multiple_nodes_audit(self, context):
         """Test audit log accumulation."""
         node1 = {
-            'type': 'RandomNode',
-            'params': {'distribution': 'uniform', 'range': [0, 1]}
+            "type": "RandomNode",
+            "params": {"distribution": "uniform", "range": [0, 1]},
         }
 
         node2 = {
-            'type': 'HyperParamNode',
-            'params': {'space': {'lr': [0.001, 0.1]}, 'strategy': 'grid'}
+            "type": "HyperParamNode",
+            "params": {"space": {"lr": [0.001, 0.1]}, "strategy": "grid"},
         }
 
         dispatch_auto_ml_node(node1, context)
         dispatch_auto_ml_node(node2, context)
 
-        assert len(context['audit_log']) == 2
-        assert context['audit_log'][0]['node_type'] == 'RandomNode'
-        assert context['audit_log'][1]['node_type'] == 'HyperParamNode'
+        assert len(context["audit_log"]) == 2
+        assert context["audit_log"][0]["node_type"] == "RandomNode"
+        assert context["audit_log"][1]["node_type"] == "HyperParamNode"
 
 
 if __name__ == "__main__":

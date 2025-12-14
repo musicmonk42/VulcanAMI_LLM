@@ -3,15 +3,21 @@ Comprehensive test suite for StochasticCostModel.
 Tests EWMA tracking, ML predictions, online learning, and adapter interfaces.
 """
 
-from vulcan.reasoning.selection.cost_model import (EWMA, LGBM_AVAILABLE,
-                                                   SKLEARN_AVAILABLE,
-                                                   ContextMode,
-                                                   CostComponent, CostEstimate,
-                                                   CostModel, ExecutionRecord,
-                                                   FeatureExtractor,
-                                                   StochasticCostModel,
-                                                   get_cost_model)
+from vulcan.reasoning.selection.cost_model import (
+    EWMA,
+    LGBM_AVAILABLE,
+    SKLEARN_AVAILABLE,
+    ContextMode,
+    CostComponent,
+    CostEstimate,
+    CostModel,
+    ExecutionRecord,
+    FeatureExtractor,
+    StochasticCostModel,
+    get_cost_model,
+)
 import shutil
+
 # Import the module under test
 import sys
 import tempfile

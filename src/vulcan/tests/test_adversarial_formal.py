@@ -4,11 +4,14 @@ Comprehensive test suite for adversarial validation and formal verification.
 Tests AdversarialValidator and FormalVerifier classes.
 """
 
-from vulcan.safety.safety_types import (ActionType, SafetyReport,
-                                        SafetyViolationType)
-from vulcan.safety.adversarial_formal import (AdversarialValidator,
-                                              AttackConfig, AttackType,
-                                              FormalVerifier, timeout)
+from vulcan.safety.safety_types import ActionType, SafetyReport, SafetyViolationType
+from vulcan.safety.adversarial_formal import (
+    AdversarialValidator,
+    AttackConfig,
+    AttackType,
+    FormalVerifier,
+    timeout,
+)
 import copy
 import time
 

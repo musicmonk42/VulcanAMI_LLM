@@ -13,7 +13,7 @@ Tests cover:
 - Edge cases and error handling
 """
 
-from explainable_generation import (ExplainableGeneration, ExplanationLevel)
+from explainable_generation import ExplainableGeneration, ExplanationLevel
 import sys
 import unittest
 from unittest.mock import Mock
@@ -488,12 +488,14 @@ class TestExplanationFormats(unittest.TestCase):
                     serializable[key] = value.value
                 elif isinstance(value, list):
                     serializable[key] = [
-                        {
-                            k: v.value if hasattr(v, "value") else v
-                            for k, v in item.items()
-                        }
-                        if isinstance(item, dict)
-                        else item
+                        (
+                            {
+                                k: v.value if hasattr(v, "value") else v
+                                for k, v in item.items()
+                            }
+                            if isinstance(item, dict)
+                            else item
+                        )
                         for item in value
                     ]
                 else:

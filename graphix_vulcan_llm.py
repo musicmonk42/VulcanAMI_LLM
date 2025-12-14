@@ -21,13 +21,21 @@ import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
-from typing import (Any, AsyncIterator, Callable, Dict, Iterator, List,
-                    Optional, Sequence, Union)
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Union,
+)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -37,8 +45,11 @@ logger = logging.getLogger(__name__)
 
 # Transformer Core
 try:
-    from src.llm_core.graphix_transformer import (GraphixTransformer,
-                                                  GraphixTransformerConfig)
+    from src.llm_core.graphix_transformer import (
+        GraphixTransformer,
+        GraphixTransformerConfig,
+    )
+
     logger.info("✓ GraphixTransformer loaded successfully")
 except Exception as e:
     logger.warning(f"GraphixTransformer import failed: {e}, using fallback")
@@ -58,7 +69,9 @@ except Exception as e:
     class GraphixTransformer:
         def __init__(self, config=None, **kwargs):
             self.config = config or GraphixTransformerConfig()
-            logger.info(f"Initialized fallback transformer: {self.config.vocab_size} vocab, {self.config.hidden_size}d")
+            logger.info(
+                f"Initialized fallback transformer: {self.config.vocab_size} vocab, {self.config.hidden_size}d"
+            )
             self._vocab = list(range(self.config.vocab_size))
             self._eos_token_id = 50256
 
@@ -66,14 +79,20 @@ except Exception as e:
             batch_size = 1
             seq_len = len(tokens) if tokens else 1
             hidden_dim = self.config.hidden_size
-            hidden_states = [[0.01 * (i % 100) for i in range(hidden_dim)] for _ in range(seq_len)]
+            hidden_states = [
+                [0.01 * (i % 100) for i in range(hidden_dim)] for _ in range(seq_len)
+            ]
             return {
                 "hidden_states": hidden_states,
-                "last_hidden_state": hidden_states[-1] if hidden_states else [0.0] * hidden_dim,
-                "attention_mask": [1] * seq_len
+                "last_hidden_state": (
+                    hidden_states[-1] if hidden_states else [0.0] * hidden_dim
+                ),
+                "attention_mask": [1] * seq_len,
             }
 
-        def get_logits(self, hidden_state: List[float], tokens: List[int]) -> List[float]:
+        def get_logits(
+            self, hidden_state: List[float], tokens: List[int]
+        ) -> List[float]:
             vocab_size = self.config.vocab_size
             logits = [0.0] * vocab_size
             if tokens:
@@ -93,6 +112,7 @@ except Exception as e:
             sum_exp = sum(exp_logits)
             probs = [e / sum_exp for e in exp_logits]
             import random
+
             r = random.random()
             cumsum = 0.0
             for i, p in enumerate(probs):
@@ -110,22 +130,23 @@ except Exception as e:
         def __call__(self, batch: Dict[str, Any]) -> float:
             return 0.05 + (hash(str(batch)) % 100) * 0.001
 
+
 # Bridge Integration
 try:
     from src.integration.graphix_vulcan_bridge import GraphixVulcanBridge
+
     logger.info("✓ GraphixVulcanBridge loaded successfully")
 except Exception as e:
     logger.warning(f"GraphixVulcanBridge import failed: {e}, using fallback")
 
     class GraphixVulcanBridge:
         def __init__(self):
-            self.world_model = type("WorldModel", (), {
-                "get_context": lambda: {},
-                "update": lambda x: None
-            })()
-            self.reasoning = type("Reasoning", (), {
-                "reason": lambda query: {"result": "fallback"}
-            })()
+            self.world_model = type(
+                "WorldModel", (), {"get_context": lambda: {}, "update": lambda x: None}
+            )()
+            self.reasoning = type(
+                "Reasoning", (), {"reason": lambda query: {"result": "fallback"}}
+            )()
             logger.info("Initialized fallback bridge")
 
         def before_execution(self, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -137,12 +158,16 @@ except Exception as e:
         def after_execution(self, result: Dict[str, Any]) -> None:
             pass
 
-        def consensus_approve_token(self, token: int, position: int, chosen_index: Optional[int] = None) -> bool:
+        def consensus_approve_token(
+            self, token: int, position: int, chosen_index: Optional[int] = None
+        ) -> bool:
             return 0 <= token < 50257
+
 
 # Safety Components
 try:
     from src.generation.safe_generation import SafeGeneration
+
     logger.info("✓ SafeGeneration loaded successfully")
 except Exception as e:
     logger.warning(f"SafeGeneration import failed: {e}, using fallback")
@@ -151,16 +176,25 @@ except Exception as e:
         def __init__(self, *args, **kwargs):
             self.blocked_tokens = {0, 50256}
 
-        def validate_token(self, token: int, context: Optional[Dict] = None, world_model: Any = None) -> int:
+        def validate_token(
+            self, token: int, context: Optional[Dict] = None, world_model: Any = None
+        ) -> int:
             if token in self.blocked_tokens:
                 return 100
             return token
 
-        def filter(self, candidates: List[int], context: Optional[Dict] = None, world_model: Any = None) -> List[int]:
+        def filter(
+            self,
+            candidates: List[int],
+            context: Optional[Dict] = None,
+            world_model: Any = None,
+        ) -> List[int]:
             return [c for c in candidates if c not in self.blocked_tokens][:10]
+
 
 try:
     from src.vulcan.safety.llm_validators import EnhancedSafetyValidator
+
     logger.info("✓ EnhancedSafetyValidator loaded successfully")
 except Exception as e:
     logger.warning(f"EnhancedSafetyValidator import failed: {e}, using fallback")
@@ -169,18 +203,24 @@ except Exception as e:
         def __init__(self):
             self.validation_count = 0
 
-        def validate_generation(self, token: int, context: Dict, world_model: Any = None) -> int:
+        def validate_generation(
+            self, token: int, context: Dict, world_model: Any = None
+        ) -> int:
             self.validation_count += 1
             if token < 0 or token > 50257:
                 return 100
             return token
 
-        def validate_sequence(self, tokens: List[int], context: Dict, world_model: Any = None) -> bool:
+        def validate_sequence(
+            self, tokens: List[int], context: Dict, world_model: Any = None
+        ) -> bool:
             return len(tokens) <= 2048 and all(0 <= t <= 50257 for t in tokens)
+
 
 # Explainability
 try:
     from src.generation.explainable_generation import ExplainableGeneration
+
     logger.info("✓ ExplainableGeneration loaded successfully")
 except Exception as e:
     logger.warning(f"ExplainableGeneration import failed: {e}, using fallback")
@@ -196,12 +236,14 @@ except Exception as e:
                 "explanation": f"Token {token} selected based on context",
                 "reasoning_steps": len(chain),
                 "confidence": 0.85,
-                "alternatives": []
+                "alternatives": [],
             }
+
 
 # Context Management
 try:
     from src.context.hierarchical_context import HierarchicalContext
+
     logger.info("✓ HierarchicalContext loaded successfully")
 except Exception as e:
     logger.warning(f"HierarchicalContext import failed: {e}, using fallback")
@@ -210,40 +252,48 @@ except Exception as e:
         def __init__(self):
             self.memory = deque(maxlen=1000)
 
-        def retrieve_context_for_generation(self, query_tokens: List[int], max_tokens: int = 2048) -> Dict[str, Any]:
+        def retrieve_context_for_generation(
+            self, query_tokens: List[int], max_tokens: int = 2048
+        ) -> Dict[str, Any]:
             return {
                 "flat": " ".join(map(str, query_tokens[-100:])),
                 "episodic": list(self.memory)[-10:],
                 "semantic": [],
-                "procedural": []
+                "procedural": [],
             }
 
-        def store_generation(self, prompt: Any, generated: str, reasoning_trace: Dict) -> None:
-            self.memory.append({
-                "prompt": str(prompt),
-                "generated": generated,
-                "timestamp": time.time()
-            })
+        def store_generation(
+            self, prompt: Any, generated: str, reasoning_trace: Dict
+        ) -> None:
+            self.memory.append(
+                {
+                    "prompt": str(prompt),
+                    "generated": generated,
+                    "timestamp": time.time(),
+                }
+            )
+
 
 try:
     from src.context.causal_context import CausalContext
+
     logger.info("✓ CausalContext loaded successfully")
 except Exception as e:
     logger.warning(f"CausalContext import failed: {e}, using fallback")
 
     class CausalContext:
         def select(self, world_model: Any, query: str) -> Dict[str, Any]:
-            return {
-                "causal_context": [],
-                "concepts": [],
-                "relationships": []
-            }
+            return {"causal_context": [], "concepts": [], "relationships": []}
+
 
 # Cognitive Loop
 try:
-    from src.integration.cognitive_loop import (CognitiveLoop,
-                                                LoopRuntimeConfig,
-                                                LoopSamplingConfig)
+    from src.integration.cognitive_loop import (
+        CognitiveLoop,
+        LoopRuntimeConfig,
+        LoopSamplingConfig,
+    )
+
     logger.info("✓ CognitiveLoop loaded successfully")
 except Exception as e:
     logger.warning(f"CognitiveLoop import failed: {e}, using ENHANCED fallback")
@@ -270,14 +320,16 @@ except Exception as e:
             safety: Any,
             sampling_config: Optional[LoopSamplingConfig] = None,
             runtime_config: Optional[LoopRuntimeConfig] = None,
-            **kwargs
+            **kwargs,
         ):
             self.bridge = bridge
             self.transformer = transformer
             self.safety = safety
             self.sampling = sampling_config or LoopSamplingConfig()
             self.runtime = runtime_config or LoopRuntimeConfig()
-            logger.info(f"Initialized CognitiveLoop: max_tokens={self.sampling.max_tokens}, temp={self.sampling.temperature}")
+            logger.info(
+                f"Initialized CognitiveLoop: max_tokens={self.sampling.max_tokens}, temp={self.sampling.temperature}"
+            )
 
         def generate(
             self,
@@ -285,7 +337,7 @@ except Exception as e:
             max_tokens: Optional[int] = None,
             stream_callback: Optional[Callable] = None,
             stop_strings: tuple = (),
-            stop_tokens: tuple = ()
+            stop_tokens: tuple = (),
         ):
             start = time.time()
             tokens = []
@@ -300,13 +352,17 @@ except Exception as e:
             tokens = list(prompt_tokens)
             max_steps = max_tokens or self.sampling.max_tokens
 
-            logger.info(f"Generating {max_steps} tokens from prompt of length {len(prompt_tokens)}")
+            logger.info(
+                f"Generating {max_steps} tokens from prompt of length {len(prompt_tokens)}"
+            )
 
             for step in range(max_steps):
                 encoded = self.transformer.encode(tokens)
                 hidden = encoded.get("hidden_states", [[0.0]])
 
-                logits = self.transformer.get_logits(hidden[-1] if hidden else [0.0], tokens)
+                logits = self.transformer.get_logits(
+                    hidden[-1] if hidden else [0.0], tokens
+                )
 
                 if self.sampling.temperature != 1.0:
                     logits = [l / self.sampling.temperature for l in logits]
@@ -317,29 +373,35 @@ except Exception as e:
                     safe_token = self.safety.validate_generation(
                         new_token,
                         {"position": len(tokens), "prompt": prompt},
-                        self.bridge.world_model
+                        self.bridge.world_model,
                     )
                     if safe_token != new_token:
-                        safety_events.append({
-                            "step": step,
-                            "original": new_token,
-                            "safe": safe_token,
-                            "reason": "safety_override"
-                        })
+                        safety_events.append(
+                            {
+                                "step": step,
+                                "original": new_token,
+                                "safe": safe_token,
+                                "reason": "safety_override",
+                            }
+                        )
                         new_token = safe_token
 
                 if not self.bridge.consensus_approve_token(new_token, len(tokens)):
-                    logger.debug(f"Token {new_token} rejected by bridge at position {len(tokens)}")
+                    logger.debug(
+                        f"Token {new_token} rejected by bridge at position {len(tokens)}"
+                    )
                     break
 
                 tokens.append(new_token)
 
-                reasoning_trace.append({
-                    "step": step,
-                    "token": new_token,
-                    "logits_max": max(logits) if logits else 0,
-                    "sequence_length": len(tokens)
-                })
+                reasoning_trace.append(
+                    {
+                        "step": step,
+                        "token": new_token,
+                        "logits_max": max(logits) if logits else 0,
+                        "sequence_length": len(tokens),
+                    }
+                )
 
                 if stream_callback:
                     try:
@@ -358,28 +420,42 @@ except Exception as e:
             duration = time.time() - start
             text = " ".join([f"<{t}>" for t in tokens])
 
-            logger.info(f"Generated {len(tokens)} tokens in {duration:.2f}s ({len(tokens)/duration:.1f} tok/s)")
+            logger.info(
+                f"Generated {len(tokens)} tokens in {duration:.2f}s ({len(tokens)/duration:.1f} tok/s)"
+            )
 
-            return type("GenerationResult", (), {
-                "tokens": tokens,
-                "text": text,
-                "reasoning_trace": reasoning_trace,
-                "safety_events": safety_events,
-                "audit_records": [],
-                "metrics": {
+            return type(
+                "GenerationResult",
+                (),
+                {
+                    "tokens": tokens,
+                    "text": text,
+                    "reasoning_trace": reasoning_trace,
+                    "safety_events": safety_events,
+                    "audit_records": [],
+                    "metrics": {
+                        "duration_seconds": duration,
+                        "tokens_per_second": (
+                            len(tokens) / duration if duration > 0 else 0
+                        ),
+                        "total_tokens": len(tokens),
+                    },
+                    "completed": True,
+                    "stopped_reason": (
+                        "max_tokens" if len(tokens) >= max_steps else "eos"
+                    ),
                     "duration_seconds": duration,
-                    "tokens_per_second": len(tokens) / duration if duration > 0 else 0,
-                    "total_tokens": len(tokens)
                 },
-                "completed": True,
-                "stopped_reason": "max_tokens" if len(tokens) >= max_steps else "eos",
-                "duration_seconds": duration
-            })()
+            )()
+
 
 # Language Reasoning
 try:
     from src.vulcan.reasoning.language_reasoning import (
-        LanguageReasoning, LanguageReasoningConfig)
+        LanguageReasoning,
+        LanguageReasoningConfig,
+    )
+
     logger.info("✓ LanguageReasoning loaded successfully")
 except Exception as e:
     logger.warning(f"LanguageReasoning import failed: {e}, using fallback")
@@ -391,23 +467,33 @@ except Exception as e:
         top_p: float = 0.9
 
     class LanguageReasoning:
-        def __init__(self, model: Any, config: Optional[LanguageReasoningConfig] = None, **kwargs):
+        def __init__(
+            self, model: Any, config: Optional[LanguageReasoningConfig] = None, **kwargs
+        ):
             self.model = model
             self.config = config or LanguageReasoningConfig()
 
-        def generate(self, hidden_state: Any, generated_tokens: List[int], context: Optional[Dict] = None, strategy: Optional[str] = None) -> Dict[str, Any]:
+        def generate(
+            self,
+            hidden_state: Any,
+            generated_tokens: List[int],
+            context: Optional[Dict] = None,
+            strategy: Optional[str] = None,
+        ) -> Dict[str, Any]:
             logits = self.model.get_logits(hidden_state, generated_tokens)
             token = self.model.generate_token(logits)
             return {
                 "token": token,
                 "token_id": token,
                 "strategy": strategy or "greedy",
-                "confidence": 0.85
+                "confidence": 0.85,
             }
+
 
 # Training
 try:
     from src.training.governed_trainer import GovernedTrainer
+
     logger.info("✓ GovernedTrainer loaded successfully")
 except Exception as e:
     logger.warning(f"GovernedTrainer import failed: {e}, using fallback")
@@ -424,7 +510,7 @@ except Exception as e:
                 "status": "applied",
                 "loss": loss,
                 "step": self.step_count,
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
             self.audit_log.append(rec)
             return rec
@@ -433,11 +519,17 @@ except Exception as e:
             return {
                 "steps": len(self.audit_log),
                 "total_steps": self.step_count,
-                "avg_loss": sum(r["loss"] for r in self.audit_log) / len(self.audit_log) if self.audit_log else 0
+                "avg_loss": (
+                    sum(r["loss"] for r in self.audit_log) / len(self.audit_log)
+                    if self.audit_log
+                    else 0
+                ),
             }
+
 
 try:
     from src.training.self_improving_training import SelfImprovingTraining
+
     logger.info("✓ SelfImprovingTraining loaded successfully")
     HAS_SELF_IMPROVEMENT = True
 except Exception as e:
@@ -458,15 +550,13 @@ except Exception as e:
             return None
 
         def get_status(self) -> Dict[str, Any]:
-            return {
-                "telemetry_points": len(self.telemetry),
-                "enabled": False
-            }
+            return {"telemetry_points": len(self.telemetry), "enabled": False}
 
 
 # -------------------------------------------------------------------
 # Configuration Loader
 # -------------------------------------------------------------------
+
 
 def load_config(config_path: Optional[str]) -> Dict[str, Any]:
     """Loads configuration from path or returns optimized defaults."""
@@ -477,7 +567,7 @@ def load_config(config_path: Optional[str]) -> Dict[str, Any]:
             num_heads=8,
             vocab_size=50257,
             max_position_embeddings=2048,
-            dropout=0.1
+            dropout=0.1,
         ),
         "generation": {
             "max_tokens": 128,
@@ -485,34 +575,26 @@ def load_config(config_path: Optional[str]) -> Dict[str, Any]:
             "top_k": 50,
             "top_p": 0.9,
             "repetition_penalty": 1.0,
-            "enable_streaming": True
+            "enable_streaming": True,
         },
-        "safety": {
-            "mode": "first_safe",
-            "enable_validation": True,
-            "max_retries": 3
-        },
-        "training": {
-            "max_grad_norm": 5.0,
-            "learning_rate": 1e-4,
-            "batch_size": 8
-        },
+        "safety": {"mode": "first_safe", "enable_validation": True, "max_retries": 3},
+        "training": {"max_grad_norm": 5.0, "learning_rate": 1e-4, "batch_size": 8},
         "performance": {
             "enable_caching": True,
             "cache_size_mb": 512,
             "enable_batching": True,
-            "batch_size": 32
+            "batch_size": 32,
         },
         "monitoring": {
             "enable_metrics": True,
             "log_level": "INFO",
-            "enable_profiling": False
-        }
+            "enable_profiling": False,
+        },
     }
 
     if config_path and os.path.exists(config_path):
         try:
-            with open(config_path, 'r') as f:
+            with open(config_path, "r") as f:
                 loaded = json.load(f)
             for key in loaded:
                 if key in default_config and isinstance(default_config[key], dict):
@@ -530,9 +612,11 @@ def load_config(config_path: Optional[str]) -> Dict[str, Any]:
 # Data Classes
 # -------------------------------------------------------------------
 
+
 @dataclass
 class GenerationResult:
     """Enhanced generation result with full telemetry"""
+
     tokens: List[int]
     text: str
     reasoning_trace: List[Dict[str, Any]]
@@ -549,9 +633,11 @@ class GenerationResult:
     def summary(self) -> str:
         return f"Generated {len(self.tokens)} tokens in {self.duration_seconds:.2f}s ({self.metrics.get('tokens_per_second', 0):.1f} tok/s)"
 
+
 @dataclass
 class TrainingRecord:
     """Enhanced training record"""
+
     status: str
     loss: float
     step: int = 0
@@ -563,6 +649,7 @@ class TrainingRecord:
 # Performance Monitor
 # -------------------------------------------------------------------
 
+
 class PerformanceMonitor:
     """Tracks system performance metrics"""
 
@@ -573,7 +660,7 @@ class PerformanceMonitor:
             "generation_count": 0,
             "error_count": 0,
             "cache_hits": 0,
-            "cache_misses": 0
+            "cache_misses": 0,
         }
         self._lock = threading.Lock()
 
@@ -597,10 +684,18 @@ class PerformanceMonitor:
 
     def get_stats(self) -> Dict[str, Any]:
         with self._lock:
-            avg_tokens = self.metrics["total_tokens"] / max(1, self.metrics["generation_count"])
-            avg_duration = self.metrics["total_duration"] / max(1, self.metrics["generation_count"])
-            throughput = self.metrics["total_tokens"] / max(1, self.metrics["total_duration"])
-            cache_hit_rate = self.metrics["cache_hits"] / max(1, self.metrics["cache_hits"] + self.metrics["cache_misses"])
+            avg_tokens = self.metrics["total_tokens"] / max(
+                1, self.metrics["generation_count"]
+            )
+            avg_duration = self.metrics["total_duration"] / max(
+                1, self.metrics["generation_count"]
+            )
+            throughput = self.metrics["total_tokens"] / max(
+                1, self.metrics["total_duration"]
+            )
+            cache_hit_rate = self.metrics["cache_hits"] / max(
+                1, self.metrics["cache_hits"] + self.metrics["cache_misses"]
+            )
 
             return {
                 **self.metrics,
@@ -608,13 +703,15 @@ class PerformanceMonitor:
                 "avg_duration_per_generation": avg_duration,
                 "overall_throughput_tokens_per_sec": throughput,
                 "cache_hit_rate": cache_hit_rate,
-                "error_rate": self.metrics["error_count"] / max(1, self.metrics["generation_count"])
+                "error_rate": self.metrics["error_count"]
+                / max(1, self.metrics["generation_count"]),
             }
 
 
 # -------------------------------------------------------------------
 # Cache Manager
 # -------------------------------------------------------------------
+
 
 class CacheManager:
     """LRU cache for generation results"""
@@ -662,13 +759,14 @@ class CacheManager:
             return {
                 "size": len(self.cache),
                 "max_size": self.max_size,
-                "utilization": len(self.cache) / self.max_size
+                "utilization": len(self.cache) / self.max_size,
             }
 
 
 # -------------------------------------------------------------------
 # Main LLM Class - FIXED ASYNC GENERATOR HANDLING
 # -------------------------------------------------------------------
+
 
 class GraphixVulcanLLM:
     """
@@ -687,7 +785,7 @@ class GraphixVulcanLLM:
         metrics_provider: Optional[Callable[[str], Optional[float]]] = None,
         enable_self_improvement: bool = True,
         enable_caching: bool = True,
-        enable_monitoring: bool = True
+        enable_monitoring: bool = True,
     ) -> None:
         logger.info(f"Initializing GraphixVulcanLLM v{self.VERSION}")
 
@@ -709,12 +807,14 @@ class GraphixVulcanLLM:
         self.transformer = GraphixTransformer(
             self.config.get("transformer"),
             observability=observability,
-            audit_log=self.audit_log
+            audit_log=self.audit_log,
         )
         self.bridge = GraphixVulcanBridge()
         self.safety_validator = EnhancedSafetyValidator()
         self.safe_generation = SafeGeneration(observability=observability)
-        self.explainer = ExplainableGeneration(bridge=self.bridge, transformer=self.transformer)
+        self.explainer = ExplainableGeneration(
+            bridge=self.bridge, transformer=self.transformer
+        )
         self.hier_context = HierarchicalContext()
         self.causal_context = CausalContext()
         self.language_reasoning = LanguageReasoning(self.transformer)
@@ -737,7 +837,7 @@ class GraphixVulcanLLM:
             max_tokens=self.config["generation"]["max_tokens"],
             temperature=self.config["generation"]["temperature"],
             top_k=self.config["generation"]["top_k"],
-            top_p=self.config["generation"]["top_p"]
+            top_p=self.config["generation"]["top_p"],
         )
         runtime_config = LoopRuntimeConfig(
             enable_stream=self.config["generation"]["enable_streaming"]
@@ -750,7 +850,7 @@ class GraphixVulcanLLM:
             sampling_config=sampling_config,
             runtime_config=runtime_config,
             observability_manager=observability,
-            audit_log=self.audit_log
+            audit_log=self.audit_log,
         )
 
         # State
@@ -761,8 +861,12 @@ class GraphixVulcanLLM:
         self._saved_state_fields = ["_total_tokens_generated", "_generation_sessions"]
 
         logger.info("✓ GraphixVulcanLLM initialized successfully")
-        logger.info(f"  Model: {self.config['transformer'].vocab_size} vocab, {self.config['transformer'].hidden_size}d")
-        logger.info(f"  Config: max_tokens={self.config['generation']['max_tokens']}, temp={self.config['generation']['temperature']}")
+        logger.info(
+            f"  Model: {self.config['transformer'].vocab_size} vocab, {self.config['transformer'].hidden_size}d"
+        )
+        logger.info(
+            f"  Config: max_tokens={self.config['generation']['max_tokens']}, temp={self.config['generation']['temperature']}"
+        )
 
     # -----------------------------------------------------------
     # Async Helper Methods - FIXED
@@ -793,11 +897,13 @@ class GraphixVulcanLLM:
         # Check if it's an async generator
         if inspect.isasyncgen(coro):
             logger.debug("Detected async generator, collecting results...")
+
             async def _collect():
                 result = None
                 async for item in coro:
                     result = item  # Collect last item
                 return result
+
             return loop.run_until_complete(_collect())
         # Check if it's a coroutine
         elif inspect.iscoroutine(coro):
@@ -813,7 +919,9 @@ class GraphixVulcanLLM:
         if not hasattr(obj, method_name):
             return False
         method = getattr(obj, method_name)
-        return asyncio.iscoroutinefunction(method) or inspect.iscoroutinefunction(method)
+        return asyncio.iscoroutinefunction(method) or inspect.iscoroutinefunction(
+            method
+        )
 
     # -----------------------------------------------------------
     # Generation Methods - FIXED
@@ -828,7 +936,8 @@ class GraphixVulcanLLM:
         stream_callback: Optional[Callable[[int, str, Dict[str, Any]], None]] = None,
         stop_strings: Optional[Sequence[str]] = None,
         stop_tokens: Optional[Sequence[int]] = None,
-        use_cache: bool = True) -> GenerationResult:
+        use_cache: bool = True,
+    ) -> GenerationResult:
         """High-level safe generation - FIXED nested async pattern"""
         start = time.time()
         max_steps = max_tokens or self.config["generation"]["max_tokens"]
@@ -837,7 +946,7 @@ class GraphixVulcanLLM:
         if use_cache and self.cache and not stream:
             cache_key_params = {
                 "max_tokens": max_steps,
-                "temperature": self.config["generation"]["temperature"]
+                "temperature": self.config["generation"]["temperature"],
             }
             cached = self.cache.get(str(prompt), **cache_key_params)
             if cached:
@@ -857,15 +966,17 @@ class GraphixVulcanLLM:
                 max_tokens=max_steps,
                 stream_callback=stream_callback if stream else None,
                 stop_strings=tuple(stop_strings or []),
-                stop_tokens=tuple(stop_tokens or [])
+                stop_tokens=tuple(stop_tokens or []),
             )
 
             # Check what we got
             result_type_name = type(gen_result).__name__
-            has_anext = hasattr(gen_result, '__anext__')
-            has_tokens = hasattr(gen_result, 'tokens')
+            has_anext = hasattr(gen_result, "__anext__")
+            has_tokens = hasattr(gen_result, "tokens")
 
-            logger.info(f"CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}")
+            logger.info(
+                f"CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}"
+            )
 
             # Get event loop once
             try:
@@ -883,10 +994,12 @@ class GraphixVulcanLLM:
 
                 # Check if the coroutine returned an async generator!
                 result_type_after_await = type(loop_result).__name__
-                logger.info(f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}")
+                logger.info(
+                    f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
+                )
 
                 # If it returned an async generator, consume it
-                if hasattr(loop_result, '__anext__'):
+                if hasattr(loop_result, "__anext__"):
                     logger.info("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
 
                     async def consume_nested_generator():
@@ -898,7 +1011,9 @@ class GraphixVulcanLLM:
                             count += 1
                             results.append(item)
                             # --- PATCH B ---
-                            logger.debug(f"  Item {count}: type={type(item).__name__}, has_tokens={hasattr(item, 'tokens')}")
+                            logger.debug(
+                                f"  Item {count}: type={type(item).__name__}, has_tokens={hasattr(item, 'tokens')}"
+                            )
 
                         logger.info(f"Consumed {count} items from nested generator")
 
@@ -908,7 +1023,9 @@ class GraphixVulcanLLM:
                         return results[-1]
 
                     loop_result = loop.run_until_complete(consume_nested_generator())
-                    logger.info(f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}")
+                    logger.info(
+                        f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
+                    )
 
             elif has_anext:
                 logger.info("DETECTED ASYNC GENERATOR - CONSUMING")
@@ -922,7 +1039,9 @@ class GraphixVulcanLLM:
                         count += 1
                         results.append(item)
                         # --- PATCH B ---
-                        logger.debug(f"  Item {count}: type={type(item).__name__}, has_tokens={hasattr(item, 'tokens')}")
+                        logger.debug(
+                            f"  Item {count}: type={type(item).__name__}, has_tokens={hasattr(item, 'tokens')}"
+                        )
 
                     logger.info(f"Consumed {count} items")
 
@@ -945,8 +1064,10 @@ class GraphixVulcanLLM:
 
             # Final check
             final_type = type(loop_result).__name__
-            final_has_tokens = hasattr(loop_result, 'tokens')
-            logger.info(f"Final result: type={final_type}, has_tokens={final_has_tokens}")
+            final_has_tokens = hasattr(loop_result, "tokens")
+            logger.info(
+                f"Final result: type={final_type}, has_tokens={final_has_tokens}"
+            )
 
             if not final_has_tokens:
                 raise AttributeError(
@@ -968,14 +1089,16 @@ class GraphixVulcanLLM:
             explanation = None
             if explain and tokens:
                 try:
-                    hidden_state = self.transformer.encode(tokens).get("last_hidden_state")
+                    hidden_state = self.transformer.encode(tokens).get(
+                        "last_hidden_state"
+                    )
                     explanation = self.explainer.explain(
                         token=tokens[-1],
                         chain=reasoning_trace,
                         hidden_state=hidden_state,
                         logits=None,
                         candidates=None,
-                        prompt_tokens=tokens
+                        prompt_tokens=tokens,
                     )
                 except Exception as e:
                     logger.warning(f"Explanation generation failed: {e}")
@@ -993,8 +1116,10 @@ class GraphixVulcanLLM:
                 duration_seconds=duration_seconds,
                 metadata={
                     "config": self.config["generation"],
-                    "prompt_length": len(prompt) if isinstance(prompt, (list, str)) else 0
-                }
+                    "prompt_length": (
+                        len(prompt) if isinstance(prompt, (list, str)) else 0
+                    ),
+                },
             )
 
             # Update state
@@ -1016,7 +1141,10 @@ class GraphixVulcanLLM:
                 self.hier_context.store_generation(
                     prompt,
                     text,
-                    {"trace_len": len(reasoning_trace), "safety_events": len(safety_events)}
+                    {
+                        "trace_len": len(reasoning_trace),
+                        "safety_events": len(safety_events),
+                    },
                 )
             except Exception as e:
                 logger.warning(f"Memory storage failed: {e}")
@@ -1036,7 +1164,7 @@ class GraphixVulcanLLM:
                 explanation={"error": str(e)},
                 metrics={"error": str(e)},
                 stopped_reason="error",
-                duration_seconds=time.time() - start
+                duration_seconds=time.time() - start,
             )
 
     # --- PATCH A START ---
@@ -1045,7 +1173,7 @@ class GraphixVulcanLLM:
         prompt: Union[str, Sequence[int]],
         max_tokens: Optional[int] = None,
         callback: Optional[Callable[[int, str, Dict[str, Any]], None]] = None,
-        **kwargs
+        **kwargs,
     ) -> Iterator[int]:
         """Streaming token emission (correctly consumes async generator)."""
         collected_tokens: List[int] = []
@@ -1066,7 +1194,7 @@ class GraphixVulcanLLM:
                 max_tokens=max_tokens or self.config["generation"]["max_tokens"],
                 stream_callback=_internal_callback,
                 stop_tokens=tuple(kwargs.get("stop_tokens", [])),
-                stop_strings=tuple(kwargs.get("stop_strings", []))
+                stop_strings=tuple(kwargs.get("stop_strings", [])),
             )
 
             # Acquire a loop
@@ -1077,7 +1205,11 @@ class GraphixVulcanLLM:
                 async for chunk in async_gen:
                     # chunk is a dict with keys: token, text, token_info
                     tok = chunk.get("token")
-                    if tok is not None and isinstance(tok, int) and tok not in collected_tokens:
+                    if (
+                        tok is not None
+                        and isinstance(tok, int)
+                        and tok not in collected_tokens
+                    ):
                         collected_tokens.append(tok)
 
             # Distinguish coroutine vs async generator
@@ -1089,13 +1221,17 @@ class GraphixVulcanLLM:
                 else:
                     # Not streaming (fallback)
                     if hasattr(awaited, "tokens"):
-                        collected_tokens.extend(int(t) for t in awaited.tokens if isinstance(t, int))
+                        collected_tokens.extend(
+                            int(t) for t in awaited.tokens if isinstance(t, int)
+                        )
             elif inspect.isasyncgen(gen_result):
                 loop.run_until_complete(_consume_async_generator(gen_result))
             else:
                 # Synchronous fallback result
                 if hasattr(gen_result, "tokens"):
-                    collected_tokens.extend(int(t) for t in gen_result.tokens if isinstance(t, int))
+                    collected_tokens.extend(
+                        int(t) for t in gen_result.tokens if isinstance(t, int)
+                    )
 
             # Yield collected tokens
             for t in collected_tokens:
@@ -1108,23 +1244,21 @@ class GraphixVulcanLLM:
         except Exception as e:
             logger.error(f"Streaming failed: {e}")
             return
+
     # --- PATCH A END ---
 
     async def generate_async(
-        self,
-        prompt: Union[str, Sequence[int]],
-        **kwargs
+        self, prompt: Union[str, Sequence[int]], **kwargs
     ) -> GenerationResult:
         """Async generation wrapper"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, lambda: self.generate(prompt, **kwargs))
 
     async def stream_async(
-        self,
-        prompt: Union[str, Sequence[int]],
-        **kwargs
+        self, prompt: Union[str, Sequence[int]], **kwargs
     ) -> AsyncIterator[int]:
         """Async streaming wrapper"""
+
         async def _gen():
             for token in self.stream(prompt, **kwargs):
                 yield token
@@ -1148,14 +1282,11 @@ class GraphixVulcanLLM:
         for _ in range(max_tokens):
             hidden = self.transformer.encode(tokens)
             logits = self.transformer.get_logits(
-                hidden.get("last_hidden_state", [0.0]),
-                tokens
+                hidden.get("last_hidden_state", [0.0]), tokens
             )
             idx = max(range(len(logits)), key=lambda i: logits[i]) if logits else 0
             safe_idx = self.safety_validator.validate_generation(
-                idx,
-                {"prompt": prompt},
-                self.bridge.world_model
+                idx, {"prompt": prompt}, self.bridge.world_model
             )
             tokens.append(safe_idx)
         return tokens
@@ -1168,7 +1299,7 @@ class GraphixVulcanLLM:
         self,
         dataset: Sequence[Dict[str, Any]],
         epochs: int = 1,
-        batch_size: Optional[int] = None
+        batch_size: Optional[int] = None,
     ) -> List[TrainingRecord]:
         """Iterate over dataset with governed training"""
         logger.info(f"Starting training: {len(dataset)} samples, {epochs} epochs")
@@ -1178,18 +1309,20 @@ class GraphixVulcanLLM:
         for epoch in range(epochs):
             logger.info(f"Epoch {epoch + 1}/{epochs}")
             for i in range(0, len(dataset), batch_size):
-                batch = dataset[i:i+batch_size]
+                batch = dataset[i : i + batch_size]
                 rec = self.trainer.training_step({"batch": batch, "epoch": epoch})
-                logs.append(TrainingRecord(
-                    status=rec.get("status", "unknown"),
-                    loss=rec.get("loss", 0.0),
-                    step=rec.get("step", 0),
-                    metadata={
-                        "timestamp": rec.get("timestamp"),
-                        "epoch": epoch,
-                        "batch": i // batch_size
-                    }
-                ))
+                logs.append(
+                    TrainingRecord(
+                        status=rec.get("status", "unknown"),
+                        loss=rec.get("loss", 0.0),
+                        step=rec.get("step", 0),
+                        metadata={
+                            "timestamp": rec.get("timestamp"),
+                            "epoch": epoch,
+                            "batch": i // batch_size,
+                        },
+                    )
+                )
 
         logger.info(f"Training complete: {len(logs)} steps")
         return logs
@@ -1201,14 +1334,16 @@ class GraphixVulcanLLM:
             status=rec.get("status", "unknown"),
             loss=rec.get("loss", 0.0),
             step=rec.get("step", 0),
-            metadata={"timestamp": rec.get("timestamp")}
+            metadata={"timestamp": rec.get("timestamp")},
         )
 
     # -----------------------------------------------------------
     # Self-Improvement
     # -----------------------------------------------------------
 
-    def self_improve(self, context: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def self_improve(
+        self, context: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
         """Perform intrinsic improvement cycle"""
         if not self.self_improvement:
             logger.debug("Self-improvement not available")
@@ -1220,16 +1355,18 @@ class GraphixVulcanLLM:
                 eval_score=0.9,
                 safety_incidents=0,
                 causal_contradictions=0,
-                novelty_score=0.7
+                novelty_score=0.7,
             )
 
-            issue = self.self_improvement.detect_issue({
-                "loss_plateau_steps": 15,
-                "loss_improvement_min": 0.005,
-                "safety_incident_threshold": 5,
-                "causal_contradiction_threshold": 3,
-                "novelty_min": 0.3
-            })
+            issue = self.self_improvement.detect_issue(
+                {
+                    "loss_plateau_steps": 15,
+                    "loss_improvement_min": 0.005,
+                    "safety_incident_threshold": 5,
+                    "causal_contradiction_threshold": 3,
+                    "novelty_min": 0.3,
+                }
+            )
 
             if issue:
                 logger.info(f"Self-improvement issue detected: {issue}")
@@ -1263,7 +1400,9 @@ class GraphixVulcanLLM:
                 "tokens": len(last.tokens) if last else 0,
                 "stopped_reason": last.stopped_reason if last else None,
                 "duration_seconds": last.duration_seconds if last else None,
-                "tokens_per_second": last.metrics.get("tokens_per_second") if last else None
+                "tokens_per_second": (
+                    last.metrics.get("tokens_per_second") if last else None
+                ),
             },
             "trainer_summary": self.trainer.summary(),
             "self_improvement": (
@@ -1272,8 +1411,8 @@ class GraphixVulcanLLM:
             "safety_events_recent": (last.safety_events[-5:] if last else []),
             "config": {
                 "generation": self.config.get("generation", {}),
-                "training": self.config.get("training", {})
-            }
+                "training": self.config.get("training", {}),
+            },
         }
 
         if self.monitor:
@@ -1296,15 +1435,11 @@ class GraphixVulcanLLM:
                     "transformer": len(test_result) > 0,
                     "safety": self.safety_validator is not None,
                     "bridge": self.bridge is not None,
-                    "memory": True
-                }
+                    "memory": True,
+                },
             }
         except Exception as e:
-            return {
-                "status": "unhealthy",
-                "timestamp": time.time(),
-                "error": str(e)
-            }
+            return {"status": "unhealthy", "timestamp": time.time(), "error": str(e)}
 
     # -----------------------------------------------------------
     # Persistence
@@ -1315,7 +1450,7 @@ class GraphixVulcanLLM:
         state = {
             "version": self.VERSION,
             "timestamp": time.time(),
-            "uptime_seconds": time.time() - self._start_time
+            "uptime_seconds": time.time() - self._start_time,
         }
 
         for fld in self._saved_state_fields:
@@ -1345,7 +1480,9 @@ class GraphixVulcanLLM:
                 if fld in data:
                     setattr(self, fld, data[fld])
 
-            logger.info(f"State loaded from {path} (saved at {datetime.fromtimestamp(data['timestamp'])})")
+            logger.info(
+                f"State loaded from {path} (saved at {datetime.fromtimestamp(data['timestamp'])})"
+            )
         except Exception as e:
             logger.error(f"Failed to load state: {e}")
 
@@ -1393,11 +1530,12 @@ class GraphixVulcanLLM:
 # Factory Function
 # -------------------------------------------------------------------
 
+
 def build_llm(
     config_path: Optional[str] = None,
     enable_caching: bool = True,
     enable_monitoring: bool = True,
-    **kwargs
+    **kwargs,
 ) -> GraphixVulcanLLM:
     """Factory function to build GraphixVulcanLLM"""
     logger.info("Building GraphixVulcanLLM...")
@@ -1405,7 +1543,7 @@ def build_llm(
         config_path=config_path,
         enable_caching=enable_caching,
         enable_monitoring=enable_monitoring,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -1438,6 +1576,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"✗ Generation failed: {e}")
         import traceback
+
         traceback.print_exc()
     print()
 
@@ -1460,6 +1599,7 @@ if __name__ == "__main__":
     # Test async
     print("Testing async generation...")
     try:
+
         async def async_test():
             result = await llm.generate_async("Async test", max_tokens=8)
             return result
@@ -1482,17 +1622,21 @@ if __name__ == "__main__":
     print("Final Status:")
     print(f"  Total tokens: {final_status['total_tokens_generated']}")
     print(f"  Sessions: {final_status['generation_sessions']}")
-    if final_status['generation_sessions'] > 0:
+    if final_status["generation_sessions"] > 0:
         print(f"  Avg tokens/session: {final_status['avg_tokens_per_session']:.1f}")
 
-    if 'performance' in final_status:
-        perf = final_status['performance']
-        print(f"  Throughput: {perf.get('overall_throughput_tokens_per_sec', 0):.1f} tok/s")
+    if "performance" in final_status:
+        perf = final_status["performance"]
+        print(
+            f"  Throughput: {perf.get('overall_throughput_tokens_per_sec', 0):.1f} tok/s"
+        )
         print(f"  Error rate: {perf.get('error_rate', 0):.2%}")
 
-    if 'cache' in final_status:
-        cache = final_status['cache']
-        print(f"  Cache: {cache['size']}/{cache['max_size']} ({cache['utilization']:.1%})")
+    if "cache" in final_status:
+        cache = final_status["cache"]
+        print(
+            f"  Cache: {cache['size']}/{cache['max_size']} ({cache['utilization']:.1%})"
+        )
 
     # Health check
     health = llm.health_check()

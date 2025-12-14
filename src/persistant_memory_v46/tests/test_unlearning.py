@@ -10,6 +10,7 @@ Tests cover:
 """
 
 from unlearning import GradientSurgeryUnlearner, UnlearningEngine
+
 # Import the modules to test
 import sys
 from unittest.mock import Mock

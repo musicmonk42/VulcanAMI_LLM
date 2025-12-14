@@ -544,7 +544,8 @@ class DatabaseManager:
     def _init_database(self):
         conn = sqlite3.connect(self.db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS graphs (
                 id TEXT PRIMARY KEY,
                 agent_id TEXT NOT NULL,
@@ -557,7 +558,8 @@ class DatabaseManager:
                 error TEXT,
                 metadata TEXT
             )
-        """)
+        """
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_graphs_agent ON graphs(agent_id)"
         )
@@ -565,7 +567,8 @@ class DatabaseManager:
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_graphs_submitted ON graphs(submitted_at DESC)"
         )
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS proposals (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
@@ -579,14 +582,16 @@ class DatabaseManager:
                 closes_at TIMESTAMP,
                 metadata TEXT
             )
-        """)
+        """
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_proposals_status ON proposals(status)"
         )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_proposals_created ON proposals(created_at DESC)"
         )
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS agents (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -600,11 +605,13 @@ class DatabaseManager:
                 password_salt TEXT,
                 password_algo TEXT
             )
-        """)
+        """
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_agents_api_key ON agents(api_key)"
         )
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS metrics (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TIMESTAMP NOT NULL,
@@ -612,14 +619,16 @@ class DatabaseManager:
                 value REAL NOT NULL,
                 metadata TEXT
             )
-        """)
+        """
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp DESC)"
         )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_metrics_type ON metrics(metric_type)"
         )
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS audit_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TIMESTAMP NOT NULL,
@@ -628,7 +637,8 @@ class DatabaseManager:
                 resource TEXT NOT NULL,
                 details TEXT
             )
-        """)
+        """
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp DESC)"
         )
@@ -1112,11 +1122,13 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 # Decode without verifying revocation first
                 payload = jwt.decode(
                     token,
-                    GRAPHIX_JWT_PUBLIC_KEY
-                    if GRAPHIX_JWT_PRIVATE_KEY
-                    and GRAPHIX_JWT_PUBLIC_KEY
-                    and JWT_ALGORITHM != "HS256"
-                    else JWT_SECRET,
+                    (
+                        GRAPHIX_JWT_PUBLIC_KEY
+                        if GRAPHIX_JWT_PRIVATE_KEY
+                        and GRAPHIX_JWT_PUBLIC_KEY
+                        and JWT_ALGORITHM != "HS256"
+                        else JWT_SECRET
+                    ),
                     algorithms=[JWT_ALGORITHM],
                     audience=JWT_AUD,
                     issuer=JWT_ISS,
@@ -1306,9 +1318,13 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         agent = self.server_instance.db.get_agent_by_api_key(api_key)
         audit_details = {
             "remote_ip": ip,
-            "auth_method": "password"
-            if password
-            else ("mutual_proof" if all([nonce, timestamp, proof]) else "api_key_only"),
+            "auth_method": (
+                "password"
+                if password
+                else (
+                    "mutual_proof" if all([nonce, timestamp, proof]) else "api_key_only"
+                )
+            ),
         }
         # Require password or mutual proof
         if password is None and not (nonce and timestamp and proof):
@@ -1503,11 +1519,13 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         try:
             payload = jwt.decode(
                 token,
-                GRAPHIX_JWT_PUBLIC_KEY
-                if GRAPHIX_JWT_PRIVATE_KEY
-                and GRAPHIX_JWT_PUBLIC_KEY
-                and JWT_ALGORITHM != "HS256"
-                else JWT_SECRET,
+                (
+                    GRAPHIX_JWT_PUBLIC_KEY
+                    if GRAPHIX_JWT_PRIVATE_KEY
+                    and GRAPHIX_JWT_PUBLIC_KEY
+                    and JWT_ALGORITHM != "HS256"
+                    else JWT_SECRET
+                ),
                 algorithms=[JWT_ALGORITHM],
                 audience=JWT_AUD,
                 issuer=JWT_ISS,
@@ -1783,7 +1801,9 @@ class GraphAPIServer:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=10, encoding="utf-8") as response:  # nosec B310 - URL validated at line 1775
+            with urllib.request.urlopen(
+                req, timeout=10, encoding="utf-8"
+            ) as response:  # nosec B310 - URL validated at line 1775
                 if response.status >= 300:
                     self.logger.error(
                         f"Callback to {url} failed with status {response.status}"

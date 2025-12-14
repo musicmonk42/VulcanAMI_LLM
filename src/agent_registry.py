@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
+
 # Cryptographic imports
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
@@ -101,7 +102,6 @@ class CalibrationData:
     """Placeholder for calibration data (for test compatibility)."""
 
 
-
 @dataclass
 class AgentKey:
     """Represents a cryptographic key for an agent."""
@@ -129,9 +129,11 @@ class AgentKey:
             "key_id": self.key_id,
             "algorithm": self.algorithm.value,
             "public_key": base64.b64encode(self.public_key).decode("utf-8"),
-            "private_key": base64.b64encode(self.private_key).decode("utf-8")
-            if self.private_key
-            else None,
+            "private_key": (
+                base64.b64encode(self.private_key).decode("utf-8")
+                if self.private_key
+                else None
+            ),
             "created_at": self.created_at.isoformat(),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
             "is_active": self.is_active,
@@ -147,13 +149,17 @@ class AgentKey:
             key_id=data["key_id"],
             algorithm=KeyAlgorithm(data["algorithm"]),
             public_key=base64.b64decode(data["public_key"]),
-            private_key=base64.b64decode(data["private_key"])
-            if data.get("private_key")
-            else None,
+            private_key=(
+                base64.b64decode(data["private_key"])
+                if data.get("private_key")
+                else None
+            ),
             created_at=datetime.fromisoformat(data["created_at"]),
-            expires_at=datetime.fromisoformat(data["expires_at"])
-            if data.get("expires_at")
-            else None,
+            expires_at=(
+                datetime.fromisoformat(data["expires_at"])
+                if data.get("expires_at")
+                else None
+            ),
             is_active=data.get("is_active", True),
             metadata=data.get("metadata", {}),
         )
@@ -188,9 +194,9 @@ class AgentCertificate:
             "not_valid_after": self.not_valid_after.isoformat(),
             "is_revoked": self.is_revoked,
             "revocation_reason": self.revocation_reason,
-            "revocation_time": self.revocation_time.isoformat()
-            if self.revocation_time
-            else None,
+            "revocation_time": (
+                self.revocation_time.isoformat() if self.revocation_time else None
+            ),
         }
 
     @classmethod
@@ -208,9 +214,11 @@ class AgentCertificate:
             not_valid_after=datetime.fromisoformat(data["not_valid_after"]),
             is_revoked=data.get("is_revoked", False),
             revocation_reason=data.get("revocation_reason"),
-            revocation_time=datetime.fromisoformat(data["revocation_time"])
-            if data.get("revocation_time")
-            else None,
+            revocation_time=(
+                datetime.fromisoformat(data["revocation_time"])
+                if data.get("revocation_time")
+                else None
+            ),
         )
 
 
@@ -258,9 +266,9 @@ class AgentProfile:
             "last_seen": self.last_seen.isoformat() if self.last_seen else None,
             "is_active": self.is_active,
             "failed_attempts": self.failed_attempts,
-            "locked_until": self.locked_until.isoformat()
-            if self.locked_until
-            else None,
+            "locked_until": (
+                self.locked_until.isoformat() if self.locked_until else None
+            ),
         }
 
     @classmethod
@@ -277,14 +285,18 @@ class AgentProfile:
             permissions=data.get("permissions", {}),
             metadata=data.get("metadata", {}),
             created_at=datetime.fromisoformat(data["created_at"]),
-            last_seen=datetime.fromisoformat(data["last_seen"])
-            if data.get("last_seen")
-            else None,
+            last_seen=(
+                datetime.fromisoformat(data["last_seen"])
+                if data.get("last_seen")
+                else None
+            ),
             is_active=data.get("is_active", True),
             failed_attempts=data.get("failed_attempts", 0),
-            locked_until=datetime.fromisoformat(data["locked_until"])
-            if data.get("locked_until")
-            else None,
+            locked_until=(
+                datetime.fromisoformat(data["locked_until"])
+                if data.get("locked_until")
+                else None
+            ),
         )
 
 
@@ -897,47 +909,59 @@ class AgentRegistry:
         conn = sqlite3.connect(str(self.registry_path))
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS agents (
                 agent_id TEXT PRIMARY KEY,
                 profile_data TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_agents_created
             ON agents(created_at)
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS revoked_keys (
                 key_id TEXT PRIMARY KEY,
                 agent_id TEXT NOT NULL,
                 revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 reason TEXT
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_revoked_keys_agent
             ON revoked_keys(agent_id)
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS revoked_certs (
                 cert_id TEXT PRIMARY KEY,
                 agent_id TEXT NOT NULL,
                 revoked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 reason TEXT
             )
-        """)
+        """
+        )
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_revoked_certs_agent
             ON revoked_certs(agent_id)
-        """)
+        """
+        )
 
         conn.commit()
         conn.close()
@@ -1142,11 +1166,11 @@ class AgentRegistry:
                 "public_key": base64.b64encode(public_key).decode("utf-8"),
                 "private_key": base64.b64encode(private_key).decode("utf-8"),
                 "algorithm": algorithm.value,
-                "certificate": base64.b64encode(certificates[0].certificate).decode(
-                    "utf-8"
-                )
-                if certificates
-                else None,
+                "certificate": (
+                    base64.b64encode(certificates[0].certificate).decode("utf-8")
+                    if certificates
+                    else None
+                ),
                 "expires_at": agent_key.expires_at.isoformat(),
             }
 
@@ -1647,15 +1671,19 @@ class AgentRegistry:
                 "is_locked": agent.is_locked(),
                 "created_at": agent.created_at.isoformat(),
                 "last_seen": agent.last_seen.isoformat() if agent.last_seen else None,
-                "active_key": {
-                    "key_id": active_key.key_id,
-                    "algorithm": active_key.algorithm.value,
-                    "expires_at": active_key.expires_at.isoformat()
-                    if active_key.expires_at
-                    else None,
-                }
-                if active_key
-                else None,
+                "active_key": (
+                    {
+                        "key_id": active_key.key_id,
+                        "algorithm": active_key.algorithm.value,
+                        "expires_at": (
+                            active_key.expires_at.isoformat()
+                            if active_key.expires_at
+                            else None
+                        ),
+                    }
+                    if active_key
+                    else None
+                ),
                 "certificates": len(agent.certificates),
                 "permissions": [k for k, v in agent.permissions.items() if v],
             }

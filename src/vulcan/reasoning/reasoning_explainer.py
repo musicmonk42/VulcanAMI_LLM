@@ -11,8 +11,12 @@ import time
 from collections import deque
 from typing import Any, Dict, List, Optional, Tuple
 
-from .reasoning_types import (ReasoningChain, ReasoningResult, ReasoningStep,
-                              ReasoningType)
+from .reasoning_types import (
+    ReasoningChain,
+    ReasoningResult,
+    ReasoningStep,
+    ReasoningType,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -161,13 +165,15 @@ class ReasoningExplainer:
         """Format explanation template with actual values"""
         # Extract key information from step
         format_dict = {
-            "step_type": step.step_type.value
-            if hasattr(step.step_type, "value")
-            else str(step.step_type),
+            "step_type": (
+                step.step_type.value
+                if hasattr(step.step_type, "value")
+                else str(step.step_type)
+            ),
             "output": self._summarize_data(getattr(step, "output_data", "N/A")),
-            "confidence": f"{step.confidence:.2f}"
-            if hasattr(step, "confidence")
-            else "N/A",
+            "confidence": (
+                f"{step.confidence:.2f}" if hasattr(step, "confidence") else "N/A"
+            ),
             "input": self._summarize_data(getattr(step, "input_data", "N/A")),
         }
 
@@ -552,9 +558,11 @@ class SafetyAwareReasoning:
                 safe, reason, confidence = self.safety_validator.validate_action(
                     {"action": result.conclusion},
                     {
-                        "reasoning_type": result.reasoning_type.value
-                        if hasattr(result, "reasoning_type")
-                        else "unknown"
+                        "reasoning_type": (
+                            result.reasoning_type.value
+                            if hasattr(result, "reasoning_type")
+                            else "unknown"
+                        )
                     },
                 )
 
@@ -751,7 +759,7 @@ class SafetyAwareReasoning:
             "pass_rate": passed / total_checks,
             "blocked_count": len(self.blocked_conclusions),
             "violation_count": len(self.safety_violations),
-            "recent_violations": list(self.safety_violations)[-5:]
-            if self.safety_violations
-            else [],
+            "recent_violations": (
+                list(self.safety_violations)[-5:] if self.safety_violations else []
+            ),
         }

@@ -35,9 +35,9 @@ import time
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, is_dataclass
 from enum import Enum
+
 # import numpy as np # Original import
-from typing import (Any, Callable, Dict, List, Optional, Set,  # Add Union here
-                    Union)
+from typing import Any, Callable, Dict, List, Optional, Set, Union  # Add Union here
 from unittest.mock import MagicMock  # ADDED for fallback
 
 # --- START FIX: Add numpy fallback ---
@@ -93,9 +93,11 @@ except ImportError:
 # Import necessary types for type checking if possible, handle gracefully if not
 try:
     # Use real imports if available
-    from .motivational_introspection import (ObjectiveAnalysis,
-                                             ObjectiveStatus,
-                                             ProposalValidation)
+    from .motivational_introspection import (
+        ObjectiveAnalysis,
+        ObjectiveStatus,
+        ProposalValidation,
+    )
 
     MOTIVATIONAL_INTROSPECTION_AVAILABLE = True
 except ImportError:
@@ -1025,7 +1027,9 @@ class TransparencyInterface:
                     try:
                         pressure = self.self_improvement_drive._csiu_pressure(U_ewma)
                     except Exception as e:
-                        logger.error(f"Error calculating CSIU pressure: {e}", exc_info=True)
+                        logger.error(
+                            f"Error calculating CSIU pressure: {e}", exc_info=True
+                        )
 
             internal_audit = {
                 "csiu": {
@@ -1035,9 +1039,11 @@ class TransparencyInterface:
                         for k, v in csiu_weights.items()
                     },
                     "telemetry": {
-                        k: round(self._safe_float(v, 0.0), 3)
-                        if isinstance(v, (int, float))
-                        else str(v)
+                        k: (
+                            round(self._safe_float(v, 0.0), 3)
+                            if isinstance(v, (int, float))
+                            else str(v)
+                        )
                         for k, v in cur_telemetry.items()
                     },
                     "timestamp": time.time(),
@@ -1613,7 +1619,9 @@ class TransparencyInterface:
                         csiu_summary.get("weights", {}).items(),
                         key=lambda item: item[1],
                         reverse=True,
-                    )[:3],  # Top 3 weights
+                    )[
+                        :3
+                    ],  # Top 3 weights
                 }
 
         try:

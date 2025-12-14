@@ -9,9 +9,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from distributed_sharder import (MAX_SHARD_SIZE_MB, CompressionType,
-                                 DistributedSharder, PruningStrategy,
-                                 ShardMetadata, create_sharder)
+from distributed_sharder import (
+    MAX_SHARD_SIZE_MB,
+    CompressionType,
+    DistributedSharder,
+    PruningStrategy,
+    ShardMetadata,
+    create_sharder,
+)
 
 
 @pytest.fixture
@@ -47,7 +52,7 @@ class TestShardMetadata:
             dtype="float32",
             compressed=False,
             compressor="none",
-            num_nodes=4
+            num_nodes=4,
         )
 
         assert meta.axis == 0
@@ -64,7 +69,7 @@ class TestShardMetadata:
             dtype="float32",
             compressed=True,
             compressor="gzip",
-            num_nodes=2
+            num_nodes=2,
         )
 
         d = meta.to_dict()
@@ -76,14 +81,14 @@ class TestShardMetadata:
     def test_from_dict(self):
         """Test creation from dictionary."""
         d = {
-            'axis': 0,
-            'original_shape': (100, 50),
-            'shard_shapes': [(50, 50), (50, 50)],
-            'shard_slices': [(0, 50), (50, 100)],
-            'dtype': 'float32',
-            'compressed': False,
-            'compressor': 'none',
-            'num_nodes': 2
+            "axis": 0,
+            "original_shape": (100, 50),
+            "shard_shapes": [(50, 50), (50, 50)],
+            "shard_slices": [(0, 50), (50, 100)],
+            "dtype": "float32",
+            "compressed": False,
+            "compressor": "none",
+            "num_nodes": 2,
         }
 
         meta = ShardMetadata.from_dict(d)
@@ -140,10 +145,7 @@ class TestDistributedSharder:
     def test_shard_tensor_compression_gzip(self, sharder, test_tensor):
         """Test sharding with gzip compression."""
         shards, meta = sharder.shard_tensor(
-            test_tensor,
-            num_nodes=4,
-            compress=True,
-            compression_type="gzip"
+            test_tensor, num_nodes=4, compress=True, compression_type="gzip"
         )
 
         assert meta.compressed
@@ -169,10 +171,7 @@ class TestDistributedSharder:
     def test_unshard_compressed(self, sharder, test_tensor):
         """Test unsharding compressed shards."""
         shards, meta = sharder.shard_tensor(
-            test_tensor,
-            num_nodes=4,
-            compress=True,
-            compression_type="gzip"
+            test_tensor, num_nodes=4, compress=True, compression_type="gzip"
         )
 
         reconstructed = sharder.unshard(shards, meta)
@@ -197,9 +196,7 @@ class TestDistributedSharder:
         tensor = np.random.randn(50, 50).astype(np.float32)
 
         pruned, mask, threshold = sharder.prune_tokens(
-            tensor,
-            strategy="magnitude",
-            target_sparsity=0.5
+            tensor, strategy="magnitude", target_sparsity=0.5
         )
 
         assert pruned.shape == tensor.shape
@@ -215,9 +212,7 @@ class TestDistributedSharder:
         tensor = np.random.randn(50, 50).astype(np.float32)
 
         pruned, mask, threshold = sharder.prune_tokens(
-            tensor,
-            strategy="random",
-            target_sparsity=0.7
+            tensor, strategy="random", target_sparsity=0.7
         )
 
         actual_sparsity = 1.0 - (np.count_nonzero(pruned) / pruned.size)
@@ -228,9 +223,7 @@ class TestDistributedSharder:
         tensor = np.random.randn(50, 50).astype(np.float32)
 
         pruned, mask, threshold = sharder.prune_tokens(
-            tensor,
-            strategy="structured",
-            target_sparsity=0.5
+            tensor, strategy="structured", target_sparsity=0.5
         )
 
         assert pruned.shape == tensor.shape
@@ -281,10 +274,7 @@ class TestDistributedSharder:
 
     def test_dynamic_batch_shape_validation(self, sharder):
         """Test batch shape validation."""
-        tensors = [
-            np.random.randn(10, 10),
-            np.random.randn(10, 5)  # Different shape
-        ]
+        tensors = [np.random.randn(10, 10), np.random.randn(10, 5)]  # Different shape
 
         with pytest.raises(ValueError, match="incompatible shape"):
             sharder.dynamic_batch(tensors, validate_shapes=True)
@@ -328,7 +318,7 @@ class TestDistributedSharder:
 
         stats = sharder.get_stats()
 
-        assert stats['shards_created'] == 6  # 4 + 2
+        assert stats["shards_created"] == 6  # 4 + 2
 
     def test_reset_stats(self, sharder, test_tensor):
         """Test resetting statistics."""
@@ -337,7 +327,7 @@ class TestDistributedSharder:
         sharder.reset_stats()
 
         stats = sharder.get_stats()
-        assert stats['shards_created'] == 0
+        assert stats["shards_created"] == 0
 
     def test_get_last_metadata(self, sharder, test_tensor):
         """Test getting last metadata."""
@@ -368,7 +358,7 @@ class TestDryRunMode:
 
         shards, meta = sharder.shard_tensor(tensor, num_nodes=4)
 
-        assert sharder.stats['dry_run_operations'] == 1
+        assert sharder.stats["dry_run_operations"] == 1
 
     def test_dry_run_unshard(self):
         """Test unsharding in dry run mode."""
@@ -376,7 +366,7 @@ class TestDryRunMode:
 
         result = sharder.unshard([np.array([1, 2, 3])])
 
-        assert sharder.stats['dry_run_operations'] == 1
+        assert sharder.stats["dry_run_operations"] == 1
 
     def test_dry_run_prune(self):
         """Test pruning in dry run mode."""
@@ -385,7 +375,7 @@ class TestDryRunMode:
 
         pruned, mask, thr = sharder.prune_tokens(tensor, strategy="magnitude")
 
-        assert sharder.stats['dry_run_operations'] == 1
+        assert sharder.stats["dry_run_operations"] == 1
 
 
 if __name__ == "__main__":

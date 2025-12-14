@@ -65,9 +65,9 @@ def compute_loss_metrics_eval(
         logits_flat,
         targets_flat,
         reduction="none",
-        ignore_index=ignore_index
-        if ignore_index is not None
-        else -100,  # default HF ignore_index
+        ignore_index=(
+            ignore_index if ignore_index is not None else -100
+        ),  # default HF ignore_index
     )
 
     # Build valid mask

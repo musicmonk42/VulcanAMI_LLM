@@ -113,9 +113,9 @@ class LowRankDraftTransformer(nn.Module):
         if input_ids.dim() == 1:  # ENHANCEMENT: Batch encode if 1D
             input_ids = input_ids.unsqueeze(0)
 
-        assert input_ids.device == next(self.parent.parameters()).device, (
-            "Input and parent model device mismatch in encode."
-        )
+        assert (
+            input_ids.device == next(self.parent.parameters()).device
+        ), "Input and parent model device mismatch in encode."
 
         self.parent.eval()
         with torch.autocast(

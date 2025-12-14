@@ -51,7 +51,9 @@ except ImportError as e:
 
 # Meta-Reasoning Component Imports
 try:
-    from vulcan.world_model.meta_reasoning.self_improvement_drive import SelfImprovementDrive
+    from vulcan.world_model.meta_reasoning.self_improvement_drive import (
+        SelfImprovementDrive,
+    )
 
     meta_reasoning_deps["self_improvement_drive"] = True
 except ImportError as e:
@@ -61,7 +63,9 @@ except ImportError as e:
     meta_reasoning_deps["self_improvement_drive"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.motivational_introspection import MotivationalIntrospection
+    from vulcan.world_model.meta_reasoning.motivational_introspection import (
+        MotivationalIntrospection,
+    )
 
     meta_reasoning_deps["motivational_introspection"] = True
 except ImportError as e:
@@ -77,7 +81,9 @@ except ImportError as e:
     meta_reasoning_deps["objective_hierarchy"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.objective_negotiator import ObjectiveNegotiator
+    from vulcan.world_model.meta_reasoning.objective_negotiator import (
+        ObjectiveNegotiator,
+    )
 
     meta_reasoning_deps["objective_negotiator"] = True
 except ImportError as e:
@@ -85,7 +91,9 @@ except ImportError as e:
     meta_reasoning_deps["objective_negotiator"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.goal_conflict_detector import GoalConflictDetector
+    from vulcan.world_model.meta_reasoning.goal_conflict_detector import (
+        GoalConflictDetector,
+    )
 
     meta_reasoning_deps["goal_conflict_detector"] = True
 except ImportError as e:
@@ -101,7 +109,9 @@ except ImportError as e:
     meta_reasoning_deps["preference_learner"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.value_evolution_tracker import ValueEvolutionTracker
+    from vulcan.world_model.meta_reasoning.value_evolution_tracker import (
+        ValueEvolutionTracker,
+    )
 
     meta_reasoning_deps["value_evolution_tracker"] = True
 except ImportError as e:
@@ -109,7 +119,9 @@ except ImportError as e:
     meta_reasoning_deps["value_evolution_tracker"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import EthicalBoundaryMonitor
+    from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
+        EthicalBoundaryMonitor,
+    )
 
     meta_reasoning_deps["ethical_boundary_monitor"] = True
 except ImportError as e:
@@ -117,7 +129,9 @@ except ImportError as e:
     meta_reasoning_deps["ethical_boundary_monitor"] = False
 
 try:
-    from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import CuriosityRewardShaper
+    from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
+        CuriosityRewardShaper,
+    )
 
     meta_reasoning_deps["curiosity_reward_shaper"] = True
 except ImportError as e:
@@ -145,8 +159,9 @@ except ImportError as e:
 try:
     # Assuming 'validation_tracker' refers to a component
     # Adjust the import path and class name as needed
-    from vulcan.world_model.meta_reasoning.validation_tracker import \
-        ValidationTracker  # Placeholder
+    from vulcan.world_model.meta_reasoning.validation_tracker import (
+        ValidationTracker,
+    )  # Placeholder
 
     meta_reasoning_deps["validation_tracker"] = True
 except ImportError as e:
@@ -156,8 +171,9 @@ except ImportError as e:
 try:
     # Assuming 'transparency_interface' refers to a component
     # Adjust the import path and class name as needed
-    from vulcan.world_model.meta_reasoning.transparency_interface import \
-        TransparencyInterface  # Placeholder
+    from vulcan.world_model.meta_reasoning.transparency_interface import (
+        TransparencyInterface,
+    )  # Placeholder
 
     meta_reasoning_deps["transparency_interface"] = True
 except ImportError as e:
@@ -166,8 +182,9 @@ except ImportError as e:
 
 try:
     # Import CounterfactualObjectiveReasoner from counterfactual_objectives
-    from vulcan.world_model.meta_reasoning.counterfactual_objectives import \
-        CounterfactualObjectiveReasoner
+    from vulcan.world_model.meta_reasoning.counterfactual_objectives import (
+        CounterfactualObjectiveReasoner,
+    )
 
     meta_reasoning_deps["counterfactual_objectives"] = True
 except ImportError as e:
@@ -324,7 +341,9 @@ class EnhancedCollectiveDeps:
     compositional: Any = None
     """CompositionalUnderstanding - Compositional concept learning"""
 
-    meta_cognitive: Any = None  # Keep this? Meta-reasoning covers much of it. Decide based on implementation.
+    meta_cognitive: Any = (
+        None  # Keep this? Meta-reasoning covers much of it. Decide based on implementation.
+    )
     """MetaCognitiveMonitor - Meta-cognitive monitoring and self-reflection"""
 
     world_model: Any = None
@@ -530,9 +549,8 @@ class EnhancedCollectiveDeps:
                     and not meta_reasoning_deps.get(field_name, True)
                 ):
                     missing[category].append(f"{field_name} (import failed)")
-                elif (
-                    category == DependencyCategory.LEARNING
-                    and not learning_deps.get(field_name, True)
+                elif category == DependencyCategory.LEARNING and not learning_deps.get(
+                    field_name, True
                 ):
                     missing[category].append(f"{field_name} (import failed)")
                 elif (
@@ -687,7 +705,9 @@ class EnhancedCollectiveDeps:
         except Exception as e:
             try:
                 logger.error(f"Error during shutdown in destructor: {e}", exc_info=True)
-            except Exception:  # nosec B110 - Logger may be unavailable during interpreter shutdown
+            except (
+                Exception
+            ):  # nosec B110 - Logger may be unavailable during interpreter shutdown
                 pass
 
 
@@ -704,11 +724,11 @@ def create_minimal_deps(
     enable_learning: bool = False,
     enable_distributed: bool = False,
     enable_meta_reasoning: bool = False,
-    max_agents: int = DEFAULT_MAX_AGENTS
+    max_agents: int = DEFAULT_MAX_AGENTS,
 ) -> EnhancedCollectiveDeps:
     """
     Create dependencies with core components and optionally learning/meta-reasoning
-    
+
     Uses minimal/default configuration for all components. For more extensive
     configuration options, use create_full_deps() instead.
 
@@ -722,88 +742,105 @@ def create_minimal_deps(
         EnhancedCollectiveDeps with minimal configuration plus optional components
     """
     deps = EnhancedCollectiveDeps()
-    
+
     # If any optional components requested, initialize them with minimal config
     if enable_learning or enable_distributed or enable_meta_reasoning:
         # Initialize learning components - minimal config (no parameters required)
         if enable_learning and learning_deps.get("continual", False):
             try:
                 from vulcan.learning.continual_learning import ContinualLearner
+
                 deps.continual = ContinualLearner()
                 logger.info("✓ ContinualLearner initialized (minimal config)")
             except Exception as e:
                 logger.debug(f"Could not initialize ContinualLearner: {e}")
-        
+
         # Initialize distributed coordinator - minimal config (configurable max_agents)
         if enable_distributed and distributed_deps.get("distributed", False):
             try:
                 from vulcan.planning import DistributedCoordinator
+
                 deps.distributed = DistributedCoordinator(max_agents=max_agents)
-                logger.info(f"✓ DistributedCoordinator initialized (minimal config, max_agents={max_agents})")
+                logger.info(
+                    f"✓ DistributedCoordinator initialized (minimal config, max_agents={max_agents})"
+                )
             except Exception as e:
                 logger.debug(f"Could not initialize DistributedCoordinator: {e}")
-        
+
         # Initialize meta-reasoning components - minimal config via helper
         if enable_meta_reasoning:
             _initialize_meta_reasoning_components(deps)
-    
+
     return deps
 
 
 def _initialize_meta_reasoning_components(deps: EnhancedCollectiveDeps) -> None:
     """
     Helper function to initialize meta-reasoning components with minimal configuration
-    
+
     Initializes components with default parameters suitable for minimal setups.
     For more extensive configuration, use create_full_deps() instead.
-    
+
     Args:
         deps: EnhancedCollectiveDeps instance to populate
     """
     # PreferenceLearner - minimal config
     if meta_reasoning_deps.get("preference_learner", False):
         try:
-            from vulcan.world_model.meta_reasoning.preference_learner import PreferenceLearner
+            from vulcan.world_model.meta_reasoning.preference_learner import (
+                PreferenceLearner,
+            )
+
             deps.preference_learner = PreferenceLearner()
             logger.info("✓ PreferenceLearner initialized (minimal config)")
         except Exception as e:
             logger.debug(f"Could not initialize PreferenceLearner: {e}")
-    
+
     # ValueEvolutionTracker - minimal config
     if meta_reasoning_deps.get("value_evolution_tracker", False):
         try:
-            from vulcan.world_model.meta_reasoning.value_evolution_tracker import ValueEvolutionTracker
+            from vulcan.world_model.meta_reasoning.value_evolution_tracker import (
+                ValueEvolutionTracker,
+            )
+
             deps.value_evolution_tracker = ValueEvolutionTracker()
             logger.info("✓ ValueEvolutionTracker initialized (minimal config)")
         except Exception as e:
             logger.debug(f"Could not initialize ValueEvolutionTracker: {e}")
-    
+
     # EthicalBoundaryMonitor - minimal config
     # Note: load_defaults=False to avoid automatic boundary loading in minimal setups
     if meta_reasoning_deps.get("ethical_boundary_monitor", False):
         try:
-            from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import EthicalBoundaryMonitor
+            from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
+                EthicalBoundaryMonitor,
+            )
+
             deps.ethical_boundary_monitor = EthicalBoundaryMonitor(load_defaults=False)
             logger.info("✓ EthicalBoundaryMonitor initialized (minimal config)")
         except Exception as e:
             logger.debug(f"Could not initialize EthicalBoundaryMonitor: {e}")
-    
+
     # CuriosityRewardShaper - minimal config
     if meta_reasoning_deps.get("curiosity_reward_shaper", False):
         try:
-            from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import CuriosityRewardShaper
+            from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
+                CuriosityRewardShaper,
+            )
+
             deps.curiosity_reward_shaper = CuriosityRewardShaper()
             logger.info("✓ CuriosityRewardShaper initialized (minimal config)")
         except Exception as e:
             logger.debug(f"Could not initialize CuriosityRewardShaper: {e}")
-    
+
     # InternalCritic - minimal config
     # Note: ethical_boundary_monitor reference is optional and will be None if not initialized
     if meta_reasoning_deps.get("internal_critic", False):
         try:
             from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
+
             # Only pass ethical_boundary_monitor if it was successfully initialized
-            ethical_monitor = getattr(deps, 'ethical_boundary_monitor', None)
+            ethical_monitor = getattr(deps, "ethical_boundary_monitor", None)
             deps.internal_critic = InternalCritic(
                 ethical_boundary_monitor=ethical_monitor
             )
@@ -817,7 +854,7 @@ def create_full_deps(
 ) -> EnhancedCollectiveDeps:
     """
     Create fully initialized dependencies container with extensive configuration
-    
+
     Initializes components with full configuration options including cross-dependencies
     and integration with validation, transparency, and other subsystems. For simpler
     initialization with defaults, use create_minimal_deps() instead.
@@ -830,7 +867,7 @@ def create_full_deps(
 
     Returns:
         EnhancedCollectiveDeps with components initialized based on availability
-        
+
     Note:
         - Components are only initialized if their imports succeed (checked via *_deps dicts)
         - Provided kwargs override auto-initialization for specific components
@@ -853,6 +890,7 @@ def create_full_deps(
     if deps.continual is None and learning_deps.get("continual", False):
         try:
             from vulcan.learning.continual_learning import ContinualLearner
+
             deps.continual = ContinualLearner()
             logger.info("✓ ContinualLearner initialized")
         except Exception as e:
@@ -861,23 +899,35 @@ def create_full_deps(
     # ========================================
     # DISTRIBUTED: Initialize distributed coordinator
     # ========================================
-    if enable_distributed and deps.distributed is None and distributed_deps.get("distributed", False):
+    if (
+        enable_distributed
+        and deps.distributed is None
+        and distributed_deps.get("distributed", False)
+    ):
         try:
             from vulcan.planning import DistributedCoordinator
+
             max_agents = getattr(config, "max_distributed_agents", 8) if config else 8
             deps.distributed = DistributedCoordinator(max_agents=max_agents)
-            logger.info(f"✓ DistributedCoordinator initialized with max_agents={max_agents}")
+            logger.info(
+                f"✓ DistributedCoordinator initialized with max_agents={max_agents}"
+            )
         except Exception as e:
             logger.warning(f"Failed to initialize DistributedCoordinator: {e}")
 
     # ========================================
     # META_REASONING: Initialize meta-reasoning components
     # ========================================
-    
+
     # PreferenceLearner
-    if deps.preference_learner is None and meta_reasoning_deps.get("preference_learner", False):
+    if deps.preference_learner is None and meta_reasoning_deps.get(
+        "preference_learner", False
+    ):
         try:
-            from vulcan.world_model.meta_reasoning.preference_learner import PreferenceLearner
+            from vulcan.world_model.meta_reasoning.preference_learner import (
+                PreferenceLearner,
+            )
+
             deps.preference_learner = PreferenceLearner(
                 decay_rate=0.99,
                 exploration_bonus=0.1,
@@ -889,9 +939,14 @@ def create_full_deps(
             logger.warning(f"Failed to initialize PreferenceLearner: {e}")
 
     # ValueEvolutionTracker
-    if deps.value_evolution_tracker is None and meta_reasoning_deps.get("value_evolution_tracker", False):
+    if deps.value_evolution_tracker is None and meta_reasoning_deps.get(
+        "value_evolution_tracker", False
+    ):
         try:
-            from vulcan.world_model.meta_reasoning.value_evolution_tracker import ValueEvolutionTracker
+            from vulcan.world_model.meta_reasoning.value_evolution_tracker import (
+                ValueEvolutionTracker,
+            )
+
             deps.value_evolution_tracker = ValueEvolutionTracker(
                 max_history=10000,
                 drift_threshold=0.15,
@@ -904,9 +959,14 @@ def create_full_deps(
             logger.warning(f"Failed to initialize ValueEvolutionTracker: {e}")
 
     # EthicalBoundaryMonitor
-    if deps.ethical_boundary_monitor is None and meta_reasoning_deps.get("ethical_boundary_monitor", False):
+    if deps.ethical_boundary_monitor is None and meta_reasoning_deps.get(
+        "ethical_boundary_monitor", False
+    ):
         try:
-            from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import EthicalBoundaryMonitor
+            from vulcan.world_model.meta_reasoning.ethical_boundary_monitor import (
+                EthicalBoundaryMonitor,
+            )
+
             deps.ethical_boundary_monitor = EthicalBoundaryMonitor(
                 strict_mode=False,
                 validation_tracker=deps.validation_tracker,
@@ -919,9 +979,14 @@ def create_full_deps(
             logger.warning(f"Failed to initialize EthicalBoundaryMonitor: {e}")
 
     # CuriosityRewardShaper
-    if deps.curiosity_reward_shaper is None and meta_reasoning_deps.get("curiosity_reward_shaper", False):
+    if deps.curiosity_reward_shaper is None and meta_reasoning_deps.get(
+        "curiosity_reward_shaper", False
+    ):
         try:
-            from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import CuriosityRewardShaper
+            from vulcan.world_model.meta_reasoning.curiosity_reward_shaper import (
+                CuriosityRewardShaper,
+            )
+
             deps.curiosity_reward_shaper = CuriosityRewardShaper(
                 curiosity_weight=0.1,
                 decay_rate=0.99,
@@ -935,11 +1000,14 @@ def create_full_deps(
             logger.warning(f"Failed to initialize CuriosityRewardShaper: {e}")
 
     # InternalCritic
-    if deps.internal_critic is None and meta_reasoning_deps.get("internal_critic", False):
+    if deps.internal_critic is None and meta_reasoning_deps.get(
+        "internal_critic", False
+    ):
         try:
             from vulcan.world_model.meta_reasoning.internal_critic import InternalCritic
+
             # Only pass ethical_boundary_monitor if it exists (may be None)
-            ethical_monitor = getattr(deps, 'ethical_boundary_monitor', None)
+            ethical_monitor = getattr(deps, "ethical_boundary_monitor", None)
             deps.internal_critic = InternalCritic(
                 strict_mode=False,
                 max_history=10000,
@@ -992,8 +1060,7 @@ def create_self_improving_deps(
         if deps.experiment_generator is None:
             try:
                 # Import here to potentially avoid import loops if called early
-                from ..curiosity_engine.experiment_generator import \
-                    ExperimentGenerator
+                from ..curiosity_engine.experiment_generator import ExperimentGenerator
 
                 deps.experiment_generator = ExperimentGenerator(
                     default_timeout=getattr(config, "exp_gen_timeout", 30.0),
@@ -1012,8 +1079,7 @@ def create_self_improving_deps(
         if deps.problem_executor is None:
             try:
                 # Import here
-                from ..problem_decomposer.problem_executor import \
-                    ProblemExecutor
+                from ..problem_decomposer.problem_executor import ProblemExecutor
 
                 # ProblemExecutor likely needs other dependencies like validator, bridge
                 semantic_bridge = kwargs.get(
@@ -1070,8 +1136,9 @@ def create_self_improving_deps(
             "motivational_introspection", False
         ):
             try:
-                from vulcan.world_model.meta_reasoning.motivational_introspection import \
-                    MotivationalIntrospection
+                from vulcan.world_model.meta_reasoning.motivational_introspection import (
+                    MotivationalIntrospection,
+                )
 
                 if deps.world_model:  # Assuming it needs world_model
                     deps.motivational_introspection = MotivationalIntrospection(
@@ -1179,7 +1246,7 @@ def print_dependency_report(deps: EnhancedCollectiveDeps):
     safe_print("\n" + "-" * 60)
     safe_print("IMPORT STATUS BY CATEGORY:")
     safe_print("-" * 60)
-    
+
     # Learning import status
     learning_import_status = status.get("learning_import_status", {})
     if learning_import_status:
@@ -1189,7 +1256,7 @@ def print_dependency_report(deps: EnhancedCollectiveDeps):
             safe_print(
                 f"  {symbol} {component}: {'Import OK' if is_imported else 'Import FAILED'}"
             )
-    
+
     # Distributed import status
     distributed_import_status = status.get("distributed_import_status", {})
     if distributed_import_status:
@@ -1199,7 +1266,7 @@ def print_dependency_report(deps: EnhancedCollectiveDeps):
             safe_print(
                 f"  {symbol} {component}: {'Import OK' if is_imported else 'Import FAILED'}"
             )
-    
+
     # Meta-reasoning import status
     mr_import_status = status.get("meta_reasoning_import_status", {})
     if mr_import_status:

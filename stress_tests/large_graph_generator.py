@@ -20,8 +20,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import (Any, Callable, Dict, Iterator, List, Optional, Set, Tuple,
-                    Union)
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union
 
 # Constants
 DEFAULT_PROBABILITY = 0.05
@@ -37,9 +36,11 @@ MAX_NESTING_DEPTH = 20
 DEFAULT_CHUNK_SIZE = 10000
 MIN_EDGE_SAMPLE_SIZE = 100000
 
+
 # Graph topology types
 class GraphTopology(Enum):
     """Supported graph topology types."""
+
     RANDOM = "random"
     ERDOS_RENYI = "erdos_renyi"
     BARABASI_ALBERT = "barabasi_albert"  # Scale-free network
@@ -57,9 +58,11 @@ class GraphTopology(Enum):
     COMMUNITY = "community"  # Multiple connected communities
     CUSTOM = "custom"
 
+
 @dataclass
 class GraphStatistics:
     """Statistics about a generated graph."""
+
     node_count: int = 0
     edge_count: int = 0
     avg_degree: float = 0.0
@@ -91,37 +94,44 @@ class GraphStatistics:
             "avg_path_length": round(self.avg_path_length, 3),
             "clustering_coefficient": round(self.clustering_coefficient, 6),
             "generation_time_ms": round(self.generation_time_ms, 2),
-            "size_bytes": self.size_bytes
+            "size_bytes": self.size_bytes,
         }
+
 
 @dataclass
 class NodeProperties:
     """Properties for graph nodes."""
+
     node_type: str = "ComputeNode"
     weight: float = 1.0
     metadata: Dict[str, Any] = field(default_factory=dict)
     attributes: Dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass
 class EdgeProperties:
     """Properties for graph edges."""
+
     edge_type: str = "data"
     weight: float = 1.0
     directed: bool = True
     metadata: Dict[str, Any] = field(default_factory=dict)
     attributes: Dict[str, Any] = field(default_factory=dict)
 
+
 class GraphGenerator:
     """
     Comprehensive generator for large-scale IR graphs with multiple topologies.
     """
 
-    def __init__(self,
-                 seed: Optional[int] = None,
-                 verbose: bool = False,
-                 optimize_memory: bool = True,
-                 validate_output: bool = True,
-                 compression: bool = False):
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        verbose: bool = False,
+        optimize_memory: bool = True,
+        validate_output: bool = True,
+        compression: bool = False,
+    ):
         """
         Initialize the graph generator.
 
@@ -150,8 +160,16 @@ class GraphGenerator:
         self.total_edges_generated = 0
 
         # Node type distribution for realistic graphs
-        self.node_types = ["InputNode", "OutputNode", "ComputeNode", "TransformNode",
-                          "AggregateNode", "FilterNode", "JoinNode", "SplitNode"]
+        self.node_types = [
+            "InputNode",
+            "OutputNode",
+            "ComputeNode",
+            "TransformNode",
+            "AggregateNode",
+            "FilterNode",
+            "JoinNode",
+            "SplitNode",
+        ]
 
         # Edge type distribution
         self.edge_types = ["data", "control", "dependency", "reference", "temporal"]
@@ -164,11 +182,13 @@ class GraphGenerator:
         if self.verbose:
             print(message)
 
-    def generate_graph(self,
-                       num_nodes: int = 100,
-                       num_edges: Optional[int] = None,
-                       topology: GraphTopology = GraphTopology.RANDOM,
-                       **kwargs) -> Dict[str, Any]:
+    def generate_graph(
+        self,
+        num_nodes: int = 100,
+        num_edges: Optional[int] = None,
+        topology: GraphTopology = GraphTopology.RANDOM,
+        **kwargs,
+    ) -> Dict[str, Any]:
         """
         Generate a graph with specified topology and size.
 
@@ -226,7 +246,7 @@ class GraphGenerator:
             "generation_time_ms": generation_time,
             "seed": self.seed,
             "generator_version": "2.0.0",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         # Validate if requested and graph is small enough
@@ -242,13 +262,19 @@ class GraphGenerator:
             stats = self._calculate_statistics(graph)
             self._log(f"Generated {topology.value} graph in {generation_time:.2f}ms")
             self._log(f"  Nodes: {stats.node_count}, Edges: {stats.edge_count}")
-            self._log(f"  Density: {stats.density:.6f}, Avg Degree: {stats.avg_degree:.2f}")
+            self._log(
+                f"  Density: {stats.density:.6f}, Avg Degree: {stats.avg_degree:.2f}"
+            )
 
         return graph
 
-    def _generate_random_graph(self, num_nodes: int, num_edges: Optional[int],
-                              allow_self_loops: bool = False,
-                              allow_multi_edges: bool = False) -> Dict[str, Any]:
+    def _generate_random_graph(
+        self,
+        num_nodes: int,
+        num_edges: Optional[int],
+        allow_self_loops: bool = False,
+        allow_multi_edges: bool = False,
+    ) -> Dict[str, Any]:
         """Generate a random graph with specified nodes and edges."""
         if num_edges is None:
             # Default to sparse graph
@@ -280,11 +306,17 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_erdos_renyi_graph(self, num_nodes: int, probability: float = None) -> Dict[str, Any]:
+    def _generate_erdos_renyi_graph(
+        self, num_nodes: int, probability: float = None
+    ) -> Dict[str, Any]:
         """Generate an Erdős-Rényi random graph."""
         if probability is None:
             # Use default that creates connected graphs with high probability
-            probability = 2 * math.log(num_nodes) / num_nodes if num_nodes > 1 else DEFAULT_PROBABILITY
+            probability = (
+                2 * math.log(num_nodes) / num_nodes
+                if num_nodes > 1
+                else DEFAULT_PROBABILITY
+            )
 
         nodes = self._create_nodes(num_nodes)
         edges = []
@@ -317,7 +349,9 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_barabasi_albert_graph(self, num_nodes: int, m: int = 2) -> Dict[str, Any]:
+    def _generate_barabasi_albert_graph(
+        self, num_nodes: int, m: int = 2
+    ) -> Dict[str, Any]:
         """Generate a Barabási-Albert scale-free network."""
         if m < 1:
             m = 1
@@ -367,8 +401,9 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_watts_strogatz_graph(self, num_nodes: int, k: int = 4,
-                                      rewiring_prob: float = REWIRING_PROBABILITY) -> Dict[str, Any]:
+    def _generate_watts_strogatz_graph(
+        self, num_nodes: int, k: int = 4, rewiring_prob: float = REWIRING_PROBABILITY
+    ) -> Dict[str, Any]:
         """Generate a Watts-Strogatz small-world network."""
         if k >= num_nodes:
             k = num_nodes - 1
@@ -407,8 +442,11 @@ class GraphGenerator:
                 if e["to"] == from_node:
                     existing_targets.add(e["from"])
 
-            available_targets = [f"node_{i}" for i in range(num_nodes)
-                               if f"node_{i}" not in existing_targets and f"node_{i}" != from_node]
+            available_targets = [
+                f"node_{i}"
+                for i in range(num_nodes)
+                if f"node_{i}" not in existing_targets and f"node_{i}" != from_node
+            ]
 
             if available_targets:
                 new_target = random.choice(available_targets)
@@ -416,18 +454,20 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_regular_lattice_graph(self, num_nodes: int, dimensions: int = 2) -> Dict[str, Any]:
+    def _generate_regular_lattice_graph(
+        self, num_nodes: int, dimensions: int = 2
+    ) -> Dict[str, Any]:
         """Generate a regular lattice graph."""
         # Calculate grid dimensions
         if dimensions == 2:
             grid_size = int(math.sqrt(num_nodes))
             actual_nodes = grid_size * grid_size
         elif dimensions == 3:
-            grid_size = int(num_nodes ** (1/3))
-            actual_nodes = grid_size ** 3
+            grid_size = int(num_nodes ** (1 / 3))
+            actual_nodes = grid_size**3
         else:
-            grid_size = int(num_nodes ** (1/dimensions))
-            actual_nodes = grid_size ** dimensions
+            grid_size = int(num_nodes ** (1 / dimensions))
+            actual_nodes = grid_size**dimensions
 
         nodes = self._create_nodes(actual_nodes)
         edges = []
@@ -439,10 +479,16 @@ class GraphGenerator:
                     node_id = i * grid_size + j
                     # Right neighbor
                     if j < grid_size - 1:
-                        edges.append(self._create_edge(f"node_{node_id}", f"node_{node_id + 1}"))
+                        edges.append(
+                            self._create_edge(f"node_{node_id}", f"node_{node_id + 1}")
+                        )
                     # Bottom neighbor
                     if i < grid_size - 1:
-                        edges.append(self._create_edge(f"node_{node_id}", f"node_{node_id + grid_size}"))
+                        edges.append(
+                            self._create_edge(
+                                f"node_{node_id}", f"node_{node_id + grid_size}"
+                            )
+                        )
         elif dimensions == 3:
             for i in range(grid_size):
                 for j in range(grid_size):
@@ -450,16 +496,30 @@ class GraphGenerator:
                         node_id = i * grid_size * grid_size + j * grid_size + k
                         # Connections in 3D
                         if k < grid_size - 1:
-                            edges.append(self._create_edge(f"node_{node_id}", f"node_{node_id + 1}"))
+                            edges.append(
+                                self._create_edge(
+                                    f"node_{node_id}", f"node_{node_id + 1}"
+                                )
+                            )
                         if j < grid_size - 1:
-                            edges.append(self._create_edge(f"node_{node_id}", f"node_{node_id + grid_size}"))
+                            edges.append(
+                                self._create_edge(
+                                    f"node_{node_id}", f"node_{node_id + grid_size}"
+                                )
+                            )
                         if i < grid_size - 1:
-                            edges.append(self._create_edge(f"node_{node_id}", f"node_{node_id + grid_size * grid_size}"))
+                            edges.append(
+                                self._create_edge(
+                                    f"node_{node_id}",
+                                    f"node_{node_id + grid_size * grid_size}",
+                                )
+                            )
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_tree_graph(self, num_nodes: int, branching_factor: int = 2,
-                            balanced: bool = True) -> Dict[str, Any]:
+    def _generate_tree_graph(
+        self, num_nodes: int, branching_factor: int = 2, balanced: bool = True
+    ) -> Dict[str, Any]:
         """Generate a tree graph."""
         nodes = self._create_nodes(num_nodes)
         edges = []
@@ -470,7 +530,9 @@ class GraphGenerator:
                 for j in range(1, branching_factor + 1):
                     child_idx = i * branching_factor + j
                     if child_idx < num_nodes:
-                        edges.append(self._create_edge(f"node_{i}", f"node_{child_idx}"))
+                        edges.append(
+                            self._create_edge(f"node_{i}", f"node_{child_idx}")
+                        )
         else:
             # Generate random tree using corrected Prüfer sequence
             if num_nodes <= 2:
@@ -478,7 +540,9 @@ class GraphGenerator:
                     edges.append(self._create_edge("node_0", "node_1"))
             else:
                 # Generate Prüfer sequence
-                prufer = [random.randint(0, num_nodes - 1) for _ in range(num_nodes - 2)]
+                prufer = [
+                    random.randint(0, num_nodes - 1) for _ in range(num_nodes - 2)
+                ]
 
                 # Decode Prüfer sequence to tree
                 degree = [1] * num_nodes
@@ -490,7 +554,9 @@ class GraphGenerator:
                     # Find first node with degree 1
                     for leaf in range(num_nodes):
                         if degree[leaf] == 1:
-                            edges.append(self._create_edge(f"node_{leaf}", f"node_{node}"))
+                            edges.append(
+                                self._create_edge(f"node_{leaf}", f"node_{node}")
+                            )
                             degree[leaf] -= 1
                             degree[node] -= 1
                             break
@@ -498,12 +564,17 @@ class GraphGenerator:
                 # Connect remaining two nodes with degree 1
                 remaining = [i for i in range(num_nodes) if degree[i] == 1]
                 if len(remaining) == 2:
-                    edges.append(self._create_edge(f"node_{remaining[0]}", f"node_{remaining[1]}"))
+                    edges.append(
+                        self._create_edge(
+                            f"node_{remaining[0]}", f"node_{remaining[1]}"
+                        )
+                    )
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_dag_graph(self, num_nodes: int, num_edges: Optional[int],
-                           layers: Optional[int] = None) -> Dict[str, Any]:
+    def _generate_dag_graph(
+        self, num_nodes: int, num_edges: Optional[int], layers: Optional[int] = None
+    ) -> Dict[str, Any]:
         """Generate a Directed Acyclic Graph (DAG)."""
         nodes = self._create_nodes(num_nodes)
 
@@ -525,10 +596,15 @@ class GraphGenerator:
                 current_layer = layer_assignment[i]
                 # Connect to 1-3 nodes in strictly higher layers
                 connections = random.randint(1, min(3, num_nodes - i - 1))
-                candidates = [j for j in range(i + 1, num_nodes)
-                            if layer_assignment[j] > current_layer]
+                candidates = [
+                    j
+                    for j in range(i + 1, num_nodes)
+                    if layer_assignment[j] > current_layer
+                ]
                 if candidates:
-                    targets = random.sample(candidates, min(connections, len(candidates)))
+                    targets = random.sample(
+                        candidates, min(connections, len(candidates))
+                    )
                     for target in targets:
                         edges.append(self._create_edge(f"node_{i}", f"node_{target}"))
         else:
@@ -545,7 +621,9 @@ class GraphGenerator:
                 if layer_assignment[from_idx] < layer_assignment[to_idx]:
                     edge_key = (from_idx, to_idx)
                     if edge_key not in edge_set:
-                        edges.append(self._create_edge(f"node_{from_idx}", f"node_{to_idx}"))
+                        edges.append(
+                            self._create_edge(f"node_{from_idx}", f"node_{to_idx}")
+                        )
                         edge_set.add(edge_key)
                         edge_count += 1
                 attempts += 1
@@ -563,9 +641,9 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_bipartite_graph(self, num_nodes: int,
-                                 partition_ratio: float = 0.5,
-                                 connection_prob: float = 0.3) -> Dict[str, Any]:
+    def _generate_bipartite_graph(
+        self, num_nodes: int, partition_ratio: float = 0.5, connection_prob: float = 0.3
+    ) -> Dict[str, Any]:
         """Generate a bipartite graph."""
         partition_1_size = int(num_nodes * partition_ratio)
         partition_2_size = num_nodes - partition_1_size
@@ -612,7 +690,9 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_ring_graph(self, num_nodes: int, k_neighbors: int = 1) -> Dict[str, Any]:
+    def _generate_ring_graph(
+        self, num_nodes: int, k_neighbors: int = 1
+    ) -> Dict[str, Any]:
         """Generate a ring graph (circular connection pattern)."""
         nodes = self._create_nodes(num_nodes)
         edges = []
@@ -624,7 +704,9 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_mesh_graph(self, num_nodes: int, dimensions: Tuple[int, ...] = None) -> Dict[str, Any]:
+    def _generate_mesh_graph(
+        self, num_nodes: int, dimensions: Tuple[int, ...] = None
+    ) -> Dict[str, Any]:
         """Generate a mesh graph."""
         if dimensions is None:
             # Default to 2D mesh
@@ -667,7 +749,9 @@ class GraphGenerator:
                 neighbor_id = get_node_id(neighbor_coords)
                 edge_key = (node_id, neighbor_id)
                 if edge_key not in edge_set:
-                    edges.append(self._create_edge(f"node_{node_id}", f"node_{neighbor_id}"))
+                    edges.append(
+                        self._create_edge(f"node_{node_id}", f"node_{neighbor_id}")
+                    )
                     edge_set.add(edge_key)
 
         return self._create_graph_structure(nodes, edges)
@@ -677,7 +761,7 @@ class GraphGenerator:
         Generate a hypercube graph.
         Note: num_nodes is determined by dimension (2^dimension nodes).
         """
-        num_nodes = 2 ** dimension
+        num_nodes = 2**dimension
         nodes = self._create_nodes(num_nodes)
         edges = []
 
@@ -690,8 +774,9 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_hierarchical_graph(self, num_nodes: int, levels: int = 3,
-                                    branching_factor: int = 3) -> Dict[str, Any]:
+    def _generate_hierarchical_graph(
+        self, num_nodes: int, levels: int = 3, branching_factor: int = 3
+    ) -> Dict[str, Any]:
         """Generate a hierarchical graph with multiple levels."""
         nodes = []
         edges = []
@@ -711,15 +796,19 @@ class GraphGenerator:
         for level in range(1, levels):
             nodes_in_level = len(level_nodes[level - 1]) * branching_factor
             for _ in range(min(nodes_in_level, num_nodes - node_counter)):
-                node = self._create_node(f"node_{node_counter}",
-                                       node_type="ComputeNode" if level < levels - 1 else "OutputNode")
+                node = self._create_node(
+                    f"node_{node_counter}",
+                    node_type="ComputeNode" if level < levels - 1 else "OutputNode",
+                )
                 node["level"] = level
                 nodes.append(node)
                 level_nodes[level].append(node_counter)
 
                 # Connect to parent
                 parent_idx = random.choice(level_nodes[level - 1])
-                edges.append(self._create_edge(f"node_{parent_idx}", f"node_{node_counter}"))
+                edges.append(
+                    self._create_edge(f"node_{parent_idx}", f"node_{node_counter}")
+                )
 
                 node_counter += 1
                 if node_counter >= num_nodes:
@@ -737,14 +826,21 @@ class GraphGenerator:
             # Connect to random parent
             if level_nodes[levels - 2]:
                 parent_idx = random.choice(level_nodes[levels - 2])
-                edges.append(self._create_edge(f"node_{parent_idx}", f"node_{node_counter}"))
+                edges.append(
+                    self._create_edge(f"node_{parent_idx}", f"node_{node_counter}")
+                )
 
             node_counter += 1
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_community_graph(self, num_nodes: int, num_communities: int = 3,
-                                 intra_prob: float = 0.3, inter_prob: float = 0.01) -> Dict[str, Any]:
+    def _generate_community_graph(
+        self,
+        num_nodes: int,
+        num_communities: int = 3,
+        intra_prob: float = 0.3,
+        inter_prob: float = 0.01,
+    ) -> Dict[str, Any]:
         """Generate a graph with community structure."""
         nodes = []
         edges = []
@@ -781,9 +877,13 @@ class GraphGenerator:
 
         return self._create_graph_structure(nodes, edges)
 
-    def _generate_custom_graph(self, num_nodes: int, num_edges: Optional[int],
-                              generator_func: Optional[Callable] = None,
-                              **kwargs) -> Dict[str, Any]:
+    def _generate_custom_graph(
+        self,
+        num_nodes: int,
+        num_edges: Optional[int],
+        generator_func: Optional[Callable] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
         """Generate a custom graph using a provided generator function."""
         if generator_func is not None:
             return generator_func(num_nodes, num_edges, **kwargs)
@@ -799,28 +899,27 @@ class GraphGenerator:
             nodes.append(self._create_node(f"node_{i}", node_type))
         return nodes
 
-    def _create_node(self, node_id: str, node_type: Optional[str] = None) -> Dict[str, Any]:
+    def _create_node(
+        self, node_id: str, node_type: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Create a single node."""
         if node_type is None:
             node_type = random.choice(self.node_types)
 
-        node = {
-            "id": node_id,
-            "type": node_type
-        }
+        node = {"id": node_id, "type": node_type}
 
         # Add optional properties
         if random.random() < METADATA_PROBABILITY:
             node["metadata"] = {
                 "weight": random.random(),
                 "priority": random.randint(1, 10),
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
 
         if random.random() < ATTRIBUTE_PROBABILITY:
             node["attributes"] = {
                 "color": random.choice(["red", "blue", "green", "yellow"]),
-                "size": random.choice(["small", "medium", "large"])
+                "size": random.choice(["small", "medium", "large"]),
             }
 
         return node
@@ -830,7 +929,7 @@ class GraphGenerator:
         edge = {
             "from": from_node,
             "to": to_node,
-            "type": random.choice(self.edge_types)
+            "type": random.choice(self.edge_types),
         }
 
         # Add optional properties
@@ -840,13 +939,14 @@ class GraphGenerator:
         if random.random() < EDGE_METADATA_PROBABILITY:
             edge["metadata"] = {
                 "label": f"edge_{random.randint(1000, 9999)}",
-                "timestamp": time.time()
+                "timestamp": time.time(),
             }
 
         return edge
 
-    def _create_graph_structure(self, nodes: List[Dict[str, Any]],
-                               edges: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _create_graph_structure(
+        self, nodes: List[Dict[str, Any]], edges: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Create the final graph structure."""
         graph_id = self._generate_id()
 
@@ -855,13 +955,15 @@ class GraphGenerator:
             "id": graph_id,
             "type": "Graph",
             "nodes": nodes,
-            "edges": edges
+            "edges": edges,
         }
 
     def _generate_id(self) -> str:
         """Generate a unique graph ID."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        random_suffix = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+        random_suffix = "".join(
+            random.choices("abcdefghijklmnopqrstuvwxyz0123456789", k=8)
+        )
         return f"graph_{timestamp}_{random_suffix}"
 
     def _validate_graph(self, graph: Dict[str, Any]) -> bool:
@@ -879,11 +981,15 @@ class GraphGenerator:
             nodes = graph["nodes"]
             sample_size = min(len(nodes), SMALL_GRAPH_THRESHOLD)
 
-            for node in (random.sample(nodes, sample_size) if len(nodes) > sample_size else nodes):
+            for node in (
+                random.sample(nodes, sample_size) if len(nodes) > sample_size else nodes
+            ):
                 assert "id" in node
                 assert "type" in node
                 if len(nodes) <= SMALL_GRAPH_THRESHOLD:
-                    assert node["id"] not in node_ids  # No duplicate IDs (only check for small graphs)
+                    assert (
+                        node["id"] not in node_ids
+                    )  # No duplicate IDs (only check for small graphs)
                     node_ids.add(node["id"])
 
             # For large graphs, build node_ids set if not already done
@@ -894,7 +1000,9 @@ class GraphGenerator:
             edges = graph["edges"]
             sample_size = min(len(edges), SMALL_GRAPH_THRESHOLD)
 
-            for edge in (random.sample(edges, sample_size) if len(edges) > sample_size else edges):
+            for edge in (
+                random.sample(edges, sample_size) if len(edges) > sample_size else edges
+            ):
                 assert "from" in edge
                 assert "to" in edge
                 # Check that edge endpoints exist (for small graphs only)
@@ -998,9 +1106,12 @@ class GraphGenerator:
 
         return stats
 
-    def generate_large_scale_graph(self, num_nodes: int,
-                                  topology: GraphTopology = GraphTopology.BARABASI_ALBERT,
-                                  chunk_size: int = DEFAULT_CHUNK_SIZE) -> Dict[str, Any]:
+    def generate_large_scale_graph(
+        self,
+        num_nodes: int,
+        topology: GraphTopology = GraphTopology.BARABASI_ALBERT,
+        chunk_size: int = DEFAULT_CHUNK_SIZE,
+    ) -> Dict[str, Any]:
         """
         Generate a very large graph using memory-efficient streaming techniques.
 
@@ -1015,7 +1126,9 @@ class GraphGenerator:
         if num_nodes <= chunk_size:
             return self.generate_graph(num_nodes, topology=topology)
 
-        self._log(f"Generating large-scale {topology.value} graph with {num_nodes:,} nodes...")
+        self._log(
+            f"Generating large-scale {topology.value} graph with {num_nodes:,} nodes..."
+        )
         self._log(f"Using chunk size: {chunk_size:,}")
 
         start_time = time.time()
@@ -1028,7 +1141,9 @@ class GraphGenerator:
         if self.optimize_memory and num_nodes > 100000:
             # Generate a more manageable subset with metadata indicating full size
             actual_nodes = min(num_nodes, 50000)
-            self._log(f"Memory optimization enabled: generating {actual_nodes:,} nodes as representative sample")
+            self._log(
+                f"Memory optimization enabled: generating {actual_nodes:,} nodes as representative sample"
+            )
 
             graph = self.generate_graph(actual_nodes, topology=topology)
             graph["metadata"]["is_large_scale"] = True
@@ -1039,8 +1154,12 @@ class GraphGenerator:
             generation_time = (time.time() - start_time) * 1000
             graph["metadata"]["generation_time_ms"] = generation_time
 
-            self._log(f"Large-scale graph sample generated in {generation_time/1000:.2f}s")
-            self._log(f"  Sample: {len(graph['nodes']):,} nodes, {len(graph['edges']):,} edges")
+            self._log(
+                f"Large-scale graph sample generated in {generation_time/1000:.2f}s"
+            )
+            self._log(
+                f"  Sample: {len(graph['nodes']):,} nodes, {len(graph['edges']):,} edges"
+            )
             self._log(f"  Represents: {num_nodes:,} node graph")
 
             return graph
@@ -1048,8 +1167,13 @@ class GraphGenerator:
         # For smaller "large" graphs, generate normally
         return self.generate_graph(num_nodes, topology=topology)
 
-    def save_graph(self, graph: Dict[str, Any], output_dir: str = "generated_graphs",
-                   format: str = "json", compress: bool = None):
+    def save_graph(
+        self,
+        graph: Dict[str, Any],
+        output_dir: str = "generated_graphs",
+        format: str = "json",
+        compress: bool = None,
+    ):
         """
         Save the graph to a file with optional compression.
 
@@ -1071,10 +1195,10 @@ class GraphGenerator:
             file_path = os.path.join(output_dir, f"{graph_id}{ext}")
 
             if compress:
-                with gzip.open(file_path, 'wt', encoding='utf-8') as f:
+                with gzip.open(file_path, "wt", encoding="utf-8") as f:
                     json.dump(graph, f, indent=2)
             else:
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(graph, f, indent=2)
 
         elif format == "pickle":
@@ -1082,10 +1206,10 @@ class GraphGenerator:
             file_path = os.path.join(output_dir, f"{graph_id}{ext}")
 
             if compress:
-                with gzip.open(file_path, 'wb') as f:
+                with gzip.open(file_path, "wb") as f:
                     pickle.dump(graph, f)
             else:
-                with open(file_path, 'wb') as f:
+                with open(file_path, "wb") as f:
                     pickle.dump(graph, f)
 
         elif format == "graphml":
@@ -1102,7 +1226,7 @@ class GraphGenerator:
 
     def _export_graphml(self, graph: Dict[str, Any], file_path: str):
         """Export graph to GraphML format with proper XML escaping."""
-        with open(file_path, 'w', encoding='utf-8') as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
             f.write('<graphml xmlns="http://graphml.graphdrawing.org/xmlns">\n')
             f.write('  <graph id="G" edgedefault="directed">\n')
@@ -1114,7 +1238,7 @@ class GraphGenerator:
                 if "type" in node:
                     node_type = saxutils.escape(str(node["type"]))
                     f.write(f' type="{node_type}"')
-                f.write('/>\n')
+                f.write("/>\n")
 
             # Write edges with XML escaping
             for i, edge in enumerate(graph.get("edges", [])):
@@ -1126,13 +1250,14 @@ class GraphGenerator:
                     f.write(f' type="{edge_type}"')
                 if "weight" in edge:
                     f.write(f' weight="{edge["weight"]}"')
-                f.write('/>\n')
+                f.write("/>\n")
 
-            f.write('  </graph>\n')
-            f.write('</graphml>\n')
+            f.write("  </graph>\n")
+            f.write("</graphml>\n")
 
-    def batch_generate(self, specs: List[Dict[str, Any]],
-                       parallel: bool = False) -> List[Dict[str, Any]]:
+    def batch_generate(
+        self, specs: List[Dict[str, Any]], parallel: bool = False
+    ) -> List[Dict[str, Any]]:
         """
         Generate multiple graphs from specifications.
 
@@ -1159,23 +1284,52 @@ class GraphGenerator:
 
         benchmarks = [
             # Small graphs
-            {"num_nodes": 10, "topology": GraphTopology.COMPLETE, "name": "small_complete"},
+            {
+                "num_nodes": 10,
+                "topology": GraphTopology.COMPLETE,
+                "name": "small_complete",
+            },
             {"num_nodes": 20, "topology": GraphTopology.TREE, "name": "small_tree"},
             {"num_nodes": 25, "topology": GraphTopology.MESH, "name": "small_mesh"},
-
             # Medium graphs
-            {"num_nodes": 100, "topology": GraphTopology.ERDOS_RENYI, "name": "medium_random"},
-            {"num_nodes": 200, "topology": GraphTopology.BARABASI_ALBERT, "name": "medium_scalefree"},
-            {"num_nodes": 150, "topology": GraphTopology.WATTS_STROGATZ, "name": "medium_smallworld"},
-
+            {
+                "num_nodes": 100,
+                "topology": GraphTopology.ERDOS_RENYI,
+                "name": "medium_random",
+            },
+            {
+                "num_nodes": 200,
+                "topology": GraphTopology.BARABASI_ALBERT,
+                "name": "medium_scalefree",
+            },
+            {
+                "num_nodes": 150,
+                "topology": GraphTopology.WATTS_STROGATZ,
+                "name": "medium_smallworld",
+            },
             # Large graphs
             {"num_nodes": 1000, "topology": GraphTopology.DAG, "name": "large_dag"},
-            {"num_nodes": 2000, "topology": GraphTopology.COMMUNITY, "name": "large_community"},
-            {"num_nodes": 1500, "topology": GraphTopology.HIERARCHICAL, "name": "large_hierarchical"},
-
+            {
+                "num_nodes": 2000,
+                "topology": GraphTopology.COMMUNITY,
+                "name": "large_community",
+            },
+            {
+                "num_nodes": 1500,
+                "topology": GraphTopology.HIERARCHICAL,
+                "name": "large_hierarchical",
+            },
             # Extra large graphs
-            {"num_nodes": 10000, "topology": GraphTopology.RANDOM, "name": "xlarge_random"},
-            {"num_nodes": 20000, "topology": GraphTopology.BARABASI_ALBERT, "name": "xlarge_scalefree"},
+            {
+                "num_nodes": 10000,
+                "topology": GraphTopology.RANDOM,
+                "name": "xlarge_random",
+            },
+            {
+                "num_nodes": 20000,
+                "topology": GraphTopology.BARABASI_ALBERT,
+                "name": "xlarge_scalefree",
+            },
         ]
 
         results = []
@@ -1188,7 +1342,7 @@ class GraphGenerator:
 
             # Save graph
             graph_file = os.path.join(output_dir, f"{name}.json")
-            with open(graph_file, 'w') as f:
+            with open(graph_file, "w") as f:
                 json.dump(graph, f, indent=2)
 
             # Calculate and save statistics
@@ -1199,12 +1353,14 @@ class GraphGenerator:
             results.append(stats_dict)
 
             self._log(f"  Saved: {graph_file}")
-            self._log(f"  Stats: {stats.node_count} nodes, {stats.edge_count} edges, "
-                     f"density={stats.density:.6f}")
+            self._log(
+                f"  Stats: {stats.node_count} nodes, {stats.edge_count} edges, "
+                f"density={stats.density:.6f}"
+            )
 
         # Save benchmark results
         results_file = os.path.join(output_dir, "benchmark_results.json")
-        with open(results_file, 'w') as f:
+        with open(results_file, "w") as f:
             json.dump(results, f, indent=2)
 
         print(f"\nBenchmark suite generated in: {output_dir}")
@@ -1219,15 +1375,24 @@ class GraphGenerator:
             "graphs_generated": self.generated_count,
             "total_nodes": self.total_nodes_generated,
             "total_edges": self.total_edges_generated,
-            "avg_nodes_per_graph": self.total_nodes_generated / self.generated_count if self.generated_count > 0 else 0,
-            "avg_edges_per_graph": self.total_edges_generated / self.generated_count if self.generated_count > 0 else 0,
+            "avg_nodes_per_graph": (
+                self.total_nodes_generated / self.generated_count
+                if self.generated_count > 0
+                else 0
+            ),
+            "avg_edges_per_graph": (
+                self.total_edges_generated / self.generated_count
+                if self.generated_count > 0
+                else 0
+            ),
             "configuration": {
                 "optimize_memory": self.optimize_memory,
                 "validate_output": self.validate_output,
                 "compression": self.compression,
-                "verbose": self.verbose
-            }
+                "verbose": self.verbose,
+            },
         }
+
 
 def main():
     """
@@ -1244,7 +1409,11 @@ def main():
         (GraphTopology.RANDOM, 50, {"num_edges": 100}),
         (GraphTopology.ERDOS_RENYI, 100, {"probability": DEFAULT_PROBABILITY}),
         (GraphTopology.BARABASI_ALBERT, 200, {"m": 3}),
-        (GraphTopology.WATTS_STROGATZ, 100, {"k": 4, "rewiring_prob": REWIRING_PROBABILITY}),
+        (
+            GraphTopology.WATTS_STROGATZ,
+            100,
+            {"k": 4, "rewiring_prob": REWIRING_PROBABILITY},
+        ),
         (GraphTopology.TREE, 63, {"branching_factor": 2, "balanced": True}),
         (GraphTopology.DAG, 50, {"layers": 5}),
         (GraphTopology.COMPLETE, 10, {}),
@@ -1254,7 +1423,11 @@ def main():
         (GraphTopology.MESH, 49, {"dimensions": (7, 7)}),
         (GraphTopology.HYPERCUBE, 16, {"dimension": 4}),
         (GraphTopology.HIERARCHICAL, 100, {"levels": 4, "branching_factor": 3}),
-        (GraphTopology.COMMUNITY, 150, {"num_communities": 3, "intra_prob": 0.3, "inter_prob": 0.01})
+        (
+            GraphTopology.COMMUNITY,
+            150,
+            {"num_communities": 3, "intra_prob": 0.3, "inter_prob": 0.01},
+        ),
     ]
 
     output_dir = "generated_graphs"
@@ -1264,7 +1437,9 @@ def main():
         print(f"\n{'-' * 40}")
         print(f"Generating {topology.value} graph...")
 
-        graph = generator.generate_graph(num_nodes=num_nodes, topology=topology, **kwargs)
+        graph = generator.generate_graph(
+            num_nodes=num_nodes, topology=topology, **kwargs
+        )
 
         # Save the graph
         generator.save_graph(graph, output_dir=output_dir)
@@ -1284,7 +1459,7 @@ def main():
     large_graph = generator.generate_large_scale_graph(
         num_nodes=100000,
         topology=GraphTopology.BARABASI_ALBERT,
-        chunk_size=DEFAULT_CHUNK_SIZE
+        chunk_size=DEFAULT_CHUNK_SIZE,
     )
 
     # Save with compression
@@ -1311,6 +1486,7 @@ def main():
 
     print(f"\nAll graphs saved to: {output_dir}/")
     print("Generation complete!")
+
 
 if __name__ == "__main__":
     main()

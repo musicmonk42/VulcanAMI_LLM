@@ -67,11 +67,15 @@ from src.training.data_loader import CorpusDataLoader
 from src.training.drift_detection import detect_drift
 from src.training.gpt_model import GPTConfig, GPTModel
 from src.training.post_training_report import generate_report
-from src.training.self_awareness import (awareness_summary,
-                                         build_extended_awareness,
-                                         calculate_adaptive_ece,
-                                         calculate_distinct_n, calculate_ece,
-                                         calculate_mce, summarize_entropies)
+from src.training.self_awareness import (
+    awareness_summary,
+    build_extended_awareness,
+    calculate_adaptive_ece,
+    calculate_distinct_n,
+    calculate_ece,
+    calculate_mce,
+    summarize_entropies,
+)
 
 
 # -------------------------------------------------------------------

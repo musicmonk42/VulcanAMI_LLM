@@ -23,17 +23,19 @@ import numpy as np
 import pytest
 
 # FIXED: Correct import path for vulcan project structure
-from vulcan.world_model.intervention_manager import (ConfounderDetector,
-                                                     Correlation,
-                                                     CostEstimator,
-                                                     InformationGainEstimator,
-                                                     InterventionCandidate,
-                                                     InterventionExecutor,
-                                                     InterventionPrioritizer,
-                                                     InterventionResult,
-                                                     InterventionScheduler,
-                                                     InterventionSimulator,
-                                                     InterventionType)
+from vulcan.world_model.intervention_manager import (
+    ConfounderDetector,
+    Correlation,
+    CostEstimator,
+    InformationGainEstimator,
+    InterventionCandidate,
+    InterventionExecutor,
+    InterventionPrioritizer,
+    InterventionResult,
+    InterventionScheduler,
+    InterventionSimulator,
+    InterventionType,
+)
 
 # ============================================================================
 # Fixtures
@@ -371,9 +373,9 @@ class TestInterventionScheduler:
         )
 
         # FIXED: Should return candidates (scheduling logic fixed to be less aggressive)
-        assert len(candidates) > 0, (
-            "Scheduler should return at least one candidate with reasonable budget"
-        )
+        assert (
+            len(candidates) > 0
+        ), "Scheduler should return at least one candidate with reasonable budget"
 
         # Total cost should not exceed budget
         total_cost = sum(c.cost for c in candidates)
@@ -575,9 +577,9 @@ class TestInterventionPrioritizer:
         candidates = prioritizer.prioritize_interventions(multiple_correlations, budget)
 
         # FIXED: Should return candidates (scheduling logic fixed)
-        assert len(candidates) > 0, (
-            "Prioritizer should return at least one candidate with reasonable budget"
-        )
+        assert (
+            len(candidates) > 0
+        ), "Prioritizer should return at least one candidate with reasonable budget"
 
         # Total cost should not exceed budget
         total_cost = sum(c.cost for c in candidates)
@@ -979,9 +981,9 @@ class TestIntegration:
         )
 
         # FIXED: Should get candidates with fixed scheduling logic
-        assert len(candidates) > 0, (
-            "Should get at least one candidate with reasonable budget"
-        )
+        assert (
+            len(candidates) > 0
+        ), "Should get at least one candidate with reasonable budget"
 
         # Step 2: Create batches
         batches = prioritizer.create_intervention_batch(candidates, max_batch_size=3)
@@ -1069,9 +1071,9 @@ class TestPerformance:
 
         assert elapsed < 5, f"Prioritization took {elapsed}s for 100 correlations"
         # FIXED: Should get candidates with fixed scheduling logic
-        assert len(candidates) > 0, (
-            "Should get at least one candidate from 100 correlations"
-        )
+        assert (
+            len(candidates) > 0
+        ), "Should get at least one candidate from 100 correlations"
 
     def test_many_executions(self, executor, sample_correlation):
         """Test many intervention executions"""

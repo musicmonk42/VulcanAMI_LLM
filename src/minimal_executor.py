@@ -55,20 +55,16 @@ class ExecutionError(Exception):
     """Base exception for execution errors."""
 
 
-
 class CycleDetectedError(ExecutionError):
     """Raised when a cycle is detected in the graph."""
-
 
 
 class TimeoutError(ExecutionError):
     """Raised when execution times out."""
 
 
-
 class ValidationError(ExecutionError):
     """Raised when graph validation fails."""
-
 
 
 class ThreadSafeContext:
@@ -940,9 +936,7 @@ if __name__ == "__main__":
         invalid_graph = {
             "id": "invalid_graph",
             "nodes": [{"id": "n1", "type": "InputNode", "value": "test"}],
-            "edges": [
-                {"from": "n1", "to": "nonexistent"}  # Invalid reference
-            ],
+            "edges": [{"from": "n1", "to": "nonexistent"}],  # Invalid reference
         }
 
         try:

@@ -15,7 +15,7 @@ Tests cover:
 - Performance benchmarks
 """
 
-from causal_context import (CausalContext, CounterfactualScenario, TemporalDecayFunction)
+from causal_context import CausalContext, CounterfactualScenario, TemporalDecayFunction
 import sys
 import time
 import unittest

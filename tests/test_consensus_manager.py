@@ -8,21 +8,28 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from consensus_manager import (DEFAULT_QUORUM_RATIO, MAX_QUORUM_RATIO,
-                               MIN_QUORUM_RATIO, ConsensusManager,
-                               LeaderElector, LeaderState, ServerState,
-                               _seed_for, _simulate_vote)
+from consensus_manager import (
+    DEFAULT_QUORUM_RATIO,
+    MAX_QUORUM_RATIO,
+    MIN_QUORUM_RATIO,
+    ConsensusManager,
+    LeaderElector,
+    LeaderState,
+    ServerState,
+    _seed_for,
+    _simulate_vote,
+)
 
 
 @pytest.fixture
 def consensus_manager():
     """Create consensus manager."""
     manager = ConsensusManager(
-        chaos_params={'failure_rate': 0.0, 'max_delay': 0.0, 'drop_rate': 0.0},
+        chaos_params={"failure_rate": 0.0, "max_delay": 0.0, "drop_rate": 0.0},
         timeout=0.1,
         deadlock_threshold=3,
         max_retries=5,
-        backend="thread"
+        backend="thread",
     )
     yield manager
     manager.shutdown()
@@ -53,7 +60,7 @@ class TestSimulateVote:
 
     def test_simulate_vote_success(self):
         """Test successful vote simulation."""
-        chaos = {'failure_rate': 0.0, 'max_delay': 0.0, 'drop_rate': 0.0}
+        chaos = {"failure_rate": 0.0, "max_delay": 0.0, "drop_rate": 0.0}
 
         agent_id, vote = _simulate_vote("agent1", "proposal1", chaos, 0.1, 42)
 
@@ -62,7 +69,7 @@ class TestSimulateVote:
 
     def test_simulate_vote_with_delay(self):
         """Test vote with delay."""
-        chaos = {'failure_rate': 0.0, 'max_delay': 0.05, 'drop_rate': 0.0}
+        chaos = {"failure_rate": 0.0, "max_delay": 0.05, "drop_rate": 0.0}
 
         start = time.time()
         _simulate_vote("agent1", "proposal1", chaos, 0.2, 42)
@@ -73,14 +80,14 @@ class TestSimulateVote:
 
     def test_simulate_vote_failure(self):
         """Test vote failure simulation."""
-        chaos = {'failure_rate': 1.0, 'max_delay': 0.0, 'drop_rate': 0.0}
+        chaos = {"failure_rate": 1.0, "max_delay": 0.0, "drop_rate": 0.0}
 
         with pytest.raises(RuntimeError, match="simulated failure"):
             _simulate_vote("agent1", "proposal1", chaos, 0.1, 42)
 
     def test_simulate_vote_drop(self):
         """Test vote drop simulation."""
-        chaos = {'failure_rate': 0.0, 'max_delay': 0.0, 'drop_rate': 1.0}
+        chaos = {"failure_rate": 0.0, "max_delay": 0.0, "drop_rate": 1.0}
 
         with pytest.raises(TimeoutError, match="simulated drop"):
             _simulate_vote("agent1", "proposal1", chaos, 0.1, 42)
@@ -229,14 +236,14 @@ class TestConsensusManager:
     def test_initialization(self):
         """Test manager initialization."""
         manager = ConsensusManager(
-            chaos_params={'failure_rate': 0.1, 'max_delay': 0.01, 'drop_rate': 0.05},
+            chaos_params={"failure_rate": 0.1, "max_delay": 0.01, "drop_rate": 0.05},
             timeout=0.1,
-            backend="thread"
+            backend="thread",
         )
 
         assert manager.timeout == 0.1
         assert manager.backend == "thread"
-        assert manager.chaos_params['failure_rate'] == 0.1
+        assert manager.chaos_params["failure_rate"] == 0.1
 
         manager.shutdown()
 
@@ -258,10 +265,10 @@ class TestConsensusManager:
     def test_invalid_chaos_params(self):
         """Test invalid chaos parameters."""
         with pytest.raises(ValueError):
-            ConsensusManager(chaos_params={'failure_rate': 1.5})
+            ConsensusManager(chaos_params={"failure_rate": 1.5})
 
         with pytest.raises(ValueError):
-            ConsensusManager(chaos_params={'max_delay': -1})
+            ConsensusManager(chaos_params={"max_delay": -1})
 
     def test_backend_resolution_thread(self):
         """Test thread backend resolution."""
@@ -279,24 +286,16 @@ class TestConsensusManager:
 
     def test_set_chaos(self, consensus_manager):
         """Test updating chaos parameters."""
-        consensus_manager.set_chaos(
-            failure_rate=0.2,
-            max_delay=0.02,
-            drop_rate=0.1
-        )
+        consensus_manager.set_chaos(failure_rate=0.2, max_delay=0.02, drop_rate=0.1)
 
-        assert consensus_manager.chaos_params['failure_rate'] == 0.2
-        assert consensus_manager.chaos_params['max_delay'] == 0.02
-        assert consensus_manager.chaos_params['drop_rate'] == 0.1
+        assert consensus_manager.chaos_params["failure_rate"] == 0.2
+        assert consensus_manager.chaos_params["max_delay"] == 0.02
+        assert consensus_manager.chaos_params["drop_rate"] == 0.1
 
     def test_set_chaos_invalid(self, consensus_manager):
         """Test setting invalid chaos parameters."""
         with pytest.raises(ValueError):
-            consensus_manager.set_chaos(
-                failure_rate=2.0,
-                max_delay=0.0,
-                drop_rate=0.0
-            )
+            consensus_manager.set_chaos(failure_rate=2.0, max_delay=0.0, drop_rate=0.0)
 
     def test_elect_leader(self, consensus_manager):
         """Test leader election."""
@@ -326,9 +325,7 @@ class TestConsensusManager:
         agents = [f"agent{i}" for i in range(10)]
 
         result = consensus_manager.aggregate_votes(
-            "proposal1",
-            agents,
-            quorum_ratio=0.5
+            "proposal1", agents, quorum_ratio=0.5
         )
 
         # With no chaos, should generally succeed
@@ -348,19 +345,13 @@ class TestConsensusManager:
     def test_aggregate_votes_invalid_quorum(self, consensus_manager):
         """Test aggregation with invalid quorum."""
         with pytest.raises(ValueError, match="Quorum ratio"):
-            consensus_manager.aggregate_votes(
-                "proposal1",
-                ["agent1"],
-                quorum_ratio=1.5
-            )
+            consensus_manager.aggregate_votes("proposal1", ["agent1"], quorum_ratio=1.5)
 
     def test_aggregate_votes_duplicates(self, consensus_manager):
         """Test aggregation with duplicate agents."""
         with pytest.raises(ValueError, match="duplicates"):
             consensus_manager.aggregate_votes(
-                "proposal1",
-                ["agent1", "agent1"],
-                quorum_ratio=0.5
+                "proposal1", ["agent1", "agent1"], quorum_ratio=0.5
             )
 
     def test_aggregate_votes_high_quorum(self, consensus_manager):
@@ -369,9 +360,7 @@ class TestConsensusManager:
 
         # With no chaos, should succeed
         result = consensus_manager.aggregate_votes(
-            "proposal1",
-            agents,
-            quorum_ratio=0.9
+            "proposal1", agents, quorum_ratio=0.9
         )
 
         assert isinstance(result, bool)
@@ -397,9 +386,9 @@ class TestThreadBackend:
     def test_thread_backend_no_chaos(self):
         """Test thread backend with no chaos."""
         manager = ConsensusManager(
-            chaos_params={'failure_rate': 0.0, 'max_delay': 0.0, 'drop_rate': 0.0},
+            chaos_params={"failure_rate": 0.0, "max_delay": 0.0, "drop_rate": 0.0},
             backend="thread",
-            timeout=0.1
+            timeout=0.1,
         )
 
         agents = [f"agent{i}" for i in range(10)]
@@ -413,10 +402,10 @@ class TestThreadBackend:
     def test_thread_backend_with_chaos(self):
         """Test thread backend with chaos."""
         manager = ConsensusManager(
-            chaos_params={'failure_rate': 0.3, 'max_delay': 0.01, 'drop_rate': 0.1},
+            chaos_params={"failure_rate": 0.3, "max_delay": 0.01, "drop_rate": 0.1},
             backend="thread",
             timeout=0.1,
-            max_retries=3
+            max_retries=3,
         )
 
         agents = [f"agent{i}" for i in range(10)]
@@ -457,8 +446,8 @@ class TestConcurrency:
     def test_concurrent_aggregations(self):
         """Test concurrent vote aggregations."""
         manager = ConsensusManager(
-            chaos_params={'failure_rate': 0.0, 'max_delay': 0.0, 'drop_rate': 0.0},
-            backend="thread"
+            chaos_params={"failure_rate": 0.0, "max_delay": 0.0, "drop_rate": 0.0},
+            backend="thread",
         )
 
         agents = [f"agent{i}" for i in range(10)]
@@ -469,8 +458,7 @@ class TestConcurrency:
             results.append(result)
 
         threads = [
-            threading.Thread(target=aggregate, args=(f"proposal{i}",))
-            for i in range(5)
+            threading.Thread(target=aggregate, args=(f"proposal{i}",)) for i in range(5)
         ]
 
         for t in threads:

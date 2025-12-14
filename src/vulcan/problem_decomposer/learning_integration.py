@@ -23,14 +23,21 @@ import torch.nn as nn
 # Import decomposer components
 try:
     from .decomposition_library import StratifiedDecompositionLibrary
-    from .problem_decomposer_core import (DecompositionPlan, ExecutionOutcome,
-                                          ProblemDecomposer, ProblemGraph)
+    from .problem_decomposer_core import (
+        DecompositionPlan,
+        ExecutionOutcome,
+        ProblemDecomposer,
+        ProblemGraph,
+    )
 except ImportError:
     try:
         from decomposition_library import StratifiedDecompositionLibrary
-        from problem_decomposer_core import (DecompositionPlan,
-                                             ExecutionOutcome, ProblemDecomposer,
-                                             ProblemGraph)
+        from problem_decomposer_core import (
+            DecompositionPlan,
+            ExecutionOutcome,
+            ProblemDecomposer,
+            ProblemGraph,
+        )
     except ImportError:
         logging.warning("Could not import ProblemDecomposer components")
         StratifiedDecompositionLibrary = None
@@ -38,10 +45,8 @@ except ImportError:
 # Import learning components - FIXED: Changed .learning to ..learning
 try:
     from ..learning.continual_learning import EnhancedContinualLearner
-    from ..learning.curriculum_learning import (CurriculumLearner,
-                                                DifficultyEstimator)
-    from ..learning.learning_types import (FeedbackData, LearningConfig,
-                                           TaskInfo)
+    from ..learning.curriculum_learning import CurriculumLearner, DifficultyEstimator
+    from ..learning.learning_types import FeedbackData, LearningConfig, TaskInfo
     from ..learning.meta_learning import MetaLearner
     from ..learning.metacognition import MetaCognitiveMonitor
     from ..learning.parameter_history import ParameterHistoryManager
@@ -240,9 +245,11 @@ class ProblemToExperienceConverter:
             experience = {
                 "embedding": embedding,
                 "reward": float(base_reward),
-                "loss": 1.0 - success_rate
-                if outcome.sub_results
-                else (0.0 if outcome.success else 1.0),
+                "loss": (
+                    1.0 - success_rate
+                    if outcome.sub_results
+                    else (0.0 if outcome.success else 1.0)
+                ),
                 "modality": "problem_decomposition",
                 "metadata": {
                     "problem_signature": problem.get_signature(),
@@ -622,15 +629,15 @@ class IntegratedLearningCoordinator:
                         )
 
                         # Update statistics
-                        self.integration_stats["principles_extracted"] += (
-                            principle_results.get("principles_extracted", 0)
-                        )
-                        self.integration_stats["principles_validated"] += (
-                            principle_results.get("principles_validated", 0)
-                        )
-                        self.integration_stats["principles_promoted"] += (
-                            principle_results.get("principles_promoted", 0)
-                        )
+                        self.integration_stats[
+                            "principles_extracted"
+                        ] += principle_results.get("principles_extracted", 0)
+                        self.integration_stats[
+                            "principles_validated"
+                        ] += principle_results.get("principles_validated", 0)
+                        self.integration_stats[
+                            "principles_promoted"
+                        ] += principle_results.get("principles_promoted", 0)
 
                         logger.debug(
                             "Principle learning: extracted=%d, validated=%d, promoted=%d",

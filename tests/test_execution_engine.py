@@ -20,6 +20,7 @@ from src.unified_runtime import execution_engine as ee
 # Create a comprehensive mock runtime for testing
 class MockRuntime:
     """Mock UnifiedRuntime for testing"""
+
     def __init__(self):
         self.memory = MagicMock()
         self.reasoning = MagicMock()
@@ -36,9 +37,11 @@ class MockRuntime:
 
         # Create a proper async executor that returns the expected result
         # The signature MUST match what _run_single_node calls: (node, context_dict, inputs_dict)
-        async def mock_executor(node: Dict[str, Any], context: Dict[str, Any], inputs: Dict[str, Any]):
+        async def mock_executor(
+            node: Dict[str, Any], context: Dict[str, Any], inputs: Dict[str, Any]
+        ):
             """Mock executor that simulates successful node execution"""
-            node_id = node.get('id', 'unknown')
+            node_id = node.get("id", "unknown")
             # Simulate some processing
             await asyncio.sleep(0.001)
             # The handler should return the OUTPUT DATA, not a NodeExecutionResult.
@@ -77,9 +80,7 @@ class TestExecutionContext:
         graph = {"nodes": [{"id": "n1", "type": "test"}], "edges": []}
         runtime = MockRuntime()
         context = ee.ExecutionContext(
-            graph=graph,
-            node_map={"n1": {"id": "n1", "type": "test"}},
-            runtime=runtime
+            graph=graph, node_map={"n1": {"id": "n1", "type": "test"}}, runtime=runtime
         )
 
         assert context.graph == graph
@@ -93,9 +94,7 @@ class TestExecutionContext:
         node = {"id": "n1", "type": "test"}
         runtime = MockRuntime()
         context = ee.ExecutionContext(
-            graph={"nodes": [node]},
-            node_map={"n1": node},
-            runtime=runtime
+            graph={"nodes": [node]}, node_map={"n1": node}, runtime=runtime
         )
 
         assert context.get_node("n1") == node
@@ -104,11 +103,7 @@ class TestExecutionContext:
     def test_set_get_output(self):
         """Test setting and getting outputs"""
         runtime = MockRuntime()
-        context = ee.ExecutionContext(
-            graph={},
-            node_map={},
-            runtime=runtime
-        )
+        context = ee.ExecutionContext(graph={}, node_map={}, runtime=runtime)
 
         context.set_output("n1", {"result": "test"})
         assert context.get_output("n1") == {"result": "test"}
@@ -117,11 +112,7 @@ class TestExecutionContext:
     def test_record_error(self):
         """Test recording errors"""
         runtime = MockRuntime()
-        context = ee.ExecutionContext(
-            graph={},
-            node_map={},
-            runtime=runtime
-        )
+        context = ee.ExecutionContext(graph={}, node_map={}, runtime=runtime)
 
         context.record_error("n1", "Test error")
         assert context.errors["n1"] == "Test error"
@@ -129,11 +120,7 @@ class TestExecutionContext:
     def test_add_audit_entry(self):
         """Test adding audit entries"""
         runtime = MockRuntime()
-        context = ee.ExecutionContext(
-            graph={},
-            node_map={},
-            runtime=runtime
-        )
+        context = ee.ExecutionContext(graph={}, node_map={}, runtime=runtime)
 
         context.add_audit_entry({"event": "test"})
         assert len(context.audit_log) == 1
@@ -145,10 +132,7 @@ class TestExecutionContext:
         """Test creating child context"""
         runtime = MockRuntime()
         parent = ee.ExecutionContext(
-            graph={},
-            node_map={},
-            runtime=runtime,
-            outputs={"p1": "parent_output"}
+            graph={}, node_map={}, runtime=runtime, outputs={"p1": "parent_output"}
         )
 
         child_graph = {"nodes": [{"id": "c1"}]}
@@ -167,7 +151,7 @@ class TestExecutionContext:
             node_map={"n1": {"id": "n1"}},
             runtime=runtime,
             outputs={"n1": "output"},
-            errors={"n2": "error"}
+            errors={"n2": "error"},
         )
 
         result = context.to_dict()
@@ -185,7 +169,7 @@ class TestExecutionScheduler:
         """Test creating scheduler"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}],
-            "edges": [{"from": "n1", "to": "n2"}]
+            "edges": [{"from": "n1", "to": "n2"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
 
@@ -201,8 +185,8 @@ class TestExecutionScheduler:
             "edges": [
                 {"from": "n1", "to": "n2"},
                 {"from": "n1", "to": "n3"},
-                {"from": "n2", "to": "n3"}
-            ]
+                {"from": "n2", "to": "n3"},
+            ],
         }
         scheduler = ee.ExecutionScheduler(graph)
 
@@ -215,7 +199,7 @@ class TestExecutionScheduler:
         """Test dependent building"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}],
-            "edges": [{"from": "n1", "to": "n2"}]
+            "edges": [{"from": "n1", "to": "n2"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
 
@@ -227,7 +211,7 @@ class TestExecutionScheduler:
         """Test cycle detection with no cycles"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}],
-            "edges": [{"from": "n1", "to": "n2"}]
+            "edges": [{"from": "n1", "to": "n2"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
         assert not scheduler.has_cycles
@@ -236,10 +220,7 @@ class TestExecutionScheduler:
         """Test cycle detection with cycles"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}],
-            "edges": [
-                {"from": "n1", "to": "n2"},
-                {"from": "n2", "to": "n1"}
-            ]
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n1"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
         assert scheduler.has_cycles
@@ -248,10 +229,7 @@ class TestExecutionScheduler:
         """Test getting ready nodes"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}, {"id": "n3"}],
-            "edges": [
-                {"from": "n1", "to": "n2"},
-                {"from": "n1", "to": "n3"}
-            ]
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n1", "to": "n3"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
 
@@ -296,10 +274,7 @@ class TestExecutionScheduler:
         """Test getting execution layers"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}, {"id": "n3"}],
-            "edges": [
-                {"from": "n1", "to": "n2"},
-                {"from": "n2", "to": "n3"}
-            ]
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
 
@@ -310,10 +285,7 @@ class TestExecutionScheduler:
         """Test getting topological order"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}, {"id": "n3"}],
-            "edges": [
-                {"from": "n1", "to": "n2"},
-                {"from": "n2", "to": "n3"}
-            ]
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
 
@@ -324,10 +296,7 @@ class TestExecutionScheduler:
         """Test topological order with cycle returns empty"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}],
-            "edges": [
-                {"from": "n1", "to": "n2"},
-                {"from": "n2", "to": "n1"}
-            ]
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n1"}],
         }
         scheduler = ee.ExecutionScheduler(graph)
 
@@ -346,21 +315,14 @@ class TestExecutionEngine:
     @pytest.fixture
     def engine(self, runtime):
         """Create engine instance with mock runtime"""
-        return ee.ExecutionEngine(
-            runtime=runtime,
-            max_parallel=4,
-            timeout_seconds=10
-        )
+        return ee.ExecutionEngine(runtime=runtime, max_parallel=4, timeout_seconds=10)
 
     @pytest.fixture
     def simple_graph(self):
         """Simple test graph"""
         return {
-            "nodes": [
-                {"id": "n1", "type": "test"},
-                {"id": "n2", "type": "test"}
-            ],
-            "edges": [{"from": "n1", "to": "n2"}]
+            "nodes": [{"id": "n1", "type": "test"}, {"id": "n2", "type": "test"}],
+            "edges": [{"from": "n1", "to": "n2"}],
         }
 
     @pytest.mark.asyncio
@@ -369,12 +331,11 @@ class TestExecutionEngine:
         context = ee.ExecutionContext(
             graph=simple_graph,
             node_map={n["id"]: n for n in simple_graph["nodes"]},
-            runtime=runtime
+            runtime=runtime,
         )
 
         result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.SEQUENTIAL
+            context=context, mode=ee.ExecutionMode.SEQUENTIAL
         )
 
         assert isinstance(result, ee.GraphExecutionResult)
@@ -387,13 +348,10 @@ class TestExecutionEngine:
         context = ee.ExecutionContext(
             graph=simple_graph,
             node_map={n["id"]: n for n in simple_graph["nodes"]},
-            runtime=runtime
+            runtime=runtime,
         )
 
-        result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.PARALLEL
-        )
+        result = await engine.run_graph(context=context, mode=ee.ExecutionMode.PARALLEL)
 
         assert isinstance(result, ee.GraphExecutionResult)
         assert result.status == ee.ExecutionStatus.SUCCESS
@@ -403,21 +361,15 @@ class TestExecutionEngine:
         """Test execution with cyclic graph"""
         graph = {
             "nodes": [{"id": "n1"}, {"id": "n2"}],
-            "edges": [
-                {"from": "n1", "to": "n2"},
-                {"from": "n2", "to": "n1"}
-            ]
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n1"}],
         }
 
         context = ee.ExecutionContext(
-            graph=graph,
-            node_map={n["id"]: n for n in graph["nodes"]},
-            runtime=runtime
+            graph=graph, node_map={n["id"]: n for n in graph["nodes"]}, runtime=runtime
         )
 
         result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.SEQUENTIAL
+            context=context, mode=ee.ExecutionMode.SEQUENTIAL
         )
 
         assert result.status == ee.ExecutionStatus.FAILED
@@ -430,12 +382,11 @@ class TestExecutionEngine:
             graph=simple_graph,
             node_map={n["id"]: n for n in simple_graph["nodes"]},
             runtime=runtime,
-            inputs={"test_input": "value"}
+            inputs={"test_input": "value"},
         )
 
         result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.SEQUENTIAL
+            context=context, mode=ee.ExecutionMode.SEQUENTIAL
         )
 
         assert result.status == ee.ExecutionStatus.SUCCESS
@@ -454,22 +405,13 @@ class TestExecutionEngine:
     def test_get_output_nodes(self, engine, runtime):
         """Test getting output nodes"""
         graph = {
-            "nodes": [
-                {"id": "n1"},
-                {"id": "n2"},
-                {"id": "n3"}
-            ],
-            "edges": [
-                {"from": "n1", "to": "n2"},
-                {"from": "n2", "to": "n3"}
-            ]
+            "nodes": [{"id": "n1"}, {"id": "n2"}, {"id": "n3"}],
+            "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
         }
 
         # _get_output_nodes expects ExecutionContext, not graph dict
         context = ee.ExecutionContext(
-            graph=graph,
-            node_map={n["id"]: n for n in graph["nodes"]},
-            runtime=runtime
+            graph=graph, node_map={n["id"]: n for n in graph["nodes"]}, runtime=runtime
         )
 
         outputs = engine._get_output_nodes(context)
@@ -522,7 +464,7 @@ class TestNodeExecutionResult:
             status=ee.ExecutionStatus.SUCCESS,
             output={"test": "output"},
             error=None,
-            duration_ms=100.5
+            duration_ms=100.5,
         )
 
         assert result.node_id == "n1"
@@ -542,7 +484,7 @@ class TestGraphExecutionResult:
             output={"n1": "output"},
             errors={},
             nodes_executed=5,
-            duration_ms=250.0
+            duration_ms=250.0,
         )
 
         assert result.status == ee.ExecutionStatus.SUCCESS
@@ -555,7 +497,7 @@ class TestGraphExecutionResult:
             status=ee.ExecutionStatus.SUCCESS,
             output={"n1": "test"},
             errors={"n2": "error"},
-            nodes_executed=2
+            nodes_executed=2,
         )
 
         data = result.to_dict()
@@ -586,26 +528,21 @@ class TestComplexGraphExecution:
                 {"id": "start", "type": "test"},
                 {"id": "left", "type": "test"},
                 {"id": "right", "type": "test"},
-                {"id": "end", "type": "test"}
+                {"id": "end", "type": "test"},
             ],
             "edges": [
                 {"from": "start", "to": "left"},
                 {"from": "start", "to": "right"},
                 {"from": "left", "to": "end"},
-                {"from": "right", "to": "end"}
-            ]
+                {"from": "right", "to": "end"},
+            ],
         }
 
         context = ee.ExecutionContext(
-            graph=graph,
-            node_map={n["id"]: n for n in graph["nodes"]},
-            runtime=runtime
+            graph=graph, node_map={n["id"]: n for n in graph["nodes"]}, runtime=runtime
         )
 
-        result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.PARALLEL
-        )
+        result = await engine.run_graph(context=context, mode=ee.ExecutionMode.PARALLEL)
 
         assert result.status == ee.ExecutionStatus.SUCCESS
         assert result.nodes_executed == 4
@@ -615,27 +552,26 @@ class TestComplexGraphExecution:
         """Test multiple parallel chains"""
         graph = {
             "nodes": [
-                {"id": "a1", "type": "test"}, {"id": "a2", "type": "test"}, {"id": "a3", "type": "test"},
-                {"id": "b1", "type": "test"}, {"id": "b2", "type": "test"}, {"id": "b3", "type": "test"}
+                {"id": "a1", "type": "test"},
+                {"id": "a2", "type": "test"},
+                {"id": "a3", "type": "test"},
+                {"id": "b1", "type": "test"},
+                {"id": "b2", "type": "test"},
+                {"id": "b3", "type": "test"},
             ],
             "edges": [
                 {"from": "a1", "to": "a2"},
                 {"from": "a2", "to": "a3"},
                 {"from": "b1", "to": "b2"},
-                {"from": "b2", "to": "b3"}
-            ]
+                {"from": "b2", "to": "b3"},
+            ],
         }
 
         context = ee.ExecutionContext(
-            graph=graph,
-            node_map={n["id"]: n for n in graph["nodes"]},
-            runtime=runtime
+            graph=graph, node_map={n["id"]: n for n in graph["nodes"]}, runtime=runtime
         )
 
-        result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.PARALLEL
-        )
+        result = await engine.run_graph(context=context, mode=ee.ExecutionMode.PARALLEL)
 
         assert result.status == ee.ExecutionStatus.SUCCESS
         assert result.nodes_executed == 6
@@ -658,15 +594,10 @@ class TestErrorHandling:
     async def test_empty_graph(self, engine, runtime):
         """Test execution with empty graph"""
         graph = {"nodes": [], "edges": []}
-        context = ee.ExecutionContext(
-            graph=graph,
-            node_map={},
-            runtime=runtime
-        )
+        context = ee.ExecutionContext(graph=graph, node_map={}, runtime=runtime)
 
         result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.SEQUENTIAL
+            context=context, mode=ee.ExecutionMode.SEQUENTIAL
         )
 
         assert result.status == ee.ExecutionStatus.SUCCESS
@@ -675,20 +606,14 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_single_node_graph(self, engine, runtime):
         """Test execution with single node"""
-        graph = {
-            "nodes": [{"id": "n1", "type": "test"}],
-            "edges": []
-        }
+        graph = {"nodes": [{"id": "n1", "type": "test"}], "edges": []}
 
         context = ee.ExecutionContext(
-            graph=graph,
-            node_map={"n1": graph["nodes"][0]},
-            runtime=runtime
+            graph=graph, node_map={"n1": graph["nodes"][0]}, runtime=runtime
         )
 
         result = await engine.run_graph(
-            context=context,
-            mode=ee.ExecutionMode.SEQUENTIAL
+            context=context, mode=ee.ExecutionMode.SEQUENTIAL
         )
 
         assert result.status == ee.ExecutionStatus.SUCCESS

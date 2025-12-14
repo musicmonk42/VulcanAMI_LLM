@@ -8,13 +8,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.utils.cpu_capabilities import (CPUCapabilities,
-                                        _detect_macos_capabilities,
-                                        detect_cpu_capabilities,
-                                        get_cpu_capabilities)
-from src.utils.performance_metrics import (PerformanceTimer,
-                                           PerformanceTracker,
-                                           get_performance_tracker)
+from src.utils.cpu_capabilities import (
+    CPUCapabilities,
+    _detect_macos_capabilities,
+    detect_cpu_capabilities,
+    get_cpu_capabilities,
+)
+from src.utils.performance_metrics import (
+    PerformanceTimer,
+    PerformanceTracker,
+    get_performance_tracker,
+)
 
 
 class TestCPUCapabilitiesFixes:
@@ -22,11 +26,7 @@ class TestCPUCapabilitiesFixes:
 
     def test_repr_method(self):
         """Test that CPUCapabilities has __repr__ for debugging"""
-        caps = CPUCapabilities(
-            architecture="x86_64",
-            platform="Linux",
-            has_avx2=True
-        )
+        caps = CPUCapabilities(architecture="x86_64", platform="Linux", has_avx2=True)
         repr_str = repr(caps)
         assert "CPUCapabilities" in repr_str
         assert "arch=" in repr_str
@@ -47,19 +47,21 @@ class TestCPUCapabilitiesFixes:
         # Mock subprocess result with key:value format
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "machdep.cpu.features: SSE AVX AVX2\nmachdep.cpu.leaf7_features: AVX512F"
+        mock_result.stdout = (
+            "machdep.cpu.features: SSE AVX AVX2\nmachdep.cpu.leaf7_features: AVX512F"
+        )
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             _detect_macos_capabilities(caps)
 
         # Verify flags don't include the key names
-        assert 'sse' in caps.cpu_flags
-        assert 'avx' in caps.cpu_flags
-        assert 'avx2' in caps.cpu_flags
-        assert 'avx512f' in caps.cpu_flags
+        assert "sse" in caps.cpu_flags
+        assert "avx" in caps.cpu_flags
+        assert "avx2" in caps.cpu_flags
+        assert "avx512f" in caps.cpu_flags
         # These should NOT be in the flags
-        assert 'machdep.cpu.features:' not in caps.cpu_flags
-        assert 'machdep.cpu.leaf7_features:' not in caps.cpu_flags
+        assert "machdep.cpu.features:" not in caps.cpu_flags
+        assert "machdep.cpu.leaf7_features:" not in caps.cpu_flags
 
     def test_singleton_thread_safety(self):
         """Test that get_cpu_capabilities is thread-safe"""
@@ -105,7 +107,7 @@ class TestPerformanceMetricsFixes:
         # Should have recorded 500 metrics total
         stats = tracker.get_stats("test_op", "impl1")
         assert stats is not None
-        assert stats['count'] == 500
+        assert stats["count"] == 500
 
     def test_thread_safety_get_stats(self):
         """Test that PerformanceTracker.get_stats is thread-safe"""
@@ -132,7 +134,7 @@ class TestPerformanceMetricsFixes:
         assert len(results) == 10
         for stats in results:
             assert stats is not None
-            assert stats['count'] == 100
+            assert stats["count"] == 100
 
     def test_division_edge_case_zero_full_mean(self):
         """Test that division by zero is handled properly"""
@@ -144,12 +146,12 @@ class TestPerformanceMetricsFixes:
 
         comparison = tracker.compare_implementations("test_op")
 
-        assert 'comparison' in comparison
-        slowdown = comparison['comparison']['fallback_slowdown_factor']
-        slower_by_percent = comparison['comparison']['fallback_slower_by_percent']
+        assert "comparison" in comparison
+        slowdown = comparison["comparison"]["fallback_slowdown_factor"]
+        slower_by_percent = comparison["comparison"]["fallback_slower_by_percent"]
         # Should be infinity when full_mean is 0 and fallback_mean > 0
-        assert slowdown == float('inf')
-        assert slower_by_percent == float('inf')
+        assert slowdown == float("inf")
+        assert slower_by_percent == float("inf")
 
     def test_division_edge_case_both_zero(self):
         """Test that division when both means are zero returns 1.0"""
@@ -161,9 +163,9 @@ class TestPerformanceMetricsFixes:
 
         comparison = tracker.compare_implementations("test_op")
 
-        assert 'comparison' in comparison
-        slowdown = comparison['comparison']['fallback_slowdown_factor']
-        slower_by_percent = comparison['comparison']['fallback_slower_by_percent']
+        assert "comparison" in comparison
+        slowdown = comparison["comparison"]["fallback_slowdown_factor"]
+        slower_by_percent = comparison["comparison"]["fallback_slower_by_percent"]
         # Should be 1.0 when both are 0
         assert slowdown == 1.0
         assert slower_by_percent == 0.0
@@ -197,15 +199,15 @@ class TestPerformanceMetricsFixes:
         stats = tracker.get_stats("test_op", "impl1")
 
         assert stats is not None
-        assert 'p95_ms' in stats
-        assert stats['p95_ms'] is not None
+        assert "p95_ms" in stats
+        assert stats["p95_ms"] is not None
         # P95 should be around the 95th percentile, not the max
-        assert stats['p95_ms'] < stats['max_ms']
+        assert stats["p95_ms"] < stats["max_ms"]
         # P95 should be >= median
-        assert stats['p95_ms'] >= stats['median_ms']
+        assert stats["p95_ms"] >= stats["median_ms"]
 
         # Not enough for p99 (need 100+)
-        assert 'p99_ms' not in stats or stats['p99_ms'] is None
+        assert "p99_ms" not in stats or stats["p99_ms"] is None
 
     def test_percentile_p99_support(self):
         """Test that p99 is calculated with 100+ samples"""
@@ -218,13 +220,13 @@ class TestPerformanceMetricsFixes:
         stats = tracker.get_stats("test_op", "impl1")
 
         assert stats is not None
-        assert 'p95_ms' in stats
-        assert 'p99_ms' in stats
-        assert stats['p99_ms'] is not None
+        assert "p95_ms" in stats
+        assert "p99_ms" in stats
+        assert stats["p99_ms"] is not None
         # With 150 samples, P99 should be < max (at index 148, not 149)
-        assert stats['p99_ms'] < stats['max_ms']
+        assert stats["p99_ms"] < stats["max_ms"]
         # P99 should be >= p95
-        assert stats['p99_ms'] >= stats['p95_ms']
+        assert stats["p99_ms"] >= stats["p95_ms"]
 
     def test_failure_rate_tracking(self):
         """Test that failure rate is tracked"""
@@ -239,10 +241,10 @@ class TestPerformanceMetricsFixes:
         stats = tracker.get_stats("test_op", "impl1")
 
         assert stats is not None
-        assert 'failure_rate' in stats
-        assert stats['total_attempts'] == 100
-        assert stats['count'] == 80  # Only successful
-        assert abs(stats['failure_rate'] - 0.2) < 0.01  # 20% failure rate
+        assert "failure_rate" in stats
+        assert stats["total_attempts"] == 100
+        assert stats["count"] == 80  # Only successful
+        assert abs(stats["failure_rate"] - 0.2) < 0.01  # 20% failure rate
 
     def test_failure_rate_all_failed(self):
         """Test failure rate when all attempts failed"""
@@ -254,8 +256,8 @@ class TestPerformanceMetricsFixes:
         stats = tracker.get_stats("test_op", "impl1")
 
         assert stats is not None
-        assert stats['failure_rate'] == 1.0
-        assert stats['count'] == 0
+        assert stats["failure_rate"] == 1.0
+        assert stats["count"] == 0
 
     def test_decorator_pattern(self):
         """Test that PerformanceTimer can be used as a decorator"""

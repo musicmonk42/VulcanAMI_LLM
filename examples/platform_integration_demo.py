@@ -20,9 +20,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import hashlib
 
 from src.gvulcan.merkle import MerkleTree
-from src.gvulcan.zk import (Circuit, Groth16Prover, R1CSConstraint,
-                            generate_proof_for_unlearning,
-                            verify_unlearning_proof)
+from src.gvulcan.zk import (
+    Circuit,
+    Groth16Prover,
+    R1CSConstraint,
+    generate_proof_for_unlearning,
+    verify_unlearning_proof,
+)
 
 
 def create_model_commitment(weights: list) -> bytes:
@@ -73,7 +77,7 @@ def main():
     affected_samples = [1, 3]  # Indices that were unlearned
     pattern_data = f"unlearn:{','.join(map(str, affected_samples))}"
     pattern_hash_bytes = hashlib.sha256(pattern_data.encode()).digest()
-    pattern_hash = int.from_bytes(pattern_hash_bytes[:8], 'big')
+    pattern_hash = int.from_bytes(pattern_hash_bytes[:8], "big")
 
     print(f"   Affected sample indices: {affected_samples}")
     print(f"   Pattern identifier: {pattern_hash}")
@@ -84,8 +88,8 @@ def main():
     print("-" * 70)
 
     # Convert Merkle roots to integers for circuit
-    merkle_before_int = int.from_bytes(root_before[:8], 'big')
-    merkle_after_int = int.from_bytes(root_after[:8], 'big')
+    merkle_before_int = int.from_bytes(root_before[:8], "big")
+    merkle_after_int = int.from_bytes(root_after[:8], "big")
 
     print("   Creating proof...")
     print("   - Public inputs: merkle_before, merkle_after, pattern_hash")
@@ -98,7 +102,7 @@ def main():
             pattern_hash=pattern_hash,
             model_weights=[int(w * 1000) for w in weights_before],  # Scale to ints
             gradient_updates=[0] * len(weights_before),  # Simplified
-            affected_samples=affected_samples
+            affected_samples=affected_samples,
         )
 
         proof_size = len(proof.to_bytes())
@@ -121,7 +125,7 @@ def main():
         merkle_root_after=merkle_after_int,
         pattern_hash=pattern_hash,
         num_samples=len(affected_samples),
-        model_size=len(weights_before)
+        model_size=len(weights_before),
     )
 
     if is_valid:

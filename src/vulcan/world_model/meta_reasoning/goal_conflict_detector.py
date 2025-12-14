@@ -26,8 +26,10 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
+
 # import numpy as np # Original import
 from typing import Any, Dict, List, Optional
+
 # FIXED: Import Mock for type checking in __init__
 from unittest.mock import MagicMock, Mock
 
@@ -109,8 +111,7 @@ try:
     # Rename imported ConflictType to avoid clash with local definition
     from .objective_hierarchy import ConflictType as RealHierarchyConflictType
     from .objective_hierarchy import Objective as RealObjective
-    from .objective_hierarchy import \
-        ObjectiveHierarchy as RealObjectiveHierarchy
+    from .objective_hierarchy import ObjectiveHierarchy as RealObjectiveHierarchy
     from .objective_hierarchy import ObjectiveType as RealObjectiveType
 
     ObjectiveHierarchy = RealObjectiveHierarchy
@@ -141,6 +142,7 @@ except ImportError as e:
         INDIRECT = "indirect"
         CONSTRAINT = "constraint"
         TRADEOFF = "tradeoff"  # Added TRADEOFF
+
 
 # --- END FIX ---
 
@@ -634,9 +636,9 @@ class GoalConflictDetector:
                 metadata={
                     "analyzed_at": time.time(),
                     "num_objectives": n,
-                    "max_tension": float(self._np.max(tension_matrix))
-                    if n > 0
-                    else 0.0,  # Use self._np
+                    "max_tension": (
+                        float(self._np.max(tension_matrix)) if n > 0 else 0.0
+                    ),  # Use self._np
                 },
             )
 
@@ -932,11 +934,11 @@ class GoalConflictDetector:
                 1.0
                 - (len(issues) * 0.1)
                 - sum(
-                    0.2
-                    if i["severity"] == "high"
-                    else 0.4
-                    if i["severity"] == "critical"
-                    else 0
+                    (
+                        0.2
+                        if i["severity"] == "high"
+                        else 0.4 if i["severity"] == "critical" else 0
+                    )
                     for i in issues
                 ),
             )

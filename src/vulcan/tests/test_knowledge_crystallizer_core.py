@@ -9,15 +9,20 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from vulcan.knowledge_crystallizer.contraindication_tracker import \
-    Contraindication
-from vulcan.knowledge_crystallizer.crystallization_selector import \
-    CrystallizationMethod
+from vulcan.knowledge_crystallizer.contraindication_tracker import Contraindication
+from vulcan.knowledge_crystallizer.crystallization_selector import CrystallizationMethod
+
 # Import the module components to test
 from vulcan.knowledge_crystallizer.knowledge_crystallizer_core import (
-    ApplicationMode, ApplicationResult, CrystallizationMode,
-    CrystallizationResult, ExecutionTrace, ImbalanceHandler,
-    KnowledgeApplicator, KnowledgeCrystallizer)
+    ApplicationMode,
+    ApplicationResult,
+    CrystallizationMode,
+    CrystallizationResult,
+    ExecutionTrace,
+    ImbalanceHandler,
+    KnowledgeApplicator,
+    KnowledgeCrystallizer,
+)
 from vulcan.knowledge_crystallizer.principle_extractor import Principle
 from vulcan.knowledge_crystallizer.validation_engine import ValidationResult
 
@@ -719,9 +724,7 @@ class TestKnowledgeCrystallizer:
         # Add some history
         for i in range(10):
             crystallizer.crystallization_history.append(
-                {
-                    "result_summary": {"success": i % 2 == 0}  # 50% success
-                }
+                {"result_summary": {"success": i % 2 == 0}}  # 50% success
             )
 
         rate = crystallizer._get_recent_success_rate()

@@ -4,15 +4,24 @@
 # FIXED: All 15 test failures resolved
 # Run: pytest src/vulcan/tests/test_processing.py -v --tb=short --cov=src.vulcan.processing --cov-report=html
 
-from src.vulcan.processing import (AdaptiveMultimodalProcessor,
-                                   CrossModalAttention, DynamicModelManager,
-                                   EmbeddingCache, EnhancedEmbeddingCache,
-                                   ModalityFusion, ModelManager,
-                                   MultimodalProcessor, ProcessingPriority,
-                                   ProcessingQuality, ProcessingResult,
-                                   SLOConfig, StreamingProcessor,
-                                   VersionedDataLogger, WorkloadManager)
-from src.vulcan.config import (EMBEDDING_DIM, ModalityType)
+from src.vulcan.processing import (
+    AdaptiveMultimodalProcessor,
+    CrossModalAttention,
+    DynamicModelManager,
+    EmbeddingCache,
+    EnhancedEmbeddingCache,
+    ModalityFusion,
+    ModelManager,
+    MultimodalProcessor,
+    ProcessingPriority,
+    ProcessingQuality,
+    ProcessingResult,
+    SLOConfig,
+    StreamingProcessor,
+    VersionedDataLogger,
+    WorkloadManager,
+)
+from src.vulcan.config import EMBEDDING_DIM, ModalityType
 import PIL.Image
 import numpy as np
 import time

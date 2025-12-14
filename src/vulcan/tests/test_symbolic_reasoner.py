@@ -14,11 +14,14 @@ import time
 import pytest
 
 # Import core types for validation
-from src.vulcan.reasoning.symbolic.core import (Function, ProofNode)
+from src.vulcan.reasoning.symbolic.core import Function, ProofNode
+
 # Import the classes we're testing
-from src.vulcan.reasoning.symbolic.reasoner import (HybridReasoner,
-                                                    ProbabilisticReasoner,
-                                                    SymbolicReasoner)
+from src.vulcan.reasoning.symbolic.reasoner import (
+    HybridReasoner,
+    ProbabilisticReasoner,
+    SymbolicReasoner,
+)
 
 # ============================================================================
 # SYMBOLIC REASONER TESTS

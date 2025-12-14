@@ -13,6 +13,7 @@ from __future__ import annotations  # Add this at the top
 import numpy  # For _calculate_validation_confidence
 
 import importlib  # ADDED as per fix steps
+
 # Existing imports remain (including from .validation_tracker)
 # The cycle is broken because validation_tracker no longer imports back at module level.
 import json
@@ -65,18 +66,7 @@ def _init_lazy_imports():
     Populate global type/class variables by lazy-loading modules.
     Called from MotivationalIntrospection.__init__ to break import cycles.
     """
-    global \
-        ObjectiveHierarchy, \
-        CounterfactualObjectiveReasoner, \
-        GoalConflictDetector, \
-        ValidationTracker, \
-        TransparencyInterface, \
-        ConflictType, \
-        ConflictSeverity, \
-        ValidationOutcome, \
-        PatternType, \
-        ObjectiveBlocker, \
-        ValidationPattern
+    global ObjectiveHierarchy, CounterfactualObjectiveReasoner, GoalConflictDetector, ValidationTracker, TransparencyInterface, ConflictType, ConflictSeverity, ValidationOutcome, PatternType, ObjectiveBlocker, ValidationPattern
 
     logger.debug("Initializing lazy imports for meta_reasoning...")
 
@@ -937,12 +927,16 @@ class MotivationalIntrospection:
                 alternative_analyses.append(
                     {
                         "objective": alt_objective,
-                        "predicted_outcome": analysis.to_dict()
-                        if hasattr(analysis, "to_dict")
-                        else analysis,
-                        "comparison_to_current": comparison.to_dict()
-                        if hasattr(comparison, "to_dict")
-                        else comparison,
+                        "predicted_outcome": (
+                            analysis.to_dict()
+                            if hasattr(analysis, "to_dict")
+                            else analysis
+                        ),
+                        "comparison_to_current": (
+                            comparison.to_dict()
+                            if hasattr(comparison, "to_dict")
+                            else comparison
+                        ),
                         "tradeoffs": self._identify_tradeoffs(
                             current_objective, alt_objective
                         ),
@@ -1589,9 +1583,11 @@ class MotivationalIntrospection:
                                 actual = getattr(
                                     p,
                                     "actual",
-                                    p.metadata.get("actual")
-                                    if hasattr(p, "metadata")
-                                    else None,
+                                    (
+                                        p.metadata.get("actual")
+                                        if hasattr(p, "metadata")
+                                        else None
+                                    ),
                                 )
                                 predicted = getattr(
                                     p, "expected", getattr(p, "predicted", None)
@@ -1993,12 +1989,14 @@ class MotivationalIntrospection:
                                 "value": value,
                                 "limit": min_limit,
                                 # FIXED: Use hierarchy to determine severity
-                                "severity": "critical"
-                                if self.objective_hierarchy.objectives.get(
-                                    obj_name, MagicMock(priority=1)
-                                ).priority
-                                == 0
-                                else "high",
+                                "severity": (
+                                    "critical"
+                                    if self.objective_hierarchy.objectives.get(
+                                        obj_name, MagicMock(priority=1)
+                                    ).priority
+                                    == 0
+                                    else "high"
+                                ),
                             }
                         )
 
@@ -2013,12 +2011,14 @@ class MotivationalIntrospection:
                                 "constraint": "maximum",
                                 "value": value,
                                 "limit": max_limit,
-                                "severity": "critical"
-                                if self.objective_hierarchy.objectives.get(
-                                    obj_name, MagicMock(priority=1)
-                                ).priority
-                                == 0
-                                else "high",
+                                "severity": (
+                                    "critical"
+                                    if self.objective_hierarchy.objectives.get(
+                                        obj_name, MagicMock(priority=1)
+                                    ).priority
+                                    == 0
+                                    else "high"
+                                ),
                             }
                         )
 
@@ -2552,8 +2552,7 @@ class MotivationalIntrospection:
                 # Create prediction context
                 # Need to import ModelContext
                 try:
-                    from vulcan.world_model.world_model_core import \
-                        ModelContext
+                    from vulcan.world_model.world_model_core import ModelContext
                 except ImportError:
                     # Fallback context dict if ModelContext dataclass not found
                     ModelContext = dict

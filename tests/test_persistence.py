@@ -12,11 +12,20 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from src.persistence import (DEFAULT_CACHE_SIZE, DEFAULT_CACHE_TTL,
-                             DEFAULT_MAX_CONNECTIONS, MAX_BACKUP_COUNT,
-                             CacheEntry, ConnectionPool, IntegrityError,
-                             KeyManagementError, KeyManager, PersistenceError,
-                             PersistenceLayer, WorkingMemory)
+from src.persistence import (
+    DEFAULT_CACHE_SIZE,
+    DEFAULT_CACHE_TTL,
+    DEFAULT_MAX_CONNECTIONS,
+    MAX_BACKUP_COUNT,
+    CacheEntry,
+    ConnectionPool,
+    IntegrityError,
+    KeyManagementError,
+    KeyManager,
+    PersistenceError,
+    PersistenceLayer,
+    WorkingMemory,
+)
 
 
 @pytest.fixture
@@ -45,12 +54,9 @@ def sample_graph():
         "nodes": [
             {"id": "n1", "type": "Input"},
             {"id": "n2", "type": "Process"},
-            {"id": "n3", "type": "Output"}
+            {"id": "n3", "type": "Output"},
         ],
-        "edges": [
-            {"from": "n1", "to": "n2"},
-            {"from": "n2", "to": "n3"}
-        ]
+        "edges": [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}],
     }
 
 
@@ -305,9 +311,7 @@ class TestPersistenceLayerInitialization:
             cursor = conn.cursor()
 
             # Check tables exist
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
 
         assert "graphs" in tables
@@ -375,11 +379,7 @@ class TestEvolutionOperations:
 
     def test_store_evolution(self, persistence):
         """Test storing evolution."""
-        evolution = {
-            "id": "evo1",
-            "type": "add_node",
-            "status": "approved"
-        }
+        evolution = {"id": "evo1", "type": "add_node", "status": "approved"}
 
         evo_id = persistence.store_evolution(evolution)
 
@@ -394,11 +394,7 @@ class TestEvolutionOperations:
 
     def test_recall_evolution(self, persistence):
         """Test recalling evolution."""
-        evolution = {
-            "id": "evo1",
-            "type": "add_node",
-            "status": "approved"
-        }
+        evolution = {"id": "evo1", "type": "add_node", "status": "approved"}
 
         persistence.store_evolution(evolution)
         recalled = persistence.recall_evolution("evo1")
@@ -460,15 +456,8 @@ class TestFeatureExtraction:
 
     def test_detect_cycles_no_cycle(self, persistence):
         """Test cycle detection with no cycle."""
-        nodes = [
-            {"id": "n1"},
-            {"id": "n2"},
-            {"id": "n3"}
-        ]
-        edges = [
-            {"from": "n1", "to": "n2"},
-            {"from": "n2", "to": "n3"}
-        ]
+        nodes = [{"id": "n1"}, {"id": "n2"}, {"id": "n3"}]
+        edges = [{"from": "n1", "to": "n2"}, {"from": "n2", "to": "n3"}]
 
         has_cycle = persistence._detect_cycles(nodes, edges)
 
@@ -476,15 +465,11 @@ class TestFeatureExtraction:
 
     def test_detect_cycles_with_cycle(self, persistence):
         """Test cycle detection with cycle."""
-        nodes = [
-            {"id": "n1"},
-            {"id": "n2"},
-            {"id": "n3"}
-        ]
+        nodes = [{"id": "n1"}, {"id": "n2"}, {"id": "n3"}]
         edges = [
             {"from": "n1", "to": "n2"},
             {"from": "n2", "to": "n3"},
-            {"from": "n3", "to": "n1"}
+            {"from": "n3", "to": "n1"},
         ]
 
         has_cycle = persistence._detect_cycles(nodes, edges)
@@ -501,18 +486,18 @@ class TestQueryGraphsByFeatures:
         graph1 = {
             "id": "g1",
             "nodes": [{"id": f"n{i}", "type": "Node"} for i in range(5)],
-            "edges": []
+            "edges": [],
         }
         graph2 = {
             "id": "g2",
             "nodes": [{"id": f"n{i}", "type": "Node"} for i in range(15)],
-            "edges": []
+            "edges": [],
         }
 
         persistence.store_graph(graph1)
         persistence.store_graph(graph2)
 
-        results = persistence.query_graphs_by_features(node_count=10, op='>')
+        results = persistence.query_graphs_by_features(node_count=10, op=">")
 
         assert len(results) == 1
         assert results[0]["id"] == "g2"

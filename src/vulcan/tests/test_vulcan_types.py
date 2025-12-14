@@ -13,15 +13,44 @@ import pytest
 
 # Import config types
 from src.vulcan.config import ActionType, ModalityType, SafetyLevel
+
 # Import types to test
 from src.vulcan.vulcan_types import (  # Version management; IR types; Agent types; Action types; Event types; System state types; Orchestrator-specific types; Validation; Schemas; Registry; Serialization
-    ActionCategory, ActionResult, ActionSpecification, AgentCapability,
-    AgentProfile, AgentRole, CommunicationState, CompleteSystemState,
-    ComponentHealth, EnhancedJSONDecoder, EnhancedJSONEncoder, Episode, Event,
-    EventCategory, EventMetadata, EventPriority, HealthSnapshot, IREdge,
-    IREdgeType, IRGraph, IRNode, IRNodeType, IRSchemas, KnowledgeState,
-    ProvRecord, SA_Latents, SchemaMigrator, SchemaVersion, SecurityState,
-    SystemHealth, SystemState, TypeRegistry, TypeValidator, enforce_types)
+    ActionCategory,
+    ActionResult,
+    ActionSpecification,
+    AgentCapability,
+    AgentProfile,
+    AgentRole,
+    CommunicationState,
+    CompleteSystemState,
+    ComponentHealth,
+    EnhancedJSONDecoder,
+    EnhancedJSONEncoder,
+    Episode,
+    Event,
+    EventCategory,
+    EventMetadata,
+    EventPriority,
+    HealthSnapshot,
+    IREdge,
+    IREdgeType,
+    IRGraph,
+    IRNode,
+    IRNodeType,
+    IRSchemas,
+    KnowledgeState,
+    ProvRecord,
+    SA_Latents,
+    SchemaMigrator,
+    SchemaVersion,
+    SecurityState,
+    SystemHealth,
+    SystemState,
+    TypeRegistry,
+    TypeValidator,
+    enforce_types,
+)
 
 # ============================================================
 # FIXTURES

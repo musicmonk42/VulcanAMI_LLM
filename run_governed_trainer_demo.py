@@ -10,22 +10,25 @@ import os
 import sys
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 try:
     from src.training.governed_trainer import GovernedTrainer
+
     print("✓ GovernedTrainer loaded successfully")
 except ImportError as e:
     print(f"Error importing GovernedTrainer: {e}")
-    print("Please ensure src/training/governed_trainer.py exists and dependencies are installed.")
+    print(
+        "Please ensure src/training/governed_trainer.py exists and dependencies are installed."
+    )
     sys.exit(1)
 
 
 def run_demo():
     """Run a simple demonstration of GovernedTrainer."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("GovernedTrainer Demo")
-    print("="*60)
+    print("=" * 60)
 
     # Initialize trainer with safety parameters
     trainer = GovernedTrainer(
@@ -51,7 +54,7 @@ def run_demo():
 
     print("\nDemo completed successfully!")
     print("For actual training, use: src/training/train_learnable_bigram.py")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":

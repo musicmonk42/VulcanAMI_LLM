@@ -33,19 +33,24 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 try:
     import faiss
     import numpy as np
+
     HAS_FAISS = True
 
     # Detect FAISS CPU capabilities with enhanced diagnostics
     try:
-        from src.utils.cpu_capabilities import (format_capability_warning,
-                                                get_cpu_capabilities)
+        from src.utils.cpu_capabilities import (
+            format_capability_warning,
+            get_cpu_capabilities,
+        )
 
         caps = get_cpu_capabilities()
         best_instr = caps.get_best_vector_instruction_set()
         perf_tier = caps.get_performance_tier()
 
         # Log detailed warning based on CPU capabilities
-        if caps.architecture.lower().startswith('arm') or caps.architecture.lower().startswith('aarch'):
+        if caps.architecture.lower().startswith(
+            "arm"
+        ) or caps.architecture.lower().startswith("aarch"):
             if not caps.has_sve and not caps.has_sve2:
                 logging.warning(
                     f"FAISS loaded with ARM NEON "
@@ -78,11 +83,12 @@ try:
         # Fallback to simple detection
         try:
             import platform
+
             if platform.system() == "Linux":
                 try:
-                    with open('/proc/cpuinfo', 'r') as f:
+                    with open("/proc/cpuinfo", "r") as f:
                         cpuinfo = f.read()
-                        has_avx512 = 'avx512f' in cpuinfo
+                        has_avx512 = "avx512f" in cpuinfo
                 except (IOError, OSError):
                     has_avx512 = False
             else:
@@ -95,7 +101,9 @@ try:
 
 except ImportError:
     HAS_FAISS = False
-    logging.error("FAISS is required for production. Install with: pip install faiss-cpu numpy")
+    logging.error(
+        "FAISS is required for production. Install with: pip install faiss-cpu numpy"
+    )
     raise ImportError("FAISS and numpy are required for production use")
 
 try:
@@ -103,32 +111,41 @@ try:
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding, rsa
+
     HAS_CRYPTOGRAPHY = True
 except ImportError:
     HAS_CRYPTOGRAPHY = False
-    logging.error("Cryptography library is required for production. Install with: pip install cryptography")
+    logging.error(
+        "Cryptography library is required for production. Install with: pip install cryptography"
+    )
     raise ImportError("cryptography library is required for production use")
 
 try:
     import networkx as nx
     from jsonschema import ValidationError, validate
+
     HAS_VALIDATION_LIBS = True
 except ImportError:
     HAS_VALIDATION_LIBS = False
-    logging.error("jsonschema and networkx are required. Install with: pip install jsonschema networkx")
+    logging.error(
+        "jsonschema and networkx are required. Install with: pip install jsonschema networkx"
+    )
     raise ImportError("jsonschema and networkx are required for production use")
 
 try:
     import jsonpatch
+
     HAS_JSONPATCH = True
 except ImportError:
     HAS_JSONPATCH = False
-    logging.warning("jsonpatch not found. Install for migration script generation: pip install jsonpatch")
+    logging.warning(
+        "jsonpatch not found. Install for migration script generation: pip install jsonpatch"
+    )
 
 # --- CONFIGURATION ---
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s",
 )
 
 DEFAULT_GRAMMAR_VERSION = "2.3.0"
@@ -141,25 +158,35 @@ MAX_PROPOSALS_PER_AGENT_PER_HOUR = 10
 MAX_SPEC_SIZE_BYTES = 1024 * 1024  # 1MB
 MAX_PROPOSAL_CONTENT_DEPTH = 10
 
+
 # --- EXCEPTIONS ---
 class RegistryError(Exception):
     """Base exception for registry errors."""
+
     pass
+
 
 class SecurityPolicyError(RegistryError):
     """Raised when security policy is violated."""
+
     pass
+
 
 class RateLimitError(RegistryError):
     """Raised when rate limit is exceeded."""
+
     pass
+
 
 class ValidationError(RegistryError):
     """Raised when validation fails."""
+
     pass
+
 
 class ConcurrencyError(RegistryError):
     """Raised when concurrent operation conflict occurs."""
+
     pass
 
 
@@ -167,15 +194,19 @@ class ConcurrencyError(RegistryError):
 @dataclass
 class ProposalMetrics:
     """Metrics for a proposal."""
+
     votes_received: int = 0
     validation_attempts: int = 0
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + 'Z')
-    last_updated: str = field(default_factory=lambda: datetime.utcnow().isoformat() + 'Z')
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    last_updated: str = field(
+        default_factory=lambda: datetime.utcnow().isoformat() + "Z"
+    )
 
 
 @dataclass
 class RateLimitInfo:
     """Rate limiting information for an agent."""
+
     proposal_count: int = 0
     window_start: float = field(default_factory=time.time)
 
@@ -234,12 +265,15 @@ class InMemoryBackend(AbstractBackend):
     In-memory backend for testing and development only.
     NOT FOR PRODUCTION USE - data is lost on restart.
     """
+
     def __init__(self):
         self._data_store: Dict[str, Any] = {}
         self._audit_logs: Dict[str, List[Dict]] = {}
         self._lock = threading.RLock()  # Reentrant lock
         self.logger = logging.getLogger("InMemoryBackend")
-        self.logger.warning("Using InMemoryBackend - NOT FOR PRODUCTION (data will be lost on restart)")
+        self.logger.warning(
+            "Using InMemoryBackend - NOT FOR PRODUCTION (data will be lost on restart)"
+        )
 
     def load_data(self, key: str) -> Optional[Dict]:
         with self._lock:
@@ -343,6 +377,7 @@ class DevelopmentKMS(AbstractKMS):
     Development KMS for testing only.
     WARNING: Keys stored in memory - NOT FOR PRODUCTION.
     """
+
     def __init__(self):
         self._keys: Dict[str, Dict] = {}
         self._lock = threading.Lock()
@@ -352,14 +387,16 @@ class DevelopmentKMS(AbstractKMS):
     def _generate_key_pair(self) -> Tuple[Any, str]:
         """Generate new RSA key pair."""
         private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
+            public_exponent=65537, key_size=2048, backend=default_backend()
         )
-        public_key_pem = private_key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ).decode('utf-8')
+        public_key_pem = (
+            private_key.public_key()
+            .public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+            .decode("utf-8")
+        )
         return private_key, public_key_pem
 
     def get_private_key(self, key_id: str) -> Any:
@@ -373,7 +410,7 @@ class DevelopmentKMS(AbstractKMS):
                     "private": private_key,
                     "public_pem": public_pem,
                     "status": "active",
-                    "created": datetime.utcnow().isoformat() + 'Z'
+                    "created": datetime.utcnow().isoformat() + "Z",
                 }
             return self._keys[key_id]["private"]
 
@@ -390,10 +427,9 @@ class DevelopmentKMS(AbstractKMS):
         return private_key.sign(
             data,
             padding.PSS(
-                mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=padding.PSS.MAX_LENGTH
+                mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
             ),
-            hashes.SHA256()
+            hashes.SHA256(),
         )
 
     def rotate_key(self, key_id: str) -> str:
@@ -408,8 +444,8 @@ class DevelopmentKMS(AbstractKMS):
                 "private": private_key,
                 "public_pem": public_pem,
                 "status": "active",
-                "created": datetime.utcnow().isoformat() + 'Z',
-                "rotated_from": key_id
+                "created": datetime.utcnow().isoformat() + "Z",
+                "rotated_from": key_id,
             }
             return new_key_id
 
@@ -440,21 +476,22 @@ class CryptoHandler:
             self.logger.error(f"Signing failed: {e}")
             raise
 
-    def verify_signature(self, data: bytes, signature_hex: str, public_key_pem: bytes) -> bool:
+    def verify_signature(
+        self, data: bytes, signature_hex: str, public_key_pem: bytes
+    ) -> bool:
         """Verify signature."""
         try:
             public_key = serialization.load_pem_public_key(
-                public_key_pem,
-                backend=default_backend()
+                public_key_pem, backend=default_backend()
             )
             public_key.verify(
                 bytes.fromhex(signature_hex),
                 data,
                 padding.PSS(
                     mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.MAX_LENGTH
+                    salt_length=padding.PSS.MAX_LENGTH,
                 ),
-                hashes.SHA256()
+                hashes.SHA256(),
             )
             return True
         except InvalidSignature:
@@ -491,8 +528,10 @@ class InputValidator:
         # Validate size
         try:
             serialized = json.dumps(proposal, sort_keys=True)
-            if len(serialized.encode('utf-8')) > MAX_SPEC_SIZE_BYTES:
-                errors.append(f"Proposal exceeds max size of {MAX_SPEC_SIZE_BYTES} bytes")
+            if len(serialized.encode("utf-8")) > MAX_SPEC_SIZE_BYTES:
+                errors.append(
+                    f"Proposal exceeds max size of {MAX_SPEC_SIZE_BYTES} bytes"
+                )
         except Exception as e:
             errors.append(f"Proposal not JSON-serializable: {e}")
 
@@ -534,14 +573,14 @@ class InputValidator:
         if not isinstance(s, str):
             return str(s)[:max_length]
         # Remove null bytes and control characters
-        s = s.replace('\x00', '').replace('\r', '').replace('\x1b', '')
+        s = s.replace("\x00", "").replace("\r", "").replace("\x1b", "")
         return s[:max_length]
 
     @staticmethod
     def validate_version_string(version: str) -> bool:
         """Validate version string format (supports pre-releases)."""
         # Supports: X.Y.Z, X.Y.Z-alpha, X.Y.Z-beta.N, X.Y.Z-rc.N
-        pattern = r'^\d+\.\d+\.\d+(-[a-zA-Z]+(\.\d+)?)?$'
+        pattern = r"^\d+\.\d+\.\d+(-[a-zA-Z]+(\.\d+)?)?$"
         return bool(re.match(pattern, version))
 
 
@@ -553,8 +592,14 @@ class SecurityAuditEngine:
         self.config = config or {}
         self.logger = logging.getLogger("SecurityAuditEngine")
         self.blacklist_patterns = [
-            "os.system", "eval(", "exec(", "__import__",
-            "subprocess", "rm -rf", "DROP TABLE", "DELETE FROM"
+            "os.system",
+            "eval(",
+            "exec(",
+            "__import__",
+            "subprocess",
+            "rm -rf",
+            "DROP TABLE",
+            "DELETE FROM",
         ]
 
     def enforce_policies(self, proposal_node: Dict) -> bool:
@@ -611,8 +656,11 @@ class ThreadSafeFAISSIndex:
 class RateLimiter:
     """Rate limiter for proposal submissions."""
 
-    def __init__(self, max_per_hour: int = MAX_PROPOSALS_PER_AGENT_PER_HOUR,
-                 window_seconds: int = RATE_LIMIT_WINDOW_SECONDS):
+    def __init__(
+        self,
+        max_per_hour: int = MAX_PROPOSALS_PER_AGENT_PER_HOUR,
+        window_seconds: int = RATE_LIMIT_WINDOW_SECONDS,
+    ):
         self.max_per_hour = max_per_hour
         self.window_seconds = window_seconds
         self.agent_limits: Dict[str, RateLimitInfo] = {}
@@ -651,7 +699,7 @@ class ConsensusManager:
                 "votes": {},
                 "weights": {},
                 "status": "pending",
-                "created_at": datetime.utcnow().isoformat() + 'Z'
+                "created_at": datetime.utcnow().isoformat() + "Z",
             }
             self.backend.save_data(key, record)
 
@@ -663,7 +711,7 @@ class VersionManager:
     @staticmethod
     def parse_version(version: str) -> Tuple[int, int, int, Optional[str]]:
         """Parse version string into components."""
-        match = re.match(r'^(\d+)\.(\d+)\.(\d+)(-(.+))?$', version)
+        match = re.match(r"^(\d+)\.(\d+)\.(\d+)(-(.+))?$", version)
         if not match:
             raise ValueError(f"Invalid version format: {version}")
         major = int(match.group(1))
@@ -691,12 +739,21 @@ class VersionManager:
                 return new_patch == 0
 
             # Patch version bump: major and minor must be same
-            if new_major == old_major and new_minor == old_minor and new_patch > old_patch:
+            if (
+                new_major == old_major
+                and new_minor == old_minor
+                and new_patch > old_patch
+            ):
                 return True
 
             # Pre-release to release (same base version)
-            if (old_major == new_major and old_minor == new_minor and
-                old_patch == new_patch and old_pre is not None and new_pre is None):
+            if (
+                old_major == new_major
+                and old_minor == new_minor
+                and old_patch == new_patch
+                and old_pre is not None
+                and new_pre is None
+            ):
                 return True
 
             return False
@@ -709,11 +766,13 @@ class VersionManager:
 class LanguageEvolutionRegistry:
     """Production-ready language evolution registry."""
 
-    def __init__(self,
-                 backend: AbstractBackend,
-                 kms: AbstractKMS,
-                 security_engine: Optional[SecurityAuditEngine] = None,
-                 rate_limiter: Optional[RateLimiter] = None):
+    def __init__(
+        self,
+        backend: AbstractBackend,
+        kms: AbstractKMS,
+        security_engine: Optional[SecurityAuditEngine] = None,
+        rate_limiter: Optional[RateLimiter] = None,
+    ):
         """
         Initialize registry with required dependencies.
 
@@ -776,9 +835,9 @@ class LanguageEvolutionRegistry:
                         "approved_proposals": 0,
                         "rejected_proposals": 0,
                         "deployed_versions": 0,
-                        "rolled_back_count": 0
+                        "rolled_back_count": 0,
                     },
-                    "initialized_at": datetime.utcnow().isoformat() + 'Z'
+                    "initialized_at": datetime.utcnow().isoformat() + "Z",
                 }
                 self.backend.save_data(self.global_state_key, self.global_state)
                 self._create_audit_entry("registry_initialized", {})
@@ -788,11 +847,13 @@ class LanguageEvolutionRegistry:
             if not grammar_data:
                 grammar_data = {
                     "active": DEFAULT_GRAMMAR_VERSION,
-                    "history": [{
-                        "version": DEFAULT_GRAMMAR_VERSION,
-                        "timestamp": datetime.utcnow().isoformat() + 'Z',
-                        "action": "initialized"
-                    }]
+                    "history": [
+                        {
+                            "version": DEFAULT_GRAMMAR_VERSION,
+                            "timestamp": datetime.utcnow().isoformat() + "Z",
+                            "action": "initialized",
+                        }
+                    ],
                 }
                 self.backend.save_data(self.grammar_versions_key, grammar_data)
 
@@ -800,18 +861,18 @@ class LanguageEvolutionRegistry:
         """Create audit log entry."""
         log_content = {
             "action": action,
-            "timestamp": datetime.utcnow().isoformat() + 'Z',
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "details": details,
-            "registry_version": "4.0.0"
+            "registry_version": "4.0.0",
         }
 
-        serialized = json.dumps(log_content, sort_keys=True).encode('utf-8')
+        serialized = json.dumps(log_content, sort_keys=True).encode("utf-8")
         signature = self.crypto.sign_data(serialized)
 
         entry = {
             "log": log_content,
             "signature": signature,
-            "public_key": self.kms.get_public_key_pem(self.crypto.key_id)
+            "public_key": self.kms.get_public_key_pem(self.crypto.key_id),
         }
 
         return self.backend.append_chained_record(self.audit_log_key, entry)
@@ -821,7 +882,10 @@ class LanguageEvolutionRegistry:
         current_time = time.time()
 
         # Clean old entries efficiently
-        while self.recent_proposals and self.recent_proposals[0][1] < current_time - self.replay_window:
+        while (
+            self.recent_proposals
+            and self.recent_proposals[0][1] < current_time - self.replay_window
+        ):
             self.recent_proposals.popleft()
 
         # Check if exists
@@ -872,12 +936,16 @@ class LanguageEvolutionRegistry:
             ).hexdigest()
 
             if self._is_replay_attack(proposal_hash):
-                self._create_audit_entry("replay_attack_blocked", {"proposal_id": proposal_id})
+                self._create_audit_entry(
+                    "replay_attack_blocked", {"proposal_id": proposal_id}
+                )
                 raise SecurityPolicyError("Replay attack detected")
 
             # Security checks
             if not self.security_engine.enforce_policies(proposal_node):
-                self._create_audit_entry("security_policy_violation", {"proposal_id": proposal_id})
+                self._create_audit_entry(
+                    "security_policy_violation", {"proposal_id": proposal_id}
+                )
                 raise SecurityPolicyError("Security policy violation")
 
             # Agent validation
@@ -886,7 +954,9 @@ class LanguageEvolutionRegistry:
                 raise ValueError("proposed_by field required")
 
             if not self.security_engine.validate_trust_policy(agent_id):
-                self._create_audit_entry("untrusted_agent", {"proposal_id": proposal_id, "agent": agent_id})
+                self._create_audit_entry(
+                    "untrusted_agent", {"proposal_id": proposal_id, "agent": agent_id}
+                )
                 raise SecurityPolicyError(f"Agent {agent_id} not trusted")
 
             # Rate limiting
@@ -899,16 +969,15 @@ class LanguageEvolutionRegistry:
                 "id": proposal_id,
                 "status": "pending",
                 "node": proposal_node,
-                "submitted_at": datetime.utcnow().isoformat() + 'Z',
+                "submitted_at": datetime.utcnow().isoformat() + "Z",
                 "history": [],
-                "metrics": {
-                    "votes_received": 0,
-                    "validation_attempts": 0
-                }
+                "metrics": {"votes_received": 0, "validation_attempts": 0},
             }
 
             # Save
-            self.backend.save_data(f"{self.proposals_prefix}{proposal_id}", proposal_record)
+            self.backend.save_data(
+                f"{self.proposals_prefix}{proposal_id}", proposal_record
+            )
 
             # Update metrics
             self.global_state["metrics"]["total_proposals"] += 1
@@ -918,10 +987,9 @@ class LanguageEvolutionRegistry:
             self.consensus_manager.initialize_consensus(proposal_id)
 
             # Audit
-            self._create_audit_entry("proposal_submitted", {
-                "proposal_id": proposal_id,
-                "agent": agent_id
-            })
+            self._create_audit_entry(
+                "proposal_submitted", {"proposal_id": proposal_id, "agent": agent_id}
+            )
 
             self.logger.info(f"Proposal {proposal_id} submitted by {agent_id}")
             return proposal_id
@@ -956,11 +1024,17 @@ class LanguageEvolutionRegistry:
             should_store_timeout = False
             if deadline_str:
                 try:
-                    deadline = datetime.fromisoformat(deadline_str.replace('Z', '+00:00'))
+                    deadline = datetime.fromisoformat(
+                        deadline_str.replace("Z", "+00:00")
+                    )
                     if datetime.utcnow() > deadline.replace(tzinfo=None):
                         proposal_record["status"] = "rejected_timeout"
-                        self.backend.save_data(f"{self.proposals_prefix}{proposal_id}", proposal_record)
-                        self._create_audit_entry("vote_timeout", {"proposal_id": proposal_id})
+                        self.backend.save_data(
+                            f"{self.proposals_prefix}{proposal_id}", proposal_record
+                        )
+                        self._create_audit_entry(
+                            "vote_timeout", {"proposal_id": proposal_id}
+                        )
                         should_store_timeout = True
                         # Create a copy for use outside the lock
                         proposal_record_copy = proposal_record.copy()
@@ -975,14 +1049,21 @@ class LanguageEvolutionRegistry:
         with self.state_lock:
             # Calculate weighted votes
             votes = consensus_node.get("votes", {})
-            weights = consensus_node.get("weights", {agent: 1.0 for agent in votes.keys()})
+            weights = consensus_node.get(
+                "weights", {agent: 1.0 for agent in votes.keys()}
+            )
 
-            weighted_yes = sum(weights.get(agent, 0) for agent, vote in votes.items() if vote == "yes")
+            weighted_yes = sum(
+                weights.get(agent, 0) for agent, vote in votes.items() if vote == "yes"
+            )
             total_weight = sum(weights.get(agent, 0) for agent in votes.keys())
 
             # Check consensus
             consensus_reached = False
-            if total_weight > 0 and (weighted_yes / total_weight) >= self.voting_threshold:
+            if (
+                total_weight > 0
+                and (weighted_yes / total_weight) >= self.voting_threshold
+            ):
                 consensus_reached = True
                 proposal_record["status"] = "approved"
                 self.global_state["metrics"]["approved_proposals"] += 1
@@ -995,15 +1076,20 @@ class LanguageEvolutionRegistry:
 
             # Save all changes atomically
             self.backend.save_data(f"consensus_record_{proposal_id}", consensus_node)
-            self.backend.save_data(f"{self.proposals_prefix}{proposal_id}", proposal_record)
+            self.backend.save_data(
+                f"{self.proposals_prefix}{proposal_id}", proposal_record
+            )
             self.backend.save_data(self.global_state_key, self.global_state)
 
             # Audit
-            self._create_audit_entry("vote_recorded", {
-                "proposal_id": proposal_id,
-                "consensus_reached": consensus_reached,
-                "threshold_used": self.voting_threshold
-            })
+            self._create_audit_entry(
+                "vote_recorded",
+                {
+                    "proposal_id": proposal_id,
+                    "consensus_reached": consensus_reached,
+                    "threshold_used": self.voting_threshold,
+                },
+            )
 
             return consensus_reached
 
@@ -1035,7 +1121,9 @@ class LanguageEvolutionRegistry:
             # Check status
             valid_statuses = ["approved", "validated"]
             if proposal_record["status"] not in valid_statuses:
-                self.logger.warning(f"Cannot deploy {proposal_id} with status {proposal_record['status']}")
+                self.logger.warning(
+                    f"Cannot deploy {proposal_id} with status {proposal_record['status']}"
+                )
                 return False
 
             # Check for duplicate deployment (idempotency)
@@ -1049,16 +1137,20 @@ class LanguageEvolutionRegistry:
 
             # Validate increment
             if not VersionManager.is_valid_increment(current_version, new_version):
-                self.logger.error(f"Invalid version increment: {current_version} -> {new_version}")
+                self.logger.error(
+                    f"Invalid version increment: {current_version} -> {new_version}"
+                )
                 return False
 
             # Update version
-            grammar_data["history"].append({
-                "version": new_version,
-                "timestamp": datetime.utcnow().isoformat() + 'Z',
-                "action": "deployed",
-                "proposal_id": proposal_id
-            })
+            grammar_data["history"].append(
+                {
+                    "version": new_version,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "action": "deployed",
+                    "proposal_id": proposal_id,
+                }
+            )
             grammar_data["active"] = new_version
 
             # Update proposal
@@ -1066,28 +1158,37 @@ class LanguageEvolutionRegistry:
 
             # Save atomically
             self.backend.save_data(self.grammar_versions_key, grammar_data)
-            self.backend.save_data(f"{self.proposals_prefix}{proposal_id}", proposal_record)
+            self.backend.save_data(
+                f"{self.proposals_prefix}{proposal_id}", proposal_record
+            )
 
             # Update metrics
             self.global_state["metrics"]["deployed_versions"] += 1
             self.backend.save_data(self.global_state_key, self.global_state)
 
             # Audit
-            self._create_audit_entry("grammar_deployed", {
-                "proposal_id": proposal_id,
-                "old_version": current_version,
-                "new_version": new_version
-            })
+            self._create_audit_entry(
+                "grammar_deployed",
+                {
+                    "proposal_id": proposal_id,
+                    "old_version": current_version,
+                    "new_version": new_version,
+                },
+            )
 
             # Save data for LTM storage outside lock
             proposal_record_for_store = proposal_record.copy()
             outcome_to_store = "deployed"
 
-            self.logger.info(f"Deployed version {new_version} from proposal {proposal_id}")
+            self.logger.info(
+                f"Deployed version {new_version} from proposal {proposal_id}"
+            )
 
         # Store outcome outside of state_lock to avoid deadlock
         if proposal_record_for_store and outcome_to_store:
-            self._store_outcome(proposal_id, proposal_record_for_store, outcome_to_store)
+            self._store_outcome(
+                proposal_id, proposal_record_for_store, outcome_to_store
+            )
 
         return True
 
@@ -1109,16 +1210,18 @@ class LanguageEvolutionRegistry:
                     "id": proposal_id,
                     "graph": graph,
                     "outcome": outcome,
-                    "timestamp": datetime.utcnow().isoformat() + 'Z'
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 }
                 self.ltm_counter += 1
 
     def _proposal_to_vector(self, content: Dict) -> Optional[np.ndarray]:
         """Convert proposal to vector."""
         try:
-            serialized = json.dumps(content, sort_keys=True).encode('utf-8')
+            serialized = json.dumps(content, sort_keys=True).encode("utf-8")
             hash_bytes = hashlib.sha512(serialized).digest()
-            vector = np.frombuffer(hash_bytes, dtype=np.float32).reshape(1, self.embedding_dim)
+            vector = np.frombuffer(hash_bytes, dtype=np.float32).reshape(
+                1, self.embedding_dim
+            )
             # Normalize in-place
             faiss.normalize_L2(vector)
             return vector
@@ -1132,13 +1235,15 @@ class LanguageEvolutionRegistry:
             G = nx.DiGraph()
 
             for key, value in content.get("add", {}).items():
-                G.add_node(key, type='add', semantic=value.get("semantic_type", "unknown"))
+                G.add_node(
+                    key, type="add", semantic=value.get("semantic_type", "unknown")
+                )
 
             for key in content.get("modify", {}).keys():
-                G.add_node(key, type='modify')
+                G.add_node(key, type="modify")
 
             for key in content.get("remove", []):
-                G.add_node(key, type='remove')
+                G.add_node(key, type="remove")
 
             return G
         except Exception as e:
@@ -1165,9 +1270,9 @@ class LanguageEvolutionRegistry:
             try:
                 content = entry["log"]
                 signature = entry["signature"]
-                pubkey_pem = entry["public_key"].encode('utf-8')
+                pubkey_pem = entry["public_key"].encode("utf-8")
 
-                serialized = json.dumps(content, sort_keys=True).encode('utf-8')
+                serialized = json.dumps(content, sort_keys=True).encode("utf-8")
 
                 if not self.crypto.verify_signature(serialized, signature, pubkey_pem):
                     self.logger.error(f"Signature verification failed at entry {i}")
@@ -1179,11 +1284,13 @@ class LanguageEvolutionRegistry:
         self.logger.info("Audit log integrity verified")
         return True
 
-    def query_proposals(self,
-                       status: Optional[str] = None,
-                       proposed_by: Optional[str] = None,
-                       limit: Optional[int] = None,
-                       offset: int = 0) -> List[Dict]:
+    def query_proposals(
+        self,
+        status: Optional[str] = None,
+        proposed_by: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> List[Dict]:
         """
         Query proposals with filters.
 
@@ -1209,7 +1316,10 @@ class LanguageEvolutionRegistry:
             if status and proposal.get("status") != status:
                 continue
 
-            if proposed_by and proposal.get("node", {}).get("proposed_by") != proposed_by:
+            if (
+                proposed_by
+                and proposal.get("node", {}).get("proposed_by") != proposed_by
+            ):
                 continue
 
             results.append(proposal)
@@ -1219,7 +1329,7 @@ class LanguageEvolutionRegistry:
 
         # Apply pagination
         if limit:
-            return results[offset:offset+limit]
+            return results[offset : offset + limit]
         return results[offset:]
 
     def adjust_voting_threshold(self, metrics: Dict):
@@ -1236,26 +1346,36 @@ class LanguageEvolutionRegistry:
             with self.state_lock:
                 old = self.voting_threshold
                 # Increase threshold for safety (up to max)
-                self.voting_threshold = min(self.max_threshold, self.voting_threshold + 0.01)
+                self.voting_threshold = min(
+                    self.max_threshold, self.voting_threshold + 0.01
+                )
 
                 if old != self.voting_threshold:
-                    self._create_audit_entry("threshold_adjusted", {
-                        "old": old,
-                        "new": self.voting_threshold,
-                        "reason": f"high_latency_{latency}ms"
-                    })
+                    self._create_audit_entry(
+                        "threshold_adjusted",
+                        {
+                            "old": old,
+                            "new": self.voting_threshold,
+                            "reason": f"high_latency_{latency}ms",
+                        },
+                    )
         else:
             # Normal latency - can decrease threshold slightly (down to min)
             with self.state_lock:
                 old = self.voting_threshold
-                self.voting_threshold = max(self.min_threshold, self.voting_threshold - 0.005)
+                self.voting_threshold = max(
+                    self.min_threshold, self.voting_threshold - 0.005
+                )
 
                 if old != self.voting_threshold:
-                    self._create_audit_entry("threshold_adjusted", {
-                        "old": old,
-                        "new": self.voting_threshold,
-                        "reason": "normal_latency"
-                    })
+                    self._create_audit_entry(
+                        "threshold_adjusted",
+                        {
+                            "old": old,
+                            "new": self.voting_threshold,
+                            "reason": "normal_latency",
+                        },
+                    )
 
 
 # --- EXAMPLE USAGE ---
@@ -1266,10 +1386,7 @@ def example_usage():
     backend = InMemoryBackend()
     kms = DevelopmentKMS()
 
-    registry = LanguageEvolutionRegistry(
-        backend=backend,
-        kms=kms
-    )
+    registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
 
     print("Registry initialized")
     print(f"Active version: {registry.get_active_grammar_version()}")
@@ -1283,14 +1400,11 @@ def example_usage():
             "add": {
                 "TestNode": {
                     "schema": "https://graphix.ai/schemas/test.json",
-                    "semantic_type": "test"
+                    "semantic_type": "test",
                 }
             }
         },
-        "metadata": {
-            "author": "agent-alpha",
-            "version": "1.0.0"
-        }
+        "metadata": {"author": "agent-alpha", "version": "1.0.0"},
     }
 
     try:
@@ -1300,14 +1414,8 @@ def example_usage():
         # Vote
         consensus = {
             "proposal_id": prop_id,
-            "votes": {
-                "agent-alpha": "yes",
-                "agent-beta": "yes"
-            },
-            "weights": {
-                "agent-alpha": 1.0,
-                "agent-beta": 1.0
-            }
+            "votes": {"agent-alpha": "yes", "agent-beta": "yes"},
+            "weights": {"agent-alpha": 1.0, "agent-beta": 1.0},
         }
 
         reached = registry.record_vote(consensus)

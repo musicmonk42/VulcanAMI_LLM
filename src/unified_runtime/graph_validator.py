@@ -149,9 +149,9 @@ class GraphValidator:
         self.resource_limits = ResourceLimits()  # Use internal class
         self._node_cache = {}
         self._edge_cache = {}
-        self._validation_cache: Dict[
-            str, Tuple[float, ValidationResult]
-        ] = {}  # Modified for TTL caching
+        self._validation_cache: Dict[str, Tuple[float, ValidationResult]] = (
+            {}
+        )  # Modified for TTL caching
         self._lock = threading.Lock()
         self._max_cache_size = 1000
         self._cache_ttl = 3600  # 1 hour TTL for cached validations
@@ -232,7 +232,9 @@ class GraphValidator:
         try:
             # Create a stable hash of the graph content
             graph_str = json.dumps(graph, sort_keys=True, default=str)
-            graph_hash = hashlib.md5(graph_str.encode("utf-8"), usedforsecurity=False).hexdigest()
+            graph_hash = hashlib.md5(
+                graph_str.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()
         except Exception:
             graph_hash = ""  # Can't hash, skip caching
 

@@ -802,9 +802,11 @@ class SelfOptimizer:
                 "current": param["current"],
                 "min": param["min"],
                 "max": param["max"],
-                "type": param["type"].__name__
-                if hasattr(param["type"], "__name__")
-                else str(param["type"]),
+                "type": (
+                    param["type"].__name__
+                    if hasattr(param["type"], "__name__")
+                    else str(param["type"])
+                ),
             }
 
         return report

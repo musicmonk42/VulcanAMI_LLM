@@ -6,12 +6,14 @@ and proper future cleanup.
 """
 
 # Import the module to test
-from vulcan.reasoning.selection.portfolio_executor import (ExecutionMonitor,
-                                                           ExecutionStatus,
-                                                           ExecutionStrategy,
-                                                           PortfolioExecutor,
-                                                           PortfolioResult,
-                                                           ToolExecution)
+from vulcan.reasoning.selection.portfolio_executor import (
+    ExecutionMonitor,
+    ExecutionStatus,
+    ExecutionStrategy,
+    PortfolioExecutor,
+    PortfolioResult,
+    ToolExecution,
+)
 import sys
 import threading
 import time

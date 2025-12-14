@@ -10,8 +10,12 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from run_validation_test import (FileCache, ValidationTestSuite,
-                                 _check_async_context, discover_golden_files)
+from run_validation_test import (
+    FileCache,
+    ValidationTestSuite,
+    _check_async_context,
+    discover_golden_files,
+)
 
 
 @pytest.fixture
@@ -30,11 +34,9 @@ def sample_graph():
         "type": "Graph",
         "nodes": [
             {"id": "n1", "type": "InputNode", "params": {"value": "test"}},
-            {"id": "n2", "type": "OutputNode", "params": {}}
+            {"id": "n2", "type": "OutputNode", "params": {}},
         ],
-        "edges": [
-            {"from": "n1", "to": "n2", "type": "data"}
-        ]
+        "edges": [{"from": "n1", "to": "n2", "type": "data"}],
     }
 
 
@@ -77,14 +79,14 @@ class TestFileCache:
 class TestDiscoverGoldenFiles:
     """Test golden file discovery."""
 
-    @patch('run_validation_test.Path')
+    @patch("run_validation_test.Path")
     def test_discover_with_existing_files(self, mock_path):
         """Test discovery with existing files."""
         mock_dir = MagicMock()
         mock_dir.exists.return_value = True
         mock_dir.glob.return_value = [
             Path("specs/ir_examples/test1.json"),
-            Path("specs/ir_examples/test2.json")
+            Path("specs/ir_examples/test2.json"),
         ]
         mock_path.return_value = mock_dir
 
@@ -144,8 +146,8 @@ class TestValidationTestSuiteInitialization:
 class TestMetricRegistration:
     """Test metric registration."""
 
-    @patch('run_validation_test.ObservabilityManager')
-    @patch('run_validation_test.PROMETHEUS_AVAILABLE', True)
+    @patch("run_validation_test.ObservabilityManager")
+    @patch("run_validation_test.PROMETHEUS_AVAILABLE", True)
     def test_register_metrics(self, mock_obs):
         """Test metric registration."""
         mock_instance = MagicMock()
@@ -173,7 +175,7 @@ class TestMetricRegistration:
 class TestValidationMethods:
     """Test validation methods."""
 
-    @patch('builtins.open', mock_open(read_data='{"test": "data"}'))
+    @patch("builtins.open", mock_open(read_data='{"test": "data"}'))
     def test_load_manifest(self):
         """Test loading manifest."""
         suite = ValidationTestSuite()
@@ -185,7 +187,9 @@ class TestValidationMethods:
 
         suite.shutdown()
 
-    @patch('builtins.open', mock_open(read_data='{"id": "test", "nodes": [], "edges": []}'))
+    @patch(
+        "builtins.open", mock_open(read_data='{"id": "test", "nodes": [], "edges": []}')
+    )
     def test_load_golden_file(self):
         """Test loading golden file."""
         suite = ValidationTestSuite()
@@ -219,7 +223,7 @@ class TestValidationReport:
         results = {
             "test1": True,
             "test2": {"status": "completed"},
-            "test3": {"status": "completed"}
+            "test3": {"status": "completed"},
         }
 
         report = suite.generate_validation_report(results)
@@ -237,7 +241,7 @@ class TestValidationReport:
         results = {
             "test1": False,
             "test2": {"status": "error", "error": "Test error"},
-            "test3": {"status": "completed"}
+            "test3": {"status": "completed"},
         }
 
         report = suite.generate_validation_report(results)
@@ -253,7 +257,7 @@ class TestValidationReport:
 
         results = {
             "test1": {"status": "unknown_status"},
-            "test2": {"status": "completed"}
+            "test2": {"status": "completed"},
         }
 
         report = suite.generate_validation_report(results)
@@ -271,7 +275,7 @@ class TestValidationReport:
         results = {
             "test1": {"status": "completed", "duration_ms": 100},
             "test2": {"status": "completed", "duration_ms": 200},
-            "test3": {"status": "completed", "duration_ms": 150}
+            "test3": {"status": "completed", "duration_ms": 150},
         }
 
         report = suite.generate_validation_report(results)
@@ -304,13 +308,13 @@ class TestAsyncContext:
 class TestLogMetrics:
     """Test metric logging."""
 
-    @patch('run_validation_test.ObservabilityManager')
+    @patch("run_validation_test.ObservabilityManager")
     def test_log_metrics(self, mock_obs_class):
         """Test logging metrics."""
         mock_obs = MagicMock()
         mock_obs.metrics = {
             "validation_pass": MagicMock(),
-            "validation_latency": MagicMock()
+            "validation_latency": MagicMock(),
         }
         mock_obs_class.return_value = mock_obs
 
@@ -327,7 +331,7 @@ class TestLogMetrics:
 class TestLogAudit:
     """Test audit logging."""
 
-    @patch('run_validation_test.SecurityAuditEngine')
+    @patch("run_validation_test.SecurityAuditEngine")
     def test_log_audit(self, mock_audit_class):
         """Test logging audit event."""
         mock_audit = MagicMock()

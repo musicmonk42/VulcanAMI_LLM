@@ -26,7 +26,7 @@ def crew_config():
     if not config_path.exists():
         config_path = Path(__file__).parent / ".." / "configs" / "crew_config.yaml"
 
-    with open(config_path, 'r', encoding="utf-8") as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -34,14 +34,25 @@ def crew_config():
 def json_schema(crew_config):
     """Extract and construct the JSON schema from the config."""
     # Build schema from the agent_schema definition in the config
-    agent_schema = crew_config.get('agent_schema', {})
+    agent_schema = crew_config.get("agent_schema", {})
 
     # Construct full schema
     schema = {
         "type": "object",
-        "required": ["version", "id", "name", "description", "agent_schema",
-                     "compliance_controls", "agents", "integration", "event_hooks",
-                     "defaults", "tags", "metadata"],
+        "required": [
+            "version",
+            "id",
+            "name",
+            "description",
+            "agent_schema",
+            "compliance_controls",
+            "agents",
+            "integration",
+            "event_hooks",
+            "defaults",
+            "tags",
+            "metadata",
+        ],
         "properties": {
             "version": {"type": "string"},
             "id": {"type": "string"},
@@ -49,17 +60,14 @@ def json_schema(crew_config):
             "description": {"type": "string"},
             "agent_schema": {"type": "object"},
             "compliance_controls": {"type": "object"},
-            "agents": {
-                "type": "array",
-                "items": agent_schema
-            },
+            "agents": {"type": "array", "items": agent_schema},
             "escalation_paths": {"type": "object"},
             "integration": {"type": "object"},
             "event_hooks": {"type": "object"},
             "defaults": {"type": "object"},
             "tags": {"type": "array", "items": {"type": "string"}},
-            "metadata": {"type": "object"}
-        }
+            "metadata": {"type": "object"},
+        },
     }
     return schema
 
@@ -67,7 +75,14 @@ def json_schema(crew_config):
 @pytest.fixture
 def valid_compliance_statuses():
     """Valid compliance control status values."""
-    return {"enforced", "logged", "not_implemented", "partially_enforced", "implemented", "not_specified"}
+    return {
+        "enforced",
+        "logged",
+        "not_implemented",
+        "partially_enforced",
+        "implemented",
+        "not_specified",
+    }
 
 
 @pytest.fixture
@@ -86,9 +101,18 @@ class TestRootSchema:
     def test_required_root_fields_present(self, crew_config):
         """Test that all required root fields are present."""
         required_fields = [
-            "version", "id", "name", "description", "agent_schema",
-            "compliance_controls", "agents", "integration", "event_hooks",
-            "defaults", "tags", "metadata"
+            "version",
+            "id",
+            "name",
+            "description",
+            "agent_schema",
+            "compliance_controls",
+            "agents",
+            "integration",
+            "event_hooks",
+            "defaults",
+            "tags",
+            "metadata",
         ]
         for field in required_fields:
             assert field in crew_config, f"Missing required field: {field}"
@@ -98,7 +122,7 @@ class TestRootSchema:
         version = crew_config.get("version")
         assert version is not None
         # Should be in format X.Y.Z
-        pattern = r'^\d+\.\d+\.\d+$'
+        pattern = r"^\d+\.\d+\.\d+$"
         assert re.match(pattern, version), f"Invalid version format: {version}"
 
     def test_id_is_valid(self, crew_config):
@@ -108,7 +132,9 @@ class TestRootSchema:
         assert isinstance(config_id, str)
         assert len(config_id) > 0
         # Should be lowercase with underscores
-        assert re.match(r'^[a-z_]+$', config_id), "ID should be lowercase with underscores"
+        assert re.match(
+            r"^[a-z_]+$", config_id
+        ), "ID should be lowercase with underscores"
 
     def test_name_is_descriptive(self, crew_config):
         """Test that name is descriptive."""
@@ -120,7 +146,9 @@ class TestRootSchema:
         """Test that description exists and is meaningful."""
         description = crew_config.get("description")
         assert description is not None
-        assert len(description.strip()) > 50, "Description should be detailed (>50 chars)"
+        assert (
+            len(description.strip()) > 50
+        ), "Description should be detailed (>50 chars)"
 
 
 # Test Agent Schema Definition
@@ -188,17 +216,19 @@ class TestComplianceControls:
 
         for control_id, control in controls.items():
             status = control.get("status")
-            assert status in valid_compliance_statuses, \
-                f"Control {control_id} has invalid status: {status}"
+            assert (
+                status in valid_compliance_statuses
+            ), f"Control {control_id} has invalid status: {status}"
 
     def test_nist_control_ids_valid(self, crew_config):
         """Test that control IDs follow NIST format."""
         controls = crew_config.get("compliance_controls", {})
-        nist_pattern = r'^[A-Z]{2}-\d+$'
+        nist_pattern = r"^[A-Z]{2}-\d+$"
 
         for control_id in controls.keys():
-            assert re.match(nist_pattern, control_id), \
-                f"Invalid NIST control ID format: {control_id}"
+            assert re.match(
+                nist_pattern, control_id
+            ), f"Invalid NIST control ID format: {control_id}"
 
     def test_critical_controls_enforced(self, crew_config):
         """Test that critical controls are enforced."""
@@ -209,8 +239,9 @@ class TestComplianceControls:
             if control_id in controls:
                 control = controls[control_id]
                 if control.get("required") is True:
-                    assert control.get("status") == "enforced", \
-                        f"Critical control {control_id} must be enforced"
+                    assert (
+                        control.get("status") == "enforced"
+                    ), f"Critical control {control_id} must be enforced"
 
     def test_control_descriptions_meaningful(self, crew_config):
         """Test that control descriptions are meaningful."""
@@ -218,8 +249,7 @@ class TestComplianceControls:
 
         for control_id, control in controls.items():
             description = control.get("description", "")
-            assert len(description) > 20, \
-                f"Control {control_id} description too short"
+            assert len(description) > 20, f"Control {control_id} description too short"
 
     def test_no_duplicate_control_names(self, crew_config):
         """Test that control names are unique."""
@@ -244,8 +274,9 @@ class TestAgents:
 
         for agent in agents:
             for field in required_fields:
-                assert field in agent, \
-                    f"Agent {agent.get('id', 'unknown')} missing field: {field}"
+                assert (
+                    field in agent
+                ), f"Agent {agent.get('id', 'unknown')} missing field: {field}"
 
     def test_agent_ids_unique(self, crew_config):
         """Test that agent IDs are unique."""
@@ -259,8 +290,9 @@ class TestAgents:
 
         for agent in agents:
             agent_type = agent.get("agent_type")
-            assert agent_type in valid_agent_types, \
-                f"Agent {agent.get('id')} has invalid type: {agent_type}"
+            assert (
+                agent_type in valid_agent_types
+            ), f"Agent {agent.get('id')} has invalid type: {agent_type}"
 
     def test_agent_manifest_paths_valid(self, crew_config):
         """Test that agent manifest paths are valid."""
@@ -270,11 +302,13 @@ class TestAgents:
             manifest = agent.get("manifest")
             assert manifest is not None
             # Should be relative path
-            assert not manifest.startswith("/"), \
-                f"Agent {agent.get('id')} manifest should be relative path"
+            assert not manifest.startswith(
+                "/"
+            ), f"Agent {agent.get('id')} manifest should be relative path"
             # Should have proper extension
-            assert manifest.endswith((".json", ".yaml")), \
-                f"Agent {agent.get('id')} manifest should be .json or .yaml"
+            assert manifest.endswith(
+                (".json", ".yaml")
+            ), f"Agent {agent.get('id')} manifest should be .json or .yaml"
 
     def test_agent_entrypoint_paths_valid(self, crew_config):
         """Test that agent entrypoint paths are valid."""
@@ -284,11 +318,13 @@ class TestAgents:
             entrypoint = agent.get("entrypoint")
             assert entrypoint is not None
             # Should be relative path
-            assert not entrypoint.startswith("/"), \
-                f"Agent {agent.get('id')} entrypoint should be relative path"
+            assert not entrypoint.startswith(
+                "/"
+            ), f"Agent {agent.get('id')} entrypoint should be relative path"
             # Should have .py extension for executable scripts
-            assert entrypoint.endswith(".py"), \
-                f"Agent {agent.get('id')} entrypoint should be .py file"
+            assert entrypoint.endswith(
+                ".py"
+            ), f"Agent {agent.get('id')} entrypoint should be .py file"
 
     def test_agent_role_refs_valid(self, crew_config):
         """Test that agent role references are valid."""
@@ -297,8 +333,9 @@ class TestAgents:
         for agent in agents:
             role_ref = agent.get("role_ref")
             if role_ref:
-                assert role_ref.startswith("configdb://"), \
-                    f"Agent {agent.get('id')} role_ref should use configdb:// scheme"
+                assert role_ref.startswith(
+                    "configdb://"
+                ), f"Agent {agent.get('id')} role_ref should use configdb:// scheme"
 
     def test_agent_skills_refs_valid(self, crew_config):
         """Test that agent skills references are valid."""
@@ -307,8 +344,9 @@ class TestAgents:
         for agent in agents:
             skills_ref = agent.get("skills_ref")
             if skills_ref:
-                assert skills_ref.startswith("configdb://"), \
-                    f"Agent {agent.get('id')} skills_ref should use configdb:// scheme"
+                assert skills_ref.startswith(
+                    "configdb://"
+                ), f"Agent {agent.get('id')} skills_ref should use configdb:// scheme"
 
     def test_human_agent_exists(self, crew_config):
         """Test that at least one human agent exists for escalation."""
@@ -322,8 +360,7 @@ class TestAgents:
 
         for agent in agents:
             name = agent.get("name")
-            assert len(name) > 5, \
-                f"Agent {agent.get('id')} name too short: {name}"
+            assert len(name) > 5, f"Agent {agent.get('id')} name too short: {name}"
 
 
 # Test Agent Compliance Controls
@@ -336,8 +373,9 @@ class TestAgentComplianceControls:
             compliance = agent.get("compliance_controls", [])
             assert isinstance(compliance, list)
             # Each agent should reference at least one control
-            assert len(compliance) > 0, \
-                f"Agent {agent.get('id')} has no compliance controls"
+            assert (
+                len(compliance) > 0
+            ), f"Agent {agent.get('id')} has no compliance controls"
 
     def test_agent_compliance_references_valid(self, crew_config):
         """Test that agent compliance references exist in global controls."""
@@ -347,19 +385,28 @@ class TestAgentComplianceControls:
         for agent in agents:
             for control in agent.get("compliance_controls", []):
                 control_id = control.get("id")
-                assert control_id in global_controls, \
-                    f"Agent {agent.get('id')} references undefined control: {control_id}"
+                assert (
+                    control_id in global_controls
+                ), f"Agent {agent.get('id')} references undefined control: {control_id}"
 
-    def test_agent_compliance_status_valid(self, crew_config, valid_compliance_statuses):
+    def test_agent_compliance_status_valid(
+        self, crew_config, valid_compliance_statuses
+    ):
         """Test that agent compliance status values are valid."""
         agents = crew_config.get("agents", [])
-        valid_agent_statuses = {"enforced", "logged", "not_implemented", "partially_enforced"}
+        valid_agent_statuses = {
+            "enforced",
+            "logged",
+            "not_implemented",
+            "partially_enforced",
+        }
 
         for agent in agents:
             for control in agent.get("compliance_controls", []):
                 status = control.get("status")
-                assert status in valid_agent_statuses, \
-                    f"Agent {agent.get('id')} control {control.get('id')} has invalid status: {status}"
+                assert (
+                    status in valid_agent_statuses
+                ), f"Agent {agent.get('id')} control {control.get('id')} has invalid status: {status}"
 
     def test_agent_compliance_has_notes(self, crew_config):
         """Test that agent compliance entries have explanatory notes."""
@@ -369,8 +416,9 @@ class TestAgentComplianceControls:
             for control in agent.get("compliance_controls", []):
                 notes = control.get("notes")
                 if notes:
-                    assert len(notes) > 10, \
-                        f"Agent {agent.get('id')} control {control.get('id')} notes too short"
+                    assert (
+                        len(notes) > 10
+                    ), f"Agent {agent.get('id')} control {control.get('id')} notes too short"
 
     def test_separation_of_duties_compliance(self, crew_config):
         """Test that AC-5 (Separation of Duties) is properly implemented."""
@@ -380,8 +428,9 @@ class TestAgentComplianceControls:
         human_agents = [a for a in agents if a.get("agent_type") == "human"]
         for agent in human_agents:
             controls = [c.get("id") for c in agent.get("compliance_controls", [])]
-            assert "AC-5" in controls, \
-                "Human agent should have AC-5 (Separation of Duties) control"
+            assert (
+                "AC-5" in controls
+            ), "Human agent should have AC-5 (Separation of Duties) control"
 
     def test_critical_agents_have_audit(self, crew_config):
         """Test that critical agents have AU-2 (Audit Events) control."""
@@ -392,8 +441,9 @@ class TestAgentComplianceControls:
             if agent.get("agent_type") in critical_agent_types:
                 controls = [c.get("id") for c in agent.get("compliance_controls", [])]
                 # Should have some audit control
-                assert any(c.startswith("AU-") for c in controls), \
-                    f"Critical agent {agent.get('id')} should have audit controls"
+                assert any(
+                    c.startswith("AU-") for c in controls
+                ), f"Critical agent {agent.get('id')} should have audit controls"
 
 
 # Test Escalation Paths
@@ -408,8 +458,7 @@ class TestEscalationPaths:
         """Test that escalation type is valid."""
         escalation = crew_config.get("escalation_paths", {})
         esc_type = escalation.get("type")
-        assert esc_type in ["static", "dynamic"], \
-            f"Invalid escalation type: {esc_type}"
+        assert esc_type in ["static", "dynamic"], f"Invalid escalation type: {esc_type}"
 
     def test_dynamic_escalation_has_resolver(self, crew_config):
         """Test that dynamic escalation has a resolver."""
@@ -417,20 +466,21 @@ class TestEscalationPaths:
         if escalation.get("type") == "dynamic":
             resolver = escalation.get("resolver")
             assert resolver is not None, "Dynamic escalation must have resolver"
-            assert resolver.startswith("service://"), \
-                "Escalation resolver should use service:// scheme"
+            assert resolver.startswith(
+                "service://"
+            ), "Escalation resolver should use service:// scheme"
 
     def test_escalation_has_compliance_controls(self, crew_config):
         """Test that escalation paths have compliance controls."""
         escalation = crew_config.get("escalation_paths", {})
         compliance = escalation.get("compliance_controls", [])
-        assert len(compliance) > 0, \
-            "Escalation paths should have compliance controls"
+        assert len(compliance) > 0, "Escalation paths should have compliance controls"
 
         # Should include IR-4 (Incident Handling)
         control_ids = [c.get("id") for c in compliance]
-        assert "IR-4" in control_ids, \
-            "Escalation should include IR-4 (Incident Handling)"
+        assert (
+            "IR-4" in control_ids
+        ), "Escalation should include IR-4 (Incident Handling)"
 
 
 # Test Integration Configuration
@@ -448,8 +498,9 @@ class TestIntegration:
         artifact_store = integration.get("artifact_store")
 
         if artifact_store:
-            assert artifact_store.startswith(("s3://", "gs://", "azure://", "file://")), \
-                "Artifact store should use valid cloud storage scheme"
+            assert artifact_store.startswith(
+                ("s3://", "gs://", "azure://", "file://")
+            ), "Artifact store should use valid cloud storage scheme"
 
     def test_provenance_log_configured(self, crew_config):
         """Test that provenance logging is configured."""
@@ -470,8 +521,9 @@ class TestIntegration:
 
         if event_bus:
             # Should use messaging protocol
-            assert event_bus.startswith(("nats://", "kafka://", "amqp://", "mqtt://")), \
-                "Event bus should use valid messaging protocol"
+            assert event_bus.startswith(
+                ("nats://", "kafka://", "amqp://", "mqtt://")
+            ), "Event bus should use valid messaging protocol"
 
     def test_dashboard_url_valid(self, crew_config):
         """Test that dashboard URL is valid."""
@@ -480,8 +532,10 @@ class TestIntegration:
 
         if dashboard:
             parsed = urlparse(dashboard)
-            assert parsed.scheme in ["http", "https"], \
-                "Dashboard should use HTTP(S) protocol"
+            assert parsed.scheme in [
+                "http",
+                "https",
+            ], "Dashboard should use HTTP(S) protocol"
             assert parsed.netloc, "Dashboard URL should have valid hostname"
 
     def test_integration_has_compliance_controls(self, crew_config):
@@ -509,7 +563,7 @@ class TestEventHooks:
         critical_hooks = [
             "on_agent_failure",
             "on_artifact_created",
-            "on_pipeline_blocked"
+            "on_pipeline_blocked",
         ]
 
         for hook_name in critical_hooks:
@@ -522,16 +576,18 @@ class TestEventHooks:
         for hook_name, hook_config in hooks.items():
             if isinstance(hook_config, str):
                 # Simple string action
-                assert hook_config.startswith("service://"), \
-                    f"Hook {hook_name} action should use service:// scheme"
+                assert hook_config.startswith(
+                    "service://"
+                ), f"Hook {hook_name} action should use service:// scheme"
             elif isinstance(hook_config, dict):
                 # Complex hook with compliance
                 if "compliance_controls" not in hook_config:
                     # Find the actual action field
                     for key, value in hook_config.items():
                         if isinstance(value, str) and not key.startswith("on_"):
-                            assert value.startswith("service://"), \
-                                f"Hook {hook_name} action should use service:// scheme"
+                            assert value.startswith(
+                                "service://"
+                            ), f"Hook {hook_name} action should use service:// scheme"
 
     def test_event_hooks_have_compliance(self, crew_config):
         """Test that event hooks have compliance controls."""
@@ -552,7 +608,9 @@ class TestEventHooks:
             # Check if there's a compliance_controls key after this hook
 
         # At least some hooks should have compliance controls defined
-        assert hooks_with_compliance >= 0, "Event hooks should define compliance controls"
+        assert (
+            hooks_with_compliance >= 0
+        ), "Event hooks should define compliance controls"
 
     def test_failure_hooks_include_incident_handling(self, crew_config):
         """Test that failure hooks include IR-4 (Incident Handling)."""
@@ -593,34 +651,44 @@ class TestDefaults:
         temperature = defaults.get("temperature")
 
         if temperature is not None:
-            assert 0.0 <= temperature <= 2.0, \
-                "Temperature should be between 0.0 and 2.0"
+            assert (
+                0.0 <= temperature <= 2.0
+            ), "Temperature should be between 0.0 and 2.0"
 
     def test_security_features_enabled(self, crew_config):
         """Test that security features are enabled by default."""
         defaults = crew_config.get("defaults", {})
 
         # Provenance should be enabled for audit
-        assert defaults.get("provenance") is True, \
-            "Provenance should be enabled for security"
+        assert (
+            defaults.get("provenance") is True
+        ), "Provenance should be enabled for security"
 
         # Rollback should be enabled for recovery
-        assert defaults.get("rollback_enabled") is True, \
-            "Rollback should be enabled for safety"
+        assert (
+            defaults.get("rollback_enabled") is True
+        ), "Rollback should be enabled for safety"
 
     def test_boolean_flags_are_boolean(self, crew_config):
         """Test that boolean flags are actual booleans."""
         defaults = crew_config.get("defaults", {})
         boolean_keys = [
-            "explainability", "provenance", "rollback_enabled",
-            "continuous_learning", "plugin_autoload", "swarm_mode",
-            "oracle_enabled", "cross_repo_refactor", "multi_modal_support"
+            "explainability",
+            "provenance",
+            "rollback_enabled",
+            "continuous_learning",
+            "plugin_autoload",
+            "swarm_mode",
+            "oracle_enabled",
+            "cross_repo_refactor",
+            "multi_modal_support",
         ]
 
         for key in boolean_keys:
             if key in defaults:
-                assert isinstance(defaults[key], bool), \
-                    f"Default {key} should be boolean"
+                assert isinstance(
+                    defaults[key], bool
+                ), f"Default {key} should be boolean"
 
 
 # Test Tags and Metadata
@@ -664,7 +732,7 @@ class TestTagsAndMetadata:
                     # Already a valid datetime object from YAML parsing
                     continue
                 try:
-                    datetime.fromisoformat(timestamp.rstrip('Z'))
+                    datetime.fromisoformat(timestamp.rstrip("Z"))
                 except (ValueError, AttributeError) as e:
                     pytest.fail(f"Invalid timestamp format for {key}: {timestamp}")
 
@@ -697,8 +765,9 @@ class TestSecurityBestPractices:
             if "AC-6" in controls:
                 agents_with_ac6 += 1
 
-        assert agents_with_ac6 > 0, \
-            "At least some agents should implement AC-6 (Least Privilege)"
+        assert (
+            agents_with_ac6 > 0
+        ), "At least some agents should implement AC-6 (Least Privilege)"
 
     def test_audit_events_tracked(self, crew_config):
         """Test that AU-2 (Audit Events) is widely implemented."""
@@ -731,8 +800,7 @@ class TestSecurityBestPractices:
 
         for pattern in dangerous_patterns:
             matches = re.findall(pattern, config_str, re.IGNORECASE)
-            assert len(matches) == 0, \
-                f"Possible hardcoded credentials found: {matches}"
+            assert len(matches) == 0, f"Possible hardcoded credentials found: {matches}"
 
     def test_external_refs_use_secure_protocols(self, crew_config):
         """Test that external references use secure protocols."""
@@ -753,8 +821,9 @@ class TestSecurityBestPractices:
         controls = crew_config.get("compliance_controls", {})
         ac5 = controls.get("AC-5")
         assert ac5 is not None, "AC-5 must be defined"
-        assert ac5.get("status") == "enforced", \
-            "AC-5 (Separation of Duties) must be enforced"
+        assert (
+            ac5.get("status") == "enforced"
+        ), "AC-5 (Separation of Duties) must be enforced"
 
 
 # Test Cross-Reference Consistency
@@ -767,8 +836,9 @@ class TestCrossReferences:
         for agent in agents:
             for control in agent.get("compliance_controls", []):
                 control_id = control.get("id")
-                assert control_id in global_controls, \
-                    f"Agent {agent.get('id')} references undefined control: {control_id}"
+                assert (
+                    control_id in global_controls
+                ), f"Agent {agent.get('id')} references undefined control: {control_id}"
 
     def test_agent_paths_consistent(self, crew_config):
         """Test that agent paths follow consistent structure."""
@@ -782,8 +852,9 @@ class TestCrossReferences:
             manifest_dir = Path(manifest).parent
             entrypoint_dir = Path(entrypoint).parent
 
-            assert manifest_dir == entrypoint_dir, \
-                f"Agent {agent.get('id')} manifest and entrypoint in different dirs"
+            assert (
+                manifest_dir == entrypoint_dir
+            ), f"Agent {agent.get('id')} manifest and entrypoint in different dirs"
 
     def test_no_orphaned_compliance_statuses(self, crew_config):
         """Test that there are no compliance statuses without controls."""
@@ -792,10 +863,12 @@ class TestCrossReferences:
         for agent in agents:
             compliance = agent.get("compliance_controls", [])
             for control in compliance:
-                assert control.get("id") is not None, \
-                    f"Agent {agent.get('id')} has control without ID"
-                assert control.get("status") is not None, \
-                    f"Agent {agent.get('id')} control {control.get('id')} without status"
+                assert (
+                    control.get("id") is not None
+                ), f"Agent {agent.get('id')} has control without ID"
+                assert (
+                    control.get("status") is not None
+                ), f"Agent {agent.get('id')} control {control.get('id')} without status"
 
 
 # Test Logical Consistency
@@ -807,8 +880,10 @@ class TestLogicalConsistency:
         for control_id, control in controls.items():
             if control.get("required") is True:
                 status = control.get("status")
-                assert status in ["enforced", "implemented"], \
-                    f"Required control {control_id} must be enforced or implemented, not {status}"
+                assert status in [
+                    "enforced",
+                    "implemented",
+                ], f"Required control {control_id} must be enforced or implemented, not {status}"
 
     def test_human_agent_for_escalation(self, crew_config):
         """Test that human agent exists for escalation paths."""
@@ -818,8 +893,9 @@ class TestLogicalConsistency:
         human_agents = [a for a in agents if a.get("agent_type") == "human"]
 
         if escalation:
-            assert len(human_agents) > 0, \
-                "Escalation paths require at least one human agent"
+            assert (
+                len(human_agents) > 0
+            ), "Escalation paths require at least one human agent"
 
     def test_critical_event_hooks_have_actions(self, crew_config):
         """Test that critical event hooks have defined actions."""
@@ -829,8 +905,9 @@ class TestLogicalConsistency:
         for hook_name in critical_hooks:
             if hook_name in hooks:
                 hook_value = hooks[hook_name]
-                assert hook_value is not None, \
-                    f"Critical hook {hook_name} must have an action defined"
+                assert (
+                    hook_value is not None
+                ), f"Critical hook {hook_name} must have an action defined"
 
 
 # Performance and Scalability Tests
@@ -838,8 +915,7 @@ class TestPerformanceConsiderations:
     def test_agent_count_reasonable(self, crew_config):
         """Test that agent count is reasonable for single config."""
         agents = crew_config.get("agents", [])
-        assert len(agents) <= 50, \
-            "Config should have reasonable number of agents (<50)"
+        assert len(agents) <= 50, "Config should have reasonable number of agents (<50)"
 
     def test_no_circular_dependencies(self, crew_config):
         """Test that there are no obvious circular dependencies."""

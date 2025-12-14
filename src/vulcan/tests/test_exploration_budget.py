@@ -18,20 +18,22 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from vulcan.curiosity_engine.exploration_budget import (BudgetRecovery,
-                                                        BudgetTracker,
-                                                        CostCalibrator,
-                                                        CostEstimator,
-                                                        CostHistory,
-                                                        DynamicBudget,
-                                                        EfficiencyTracker,
-                                                        LoadAdjuster,
-                                                        ResourceAdvisor,
-                                                        ResourceMonitor,
-                                                        ResourcePredictor,
-                                                        ResourceSampler,
-                                                        ResourceSnapshot,
-                                                        ResourceType)
+from vulcan.curiosity_engine.exploration_budget import (
+    BudgetRecovery,
+    BudgetTracker,
+    CostCalibrator,
+    CostEstimator,
+    CostHistory,
+    DynamicBudget,
+    EfficiencyTracker,
+    LoadAdjuster,
+    ResourceAdvisor,
+    ResourceMonitor,
+    ResourcePredictor,
+    ResourceSampler,
+    ResourceSnapshot,
+    ResourceType,
+)
 
 # ============================================================================
 # Fixtures

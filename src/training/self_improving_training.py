@@ -160,7 +160,9 @@ class IssueReport:
     recommended_actions: List[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
     id: str = field(
-        default_factory=lambda: hashlib.md5(str(time.time()).encode(), usedforsecurity=False).hexdigest()[:8]
+        default_factory=lambda: hashlib.md5(
+            str(time.time()).encode(), usedforsecurity=False
+        ).hexdigest()[:8]
     )
 
 
