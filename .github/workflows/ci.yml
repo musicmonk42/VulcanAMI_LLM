@@ -154,7 +154,8 @@ jobs:
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
           # Remove large pre-installed packages
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
@@ -277,7 +278,8 @@ jobs:
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
           # Remove large pre-installed packages
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
@@ -392,7 +394,8 @@ jobs:
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
           # Remove large pre-installed packages
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
@@ -422,7 +425,7 @@ jobs:
             network=host
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -462,7 +465,8 @@ jobs:
           set -euo pipefail
           echo "Disk usage before cleanup:" && df -h || true
           # Remove large pre-installed packages
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
           # Clear apt cache and package lists
           sudo apt-get clean || true
           sudo rm -rf /var/lib/apt/lists/* || true
