@@ -95,7 +95,7 @@ jobs:
         run: |
           set -x
           for i in 1 2 3; do
-            pip install pip-audit && break || (echo "Retry $i/3: pip-audit install failed"; sleep $((i*10)))
+            pip install --no-cache-dir pip-audit && break || (echo "Retry $i/3: pip-audit install failed"; sleep $((i*10)))
           done
 
       - name: Run pip-audit
@@ -115,7 +115,7 @@ jobs:
         run: |
           set -x
           for i in 1 2 3; do
-            pip install safety && break || (echo "Retry $i/3: safety install failed"; sleep $((i*10)))
+            pip install --no-cache-dir safety && break || (echo "Retry $i/3: safety install failed"; sleep $((i*10)))
           done
           safety check --json --output safety-report.json -r requirements.txt || true
           safety check -r requirements.txt || true
@@ -202,8 +202,8 @@ jobs:
         run: |
           set -x
           for i in 1 2 3; do
-            python -m pip install --upgrade pip && \
-            python -m pip install 'bandit==1.4.0' && \
+            python -m pip install --no-cache-dir --upgrade pip && \
+            python -m pip install --no-cache-dir 'bandit==1.4.0' && \
             break || (echo "Retry $i/3: bandit install failed"; sleep $((i*10)))
           done
 
@@ -445,14 +445,14 @@ jobs:
         run: |
           set -x
           for i in 1 2 3; do
-            pip install pip-licenses && break || (echo "Retry $i/3: pip-licenses install failed"; sleep $((i*10)))
+            pip install --no-cache-dir pip-licenses && break || (echo "Retry $i/3: pip-licenses install failed"; sleep $((i*10)))
           done
 
       - name: Check licenses
         run: |
           set -x
           for i in 1 2 3; do
-            pip install -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
+            pip install --no-cache-dir -r requirements.txt && break || (echo "Retry $i/3: requirements.txt install failed"; sleep $((i*10)))
           done || true
           pip-licenses --format=json --output-file=licenses.json || true
           pip-licenses --format=markdown --output-file=licenses.md || true

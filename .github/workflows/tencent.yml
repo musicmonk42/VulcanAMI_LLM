@@ -39,6 +39,24 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Free up runner disk space
+      run: |
+        set -euo pipefail
+        echo "Disk usage before cleanup:" && df -h || true
+        # Remove large pre-installed packages
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+        # Clear apt cache and package lists
+        sudo apt-get clean || true
+        sudo rm -rf /var/lib/apt/lists/* || true
+        # Purge pip cache
+        python -m pip cache purge || true
+        # Remove common runner caches that may be large
+        sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+        # Prune Docker images / containers / volumes
+        sudo docker system prune -af --volumes || true
+        echo "Disk usage after cleanup:" && df -h || true
+
     # Build
     - name: Build Docker image
       run: |
