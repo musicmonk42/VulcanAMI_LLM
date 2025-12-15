@@ -442,58 +442,38 @@ async def lifespan(app: FastAPI):
         logger.info(f"VULCAN-AGI worker {worker_id} started successfully")
 
         # ADDED: Initialize all Vulcan subsystem modules for complete activation
+        def _activate_subsystem(deps, attr_name: str, display_name: str, needs_init: bool = False):
+            """Helper to activate a subsystem with optional initialization."""
+            if hasattr(deps, attr_name) and getattr(deps, attr_name):
+                subsystem = getattr(deps, attr_name)
+                if needs_init and hasattr(subsystem, 'initialize'):
+                    subsystem.initialize()
+                logger.info(f"✓ {display_name} activated")
+                return True
+            return False
+
         try:
             logger.info("Activating all Vulcan subsystem modules...")
             
-            # Initialize Curiosity Engine if available
-            if hasattr(deployment.collective.deps, 'curiosity') and deployment.collective.deps.curiosity:
-                curiosity_engine = deployment.collective.deps.curiosity
-                if hasattr(curiosity_engine, 'initialize'):
-                    curiosity_engine.initialize()
-                    logger.info("✓ Curiosity Engine activated")
+            # Initialize subsystems that need explicit initialization
+            _activate_subsystem(deployment.collective.deps, 'curiosity', 'Curiosity Engine', needs_init=True)
+            _activate_subsystem(deployment.collective.deps, 'crystallizer', 'Knowledge Crystallizer', needs_init=True)
+            _activate_subsystem(deployment.collective.deps, 'decomposer', 'Problem Decomposer', needs_init=True)
+            _activate_subsystem(deployment.collective.deps, 'semantic_bridge', 'Semantic Bridge', needs_init=True)
             
-            # Initialize Knowledge Crystallizer if available
-            if hasattr(deployment.collective.deps, 'crystallizer') and deployment.collective.deps.crystallizer:
-                crystallizer = deployment.collective.deps.crystallizer
-                if hasattr(crystallizer, 'initialize'):
-                    crystallizer.initialize()
-                    logger.info("✓ Knowledge Crystallizer activated")
-            
-            # Initialize Problem Decomposer if available
-            if hasattr(deployment.collective.deps, 'decomposer') and deployment.collective.deps.decomposer:
-                decomposer = deployment.collective.deps.decomposer
-                if hasattr(decomposer, 'initialize'):
-                    decomposer.initialize()
-                    logger.info("✓ Problem Decomposer activated")
-            
-            # Initialize Semantic Bridge if available
-            if hasattr(deployment.collective.deps, 'semantic_bridge') and deployment.collective.deps.semantic_bridge:
-                semantic_bridge = deployment.collective.deps.semantic_bridge
-                if hasattr(semantic_bridge, 'initialize'):
-                    semantic_bridge.initialize()
-                    logger.info("✓ Semantic Bridge activated")
-            
-            # Initialize all Reasoning subsystems
-            if hasattr(deployment.collective.deps, 'symbolic') and deployment.collective.deps.symbolic:
-                logger.info("✓ Symbolic Reasoning activated")
-            if hasattr(deployment.collective.deps, 'probabilistic') and deployment.collective.deps.probabilistic:
-                logger.info("✓ Probabilistic Reasoning activated")
-            if hasattr(deployment.collective.deps, 'causal') and deployment.collective.deps.causal:
-                logger.info("✓ Causal Reasoning activated")
-            if hasattr(deployment.collective.deps, 'analogical') and deployment.collective.deps.analogical:
-                logger.info("✓ Analogical Reasoning activated")
+            # Initialize all Reasoning subsystems (no explicit init needed)
+            _activate_subsystem(deployment.collective.deps, 'symbolic', 'Symbolic Reasoning')
+            _activate_subsystem(deployment.collective.deps, 'probabilistic', 'Probabilistic Reasoning')
+            _activate_subsystem(deployment.collective.deps, 'causal', 'Causal Reasoning')
+            _activate_subsystem(deployment.collective.deps, 'analogical', 'Analogical Reasoning')
             
             # Initialize Memory subsystems
-            if hasattr(deployment.collective.deps, 'ltm') and deployment.collective.deps.ltm:
-                logger.info("✓ Long-term Memory activated")
-            if hasattr(deployment.collective.deps, 'am') and deployment.collective.deps.am:
-                logger.info("✓ Associative Memory activated")
+            _activate_subsystem(deployment.collective.deps, 'ltm', 'Long-term Memory')
+            _activate_subsystem(deployment.collective.deps, 'am', 'Associative Memory')
             
             # Initialize Learning subsystems
-            if hasattr(deployment.collective.deps, 'continual') and deployment.collective.deps.continual:
-                logger.info("✓ Continual Learning activated")
-            if hasattr(deployment.collective.deps, 'meta') and deployment.collective.deps.meta:
-                logger.info("✓ Meta-Learning activated")
+            _activate_subsystem(deployment.collective.deps, 'continual', 'Continual Learning')
+            _activate_subsystem(deployment.collective.deps, 'meta', 'Meta-Learning')
             
             # Initialize Safety subsystems
             if hasattr(deployment.collective.deps, 'safety') and deployment.collective.deps.safety:
@@ -2383,68 +2363,40 @@ def test_llm_integration() -> bool:
         return False
 
 
-def test_curiosity_engine(deployment: ProductionDeployment) -> bool:
-    """Test Curiosity Engine activation."""
-    logger.info("Testing Curiosity Engine...")
+def _test_optional_subsystem(deployment: ProductionDeployment, attr_name: str, display_name: str) -> bool:
+    """Generic test for optional subsystem activation."""
+    logger.info(f"Testing {display_name}...")
     try:
-        if hasattr(deployment.collective.deps, 'curiosity'):
-            curiosity = deployment.collective.deps.curiosity
-            if curiosity:
-                logger.info("Curiosity Engine is activated")
+        if hasattr(deployment.collective.deps, attr_name):
+            subsystem = getattr(deployment.collective.deps, attr_name)
+            if subsystem:
+                logger.info(f"{display_name} is activated")
                 return True
-        logger.warning("Curiosity Engine not available, treating as optional")
+        logger.warning(f"{display_name} not available, treating as optional")
         return True  # Do not fail if not available (optional component)
     except Exception as e:
-        logger.error(f"Curiosity Engine test failed: {e}")
+        logger.error(f"{display_name} test failed: {e}")
         return False
+
+
+def test_curiosity_engine(deployment: ProductionDeployment) -> bool:
+    """Test Curiosity Engine activation."""
+    return _test_optional_subsystem(deployment, 'curiosity', 'Curiosity Engine')
 
 
 def test_knowledge_crystallizer(deployment: ProductionDeployment) -> bool:
     """Test Knowledge Crystallizer activation."""
-    logger.info("Testing Knowledge Crystallizer...")
-    try:
-        if hasattr(deployment.collective.deps, 'crystallizer'):
-            crystallizer = deployment.collective.deps.crystallizer
-            if crystallizer:
-                logger.info("Knowledge Crystallizer is activated")
-                return True
-        logger.warning("Knowledge Crystallizer not available, skipping")
-        return True
-    except Exception as e:
-        logger.error(f"Knowledge Crystallizer test failed: {e}")
-        return False
+    return _test_optional_subsystem(deployment, 'crystallizer', 'Knowledge Crystallizer')
 
 
 def test_problem_decomposer(deployment: ProductionDeployment) -> bool:
     """Test Problem Decomposer activation."""
-    logger.info("Testing Problem Decomposer...")
-    try:
-        if hasattr(deployment.collective.deps, 'decomposer'):
-            decomposer = deployment.collective.deps.decomposer
-            if decomposer:
-                logger.info("Problem Decomposer is activated")
-                return True
-        logger.warning("Problem Decomposer not available, skipping")
-        return True
-    except Exception as e:
-        logger.error(f"Problem Decomposer test failed: {e}")
-        return False
+    return _test_optional_subsystem(deployment, 'decomposer', 'Problem Decomposer')
 
 
 def test_semantic_bridge(deployment: ProductionDeployment) -> bool:
     """Test Semantic Bridge activation."""
-    logger.info("Testing Semantic Bridge...")
-    try:
-        if hasattr(deployment.collective.deps, 'semantic_bridge'):
-            semantic_bridge = deployment.collective.deps.semantic_bridge
-            if semantic_bridge:
-                logger.info("Semantic Bridge is activated")
-                return True
-        logger.warning("Semantic Bridge not available, skipping")
-        return True
-    except Exception as e:
-        logger.error(f"Semantic Bridge test failed: {e}")
-        return False
+    return _test_optional_subsystem(deployment, 'semantic_bridge', 'Semantic Bridge')
 
 
 def test_reasoning_subsystems(deployment: ProductionDeployment) -> bool:
@@ -3628,9 +3580,11 @@ def main():
             test_suite.cleanup()
             
             # Check if all async tests passed
+            # Note: async_results may have either 'success' (boolean) or 'successful' (count) key
+            # depending on the test implementation version
             async_success = async_results.get('success', False) if isinstance(async_results, dict) else False
             if not async_success and isinstance(async_results, dict):
-                # Try alternate key name for backward compatibility
+                # Backward compatibility: check for 'successful' count > 0
                 async_success = async_results.get('successful', 0) > 0
             
             concurrent_success = all(
