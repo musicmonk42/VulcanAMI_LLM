@@ -244,6 +244,26 @@ sudo lsof -i :6379
 # Or change ports in docker-compose.yml
 ```
 
+### Issue: FAISS AVX512 or LLVM warnings on startup
+
+**Problem:** Log shows messages about FAISS AVX512 fallback or LLVM execution engine
+
+**Solution:** These are informational messages, not errors:
+
+- **FAISS AVX512 warning**: System automatically uses best available instruction set (typically AVX2). This is expected and optimal for your CPU.
+- **LLVM execution engine**: If creation fails, IR generation and compilation still work. Only JIT execution is unavailable, which doesn't affect most functionality.
+
+No action needed. For production optimization:
+```bash
+# Optional: Install FAISS for better vector search performance
+pip install faiss-cpu
+
+# Check CPU capabilities
+cat /proc/cpuinfo | grep -E 'avx|avx2|avx512'
+```
+
+See `docs/CONFIGURATION.md` section 9 for details.
+
 ### Issue: Kubernetes connection refused
 
 **Problem:** kubectl commands fail with "connection refused"

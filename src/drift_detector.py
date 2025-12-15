@@ -12,8 +12,22 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-import faiss
 import numpy as np
+
+# FAISS import with enhanced configuration
+try:
+    from src.utils.faiss_config import initialize_faiss
+    
+    faiss, FAISS_AVAILABLE, _ = initialize_faiss()
+except ImportError:
+    # Fallback: try direct import if config module not available
+    try:
+        import faiss
+        FAISS_AVAILABLE = True
+    except ImportError:
+        # FAISS truly not available
+        FAISS_AVAILABLE = False
+        faiss = None
 
 # Optional Prometheus metrics
 try:

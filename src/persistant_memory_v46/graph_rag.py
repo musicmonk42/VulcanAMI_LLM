@@ -20,12 +20,19 @@ logger = logging.getLogger(__name__)
 
 # Optional imports with fallbacks
 try:
-    import faiss
-
-    FAISS_AVAILABLE = True
+    from src.utils.faiss_config import initialize_faiss
+    
+    faiss, FAISS_AVAILABLE, _ = initialize_faiss()
 except ImportError:
-    FAISS_AVAILABLE = False
-    logger.warning("FAISS not available, using numpy-based search")
+    # Fallback if faiss_config module is not available
+    try:
+        import faiss
+        FAISS_AVAILABLE = True
+        logger.info("FAISS imported (direct)")
+    except ImportError:
+        FAISS_AVAILABLE = False
+        faiss = None
+        logger.warning("FAISS not available, using numpy-based search")
 
 try:
     import networkx as nx
