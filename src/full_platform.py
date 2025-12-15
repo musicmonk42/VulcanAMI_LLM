@@ -1430,14 +1430,15 @@ async def lifespan(app: FastAPI):
         try:
             from src.drift_detector import DriftDetector
             drift_detector = DriftDetector(
-                window_size=1000,
-                threshold=0.05,
-                embedding_dim=768
+                dim=768,
+                drift_threshold=0.05,
+                history=1000,
+                realignment_method="center"
             )
             
             app.state.drift_detector = drift_detector
             components_status["Drift Detector"] = True
-            logger.info(f"✓ DriftDetector initialized (window_size=1000, threshold=0.05)")
+            logger.info(f"✓ DriftDetector initialized (dim=768, drift_threshold=0.05, history=1000)")
         except Exception as e:
             components_status["Drift Detector"] = False
             logger.error(f"✗ DriftDetector failed to initialize: {e}")
