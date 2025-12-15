@@ -14,17 +14,10 @@
 #   constant-time secret comparisons, request size limiting
 # ============================================================
 
-# ============================================================================
-# CRITICAL FIX: Set Windows event loop policy BEFORE any imports
-# This MUST be the VERY FIRST code to run, before asyncio is imported anywhere
-# ============================================================================
-import sys
-if sys.platform == "win32":
-    import asyncio
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    print("✅ Set WindowsProactorEventLoopPolicy before any imports")
+# NOTE: Subprocess management now uses subprocess.Popen instead of asyncio.create_subprocess_exec
+# This avoids issues with Windows event loop policy when using uvicorn --reload
 
-# Now proceed with all other imports
+# Now proceed with all imports
 import argparse
 import asyncio
 import hmac
@@ -32,6 +25,7 @@ import importlib
 import json  # For Arena API endpoints
 import logging
 import os
+import subprocess  # For background process management
 import sys
 from collections import deque
 from contextlib import asynccontextmanager
@@ -1272,12 +1266,16 @@ async def lifespan(app: FastAPI):
         if settings.enable_api_server:
             try:
                 logger.info(f"Starting API Server on port {settings.api_server_port}...")
-                api_server_proc = await asyncio.create_subprocess_exec(
-                    sys.executable,
-                    "-m", "src.api_server",
+                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
+                # This avoids issues with Windows event loop policy and uvicorn --reload
+                api_server_proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m", "src.api_server",
+                    ],
                     env={**os.environ, "API_SERVER_PORT": str(settings.api_server_port)},
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 background_processes.append(("api_server", api_server_proc))
                 logger.info(f"✓ API Server started (PID: {api_server_proc.pid})")
@@ -1302,12 +1300,15 @@ async def lifespan(app: FastAPI):
         if settings.enable_registry_grpc:
             try:
                 logger.info(f"Starting Registry gRPC Server on port {settings.registry_grpc_port}...")
-                registry_grpc_proc = await asyncio.create_subprocess_exec(
-                    sys.executable,
-                    "-m", "src.governance.registry_api_server",
+                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
+                registry_grpc_proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m", "src.governance.registry_api_server",
+                    ],
                     env={**os.environ, "REGISTRY_PORT": str(settings.registry_grpc_port)},
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 background_processes.append(("registry_grpc", registry_grpc_proc))
                 logger.info(f"✓ Registry gRPC Server started (PID: {registry_grpc_proc.pid})")
@@ -1332,13 +1333,16 @@ async def lifespan(app: FastAPI):
         if settings.enable_listener:
             try:
                 logger.info(f"Starting Listener Service on port {settings.listener_port}...")
-                listener_proc = await asyncio.create_subprocess_exec(
-                    sys.executable,
-                    "-m", "src.listener",
-                    "--port", str(settings.listener_port),
-                    "--host", settings.host,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
+                listener_proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m", "src.listener",
+                        "--port", str(settings.listener_port),
+                        "--host", settings.host,
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 background_processes.append(("listener", listener_proc))
                 logger.info(f"✓ Listener Service started (PID: {listener_proc.pid})")
@@ -1402,18 +1406,18 @@ async def lifespan(app: FastAPI):
             logger.info("Terminating background services...")
             for service_name, process in app.state.background_processes:
                 try:
-                    if process.returncode is None:  # Process is still running
+                    if process.poll() is None:  # Process is still running
                         logger.info(f"Terminating {service_name} (PID: {process.pid})...")
                         process.terminate()
                         try:
                             # Wait up to 5 seconds for graceful shutdown
-                            await asyncio.wait_for(process.wait(), timeout=5.0)
+                            process.wait(timeout=5.0)
                             logger.info(f"✓ {service_name} terminated gracefully")
-                        except asyncio.TimeoutError:
+                        except subprocess.TimeoutExpired:
                             # Force kill if graceful shutdown fails
                             logger.warning(f"Force killing {service_name} (PID: {process.pid})...")
                             process.kill()
-                            await process.wait()
+                            process.wait()
                             logger.info(f"✓ {service_name} killed")
                 except Exception as e:
                     logger.error(f"Error terminating {service_name}: {e}")
