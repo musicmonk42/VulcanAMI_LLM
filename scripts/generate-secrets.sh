@@ -14,26 +14,26 @@ echo "# SECURITY: Keep this file secure and never commit to git!"
 echo ""
 
 echo "# Core Application Secrets"
-echo "JWT_SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n' | tr -d '+/')"
-echo "BOOTSTRAP_KEY=$(openssl rand -base64 32 | tr -d '\n' | tr -d '+/')"
+echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
+echo "BOOTSTRAP_KEY=$(openssl rand -hex 24)"
 echo ""
 
 echo "# Database Secrets"
-echo "POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '\n' | tr -d '+/')"
+echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
 echo ""
 
 echo "# Redis Secrets"
-echo "REDIS_PASSWORD=$(openssl rand -base64 32 | tr -d '\n' | tr -d '+/')"
+echo "REDIS_PASSWORD=$(openssl rand -hex 24)"
 echo ""
 
 echo "# MinIO Object Storage Secrets"
 echo "MINIO_ROOT_USER=admin"
-echo "MINIO_ROOT_PASSWORD=$(openssl rand -base64 32 | tr -d '\n' | tr -d '+/')"
+echo "MINIO_ROOT_PASSWORD=$(openssl rand -hex 24)"
 echo ""
 
 echo "# Grafana Secrets"
 echo "GRAFANA_USER=admin"
-echo "GRAFANA_PASSWORD=$(openssl rand -base64 24 | tr -d '\n' | tr -d '+/')"
+echo "GRAFANA_PASSWORD=$(openssl rand -hex 16)"
 echo ""
 
 echo "# Configuration"
