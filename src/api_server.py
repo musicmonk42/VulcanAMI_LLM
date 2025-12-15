@@ -58,18 +58,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Use cryptographically secure random for security-relevant operations (timing jitter, etc.)
 secure_random = secrets.SystemRandom()
 
-# Vulcan reasoning imports
-try:
-    from src.vulcan.reasoning.unified_reasoning import UnifiedReasoner
-    from src.vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
-    REASONING_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"UnifiedReasoner not available: {e}")
-    REASONING_AVAILABLE = False
-    UnifiedReasoner = None
-    ReasoningType = None
-    ReasoningResult = None
-
 # Optional dependencies
 try:
     import psutil
@@ -97,6 +85,19 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("GraphAPIServer")
+
+# Vulcan reasoning imports (after logger initialization)
+try:
+    from src.vulcan.reasoning.unified_reasoning import UnifiedReasoner
+    from src.vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
+    REASONING_AVAILABLE = True
+    logger.info("UnifiedReasoner loaded successfully")
+except ImportError as e:
+    logger.warning(f"UnifiedReasoner not available: {e}")
+    REASONING_AVAILABLE = False
+    UnifiedReasoner = None
+    ReasoningType = None
+    ReasoningResult = None
 
 # JWT support
 try:
