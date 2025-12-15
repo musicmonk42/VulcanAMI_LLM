@@ -132,6 +132,10 @@ except ImportError:
 RECOMMENDED_PBKDF2_ITERATIONS = 200_000
 JWT_SECRET = os.environ.get("GRAPHIX_JWT_SECRET")
 
+# Query preview lengths for logging and audit
+QUERY_PREVIEW_LOG_LENGTH = 100  # For logging
+QUERY_PREVIEW_AUDIT_LENGTH = 200  # For audit trail
+
 ALLOW_EPHEMERAL_SECRET = (
     os.environ.get("ALLOW_EPHEMERAL_SECRET", "false").lower() == "true"
 )
@@ -1637,23 +1641,36 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 return
         
         try:
-            # Initialize or get cached reasoner instance
-            if not hasattr(self.server_instance, '_unified_reasoner'):
-                logger.info("Initializing UnifiedReasoner...")
-                self.server_instance._unified_reasoner = UnifiedReasoner(
-                    enable_learning=False,  # Disable learning for API mode
-                    enable_safety=True,
-                    max_workers=2  # Limit workers for API server
-                )
-                logger.info("UnifiedReasoner initialized successfully")
+            # Thread-safe lazy initialization of reasoner
+            with self.server_instance.locks["reasoner"]:
+                if self.server_instance._unified_reasoner is None:
+                    logger.info("Initializing UnifiedReasoner...")
+                    self.server_instance._unified_reasoner = UnifiedReasoner(
+                        enable_learning=False,  # Disable learning for API mode
+                        enable_safety=True,
+                        max_workers=2  # Limit workers for API server
+                    )
+                    logger.info("UnifiedReasoner initialized successfully")
             
             reasoner = self.server_instance._unified_reasoner
             
+            # Prepare input for reasoner
+            # UnifiedReasoner expects:
+            # - input_data: raw input (can be str, dict, etc.)
+            # - query: structured query dict with additional context
+            if isinstance(query, str):
+                input_data = query
+                query_dict = {"query": query}
+            else:
+                # query is already a dict
+                input_data = query.get("query", query)
+                query_dict = query
+            
             # Perform reasoning
-            logger.info(f"Reasoning request from agent {agent.id}: query={str(query)[:100]}, type={reasoning_type}")
+            logger.info(f"Reasoning request from agent {agent.id}: query={str(input_data)[:QUERY_PREVIEW_LOG_LENGTH]}, type={reasoning_type}")
             result = reasoner.reason(
-                input_data=query,
-                query={"query": query} if isinstance(query, str) else query,
+                input_data=input_data,
+                query=query_dict,
                 reasoning_type=reasoning_type
             )
             
@@ -1677,7 +1694,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 "reasoning_request",
                 "api/reason",
                 {
-                    "query_preview": str(query)[:200],
+                    "query_preview": str(input_data)[:QUERY_PREVIEW_AUDIT_LENGTH],
                     "reasoning_type": reasoning_type.value if reasoning_type else "auto",
                     "confidence": result.confidence
                 }
@@ -1793,7 +1810,9 @@ class GraphAPIServer:
             "submissions": threading.RLock(),
             "proposals": threading.RLock(),
             "agents": threading.RLock(),
+            "reasoner": threading.RLock(),  # Lock for thread-safe reasoner initialization
         }
+        self._unified_reasoner = None  # Initialize to None, created on first use
         self.running = False
         self.start_time = datetime.utcnow()
         self.request_count = 0
