@@ -74,6 +74,7 @@ jobs:
           echo "=== Removing unnecessary files to free up disk space ==="
           # Remove large pre-installed software
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
           sudo rm -rf /usr/local/.ghcup || true
           sudo rm -rf /usr/share/swift || true
           sudo rm -rf /opt/hostedtoolcache/* || true
@@ -197,7 +198,7 @@ jobs:
 
       - name: Build and push Docker image
         if: steps.check_dockerfile.outputs.exists == 'true'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.service.context }}
           file: ${{ matrix.service.dockerfile }}
@@ -206,8 +207,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          # Use min cache mode instead of max to reduce disk usage
-          cache-to: type=gha,mode=min
+          cache-to: type=gha,mode=max
           build-args: |
             REJECT_INSECURE_JWT=ack
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
@@ -306,6 +306,7 @@ jobs:
           echo "=== Removing unnecessary files to free up disk space ==="
           # Remove large pre-installed software
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
           sudo rm -rf /usr/local/.ghcup || true
           sudo rm -rf /usr/share/swift || true
           sudo rm -rf /opt/hostedtoolcache/* || true
