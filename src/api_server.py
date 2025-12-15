@@ -45,7 +45,10 @@ import uuid
 from collections import defaultdict, deque
 
 # Import URL validation utility
-from src.utils.url_validator import validate_url_scheme
+try:
+    from src.utils.url_validator import validate_url_scheme
+except ImportError:
+    from utils.url_validator import validate_url_scheme
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
@@ -92,12 +95,19 @@ try:
     from src.vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
     REASONING_AVAILABLE = True
     logger.info("UnifiedReasoner loaded successfully")
-except ImportError as e:
-    logger.warning(f"UnifiedReasoner not available: {e}")
-    REASONING_AVAILABLE = False
-    UnifiedReasoner = None
-    ReasoningType = None
-    ReasoningResult = None
+except ImportError:
+    try:
+        # Try without src. prefix
+        from vulcan.reasoning.unified_reasoning import UnifiedReasoner
+        from vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
+        REASONING_AVAILABLE = True
+        logger.info("UnifiedReasoner loaded successfully")
+    except ImportError as e:
+        logger.warning(f"UnifiedReasoner not available: {e}")
+        REASONING_AVAILABLE = False
+        UnifiedReasoner = None
+        ReasoningType = None
+        ReasoningResult = None
 
 # JWT support
 try:
