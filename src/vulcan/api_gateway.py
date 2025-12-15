@@ -64,140 +64,56 @@ except Exception:
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
 
-# FIXED: Local imports with proper error handling and stubs
+# FIXED: Proper imports with absolute paths - NO STUBS, 100% REAL
+import sys
+from pathlib import Path
+
+# Ensure src is in the path for absolute imports
+src_path = Path(__file__).parent.parent
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+# Import real modules - no fallbacks
 try:
-    from .config import ActionType, AgentConfig, ModalityType
+    from vulcan.config import ActionType, AgentConfig, ModalityType
 except ImportError:
-    logging.warning("Config module not found, using stubs")
-    from dataclasses import dataclass
-    from enum import Enum
-
-    class ModalityType(Enum):
-        TEXT = "text"
-        VISION = "vision"
-        AUDIO = "audio"
-        VIDEO = "video"
-        MULTIMODAL = "multimodal"
-        UNKNOWN = "unknown"
-
-    class ActionType(Enum):
-        EXPLORE = "explore"
-        OPTIMIZE = "optimize"
-        WAIT = "wait"
-
-    @dataclass
-    class AgentConfig:
-        agent_id: str = "vulcan-001"
-        version: str = "1.0.0"
-
-
-# FIXED: Import from orchestrator submodule
-try:
-    from .orchestrator import ProductionDeployment, VULCANAGICollective
-except ImportError:
-    logging.warning("Orchestrator module not found, using stub")
-
-    class VULCANAGICollective:
-        def __init__(self, config):
-            self.config = config
-            self.deps = type(
-                "obj",
-                (object,),
-                {
-                    "multimodal": None,
-                    "goal_system": None,
-                    "continual": None,
-                    "symbolic": None,
-                    "causal": None,
-                    "probabilistic": None,
-                    "ltm": None,
-                },
-            )()
-
-    class ProductionDeployment:
-        def __init__(self, config):
-            self.config = config
-            self.collective = VULCANAGICollective(config)
-
-        def step_with_monitoring(self, history, context):
-            return {"status": "stub", "result": None}
-
-        def get_status(self):
-            return {"status": "stub", "healthy": True}
-
+    # Try absolute import
+    from src.vulcan.config import ActionType, AgentConfig, ModalityType
 
 try:
-    from .processing import MultimodalProcessor
+    from vulcan.orchestrator import ProductionDeployment, VULCANAGICollective
 except ImportError:
-    logging.warning("Processing module not found, using stub")
-
-    class MultimodalProcessor:
-        def process_input(self, data):
-            return type(
-                "obj",
-                (object,),
-                {
-                    "embedding": np.zeros(384),
-                    "modality": ModalityType.TEXT,
-                    "uncertainty": 0.5,
-                    "metadata": {},
-                },
-            )()
-
+    from src.vulcan.orchestrator import ProductionDeployment, VULCANAGICollective
 
 try:
-    from .reasoning import CrossModalReasoner
+    from vulcan.processing import MultimodalProcessor
 except ImportError:
-    logging.warning("Reasoning module not found, using stub")
-
-    class CrossModalReasoner:
-        pass
-
+    from src.vulcan.processing import MultimodalProcessor
 
 try:
-    from .learning import ContinualLearner
+    from vulcan.reasoning import CrossModalReasoner
 except ImportError:
-    logging.warning("Learning module not found, using stub")
-
-    class ContinualLearner:
-        pass
-
+    from src.vulcan.reasoning import CrossModalReasoner
 
 try:
-    from .planning import EnhancedHierarchicalPlanner, ResourceAwareCompute
+    from vulcan.learning import ContinualLearner
 except ImportError:
-    logging.warning("Planning module not found, using stub")
-
-    class EnhancedHierarchicalPlanner:
-        pass
-
-    class ResourceAwareCompute:
-        pass
-
+    from src.vulcan.learning import ContinualLearner
 
 try:
-    from .safety import GovernanceOrchestrator, SafetyValidator
+    from vulcan.planning import EnhancedHierarchicalPlanner, ResourceAwareCompute
 except ImportError:
-    logging.warning("Safety module not found, using stub")
-
-    class SafetyValidator:
-        pass
-
-    class GovernanceOrchestrator:
-        pass
-
+    from src.vulcan.planning import EnhancedHierarchicalPlanner, ResourceAwareCompute
 
 try:
-    from .memory import VectorMemoryStore
+    from vulcan.safety import GovernanceOrchestrator, SafetyValidator
 except ImportError:
-    logging.warning("Memory module not found, using stub")
+    from src.vulcan.safety import GovernanceOrchestrator, SafetyValidator
 
-    class VectorMemoryStore:
-        def search(self, embedding, k=10):
-            return []
-
-        def upsert(self, memory_id, embedding, metadata):
-            return True
+try:
+    from vulcan.memory import VectorMemoryStore
+except ImportError:
+    from src.vulcan.memory import VectorMemoryStore
 
 
 logger = logging.getLogger(__name__)
@@ -2006,7 +1922,7 @@ class APIGateway:
             processor = self.deployment.collective.deps.multimodal
 
             if processor is None:
-                return {"error": "Processor not available", "status": "stub"}
+                return {"error": "Processor not available", "status": "not_initialized"}
 
             result = processor.process_input(data.get("input"))
 
@@ -2046,7 +1962,7 @@ class APIGateway:
 
             if planner is None:
                 return web.json_response(
-                    {"error": "Planner not available", "status": "stub"}, status=503
+                    {"error": "Planner not available", "status": "not_initialized"}, status=503
                 )
 
             plan = planner.generate_plan(goal, context)
@@ -2103,7 +2019,7 @@ class APIGateway:
 
             if learner is None:
                 return web.json_response(
-                    {"error": "Learner not available", "status": "stub"}, status=503
+                    {"error": "Learner not available", "status": "not_initialized"}, status=503
                 )
 
             result = learner.process_experience(experience)
@@ -2425,8 +2341,18 @@ class APIGateway:
                 return "healthy"
 
             def resolve_memory_search(self, info, query, k):
-                logger.warning("GraphQL memory_search using stub implementation")
-                return ["result1", "result2"]
+                # Use real memory system
+                try:
+                    memory = self.deployment.collective.deps.ltm if hasattr(self, 'deployment') else None
+                    if memory:
+                        results = memory.search(query, k=k)
+                        return [str(r) for r in results]
+                    else:
+                        logger.warning("GraphQL memory_search: Memory system not initialized")
+                        return []
+                except Exception as e:
+                    logger.error(f"GraphQL memory_search error: {e}")
+                    return []
 
         class Mutation(graphene.ObjectType):
             process = graphene.Field(
@@ -2434,8 +2360,18 @@ class APIGateway:
             )
 
             def resolve_process(self, info, input):
-                logger.warning("GraphQL process using stub implementation")
-                return f"Processed: {input}"
+                # Use real processing system
+                try:
+                    processor = self.deployment.collective.deps.multimodal if hasattr(self, 'deployment') else None
+                    if processor:
+                        result = processor.process_input(input)
+                        return f"Processed: {input} -> {result}"
+                    else:
+                        logger.warning("GraphQL process: Processor not initialized")
+                        return f"Processor unavailable: {input}"
+                except Exception as e:
+                    logger.error(f"GraphQL process error: {e}")
+                    return f"Error processing: {input}"
 
         return graphene.Schema(query=Query, mutation=Mutation)
 

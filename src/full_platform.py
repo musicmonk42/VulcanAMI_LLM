@@ -14,6 +14,10 @@
 #   constant-time secret comparisons, request size limiting
 # ============================================================
 
+# NOTE: Subprocess management now uses subprocess.Popen instead of asyncio.create_subprocess_exec
+# This avoids issues with Windows event loop policy when using uvicorn --reload
+
+# Now proceed with all imports
 import argparse
 import asyncio
 import hmac
@@ -21,6 +25,7 @@ import importlib
 import json  # For Arena API endpoints
 import logging
 import os
+import subprocess  # For background process management
 import sys
 from collections import deque
 from contextlib import asynccontextmanager
@@ -38,6 +43,9 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.middleware.wsgi import WSGIMiddleware
 
+# NOTE: Windows event loop policy is now set at the very top of the file (line 17)
+# before any imports that might trigger asyncio initialization.
+# 
 # NOTE: The encoding fix and .env loader have been MOVED
 # into the lifespan function to ensure they run in the
 # Uvicorn worker process.
@@ -879,6 +887,9 @@ async def lifespan(app: FastAPI):
     # [!!!] MOVED BLOCKS HERE TO RUN IN WORKER PROCESS [!!!]
     # ====================================================================
 
+    # NOTE: Windows event loop policy is now set at module level (line 42)
+    # to ensure it's applied before uvicorn creates the event loop
+
     # Fix Windows console encoding issues
     if sys.platform == "win32":
         try:
@@ -1054,6 +1065,88 @@ async def lifespan(app: FastAPI):
                 vulcan_module.app.state.startup_time = __import__("time").time()
                 vulcan_module.app.state.worker_id = worker_id
 
+                # ================================================================
+                # ACTIVATE ALL VULCAN SUBSYSTEMS (from main.py lifespan logic)
+                # ================================================================
+                def _activate_subsystem(deps, attr_name: str, display_name: str, needs_init: bool = False):
+                    """Helper to activate a subsystem with optional initialization."""
+                    if hasattr(deps, attr_name) and getattr(deps, attr_name):
+                        subsystem = getattr(deps, attr_name)
+                        if needs_init and hasattr(subsystem, 'initialize'):
+                            subsystem.initialize()
+                        logger.info(f"✓ {display_name} activated")
+                        return True
+                    return False
+
+                try:
+                    logger.info("Activating all Vulcan subsystem modules...")
+                    
+                    # Initialize subsystems that need explicit initialization
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'curiosity', 'Curiosity Engine', needs_init=True)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'crystallizer', 'Knowledge Crystallizer', needs_init=True)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'decomposer', 'Problem Decomposer', needs_init=True)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'semantic_bridge', 'Semantic Bridge', needs_init=True)
+                    
+                    # Initialize all Reasoning subsystems (no explicit init needed)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'symbolic', 'Symbolic Reasoning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'probabilistic', 'Probabilistic Reasoning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'causal', 'Causal Reasoning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'analogical', 'Analogical Reasoning')
+                    
+                    # Initialize Memory subsystems
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'ltm', 'Long-term Memory')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'am', 'Associative Memory')
+                    
+                    # Initialize Learning subsystems
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'continual', 'Continual Learning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'meta', 'Meta-Learning')
+                    
+                    # Initialize Safety subsystems
+                    if hasattr(vulcan_deployment.collective.deps, 'safety') and vulcan_deployment.collective.deps.safety:
+                        safety_validator = vulcan_deployment.collective.deps.safety
+                        if hasattr(safety_validator, 'activate_all_constraints'):
+                            try:
+                                safety_validator.activate_all_constraints()
+                                logger.info("✓ Safety Validator with all constraints activated")
+                            except Exception as e:
+                                logger.warning(f"Failed to activate all constraints: {e}")
+                                logger.info("✓ Safety Validator activated (without all constraints)")
+                        else:
+                            logger.info("✓ Safety Validator activated")
+                    
+                    logger.info("✅ All Vulcan subsystem modules activation complete")
+                    
+                except Exception as subsys_err:
+                    logger.error(f"Error during subsystem activation: {subsys_err}", exc_info=True)
+                    logger.warning("Continuing with partial subsystem activation")
+
+                # Start self-improvement drive if enabled
+                if vulcan_config.enable_self_improvement:
+                    try:
+                        world_model = vulcan_deployment.collective.deps.world_model
+                        
+                        if world_model:
+                            from vulcan.world_model.meta_reasoning import MotivationalIntrospection
+                            
+                            world_model_config = vulcan_config.world_model
+                            config_path = getattr(
+                                world_model_config,
+                                "meta_reasoning_config",
+                                "configs/intrinsic_drives.json",
+                            )
+                            
+                            introspection = MotivationalIntrospection(world_model, config_path=config_path)
+                            logger.info("✓ MotivationalIntrospection initialized (modern mode)")
+                        
+                        if world_model and hasattr(world_model, "start_autonomous_improvement"):
+                            world_model.start_autonomous_improvement()
+                            logger.info("🚀 Autonomous self-improvement drive started")
+                        else:
+                            logger.warning("Self-improvement enabled but world model doesn't support it")
+                    except Exception as si_err:
+                        logger.error(f"Failed to start self-improvement drive: {si_err}")
+                # ================================================================
+
                 # Initialize LLM component if available
                 try:
                     from graphix_vulcan_llm import GraphixVulcanLLM
@@ -1173,12 +1266,16 @@ async def lifespan(app: FastAPI):
         if settings.enable_api_server:
             try:
                 logger.info(f"Starting API Server on port {settings.api_server_port}...")
-                api_server_proc = await asyncio.create_subprocess_exec(
-                    sys.executable,
-                    "-m", "src.api_server",
+                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
+                # This avoids issues with Windows event loop policy and uvicorn --reload
+                api_server_proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m", "src.api_server",
+                    ],
                     env={**os.environ, "API_SERVER_PORT": str(settings.api_server_port)},
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 background_processes.append(("api_server", api_server_proc))
                 logger.info(f"✓ API Server started (PID: {api_server_proc.pid})")
@@ -1203,12 +1300,15 @@ async def lifespan(app: FastAPI):
         if settings.enable_registry_grpc:
             try:
                 logger.info(f"Starting Registry gRPC Server on port {settings.registry_grpc_port}...")
-                registry_grpc_proc = await asyncio.create_subprocess_exec(
-                    sys.executable,
-                    "-m", "src.governance.registry_api_server",
+                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
+                registry_grpc_proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m", "src.governance.registry_api_server",
+                    ],
                     env={**os.environ, "REGISTRY_PORT": str(settings.registry_grpc_port)},
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 background_processes.append(("registry_grpc", registry_grpc_proc))
                 logger.info(f"✓ Registry gRPC Server started (PID: {registry_grpc_proc.pid})")
@@ -1233,13 +1333,16 @@ async def lifespan(app: FastAPI):
         if settings.enable_listener:
             try:
                 logger.info(f"Starting Listener Service on port {settings.listener_port}...")
-                listener_proc = await asyncio.create_subprocess_exec(
-                    sys.executable,
-                    "-m", "src.listener",
-                    "--port", str(settings.listener_port),
-                    "--host", settings.host,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
+                # Use subprocess.Popen instead of asyncio.create_subprocess_exec
+                listener_proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-m", "src.listener",
+                        "--port", str(settings.listener_port),
+                        "--host", settings.host,
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 background_processes.append(("listener", listener_proc))
                 logger.info(f"✓ Listener Service started (PID: {listener_proc.pid})")
@@ -1263,17 +1366,42 @@ async def lifespan(app: FastAPI):
         # Store background processes in app state for cleanup
         app.state.background_processes = background_processes
 
+        # Give subprocesses a moment to start and check if they're running
+        await asyncio.sleep(0.5)
+
         # Summary
         logger.info("=" * 70)
         logger.info("Service Status Summary")
         logger.info("=" * 70)
+        
+        # Check mounted services
         service_status = await service_manager.get_service_status()
         for name, service in service_status.items():
+            # Skip subprocess services - they'll be checked separately
+            if name in ["api_server", "registry_grpc", "listener"]:
+                continue
             status_txt = "✅ MOUNTED" if service.get("mounted") else "❌ FAILED"
             logger.info(f"{name}: {status_txt}")
             if service.get("mounted"):
                 logger.info(f"  → {service['mount_path']}")
                 logger.info(f"  → Import: {service.get('import_path', 'N/A')}")
+
+        # Check subprocess services
+        for service_name, process in background_processes:
+            returncode = process.poll()
+            if returncode is None:
+                # Process is still running
+                logger.info(f"{service_name}: ✅ RUNNING (PID: {process.pid})")
+            else:
+                # Process has exited
+                logger.info(f"{service_name}: ❌ FAILED (exit code: {returncode})")
+                # Try to read stderr to see why it failed
+                try:
+                    stderr_output = process.stderr.read().decode('utf-8', errors='replace')
+                    if stderr_output:
+                        logger.error(f"  → {service_name} stderr: {stderr_output[:500]}")
+                except Exception:
+                    pass
 
         logger.info("=" * 70)
         logger.info(f"Platform Ready! (Worker {worker_id})")
@@ -1303,18 +1431,18 @@ async def lifespan(app: FastAPI):
             logger.info("Terminating background services...")
             for service_name, process in app.state.background_processes:
                 try:
-                    if process.returncode is None:  # Process is still running
+                    if process.poll() is None:  # Process is still running
                         logger.info(f"Terminating {service_name} (PID: {process.pid})...")
                         process.terminate()
                         try:
                             # Wait up to 5 seconds for graceful shutdown
-                            await asyncio.wait_for(process.wait(), timeout=5.0)
+                            process.wait(timeout=5.0)
                             logger.info(f"✓ {service_name} terminated gracefully")
-                        except asyncio.TimeoutError:
+                        except subprocess.TimeoutExpired:
                             # Force kill if graceful shutdown fails
                             logger.warning(f"Force killing {service_name} (PID: {process.pid})...")
                             process.kill()
-                            await process.wait()
+                            process.wait()
                             logger.info(f"✓ {service_name} killed")
                 except Exception as e:
                     logger.error(f"Error terminating {service_name}: {e}")

@@ -360,12 +360,19 @@ except ImportError as e:
 # ====================================================================
 # PII DETECTION API ENDPOINTS
 # ====================================================================
+
+class PIIRequest(BaseModel):
+    """Request model for PII detection"""
+    text: str = Field(..., description="Text to analyze for PII")
+
+
 @app.post("/detect", response_model=PIIDetectionResult, tags=["PII Detection"])
-async def detect_pii(text: str = Field(..., description="Text to analyze for PII")):
+async def detect_pii(request: PIIRequest):
     """
     Detect PII in provided text.
     Returns detection results with identified PII types and confidence scores.
     """
+    text = request.text
     # TODO: Implement actual PII detection using security nodes
     # This would integrate with:
     # - Named entity recognition models
@@ -387,11 +394,12 @@ async def detect_pii(text: str = Field(..., description="Text to analyze for PII
     return result
 
 @app.post("/redact", response_model=PIIDetectionResult, tags=["PII Detection"])
-async def redact_pii(text: str = Field(..., description="Text to redact PII from")):
+async def redact_pii(request: PIIRequest):
     """
     Detect and redact PII from provided text.
     Returns redacted text with PII replaced by placeholders.
     """
+    text = request.text
     # TODO: Implement actual PII redaction
     # This would:
     # - Detect PII using detection logic

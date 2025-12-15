@@ -32,6 +32,9 @@ from .specialized import (
     WorkingMemoryBuffer,
 )
 
+# Alias for API Gateway compatibility
+VectorMemoryStore = MemoryIndex
+
 __all__ = [
     # Base
     "MemoryType",
@@ -57,6 +60,7 @@ __all__ = [
     "MemorySearch",
     "AttentionMechanism",
     "RetrievalResult",
+    "VectorMemoryStore",  # Added - Alias for MemoryIndex
     # Consolidation
     "MemoryConsolidator",
     "ConsolidationStrategy",

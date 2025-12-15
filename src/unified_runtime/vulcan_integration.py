@@ -29,50 +29,59 @@ from unittest.mock import MagicMock
 # Define logger early
 logger = logging.getLogger(__name__)
 
-# Import VULCAN components
+# Import VULCAN components - NO STUBS, 100% REAL
+import sys
+from pathlib import Path
+
+# Ensure src is in the path for absolute imports
+src_path = Path(__file__).parent.parent
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
 try:
     # WorldModel is now lazy-loaded to prevent circular imports
     from vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
     from vulcan.world_model.meta_reasoning.motivational_introspection import (
         MotivationalIntrospection,
     )
-
     VULCAN_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"VULCAN components not available: {e}. Using MagicMock stubs.")
-    VULCAN_AVAILABLE = False
-    MotivationalIntrospection = MagicMock()
-    SemanticBridge = MagicMock()
+except ImportError:
+    try:
+        # Try with src prefix
+        from src.vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+        from src.vulcan.world_model.meta_reasoning.motivational_introspection import (
+            MotivationalIntrospection,
+        )
+        VULCAN_AVAILABLE = True
+    except ImportError as e:
+        logger.error(f"CRITICAL: VULCAN components not available: {e}")
+        raise ImportError("VULCAN components are required - no stubs allowed") from e
 
 # Placeholder for lazy-loaded WorldModel
 WorldModel = None
 
-# Import Graphix components (relative imports within package)
+# Import Graphix components (relative imports within package) - NO STUBS
 try:
     from .execution_engine import ExecutionContext, ExecutionMode, GraphExecutionResult
     from .execution_metrics import ExecutionMetrics  # Needed for on_run_complete
     from .graph_validator import ValidationResult
 except ImportError as e:
-    # Fallback for potential direct script execution or testing issues
-    logger.warning(
-        f"Could not perform relative import for Graphix components: {e}. Using MagicMock stubs."
-    )
-    ExecutionContext = MagicMock()
-    ExecutionMode = MagicMock()
-    ValidationResult = MagicMock()
-    GraphExecutionResult = MagicMock()
-    ExecutionMetrics = MagicMock()
+    logger.error(f"CRITICAL: Could not import Graphix components: {e}")
+    raise ImportError("Graphix components are required - no stubs allowed") from e
 
 
 def _lazy_import_world_model():
-    """Lazy imports WorldModel to avoid circular dependencies."""
+    """Lazy imports WorldModel to avoid circular dependencies - NO STUBS."""
     try:
         from vulcan.world_model.world_model_core import WorldModel
-
         return WorldModel
-    except ImportError as e:
-        logger.warning(f"Failed to import WorldModel: {e}. Using MagicMock stub.")
-        return MagicMock()
+    except ImportError:
+        try:
+            from src.vulcan.world_model.world_model_core import WorldModel
+            return WorldModel
+        except ImportError as e:
+            logger.error(f"CRITICAL: Failed to import WorldModel: {e}")
+            raise ImportError("WorldModel is required - no stubs allowed") from e
 
 
 @dataclass
@@ -158,16 +167,13 @@ class VulcanGraphixBridge:
         self.world_model = None
         self.semantic_bridge = SemanticBridge() if SemanticBridge else None
 
-        # --- START REPLACEMENT ---
-        if MotivationalIntrospection and not isinstance(
-            MotivationalIntrospection, MagicMock
-        ):
+        # Initialize motivational driver - NO STUBS
+        if VULCAN_AVAILABLE:
             self.motivational_driver = MotivationalIntrospection(
                 world_model=self.world_model
             )
         else:
-            self.motivational_driver = MagicMock()
-        # --- END REPLACEMENT ---
+            raise RuntimeError("VULCAN components are required but not available")
 
         self._cache = {}
         self.cache_timestamps = {}  # Initialize cache timestamps
@@ -181,70 +187,61 @@ class VulcanGraphixBridge:
             try:
                 global WorldModel
                 WorldModel = _lazy_import_world_model()
-                if WorldModel and not isinstance(WorldModel, MagicMock):
-                    # FIX: Pass explicit config including enable_self_improvement
-                    world_model_config = {
-                        # Honor environment and integration config toggle
-                        "enable_self_improvement": bool(
-                            self.config.enable_self_improvement
-                        ),
-                        # Sensible defaults that match your profile_development.json
-                        "enable_meta_reasoning": True,
-                        "simulation_mode": True,
-                        "bootstrap_mode": True,
-                        # Also pass the file paths used elsewhere for consistency
-                        "self_improvement_config": "configs/intrinsic_drives.json",
-                        "self_improvement_state": "data/agent_state.json",
-                        "meta_reasoning_config": "configs/intrinsic_drives.json",
-                    }
-                    self.world_model = WorldModel(config=world_model_config)
-                    logger.info("Initializing VULCAN World Model...")
-                    if hasattr(self.world_model, "initialize"):
-                        if asyncio.iscoroutinefunction(self.world_model.initialize):
-                            asyncio.run(self.world_model.initialize())
-                        else:
-                            self.world_model.initialize()
-                    logger.info("✓ VULCAN World Model initialized")
-
-                    # --- PATCH: Re-initialize motivational_driver *after* world_model is created ---
-                    if MotivationalIntrospection and not isinstance(
-                        MotivationalIntrospection, MagicMock
-                    ):
-                        self.motivational_driver = MotivationalIntrospection(
-                            world_model=self.world_model
-                        )
-                        logger.info(
-                            "✓ VULCAN MotivationalIntrospection re-initialized with WorldModel"
-                        )
+                # WorldModel import now raises error instead of returning mock
+                # FIX: Pass explicit config including enable_self_improvement
+                world_model_config = {
+                    # Honor environment and integration config toggle
+                    "enable_self_improvement": bool(
+                        self.config.enable_self_improvement
+                    ),
+                    # Sensible defaults that match your profile_development.json
+                    "enable_meta_reasoning": True,
+                    "simulation_mode": True,
+                    "bootstrap_mode": True,
+                    # Also pass the file paths used elsewhere for consistency
+                    "self_improvement_config": "configs/intrinsic_drives.json",
+                    "self_improvement_state": "data/agent_state.json",
+                    "meta_reasoning_config": "configs/intrinsic_drives.json",
+                }
+                self.world_model = WorldModel(config=world_model_config)
+                logger.info("Initializing VULCAN World Model...")
+                if hasattr(self.world_model, "initialize"):
+                    if asyncio.iscoroutinefunction(self.world_model.initialize):
+                        asyncio.run(self.world_model.initialize())
                     else:
-                        self.motivational_driver = MagicMock()
-                    # --- END PATCH ---
+                        self.world_model.initialize()
+                logger.info("✓ VULCAN World Model initialized")
 
-                else:
-                    logger.error(
-                        "❌ Failed to initialize VULCAN World Model: WorldModel is None or Mock"
+                # Re-initialize motivational_driver after world_model is created - NO STUBS
+                if VULCAN_AVAILABLE:
+                    self.motivational_driver = MotivationalIntrospection(
+                        world_model=self.world_model
                     )
-                    self.vulcan_available = False
+                    logger.info(
+                        "✓ VULCAN MotivationalIntrospection re-initialized with WorldModel"
+                    )
             except Exception as e:
                 logger.error(f"❌ Failed to initialize VULCAN World Model: {e}")
-                self.vulcan_available = False
+                raise RuntimeError("VULCAN World Model initialization failed - no fallback allowed") from e
 
     def _lazy_import_world_model(self):
         """
-        Lazy loader for WorldModel to fix circular dependencies
+        Lazy loader for WorldModel to fix circular dependencies - NO STUBS
         """
         global WorldModel  # Use global to cache the import
         if WorldModel is None:
             try:
                 from vulcan.world_model.world_model_core import WorldModel as WM
-
                 WorldModel = WM  # Assign to global
                 logger.info("WorldModel lazy loaded successfully")
-            except ImportError as e:
-                logger.error(
-                    f"Failed to import VULCAN World Model: {e}. Using MagicMock stub."
-                )
-                WorldModel = MagicMock()  # Ensure it's a mock on failure
+            except ImportError:
+                try:
+                    from src.vulcan.world_model.world_model_core import WorldModel as WM
+                    WorldModel = WM
+                    logger.info("WorldModel lazy loaded successfully (src prefix)")
+                except ImportError as e:
+                    logger.error(f"CRITICAL: Failed to import VULCAN World Model: {e}")
+                    raise ImportError("WorldModel is required - no stubs allowed") from e
         return WorldModel
 
     def _validate_graph_structure(self, graph: Dict[str, Any]) -> bool:
