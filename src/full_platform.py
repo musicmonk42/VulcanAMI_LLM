@@ -159,6 +159,9 @@ class UnifiedPlatformSettings(BaseSettings):
     vulcan_mount: str = "/vulcan"
     arena_mount: str = "/arena"
     registry_mount: str = "/registry"
+    api_gateway_mount: str = "/api-gateway"
+    dqs_mount: str = "/dqs"
+    pii_mount: str = "/pii"
 
     # Service import paths (support absolute imports like src.vulcan.main)
     vulcan_module: str = "src.vulcan.main"
@@ -167,6 +170,25 @@ class UnifiedPlatformSettings(BaseSettings):
     arena_attr: str = "app"
     registry_module: str = "app"
     registry_attr: str = "app"
+    api_gateway_module: str = "src.api_gateway"
+    api_gateway_attr: str = "app"
+    dqs_module: str = "src.dqs_service"
+    dqs_attr: str = "app"
+    pii_module: str = "src.pii_service"
+    pii_attr: str = "app"
+
+    # Standalone service ports (for services that can't be mounted as sub-apps)
+    api_server_port: int = 8001
+    registry_grpc_port: int = 50051
+    listener_port: int = 8084
+
+    # Enable/disable individual services
+    enable_api_gateway: bool = True
+    enable_dqs_service: bool = True
+    enable_pii_service: bool = True
+    enable_api_server: bool = True
+    enable_registry_grpc: bool = True
+    enable_listener: bool = True
 
     # Auto-detect src structure
     auto_detect_src: bool = True
@@ -1071,6 +1093,176 @@ async def lifespan(app: FastAPI):
         await service_manager.mount_service(app, "arena")
         await service_manager.mount_service(app, "registry", use_wsgi=True)
 
+        # ================================================================
+        # ADDITIONAL FASTAPI SERVICES (API Gateway, DQS, PII)
+        # ================================================================
+        logger.info("=" * 70)
+        logger.info("Importing additional FastAPI services...")
+        logger.info("=" * 70)
+
+        # Import and mount API Gateway
+        if settings.enable_api_gateway:
+            try:
+                api_gateway_result = await import_service_async(
+                    "API Gateway", settings.api_gateway_module, settings.api_gateway_attr, "FastAPI"
+                )
+                await service_manager.register_service(
+                    "api_gateway",
+                    api_gateway_result,
+                    settings.api_gateway_mount,
+                    f"{settings.api_gateway_mount}/health",
+                )
+                await service_manager.mount_service(app, "api_gateway")
+                logger.info(f"✓ Mounted API Gateway at {settings.api_gateway_mount}")
+            except Exception as e:
+                logger.error(f"❌ Failed to mount API Gateway: {e}", exc_info=True)
+        else:
+            logger.info("⊘ API Gateway disabled via configuration")
+
+        # Import and mount DQS Service
+        if settings.enable_dqs_service:
+            try:
+                dqs_result = await import_service_async(
+                    "DQS Service", settings.dqs_module, settings.dqs_attr, "FastAPI"
+                )
+                await service_manager.register_service(
+                    "dqs",
+                    dqs_result,
+                    settings.dqs_mount,
+                    f"{settings.dqs_mount}/health",
+                )
+                await service_manager.mount_service(app, "dqs")
+                logger.info(f"✓ Mounted DQS Service at {settings.dqs_mount}")
+            except Exception as e:
+                logger.error(f"❌ Failed to mount DQS Service: {e}", exc_info=True)
+        else:
+            logger.info("⊘ DQS Service disabled via configuration")
+
+        # Import and mount PII Service
+        if settings.enable_pii_service:
+            try:
+                pii_result = await import_service_async(
+                    "PII Service", settings.pii_module, settings.pii_attr, "FastAPI"
+                )
+                await service_manager.register_service(
+                    "pii",
+                    pii_result,
+                    settings.pii_mount,
+                    f"{settings.pii_mount}/health",
+                )
+                await service_manager.mount_service(app, "pii")
+                logger.info(f"✓ Mounted PII Service at {settings.pii_mount}")
+            except Exception as e:
+                logger.error(f"❌ Failed to mount PII Service: {e}", exc_info=True)
+        else:
+            logger.info("⊘ PII Service disabled via configuration")
+
+        # ================================================================
+        # STANDALONE SERVICES (API Server, Registry gRPC, Listener)
+        # These services need to run as separate processes because they
+        # use non-FastAPI frameworks (custom HTTP server, gRPC, etc.)
+        # ================================================================
+        logger.info("=" * 70)
+        logger.info("Starting standalone services as background processes...")
+        logger.info("=" * 70)
+
+        # Track background processes for cleanup
+        background_processes = []
+
+        # Start API Server (custom HTTP server)
+        if settings.enable_api_server:
+            try:
+                logger.info(f"Starting API Server on port {settings.api_server_port}...")
+                api_server_proc = await asyncio.create_subprocess_exec(
+                    sys.executable,
+                    "-m", "src.api_server",
+                    env={**os.environ, "API_SERVER_PORT": str(settings.api_server_port)},
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                background_processes.append(("api_server", api_server_proc))
+                logger.info(f"✓ API Server started (PID: {api_server_proc.pid})")
+                
+                # Register in service manager for status tracking
+                await service_manager.register_service(
+                    "api_server",
+                    ServiceImportResult(
+                        name="API Server",
+                        success=True,
+                        import_path="src.api_server (standalone)",
+                    ),
+                    f"http://localhost:{settings.api_server_port}",
+                    f"http://localhost:{settings.api_server_port}/health",
+                )
+            except Exception as e:
+                logger.error(f"❌ Failed to start API Server: {e}", exc_info=True)
+        else:
+            logger.info("⊘ API Server disabled via configuration")
+
+        # Start Registry gRPC Server
+        if settings.enable_registry_grpc:
+            try:
+                logger.info(f"Starting Registry gRPC Server on port {settings.registry_grpc_port}...")
+                registry_grpc_proc = await asyncio.create_subprocess_exec(
+                    sys.executable,
+                    "-m", "src.governance.registry_api_server",
+                    env={**os.environ, "REGISTRY_PORT": str(settings.registry_grpc_port)},
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                background_processes.append(("registry_grpc", registry_grpc_proc))
+                logger.info(f"✓ Registry gRPC Server started (PID: {registry_grpc_proc.pid})")
+                
+                # Register in service manager
+                await service_manager.register_service(
+                    "registry_grpc",
+                    ServiceImportResult(
+                        name="Registry gRPC",
+                        success=True,
+                        import_path="src.governance.registry_api_server (standalone)",
+                    ),
+                    f"grpc://localhost:{settings.registry_grpc_port}",
+                    None,  # gRPC services don't have HTTP health endpoints
+                )
+            except Exception as e:
+                logger.error(f"❌ Failed to start Registry gRPC Server: {e}", exc_info=True)
+        else:
+            logger.info("⊘ Registry gRPC Server disabled via configuration")
+
+        # Start Listener Service
+        if settings.enable_listener:
+            try:
+                logger.info(f"Starting Listener Service on port {settings.listener_port}...")
+                listener_proc = await asyncio.create_subprocess_exec(
+                    sys.executable,
+                    "-m", "src.listener",
+                    "--port", str(settings.listener_port),
+                    "--host", settings.host,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                background_processes.append(("listener", listener_proc))
+                logger.info(f"✓ Listener Service started (PID: {listener_proc.pid})")
+                
+                # Register in service manager
+                await service_manager.register_service(
+                    "listener",
+                    ServiceImportResult(
+                        name="Listener",
+                        success=True,
+                        import_path="src.listener (standalone)",
+                    ),
+                    f"http://localhost:{settings.listener_port}",
+                    f"http://localhost:{settings.listener_port}/health",
+                )
+            except Exception as e:
+                logger.error(f"❌ Failed to start Listener Service: {e}", exc_info=True)
+        else:
+            logger.info("⊘ Listener Service disabled via configuration")
+
+        # Store background processes in app state for cleanup
+        app.state.background_processes = background_processes
+
         # Summary
         logger.info("=" * 70)
         logger.info("Service Status Summary")
@@ -1105,6 +1297,27 @@ async def lifespan(app: FastAPI):
         logger.info("=" * 70)
         logger.info(f"Shutting down Unified Platform (Worker {worker_id})...")
         logger.info("=" * 70)
+
+        # Cleanup background processes
+        if hasattr(app.state, "background_processes"):
+            logger.info("Terminating background services...")
+            for service_name, process in app.state.background_processes:
+                try:
+                    if process.returncode is None:  # Process is still running
+                        logger.info(f"Terminating {service_name} (PID: {process.pid})...")
+                        process.terminate()
+                        try:
+                            # Wait up to 5 seconds for graceful shutdown
+                            await asyncio.wait_for(process.wait(), timeout=5.0)
+                            logger.info(f"✓ {service_name} terminated gracefully")
+                        except asyncio.TimeoutError:
+                            # Force kill if graceful shutdown fails
+                            logger.warning(f"Force killing {service_name} (PID: {process.pid})...")
+                            process.kill()
+                            await process.wait()
+                            logger.info(f"✓ {service_name} killed")
+                except Exception as e:
+                    logger.error(f"Error terminating {service_name}: {e}")
 
         # Cleanup tasks
         logger.info("Shutdown complete")

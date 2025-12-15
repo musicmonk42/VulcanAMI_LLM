@@ -103,6 +103,12 @@ stress_test_report.json
 proposal.json
 registry.json
 
+# Temporary test files (do not commit)
+test_platform_startup.py
+test_new_files.py
+test_*.tmp
+*_test_temp.py
+
 # Windows / Misc binaries
 jq.exe
 
