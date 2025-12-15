@@ -502,8 +502,9 @@ async def lifespan(app: FastAPI):
                     try:
                         safety_validator.activate_all_constraints()
                         logger.info("✓ Safety Validator with all constraints activated")
-                    except:
-                        logger.info("✓ Safety Validator activated")
+                    except Exception as e:
+                        logger.warning(f"Failed to activate all constraints: {e}")
+                        logger.info("✓ Safety Validator activated (without all constraints)")
                 else:
                     logger.info("✓ Safety Validator activated")
             
@@ -2391,8 +2392,8 @@ def test_curiosity_engine(deployment: ProductionDeployment) -> bool:
             if curiosity:
                 logger.info("Curiosity Engine is activated")
                 return True
-        logger.warning("Curiosity Engine not available, skipping")
-        return True  # Not fail if not available
+        logger.warning("Curiosity Engine not available, treating as optional")
+        return True  # Do not fail if not available (optional component)
     except Exception as e:
         logger.error(f"Curiosity Engine test failed: {e}")
         return False
@@ -2476,8 +2477,8 @@ def test_world_model_subsystems(deployment: ProductionDeployment) -> bool:
             if hasattr(world_model, 'meta_reasoning'):
                 logger.info("Meta-reasoning subsystem is activated")
             return True
-        logger.warning("World Model not available")
-        return True
+        logger.warning("World Model not available - this is a core component")
+        return False  # World Model is required, so fail if not available
     except Exception as e:
         logger.error(f"World Model test failed: {e}")
         return False
@@ -3627,7 +3628,11 @@ def main():
             test_suite.cleanup()
             
             # Check if all async tests passed
-            async_success = async_results.get('successful', 0) > 0 if isinstance(async_results, dict) else False
+            async_success = async_results.get('success', False) if isinstance(async_results, dict) else False
+            if not async_success and isinstance(async_results, dict):
+                # Try alternate key name for backward compatibility
+                async_success = async_results.get('successful', 0) > 0
+            
             concurrent_success = all(
                 v.get('success', False) if isinstance(v, dict) else False
                 for v in concurrent_results.values()
