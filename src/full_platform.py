@@ -38,6 +38,17 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.middleware.wsgi import WSGIMiddleware
 
+# ============================================================================
+# CRITICAL FIX: Set Windows event loop policy at module level
+# This MUST be done BEFORE uvicorn creates the event loop to enable subprocess support
+# ============================================================================
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        print("✅ Set WindowsProactorEventLoopPolicy at module level for subprocess support")
+    except Exception as e:
+        print(f"⚠️  Could not set Windows event loop policy: {e}")
+
 # NOTE: The encoding fix and .env loader have been MOVED
 # into the lifespan function to ensure they run in the
 # Uvicorn worker process.
@@ -879,14 +890,8 @@ async def lifespan(app: FastAPI):
     # [!!!] MOVED BLOCKS HERE TO RUN IN WORKER PROCESS [!!!]
     # ====================================================================
 
-    # CRITICAL FIX: Set Windows event loop policy for subprocess support
-    # This must be done BEFORE any async subprocess operations
-    if sys.platform == "win32":
-        try:
-            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-            logger.info("✅ Set WindowsProactorEventLoopPolicy for subprocess support")
-        except Exception as e:
-            logger.warning(f"⚠️  Could not set Windows event loop policy: {e}")
+    # NOTE: Windows event loop policy is now set at module level (line 42)
+    # to ensure it's applied before uvicorn creates the event loop
 
     # Fix Windows console encoding issues
     if sys.platform == "win32":
