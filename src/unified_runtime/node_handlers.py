@@ -499,7 +499,7 @@ async def generative_node_handler(
                 operation="generate",
                 provider=provider,
                 model=params.get("model", "gpt-3.5-turbo"),
-                prompt=prompt,
+                payload={"prompt": prompt},
                 context=processed_input,
             )
             

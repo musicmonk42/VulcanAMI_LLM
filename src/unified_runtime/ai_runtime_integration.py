@@ -650,6 +650,16 @@ class OpenAIProvider(AIProvider):
 
 class AnthropicProvider(AIProvider):
     """Anthropic Claude API provider with real implementation"""
+    
+    # Pricing constants for Claude models (per million tokens)
+    CLAUDE_OPUS_INPUT_RATE = 15.0
+    CLAUDE_OPUS_OUTPUT_RATE = 75.0
+    CLAUDE_SONNET_INPUT_RATE = 3.0
+    CLAUDE_SONNET_OUTPUT_RATE = 15.0
+    CLAUDE_HAIKU_INPUT_RATE = 0.25
+    CLAUDE_HAIKU_OUTPUT_RATE = 1.25
+    CLAUDE_DEFAULT_INPUT_RATE = 8.0
+    CLAUDE_DEFAULT_OUTPUT_RATE = 24.0
 
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key, "https://api.anthropic.com/v1")
@@ -707,8 +717,8 @@ class AnthropicProvider(AIProvider):
             if AIOHTTP_AVAILABLE:
                 session = await self._get_session()
                 
-                # Prepare request payload
-                prompt = task.payload.get("prompt", task.prompt or "")
+                # Prepare request payload - extract prompt from payload dict
+                prompt = task.payload.get("prompt", "")
                 messages = task.payload.get("messages", [{"role": "user", "content": prompt}])
                 
                 headers = {
@@ -750,17 +760,21 @@ class AnthropicProvider(AIProvider):
                     output_tokens = usage.get("output_tokens", 0)
                     total_tokens = input_tokens + output_tokens
                     
-                    # Calculate cost (Claude pricing)
-                    # Opus: $15/$75 per MTok, Sonnet: $3/$15, Haiku: $0.25/$1.25
-                    model_name = payload["model"]
+                    # Calculate cost using pricing constants
+                    model_name = payload["model"].lower()  # Case-insensitive matching
                     if "opus" in model_name:
-                        cost = (input_tokens / 1_000_000 * 15) + (output_tokens / 1_000_000 * 75)
+                        cost = (input_tokens / 1_000_000 * self.CLAUDE_OPUS_INPUT_RATE) + \
+                               (output_tokens / 1_000_000 * self.CLAUDE_OPUS_OUTPUT_RATE)
                     elif "sonnet" in model_name:
-                        cost = (input_tokens / 1_000_000 * 3) + (output_tokens / 1_000_000 * 15)
+                        cost = (input_tokens / 1_000_000 * self.CLAUDE_SONNET_INPUT_RATE) + \
+                               (output_tokens / 1_000_000 * self.CLAUDE_SONNET_OUTPUT_RATE)
                     elif "haiku" in model_name:
-                        cost = (input_tokens / 1_000_000 * 0.25) + (output_tokens / 1_000_000 * 1.25)
+                        cost = (input_tokens / 1_000_000 * self.CLAUDE_HAIKU_INPUT_RATE) + \
+                               (output_tokens / 1_000_000 * self.CLAUDE_HAIKU_OUTPUT_RATE)
                     else:
-                        cost = (input_tokens / 1_000_000 * 8) + (output_tokens / 1_000_000 * 24)  # Fallback
+                        # Fallback for unknown models
+                        cost = (input_tokens / 1_000_000 * self.CLAUDE_DEFAULT_INPUT_RATE) + \
+                               (output_tokens / 1_000_000 * self.CLAUDE_DEFAULT_OUTPUT_RATE)
                     
                     latency_ms = (time.time_ns() - start_time_ns) / 1_000_000.0
                     return AIResult(
