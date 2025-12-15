@@ -41,24 +41,35 @@ class TestFAISSConfig(unittest.TestCase):
     
     def test_initialize_faiss_not_available(self):
         """Test FAISS initialization when module not available"""
-        # Remove faiss from sys.modules if present
-        faiss_backup = sys.modules.pop('faiss', None)
+        # Reset state first
+        import src.utils.faiss_config as fc
+        fc.FAISS_MODULE = None
+        fc.FAISS_AVAILABLE = False
+        fc.FAISS_INSTRUCTION_SET = None
         
-        try:
-            # Mock import to raise ImportError
-            with patch('builtins.__import__', side_effect=ImportError("No module named 'faiss'")):
-                from src.utils.faiss_config import initialize_faiss
-                
-                faiss_mod, available, instr_set = initialize_faiss()
-                
-                # Should fail gracefully
-                self.assertIsNone(faiss_mod)
-                self.assertFalse(available)
-                self.assertIsNone(instr_set)
-        finally:
-            # Restore faiss if it was present
-            if faiss_backup:
-                sys.modules['faiss'] = faiss_backup
+        # Remove faiss from sys.modules to ensure clean state
+        sys.modules.pop('faiss', None)
+        
+        # Import the function first, before mocking
+        from src.utils.faiss_config import initialize_faiss
+        
+        # Get the original __import__ function properly
+        # __builtins__ can be either a module or a dict
+        import builtins
+        original_import = builtins.__import__
+        
+        def mock_import(name, *args, **kwargs):
+            if name == 'faiss':
+                raise ImportError("No module named 'faiss'")
+            return original_import(name, *args, **kwargs)
+        
+        with patch('builtins.__import__', side_effect=mock_import):
+            faiss_mod, available, instr_set = initialize_faiss()
+            
+            # Should fail gracefully
+            self.assertIsNone(faiss_mod)
+            self.assertFalse(available)
+            self.assertIsNone(instr_set)
     
     @patch('src.utils.faiss_config.warnings')
     def test_get_faiss(self, mock_warnings):
@@ -100,12 +111,15 @@ class TestFAISSConfig(unittest.TestCase):
         mock_caps.has_avx = True
         
         with patch.dict('sys.modules', {'faiss': mock_faiss}):
-            with patch('src.utils.faiss_config.get_cpu_capabilities', return_value=mock_caps):
+            # Patch the cpu_capabilities module's get_cpu_capabilities function
+            with patch('src.utils.cpu_capabilities.get_cpu_capabilities', return_value=mock_caps):
                 from src.utils.faiss_config import get_faiss_instruction_set, initialize_faiss
                 
                 # Force re-initialization
                 import src.utils.faiss_config as fc
                 fc.FAISS_MODULE = None
+                fc.FAISS_AVAILABLE = False
+                fc.FAISS_INSTRUCTION_SET = None
                 
                 initialize_faiss()
                 instr_set = get_faiss_instruction_set()
@@ -130,6 +144,7 @@ class TestFAISSConfig(unittest.TestCase):
             import src.utils.faiss_config as fc
             fc.FAISS_MODULE = None
             fc.FAISS_AVAILABLE = False
+            fc.FAISS_INSTRUCTION_SET = None
             
             from src.utils.faiss_config import initialize_faiss
             
@@ -176,14 +191,16 @@ class TestFAISSConfig(unittest.TestCase):
         """Test fallback when CPU capability detection fails"""
         mock_faiss = MagicMock()
         
+        # Reset state
+        import src.utils.faiss_config as fc
+        fc.FAISS_MODULE = None
+        fc.FAISS_AVAILABLE = False
+        fc.FAISS_INSTRUCTION_SET = None
+        
         with patch.dict('sys.modules', {'faiss': mock_faiss}):
-            # Mock cpu_capabilities to not be available
-            with patch('src.utils.faiss_config.get_cpu_capabilities', side_effect=ImportError):
+            # Mock cpu_capabilities to not be available - patch at the source
+            with patch('src.utils.cpu_capabilities.get_cpu_capabilities', side_effect=ImportError("Module not found")):
                 from src.utils.faiss_config import initialize_faiss
-                
-                # Reset state
-                import src.utils.faiss_config as fc
-                fc.FAISS_MODULE = None
                 
                 faiss_mod, available, instr_set = initialize_faiss()
                 
@@ -202,6 +219,8 @@ class TestFAISSConfig(unittest.TestCase):
             # Reset state
             import src.utils.faiss_config as fc
             fc.FAISS_MODULE = None
+            fc.FAISS_AVAILABLE = False
+            fc.FAISS_INSTRUCTION_SET = None
             
             initialize_faiss()
             
@@ -236,6 +255,7 @@ class TestFAISSConfigIntegration(unittest.TestCase):
         import src.utils.faiss_config as fc
         fc.FAISS_MODULE = None
         fc.FAISS_AVAILABLE = False
+        fc.FAISS_INSTRUCTION_SET = None
         
         faiss_mod, available, instr_set = initialize_faiss()
         
