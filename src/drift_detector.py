@@ -60,6 +60,12 @@ class _MetricsRegistry:
     """Singleton registry for DriftDetector metrics to prevent duplicate registration."""
     _instance = None
     _initialized = False
+    _drift_value_gauge = None
+    _drift_events = None
+    _drift_checks = None
+    _drift_latency = None
+    _realignment_operations = None
+    _validation_errors = None
     
     def __new__(cls):
         if cls._instance is None:
@@ -67,47 +73,73 @@ class _MetricsRegistry:
         return cls._instance
     
     def __init__(self):
+        # Only initialize metrics once at class level
         if not _MetricsRegistry._initialized and PROMETHEUS_AVAILABLE:
             try:
-                self.drift_value_gauge = Gauge("drift_detector_drift_value", "Current mean embedding drift")
-                self.drift_events = Counter("drift_detector_realignments_total", "Total drift-triggered realignments")
-                self.drift_checks = Counter("drift_detector_checks_total", "Total drift checks performed")
-                self.drift_latency = Histogram("drift_detector_check_latency_seconds", "Latency of drift detection checks")
-                self.realignment_operations = Counter("drift_detector_realignment_operations", "Realignment operations performed")
-                self.validation_errors = Counter("drift_detector_validation_errors", "Validation errors encountered")
+                _MetricsRegistry._drift_value_gauge = Gauge("drift_detector_drift_value", "Current mean embedding drift")
+                _MetricsRegistry._drift_events = Counter("drift_detector_realignments_total", "Total drift-triggered realignments")
+                _MetricsRegistry._drift_checks = Counter("drift_detector_checks_total", "Total drift checks performed")
+                _MetricsRegistry._drift_latency = Histogram("drift_detector_check_latency_seconds", "Latency of drift detection checks")
+                _MetricsRegistry._realignment_operations = Counter("drift_detector_realignment_operations", "Realignment operations performed")
+                _MetricsRegistry._validation_errors = Counter("drift_detector_validation_errors", "Validation errors encountered")
                 _MetricsRegistry._initialized = True
                 logger.debug("DriftDetector metrics initialized")
             except ValueError as e:
                 # Metrics already registered from previous import
                 if "Duplicated timeseries" in str(e):
-                    logger.debug("Metrics already registered, skipping initialization")
+                    logger.debug("Metrics already registered, retrieving from registry")
                     # Try to retrieve from registry
                     from prometheus_client import REGISTRY
                     for collector in list(REGISTRY._collector_to_names.keys()):
                         if hasattr(collector, "_name"):
                             if collector._name == "drift_detector_drift_value":
-                                self.drift_value_gauge = collector
+                                _MetricsRegistry._drift_value_gauge = collector
                             elif collector._name == "drift_detector_realignments_total":
-                                self.drift_events = collector
+                                _MetricsRegistry._drift_events = collector
                             elif collector._name == "drift_detector_checks_total":
-                                self.drift_checks = collector
+                                _MetricsRegistry._drift_checks = collector
                             elif collector._name == "drift_detector_check_latency_seconds":
-                                self.drift_latency = collector
+                                _MetricsRegistry._drift_latency = collector
                             elif collector._name == "drift_detector_realignment_operations":
-                                self.realignment_operations = collector
+                                _MetricsRegistry._realignment_operations = collector
                             elif collector._name == "drift_detector_validation_errors":
-                                self.validation_errors = collector
+                                _MetricsRegistry._validation_errors = collector
                     _MetricsRegistry._initialized = True
                 else:
                     raise
-        elif not PROMETHEUS_AVAILABLE:
+        elif not PROMETHEUS_AVAILABLE and not _MetricsRegistry._initialized:
             # Set to None if Prometheus not available
-            self.drift_value_gauge = None
-            self.drift_events = None
-            self.drift_checks = None
-            self.drift_latency = None
-            self.realignment_operations = None
-            self.validation_errors = None
+            _MetricsRegistry._drift_value_gauge = None
+            _MetricsRegistry._drift_events = None
+            _MetricsRegistry._drift_checks = None
+            _MetricsRegistry._drift_latency = None
+            _MetricsRegistry._realignment_operations = None
+            _MetricsRegistry._validation_errors = None
+            _MetricsRegistry._initialized = True
+    
+    @property
+    def drift_value_gauge(self):
+        return _MetricsRegistry._drift_value_gauge
+    
+    @property
+    def drift_events(self):
+        return _MetricsRegistry._drift_events
+    
+    @property
+    def drift_checks(self):
+        return _MetricsRegistry._drift_checks
+    
+    @property
+    def drift_latency(self):
+        return _MetricsRegistry._drift_latency
+    
+    @property
+    def realignment_operations(self):
+        return _MetricsRegistry._realignment_operations
+    
+    @property
+    def validation_errors(self):
+        return _MetricsRegistry._validation_errors
 
 # Create singleton instance
 _metrics = _MetricsRegistry()
