@@ -879,6 +879,15 @@ async def lifespan(app: FastAPI):
     # [!!!] MOVED BLOCKS HERE TO RUN IN WORKER PROCESS [!!!]
     # ====================================================================
 
+    # CRITICAL FIX: Set Windows event loop policy for subprocess support
+    # This must be done BEFORE any async subprocess operations
+    if sys.platform == "win32":
+        try:
+            asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+            logger.info("✅ Set WindowsProactorEventLoopPolicy for subprocess support")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not set Windows event loop policy: {e}")
+
     # Fix Windows console encoding issues
     if sys.platform == "win32":
         try:
@@ -1053,6 +1062,88 @@ async def lifespan(app: FastAPI):
                 vulcan_module.app.state.deployment = vulcan_deployment
                 vulcan_module.app.state.startup_time = __import__("time").time()
                 vulcan_module.app.state.worker_id = worker_id
+
+                # ================================================================
+                # ACTIVATE ALL VULCAN SUBSYSTEMS (from main.py lifespan logic)
+                # ================================================================
+                def _activate_subsystem(deps, attr_name: str, display_name: str, needs_init: bool = False):
+                    """Helper to activate a subsystem with optional initialization."""
+                    if hasattr(deps, attr_name) and getattr(deps, attr_name):
+                        subsystem = getattr(deps, attr_name)
+                        if needs_init and hasattr(subsystem, 'initialize'):
+                            subsystem.initialize()
+                        logger.info(f"✓ {display_name} activated")
+                        return True
+                    return False
+
+                try:
+                    logger.info("Activating all Vulcan subsystem modules...")
+                    
+                    # Initialize subsystems that need explicit initialization
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'curiosity', 'Curiosity Engine', needs_init=True)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'crystallizer', 'Knowledge Crystallizer', needs_init=True)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'decomposer', 'Problem Decomposer', needs_init=True)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'semantic_bridge', 'Semantic Bridge', needs_init=True)
+                    
+                    # Initialize all Reasoning subsystems (no explicit init needed)
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'symbolic', 'Symbolic Reasoning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'probabilistic', 'Probabilistic Reasoning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'causal', 'Causal Reasoning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'analogical', 'Analogical Reasoning')
+                    
+                    # Initialize Memory subsystems
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'ltm', 'Long-term Memory')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'am', 'Associative Memory')
+                    
+                    # Initialize Learning subsystems
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'continual', 'Continual Learning')
+                    _activate_subsystem(vulcan_deployment.collective.deps, 'meta', 'Meta-Learning')
+                    
+                    # Initialize Safety subsystems
+                    if hasattr(vulcan_deployment.collective.deps, 'safety') and vulcan_deployment.collective.deps.safety:
+                        safety_validator = vulcan_deployment.collective.deps.safety
+                        if hasattr(safety_validator, 'activate_all_constraints'):
+                            try:
+                                safety_validator.activate_all_constraints()
+                                logger.info("✓ Safety Validator with all constraints activated")
+                            except Exception as e:
+                                logger.warning(f"Failed to activate all constraints: {e}")
+                                logger.info("✓ Safety Validator activated (without all constraints)")
+                        else:
+                            logger.info("✓ Safety Validator activated")
+                    
+                    logger.info("✅ All Vulcan subsystem modules activation complete")
+                    
+                except Exception as subsys_err:
+                    logger.error(f"Error during subsystem activation: {subsys_err}", exc_info=True)
+                    logger.warning("Continuing with partial subsystem activation")
+
+                # Start self-improvement drive if enabled
+                if vulcan_config.enable_self_improvement:
+                    try:
+                        world_model = vulcan_deployment.collective.deps.world_model
+                        
+                        if world_model:
+                            from vulcan.world_model.meta_reasoning import MotivationalIntrospection
+                            
+                            world_model_config = vulcan_config.world_model
+                            config_path = getattr(
+                                world_model_config,
+                                "meta_reasoning_config",
+                                "configs/intrinsic_drives.json",
+                            )
+                            
+                            introspection = MotivationalIntrospection(world_model, config_path=config_path)
+                            logger.info("✓ MotivationalIntrospection initialized (modern mode)")
+                        
+                        if world_model and hasattr(world_model, "start_autonomous_improvement"):
+                            world_model.start_autonomous_improvement()
+                            logger.info("🚀 Autonomous self-improvement drive started")
+                        else:
+                            logger.warning("Self-improvement enabled but world model doesn't support it")
+                    except Exception as si_err:
+                        logger.error(f"Failed to start self-improvement drive: {si_err}")
+                # ================================================================
 
                 # Initialize LLM component if available
                 try:
