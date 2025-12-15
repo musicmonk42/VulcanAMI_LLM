@@ -285,6 +285,70 @@ async def readiness_check():
             detail={"status": "not_ready", "error": str(e)},
         )
 
+
+@app.get("/health/components", tags=["Health"])
+async def component_health():
+    """
+    Detailed component health check endpoint.
+    Returns status of all gateway components and downstream services.
+    
+    This endpoint provides comprehensive visibility into:
+    - Gateway service status
+    - VULCAN AGI Gateway availability
+    - Service discovery status
+    - Component initialization status
+    """
+    try:
+        components = {
+            "api_gateway": True,
+            "vulcan_gateway": False,
+            "service_discovery": False,
+            "metrics": PROMETHEUS_AVAILABLE,
+            "rate_limiter": RATE_LIMIT_AVAILABLE,
+        }
+        
+        # Check VULCAN Gateway availability
+        try:
+            from src.vulcan.api_gateway import APIGateway
+            components["vulcan_gateway"] = True
+        except ImportError:
+            pass
+        
+        # Check if we can access service discovery
+        try:
+            # This would check if service discovery is working
+            # For now, we just mark it as available if VULCAN Gateway is available
+            components["service_discovery"] = components["vulcan_gateway"]
+        except Exception:
+            pass
+        
+        # Calculate statistics
+        total_components = len(components)
+        available_components = sum(1 for v in components.values() if v)
+        
+        return {
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": SERVICE_NAME,
+            "version": APP_VERSION,
+            "mode": DEPLOYMENT_MODE,
+            "components": components,
+            "statistics": {
+                "total": total_components,
+                "available": available_components,
+                "missing": total_components - available_components,
+            },
+            "health_summary": {
+                "status": "healthy" if available_components == total_components else "degraded",
+                "components_health": f"{available_components}/{total_components} available",
+            }
+        }
+    except Exception as e:
+        logger.error(f"Component health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"status": "error", "error": str(e)},
+        )
+
 # ====================================================================
 # METRICS ENDPOINT
 # ====================================================================

@@ -1339,6 +1339,7 @@ class APIGateway:
     def _setup_routes(self):
         """Setup HTTP routes."""
         self.app.router.add_get("/health", self.health_check)
+        self.app.router.add_get("/health/components", self.component_health_check)
         self.app.router.add_get("/metrics", self.metrics_endpoint)
 
         self.app.router.add_post("/auth/login", self.login)
@@ -1757,6 +1758,65 @@ class APIGateway:
             }
 
         return web.json_response(health)
+    
+    async def component_health_check(self, request):
+        """
+        Detailed component health check endpoint.
+        Returns status of all VULCAN AGI Gateway components.
+        """
+        try:
+            components = {
+                "api_gateway": True,
+                "service_registry": self.service_registry is not None,
+                "auth_manager": self.auth_manager is not None,
+                "cache_manager": self.cache_manager is not None,
+                "rate_limiter": self.rate_limiter is not None,
+                "redis_client": self.redis_client is not None,
+                "websocket_support": True,
+                "graphql_support": True,
+            }
+            
+            # Add degraded mode status
+            degraded_components = {}
+            if hasattr(self.auth_manager, 'degraded_mode'):
+                degraded_components["auth"] = self.auth_manager.degraded_mode
+            if hasattr(self.cache_manager, 'degraded_mode'):
+                degraded_components["cache"] = self.cache_manager.degraded_mode
+            if hasattr(self.rate_limiter, 'degraded_mode'):
+                degraded_components["rate_limiter"] = self.rate_limiter.degraded_mode
+            
+            # Get service count
+            service_count = 0
+            async with self.service_registry._lock:
+                service_count = len(self.service_registry.services)
+            
+            # Calculate statistics
+            total_components = len(components)
+            available_components = sum(1 for v in components.values() if v)
+            
+            return web.json_response({
+                "timestamp": time.time(),
+                "service": "vulcan-api-gateway",
+                "version": "1.0.0",
+                "components": components,
+                "degraded_mode": degraded_components,
+                "registered_services": service_count,
+                "statistics": {
+                    "total": total_components,
+                    "available": available_components,
+                    "missing": total_components - available_components,
+                },
+                "health_summary": {
+                    "status": "healthy" if available_components == total_components and not any(degraded_components.values()) else "degraded",
+                    "components_health": f"{available_components}/{total_components} available",
+                }
+            })
+        except Exception as e:
+            logger.error(f"Component health check failed: {e}")
+            return web.json_response(
+                {"status": "error", "error": str(e)},
+                status=500
+            )
 
     async def metrics_endpoint(self, request):
         """Prometheus metrics endpoint."""
