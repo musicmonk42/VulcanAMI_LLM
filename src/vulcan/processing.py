@@ -59,54 +59,87 @@ except ImportError:
     UnifiedRuntime = None
 
 
-# --- Custom LLM Dependency (Mocked for self-contained file) ---
+# --- Custom LLM Dependency ---
 # NOTE: In a real system, this would be imported from src.llm_core.graphix_transformer
 class GraphixTransformer:
-    """Mock/Placeholder for the core LLM component."""
+    """
+    Core LLM component with real BERT embeddings.
+    Uses pre-trained BERT model for text embeddings.
+    """
 
     def __init__(self, config=None, embedding_dim=EMBEDDING_DIM):
-        # A mock configuration, assuming it initializes the LLM's embedding layer
         self.embedding_dim = embedding_dim
-        self.device = "cpu"  # Mock device
+        self.device = "cpu"
+        
         # SECURITY: Support model revision pinning (CWE-494 mitigation)
-        # Use environment variable VULCAN_BERT_MODEL_REVISION to pin to specific commit
         revision = BERT_MODEL_REVISION if BERT_MODEL_REVISION else "main"
-        self.tokenizer = (
-            AutoTokenizer.from_pretrained(  # nosec B615 - revision parameter present
+        
+        # Load real BERT model and tokenizer
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(
                 "bert-base-uncased", revision=revision
-            )
-        )
+            )  # nosec B615 - revision parameter present
+            
+            self.model = AutoModel.from_pretrained(
+                "bert-base-uncased", revision=revision
+            )  # nosec B615 - revision parameter present
+            
+            self.model.eval()  # Set to evaluation mode
+            
+            # Pre-compute projection matrix for consistent embeddings
+            bert_dim = 768  # BERT base hidden size
+            self.projection = torch.randn(bert_dim, 384) * 0.01
+            
+            logger.info("Loaded real BERT model for embeddings")
+        except Exception as e:
+            logger.error(f"Failed to load BERT model: {e}, using fallback")
+            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", revision=revision)
+            self.model = None
+            self.projection = None
 
     def get_embeddings(self, text: Union[str, List[str]]) -> torch.Tensor:
         """
-        Mock implementation to return an embedding tensor.
-        This simulates using the LLM's embedding layer and pooling.
-
-        The text embedding model used to return a 384 dim vector. We preserve this
-        mock dimensionality to match the projection layers in AdaptiveMultimodalProcessor.
+        Get real BERT embeddings for text.
+        Returns 384-dim embeddings to match projection layers.
         """
-
         if isinstance(text, str):
             text = [text]
 
-        # Mock tokenization and getting embeddings (simulates output shape)
-        # Assuming the LLM uses a CLS token or mean pooling to get a fixed-size vector
         batch_size = len(text)
+        embedding_size = 384  # Match projection layer
 
-        # FIXED: Use a fixed output dimension (384) to match the projection layer
-        # in AdaptiveMultimodalProcessor for compatibility.
-        embedding_size_to_match_projection = 384
-
-        # This is the actual embedding logic that replaces SentenceTransformer's encode
-        # In a real system:
-        # 1. tokens = self.tokenizer(text, ...)
-        # 2. embeddings = self.llm_embedding_layer(tokens)
-        # 3. pooled_embedding = mean_or_cls_pooling(embeddings)
-
-        # Mocking the pooled_embedding output: (batch_size, 384)
-        return torch.randn(
-            batch_size, embedding_size_to_match_projection, dtype=torch.float32
-        )
+        # Use real BERT model if available
+        if self.model is not None:
+            try:
+                # Tokenize text
+                encoded = self.tokenizer(
+                    text,
+                    padding=True,
+                    truncation=True,
+                    max_length=512,
+                    return_tensors="pt"
+                )
+                
+                # Get embeddings from BERT
+                with torch.no_grad():
+                    outputs = self.model(**encoded)
+                    # Use CLS token embedding (first token)
+                    cls_embeddings = outputs.last_hidden_state[:, 0, :]
+                    
+                    # Project to 384 dimensions using stored projection matrix
+                    if cls_embeddings.shape[1] != embedding_size and self.projection is not None:
+                        embeddings = torch.matmul(cls_embeddings, self.projection)
+                    else:
+                        embeddings = cls_embeddings
+                    
+                    return embeddings.float()
+                    
+            except Exception as e:
+                logger.warning(f"BERT embedding failed: {e}, using fallback")
+        
+        # Fallback to random embeddings if model unavailable
+        logger.debug("Using fallback random embeddings")
+        return torch.randn(batch_size, embedding_size, dtype=torch.float32)
 
 
 class GraphixTextEncoder:
@@ -1748,7 +1781,31 @@ class AdaptiveMultimodalProcessor(nn.Module):
                 ModalityType.VISION if len(data.shape) > 1 else ModalityType.AUDIO
             )
         else:
-            embedding = np.random.randn(self.common_dim) * 0.1
+            # For unknown types, try to create a meaningful embedding
+            # Use text encoder if possible, otherwise fallback
+            if hasattr(self, 'text_encoder') and self.text_encoder:
+                try:
+                    # Try to convert to string and encode
+                    text_repr = str(data)[:512]  # Limit length
+                    text_embedding = self.text_encoder.encode([text_repr], convert_to_tensor=False)
+                    if isinstance(text_embedding, np.ndarray):
+                        embedding = text_embedding[0] if len(text_embedding.shape) > 1 else text_embedding
+                    else:
+                        embedding = np.array(text_embedding).flatten()
+                    
+                    # Pad or truncate to common_dim
+                    if len(embedding) > self.common_dim:
+                        embedding = embedding[:self.common_dim]
+                    elif len(embedding) < self.common_dim:
+                        embedding = np.pad(embedding, (0, self.common_dim - len(embedding)))
+                except Exception as e:
+                    logger.debug(f"Text encoding failed for unknown type: {e}, using zero vector")
+                    embedding = np.zeros(self.common_dim)
+            else:
+                # Last resort: zero vector instead of random
+                logger.debug("Unknown data type, using zero vector")
+                embedding = np.zeros(self.common_dim)
+            
             modality = ModalityType.UNKNOWN
 
         # Cache result

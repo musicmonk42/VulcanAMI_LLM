@@ -1679,11 +1679,44 @@ class MultiModalReasoningEngine:
 
     def _compute_alignment(self, features1: Dict, features2: Dict) -> Dict:
         """Compute alignment between two feature sets"""
-        # Simplified alignment computation
+        # Compute alignment based on feature similarity
         try:
-            score = np.random.random()  # Would use actual alignment algorithm
+            # Calculate similarity based on feature overlap and values
+            common_keys = set(features1.keys()) & set(features2.keys())
+            if not common_keys:
+                return {"score": 0.0, "mapping": {}, "confidence": 0.0}
+            
+            # Compute alignment score based on feature similarity
+            similarities = []
+            mapping = {}
+            for key in common_keys:
+                val1 = features1[key]
+                val2 = features2[key]
+                
+                # Handle different types
+                if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
+                    # Normalized difference for numeric values
+                    max_val = max(abs(val1), abs(val2), 1e-10)
+                    sim = 1.0 - min(abs(val1 - val2) / max_val, 1.0)
+                    similarities.append(sim)
+                    mapping[key] = sim
+                elif isinstance(val1, str) and isinstance(val2, str):
+                    # Exact match for strings
+                    sim = 1.0 if val1 == val2 else 0.0
+                    similarities.append(sim)
+                    mapping[key] = sim
+                else:
+                    # Type mismatch
+                    similarities.append(0.0)
+                    mapping[key] = 0.0
+            
+            # Average similarity as alignment score
+            score = sum(similarities) / len(similarities) if similarities else 0.0
+            
+            # Confidence based on number of aligned features
+            confidence = len(common_keys) / max(len(features1), len(features2))
 
-            return {"score": float(score), "mapping": {}, "confidence": float(score)}
+            return {"score": float(score), "mapping": mapping, "confidence": float(confidence)}
         except Exception:
             return {"score": 0.0, "mapping": {}, "confidence": 0.0}
 

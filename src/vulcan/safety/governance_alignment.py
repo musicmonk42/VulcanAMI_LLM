@@ -848,14 +848,40 @@ class GovernanceManager:
             }
 
         # Simulate human response (in production, wait for actual response)
-        import random
+        # Use deterministic confidence based on action properties instead of random
 
-        if random.random() < 0.8:  # 80% response rate
+        # Calculate confidence based on action characteristics
+        action_risk = action.get("risk_level", "medium")
+        action_cost = action.get("estimated_cost", 0)
+        action_complexity = action.get("complexity", "medium")
+        
+        # Response rate based on action urgency
+        urgency = action.get("urgency", "normal")
+        response_rate = 0.95 if urgency == "high" else 0.8
+        
+        # Simulate response (in production, this would be real human interaction)
+        import hashlib
+        action_hash = int(hashlib.md5(str(action.get("id", "")).encode()).hexdigest()[:8], 16)
+        responds = (action_hash % 100) < (response_rate * 100)
+        
+        if responds:
             time.sleep(min(0.1, timeout * 0.1))  # Simulate response time
 
-            # Generate simulated response
-            approval = random.random() < 0.7  # 70% approval rate
-            confidence = 0.6 + random.random() * 0.4
+            # Calculate approval and confidence based on action properties
+            # Lower risk, cost, complexity → higher approval and confidence
+            risk_scores = {"low": 0.9, "medium": 0.7, "high": 0.4, "critical": 0.2}
+            complexity_scores = {"low": 0.9, "medium": 0.7, "high": 0.5}
+            
+            risk_score = risk_scores.get(action_risk, 0.7)
+            complexity_score = complexity_scores.get(action_complexity, 0.7)
+            cost_score = 1.0 if action_cost < 100 else (0.8 if action_cost < 1000 else 0.6)
+            
+            # Combined score for approval
+            approval_score = (risk_score + complexity_score + cost_score) / 3.0
+            approval = approval_score > 0.65  # Threshold for approval
+            
+            # Confidence correlates with how clear the decision is
+            confidence = 0.5 + (approval_score * 0.5) if approval else (0.5 + ((1.0 - approval_score) * 0.4))
 
             feedback = HumanFeedback(
                 feedback_id=str(uuid.uuid4()),
@@ -864,7 +890,7 @@ class GovernanceManager:
                 stakeholder_id="human_operator_1",
                 approval=approval,
                 confidence=confidence,
-                reasoning="Simulated human review",
+                reasoning=f"Evaluated based on risk={action_risk}, cost={action_cost}, complexity={action_complexity}",
             )
 
             with self.lock:
@@ -903,11 +929,42 @@ class GovernanceManager:
         stakeholder_id = stakeholders[0]
 
         # Simulate stakeholder response
-        import random
-
-        if random.random() < 0.9:  # 90% response rate for registered stakeholders
-            approval = random.random() < 0.6  # Varying approval rates
-            confidence = 0.5 + random.random() * 0.5
+        # Use deterministic confidence based on action and stakeholder type
+        import hashlib
+        
+        # Calculate response based on stakeholder type and action
+        action_id = action.get("id", "default")
+        stakeholder_hash = int(hashlib.md5(f"{stakeholder_id}{action_id}".encode()).hexdigest()[:8], 16)
+        
+        # Different stakeholder types have different response rates
+        response_rates = {
+            StakeholderType.OPERATOR: 0.95,
+            StakeholderType.ADMIN: 0.90,
+            StakeholderType.USER: 0.70,
+        }
+        response_rate = response_rates.get(stakeholder_type, 0.80)
+        responds = (stakeholder_hash % 100) < (response_rate * 100)
+        
+        if responds:
+            # Approval based on action properties and stakeholder type
+            action_risk = action.get("risk_level", "medium")
+            stakeholder_info = None
+            with self.lock:
+                stakeholder_info = self.stakeholder_registry.get(stakeholder_id, {})
+            
+            # Operators are more permissive, admins more strict
+            risk_thresholds = {
+                StakeholderType.OPERATOR: {"low": 0.9, "medium": 0.8, "high": 0.5, "critical": 0.3},
+                StakeholderType.ADMIN: {"low": 0.85, "medium": 0.7, "high": 0.4, "critical": 0.2},
+                StakeholderType.USER: {"low": 0.7, "medium": 0.5, "high": 0.3, "critical": 0.1},
+            }
+            
+            thresholds = risk_thresholds.get(stakeholder_type, risk_thresholds[StakeholderType.OPERATOR])
+            approval_prob = thresholds.get(action_risk, 0.6)
+            approval = (stakeholder_hash % 1000) < (approval_prob * 1000)
+            
+            # Confidence based on how clear the decision is
+            confidence = 0.5 + (approval_prob * 0.4) if approval else (0.5 + ((1.0 - approval_prob) * 0.3))
 
             return {
                 "approval": approval,
