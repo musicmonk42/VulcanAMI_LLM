@@ -207,6 +207,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
+          # Use max cache mode for optimal layer caching and faster builds
+          # Despite larger cache size, this reduces overall disk usage by avoiding full rebuilds
           cache-to: type=gha,mode=max
           build-args: |
             REJECT_INSECURE_JWT=ack
