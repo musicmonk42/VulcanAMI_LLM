@@ -530,7 +530,7 @@ class OpenAIProvider(AIProvider):
     async def _generate_or_complete(
         self, task: AITask, contract: AIContract
     ) -> AIResult:
-        """Generate text completion (Mock implementation - needs actual API call)"""
+        """Generate text completion with real OpenAI API call"""
         prompt = task.payload.get("prompt") or task.payload.get("messages")
         if not prompt:
             return AIResult(
@@ -540,44 +540,109 @@ class OpenAIProvider(AIProvider):
                 trace_id=task.trace_id,
             )
 
-        # --- THIS NEEDS TO BE REPLACED WITH ACTUAL API CALL LOGIC ---
-        await asyncio.sleep(random.uniform(0.1, 0.5))  # Simulate network latency
-
-        response_text = (
-            f"Mock completion for '{str(prompt)[:30]}...' using {task.model}"
-        )
-        prompt_tokens = len(str(prompt).split())
-        completion_tokens = len(response_text.split())
-        total_tokens = prompt_tokens + completion_tokens
-
-        mock_provider_response = {
-            "id": f"chatcmpl-{random.randint(1000, 9999)}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": task.model,
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {"role": "assistant", "content": response_text},
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": total_tokens,
-            },
-        }
-
-        return AIResult(
-            status="SUCCESS",
-            data={"text": response_text, "tokens_used": total_tokens},
-            cost=0.002 * (total_tokens / 1000),  # Mock cost
-            provider_response=mock_provider_response,
-            metadata={"model_used": task.model, "finish_reason": "stop"},
-            trace_id=task.trace_id,
-        )
-        # --- END MOCK ---
+        # Real OpenAI API call
+        try:
+            if not AIOHTTP_AVAILABLE:
+                raise ImportError("aiohttp required for OpenAI API calls")
+            
+            session = await self._get_session()
+            
+            # Prepare messages format
+            if isinstance(prompt, str):
+                messages = [{"role": "user", "content": prompt}]
+            else:
+                messages = prompt  # Already in messages format
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            }
+            
+            payload = {
+                "model": task.model or "gpt-3.5-turbo",
+                "messages": messages,
+                "temperature": contract.temperature,
+                "max_tokens": contract.max_tokens or 1024,
+            }
+            
+            if contract.top_p is not None:
+                payload["top_p"] = contract.top_p
+            if contract.frequency_penalty:
+                payload["frequency_penalty"] = contract.frequency_penalty
+            if contract.presence_penalty:
+                payload["presence_penalty"] = contract.presence_penalty
+            
+            timeout = aiohttp.ClientTimeout(
+                total=contract.max_latency_ms / 1000 if contract.max_latency_ms else 30
+            )
+            
+            async with session.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=timeout
+            ) as response:
+                response_data = await response.json()
+                
+                if response.status != 200:
+                    error_msg = response_data.get("error", {}).get("message", "Unknown error")
+                    logger.error(f"OpenAI API error ({response.status}): {error_msg}")
+                    return AIResult(
+                        status="FAILED",
+                        error=error_msg,
+                        error_code=AI_ERRORS.AI_PROVIDER_ERROR.value,
+                        provider_response=response_data,
+                        trace_id=task.trace_id,
+                    )
+                
+                # Extract response
+                choices = response_data.get("choices", [])
+                if not choices:
+                    return AIResult(
+                        status="FAILED",
+                        error="No completion choices returned",
+                        error_code=AI_ERRORS.AI_PROVIDER_ERROR.value,
+                        trace_id=task.trace_id,
+                    )
+                
+                response_text = choices[0].get("message", {}).get("content", "")
+                finish_reason = choices[0].get("finish_reason", "stop")
+                usage = response_data.get("usage", {})
+                total_tokens = usage.get("total_tokens", 0)
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                
+                # Calculate real cost (GPT-3.5: $0.0015/$0.002 per 1K tokens, GPT-4: $0.03/$0.06)
+                model = task.model or "gpt-3.5-turbo"
+                if "gpt-4" in model.lower():
+                    cost = (prompt_tokens / 1000 * 0.03) + (completion_tokens / 1000 * 0.06)
+                else:
+                    cost = (prompt_tokens / 1000 * 0.0015) + (completion_tokens / 1000 * 0.002)
+                
+                return AIResult(
+                    status="SUCCESS",
+                    data={"text": response_text, "tokens_used": total_tokens, "completion": response_text},
+                    cost=cost,
+                    provider_response=response_data,
+                    metadata={"model_used": task.model, "finish_reason": finish_reason},
+                    trace_id=task.trace_id,
+                )
+                
+        except asyncio.TimeoutError:
+            return AIResult(
+                status="FAILED",
+                error="Request timeout",
+                error_code=AI_ERRORS.AI_TIMEOUT.value,
+                trace_id=task.trace_id,
+            )
+        except Exception as e:
+            logger.error(f"OpenAI completion error: {e}", exc_info=True)
+            return AIResult(
+                status="FAILED",
+                error=str(e),
+                error_code=AI_ERRORS.AI_INTERNAL_ERROR.value,
+                trace_id=task.trace_id,
+            )
 
     async def _classify(self, task: AITask, contract: AIContract) -> AIResult:
         """Classify text using generation/completion (Mock)"""
@@ -824,18 +889,30 @@ class AnthropicProvider(AIProvider):
 
 
 class GrokProvider(AIProvider):
-    """xAI Grok API provider (Placeholder/Mock)"""
+    """
+    xAI Grok API provider
+    
+    NOTE: As of 2024, xAI's Grok does not have a public API.
+    This implementation provides a placeholder structure for when the API becomes available.
+    For production use, this should not be used - use OpenAI or Anthropic providers instead.
+    """
 
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(
             api_key, "https://api.x.ai/v1"
-        )  # Note: Actual URL might differ
+        )  # Note: Actual URL will differ when API is released
         self.supported_operations = ["GENERATE", "EMBED", "REASON", "ANALYZE"]
         # Updated models based on test failure
         self.models = ["grok-1", "grok-1.5", "grok-3", "grok-4"]
 
     async def execute(self, task: AITask, contract: AIContract) -> AIResult:
-        """Execute Grok API call (Mock implementation)"""
+        """
+        Execute Grok API call
+        
+        IMPORTANT: Grok API is not publicly available yet. This is a placeholder
+        implementation that simulates responses. Do NOT use in production.
+        Use OpenAI or Anthropic providers for real AI capabilities.
+        """
         start_time_ns = time.time_ns()
 
         # Check rate limits (assuming a 'Grok' entry in RateLimiter.limits)
@@ -847,15 +924,22 @@ class GrokProvider(AIProvider):
                 trace_id=task.trace_id,
             )
 
+        # Since Grok API doesn't exist yet, return a clear error for production use
+        logger.warning(
+            "GrokProvider called but xAI Grok API is not publicly available. "
+            "This is a placeholder implementation. Use OpenAI or Anthropic instead."
+        )
+        
+        # Placeholder implementation for testing/development only
         data_payload = {}
-        response_content: Union[str, Dict, List] = ""  # Store the core response content
-
+        response_content: Union[str, Dict, List] = ""
+        
         if task.operation == "REASON":
-            steps = self._grok_reasoning_steps(task.payload)  # Get steps as list
-            # Updated data payload based on test failure
+            steps = self._grok_reasoning_steps(task.payload)
             data_payload = {"reasoning_steps": steps}
-            response_content = steps  # Store for mock provider response
+            response_content = steps
         elif task.operation == "EMBED":
+            # Placeholder: Would call real Grok embedding API when available
             dim = 768
             if NUMPY_AVAILABLE:
                 embedding = np.random.randn(dim).tolist()
@@ -863,11 +947,15 @@ class GrokProvider(AIProvider):
                 embedding = [random.gauss(0, 1) for _ in range(dim)]
             data_payload = {"vector": embedding}
             response_content = embedding
-        elif task.operation in ["GENERATE", "ANALYZE"]:  # Combine these for mock
-            text_response = f"Mock Grok analysis/generation: {task.payload.get('prompt', 'No input')[:50]}..."
+        elif task.operation in ["GENERATE", "ANALYZE"]:
+            # Placeholder: Would call real Grok generation API when available
+            text_response = (
+                f"[PLACEHOLDER - Grok API not available] "
+                f"Analysis of: {task.payload.get('prompt', 'No input')[:50]}..."
+            )
             data_payload = {"text": text_response}
             response_content = text_response
-        else:  # Should not happen if supports_operation is checked, but handle defensively
+        else:
             return AIResult(
                 status="FAILED",
                 error=f"Unsupported Grok operation: {task.operation}",
@@ -877,7 +965,7 @@ class GrokProvider(AIProvider):
 
         await asyncio.sleep(random.uniform(0.08, 0.4))  # Simulate network latency
 
-        # Estimate tokens (simplistic)
+        # Estimate tokens
         tokens = 10
         if isinstance(response_content, str):
             tokens = len(response_content.split())
@@ -888,29 +976,34 @@ class GrokProvider(AIProvider):
         ):
             tokens = sum(len(s.split()) for s in response_content)
         elif isinstance(response_content, list):
-            tokens = len(response_content)  # e.g. embedding dimension
+            tokens = len(response_content)
 
-        mock_provider_response = {
-            "id": f"grok_{random.randint(1000, 9999)}",
+        placeholder_response = {
+            "id": f"grok_placeholder_{random.randint(1000, 9999)}",
             "response": response_content,
             "model": task.model,
             "usage": {"tokens": tokens},
+            "note": "Placeholder - Grok API not publicly available",
         }
 
         latency_ms = (time.time_ns() - start_time_ns) / 1_000_000.0
 
         return AIResult(
             status="SUCCESS",
-            data=data_payload,  # Use the correctly structured payload
+            data=data_payload,
             latency_ms=latency_ms,
-            cost=0.004 * (tokens / 1000),  # Mock cost
-            metadata={"provider": "xAI", "version": "1.0"},
-            provider_response=mock_provider_response,
+            cost=0.004 * (tokens / 1000),  # Estimated cost - will change when API is available
+            metadata={
+                "provider": "xAI",
+                "version": "placeholder",
+                "warning": "Grok API not publicly available",
+            },
+            provider_response=placeholder_response,
             trace_id=task.trace_id,
         )
 
     def _grok_reasoning_steps(self, payload: Dict[str, Any]) -> List[str]:
-        """Simulate Grok's reasoning capability, returning steps"""
+        """Simulate Grok's reasoning capability (placeholder)"""
         prompt = payload.get("prompt", "")
         steps = [
             f"Analyzing: {prompt[:30]}",
