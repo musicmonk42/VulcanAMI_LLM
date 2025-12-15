@@ -310,6 +310,14 @@ class GraphCompiler:
             NodeType.TRANSPOSE,
             NodeType.RESHAPE,
         }
+        
+        # Log initialization
+        llvm_available = self.llvm_backend is not None
+        self.logger.info(
+            f"GraphCompiler initialized: optimization_level={optimization_level}, "
+            f"LLVM_backend={'available' if llvm_available else 'unavailable'}, "
+            f"compilable_nodes={len(self.compilable_nodes)}"
+        )
 
     def can_compile(self, graph: Dict[str, Any]) -> bool:
         """Check if graph can be compiled"""

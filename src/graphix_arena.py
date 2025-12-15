@@ -673,9 +673,18 @@ class GraphixArena:
         self.drift_detector = (
             DriftDetector() if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
         )
+        if self.drift_detector:
+            logger.info(f"✓ DriftDetector initialized in Arena (window_size=1000, threshold=0.05)")
+        else:
+            logger.warning(f"⚠ DriftDetector unavailable")
+            
         self.tournament_manager = (
             TournamentManager() if TOURNAMENT_AVAILABLE and TournamentManager else None
         )
+        if self.tournament_manager:
+            logger.info(f"✓ TournamentManager initialized in Arena")
+        else:
+            logger.warning(f"⚠ TournamentManager unavailable")
 
         # Bounded feedback log
         self.feedback_log: deque = deque(maxlen=MAX_FEEDBACK_LOG_SIZE)
@@ -686,6 +695,11 @@ class GraphixArena:
             if INTERPRETABILITY_AVAILABLE and InterpretabilityEngine
             else None
         )
+        if self.interpret_engine:
+            logger.info(f"✓ InterpretabilityEngine initialized in Arena (lazy-load ready)")
+        else:
+            logger.warning(f"⚠ InterpretabilityEngine unavailable")
+            
         # FIX: use the correct class symbol 'NSOAligner' guarded by availability
         self.nso_aligner = (
             NSOAligner() if NSO_ALIGNER_AVAILABLE and (NSOAligner is not None) else None
