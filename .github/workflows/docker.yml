@@ -68,31 +68,59 @@ jobs:
 
       - name: Free up disk space
         run: |
-          echo "Disk space before cleanup:"
+          set -euo pipefail
+          echo "=== Disk space before cleanup ==="
           df -h
-          echo "Removing unnecessary files to free up disk space..."
+          echo "=== Removing unnecessary files to free up disk space ==="
+          # Remove large pre-installed software
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
           sudo rm -rf /usr/local/.ghcup || true
           sudo rm -rf /usr/share/swift || true
-          sudo docker system prune -af --volumes || true
-          sudo docker image prune -af || true
-          sudo docker builder prune -af || true
           sudo rm -rf /opt/hostedtoolcache/* || true
-          sudo apt-get clean || true
-          sudo rm -rf /var/lib/apt/lists/* || true
-          sudo rm -rf /tmp/* || true
-          sudo rm -rf ~/.cache/* || true
-          sudo rm -rf /var/cache/* || true
           sudo rm -rf /usr/local/share/chromium || true
           sudo rm -rf /usr/local/share/powershell || true
-          echo "Disk space after cleanup:"
+          sudo rm -rf /usr/local/share/az_* || true
+          sudo rm -rf /opt/az || true
+          # Clean package manager caches
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Clean temporary directories
+          sudo rm -rf /tmp/* || true
+          sudo rm -rf /var/tmp/* || true
+          sudo rm -rf ~/.cache/* || true
+          sudo rm -rf /var/cache/* || true
+          # Docker cleanup - aggressive
+          echo "=== Cleaning Docker resources ==="
+          sudo docker system prune -af --volumes || true
+          sudo docker image prune -af || true
+          sudo docker container prune -f || true
+          sudo docker volume prune -f || true
+          sudo docker network prune -f || true
+          sudo docker builder prune -af || true
+          # Remove Docker build cache directory
+          sudo rm -rf /var/lib/docker/overlay2/* || true
+          # Restart Docker to clear any in-memory caches
+          sudo systemctl restart docker || true
+          sleep 5
+          echo "=== Disk space after cleanup ==="
           df -h
+          # Verify we have sufficient space (at least 10GB)
+          AVAILABLE_GB=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
+          echo "Available space: ${AVAILABLE_GB}GB"
+          if [ "$AVAILABLE_GB" -lt 10 ]; then
+            echo "WARNING: Less than 10GB available. Build may fail."
+          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+          buildkitd-flags: --debug
 
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
@@ -135,6 +163,19 @@ jobs:
             echo "Warning: Dockerfile ${{ matrix.service.dockerfile }} not found"
           fi
 
+      - name: Pre-build disk check
+        if: steps.check_dockerfile.outputs.exists == 'true'
+        run: |
+          echo "=== Pre-build disk status ==="
+          df -h
+          AVAILABLE_GB=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
+          echo "Available space: ${AVAILABLE_GB}GB"
+          if [ "$AVAILABLE_GB" -lt 15 ]; then
+            echo "ERROR: Insufficient disk space for Docker build"
+            echo "Required: 15GB, Available: ${AVAILABLE_GB}GB"
+            exit 1
+          fi
+
       - name: Build and push Docker image
         if: steps.check_dockerfile.outputs.exists == 'true'
         uses: docker/build-push-action@v5
@@ -152,6 +193,8 @@ jobs:
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
+          no-cache: false
+          pull: true
 
       - name: Generate SBOM
         if: steps.check_dockerfile.outputs.exists == 'true' && github.event_name != 'pull_request'
@@ -229,28 +272,56 @@ jobs:
 
       - name: Free up disk space
         run: |
-          echo "Disk space before cleanup:"
+          set -euo pipefail
+          echo "=== Disk space before cleanup ==="
           df -h
-          echo "Removing unnecessary files to free up disk space..."
+          echo "=== Removing unnecessary files to free up disk space ==="
+          # Remove large pre-installed software
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost || true
           sudo rm -rf /usr/local/.ghcup || true
           sudo rm -rf /usr/share/swift || true
-          sudo docker system prune -af --volumes || true
-          sudo docker image prune -af || true
-          sudo docker builder prune -af || true
           sudo rm -rf /opt/hostedtoolcache/* || true
-          sudo apt-get clean || true
-          sudo rm -rf /var/lib/apt/lists/* || true
-          sudo rm -rf /tmp/* || true
-          sudo rm -rf ~/.cache/* || true
-          sudo rm -rf /var/cache/* || true
           sudo rm -rf /usr/local/share/chromium || true
           sudo rm -rf /usr/local/share/powershell || true
-          echo "Disk space after cleanup:"
+          sudo rm -rf /usr/local/share/az_* || true
+          sudo rm -rf /opt/az || true
+          # Clean package manager caches
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Clean temporary directories
+          sudo rm -rf /tmp/* || true
+          sudo rm -rf /var/tmp/* || true
+          sudo rm -rf ~/.cache/* || true
+          sudo rm -rf /var/cache/* || true
+          # Docker cleanup - aggressive
+          echo "=== Cleaning Docker resources ==="
+          sudo docker system prune -af --volumes || true
+          sudo docker image prune -af || true
+          sudo docker container prune -f || true
+          sudo docker volume prune -f || true
+          sudo docker network prune -f || true
+          sudo docker builder prune -af || true
+          # Remove Docker build cache directory
+          sudo rm -rf /var/lib/docker/overlay2/* || true
+          # Restart Docker to clear any in-memory caches
+          sudo systemctl restart docker || true
+          sleep 5
+          echo "=== Disk space after cleanup ==="
           df -h
+          # Verify we have sufficient space (at least 10GB)
+          AVAILABLE_GB=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
+          echo "Available space: ${AVAILABLE_GB}GB"
+          if [ "$AVAILABLE_GB" -lt 10 ]; then
+            echo "WARNING: Less than 10GB available. Build may fail."
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+          buildkitd-flags: --debug
 
       - name: Create .env file
         run: |
