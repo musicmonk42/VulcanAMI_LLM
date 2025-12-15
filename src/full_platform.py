@@ -1589,9 +1589,16 @@ async def lifespan(app: FastAPI):
             logger.info(f"  {icon} {name}")
         
         # Summary counts
-        services_mounted = sum(1 for s in service_status.values() if s.get("mounted") and s.get("name") not in ["api_server", "registry_grpc", "listener"])
+        # Count mounted FastAPI/Flask services (excluding background processes)
+        services_mounted = sum(1 for name, s in service_status.items() 
+                              if s.get("mounted") and name not in ["api_server", "registry_grpc", "listener"])
+        
+        # Count running background processes
         services_running = sum(1 for _, p in background_processes if p.poll() is None)
-        total_services = len([s for s in service_status.values() if s.get("name") not in ["api_server", "registry_grpc", "listener"]]) + len(background_processes)
+        
+        # Total services = mounted services + background processes
+        total_services = len([name for name in service_status.keys() 
+                             if name not in ["api_server", "registry_grpc", "listener"]]) + len(background_processes)
         
         components_initialized = sum(1 for c in components_status.values() if c)
         total_components = len(components_status)

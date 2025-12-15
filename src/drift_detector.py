@@ -55,21 +55,35 @@ logging.basicConfig(
 )
 logger = logging.getLogger("DriftDetector")
 
-# Metrics
-drift_value_gauge = Gauge("drift_detector_drift_value", "Current mean embedding drift")
-drift_events = Counter(
-    "drift_detector_realignments_total", "Total drift-triggered realignments"
-)
-drift_checks = Counter("drift_detector_checks_total", "Total drift checks performed")
-drift_latency = Histogram(
-    "drift_detector_check_latency_seconds", "Latency of drift detection checks"
-)
-realignment_operations = Counter(
-    "drift_detector_realignment_operations", "Realignment operations performed"
-)
-validation_errors = Counter(
-    "drift_detector_validation_errors", "Validation errors encountered"
-)
+# Metrics - Handle duplicate registration gracefully
+def _get_or_create_metric(metric_type, name: str, description: str):
+    """
+    Get existing metric or create a new one.
+    Prevents duplicate registration errors when module is imported multiple times.
+    """
+    if not PROMETHEUS_AVAILABLE:
+        return None
+    
+    try:
+        return metric_type(name, description)
+    except ValueError as e:
+        # Metric already registered, retrieve it from registry
+        if "Duplicated timeseries" in str(e):
+            from prometheus_client import REGISTRY
+            # Search for existing metric
+            for collector in list(REGISTRY._collector_to_names.keys()):
+                if hasattr(collector, "_name") and collector._name == name:
+                    logger.debug(f"Reusing existing metric: {name}")
+                    return collector
+        # Re-raise if it's a different ValueError
+        raise
+
+drift_value_gauge = _get_or_create_metric(Gauge, "drift_detector_drift_value", "Current mean embedding drift")
+drift_events = _get_or_create_metric(Counter, "drift_detector_realignments_total", "Total drift-triggered realignments")
+drift_checks = _get_or_create_metric(Counter, "drift_detector_checks_total", "Total drift checks performed")
+drift_latency = _get_or_create_metric(Histogram, "drift_detector_check_latency_seconds", "Latency of drift detection checks")
+realignment_operations = _get_or_create_metric(Counter, "drift_detector_realignment_operations", "Realignment operations performed")
+validation_errors = _get_or_create_metric(Counter, "drift_detector_validation_errors", "Validation errors encountered")
 
 # Constants
 MIN_DRIFT_THRESHOLD = 0.0
