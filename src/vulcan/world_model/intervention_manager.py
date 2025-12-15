@@ -813,38 +813,96 @@ class ConfounderDetector:
                     self.confounder_registry[failure_key].update(common_confounders)
 
     def _find_correlated_variables(self, var_a: str, var_b: str) -> List[str]:
-        """Find variables correlated with both var_a and var_b"""
-        # In practice, this would query the correlation matrix
-        if np.random.random() < 0.3:
-            return [f"corr_var_{i}" for i in range(1, np.random.randint(2, 5))]
+        """
+        Find variables correlated with both var_a and var_b.
+        
+        Uses deterministic hash-based simulation for reproducibility.
+        In production, this would query the actual correlation matrix.
+        """
+        import hashlib
+        # Deterministic based on variable names
+        var_hash = int(hashlib.md5(f"{var_a}{var_b}".encode()).hexdigest()[:8], 16)
+        
+        # 30% chance of confounders (deterministic)
+        if (var_hash % 100) < 30:
+            # Deterministic number of confounders (2-4)
+            num_confounders = 2 + (var_hash % 3)
+            return [f"corr_var_{i}" for i in range(1, num_confounders + 1)]
         return []
 
     def _test_confounder(self, confounder: str, correlation: Correlation) -> bool:
-        """Test if variable is a confounder"""
-        # Simplified test - in practice would run partial correlation
-        return np.random.random() < 0.4
+        """
+        Test if variable is a confounder using deterministic simulation.
+        
+        In production, this would run partial correlation tests.
+        """
+        import hashlib
+        # Deterministic test based on confounder name and correlation
+        test_hash = int(hashlib.md5(f"{confounder}{correlation.var_a}{correlation.var_b}".encode()).hexdigest()[:8], 16)
+        # 40% success rate (deterministic)
+        return (test_hash % 100) < 40
 
 
 class InterventionSimulator:
-    """Simulates interventions for testing - SEPARATED CONCERN"""
+    """
+    Simulates interventions for testing - SEPARATED CONCERN
+    
+    Uses deterministic simulation based on hash functions to ensure reproducibility.
+    Noise is added to simulate real-world measurement uncertainty and natural variation.
+    
+    Args:
+        confidence_level: Statistical confidence level for intervals (default: 0.95)
+        simulation_noise: Standard deviation of measurement noise (default: 0.1)
+                         Controls the amount of random variation in observations.
+                         Set to 0.0 for deterministic simulations.
+                         Higher values simulate more uncertain environments.
+    """
 
     def __init__(self, confidence_level: float = 0.95, simulation_noise: float = 0.1):
         self.confidence_level = confidence_level
         self.simulation_noise = simulation_noise
+        logger.debug(
+            f"InterventionSimulator initialized with confidence_level={confidence_level}, "
+            f"simulation_noise={simulation_noise}"
+        )
 
     def simulate_direct(self, correlation: Correlation) -> InterventionResult:
-        """Simulate direct intervention with deterministic calculation"""
+        """
+        Simulate direct intervention with deterministic calculation.
+        
+        This method simulates the effect of directly intervening on a variable,
+        using hash-based deterministic variation to ensure reproducibility while
+        maintaining realistic variability in results.
+        
+        Why noise is added:
+        1. Simulates measurement uncertainty in real systems
+        2. Reflects natural variation in causal effects
+        3. Provides realistic confidence intervals and p-values
+        4. Enables testing of statistical inference procedures
+        
+        The noise level is configurable via simulation_noise parameter to allow
+        trade-off between determinism and realism.
+        
+        Args:
+            correlation: The correlation to test via intervention
+            
+        Returns:
+            InterventionResult with deterministic but realistic causal estimates
+        """
 
         # Calculate true causal effect based on correlation properties
-        # Use hash-based deterministic variation instead of random
+        # Use hash-based deterministic variation instead of random for reproducibility
         import hashlib
         corr_hash = int(hashlib.md5(f"{correlation.var_a}{correlation.var_b}".encode()).hexdigest()[:8], 16)
         
         # Deterministic variation factor (0.8 to 1.2)
+        # This simulates natural variation in causal strength across different contexts
         variation_factor = 0.8 + (corr_hash % 400) / 1000.0
         true_causal = correlation.strength * variation_factor
 
         # Add deterministic noise based on simulation settings
+        # Noise simulates measurement uncertainty and natural variation
+        # Uses hash-based calculation for reproducibility
         noise_hash = (corr_hash >> 8) % 1000
         noise = (noise_hash / 500.0 - 1.0) * self.simulation_noise  # Range: -noise to +noise
         observed_effect = true_causal + noise
