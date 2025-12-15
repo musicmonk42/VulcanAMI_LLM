@@ -15,20 +15,23 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
-# FAISS for vector search - Robust loader to prevent shadow variable bug
-# --- FIX START ---
+# FAISS for vector search - Enhanced with CPU capability detection
 try:
-    import faiss
-
-    logging.info("FAISS library imported successfully")
-    HAS_FAISS = True
-except (ImportError, ModuleNotFoundError) as e:
-    logging.warning(
-        f"Could not import FAISS: {e}. Falling back to NumPy-based retrieval"
-    )
-    HAS_FAISS = False
-    faiss = None  # Define faiss as None so references don't crash
-# --- FIX END ---
+    from src.utils.faiss_config import initialize_faiss
+    
+    faiss, HAS_FAISS, _ = initialize_faiss()
+except ImportError:
+    # Fallback if faiss_config module is not available
+    try:
+        import faiss
+        logging.info("FAISS library imported successfully")
+        HAS_FAISS = True
+    except (ImportError, ModuleNotFoundError) as e:
+        logging.warning(
+            f"Could not import FAISS: {e}. Falling back to NumPy-based retrieval"
+        )
+        HAS_FAISS = False
+        faiss = None  # Define faiss as None so references don't crash
 
 # Maintain backward compatibility with existing FAISS_AVAILABLE usage
 FAISS_AVAILABLE = HAS_FAISS

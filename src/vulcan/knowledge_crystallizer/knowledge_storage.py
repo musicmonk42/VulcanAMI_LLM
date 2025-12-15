@@ -27,13 +27,19 @@ from ..security_fixes import safe_pickle_load
 
 # Optional imports with fallbacks
 try:
-    import faiss
-
-    FAISS_AVAILABLE = True
+    from src.utils.faiss_config import initialize_faiss
+    
+    faiss, FAISS_AVAILABLE, _ = initialize_faiss()
 except ImportError:
-    FAISS_AVAILABLE = False
-    faiss = None  # Define faiss as None to prevent UnboundLocalError
-    logging.warning("faiss not available, vector search will be limited")
+    # Fallback if faiss_config module is not available
+    try:
+        import faiss
+        FAISS_AVAILABLE = True
+        logging.info("FAISS imported (direct)")
+    except ImportError:
+        FAISS_AVAILABLE = False
+        faiss = None  # Define faiss as None to prevent UnboundLocalError
+        logging.warning("faiss not available, vector search will be limited")
 
 logger = logging.getLogger(__name__)
 

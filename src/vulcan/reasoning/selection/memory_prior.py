@@ -84,13 +84,19 @@ class MemoryIndex:
 
         # Try to import faiss for fast similarity search
         try:
-            pass
-
-            self.use_faiss = True
+            from src.utils.faiss_config import get_faiss, is_faiss_available
+            
+            faiss_module = get_faiss()
+            self.use_faiss = is_faiss_available()
+            self.faiss = faiss_module
             self.faiss_index = None
+            
+            if not self.use_faiss:
+                logger.info("FAISS not available, using numpy for similarity search")
         except ImportError:
-            logger.info("FAISS not available, using numpy for similarity search")
+            logger.info("FAISS configuration not available, using numpy for similarity search")
             self.use_faiss = False
+            self.faiss = None
 
     def add(self, entry: MemoryEntry):
         """Add entry to index with size limit"""
