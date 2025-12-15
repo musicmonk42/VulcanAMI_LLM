@@ -183,13 +183,14 @@ except ImportError as e:
 # Multimodal Reasoning - Core component
 # ============================================================================
 try:
-    from .multimodal_reasoning import MultimodalReasoner, MultiModalReasoningEngine
+    from .multimodal_reasoning import MultimodalReasoner, MultiModalReasoningEngine, CrossModalReasoner
 
     MULTIMODAL_AVAILABLE = True
 except ImportError as e:
     logger.error(f"Multimodal reasoning import failed: {e}")
     MultiModalReasoningEngine = None
     MultimodalReasoner = None
+    CrossModalReasoner = None
     MULTIMODAL_AVAILABLE = False
 
 # ============================================================================
@@ -284,6 +285,7 @@ __all__ = [
     "AnalogicalReasoner",
     "MultiModalReasoningEngine",
     "MultimodalReasoner",
+    "CrossModalReasoner",  # ADDED: Export CrossModalReasoner
     # ===== Symbolic Types =====
     "Clause",
     "Literal",
