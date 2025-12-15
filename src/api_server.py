@@ -58,6 +58,18 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 # Use cryptographically secure random for security-relevant operations (timing jitter, etc.)
 secure_random = secrets.SystemRandom()
 
+# Vulcan reasoning imports
+try:
+    from src.vulcan.reasoning.unified_reasoning import UnifiedReasoner
+    from src.vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
+    REASONING_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"UnifiedReasoner not available: {e}")
+    REASONING_AVAILABLE = False
+    UnifiedReasoner = None
+    ReasoningType = None
+    ReasoningResult = None
+
 # Optional dependencies
 try:
     import psutil
@@ -232,6 +244,7 @@ class APIEndpoint(Enum):
     ADMIN = "/admin"
     GRAPHQL = "/graphql"
     LOGOUT = "/auth/logout"
+    REASON = "/api/reason"
 
 
 @dataclass
@@ -1085,6 +1098,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             elif path == f"{APIEndpoint.GRAPHS.value}/submit":
                 agent = self._authenticate()
                 self._handle_submit_graph(data, agent)
+            elif path == APIEndpoint.REASON.value:
+                agent = self._authenticate()
+                self._handle_reason(data, agent)
             elif path == f"{APIEndpoint.PROPOSALS.value}/create":
                 agent = self._authenticate()
                 self._handle_create_proposal(data, agent)
@@ -1575,6 +1591,93 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             }
         )
 
+    def _handle_reason(self, data: Dict, agent: Optional[Agent]):
+        """
+        Handle reasoning endpoint requests.
+        Accepts a query and optional reasoning_type, returns reasoning result.
+        """
+        if not agent:
+            self._send_error(401, "Unauthorized")
+            return
+        
+        if not REASONING_AVAILABLE:
+            self._send_error(501, "Reasoning engine not available")
+            return
+        
+        if not self.server_instance:
+            self._send_error(500, "Server not initialized")
+            return
+        
+        # Extract request data
+        query = data.get("query")
+        reasoning_type_str = data.get("reasoning_type")
+        
+        if not query:
+            self._send_error(400, "Missing required field: query")
+            return
+        
+        # Parse reasoning_type if provided
+        reasoning_type = None
+        if reasoning_type_str:
+            try:
+                reasoning_type = ReasoningType(reasoning_type_str)
+            except (ValueError, AttributeError):
+                self._send_error(400, f"Invalid reasoning_type: {reasoning_type_str}")
+                return
+        
+        try:
+            # Initialize or get cached reasoner instance
+            if not hasattr(self.server_instance, '_unified_reasoner'):
+                logger.info("Initializing UnifiedReasoner...")
+                self.server_instance._unified_reasoner = UnifiedReasoner(
+                    enable_learning=False,  # Disable learning for API mode
+                    enable_safety=True,
+                    max_workers=2  # Limit workers for API server
+                )
+                logger.info("UnifiedReasoner initialized successfully")
+            
+            reasoner = self.server_instance._unified_reasoner
+            
+            # Perform reasoning
+            logger.info(f"Reasoning request from agent {agent.id}: query={str(query)[:100]}, type={reasoning_type}")
+            result = reasoner.reason(
+                input_data=query,
+                query={"query": query} if isinstance(query, str) else query,
+                reasoning_type=reasoning_type
+            )
+            
+            # Convert result to JSON-serializable format
+            response = {
+                "conclusion": str(result.conclusion),
+                "confidence": float(result.confidence),
+                "reasoning_type": result.reasoning_type.value if result.reasoning_type else "unknown",
+                "explanation": result.explanation,
+                "uncertainty": float(result.uncertainty),
+                "metadata": result.metadata
+            }
+            
+            # Add safety status if available
+            if result.safety_status:
+                response["safety_status"] = result.safety_status
+            
+            # Log audit entry
+            self.server_instance.db.log_audit(
+                agent.id,
+                "reasoning_request",
+                "api/reason",
+                {
+                    "query_preview": str(query)[:200],
+                    "reasoning_type": reasoning_type.value if reasoning_type else "auto",
+                    "confidence": result.confidence
+                }
+            )
+            
+            self._send_json(response)
+            
+        except Exception as e:
+            logger.error(f"Reasoning request failed: {e}\n{traceback.format_exc()}")
+            self._send_error(500, f"Reasoning failed: {str(e)}")
+
     def _handle_vulcan_insights(self):
         agent = self._authenticate()
         if not agent:
@@ -1734,6 +1837,13 @@ class GraphAPIServer:
         self.execution_engine.shutdown()
         self.rate_limiter.shutdown()
         self.cache.shutdown()
+        # Clean up reasoner if it was initialized
+        if hasattr(self, '_unified_reasoner') and self._unified_reasoner:
+            try:
+                self.logger.info("Shutting down UnifiedReasoner...")
+                self._unified_reasoner.shutdown()
+            except Exception as e:
+                self.logger.warning(f"Error shutting down reasoner: {e}")
         self.db.cleanup()
         self.logger.info("Server stopped")
 
