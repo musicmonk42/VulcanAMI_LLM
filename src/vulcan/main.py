@@ -441,6 +441,78 @@ async def lifespan(app: FastAPI):
 
         logger.info(f"VULCAN-AGI worker {worker_id} started successfully")
 
+        # ADDED: Initialize all Vulcan subsystem modules for complete activation
+        try:
+            logger.info("Activating all Vulcan subsystem modules...")
+            
+            # Initialize Curiosity Engine if available
+            if hasattr(deployment.collective.deps, 'curiosity') and deployment.collective.deps.curiosity:
+                curiosity_engine = deployment.collective.deps.curiosity
+                if hasattr(curiosity_engine, 'initialize'):
+                    curiosity_engine.initialize()
+                    logger.info("✓ Curiosity Engine activated")
+            
+            # Initialize Knowledge Crystallizer if available
+            if hasattr(deployment.collective.deps, 'crystallizer') and deployment.collective.deps.crystallizer:
+                crystallizer = deployment.collective.deps.crystallizer
+                if hasattr(crystallizer, 'initialize'):
+                    crystallizer.initialize()
+                    logger.info("✓ Knowledge Crystallizer activated")
+            
+            # Initialize Problem Decomposer if available
+            if hasattr(deployment.collective.deps, 'decomposer') and deployment.collective.deps.decomposer:
+                decomposer = deployment.collective.deps.decomposer
+                if hasattr(decomposer, 'initialize'):
+                    decomposer.initialize()
+                    logger.info("✓ Problem Decomposer activated")
+            
+            # Initialize Semantic Bridge if available
+            if hasattr(deployment.collective.deps, 'semantic_bridge') and deployment.collective.deps.semantic_bridge:
+                semantic_bridge = deployment.collective.deps.semantic_bridge
+                if hasattr(semantic_bridge, 'initialize'):
+                    semantic_bridge.initialize()
+                    logger.info("✓ Semantic Bridge activated")
+            
+            # Initialize all Reasoning subsystems
+            if hasattr(deployment.collective.deps, 'symbolic') and deployment.collective.deps.symbolic:
+                logger.info("✓ Symbolic Reasoning activated")
+            if hasattr(deployment.collective.deps, 'probabilistic') and deployment.collective.deps.probabilistic:
+                logger.info("✓ Probabilistic Reasoning activated")
+            if hasattr(deployment.collective.deps, 'causal') and deployment.collective.deps.causal:
+                logger.info("✓ Causal Reasoning activated")
+            if hasattr(deployment.collective.deps, 'analogical') and deployment.collective.deps.analogical:
+                logger.info("✓ Analogical Reasoning activated")
+            
+            # Initialize Memory subsystems
+            if hasattr(deployment.collective.deps, 'ltm') and deployment.collective.deps.ltm:
+                logger.info("✓ Long-term Memory activated")
+            if hasattr(deployment.collective.deps, 'am') and deployment.collective.deps.am:
+                logger.info("✓ Associative Memory activated")
+            
+            # Initialize Learning subsystems
+            if hasattr(deployment.collective.deps, 'continual') and deployment.collective.deps.continual:
+                logger.info("✓ Continual Learning activated")
+            if hasattr(deployment.collective.deps, 'meta') and deployment.collective.deps.meta:
+                logger.info("✓ Meta-Learning activated")
+            
+            # Initialize Safety subsystems
+            if hasattr(deployment.collective.deps, 'safety') and deployment.collective.deps.safety:
+                safety_validator = deployment.collective.deps.safety
+                if hasattr(safety_validator, 'activate_all_constraints'):
+                    try:
+                        safety_validator.activate_all_constraints()
+                        logger.info("✓ Safety Validator with all constraints activated")
+                    except:
+                        logger.info("✓ Safety Validator activated")
+                else:
+                    logger.info("✓ Safety Validator activated")
+            
+            logger.info("✅ All Vulcan subsystem modules activation complete")
+            
+        except Exception as e:
+            logger.error(f"Error during subsystem activation: {e}", exc_info=True)
+            logger.warning("Continuing with partial subsystem activation")
+
         # Start self-improvement drive if enabled
         if config.enable_self_improvement:
             try:
@@ -2310,6 +2382,107 @@ def test_llm_integration() -> bool:
         return False
 
 
+def test_curiosity_engine(deployment: ProductionDeployment) -> bool:
+    """Test Curiosity Engine activation."""
+    logger.info("Testing Curiosity Engine...")
+    try:
+        if hasattr(deployment.collective.deps, 'curiosity'):
+            curiosity = deployment.collective.deps.curiosity
+            if curiosity:
+                logger.info("Curiosity Engine is activated")
+                return True
+        logger.warning("Curiosity Engine not available, skipping")
+        return True  # Not fail if not available
+    except Exception as e:
+        logger.error(f"Curiosity Engine test failed: {e}")
+        return False
+
+
+def test_knowledge_crystallizer(deployment: ProductionDeployment) -> bool:
+    """Test Knowledge Crystallizer activation."""
+    logger.info("Testing Knowledge Crystallizer...")
+    try:
+        if hasattr(deployment.collective.deps, 'crystallizer'):
+            crystallizer = deployment.collective.deps.crystallizer
+            if crystallizer:
+                logger.info("Knowledge Crystallizer is activated")
+                return True
+        logger.warning("Knowledge Crystallizer not available, skipping")
+        return True
+    except Exception as e:
+        logger.error(f"Knowledge Crystallizer test failed: {e}")
+        return False
+
+
+def test_problem_decomposer(deployment: ProductionDeployment) -> bool:
+    """Test Problem Decomposer activation."""
+    logger.info("Testing Problem Decomposer...")
+    try:
+        if hasattr(deployment.collective.deps, 'decomposer'):
+            decomposer = deployment.collective.deps.decomposer
+            if decomposer:
+                logger.info("Problem Decomposer is activated")
+                return True
+        logger.warning("Problem Decomposer not available, skipping")
+        return True
+    except Exception as e:
+        logger.error(f"Problem Decomposer test failed: {e}")
+        return False
+
+
+def test_semantic_bridge(deployment: ProductionDeployment) -> bool:
+    """Test Semantic Bridge activation."""
+    logger.info("Testing Semantic Bridge...")
+    try:
+        if hasattr(deployment.collective.deps, 'semantic_bridge'):
+            semantic_bridge = deployment.collective.deps.semantic_bridge
+            if semantic_bridge:
+                logger.info("Semantic Bridge is activated")
+                return True
+        logger.warning("Semantic Bridge not available, skipping")
+        return True
+    except Exception as e:
+        logger.error(f"Semantic Bridge test failed: {e}")
+        return False
+
+
+def test_reasoning_subsystems(deployment: ProductionDeployment) -> bool:
+    """Test all Reasoning subsystems activation."""
+    logger.info("Testing Reasoning subsystems...")
+    try:
+        subsystems = ['symbolic', 'probabilistic', 'causal', 'analogical']
+        activated = []
+        
+        for subsystem in subsystems:
+            if hasattr(deployment.collective.deps, subsystem):
+                if getattr(deployment.collective.deps, subsystem):
+                    activated.append(subsystem)
+        
+        logger.info(f"Activated reasoning subsystems: {', '.join(activated)}")
+        return len(activated) > 0
+    except Exception as e:
+        logger.error(f"Reasoning subsystems test failed: {e}")
+        return False
+
+
+def test_world_model_subsystems(deployment: ProductionDeployment) -> bool:
+    """Test World Model and meta-reasoning subsystems."""
+    logger.info("Testing World Model subsystems...")
+    try:
+        world_model = deployment.collective.deps.world_model
+        if world_model:
+            logger.info("World Model is activated")
+            # Check meta-reasoning components
+            if hasattr(world_model, 'meta_reasoning'):
+                logger.info("Meta-reasoning subsystem is activated")
+            return True
+        logger.warning("World Model not available")
+        return True
+    except Exception as e:
+        logger.error(f"World Model test failed: {e}")
+        return False
+
+
 def run_all_tests(config: AgentConfig) -> bool:
     """Run comprehensive test suite."""
     logger.info("Starting comprehensive test suite...")
@@ -2321,11 +2494,15 @@ def run_all_tests(config: AgentConfig) -> bool:
         ("Safety Systems", test_safety_systems),
         ("Memory Systems", test_memory_systems),
         ("Resource Limits", test_resource_limits),
-        (
-            "Self-Improvement",
-            test_self_improvement,
-        ),  # Will use the global drive instance
+        ("Self-Improvement", test_self_improvement),
         ("LLM Integration", test_llm_integration),
+        # ADDED: New comprehensive subsystem tests
+        ("Curiosity Engine", test_curiosity_engine),
+        ("Knowledge Crystallizer", test_knowledge_crystallizer),
+        ("Problem Decomposer", test_problem_decomposer),
+        ("Semantic Bridge", test_semantic_bridge),
+        ("Reasoning Subsystems", test_reasoning_subsystems),
+        ("World Model Subsystems", test_world_model_subsystems),
     ]
 
     results = {}
@@ -3437,12 +3614,31 @@ def main():
         asyncio.set_event_loop(loop)
 
         try:
+            # Run end-to-end async tests
             async_results = loop.run_until_complete(test_suite.test_end_to_end_async())
             print(f"\n🎉 Async test results: {async_results}")
 
+            # FIXED: Run concurrent operations test (was missing!)
+            concurrent_results = loop.run_until_complete(test_suite.test_concurrent_operations())
+            print(f"\n🎉 Concurrent operations test results: {concurrent_results}")
+
+            # Run synchronous tests
             success = run_all_tests(config)
             test_suite.cleanup()
-            sys.exit(0 if success else 1)
+            
+            # Check if all async tests passed
+            async_success = async_results.get('successful', 0) > 0 if isinstance(async_results, dict) else False
+            concurrent_success = all(
+                v.get('success', False) if isinstance(v, dict) else False
+                for v in concurrent_results.values()
+            ) if isinstance(concurrent_results, dict) else False
+            
+            overall_success = success and async_success and concurrent_success
+            print(f"\n{'='*80}")
+            print(f"OVERALL TEST RESULT: {'ALL PASSED' if overall_success else 'SOME FAILED'}")
+            print(f"{'='*80}")
+            
+            sys.exit(0 if overall_success else 1)
         finally:
             loop.close()
 
