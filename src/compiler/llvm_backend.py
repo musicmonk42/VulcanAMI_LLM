@@ -272,8 +272,8 @@ class LLVMBackend:
                     f"CPU: {caps.architecture}, "
                     f"Best instruction set: {caps.get_best_vector_instruction_set()}"
                 )
-            except Exception:
-                pass
+            except (ImportError, AttributeError) as cpu_err:
+                logger.debug(f"Could not get CPU capabilities: {cpu_err}")
             
             # Log as info (not warning) since this is often expected in test/dev environments
             logger.info("\n".join(diagnostic_parts))

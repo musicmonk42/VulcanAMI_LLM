@@ -77,16 +77,12 @@ def initialize_faiss() -> Tuple[Optional[Any], bool, Optional[str]]:
         try:
             # Suppress FAISS internal warnings about swigfaiss_avx512 BEFORE import
             # These are expected when AVX512 is not available and FAISS falls back to AVX2
-            warnings.filterwarnings(
-                'ignore',
-                message='.*swigfaiss_avx512.*',
-                category=UserWarning
-            )
-            warnings.filterwarnings(
-                'ignore', 
-                message='.*swigfaiss_avx512.*',
-                category=RuntimeWarning
-            )
+            AVX512_PATTERN = '.*swigfaiss_avx512.*'
+            WARNING_CATEGORIES = [UserWarning, RuntimeWarning]
+            
+            for category in WARNING_CATEGORIES:
+                warnings.filterwarnings('ignore', message=AVX512_PATTERN, category=category)
+            
             # Note: ModuleNotFoundError cannot be filtered via warnings.filterwarnings
             # as it's an exception, not a warning. The try/except below handles it.
             

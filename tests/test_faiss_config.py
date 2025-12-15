@@ -205,15 +205,18 @@ class TestFAISSConfig(unittest.TestCase):
             
             initialize_faiss()
             
-            # Check that filterwarnings was called with correct patterns
-            calls = mock_warnings.filterwarnings.call_args_list
+            # Verify filterwarnings was called with swigfaiss_avx512 pattern
+            self.assertTrue(mock_warnings.filterwarnings.called)
             
-            # Should suppress swigfaiss_avx512 warnings
-            warning_patterns = [call[1].get('message') for call in calls if 'message' in call[1]]
-            self.assertTrue(
-                any('swigfaiss_avx512' in str(pattern) for pattern in warning_patterns),
-                "Should suppress swigfaiss_avx512 warnings"
-            )
+            # Check at least one call has the expected pattern
+            found_pattern = False
+            for call in mock_warnings.filterwarnings.call_args_list:
+                args, kwargs = call
+                if 'message' in kwargs and 'swigfaiss_avx512' in str(kwargs['message']):
+                    found_pattern = True
+                    break
+            
+            self.assertTrue(found_pattern, "Should suppress swigfaiss_avx512 warnings")
 
 
 class TestFAISSConfigIntegration(unittest.TestCase):

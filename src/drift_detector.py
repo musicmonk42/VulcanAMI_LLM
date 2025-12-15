@@ -19,13 +19,15 @@ try:
     from src.utils.faiss_config import initialize_faiss
     
     faiss, FAISS_AVAILABLE, _ = initialize_faiss()
-    if not FAISS_AVAILABLE:
-        # Provide a mock faiss module if needed
-        raise ImportError("FAISS not available")
 except ImportError:
-    # Direct import fallback
-    import faiss
-    FAISS_AVAILABLE = True
+    # Fallback: try direct import if config module not available
+    try:
+        import faiss
+        FAISS_AVAILABLE = True
+    except ImportError:
+        # FAISS truly not available
+        FAISS_AVAILABLE = False
+        faiss = None
 
 # Optional Prometheus metrics
 try:

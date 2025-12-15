@@ -84,10 +84,11 @@ class MemoryIndex:
 
         # Try to import faiss for fast similarity search
         try:
-            from src.utils.faiss_config import get_faiss, is_faiss_available
+            from src.utils.faiss_config import initialize_faiss
             
-            faiss_module = get_faiss()
-            self.use_faiss = is_faiss_available()
+            # Initialize once and store results
+            faiss_module, is_available, _ = initialize_faiss()
+            self.use_faiss = is_available
             self.faiss = faiss_module
             self.faiss_index = None
             
