@@ -288,6 +288,12 @@ class AIProvider(ABC):
 
 class OpenAIProvider(AIProvider):
     """OpenAI API provider implementation"""
+    
+    # OpenAI Pricing Constants (per 1K tokens) - Update as needed
+    GPT4_INPUT_RATE = 0.03
+    GPT4_OUTPUT_RATE = 0.06
+    GPT35_INPUT_RATE = 0.0015
+    GPT35_OUTPUT_RATE = 0.002
 
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key, "https://api.openai.com/v1")
@@ -612,16 +618,18 @@ class OpenAIProvider(AIProvider):
                 prompt_tokens = usage.get("prompt_tokens", 0)
                 completion_tokens = usage.get("completion_tokens", 0)
                 
-                # Calculate real cost (GPT-3.5: $0.0015/$0.002 per 1K tokens, GPT-4: $0.03/$0.06)
+                # Calculate cost using pricing constants
                 model = task.model or "gpt-3.5-turbo"
                 if "gpt-4" in model.lower():
-                    cost = (prompt_tokens / 1000 * 0.03) + (completion_tokens / 1000 * 0.06)
+                    cost = (prompt_tokens / 1000 * self.GPT4_INPUT_RATE) + \
+                           (completion_tokens / 1000 * self.GPT4_OUTPUT_RATE)
                 else:
-                    cost = (prompt_tokens / 1000 * 0.0015) + (completion_tokens / 1000 * 0.002)
+                    cost = (prompt_tokens / 1000 * self.GPT35_INPUT_RATE) + \
+                           (completion_tokens / 1000 * self.GPT35_OUTPUT_RATE)
                 
                 return AIResult(
                     status="SUCCESS",
-                    data={"text": response_text, "tokens_used": total_tokens, "completion": response_text},
+                    data={"text": response_text, "tokens_used": total_tokens},
                     cost=cost,
                     provider_response=response_data,
                     metadata={"model_used": task.model, "finish_reason": finish_reason},
