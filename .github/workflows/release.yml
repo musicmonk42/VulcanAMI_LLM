@@ -114,6 +114,23 @@ jobs:
             echo "$REPO_CERT_DIR not present, skipping"
           fi
 
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Remove large pre-installed packages
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          # Clear apt cache and package lists
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Purge pip cache
+          python -m pip cache purge || true
+          # Remove common runner caches that may be large
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          # Prune Docker images / containers / volumes
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -123,7 +140,7 @@ jobs:
         run: |
           set -x
           for i in 1 2 3; do
-            pip install build twine && break || (echo "Retry $i/3: build tools install failed"; sleep $((i*10)))
+            pip install --no-cache-dir build twine && break || (echo "Retry $i/3: build tools install failed"; sleep $((i*10)))
           done
           python -m build
 
@@ -173,6 +190,23 @@ jobs:
             echo "$REPO_CERT_DIR not present, skipping"
           fi
 
+      - name: Free up runner disk space
+        run: |
+          set -euo pipefail
+          echo "Disk usage before cleanup:" && df -h || true
+          # Remove large pre-installed packages
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          # Clear apt cache and package lists
+          sudo apt-get clean || true
+          sudo rm -rf /var/lib/apt/lists/* || true
+          # Purge pip cache
+          python -m pip cache purge || true
+          # Remove common runner caches that may be large
+          sudo rm -rf /home/runner/.cache/* /home/runner/.local/share/virtualenvs/* || true
+          # Prune Docker images / containers / volumes
+          sudo docker system prune -af --volumes || true
+          echo "Disk usage after cleanup:" && df -h || true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -182,7 +216,7 @@ jobs:
         run: |
           set -x
           for i in 1 2 3; do
-            pip install build && break || (echo "Retry $i/3: build tool install failed"; sleep $((i*10)))
+            pip install --no-cache-dir build && break || (echo "Retry $i/3: build tool install failed"; sleep $((i*10)))
           done
           python -m build
 
