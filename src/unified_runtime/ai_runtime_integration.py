@@ -649,7 +649,7 @@ class OpenAIProvider(AIProvider):
 
 
 class AnthropicProvider(AIProvider):
-    """Anthropic Claude API provider (Placeholder/Mock)"""
+    """Anthropic Claude API provider with real implementation"""
 
     def __init__(self, api_key: Optional[str] = None):
         super().__init__(api_key, "https://api.anthropic.com/v1")
@@ -660,10 +660,31 @@ class AnthropicProvider(AIProvider):
             "claude-3-haiku-20240307",
             "claude-2.1",
         ]
+        self._session: Optional[aiohttp.ClientSession] = None
+        self.anthropic_version = "2023-06-01"  # API version
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create an aiohttp session."""
+        if self._session is None or self._session.closed:
+            if AIOHTTP_AVAILABLE:
+                self._session = aiohttp.ClientSession()
+            else:
+                raise ImportError(
+                    "aiohttp is required for async Anthropic calls but not installed."
+                )
+        return self._session
 
     async def execute(self, task: AITask, contract: AIContract) -> AIResult:
-        """Execute Anthropic API call (Mock implementation)"""
+        """Execute Anthropic API call with real implementation"""
         start_time_ns = time.time_ns()
+
+        if not self.api_key:
+            return AIResult(
+                status="FAILED",
+                error="Anthropic API key not configured",
+                error_code=AI_ERRORS.AI_UNAUTHORIZED.value,
+                trace_id=task.trace_id,
+            )
 
         if task.operation not in self.supported_operations:
             return AIResult(
@@ -673,7 +694,7 @@ class AnthropicProvider(AIProvider):
                 trace_id=task.trace_id,
             )
 
-        # Check rate limits using the provider's specific name
+        # Check rate limits
         if not self.rate_limiter.check_limit("Anthropic"):
             return AIResult(
                 status="FAILED",
@@ -682,28 +703,104 @@ class AnthropicProvider(AIProvider):
                 trace_id=task.trace_id,
             )
 
-        await asyncio.sleep(random.uniform(0.1, 0.6))  # Simulate network latency
-        response = f"Mock Claude response for {task.operation}: {task.payload.get('prompt', '')[:30]}..."
-        tokens = len(response.split())
-        mock_provider_response = {
-            "id": f"msg_{random.randint(1000, 9999)}",
-            "type": "message",
-            "role": "assistant",
-            "content": [{"type": "text", "text": response}],
-            "model": task.model,
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 5, "output_tokens": tokens},
-        }
-
-        latency_ms = (time.time_ns() - start_time_ns) / 1_000_000.0
-        return AIResult(
-            status="SUCCESS",
-            data={"text": response, "model": task.model, "tokens_used": tokens},
-            latency_ms=latency_ms,
-            cost=0.003 * (tokens / 1000),  # Mock cost
-            provider_response=mock_provider_response,
-            trace_id=task.trace_id,
-        )
+        try:
+            if AIOHTTP_AVAILABLE:
+                session = await self._get_session()
+                
+                # Prepare request payload
+                prompt = task.payload.get("prompt", task.prompt or "")
+                messages = task.payload.get("messages", [{"role": "user", "content": prompt}])
+                
+                headers = {
+                    "x-api-key": self.api_key,
+                    "anthropic-version": self.anthropic_version,
+                    "content-type": "application/json",
+                }
+                
+                payload = {
+                    "model": task.model or "claude-3-sonnet-20240229",
+                    "messages": messages,
+                    "max_tokens": contract.max_tokens or 1024,
+                    "temperature": contract.temperature,
+                }
+                
+                # Make API call
+                async with session.post(
+                    f"{self.base_url}/messages",
+                    headers=headers,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=contract.max_latency_ms / 1000 if contract.max_latency_ms else 30)
+                ) as response:
+                    response_data = await response.json()
+                    
+                    if response.status != 200:
+                        error_msg = response_data.get("error", {}).get("message", "Unknown error")
+                        return AIResult(
+                            status="FAILED",
+                            error=f"Anthropic API error: {error_msg}",
+                            error_code=AI_ERRORS.AI_PROVIDER_ERROR.value,
+                            trace_id=task.trace_id,
+                        )
+                    
+                    # Extract response
+                    content = response_data.get("content", [])
+                    text = content[0].get("text", "") if content else ""
+                    usage = response_data.get("usage", {})
+                    input_tokens = usage.get("input_tokens", 0)
+                    output_tokens = usage.get("output_tokens", 0)
+                    total_tokens = input_tokens + output_tokens
+                    
+                    # Calculate cost (Claude pricing)
+                    # Opus: $15/$75 per MTok, Sonnet: $3/$15, Haiku: $0.25/$1.25
+                    model_name = payload["model"]
+                    if "opus" in model_name:
+                        cost = (input_tokens / 1_000_000 * 15) + (output_tokens / 1_000_000 * 75)
+                    elif "sonnet" in model_name:
+                        cost = (input_tokens / 1_000_000 * 3) + (output_tokens / 1_000_000 * 15)
+                    elif "haiku" in model_name:
+                        cost = (input_tokens / 1_000_000 * 0.25) + (output_tokens / 1_000_000 * 1.25)
+                    else:
+                        cost = (input_tokens / 1_000_000 * 8) + (output_tokens / 1_000_000 * 24)  # Fallback
+                    
+                    latency_ms = (time.time_ns() - start_time_ns) / 1_000_000.0
+                    return AIResult(
+                        status="SUCCESS",
+                        data={"text": text, "model": task.model, "tokens_used": total_tokens},
+                        latency_ms=latency_ms,
+                        cost=cost,
+                        provider_response=response_data,
+                        trace_id=task.trace_id,
+                    )
+            else:
+                # Fallback to mock when aiohttp not available
+                await asyncio.sleep(random.uniform(0.1, 0.6))
+                response = f"Mock Claude response (aiohttp unavailable) for {task.operation}: {task.payload.get('prompt', '')[:30]}..."
+                tokens = len(response.split())
+                latency_ms = (time.time_ns() - start_time_ns) / 1_000_000.0
+                return AIResult(
+                    status="SUCCESS",
+                    data={"text": response, "model": task.model, "tokens_used": tokens},
+                    latency_ms=latency_ms,
+                    cost=0.003 * (tokens / 1000),
+                    provider_response={"fallback": "aiohttp_unavailable"},
+                    trace_id=task.trace_id,
+                )
+                
+        except asyncio.TimeoutError:
+            return AIResult(
+                status="FAILED",
+                error="Request timeout",
+                error_code=AI_ERRORS.AI_TIMEOUT.value,
+                trace_id=task.trace_id,
+            )
+        except Exception as e:
+            logger.error(f"Anthropic API error: {e}")
+            return AIResult(
+                status="FAILED",
+                error=str(e),
+                error_code=AI_ERRORS.AI_PROVIDER_ERROR.value,
+                trace_id=task.trace_id,
+            )
 
     def supports_operation(self, operation: str) -> bool:
         return operation in self.supported_operations
