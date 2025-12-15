@@ -57,6 +57,12 @@ jobs:
       # Checks out the repository this file is in
       - uses: actions/checkout@v4
 
+      # NOTE: Azure CLI is provided on GitHub-hosted runners by default.
+      # If using a self-hosted runner, uncomment the following step to install Azure CLI:
+      # - name: Install Azure CLI
+      #   run: |
+      #     curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
       # Logs in with your Azure credentials
       - name: Azure login
         uses: azure/login@v1.4.6
@@ -80,6 +86,12 @@ jobs:
     steps:
       # Checks out the repository this file is in
       - uses: actions/checkout@v4
+
+      # NOTE: Azure CLI is provided on GitHub-hosted runners by default.
+      # If using a self-hosted runner, uncomment the following step to install Azure CLI:
+      # - name: Install Azure CLI
+      #   run: |
+      #     curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
       # Logs in with your Azure credentials
       - name: Azure login
