@@ -288,11 +288,23 @@ class GraphCompiler:
     """
 
     def __init__(self, optimization_level: int = 2):
-        self.llvm_backend = LLVMBackend(optimization_level=optimization_level)
         self.optimization_level = optimization_level
         self.optimizer = GraphOptimizer()
         self.logger = logging.getLogger(__name__)
         self.compiled_cache = {}
+        
+        # Initialize LLVM backend with graceful fallback
+        self.llvm_backend = None
+        self.llvm_available = False
+        try:
+            self.llvm_backend = LLVMBackend(optimization_level=optimization_level)
+            self.llvm_available = self.llvm_backend is not None
+            if self.llvm_available:
+                self.logger.debug("LLVM backend initialized successfully")
+        except Exception as e:
+            self.logger.warning(f"LLVM backend unavailable, using interpreter fallback: {e}")
+            self.llvm_available = False
+            self.llvm_backend = None
 
         # Supported node types for compilation
         self.compilable_nodes = {
@@ -312,10 +324,9 @@ class GraphCompiler:
         }
         
         # Log initialization
-        llvm_available = self.llvm_backend is not None
         self.logger.info(
             f"GraphCompiler initialized: optimization_level={optimization_level}, "
-            f"LLVM_backend={'available' if llvm_available else 'unavailable'}, "
+            f"LLVM_backend={'available' if self.llvm_available else 'unavailable'}, "
             f"compilable_nodes={len(self.compilable_nodes)}"
         )
 

@@ -20,82 +20,90 @@ logger = logging.getLogger(__name__)
 
 # Initialize LLVM
 def initialize_llvm():
-    """Initialize LLVM with proper target registration for compilation to assembly and object files"""
-    # Check if already initialized by trying to create a target
-    try:
-        target = llvm.Target.from_default_triple()
-        if target:
-            return  # Already initialized successfully
-    except Exception as e:
-        logger.error(f"Error checking LLVM initialization: {e}", exc_info=True)
-
-    # Initialize LLVM core
+    """
+    Initialize LLVM with proper target registration.
+    MUST call initialization functions BEFORE Target.from_default_triple().
+    """
+    logger.info("Initializing LLVM backend...")
+    
+    # Initialize LLVM core first
     try:
         if hasattr(llvm, "initialize"):
             llvm.initialize()
+            logger.debug("LLVM core initialized")
     except RuntimeError as e:
-        if "deprecated" not in str(e):
-            print(f"Warning: LLVM core initialization issue: {e}")
+        if "deprecated" not in str(e).lower():
+            logger.warning(f"LLVM core initialization issue: {e}")
     except Exception as e:
-        print(f"Warning: LLVM core initialization uncertain: {e}")
+        logger.warning(f"LLVM core initialization uncertain: {e}")
 
-    # Initialize native target (for the host machine)
+    # Initialize native target (CRITICAL - must be before Target.from_default_triple())
     try:
         if hasattr(llvm, "initialize_native_target"):
             llvm.initialize_native_target()
+            logger.debug("Native target initialized")
     except RuntimeError as e:
-        if "deprecated" not in str(e):
-            print(f"Warning: Native target initialization issue: {e}")
+        if "deprecated" not in str(e).lower():
+            logger.warning(f"Native target initialization issue: {e}")
     except Exception as e:
-        print(f"Warning: Native target initialization uncertain: {e}")
+        logger.warning(f"Native target initialization uncertain: {e}")
 
-    # Initialize native ASM printer (for assembly generation)
+    # Initialize native ASM printer
     try:
         if hasattr(llvm, "initialize_native_asmprinter"):
             llvm.initialize_native_asmprinter()
+            logger.debug("Native ASM printer initialized")
     except RuntimeError as e:
-        if "deprecated" not in str(e):
-            print(f"Warning: Native ASM printer initialization issue: {e}")
+        if "deprecated" not in str(e).lower():
+            logger.warning(f"Native ASM printer initialization issue: {e}")
     except Exception as e:
-        print(f"Warning: Native ASM printer initialization uncertain: {e}")
+        logger.warning(f"Native ASM printer initialization uncertain: {e}")
+    
+    # Initialize native ASM parser
+    try:
+        if hasattr(llvm, "initialize_native_asmparser"):
+            llvm.initialize_native_asmparser()
+            logger.debug("Native ASM parser initialized")
+    except RuntimeError as e:
+        if "deprecated" not in str(e).lower():
+            logger.warning(f"Native ASM parser initialization issue: {e}")
+    except Exception as e:
+        logger.warning(f"Native ASM parser initialization uncertain: {e}")
 
-    # CRITICAL: Initialize ALL targets (not just native)
-    # This is often needed for Target.from_default_triple() to work properly
+    # Initialize ALL targets (backup for Target.from_default_triple())
     try:
         if hasattr(llvm, "initialize_all_targets"):
             llvm.initialize_all_targets()
+            logger.debug("All targets initialized")
     except RuntimeError as e:
-        if "deprecated" not in str(e):
-            print(f"Warning: All targets initialization issue: {e}")
+        if "deprecated" not in str(e).lower():
+            logger.warning(f"All targets initialization issue: {e}")
     except Exception as e:
-        print(f"Warning: All targets initialization uncertain: {e}")
+        logger.warning(f"All targets initialization uncertain: {e}")
 
-    # Initialize all ASM printers (for assembly output from all targets)
+    # Initialize all ASM printers
     try:
         if hasattr(llvm, "initialize_all_asmprinters"):
             llvm.initialize_all_asmprinters()
+            logger.debug("All ASM printers initialized")
     except RuntimeError as e:
-        if "deprecated" not in str(e):
-            print(f"Warning: All ASM printers initialization issue: {e}")
+        if "deprecated" not in str(e).lower():
+            logger.warning(f"All ASM printers initialization issue: {e}")
     except Exception as e:
-        print(f"Warning: All ASM printers initialization uncertain: {e}")
+        logger.warning(f"All ASM printers initialization uncertain: {e}")
 
-    # Try to verify initialization worked but don't fail if it doesn't
+    # Now safe to get target - this should work after initialization
     try:
-        triple = llvm.get_default_triple()
-        if not triple:
-            print("Warning: LLVM initialization may have issues - no default triple")
-        # Try to create a target to verify registration worked
-        try:
-            target = llvm.Target.from_default_triple()
-            if not target:
-                print("Warning: Could not create default target after initialization")
-        except Exception as e:
-            print(
-                f"Warning: Could not create default target during initialization: {e}"
-            )
+        target = llvm.Target.from_default_triple()
+        if target:
+            logger.info(f"✓ LLVM initialized successfully: {llvm.get_default_triple()}")
+            return target
+        else:
+            logger.error("LLVM initialization failed: No target available")
+            return None
     except Exception as e:
-        print(f"Warning: LLVM verification had issues: {e}")
+        logger.error(f"LLVM target initialization failed: {e}", exc_info=True)
+        return None
 
 
 # Call initialization but don't fail module import if it has issues

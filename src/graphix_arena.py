@@ -637,12 +637,27 @@ class GraphixArena:
         if REGISTRY_AVAILABLE and LanguageEvolutionRegistry:
             if REGISTRY_BACKENDS_AVAILABLE and InMemoryBackend and DevelopmentKMS:
                 try:
-                    backend = InMemoryBackend()
-                    kms = DevelopmentKMS()
-                    self.registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
-                    logger.info(
-                        "✅ LanguageEvolutionRegistry initialized with InMemoryBackend"
-                    )
+                    # Check environment to determine which backend/KMS to use
+                    env = os.getenv('ENVIRONMENT', 'development')
+                    
+                    if env == 'production':
+                        logger.error(
+                            "Production environment detected but only development backends available. "
+                            "Please configure production-grade storage (Redis/Postgres) and KMS (AWS/Azure)."
+                        )
+                        self.registry = None
+                    else:
+                        # Development environment - OK to use in-memory backends
+                        backend = InMemoryBackend()
+                        kms = DevelopmentKMS()
+                        self.registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
+                        logger.info(
+                            "✅ LanguageEvolutionRegistry initialized with InMemoryBackend (development mode)"
+                        )
+                        logger.warning(
+                            "⚠️  Using InMemoryBackend and DevelopmentKMS - NOT FOR PRODUCTION. "
+                            "Set ENVIRONMENT=production and configure Redis/AWS KMS for production use."
+                        )
                 except Exception as e:
                     logger.warning(
                         f"Failed to initialize LanguageEvolutionRegistry with backends: {e}"
