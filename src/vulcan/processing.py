@@ -85,11 +85,17 @@ class GraphixTransformer:
             )  # nosec B615 - revision parameter present
             
             self.model.eval()  # Set to evaluation mode
+            
+            # Pre-compute projection matrix for consistent embeddings
+            bert_dim = 768  # BERT base hidden size
+            self.projection = torch.randn(bert_dim, 384) * 0.01
+            
             logger.info("Loaded real BERT model for embeddings")
         except Exception as e:
             logger.error(f"Failed to load BERT model: {e}, using fallback")
-            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+            self.tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", revision=revision)
             self.model = None
+            self.projection = None
 
     def get_embeddings(self, text: Union[str, List[str]]) -> torch.Tensor:
         """
@@ -120,11 +126,9 @@ class GraphixTransformer:
                     # Use CLS token embedding (first token)
                     cls_embeddings = outputs.last_hidden_state[:, 0, :]
                     
-                    # Project to 384 dimensions if needed
-                    if cls_embeddings.shape[1] != embedding_size:
-                        # Simple linear projection
-                        projection = torch.randn(cls_embeddings.shape[1], embedding_size) * 0.01
-                        embeddings = torch.matmul(cls_embeddings, projection)
+                    # Project to 384 dimensions using stored projection matrix
+                    if cls_embeddings.shape[1] != embedding_size and self.projection is not None:
+                        embeddings = torch.matmul(cls_embeddings, self.projection)
                     else:
                         embeddings = cls_embeddings
                     

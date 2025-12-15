@@ -584,7 +584,7 @@ async def transformer_embedding_node(
         embedding_table = np.random.uniform(-limit, limit, size=(max_len, d_model))
         
         # Get embeddings for tokens
-        if isinstance(tokens[0], int):
+        if seq_len > 0 and isinstance(tokens[0], int):
             # Token indices
             embedded_result = [embedding_table[min(t, max_len-1)].tolist() for t in tokens[:seq_len]]
         else:
@@ -592,13 +592,16 @@ async def transformer_embedding_node(
             embedded_result = [[np.random.uniform(-limit, limit) for _ in range(d_model)] for _ in range(seq_len)]
         
         # Add sinusoidal positional encoding (standard in transformers)
-        positions = np.arange(seq_len)
+        # Pre-compute frequency values to avoid redundant calculations
         position_encoding = np.zeros((seq_len, d_model))
-        for pos in range(seq_len):
-            for i in range(0, d_model, 2):
-                position_encoding[pos, i] = np.sin(pos / (10000 ** (i / d_model)))
-                if i + 1 < d_model:
-                    position_encoding[pos, i + 1] = np.cos(pos / (10000 ** (i / d_model)))
+        positions = np.arange(seq_len)
+        div_term = np.exp(np.arange(0, d_model, 2) * -(np.log(10000.0) / d_model))
+        
+        position_encoding[:, 0::2] = np.sin(positions[:, np.newaxis] * div_term)
+        if d_model % 2 == 0:
+            position_encoding[:, 1::2] = np.cos(positions[:, np.newaxis] * div_term)
+        else:
+            position_encoding[:, 1::2] = np.cos(positions[:, np.newaxis] * div_term[:-1])
         
         # Combine embeddings and positional encoding
         embedded_result = (np.array(embedded_result) + position_encoding).tolist()
