@@ -2672,7 +2672,12 @@ class IntegrationTestSuite:
             if not reasoner:
                 return {"success": False, "error": "Reasoner not available"}
 
-            result = reasoner.predict_with_uncertainty(np.random.random(384))
+            # Create deterministic test input based on reasoner properties
+            import hashlib
+            reasoner_hash = int(hashlib.md5(str(id(reasoner)).encode()).hexdigest()[:8], 16)
+            test_input = np.array([((reasoner_hash >> i) % 256) / 255.0 for i in range(384)])
+            
+            result = reasoner.predict_with_uncertainty(test_input)
             return {"success": result is not None}
         except Exception as e:
             return {"success": False, "error": str(e)}

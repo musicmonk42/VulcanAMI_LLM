@@ -833,13 +833,21 @@ class InterventionSimulator:
         self.simulation_noise = simulation_noise
 
     def simulate_direct(self, correlation: Correlation) -> InterventionResult:
-        """Simulate direct intervention"""
+        """Simulate direct intervention with deterministic calculation"""
 
-        # Simulate intervention
-        true_causal = correlation.strength * np.random.uniform(0.8, 1.2)
+        # Calculate true causal effect based on correlation properties
+        # Use hash-based deterministic variation instead of random
+        import hashlib
+        corr_hash = int(hashlib.md5(f"{correlation.var_a}{correlation.var_b}".encode()).hexdigest()[:8], 16)
+        
+        # Deterministic variation factor (0.8 to 1.2)
+        variation_factor = 0.8 + (corr_hash % 400) / 1000.0
+        true_causal = correlation.strength * variation_factor
 
-        # Add noise
-        observed_effect = true_causal + np.random.normal(0, self.simulation_noise)
+        # Add deterministic noise based on simulation settings
+        noise_hash = (corr_hash >> 8) % 1000
+        noise = (noise_hash / 500.0 - 1.0) * self.simulation_noise  # Range: -noise to +noise
+        observed_effect = true_causal + noise
 
         # Calculate statistics
         sample_size = 100
