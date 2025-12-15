@@ -686,10 +686,15 @@ class GraphixArena:
             DataAugmentor() if AUGMENTOR_AVAILABLE and DataAugmentor else None
         )
         self.drift_detector = (
-            DriftDetector() if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
+            DriftDetector(
+                dim=128,
+                drift_threshold=0.1,
+                history=5,
+                realignment_method="center"
+            ) if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
         )
         if self.drift_detector:
-            logger.info(f"✓ DriftDetector initialized in Arena (window_size=1000, threshold=0.05)")
+            logger.info(f"✓ DriftDetector initialized in Arena (dim=128, drift_threshold=0.1, history=5)")
         else:
             logger.warning(f"⚠ DriftDetector unavailable")
             
