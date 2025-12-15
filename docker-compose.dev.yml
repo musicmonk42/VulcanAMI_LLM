@@ -298,6 +298,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/dqs/Dockerfile
+      args:
+        REJECT_INSECURE_JWT: ack
     container_name: vulcanami-dqs
     hostname: dqs-service
     environment:
@@ -386,6 +388,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/pii/Dockerfile
+      args:
+        REJECT_INSECURE_JWT: ack
     container_name: vulcanami-pii
     hostname: pii-service
     environment:
@@ -430,6 +434,8 @@ services:
     build:
       context: .
       dockerfile: ./docker/api/Dockerfile
+      args:
+        REJECT_INSECURE_JWT: ack
     container_name: vulcanami-api
     hostname: api-gateway
     environment:
