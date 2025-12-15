@@ -52,7 +52,7 @@ async def test_platform_startup():
     print(f"   API Gateway: {'✓ Enabled' if settings.enable_api_gateway else '✗ Disabled'}")
     print(f"   DQS Service: {'✓ Enabled' if settings.enable_dqs_service else '✗ Disabled'}")
     print(f"   PII Service: {'✓ Enabled' if settings.enable_pii_service else '✗ Disabled'}")
-    print(f"   API Server: {'✓ Enabled' if settings.enable_api_server else '✗ Enabled'}")
+    print(f"   API Server: {'✓ Enabled' if settings.enable_api_server else '✗ Disabled'}")
     print(f"   Registry gRPC: {'✓ Enabled' if settings.enable_registry_grpc else '✗ Disabled'}")
     print(f"   Listener: {'✓ Enabled' if settings.enable_listener else '✗ Disabled'}")
     print()
