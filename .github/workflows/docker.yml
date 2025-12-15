@@ -110,11 +110,12 @@ jobs:
           sleep 5
           echo "=== Disk space after cleanup ==="
           df -h
-          # Verify we have sufficient space (at least 15GB for multi-image builds)
+          # Verify we have sufficient space
+          # Multi-platform builds need ~15GB, single-platform needs ~10GB
           AVAILABLE_GB=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
           echo "Available space: ${AVAILABLE_GB}GB"
           if [ "$AVAILABLE_GB" -lt 15 ]; then
-            echo "WARNING: Less than 15GB available. Build may fail."
+            echo "WARNING: Less than 15GB available. Multi-platform builds may require additional cleanup."
           fi
 
       - name: Set up QEMU
@@ -178,8 +179,20 @@ jobs:
           echo "Available space: ${AVAILABLE_GB}GB"
           if [ "$AVAILABLE_GB" -lt 15 ]; then
             echo "ERROR: Insufficient disk space for Docker build"
-            echo "Required: 15GB, Available: ${AVAILABLE_GB}GB"
+            echo "Required: 15GB for multi-platform, 10GB for single-platform"
+            echo "Available: ${AVAILABLE_GB}GB"
             exit 1
+          fi
+
+      - name: Determine build platforms
+        id: platforms
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "platforms=linux/amd64,linux/arm64" >> $GITHUB_OUTPUT
+            echo "Building multi-platform image for release"
+          else
+            echo "platforms=linux/amd64" >> $GITHUB_OUTPUT
+            echo "Building single-platform image to conserve disk space"
           fi
 
       - name: Build and push Docker image
@@ -188,9 +201,7 @@ jobs:
         with:
           context: ${{ matrix.service.context }}
           file: ${{ matrix.service.dockerfile }}
-          # Build only for amd64 on PRs/non-tags to save disk space
-          # Multi-platform builds only for production releases
-          platforms: ${{ startsWith(github.ref, 'refs/tags/v') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          platforms: ${{ steps.platforms.outputs.platforms }}
           push: ${{ github.event_name != 'pull_request' || github.event.inputs.push_to_registry == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -331,11 +342,12 @@ jobs:
           sleep 5
           echo "=== Disk space after cleanup ==="
           df -h
-          # Verify we have sufficient space (at least 15GB for multi-image builds)
+          # Verify we have sufficient space
+          # Docker Compose builds typically need ~10-15GB
           AVAILABLE_GB=$(df / | tail -1 | awk '{print int($4/1024/1024)}')
           echo "Available space: ${AVAILABLE_GB}GB"
           if [ "$AVAILABLE_GB" -lt 15 ]; then
-            echo "WARNING: Less than 15GB available. Build may fail."
+            echo "WARNING: Less than 15GB available. Build may require additional cleanup."
           fi
 
       - name: Set up Docker Buildx
