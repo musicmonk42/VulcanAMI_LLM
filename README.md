@@ -114,6 +114,10 @@ Note: Platform components and integrations are configurable; enterprise deployme
 
 ## Quick start (development)
 
+**📚 New to the project?** See [NEW_ENGINEER_SETUP.md](NEW_ENGINEER_SETUP.md) for step-by-step Docker, Kubernetes, and Helm deployment instructions.
+
+**⚡ Quick Reference:** See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for common commands and troubleshooting.
+
 Important: The steps below are for internal or licensed development environments only. Do not expose development services to the public internet.
 
 1) Clone and environment
