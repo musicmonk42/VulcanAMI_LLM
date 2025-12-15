@@ -1,7 +1,7 @@
 # Service Overview and Architecture
 
-**Last Updated:** December 2024  
-**Platform Version:** v1.0
+**Last Updated:** December 15, 2024  
+**Platform Version:** v2.1.0
 
 This document provides a high-level overview of all services in the VulcanAMI LLM platform, organized by functional area.
 
@@ -724,6 +724,188 @@ All services expose health check endpoints:
 - Redis cluster
 - Full observability
 - Auto-scaling (Kubernetes)
+
+---
+
+## Component Initialization Status
+
+### Overview
+
+This section documents the initialization status of all documented platform components during startup. Components are categorized as either **eager-loaded** (initialized at startup) or **lazy-loaded** (initialized on first use).
+
+### Eager-Loaded Components
+
+These components are initialized during platform startup in `src/full_platform.py`:
+
+#### 1. **Graph Compiler** (`src/compiler/graph_compiler.py`)
+- **Status:** ✅ Initialized at startup
+- **Initialization:** Creates `GraphCompiler(optimization_level=2)`
+- **Verification:** Checks LLVM backend availability
+- **Log Message:** `✓ GraphCompiler initialized (optimization_level=2, LLVM=available/unavailable)`
+- **Dependencies:** llvmlite, networkx
+- **Purpose:** Compiles Graphix IR to optimized native code
+
+#### 2. **Persistent Memory v46** (`src/persistant_memory_v46/`)
+- **Status:** ✅ Verified at startup
+- **Initialization:** Imports and verifies all subsystems
+- **Subsystems:**
+  - LSM tree with Merkle DAG
+  - Graph RAG with hybrid retrieval
+  - Unlearning module (gradient surgery, SISA, influence)
+  - ZK proofs (Groth16, PLONK)
+  - S3/CloudFront storage backend
+- **Log Message:** `✓ Persistent Memory v46.0.0 initialized`
+- **Purpose:** Advanced persistent storage with privacy-preserving unlearning
+
+#### 3. **Conformal Prediction** (`src/conformal/confidence_calibration.py`)
+- **Status:** ✅ Initialized at startup
+- **Initialization:** Creates `ConformalPredictor(alpha=0.1)`
+- **Log Message:** `✓ ConformalPredictor initialized (alpha=0.1, coverage_guarantee=90.0%)`
+- **Purpose:** Uncertainty quantification with coverage guarantees
+
+#### 4. **Drift Detector** (`src/drift_detector.py`)
+- **Status:** ✅ Initialized at startup
+- **Initialization:** Creates `DriftDetector(window_size=1000, threshold=0.05, embedding_dim=768)`
+- **Log Message:** `✓ DriftDetector initialized (window_size=1000, threshold=0.05)`
+- **Dependencies:** faiss, numpy
+- **Purpose:** Concept drift detection and automatic realignment
+
+#### 5. **Pattern Matcher** (`src/pattern_matcher.py`)
+- **Status:** ✅ Initialized at startup
+- **Initialization:** Creates `PatternMatcher()`
+- **Log Message:** `✓ PatternMatcher initialized`
+- **Dependencies:** networkx
+- **Purpose:** Subgraph pattern matching with ethical validation
+
+#### 6. **Superoptimizer** (`src/superoptimizer.py`)
+- **Status:** ✅ Initialized at startup
+- **Initialization:** Creates `Superoptimizer()`
+- **Log Message:** `✓ Superoptimizer initialized (cache_size=0)`
+- **Dependencies:** LLM client (optional)
+- **Purpose:** Hardware-specific kernel optimization
+
+#### 7. **Tournament Manager** (`src/tournament_manager.py`)
+- **Status:** ✅ Initialized at startup (in Arena)
+- **Initialization:** Creates `TournamentManager(diversity_penalty=0.3, winner_percentage=0.2)`
+- **Log Message:** `✓ TournamentManager initialized (diversity_penalty=0.3, winner_percentage=0.2)`
+- **Connected to:** Evolution Engine (available on demand)
+- **Purpose:** Adaptive tournament selection with diversity penalties
+
+#### 8. **Evolution Engine** (`src/evolution_engine.py`)
+- **Status:** ✅ Verified at startup
+- **Initialization:** Lazy-loaded, connected to Tournament Manager
+- **Log Message:** `✓ EvolutionEngine available (will be connected to TournamentManager on demand)`
+- **Purpose:** Genetic algorithm-based graph optimization
+
+### Lazy-Loaded Components
+
+These components are verified for availability but not initialized until first use:
+
+#### 1. **Interpretability Engine** (`src/interpretability_engine.py`)
+- **Status:** ✅ Available (lazy-load ready)
+- **Initialization:** On first request for model interpretation
+- **Log Message:** `✓ InterpretabilityEngine available (lazy-load ready)`
+- **Dependencies:** torch, captum (optional), matplotlib (optional)
+- **Purpose:** SHAP-like attributions, attention visualization, counterfactual tracing
+- **Used in:** Arena (when interpretability is requested)
+
+### Component Initialization in Sub-Apps
+
+When running as mounted sub-apps in `full_platform.py`, the following apps have their own initialization:
+
+#### 1. **VULCAN-AGI** (`src/vulcan/main.py`)
+- **Lifespan:** Yes (FastAPI lifespan)
+- **Components Initialized:**
+  - World Model (causal reasoning, prediction)
+  - Reasoning Systems (symbolic, probabilistic, causal, analogical)
+  - Memory Systems (LTM, associative memory)
+  - Learning Systems (continual, meta-learning)
+  - Safety Validator
+  - Curiosity Engine
+  - Knowledge Crystallizer
+  - Problem Decomposer
+  - Semantic Bridge
+- **Self-Improvement:** Optional, enabled via config
+- **Log Messages:** `✓ [Component] activated` for each subsystem
+
+#### 2. **Arena** (`src/graphix_arena.py`)
+- **Lifespan:** No (standalone FastAPI app)
+- **Components Initialized:**
+  - DriftDetector
+  - TournamentManager
+  - InterpretabilityEngine (lazy)
+  - DataAugmentor
+  - NSOAligner
+  - ObservabilityManager
+- **Log Messages:** `✓ [Component] initialized in Arena`
+
+#### 3. **Registry** (`app.py`)
+- **Framework:** Flask (no async lifespan)
+- **Components:** JWT authentication, audit logging, agent registry
+- **Initialization:** On first import/request
+
+### Port Assignments
+
+| Service | Port | Mount Path | Type |
+|---------|------|------------|------|
+| Unified Platform | 8080 | / | FastAPI (main) |
+| VULCAN | 8080 | /vulcan | FastAPI (mounted) |
+| Arena | 8080 | /arena | FastAPI (mounted) |
+| Registry | 8080 | /registry | Flask (mounted via WSGI) |
+| API Gateway | 8080 | /api-gateway | FastAPI (mounted) |
+| DQS Service | 8080 | /dqs | FastAPI (mounted) |
+| PII Service | 8080 | /pii | FastAPI (mounted) |
+| API Server | 8001 | - | Standalone HTTP |
+| Registry gRPC | 50051 | - | Standalone gRPC |
+| Listener | 8084 | - | Standalone HTTP |
+
+### Health Check Endpoints
+
+- **Platform:** `GET /health` - Overall platform health
+- **Components:** `GET /health/components` - Detailed component status
+- **Status API:** `GET /api/status` - Service and configuration status
+- **Individual Services:** Each mounted service has `[mount_path]/health`
+
+### Startup Summary
+
+During startup, the platform logs a comprehensive summary:
+
+```
+PLATFORM STARTUP SUMMARY
+======================================================================
+Services:
+  ✅ vulcan: MOUNTED (path /vulcan)
+  ✅ arena: MOUNTED (path /arena)
+  ✅ registry: MOUNTED (path /registry)
+  ✅ api_server: RUNNING (PID: 12345)
+  ✅ registry_grpc: RUNNING (PID: 12346)
+  ✅ listener: RUNNING (PID: 12347)
+
+Core Components:
+  ✅ VULCAN World Model
+  ✅ Reasoning (5/5)
+  ✅ Semantic Bridge
+  ✅ Agent Pool
+  ✅ Unified Runtime
+  ✅ Hardware Dispatcher
+  ✅ Governance Loop
+  ✅ Consensus Engine
+  ✅ Security Audit Engine
+  ✅ Graph Compiler
+  ✅ Persistent Memory v46
+  ✅ Conformal Prediction
+  ✅ Drift Detector
+  ✅ Pattern Matcher
+  ✅ Superoptimizer
+  ✅ Interpretability Engine
+  ✅ Tournament Manager
+  ✅ Evolution Engine
+
+======================================================================
+Services: 9/9 running
+Components: 18/18 initialized
+======================================================================
+```
 
 ---
 

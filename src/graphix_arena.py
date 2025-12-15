@@ -637,12 +637,27 @@ class GraphixArena:
         if REGISTRY_AVAILABLE and LanguageEvolutionRegistry:
             if REGISTRY_BACKENDS_AVAILABLE and InMemoryBackend and DevelopmentKMS:
                 try:
-                    backend = InMemoryBackend()
-                    kms = DevelopmentKMS()
-                    self.registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
-                    logger.info(
-                        "✅ LanguageEvolutionRegistry initialized with InMemoryBackend"
-                    )
+                    # Check environment to determine which backend/KMS to use
+                    env = os.getenv('ENVIRONMENT', 'development')
+                    
+                    if env == 'production':
+                        logger.error(
+                            "Production environment detected but only development backends available. "
+                            "Please configure production-grade storage (Redis/Postgres) and KMS (AWS/Azure)."
+                        )
+                        self.registry = None
+                    else:
+                        # Development environment - OK to use in-memory backends
+                        backend = InMemoryBackend()
+                        kms = DevelopmentKMS()
+                        self.registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
+                        logger.info(
+                            "✅ LanguageEvolutionRegistry initialized with InMemoryBackend (development mode)"
+                        )
+                        logger.warning(
+                            "⚠️  Using InMemoryBackend and DevelopmentKMS - NOT FOR PRODUCTION. "
+                            "Set ENVIRONMENT=production and configure Redis/AWS KMS for production use."
+                        )
                 except Exception as e:
                     logger.warning(
                         f"Failed to initialize LanguageEvolutionRegistry with backends: {e}"
@@ -671,11 +686,25 @@ class GraphixArena:
             DataAugmentor() if AUGMENTOR_AVAILABLE and DataAugmentor else None
         )
         self.drift_detector = (
-            DriftDetector() if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
+            DriftDetector(
+                dim=128,
+                drift_threshold=0.1,
+                history=5,
+                realignment_method="center"
+            ) if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
         )
+        if self.drift_detector:
+            logger.info(f"✓ DriftDetector initialized in Arena (dim=128, drift_threshold=0.1, history=5)")
+        else:
+            logger.warning(f"⚠ DriftDetector unavailable")
+            
         self.tournament_manager = (
             TournamentManager() if TOURNAMENT_AVAILABLE and TournamentManager else None
         )
+        if self.tournament_manager:
+            logger.info(f"✓ TournamentManager initialized in Arena")
+        else:
+            logger.warning(f"⚠ TournamentManager unavailable")
 
         # Bounded feedback log
         self.feedback_log: deque = deque(maxlen=MAX_FEEDBACK_LOG_SIZE)
@@ -686,6 +715,11 @@ class GraphixArena:
             if INTERPRETABILITY_AVAILABLE and InterpretabilityEngine
             else None
         )
+        if self.interpret_engine:
+            logger.info(f"✓ InterpretabilityEngine initialized in Arena (lazy-load ready)")
+        else:
+            logger.warning(f"⚠ InterpretabilityEngine unavailable")
+            
         # FIX: use the correct class symbol 'NSOAligner' guarded by availability
         self.nso_aligner = (
             NSOAligner() if NSO_ALIGNER_AVAILABLE and (NSOAligner is not None) else None
