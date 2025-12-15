@@ -1366,17 +1366,42 @@ async def lifespan(app: FastAPI):
         # Store background processes in app state for cleanup
         app.state.background_processes = background_processes
 
+        # Give subprocesses a moment to start and check if they're running
+        await asyncio.sleep(0.5)
+
         # Summary
         logger.info("=" * 70)
         logger.info("Service Status Summary")
         logger.info("=" * 70)
+        
+        # Check mounted services
         service_status = await service_manager.get_service_status()
         for name, service in service_status.items():
+            # Skip subprocess services - they'll be checked separately
+            if name in ["api_server", "registry_grpc", "listener"]:
+                continue
             status_txt = "✅ MOUNTED" if service.get("mounted") else "❌ FAILED"
             logger.info(f"{name}: {status_txt}")
             if service.get("mounted"):
                 logger.info(f"  → {service['mount_path']}")
                 logger.info(f"  → Import: {service.get('import_path', 'N/A')}")
+
+        # Check subprocess services
+        for service_name, process in background_processes:
+            returncode = process.poll()
+            if returncode is None:
+                # Process is still running
+                logger.info(f"{service_name}: ✅ RUNNING (PID: {process.pid})")
+            else:
+                # Process has exited
+                logger.info(f"{service_name}: ❌ FAILED (exit code: {returncode})")
+                # Try to read stderr to see why it failed
+                try:
+                    stderr_output = process.stderr.read().decode('utf-8', errors='replace')
+                    if stderr_output:
+                        logger.error(f"  → {service_name} stderr: {stderr_output[:500]}")
+                except Exception:
+                    pass
 
         logger.info("=" * 70)
         logger.info(f"Platform Ready! (Worker {worker_id})")
