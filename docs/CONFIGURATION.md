@@ -86,7 +86,50 @@ Signed config proposal → validation pipeline → hot reload for non-critical; 
 }
 ```
 
-## 9. Troubleshooting
+## 9. Performance Optimization Configuration
+
+### FAISS Vector Search
+The system uses FAISS for high-performance vector similarity search with automatic CPU instruction set detection:
+
+**Instruction Sets** (best to worst performance):
+- AVX-512: Optimal performance (requires CPU support)
+- AVX2: Good performance (most modern CPUs)
+- AVX: Standard performance
+- Scalar: Fallback mode
+
+**Configuration**: Automatic detection via `src/utils/faiss_config.py`
+- No manual configuration needed
+- System logs detected instruction set on startup
+- Gracefully falls back to NumPy if FAISS unavailable
+
+**Installation** (if not present):
+```bash
+pip install faiss-cpu  # For CPU-only systems
+pip install faiss-gpu  # For GPU acceleration
+```
+
+### LLVM Compiler Backend
+The LLVM backend compiles graph IR to optimized native code with configurable optimization levels:
+
+**Optimization Levels**:
+- 0: No optimization (fastest compilation)
+- 1: Basic optimization
+- 2: Standard optimization (default)
+- 3: Aggressive optimization
+
+**Configuration**: Set via `LLVMBackend(optimization_level=N)`
+- Execution engine creation may fail in some environments (containers, ARM)
+- Compiler still functions for IR generation/analysis without execution engine
+- System logs detailed diagnostics on initialization
+
+**Note**: Execution engine unavailability does not impact:
+- IR generation and optimization
+- Graph compilation and analysis
+- Most compiler functionality
+
+Only JIT (Just-In-Time) execution requires the execution engine.
+
+## 10. Troubleshooting
 | Symptom | Cause | Resolution |
 |---------|-------|-----------|
 | Validation timeout | recursion depth or large params | Increase timeout / optimize params |
@@ -94,3 +137,6 @@ Signed config proposal → validation pipeline → hot reload for non-critical; 
 | Missing metrics | METRICS_ENABLED false | Set true + restart |
 | Replay rejection | identical hash inside window | Modify proposal or wait window expiry |
 | Self-improvement not triggering | ENABLE_INTRINSIC_DRIVES false | Enable & restart |
+| FAISS AVX512 warnings | CPU doesn't support AVX512 | Expected; system uses best available (AVX2) |
+| LLVM execution engine fails | Platform limitations | Expected in some environments; IR generation still works |
+| Slow vector search | FAISS not installed | Install faiss-cpu for 10-100x speedup |
