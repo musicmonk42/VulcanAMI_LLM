@@ -14,6 +14,17 @@
 #   constant-time secret comparisons, request size limiting
 # ============================================================
 
+# ============================================================================
+# CRITICAL FIX: Set Windows event loop policy BEFORE any imports
+# This MUST be the VERY FIRST code to run, before asyncio is imported anywhere
+# ============================================================================
+import sys
+if sys.platform == "win32":
+    import asyncio
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    print("✅ Set WindowsProactorEventLoopPolicy before any imports")
+
+# Now proceed with all other imports
 import argparse
 import asyncio
 import hmac
@@ -38,17 +49,9 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.middleware.wsgi import WSGIMiddleware
 
-# ============================================================================
-# CRITICAL FIX: Set Windows event loop policy at module level
-# This MUST be done BEFORE uvicorn creates the event loop to enable subprocess support
-# ============================================================================
-if sys.platform == "win32":
-    try:
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        print("✅ Set WindowsProactorEventLoopPolicy at module level for subprocess support")
-    except Exception as e:
-        print(f"⚠️  Could not set Windows event loop policy: {e}")
-
+# NOTE: Windows event loop policy is now set at the very top of the file (line 17)
+# before any imports that might trigger asyncio initialization.
+# 
 # NOTE: The encoding fix and .env loader have been MOVED
 # into the lifespan function to ensure they run in the
 # Uvicorn worker process.
