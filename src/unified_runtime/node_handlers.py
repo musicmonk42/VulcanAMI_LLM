@@ -480,13 +480,57 @@ async def generative_node_handler(
                 processed_input
             )
 
-    # Generate response
+    # Generate response using AI runtime
     provider = params.get("provider", "default")
     temperature = params.get("temperature", 0.7)
     max_tokens = params.get("max_tokens", 100)
 
-    # Mock generation for now
-    generated_text = f"Generated response to: {prompt[:50]}..."
+    # Use real AI runtime if available, fallback to mock for tests/demo
+    generated_text = None
+    tokens_used = 0
+    
+    if hasattr(runtime, "ai_runtime") and runtime.ai_runtime:
+        try:
+            # Import AI runtime classes
+            from .ai_runtime_integration import AIContract, AITask
+            
+            # Create AI task for text generation
+            task = AITask(
+                operation="generate",
+                provider=provider,
+                model=params.get("model", "gpt-3.5-turbo"),
+                prompt=prompt,
+                context=processed_input,
+            )
+            
+            # Create contract with constraints
+            contract = AIContract(
+                temperature=temperature,
+                max_tokens=max_tokens,
+                max_latency_ms=params.get("max_latency_ms", 5000.0),
+                min_accuracy=params.get("min_accuracy", 0.8),
+            )
+            
+            # Execute task through AI runtime
+            result = runtime.ai_runtime.execute_task(task, contract)
+            
+            if result.status == "SUCCESS" and result.data:
+                generated_text = result.data.get("text", result.data.get("completion", ""))
+                tokens_used = result.data.get("tokens", len(prompt.split()) + len(generated_text.split()))
+                logger.info(f"Successfully generated text using {provider} provider")
+            else:
+                logger.warning(f"AI generation failed: {result.error}, falling back to mock")
+                generated_text = f"Generated response to: {prompt[:50]}..."
+                tokens_used = min(len(prompt.split()), max_tokens)
+        except Exception as e:
+            logger.warning(f"AI runtime error: {e}, falling back to mock generation")
+            generated_text = f"Generated response to: {prompt[:50]}..."
+            tokens_used = min(len(prompt.split()), max_tokens)
+    else:
+        # Fallback to mock for testing/demo when AI runtime not available
+        logger.debug("AI runtime not available, using mock generation")
+        generated_text = f"Generated response to: {prompt[:50]}..."
+        tokens_used = min(len(prompt.split()), max_tokens)
 
     # Apply RLHF if configured
     rlhf_params = params.get("rlhf_params", {})
@@ -495,7 +539,7 @@ async def generative_node_handler(
 
     return {
         "text": generated_text,
-        "tokens": min(len(prompt.split()), max_tokens),
+        "tokens": tokens_used,
         "provider": provider,
         "temperature": temperature,
     }
