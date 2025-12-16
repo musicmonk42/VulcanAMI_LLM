@@ -464,3 +464,126 @@ The Docker build will:
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [Helm Documentation](https://helm.sh/docs/)
 - [Kustomize Documentation](https://kustomize.io/)
+
+## Azure AKS Deployment Workflow
+
+### Overview
+
+The repository includes a GitHub Actions workflow (`.github/workflows/azure-kubernetes-service-helm.yml`) for automated deployment to Azure Kubernetes Service (AKS) using Helm.
+
+**Workflow Triggers:**
+- Push to `main` branch
+- Manual workflow dispatch
+
+### Prerequisites
+
+Before the workflow can run successfully, you must configure the following:
+
+#### 1. Azure Service Principal Credentials
+
+The workflow requires three repository secrets to authenticate with Azure:
+
+| Secret Name | Description | How to Get |
+|------------|-------------|-----------|
+| `AZURE_CLIENT_ID` | Service Principal Application (client) ID | Azure Portal → Azure Active Directory → App registrations |
+| `AZURE_TENANT_ID` | Azure Active Directory Tenant ID | Azure Portal → Azure Active Directory → Properties |
+| `AZURE_SUBSCRIPTION_ID` | Azure Subscription ID | Azure Portal → Subscriptions |
+
+**To configure these secrets:**
+
+1. Go to your repository on GitHub
+2. Navigate to: **Settings** → **Secrets and variables** → **Actions** → **Repository secrets**
+3. Click "New repository secret" for each of the three secrets above
+4. Follow the [Microsoft documentation](https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure) to create a Service Principal and get the values
+
+**⚠️ Important:** Without these secrets configured, the workflow will fail at the "Azure login" step with a clear error message.
+
+#### 2. Azure Resources
+
+Ensure you have created:
+- Azure Container Registry (ACR)
+- Azure Kubernetes Service (AKS) cluster
+- Resource Group
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed setup instructions.
+
+#### 3. Environment Variables
+
+Update the following environment variables in the workflow file to match your Azure setup:
+
+```yaml
+env:
+  AZURE_CONTAINER_REGISTRY: "your-azure-container-registry"
+  CONTAINER_NAME: "your-container-name"
+  RESOURCE_GROUP: "your-resource-group"
+  CLUSTER_NAME: "your-cluster-name"
+  CHART_PATH: "your-chart-path"
+  CHART_OVERRIDE_PATH: "your-chart-override-path"
+```
+
+### Workflow Jobs
+
+#### Job 1: buildImage
+- Checks out the code
+- Frees up runner disk space (removes unnecessary pre-installed packages)
+- Verifies Azure credentials are configured
+- Logs into Azure
+- Builds and pushes Docker image to Azure Container Registry (ACR)
+
+#### Job 2: deploy
+- Checks out the code
+- Verifies Azure credentials are configured
+- Logs into Azure
+- Sets up kubelogin for Kubernetes authentication
+- Gets AKS cluster context
+- Bakes Kubernetes manifests using Helm
+- Deploys the application to AKS
+
+### Self-Hosted Runners
+
+If you're using self-hosted runners instead of GitHub-hosted runners:
+
+1. Uncomment the "Install Azure CLI" step in the workflow:
+
+```yaml
+- name: Install Azure CLI
+  run: |
+    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
+2. This step appears twice in the workflow (once for each job)
+
+GitHub-hosted runners have Azure CLI pre-installed, so this step is not needed for them.
+
+### Troubleshooting
+
+**Error: "Az CLI Login failed"**
+
+This error occurs when Azure credentials are missing or misconfigured. The workflow now includes a credential check step that will fail early with a helpful error message if any secrets are missing.
+
+**Solution:**
+1. Verify all three secrets are set in your repository settings
+2. Check that the secret values are correct (no extra spaces, complete values)
+3. Ensure your Service Principal has the necessary permissions
+
+**Error: "Resource group not found"**
+
+Update the `RESOURCE_GROUP` environment variable in the workflow to match your actual Azure resource group name.
+
+**Error: "Container registry not found"**
+
+Update the `AZURE_CONTAINER_REGISTRY` environment variable in the workflow to match your actual ACR name (without the `.azurecr.io` suffix).
+
+### Monitoring
+
+You can monitor workflow runs:
+- Go to the **Actions** tab in your GitHub repository
+- Select "Build and deploy an app to AKS with Helm"
+- View individual workflow runs and their logs
+
+### Additional Resources
+
+- [Azure AKS Documentation](https://docs.microsoft.com/en-us/azure/aks/)
+- [Azure Container Registry Documentation](https://docs.microsoft.com/en-us/azure/container-registry/)
+- [GitHub Actions for Azure](https://github.com/Azure/Actions)
+- [Connecting GitHub to Azure](https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure)

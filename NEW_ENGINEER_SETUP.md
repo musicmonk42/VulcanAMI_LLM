@@ -20,6 +20,9 @@ Run this command to verify you have everything installed:
 - Helm 3.10+ (for Helm deployment)
 - Git
 
+**Optional (for Azure AKS deployment):**
+- Azure CLI 2.0+ (https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
+
 ### Installation Links (if needed)
 
 - **Docker**: https://docs.docker.com/get-docker/
@@ -146,6 +149,60 @@ helm upgrade vulcanami ./helm/vulcanami -n vulcanami
 ```bash
 helm uninstall vulcanami -n vulcanami
 ```
+
+#### D. Azure Kubernetes Service (AKS) with GitHub Actions
+
+**Best for:** Production deployment with automated CI/CD on Azure
+
+This repository includes a GitHub Actions workflow for automated deployment to Azure AKS.
+
+**Prerequisites:**
+1. Azure subscription with AKS cluster and ACR created
+2. Azure Service Principal for GitHub Actions
+3. GitHub repository secrets configured
+
+**Setup Steps:**
+
+```bash
+# 1. Create Azure Service Principal
+az login
+az ad sp create-for-rbac \
+  --name "github-actions-vulcanami" \
+  --role contributor \
+  --scopes /subscriptions/{YOUR_SUBSCRIPTION_ID} \
+  --sdk-auth
+
+# 2. Copy the output (clientId, tenantId, subscriptionId)
+# 3. Add these secrets to your GitHub repository:
+#    Settings > Secrets and variables > Actions > Repository secrets
+#    - AZURE_CLIENT_ID (from clientId)
+#    - AZURE_TENANT_ID (from tenantId)
+#    - AZURE_SUBSCRIPTION_ID (from subscriptionId)
+
+# 4. Update workflow configuration
+# Edit .github/workflows/azure-kubernetes-service-helm.yml
+# Update these environment variables:
+#   - AZURE_CONTAINER_REGISTRY
+#   - CONTAINER_NAME
+#   - RESOURCE_GROUP
+#   - CLUSTER_NAME
+#   - CHART_PATH
+#   - CHART_OVERRIDE_PATH
+```
+
+**Trigger Deployment:**
+- Automatically on push to `main` branch
+- Manually via GitHub Actions UI
+
+**Monitor Deployment:**
+```bash
+# View workflow runs in GitHub Actions tab
+# Or check deployment locally:
+az aks get-credentials --resource-group vulcanami-prod --name vulcanami-cluster
+kubectl get pods -n vulcanami
+```
+
+**⚠️ Important:** Without the required Azure secrets, the workflow will fail with a clear error message. See [DEPLOYMENT.md](DEPLOYMENT.md#4-azure-aks-deployment) for detailed Azure setup.
 
 ## Validation & Testing
 

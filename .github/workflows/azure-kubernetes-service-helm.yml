@@ -10,11 +10,14 @@
 #
 # To configure this workflow:
 #
-# 1. Set the following secrets in your repository (instructions for getting these
-#    https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure?tabs=azure-cli%2Clinux)):
-#    - AZURE_CLIENT_ID
-#    - AZURE_TENANT_ID
-#    - AZURE_SUBSCRIPTION_ID
+# 1. **REQUIRED** Set the following secrets in your repository:
+#    Go to: Repository Settings > Secrets and variables > Actions > Repository secrets
+#    (instructions: https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure?tabs=azure-cli%2Clinux)
+#    - AZURE_CLIENT_ID (Service Principal Client ID)
+#    - AZURE_TENANT_ID (Azure Active Directory Tenant ID)
+#    - AZURE_SUBSCRIPTION_ID (Azure Subscription ID)
+#    
+#    ⚠️  Without these secrets, the "Azure login" step will fail!
 #
 # 2. Set the following environment variables (or replace the values below):
 #    - AZURE_CONTAINER_REGISTRY (name of your container registry / ACR)
@@ -27,6 +30,10 @@
 #    Set your helmChart, overrideFiles, overrides, and helm-version to suit your configuration.
 #    - CHART_PATH (path to your helm chart)
 #    - CHART_OVERRIDE_PATH (path to your helm chart with override values)
+#
+# 4. (Optional) If using a self-hosted runner:
+#    - Ensure Azure CLI is installed by uncommenting the "Install Azure CLI" steps below
+#    - The command to install: curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 #
 # For more information on GitHub Actions for Azure, refer to https://github.com/Azure/Actions
 # For more samples to get started with GitHub Action workflows to deploy to Azure, refer to https://github.com/Azure/actions-workflow-samples
@@ -81,6 +88,26 @@ jobs:
       #   run: |
       #     curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
+      # Verify required secrets are set
+      # IMPORTANT: Ensure these secrets are configured in your repository:
+      # - AZURE_CLIENT_ID
+      # - AZURE_TENANT_ID
+      # - AZURE_SUBSCRIPTION_ID
+      # Go to: Repository Settings > Secrets and variables > Actions > Repository secrets
+      - name: Check Azure credentials
+        run: |
+          if [ -z "${{ secrets.AZURE_CLIENT_ID }}" ] || [ -z "${{ secrets.AZURE_TENANT_ID }}" ] || [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "ERROR: Required Azure secrets are not configured."
+            echo "Please set the following secrets in your repository:"
+            echo "  - AZURE_CLIENT_ID"
+            echo "  - AZURE_TENANT_ID"
+            echo "  - AZURE_SUBSCRIPTION_ID"
+            echo ""
+            echo "For instructions, see: https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure"
+            exit 1
+          fi
+          echo "✓ All required Azure secrets are configured"
+
       # Logs in with your Azure credentials
       - name: Azure login
         uses: azure/login@v1.4.6
@@ -110,6 +137,26 @@ jobs:
       # - name: Install Azure CLI
       #   run: |
       #     curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+      # Verify required secrets are set
+      # IMPORTANT: Ensure these secrets are configured in your repository:
+      # - AZURE_CLIENT_ID
+      # - AZURE_TENANT_ID
+      # - AZURE_SUBSCRIPTION_ID
+      # Go to: Repository Settings > Secrets and variables > Actions > Repository secrets
+      - name: Check Azure credentials
+        run: |
+          if [ -z "${{ secrets.AZURE_CLIENT_ID }}" ] || [ -z "${{ secrets.AZURE_TENANT_ID }}" ] || [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "ERROR: Required Azure secrets are not configured."
+            echo "Please set the following secrets in your repository:"
+            echo "  - AZURE_CLIENT_ID"
+            echo "  - AZURE_TENANT_ID"
+            echo "  - AZURE_SUBSCRIPTION_ID"
+            echo ""
+            echo "For instructions, see: https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure"
+            exit 1
+          fi
+          echo "✓ All required Azure secrets are configured"
 
       # Logs in with your Azure credentials
       - name: Azure login
