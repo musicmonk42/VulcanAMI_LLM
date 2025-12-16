@@ -767,8 +767,15 @@ from pathlib import Path
 repo_root = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(repo_root))
 
-# Import actual platform components
-from src.adversarial_tester import AdversarialTester, AttackType, SafetyLevel
+# Import actual platform components with graceful fallback
+try:
+    from src.adversarial_tester import AdversarialTester, AttackType, SafetyLevel
+    HAS_ADVERSARIAL = True
+except ImportError as e:
+    HAS_ADVERSARIAL = False
+    print(f"[WARNING] AdversarialTester not available: {e}")
+    print("[INFO] Demo will run in presentation mode")
+    print()
 
 def display_phase3():
     """Display Phase 3: Active Immunization using real platform methods."""
@@ -792,16 +799,21 @@ def display_phase3():
     
     print("[SYSTEM] Initializing Adversarial Defense System...")
     
-    # Initialize actual AdversarialTester from platform
-    # Note: interpret_engine and nso_aligner are optional
-    tester = AdversarialTester(
-        interpret_engine=None,  # Optional parameter
-        nso_aligner=None,       # Optional parameter
-        log_dir="logs/demo/adversarial"  # Demo log directory
-    )
+    if HAS_ADVERSARIAL:
+        # Initialize actual AdversarialTester from platform
+        tester = AdversarialTester(
+            interpret_engine=None,  # Optional parameter
+            nso_aligner=None,       # Optional parameter
+            log_dir="logs/demo/adversarial"  # Demo log directory
+        )
+        
+        print("[INFO] AdversarialTester initialized (real platform)")
+        print(f"[INFO] Log directory: {tester.log_dir}")
+    else:
+        print("[INFO] Running in presentation mode")
+        print("[INFO] Install numpy/scipy to use real platform code:")
+        print("      pip install numpy scipy scikit-learn")
     
-    print("[INFO] AdversarialTester initialized")
-    print(f"[INFO] Log directory: {tester.log_dir}")
     print()
     
     # Simulate attack input - real jailbreak attempt
@@ -892,9 +904,13 @@ def display_phase3():
     print()
     
     # Show available attack types from the platform
-    print("[INFO] Platform supports detection of:")
-    for attack_type in AttackType:
-        print(f"  - {attack_type.value.upper()}: {attack_type.name}")
+    if HAS_ADVERSARIAL:
+        print("[INFO] Platform supports detection of:")
+        for attack_type in AttackType:
+            print(f"  - {attack_type.value.upper()}: {attack_type.name}")
+    else:
+        print("[INFO] Platform attack types (when dependencies installed):")
+        print("  - FGSM, PGD, CW, DEEPFOOL, JSMA, RANDOM, GENETIC, BOUNDARY")
     print()
 
 if __name__ == "__main__":
@@ -991,12 +1007,19 @@ from pathlib import Path
 repo_root = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(repo_root))
 
-# Import actual platform components
-from src.vulcan.world_model.meta_reasoning.csiu_enforcement import (
-    CSIUEnforcement,
-    CSIUEnforcementConfig,
-    CSIUInfluenceRecord
-)
+# Import actual platform components with graceful fallback
+try:
+    from src.vulcan.world_model.meta_reasoning.csiu_enforcement import (
+        CSIUEnforcement,
+        CSIUEnforcementConfig,
+        CSIUInfluenceRecord
+    )
+    HAS_CSIU = True
+except ImportError as e:
+    HAS_CSIU = False
+    print(f"[WARNING] CSIUEnforcement not available: {e}")
+    print("[INFO] Demo will run in presentation mode")
+    print()
 
 def display_phase4():
     """Display Phase 4: CSIU Protocol using real platform methods."""
@@ -1047,21 +1070,28 @@ def display_phase4():
     print("[SYSTEM] Initiating CSIU Safety Analysis...")
     print()
     
-    # Initialize actual CSIUEnforcement from platform
-    config = CSIUEnforcementConfig(
-        max_single_influence=0.05,  # Real 5% cap from platform
-        max_cumulative_influence_window=0.10,
-        global_enabled=True,
-        calculation_enabled=True,
-        alert_on_high_influence=True,
-        alert_threshold=0.04
-    )
+    if HAS_CSIU:
+        # Initialize actual CSIUEnforcement from platform
+        config = CSIUEnforcementConfig(
+            max_single_influence=0.05,  # Real 5% cap from platform
+            max_cumulative_influence_window=0.10,
+            global_enabled=True,
+            calculation_enabled=True,
+            alert_on_high_influence=True,
+            alert_threshold=0.04
+        )
+        
+        enforcer = CSIUEnforcement(config=config)
+        
+        print(f"[INFO] CSIU Enforcement initialized (real platform)")
+        print(f"[INFO] Max single influence: {config.max_single_influence*100:.0f}%")
+        print(f"[INFO] Alert threshold: {config.alert_threshold*100:.0f}%")
+    else:
+        print("[INFO] Running in presentation mode")
+        print("[INFO] Using simulated CSIU configuration")
+        print("[INFO] Max single influence: 5%")
+        print("[INFO] Alert threshold: 4%")
     
-    enforcer = CSIUEnforcement(config=config)
-    
-    print(f"[INFO] CSIU Enforcement initialized")
-    print(f"[INFO] Max single influence: {config.max_single_influence*100:.0f}%")
-    print(f"[INFO] Alert threshold: {config.alert_threshold*100:.0f}%")
     print()
     
     # Evaluate against CSIU axioms
@@ -1118,17 +1148,27 @@ def display_phase4():
     print()
     
     # Get enforcement stats from actual platform
-    stats = enforcer.get_enforcement_stats()
-    print("[INFO] Current enforcement statistics:")
-    print(f"  Total influence records: {stats.get('total_records', 0)}")
-    print(f"  Enforcement enabled: {enforcer.config.global_enabled}")
+    if HAS_CSIU:
+        stats = enforcer.get_enforcement_stats()
+        print("[INFO] Current enforcement statistics:")
+        print(f"  Total influence records: {stats.get('total_records', 0)}")
+        print(f"  Enforcement enabled: {enforcer.config.global_enabled}")
+    else:
+        print("[INFO] Enforcement statistics (simulated):")
+        print(f"  Total influence records: 0")
+        print(f"  Enforcement enabled: True")
+    
     print()
     
     print("✓ CSIU Protocol Active and Enforcing")
     print(f"→ Proposal evaluated against {len(axioms_evaluation)} axioms")
     print(f"→ {len(violations)} violations detected")
     print("→ Human control preserved")
-    print(f"→ System influence kept within {config.max_single_influence*100:.0f}% cap")
+    
+    if HAS_CSIU:
+        print(f"→ System influence kept within {config.max_single_influence*100:.0f}% cap")
+    else:
+        print(f"→ System influence kept within 5% cap")
     print()
 
 if __name__ == "__main__":
