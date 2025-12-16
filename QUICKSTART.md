@@ -73,6 +73,39 @@ make helm-template
 make helm-uninstall
 ```
 
+### Azure AKS Deployment (Automated CI/CD)
+
+The repository includes automated deployment to Azure Kubernetes Service via GitHub Actions.
+
+**Prerequisites:**
+1. Azure subscription
+2. GitHub repository secrets configured
+
+```bash
+# Create Azure Service Principal
+az ad sp create-for-rbac \
+  --name "github-actions-vulcanami" \
+  --role contributor \
+  --scopes /subscriptions/{SUBSCRIPTION_ID} \
+  --sdk-auth
+
+# Add these secrets to GitHub repository:
+# - AZURE_CLIENT_ID (from Service Principal output)
+# - AZURE_TENANT_ID (from Service Principal output)
+# - AZURE_SUBSCRIPTION_ID (from Service Principal output)
+```
+
+**Trigger Deployment:**
+- Push to `main` branch (automatic)
+- Manual trigger via GitHub Actions UI
+
+**Monitor:**
+- View workflow runs in GitHub Actions tab
+- Check deployment logs
+- Verify with: `kubectl get pods -n vulcanami`
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md#4-azure-aks-deployment) for detailed Azure setup instructions.
+
 ## 📋 Available Make Commands
 
 Run `make help` to see all available commands.
@@ -114,6 +147,15 @@ SLACK_WEBHOOK_URL      # For notifications
 CODECOV_TOKEN          # For code coverage
 KUBE_CONFIG            # For K8s deployment
 ```
+
+For Azure AKS Deployment:
+```
+AZURE_CLIENT_ID         # Azure Service Principal Client ID
+AZURE_TENANT_ID         # Azure Active Directory Tenant ID
+AZURE_SUBSCRIPTION_ID   # Azure Subscription ID
+```
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md#4-azure-aks-deployment) for Azure setup instructions.
 
 ### Kubernetes Secrets
 

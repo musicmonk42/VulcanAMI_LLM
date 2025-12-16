@@ -402,6 +402,31 @@ Note: Exact routes may vary by version and deployment profile. Refer to your int
 
 ## Deployment notes
 
+This repository supports multiple deployment options:
+
+### Local Development
+- Docker Compose for local development and testing
+- Quick start: `docker compose up -d`
+
+### Production Deployment Options
+
+**Kubernetes (Recommended)**
+- Kustomize overlays for different environments
+- Helm charts for templated deployments
+- See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions
+
+**Azure Kubernetes Service (AKS)**
+- Automated GitHub Actions workflow included
+- CI/CD pipeline with `.github/workflows/azure-kubernetes-service-helm.yml`
+- **Prerequisites**: Configure `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets
+- See [DEPLOYMENT.md](DEPLOYMENT.md#4-azure-aks-deployment) and [CI_CD.md](CI_CD.md#azure-aks-deployment-workflow) for setup
+
+**Other Cloud Providers**
+- Google GKE
+- AWS EKS
+- Tencent TKE (workflow included)
+
+### Best Practices
 - Production deployments are typically containerized and run behind an API gateway with centralized auth, logging, and metrics scrape.
 - A single primary entry point is recommended per service image (avoid running multiple servers in the same container unless directed by Novatrax).
 - Externalize configuration and secrets; disable debug/reload modes; enforce TLS and strict CORS as applicable.

@@ -278,9 +278,26 @@ kubectl get svc -n ingress-nginx
 
 ### 4. Azure AKS Deployment
 
+#### Prerequisites
+
+1. **Azure CLI**: Install from https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+2. **Azure Subscription**: Active Azure subscription with appropriate permissions
+3. **Azure Service Principal**: For GitHub Actions automation (see below)
+
+#### Manual Deployment
+
 ```bash
+# Login to Azure
+az login
+
 # Create resource group
 az group create --name vulcanami-prod --location eastus
+
+# Create Azure Container Registry (ACR)
+az acr create \
+  --resource-group vulcanami-prod \
+  --name vulcanamiregistry \
+  --sku Standard
 
 # Create AKS cluster
 az aks create \
@@ -289,6 +306,7 @@ az aks create \
   --node-count 3 \
   --node-vm-size Standard_D4s_v3 \
   --enable-managed-identity \
+  --attach-acr vulcanamiregistry \
   --generate-ssh-keys
 
 # Get credentials
@@ -303,6 +321,77 @@ helm install ingress-nginx ingress-nginx/ingress-nginx \
 # Deploy application
 kubectl apply -k k8s/overlays/production/
 ```
+
+#### GitHub Actions Automated Deployment
+
+This repository includes a GitHub Actions workflow (`.github/workflows/azure-kubernetes-service-helm.yml`) for automated CI/CD to Azure AKS.
+
+**Step 1: Create Azure Service Principal**
+
+```bash
+# Login to Azure
+az login
+
+# Get your subscription ID
+az account show --query id --output tsv
+
+# Create Service Principal with Contributor role
+az ad sp create-for-rbac \
+  --name "github-actions-vulcanami" \
+  --role contributor \
+  --scopes /subscriptions/{YOUR_SUBSCRIPTION_ID} \
+  --sdk-auth
+
+# Output will show:
+# {
+#   "clientId": "xxxx",
+#   "clientSecret": "xxxx",
+#   "subscriptionId": "xxxx",
+#   "tenantId": "xxxx",
+#   ...
+# }
+```
+
+**Step 2: Configure GitHub Repository Secrets**
+
+Add the following secrets to your GitHub repository:
+- Go to: **Repository Settings** → **Secrets and variables** → **Actions** → **Repository secrets**
+- Click "New repository secret" and add:
+
+| Secret Name | Value | Description |
+|------------|-------|-------------|
+| `AZURE_CLIENT_ID` | `{clientId}` from output | Service Principal Application ID |
+| `AZURE_TENANT_ID` | `{tenantId}` from output | Azure Active Directory Tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | `{subscriptionId}` from output | Azure Subscription ID |
+
+**⚠️ Important:** Without these secrets, the workflow will fail at the "Azure login" step.
+
+**Step 3: Update Workflow Configuration**
+
+Edit `.github/workflows/azure-kubernetes-service-helm.yml` and update environment variables:
+
+```yaml
+env:
+  AZURE_CONTAINER_REGISTRY: "vulcanamiregistry"  # Your ACR name (without .azurecr.io)
+  CONTAINER_NAME: "vulcanami-llm"                 # Your container image name
+  RESOURCE_GROUP: "vulcanami-prod"                # Your resource group name
+  CLUSTER_NAME: "vulcanami-cluster"               # Your AKS cluster name
+  CHART_PATH: "helm/vulcanami"                    # Path to your Helm chart
+  CHART_OVERRIDE_PATH: "helm/vulcanami/values-prod.yaml"  # Values override file
+```
+
+**Step 4: Trigger Deployment**
+
+The workflow automatically runs on:
+- Push to `main` branch
+- Manual trigger via GitHub Actions UI
+
+**Monitoring:**
+- View workflow runs in the **Actions** tab
+- Check deployment status and logs
+- Monitor AKS cluster with `kubectl` or Azure Portal
+
+**For detailed troubleshooting**, see the Azure AKS Deployment Workflow section in [CI_CD.md](CI_CD.md).
 
 ### 5. Google GKE Deployment
 
