@@ -483,12 +483,19 @@ from pathlib import Path
 repo_root = Path(__file__).parent.parent.absolute()
 sys.path.insert(0, str(repo_root))
 
-# Import actual platform components
+# Import actual platform components with graceful fallback
 # Note: These classes exist but SemanticBridge doesn't have simple transfer_concept()
 # This demo shows the conceptual approach
-from src.vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
-from src.vulcan.semantic_bridge.domain_registry import DomainRegistry
-from src.vulcan.semantic_bridge.concept_mapper import ConceptMapper
+try:
+    from src.vulcan.semantic_bridge.semantic_bridge_core import SemanticBridge
+    from src.vulcan.semantic_bridge.domain_registry import DomainRegistry
+    from src.vulcan.semantic_bridge.concept_mapper import ConceptMapper
+    HAS_SEMANTIC_BRIDGE = True
+except ImportError as e:
+    HAS_SEMANTIC_BRIDGE = False
+    print(f"[WARNING] SemanticBridge not available: {e}")
+    print("[INFO] Demo will run in presentation mode")
+    print()
 
 def display_phase2():
     """Display Phase 2: Knowledge Teleportation demo."""
@@ -505,29 +512,35 @@ def display_phase2():
     
     print("[SYSTEM] Initializing Semantic Bridge components...")
     
-    # These are the actual platform classes
-    # In production they work together for cross-domain reasoning
-    bridge = SemanticBridge(
-        world_model=None,  # Optional
-        vulcan_memory=None,  # Optional
-        safety_config=None  # Uses defaults
-    )
+    if HAS_SEMANTIC_BRIDGE:
+        # These are the actual platform classes
+        # In production they work together for cross-domain reasoning
+        bridge = SemanticBridge(
+            world_model=None,  # Optional
+            vulcan_memory=None,  # Optional
+            safety_config=None  # Uses defaults
+        )
+        
+        # Registry for managing domains
+        registry = DomainRegistry(
+            world_model=None,
+            safety_validator=None
+        )
+        
+        # Mapper for concept similarity
+        mapper = ConceptMapper(
+            world_model=None,
+            safety_validator=None
+        )
+        
+        print("[INFO] SemanticBridge initialized (real platform)")
+        print("[INFO] DomainRegistry initialized")
+        print("[INFO] ConceptMapper initialized")
+    else:
+        print("[INFO] Running in presentation mode")
+        print("[INFO] Install numpy to use real platform code:")
+        print("      pip install numpy networkx")
     
-    # Registry for managing domains
-    registry = DomainRegistry(
-        world_model=None,
-        safety_validator=None
-    )
-    
-    # Mapper for concept similarity
-    mapper = ConceptMapper(
-        world_model=None,
-        safety_validator=None
-    )
-    
-    print("[INFO] SemanticBridge initialized")
-    print("[INFO] DomainRegistry initialized")
-    print("[INFO] ConceptMapper initialized")
     print()
     
     # ===== DEMO: SIMPLIFIED CROSS-DOMAIN MATCHING =====
