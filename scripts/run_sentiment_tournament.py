@@ -107,7 +107,7 @@ except ImportError:
 
 try:
     # FIXED: Import AgentInterface instead of the non-existent GraphixClient
-    from agent_interface import AgentInterface, ConnectionConfig
+    from src.agent_interface import AgentInterface, ConnectionConfig
 
     HAS_SDK = True
 except ImportError:
