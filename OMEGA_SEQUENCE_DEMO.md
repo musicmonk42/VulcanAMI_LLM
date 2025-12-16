@@ -307,16 +307,16 @@ def display_phase1():
             if current_stats.num_layers > target_layers:
                 # REAL PLATFORM METHOD CALL
                 layer_idx = current_stats.num_layers - 1
-                result = arch.remove_layer(layer_idx)
+                result = arch.remove_layer(layer_idx)  # Returns bool
                 
-                if result.ok:
+                if result:  # result is a boolean (True = success)
                     new_stats = arch.get_stats()
                     current_power = estimate_power(new_stats.num_layers, initial_layer_count)
                     print(f"[RESOURCE] Shedding {name}... ✓")
                     print(f"            Removed layer {layer_idx}")
                     print(f"            Power: {current_power:.1f}W")
                 else:
-                    print(f"[RESOURCE] Cannot shed {name}: {result.reason}")
+                    print(f"[RESOURCE] Cannot shed {name}: constraints prevented removal")
         
         time.sleep(0.5)
     
@@ -371,7 +371,8 @@ python3 demos/omega_phase1_survival.py
 - ✅ Calls actual methods: `remove_layer()`, `get_stats()`
 - ✅ Initializes with proper config and constraints
 - ✅ Uses `_shadow_layers` for architecture simulation
-- ✅ Returns actual `ArchChangeResult` objects with `.ok` and `.reason`
+- ✅ `remove_layer()` returns `bool` (True = success, False = failure)
+- ✅ `get_stats()` returns `ArchitectureStats` with num_layers, num_heads, etc.
 - ✅ NOT a script simulation - this is real platform code
 
 ---
