@@ -45,26 +45,6 @@ _REASONING_COMPONENTS = None
 _OPTIONAL_COMPONENTS = None
 
 
-# Mock LanguageReasoner since it is required by the prompt but not provided
-class MockLanguageReasoner:
-    """Mock implementation for LanguageReasoner (LLM Mode)"""
-
-    def reason(self, input_data: Any, query: Dict[str, Any]) -> ReasoningResult:
-        conclusion = f"Generated text response to query: {query.get('query', 'N/A')}"
-        if isinstance(input_data, str) and len(input_data) > 50:
-            conclusion += f" based on input summary: {input_data[:50]}..."
-
-        # Simulate a typical high LLM confidence
-        confidence = 0.95
-
-        return ReasoningResult(
-            conclusion=conclusion,
-            confidence=confidence,
-            reasoning_type=ReasoningType.SYMBOLIC,
-            explanation=f"Executed neural language generation (LLM mode).",
-        )
-
-
 def _load_selection_components():
     """Lazy load selection components to avoid circular imports"""
     global _SELECTION_COMPONENTS
@@ -227,18 +207,22 @@ def _load_reasoning_components():
     except ImportError as e:
         logger.warning(f"ModalityType not available: {e}")
 
-    # --- START NEW LLM MODE ADDITION ---
-    # Assume LanguageReasoner is a class from language_reasoning.py
-    # Use mock if real import fails as per problem constraints
     try:
-        # Placeholder for actual import
-        # from vulcan.reasoning.language_reasoning import LanguageReasoner
-        LanguageReasoner = MockLanguageReasoner
+        from vulcan.reasoning.language_reasoning import LanguageReasoner  # UNCOMMENTED!
         _REASONING_COMPONENTS["LanguageReasoner"] = LanguageReasoner
+        logger.info("LanguageReasoner loaded successfully")
     except ImportError as e:
-        logger.warning(f"LanguageReasoner not available, using mock: {e}")
-        _REASONING_COMPONENTS["LanguageReasoner"] = MockLanguageReasoner
-    # --- END NEW LLM MODE ADDITION ---
+        logger.warning(f"LanguageReasoner not available: {e}")
+        # Minimal fallback only if import fails
+        class LanguageReasonerFallback:
+            def reason(self, input_data, query):
+                return ReasoningResult(
+                    conclusion="Language reasoning unavailable",
+                    confidence=0.0,  # Not 0.95!
+                    reasoning_type=ReasoningType.SYMBOLIC,
+                    explanation="Real implementation not imported",
+                )
+        _REASONING_COMPONENTS["LanguageReasoner"] = LanguageReasonerFallback
 
     return _REASONING_COMPONENTS
 
