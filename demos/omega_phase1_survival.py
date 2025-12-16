@@ -8,9 +8,12 @@ It is NOT a script simulation - it uses real code.
 """
 import sys
 import time
+from pathlib import Path
 
 # Add repository root to Python path
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM')
+# This makes the demo portable across different environments
+repo_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(repo_root))
 
 # Import actual platform components
 from src.execution.dynamic_architecture import (
@@ -60,6 +63,9 @@ def display_phase1():
     )
     
     # Initialize shadow layers (simulating a full model)
+    # NOTE: For demo purposes only - directly setting _shadow_layers
+    # In production code, the model would be passed to __init__ or
+    # architecture would be managed through proper API methods
     # This represents the actual transformer architecture
     initial_layer_count = 12  # Typical transformer layer count
     arch._shadow_layers = [

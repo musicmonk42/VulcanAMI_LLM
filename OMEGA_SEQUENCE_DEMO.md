@@ -208,9 +208,12 @@ It is NOT a script simulation - it uses real code.
 """
 import sys
 import time
+from pathlib import Path
 
 # Add repository root to Python path
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM')
+# This makes the demo portable across different environments
+repo_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(repo_root))
 
 # Import actual platform components
 from src.execution.dynamic_architecture import (
