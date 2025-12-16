@@ -215,7 +215,7 @@ def _load_reasoning_components():
         logger.warning(f"LanguageReasoner not available: {e}")
         # Minimal fallback only if import fails
         class LanguageReasonerFallback:
-            def reason(self, input_data, query):
+            def reason(self, input_data: Any, query: Optional[Dict[str, Any]] = None) -> ReasoningResult:
                 return ReasoningResult(
                     conclusion="Language reasoning unavailable",
                     confidence=0.0,  # Not 0.95!
