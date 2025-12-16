@@ -315,6 +315,10 @@ class MockCacheManager:
 
 
 class MockSemanticBridge:
+    # Transfer decay factors (confidence reduction after domain transfer)
+    TRANSFER_CONFIDENCE_DECAY = 0.9  # 10% confidence reduction
+    TRANSFER_SUCCESS_RATE_DECAY = 0.95  # 5% success rate reduction
+    
     def __init__(self, world_model=None, safety_config=None):
         self.world_model = world_model or MockWorldModel()
         self.safety_config = safety_config
@@ -352,13 +356,13 @@ class MockSemanticBridge:
         transferred = Concept(
             pattern_signature=concept.pattern_signature,
             grounded_effects=concept.grounded_effects.copy() if hasattr(concept, 'grounded_effects') else [],
-            confidence=concept.confidence * 0.9,  # Slightly lower confidence after transfer
+            confidence=concept.confidence * self.TRANSFER_CONFIDENCE_DECAY,
             domains={target_domain}
         )
         
         # Copy over other attributes
         if hasattr(concept, 'success_rate'):
-            transferred.success_rate = concept.success_rate * 0.95
+            transferred.success_rate = concept.success_rate * self.TRANSFER_SUCCESS_RATE_DECAY
         
         return transferred
 

@@ -1522,7 +1522,7 @@ class SemanticBridge:
             >>> cyber_concept = bridge.concept_mapper.concepts["malware_detection"]
             >>> bio_concept = bridge.transfer_concept(cyber_concept, "cyber", "biosecurity")
             >>> if bio_concept:
-            ...     print(f"Successfully transferred to {target_domain}")
+            ...     print("Successfully transferred to biosecurity")
         """
         logger.info(
             "Transferring concept from %s to %s", source_domain, target_domain
