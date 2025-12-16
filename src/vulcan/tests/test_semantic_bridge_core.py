@@ -315,6 +315,10 @@ class MockCacheManager:
 
 
 class MockSemanticBridge:
+    # Transfer decay factors (confidence reduction after domain transfer)
+    TRANSFER_CONFIDENCE_DECAY = 0.9  # 10% confidence reduction
+    TRANSFER_SUCCESS_RATE_DECAY = 0.95  # 5% success rate reduction
+    
     def __init__(self, world_model=None, safety_config=None):
         self.world_model = world_model or MockWorldModel()
         self.safety_config = safety_config
@@ -342,8 +346,25 @@ class MockSemanticBridge:
             effects = self.concept_mapper.extract_measurable_effects(outcome)
         return self.concept_mapper.map_pattern_to_concept(pattern, effects)
 
-    def transfer_concept(self, concept: Concept, target_domain: str) -> Concept:
-        return self.transfer_engine.execute_transfer(concept, target_domain)
+    def transfer_concept(self, concept: Concept, source_domain: str, target_domain: str) -> Optional[Concept]:
+        """Transfer concept between domains (updated to match new signature)"""
+        # Validate compatibility
+        if source_domain == target_domain:
+            return None  # No transfer needed
+        
+        # Create transferred concept
+        transferred = Concept(
+            pattern_signature=concept.pattern_signature,
+            grounded_effects=concept.grounded_effects.copy() if hasattr(concept, 'grounded_effects') else [],
+            confidence=concept.confidence * self.TRANSFER_CONFIDENCE_DECAY,
+            domains={target_domain}
+        )
+        
+        # Copy over other attributes
+        if hasattr(concept, 'success_rate'):
+            transferred.success_rate = concept.success_rate * self.TRANSFER_SUCCESS_RATE_DECAY
+        
+        return transferred
 
     def get_statistics(self) -> Dict:
         return {
@@ -531,10 +552,29 @@ class TestSemanticBridgeOperations:
         assert concept.pattern_signature == "test_pattern"
 
     def test_transfer_concept(self):
+        """Test the new transfer_concept convenience method"""
         bridge = MockSemanticBridge()
-        concept = Concept(pattern_signature="original")
-        transferred = bridge.transfer_concept(concept, "new_domain")
-        assert "new_domain" in transferred.domains
+        
+        # Create a concept in source domain
+        concept = Concept(
+            pattern_signature="malware_detection",
+            confidence=0.85,
+            success_rate=0.9
+        )
+        concept.domains = {"cyber_security"}
+        
+        # Transfer from cyber to biosecurity
+        transferred = bridge.transfer_concept(concept, "cyber_security", "biosecurity")
+        
+        # Verify transfer succeeded
+        assert transferred is not None, "Transfer should succeed"
+        assert "biosecurity" in transferred.domains, "Target domain should be in domains"
+        assert transferred.pattern_signature == concept.pattern_signature, "Pattern should be preserved"
+        assert transferred.confidence <= concept.confidence, "Confidence may decrease after transfer"
+        
+        # Test that same domain returns None
+        no_transfer = bridge.transfer_concept(concept, "cyber_security", "cyber_security")
+        assert no_transfer is None, "Same source/target should not transfer"
 
     def test_get_statistics(self):
         bridge = MockSemanticBridge()
