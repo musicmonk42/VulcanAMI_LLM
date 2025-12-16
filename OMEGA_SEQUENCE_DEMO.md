@@ -761,9 +761,11 @@ It demonstrates actual attack detection capabilities.
 import sys
 import time
 import re
+from pathlib import Path
 
 # Add repository root to Python path
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM')
+repo_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(repo_root))
 
 # Import actual platform components
 from src.adversarial_tester import AdversarialTester, AttackType, SafetyLevel
@@ -983,9 +985,11 @@ It demonstrates actual safety governance evaluation.
 """
 import sys
 import time
+from pathlib import Path
 
 # Add repository root to Python path
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM')
+repo_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(repo_root))
 
 # Import actual platform components
 from src.vulcan.world_model.meta_reasoning.csiu_enforcement import (
@@ -1251,9 +1255,11 @@ It references actual platform methods from GovernedUnlearning and Groth16Prover.
 """
 import sys
 import time
+from pathlib import Path
 
 # Add repository root to Python path
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM')
+repo_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(repo_root))
 
 # Import actual platform components
 try:
@@ -1462,9 +1468,11 @@ Each phase imports and calls actual methods from the VulcanAMI platform.
 import sys
 import asyncio
 import importlib.util
+from pathlib import Path
 
 # Add repository root to Python path
-sys.path.insert(0, '/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM')
+repo_root = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(repo_root))
 
 def load_phase_module(phase_name, file_path):
     """Dynamically load a phase module from file path."""
@@ -1532,6 +1540,10 @@ async def main():
     
     print_opening()
     
+    # Get repo root for constructing paths
+    repo_root = Path(__file__).parent.parent.absolute()
+    demos_dir = repo_root / "demos"
+    
     # Phase 1 - Infrastructure Survival
     try:
         print("\n" + "="*70)
@@ -1541,7 +1553,7 @@ async def main():
         
         phase1 = load_phase_module(
             "omega_phase1",
-            "/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/demos/omega_phase1_survival.py"
+            str(demos_dir / "omega_phase1_survival.py")
         )
         phase1.display_phase1()
         input("\n🎯 Phase 1 Complete. Press Enter for Phase 2...")
@@ -1558,7 +1570,7 @@ async def main():
         
         phase2 = load_phase_module(
             "omega_phase2",
-            "/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/demos/omega_phase2_teleportation.py"
+            str(demos_dir / "omega_phase2_teleportation.py")
         )
         await phase2.display_phase2()
         input("\n🎯 Phase 2 Complete. Press Enter for Phase 3...")
@@ -1575,7 +1587,7 @@ async def main():
         
         phase3 = load_phase_module(
             "omega_phase3",
-            "/home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM/demos/omega_phase3_immunization.py"
+            str(demos_dir / "omega_phase3_immunization.py")
         )
         phase3.display_phase3()
         input("\n🎯 Phase 3 Complete. Press Enter for Phase 4...")
