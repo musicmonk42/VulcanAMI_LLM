@@ -38,8 +38,8 @@ from urllib.parse import urljoin
 
 try:
     import httpx
-except ImportError:
-    print("❌ Error: httpx is required. Install with: pip install httpx")
+except ImportError as e:
+    print(f"❌ Error: httpx is required. Install with: pip install httpx (Error: {e})")
     sys.exit(1)
 
 

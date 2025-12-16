@@ -1,0 +1,44 @@
+{
+  "grammar_version": null,
+  "id": "null_fields_20251216_152455_LfD3Rr",
+  "type": "Graph",
+  "nodes": [
+    null,
+    {
+      "id": null,
+      "type": "ComputeNode"
+    },
+    {
+      "id": "node1",
+      "type": null
+    },
+    {
+      "id": "node2",
+      "type": "Node",
+      "data": null
+    },
+    {
+      "id": "node3",
+      "type": "Node",
+      "metadata": null,
+      "attributes": null
+    }
+  ],
+  "edges": [
+    null,
+    {
+      "from": null,
+      "to": null
+    },
+    {
+      "from": "node1",
+      "to": null
+    },
+    {
+      "from": null,
+      "to": "node2",
+      "type": null
+    }
+  ],
+  "metadata": null
+}

@@ -3,9 +3,21 @@ import socket
 import sys
 import time
 import urllib.request
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 # Import URL validation utility
-from src.utils.url_validator import validate_url_scheme
+try:
+    from src.utils.url_validator import validate_url_scheme
+except ImportError:
+    # Fallback if module not available
+    def validate_url_scheme(url):
+        """Fallback URL validation."""
+        if not url.startswith(('http://', 'https://')):
+            raise ValueError(f"URL must start with http:// or https://: {url}")
 
 HOST = os.getenv("ARENA_HOST", "127.0.0.1")
 PORT = int(os.getenv("ARENA_PORT", "8181"))

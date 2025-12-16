@@ -1,0 +1,22 @@
+{
+  "id": "missing_fields_20251216_152455_toXLqR",
+  "type": "Graph",
+  "nodes": [
+    {
+      "id": "node1",
+      "type": "InvalidType"
+    },
+    {
+      "id": "node2"
+    }
+  ],
+  "edges": [
+    {
+      "from": "node1",
+      "to": "node3"
+    },
+    {
+      "to": "node2"
+    }
+  ]
+}
