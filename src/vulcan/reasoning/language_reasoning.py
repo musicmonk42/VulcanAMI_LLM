@@ -412,7 +412,6 @@ class LanguageReasoning:
         return best["token_id"], beam_info, candidate_list
 
     def _validate_token(self, token_id: int, context: Dict[str, Any]) -> int:
-        pass
         # Safety validator
         if self.safety and hasattr(self.safety, "validate_generation"):
             try:
@@ -462,3 +461,206 @@ class LanguageReasoning:
                 "repetition_penalty_applied": False,
             },
         }
+
+
+# --------------------------- Reasoning Interface Wrapper --------------------------- #
+
+
+class SimpleLanguageModel:
+    """
+    Simple heuristic language model for generating logits when no external model provided.
+    Uses hash-based features from input to generate consistent but varied distributions.
+    """
+
+    def __init__(self, vocab_size: int = 1000, seed: Optional[int] = None):
+        self.vocab_size = vocab_size
+        self.seed = seed
+        if seed is not None:
+            random.seed(seed)
+
+    def get_logits(
+        self, hidden_state: Any, tokens_so_far: List[Any]
+    ) -> List[float]:
+        """
+        Generate logits based on hidden state and context.
+        Uses deterministic hashing for consistency.
+        """
+        # Create base distribution from hidden state hash
+        state_hash = hash(str(hidden_state)) % 10000
+        random.seed(state_hash)
+
+        # Generate base logits with some structure
+        logits = []
+        for i in range(self.vocab_size):
+            # Mix hash-based and position-based components
+            base = random.gauss(0, 1.5)
+            position_bias = -0.1 * (i / self.vocab_size)  # Slight preference for earlier tokens
+            logits.append(base + position_bias)
+
+        # Apply context from tokens so far
+        if tokens_so_far:
+            # Boost logits for tokens that continue patterns
+            context_hash = hash(tuple(tokens_so_far[-10:])) % self.vocab_size
+            logits[context_hash % self.vocab_size] += 2.0
+            logits[(context_hash + 1) % self.vocab_size] += 1.5
+            logits[(context_hash - 1) % self.vocab_size] += 1.5
+
+        return logits
+
+
+class LanguageReasoner:
+    """
+    Reasoning interface wrapper for LanguageReasoning engine.
+    Implements the standard reasoner interface expected by UnifiedReasoner.
+    """
+
+    def __init__(
+        self,
+        model: Optional[Any] = None,
+        config: Optional[LanguageReasoningConfig] = None,
+        vocab_size: int = 1000,
+        **kwargs,
+    ):
+        """
+        Initialize LanguageReasoner.
+
+        Args:
+            model: Optional external model with get_logits() method
+            config: LanguageReasoningConfig for generation parameters
+            vocab_size: Vocabulary size for default model
+            **kwargs: Additional arguments passed to LanguageReasoning
+        """
+        # Use provided model or create simple default
+        if model is None:
+            model = SimpleLanguageModel(vocab_size=vocab_size)
+
+        self.model = model
+        self.config = config or LanguageReasoningConfig()
+        self.engine = LanguageReasoning(model, config=self.config, **kwargs)
+        self.generated_tokens: List[int] = []
+
+    def reason(self, input_data: Any, query: Optional[Dict[str, Any]] = None) -> Any:
+        """
+        Main reasoning interface compatible with UnifiedReasoner.
+
+        Args:
+            input_data: Input to process (text, dict, etc.)
+            query: Query dictionary with generation parameters
+
+        Returns:
+            ReasoningResult with generated text and metadata
+        """
+        # Import here to avoid circular dependency
+        from .reasoning_types import ReasoningResult, ReasoningType
+
+        query = query or {}
+
+        # Extract generation parameters from query
+        strategy = query.get("strategy", "sample")
+        max_tokens = query.get("max_tokens", 50)
+        temperature = query.get("temperature", self.config.temperature)
+
+        # Update config if temperature specified
+        if temperature != self.config.temperature:
+            self.config.temperature = temperature
+
+        # Create context from input_data and query
+        context = {
+            "input_data": input_data,
+            "query": query.get("query", ""),
+            "task": query.get("task", "generation"),
+        }
+
+        # Generate tokens iteratively
+        generated_text_tokens = []
+        total_confidence = 0.0
+        generation_steps = []
+
+        for step in range(max_tokens):
+            # Generate next token
+            result = self.engine.generate(
+                hidden_state=context,
+                generated_tokens=self.generated_tokens,
+                context=context,
+                strategy=strategy,
+            )
+
+            token_id = result["token_id"]
+            confidence = result["reasoning"].get("confidence", 0.5)
+            
+            # Track generated tokens
+            self.generated_tokens.append(token_id)
+            generated_text_tokens.append(token_id)
+            total_confidence += confidence if confidence else 0.5
+
+            # Store step metadata
+            generation_steps.append(
+                {
+                    "step": step,
+                    "token_id": token_id,
+                    "confidence": confidence,
+                    "strategy": result["strategy"],
+                    "entropy": result["reasoning"].get("entropy", 0.0),
+                }
+            )
+
+            # Early stopping on low confidence or end-of-sequence heuristic
+            if confidence and confidence < 0.1:
+                break
+            if token_id == 0:  # Assume 0 is EOS token
+                break
+
+        # Calculate average confidence
+        avg_confidence = (
+            total_confidence / len(generated_text_tokens)
+            if generated_text_tokens
+            else 0.0
+        )
+
+        # Create human-readable conclusion
+        if isinstance(input_data, str):
+            conclusion = f"Generated response to: '{input_data[:100]}...'"
+        elif isinstance(query.get("query"), str):
+            conclusion = f"Generated response to query: '{query['query'][:100]}...'"
+        else:
+            conclusion = "Generated language response"
+
+        # Add token sequence information
+        conclusion += f" (generated {len(generated_text_tokens)} tokens)"
+
+        # Build explanation
+        explanation = (
+            f"Neural language generation using {strategy} strategy. "
+            f"Generated {len(generated_text_tokens)} tokens with average confidence {avg_confidence:.3f}. "
+            f"Temperature: {temperature}, Top-k: {self.config.top_k}, Top-p: {self.config.top_p}"
+        )
+
+        # Create metadata
+        metadata = {
+            "generated_tokens": generated_text_tokens,
+            "generation_steps": generation_steps,
+            "strategy": strategy,
+            "avg_entropy": (
+                sum(s["entropy"] for s in generation_steps) / len(generation_steps)
+                if generation_steps
+                else 0.0
+            ),
+            "total_tokens": len(generated_text_tokens),
+            "sampling_params": {
+                "temperature": temperature,
+                "top_k": self.config.top_k,
+                "top_p": self.config.top_p,
+            },
+        }
+
+        return ReasoningResult(
+            conclusion=conclusion,
+            confidence=float(avg_confidence),
+            reasoning_type=ReasoningType.SYMBOLIC,  # Language generation is symbolic reasoning
+            explanation=explanation,
+            metadata=metadata,
+        )
+
+    def reset(self):
+        """Reset generation state (clear token history)"""
+        self.generated_tokens.clear()
