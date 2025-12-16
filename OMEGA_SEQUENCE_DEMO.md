@@ -1119,14 +1119,15 @@ def display_phase4():
     # Calculate influence and check against cap
     # In production, this would be the actual influence on the system
     proposed_influence = 0.40  # 40% system change (requesting root access)
+    max_influence = 0.05  # 5% cap
     
     print(f"[ANALYSIS] Proposed system influence: {proposed_influence*100:.0f}%")
-    print(f"[ANALYSIS] Platform maximum allowed: {config.max_single_influence*100:.0f}%")
+    print(f"[ANALYSIS] Platform maximum allowed: {max_influence*100:.0f}%")
     print()
     
-    if proposed_influence > config.max_single_influence:
+    if proposed_influence > max_influence:
         print(f"[CRITICAL] ⚠️  INFLUENCE CAP EXCEEDED")
-        print(f"           Proposed: {proposed_influence*100:.0f}% > Maximum: {config.max_single_influence*100:.0f}%")
+        print(f"           Proposed: {proposed_influence*100:.0f}% > Maximum: {max_influence*100:.0f}%")
         print()
     
     if violations:
