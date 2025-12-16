@@ -420,8 +420,23 @@ class TestAnthropicProvider:
         )
         contract = ai.AIContract()
 
-        # AnthropicProvider is already a mock implementation, no need to patch
-        result = await provider.execute(task, contract)
+        # Mock the aiohttp response for Anthropic API
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(
+            return_value={
+                "content": [{"text": "Hello from Claude!"}],
+                "usage": {"input_tokens": 10, "output_tokens": 5},
+            }
+        )
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = AsyncMock()
+        mock_session.post = Mock(return_value=mock_response)
+
+        with patch.object(provider, "_get_session", return_value=mock_session):
+            result = await provider.execute(task, contract)
 
         assert result.status == "SUCCESS"
         assert "text" in result.data
