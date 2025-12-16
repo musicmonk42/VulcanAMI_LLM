@@ -11,6 +11,8 @@ __pycache__/
 # Testing artifacts
 continual_learning_checkpoints/
 generated_graphs/
+test_ir/
+benchmark_graphs/
 meta_params/
 parameter_history/
 processing_logs/
