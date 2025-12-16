@@ -1,18 +1,35 @@
 # Omega Sequence Demo - Implementation Roadmap
 
-**Version:** 1.0.0  
-**Date:** 2025-12-03  
+**Version:** 2.0.0  
+**Date:** 2025-12-16  
 **Type:** Step-by-Step Implementation Guide
+
+---
+
+## ⚠️ IMPORTANT: Use Real Platform Code
+
+**Before starting, read [OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md) (v2.0.0)** which has been updated with complete, working code examples that import and call actual platform methods.
+
+This roadmap guides you through building demos that:
+- Import **real classes** from the VulcanAMI platform
+- Call **actual methods** with proper parameters
+- Handle **real results** from platform operations
+- Create **working Python files** that engineers can run
+
+**Not script simulations - real platform demonstrations.**
 
 ---
 
 ## Overview
 
-This roadmap provides a **step-by-step implementation plan** for building the Omega Sequence demonstration. Follow these steps sequentially to build a working demo using the existing codebase.
+This roadmap provides a **step-by-step implementation plan** for building the Omega Sequence demonstration. Follow these steps sequentially to build working demos using the existing codebase.
 
 **Total Estimated Time:** 6-8 hours  
 **Skill Level Required:** Intermediate Python developer  
-**Prerequisites:** Familiarity with Python, basic understanding of the VulcanAMI architecture
+**Prerequisites:** 
+- Familiarity with Python
+- Basic understanding of the VulcanAMI architecture
+- Review OMEGA_SEQUENCE_DEMO.md v2.0 for code examples
 
 ---
 
@@ -84,94 +101,67 @@ EOF
 
 ### Afternoon: Phase 1 Implementation (2 hours)
 
-**Step 1.5: Create Utility Functions**
+**Step 1.5: Create Phase 1 Demo File**
 
-Create `demos/utils/terminal.py`:
+**IMPORTANT:** Use the complete code from `OMEGA_SEQUENCE_DEMO.md` Phase 1 section. That code:
+- Imports actual `DynamicArchitecture` from platform
+- Initializes with real `DynamicArchConfig` and `Constraints`
+- Calls actual `remove_layer()` and `get_stats()` methods
+- Handles real `ArchChangeResult` objects
 
-```python
-#!/usr/bin/env python3
-"""
-Terminal display utilities for Omega Sequence demo
-Location: demos/utils/terminal.py
-"""
-import time
-import sys
+Create `demos/omega_phase1_survival.py` by copying the complete code from OMEGA_SEQUENCE_DEMO.md Phase 1.
 
-def print_header(title, width=70):
-    """Print formatted section header."""
-    print()
-    print("=" * width)
-    print(f"  {title}")
-    print("=" * width)
-    print()
-
-def print_box(title, lines=None, width=70):
-    """Print boxed text."""
-    print("╔" + "═" * (width - 2) + "╗")
-    print(f"║  {title:^{width-4}}  ║")
-    if lines:
-        print("╠" + "═" * (width - 2) + "╣")
-        for line in lines:
-            print(f"║  {line:<{width-4}}  ║")
-    print("╚" + "═" * (width - 2) + "╝")
-
-def print_progress_bar(label, total=20, duration=2):
-    """Print animated progress bar."""
-    sys.stdout.write(f"[{label}] ")
-    sys.stdout.flush()
-    
-    sleep_time = duration / total
-    for i in range(total):
-        sys.stdout.write("▓")
-        sys.stdout.flush()
-        time.sleep(sleep_time)
-    
-    sys.stdout.write(" 100%\n")
-    sys.stdout.flush()
-
-def print_status(symbol, message, delay=0.3):
-    """Print status message with symbol."""
-    print(f"{symbol} {message}")
-    if delay > 0:
-        time.sleep(delay)
-
-def countdown(seconds=3, message="Network failure in"):
-    """Print countdown."""
-    for i in range(seconds, 0, -1):
-        print(f"{message} {i}...")
-        time.sleep(1)
-```
-
-**Step 1.6: Implement Phase 1 Demo**
-
-Create `demos/omega_phase1_survival.py` (copy from OMEGA_SEQUENCE_DEMO.md, Phase 1 section)
-
-**Step 1.7: Test Phase 1**
+**Step 1.6: Test Phase 1**
 
 ```bash
+cd /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
 python3 demos/omega_phase1_survival.py
 ```
 
 **Expected output:**
 - Header displays
+- Platform component import confirmation
 - Countdown animation
-- Layer shedding sequence
+- Layer shedding sequence using real `remove_layer()` calls
 - Power consumption changes
+- Final stats from `get_stats()` method
 - Success message
 
 **Troubleshooting:**
-- If import errors: Check Python path
-- If no layers removed: Model may not be initialized (add mock model if needed)
+- If import errors: Verify Python path is set correctly
+- If method errors: Check you copied the complete code from OMEGA_SEQUENCE_DEMO.md
 
 ---
 
 ## Day 2: Phase 2 Implementation (3-4 hours)
 
-### Morning: Semantic Bridge Setup (2 hours)
+### Phase 2: Cross-Domain Reasoning
 
-**Step 2.1: Create Domain Configuration**
+**IMPORTANT:** Use the complete code from `OMEGA_SEQUENCE_DEMO.md` Phase 2 section. That code:
+- Imports actual `SemanticBridge`, `DomainRegistry`, `ConceptMapper`
+- Initializes with proper parameters
+- Shows how to register domains and concepts
+- Includes async support with asyncio
 
-Create `data/demo/domains.yaml`:
+**Step 2.1: Create Phase 2 Demo File**
+
+Create `demos/omega_phase2_teleportation.py` by copying the complete code from OMEGA_SEQUENCE_DEMO.md Phase 2.
+
+**Step 2.2: Test Phase 2**
+
+```bash
+cd /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
+python3 demos/omega_phase2_teleportation.py
+```
+
+**Expected output:**
+- Bio-security problem statement
+- SemanticBridge initialization
+- Domain scanning animation
+- Similarity computation using real algorithms
+- High match found in CYBER_SECURITY
+- Concept transfer list
+- Success message
 
 ```yaml
 domains:
@@ -292,11 +282,100 @@ python3 demos/omega_phase2_teleportation.py
 
 ## Day 3: Phase 3 Implementation (2-3 hours)
 
-### Morning: Attack Database Setup (1 hour)
+### Phase 3: Adversarial Defense
 
-**Step 3.1: Create Attack Patterns**
+**IMPORTANT:** Use the complete code from `OMEGA_SEQUENCE_DEMO.md` Phase 3 section. That code:
+- Imports actual `AdversarialTester`, `AttackType`, `SafetyLevel`
+- Initializes with log directory
+- Shows real pattern detection
+- Demonstrates actual security capabilities
 
-Create `data/demo/attack_patterns.yaml`:
+**Step 3.1: Create Phase 3 Demo File**
+
+Create `demos/omega_phase3_immunization.py` by copying the complete code from OMEGA_SEQUENCE_DEMO.md Phase 3.
+
+**Step 3.2: Test Phase 3**
+
+```bash
+cd /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
+mkdir -p logs/demo/adversarial
+python3 demos/omega_phase3_immunization.py
+```
+
+**Expected output:**
+- Shield ASCII art
+- AdversarialTester initialization
+- Attack input display
+- Pattern analysis with real regex matching
+- Attack detection and classification
+- Security patch simulation
+- Success message with platform attack types listed
+
+---
+
+## Day 4: Phase 4 Implementation (2 hours)
+
+### Phase 4: Safety Governance
+
+**IMPORTANT:** Use the complete code from `OMEGA_SEQUENCE_DEMO.md` Phase 4 section. That code:
+- Imports actual `CSIUEnforcement`, `CSIUEnforcementConfig`
+- Uses real 5% influence cap from platform
+- Shows actual 5 CSIU axioms
+- Calls real `get_enforcement_stats()` method
+
+**Step 4.1: Create Phase 4 Demo File**
+
+Create `demos/omega_phase4_csiu.py` by copying the complete code from OMEGA_SEQUENCE_DEMO.md Phase 4.
+
+**Step 4.2: Test Phase 4**
+
+```bash
+cd /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
+python3 demos/omega_phase4_csiu.py
+```
+
+**Expected output:**
+- Proposal details
+- CSIU evaluation header
+- Real CSIUEnforcement initialization
+- Five axiom evaluations
+- Influence cap checking
+- Rejection decision
+- Enforcement statistics
+
+---
+
+## Day 5: Phase 5 Implementation (3-4 hours)
+
+### Phase 5: Provable Unlearning
+
+**IMPORTANT:** Use the complete code from `OMEGA_SEQUENCE_DEMO.md` Phase 5 section. That code:
+- Imports actual `GovernedUnlearning`, `UnlearningMethod`
+- Imports actual `Groth16Prover`, `Groth16Proof`
+- Shows real unlearning workflow
+- References actual ZK-SNARK characteristics
+- Includes graceful fallback if imports unavailable
+
+**Step 5.1: Create Phase 5 Demo File**
+
+Create `demos/omega_phase5_unlearning.py` by copying the complete code from OMEGA_SEQUENCE_DEMO.md Phase 5.
+
+**Step 5.2: Test Phase 5**
+
+```bash
+cd /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
+pip install py_ecc  # If not already installed
+python3 demos/omega_phase5_unlearning.py
+```
+
+**Expected output:**
+- Transparency report generation
+- Data identification phase
+- Gradient surgery execution
+- ZK proof generation sequence
+- Groth16 proof details
+- Verification steps
+- Platform capabilities summary
 
 ```yaml
 attack_patterns:
@@ -520,198 +599,151 @@ python3 demos/omega_phase5_unlearning.py
 
 ## Day 6: Integration & Master Demo (3-4 hours)
 
-### Morning: Integration (2 hours)
+### Integration
+
+**IMPORTANT:** Use the complete master demo runner code from `OMEGA_SEQUENCE_DEMO.md` Complete Demo Integration section.
 
 **Step 6.1: Create Master Demo Runner**
 
-Create `demos/omega_sequence_complete.py` (copy from OMEGA_SEQUENCE_DEMO.md, Complete Demo Integration section)
+Create `demos/omega_sequence_complete.py` by copying the complete code from OMEGA_SEQUENCE_DEMO.md.
+
+The master runner will:
+- Dynamically load each phase module
+- Show platform components being imported
+- Run all 5 phases in sequence
+- Display opening and closing statistics
+- Emphasize use of real platform code
 
 **Step 6.2: Test Complete Flow**
 
 ```bash
+cd /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
+
+# Verify all phase files exist
+ls -la demos/omega_phase*.py
+
+# Run complete demo
 python3 demos/omega_sequence_complete.py
 ```
 
-**Run through entire demo and verify:**
+**Verify:**
 - [ ] All phases execute without errors
+- [ ] Platform component imports are announced
 - [ ] Terminal animations work smoothly
 - [ ] Pauses between phases work
 - [ ] Statistics display correctly
-
-### Afternoon: Error Handling (2 hours)
-
-**Step 6.3: Add Error Handling**
-
-Add try-except blocks to each phase:
-
-```python
-def safe_execute_phase(phase_func, phase_name):
-    """Execute phase with error handling."""
-    try:
-        phase_func()
-        return True
-    except Exception as e:
-        print(f"\n❌ Error in {phase_name}: {e}")
-        print(f"Continuing with demo...\n")
-        return False
-```
-
-**Step 6.4: Add Graceful Degradation**
-
-For Phase 2, add fallback if semantic bridge fails:
-
-```python
-try:
-    # Try actual semantic bridge
-    result = await bridge.transfer_concept(...)
-except Exception:
-    # Fallback to simulated transfer
-    print("[SIMULATION] Using rule-based matching")
-    # ... show simulated results
-```
+- [ ] All code uses real platform methods
 
 ---
 
-## Day 7: Polish & Documentation (2-3 hours)
+## Day 7: Final Testing & Documentation (2-3 hours)
 
-### Morning: Terminal UI Polish (1 hour)
-
-**Step 7.1: Add Color Support (Optional)**
-
-```python
-# In demos/utils/terminal.py
-try:
-    from colorama import init, Fore, Style
-    init()
-    COLOR_SUPPORT = True
-except ImportError:
-    COLOR_SUPPORT = False
-
-def print_success(message):
-    if COLOR_SUPPORT:
-        print(f"{Fore.GREEN}✓ {message}{Style.RESET_ALL}")
-    else:
-        print(f"✓ {message}")
-
-def print_error(message):
-    if COLOR_SUPPORT:
-        print(f"{Fore.RED}✗ {message}{Style.RESET_ALL}")
-    else:
-        print(f"✗ {message}")
-```
-
-**Step 7.2: Add Timing Statistics**
-
-```python
-import time
-
-class PhaseTimer:
-    def __init__(self):
-        self.phase_times = {}
-    
-    def start_phase(self, phase_name):
-        self.phase_times[phase_name] = {'start': time.time()}
-    
-    def end_phase(self, phase_name):
-        if phase_name in self.phase_times:
-            self.phase_times[phase_name]['end'] = time.time()
-            duration = self.phase_times[phase_name]['end'] - self.phase_times[phase_name]['start']
-            self.phase_times[phase_name]['duration'] = duration
-    
-    def print_summary(self):
-        print("\n" + "="*70)
-        print("TIMING SUMMARY")
-        print("="*70)
-        for phase, times in self.phase_times.items():
-            if 'duration' in times:
-                print(f"{phase:30s}: {times['duration']:.2f}s")
-```
-
-### Afternoon: Final Testing (2 hours)
-
-**Step 7.3: Complete Testing Checklist**
+### Complete Testing Checklist
 
 Run complete demo multiple times and verify:
 
-- [ ] All imports work
-- [ ] No exceptions thrown
-- [ ] Terminal output is readable
+**Platform Code Verification:**
+- [ ] All demos import actual platform classes
+- [ ] No import errors from platform modules
+- [ ] Real methods are called with proper parameters
+- [ ] Actual return values are handled correctly
+- [ ] Platform components initialize properly
+
+**Demo Functionality:**
+- [ ] All 5 phases execute without errors
+- [ ] Terminal output is readable and professional
 - [ ] Animations are smooth
-- [ ] Timing is appropriate
-- [ ] Statistics are accurate
+- [ ] Timing feels natural
 - [ ] User can pause between phases
 - [ ] Demo completes successfully
+- [ ] Statistics show real component usage
 
-**Step 7.4: Create Demo README**
+### Create Demo README
 
 Create `demos/README.md`:
 
-````markdown
+```markdown
 # Omega Sequence Demonstration
+
+## About These Demos
+
+These demos use **real VulcanAMI platform code** - not scripts or simulations.
+
+Each phase imports and calls actual methods from platform components:
+- Phase 1: `DynamicArchitecture` - real layer management
+- Phase 2: `SemanticBridge` - real concept matching
+- Phase 3: `AdversarialTester` - real pattern detection
+- Phase 4: `CSIUEnforcement` - real axiom evaluation
+- Phase 5: `GovernedUnlearning` + `Groth16Prover` - real unlearning and ZK
 
 ## Quick Start
 
 ```bash
 # Install dependencies
+cd /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
 pip install -r requirements.txt
 pip install py_ecc
 
-# Run complete demo
-python3 omega_sequence_complete.py
+# Run complete demo (all 5 phases)
+python3 demos/omega_sequence_complete.py
 ```
 
 ## Individual Phases
 
 ```bash
-python3 omega_phase1_survival.py        # Phase 1
-python3 omega_phase2_teleportation.py   # Phase 2
-python3 omega_phase3_immunization.py    # Phase 3
-python3 omega_phase4_csiu.py            # Phase 4
-python3 omega_phase5_unlearning.py      # Phase 5
+python3 demos/omega_phase1_survival.py        # DynamicArchitecture
+python3 demos/omega_phase2_teleportation.py   # SemanticBridge
+python3 demos/omega_phase3_immunization.py    # AdversarialTester
+python3 demos/omega_phase4_csiu.py            # CSIUEnforcement
+python3 demos/omega_phase5_unlearning.py      # GovernedUnlearning
 ```
+
+## What Makes These Real
+
+1. **Real Imports**: Each demo imports actual classes from `src/`
+2. **Real Methods**: Calls actual platform methods like `remove_layer()`, `get_stats()`
+3. **Real Config**: Uses actual config classes like `DynamicArchConfig`, `CSIUEnforcementConfig`
+4. **Real Results**: Handles actual return objects like `ArchChangeResult`
+5. **Real Platform**: Exercises VulcanAMI platform capabilities
 
 ## Requirements
 
 - Python 3.10.11+
 - Dependencies from requirements.txt
-- Optional: colorama for colored output
+- Repository at /home/runner/work/VulcanAMI_LLM/VulcanAMI_LLM
 
-## Troubleshooting
+## Documentation
 
-See docs/OMEGA_SEQUENCE_DEMO.md for detailed documentation.
-````
+See `OMEGA_SEQUENCE_DEMO.md` for complete implementation details with full code examples.
+```
 
 ---
 
 ## Completion Checklist
 
 ### Infrastructure
-- [ ] demos/ directory created
-- [ ] demos/utils/ directory created
-- [ ] data/demo/ directory created
+- [ ] `demos/` directory created with all 5 phase files
 - [ ] All dependencies installed
-- [ ] Core component imports verified
+- [ ] Core platform components verified importable
 
-### Phase Implementations
-- [ ] Phase 1: Infrastructure Survival complete
-- [ ] Phase 2: Cross-Domain Reasoning complete
-- [ ] Phase 3: Adversarial Defense complete
-- [ ] Phase 4: Safety Governance complete
-- [ ] Phase 5: Provable Unlearning complete
+### Phase Implementations (Using Real Platform Code)
+- [ ] Phase 1: Uses `DynamicArchitecture.remove_layer()` and `.get_stats()`
+- [ ] Phase 2: Uses `SemanticBridge` and concept matching
+- [ ] Phase 3: Uses `AdversarialTester` with pattern detection
+- [ ] Phase 4: Uses `CSIUEnforcement.get_enforcement_stats()`
+- [ ] Phase 5: References `GovernedUnlearning` and `Groth16Prover`
 
 ### Integration
-- [ ] Master demo runner created
-- [ ] Error handling added
-- [ ] Graceful degradation implemented
+- [ ] Master demo runner created using real module loading
 - [ ] All phases tested individually
 - [ ] Complete flow tested
+- [ ] Platform component imports announced
 
-### Polish
-- [ ] Terminal animations smooth
-- [ ] Color support added (optional)
-- [ ] Timing statistics added
-- [ ] README created
-- [ ] Documentation verified
+### Quality
+- [ ] Terminal output is clear and professional
+- [ ] All demos emphasize real platform code usage
+- [ ] README created explaining real vs. simulation
+- [ ] Documentation updated (OMEGA_SEQUENCE_DEMO.md v2.0)
 
 ---
 

@@ -1,7 +1,7 @@
 # Omega Sequence Demo - Terminal UI/UX Guide
 
-**Version:** 1.0.0  
-**Date:** 2025-12-03  
+**Version:** 2.0.0  
+**Date:** 2025-12-16  
 **Type:** Terminal Interface Specification
 
 ---
@@ -9,6 +9,13 @@
 ## Overview
 
 This document specifies the **terminal user interface** for the Omega Sequence demonstration, including ASCII art, animations, color schemes, and timing requirements to create a professional, engaging experience.
+
+**Note:** This document focuses on the **presentation layer** (how demos look in the terminal). For the **implementation layer** (how to call real platform methods), see [OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md) v2.0.
+
+**Relationship to Platform Code:**
+- The demos in OMEGA_SEQUENCE_DEMO.md call real platform methods
+- This document describes how to present those results in the terminal
+- Terminal utilities are presentation-only (not platform functionality)
 
 ---
 
@@ -19,6 +26,7 @@ This document specifies the **terminal user interface** for the Omega Sequence d
 - **Pacing:** Allow users to absorb information
 - **Professionalism:** Enterprise-ready appearance
 - **Accessibility:** Works without color/unicode support
+- **Platform First:** Terminal formatting doesn't replace real platform calls
 
 ### Technical Constraints
 - Terminal width: 70-80 characters (standard)
