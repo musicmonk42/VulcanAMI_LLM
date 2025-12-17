@@ -226,7 +226,7 @@ class LLVMBackend:
 
             # Create target machine with optimization level
             target_machine = target.create_target_machine(
-                opt=self.optimization_level, codemodel="jit"
+                opt=self.optimization_level, codemodel="jitdefault"
             )
 
             # Create execution engine
