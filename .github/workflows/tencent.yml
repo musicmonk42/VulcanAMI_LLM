@@ -63,24 +63,24 @@ jobs:
         docker build --build-arg REJECT_INSECURE_JWT=ack -t ${TKE_IMAGE_URL}:${GITHUB_SHA} .
 
     - name: Login TKE Registry
-      if: secrets.TENCENT_CLOUD_ACCOUNT_ID && secrets.TKE_REGISTRY_PASSWORD
+      if: secrets.TENCENT_CLOUD_ACCOUNT_ID != '' && secrets.TKE_REGISTRY_PASSWORD != ''
       run: |
         docker login -u ${{ secrets.TENCENT_CLOUD_ACCOUNT_ID }} -p '${{ secrets.TKE_REGISTRY_PASSWORD }}' ${TKE_IMAGE_URL}
 
     # Push the Docker image to TKE Registry
     - name: Publish
-      if: secrets.TENCENT_CLOUD_ACCOUNT_ID && secrets.TKE_REGISTRY_PASSWORD
+      if: secrets.TENCENT_CLOUD_ACCOUNT_ID != '' && secrets.TKE_REGISTRY_PASSWORD != ''
       run: |
         docker push ${TKE_IMAGE_URL}:${GITHUB_SHA}
 
     - name: Set up Kustomize
-      if: secrets.TENCENT_CLOUD_ACCOUNT_ID && secrets.TKE_REGISTRY_PASSWORD && secrets.TENCENT_CLOUD_SECRET_ID && secrets.TENCENT_CLOUD_SECRET_KEY
+      if: secrets.TENCENT_CLOUD_ACCOUNT_ID != '' && secrets.TKE_REGISTRY_PASSWORD != '' && secrets.TENCENT_CLOUD_SECRET_ID != '' && secrets.TENCENT_CLOUD_SECRET_KEY != ''
       run: |
         curl -o kustomize --location https://github.com/kubernetes-sigs/kustomize/releases/download/v3.1.0/kustomize_3.1.0_linux_amd64
         chmod u+x ./kustomize
 
     - name: Set up ~/.kube/config for connecting TKE cluster
-      if: secrets.TENCENT_CLOUD_ACCOUNT_ID && secrets.TKE_REGISTRY_PASSWORD && secrets.TENCENT_CLOUD_SECRET_ID && secrets.TENCENT_CLOUD_SECRET_KEY
+      if: secrets.TENCENT_CLOUD_ACCOUNT_ID != '' && secrets.TKE_REGISTRY_PASSWORD != '' && secrets.TENCENT_CLOUD_SECRET_ID != '' && secrets.TENCENT_CLOUD_SECRET_KEY != ''
       uses: TencentCloud/tke-cluster-credential-action@v1
       with:
         secret_id: ${{ secrets.TENCENT_CLOUD_SECRET_ID }}
@@ -89,13 +89,13 @@ jobs:
         cluster_id: ${{ env.TKE_CLUSTER_ID }}
 
     - name: Switch to TKE context
-      if: secrets.TENCENT_CLOUD_ACCOUNT_ID && secrets.TKE_REGISTRY_PASSWORD && secrets.TENCENT_CLOUD_SECRET_ID && secrets.TENCENT_CLOUD_SECRET_KEY
+      if: secrets.TENCENT_CLOUD_ACCOUNT_ID != '' && secrets.TKE_REGISTRY_PASSWORD != '' && secrets.TENCENT_CLOUD_SECRET_ID != '' && secrets.TENCENT_CLOUD_SECRET_KEY != ''
       run: |
         kubectl config use-context ${TKE_CLUSTER_ID}-context-default
 
     # Deploy the Docker image to the TKE cluster
     - name: Deploy
-      if: secrets.TENCENT_CLOUD_ACCOUNT_ID && secrets.TKE_REGISTRY_PASSWORD && secrets.TENCENT_CLOUD_SECRET_ID && secrets.TENCENT_CLOUD_SECRET_KEY
+      if: secrets.TENCENT_CLOUD_ACCOUNT_ID != '' && secrets.TKE_REGISTRY_PASSWORD != '' && secrets.TENCENT_CLOUD_SECRET_ID != '' && secrets.TENCENT_CLOUD_SECRET_KEY != ''
       run: |
         ./kustomize edit set image ${TKE_IMAGE_URL}:${GITHUB_SHA}
         ./kustomize build . | kubectl apply -f -
