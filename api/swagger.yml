@@ -1,0 +1,878 @@
+openapi: 3.0.0
+info:
+  title: VulcanAMI API Suite
+  version: 1.0.0
+servers:
+  - url: https://registry.example.com
+    description: Graphix Registry (Flask)
+  - url: https://arena.example.com
+    description: Graphix Arena (FastAPI)
+  - url: https://gateway.example.com
+    description: Vulcan API Gateway (aiohttp)
+  - url: https://core-api.example.com
+    description: Legacy Graph API Server
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BootstrapKey:
+      type: apiKey
+      in: header
+      name: X-Bootstrap-Key
+  schemas:
+    RegistryNonceRequest:
+      type: object
+      required: [agent_id]
+      properties:
+        agent_id: {type: string}
+    RegistryLoginRequest:
+      type: object
+      required: [agent_id, nonce, signature]
+      properties:
+        agent_id: {type: string}
+        nonce: {type: string}
+        signature: {type: string, description: "Base64 signature over '<agent_id>:<nonce>'"}
+    RegistryBootstrapRequest:
+      type: object
+      required: [agent_id, pubkey]
+      properties:
+        agent_id: {type: string}
+        pubkey: {type: string}
+        roles:
+          type: array
+          items: {type: string}
+        trust: {type: number, format: float}
+    RegistryOnboardRequest:
+      type: object
+      required: [agent_id, pubkey]
+      properties:
+        agent_id: {type: string}
+        pubkey: {type: string}
+        roles:
+          type: array
+          items: {type: string}
+        trust: {type: number}
+    IRProposalRequest:
+      type: object
+      required: [agent_id, ir]
+      properties:
+        agent_id: {type: string}
+        ir: {type: object}
+    AuditLogsResponse:
+      type: object
+      properties:
+        count: {type: integer}
+        offset: {type: integer}
+        limit: {type: integer}
+        logs: {type: array, items: {type: object}}
+    RootResponse:
+      type: object
+      properties:
+        service: {type: string, example: "Graphix Registry"}
+        version: {type: string}
+        timestamp: {type: string, format: date-time}
+        redis_backing: {type: boolean}
+        endpoints:
+          type: array
+          items: {type: string}
+    ArenaRootResponse:
+      type: object
+      properties:
+        service: {type: string, example: "Graphix Arena"}
+        version: {type: string}
+        endpoints:
+          type: array
+          items: {type: string}
+    MetaResponse:
+      type: object
+      properties:
+        service: {type: string}
+        version: {type: string}
+        rate_limits: {type: object}
+        auth: {type: object}
+        jwt: {type: object}
+        cors: {type: object}
+        limits: {type: object}
+        bootstrap: {type: object}
+    HealthResponse:
+      type: object
+      properties:
+        status: {type: string, example: healthy}
+        db: {type: string}
+        db_latency_ms: {type: number}
+        redis: {type: string}
+        redis_latency_ms: {type: number}
+        time: {type: string, format: date-time}
+    JWKSResponse:
+      type: object
+      properties:
+        keys:
+          type: array
+          items: {type: object}
+        symmetric: {type: boolean}
+    SpecResponse:
+      type: object
+      description: Minimal internal OpenAPI stub
+    RegistryNonceResponse:
+      type: object
+      properties:
+        nonce: {type: string}
+        agent_id: {type: string}
+    RegistryLoginResponse:
+      type: object
+      properties:
+        access_token: {type: string}
+        agent_id: {type: string}
+        issuer: {type: string}
+        audience: {type: string}
+    RegistryLogoutResponse:
+      type: object
+      properties:
+        status: {type: string, example: revoked}
+        jti: {type: string}
+    RegistryBootstrapResponse:
+      type: object
+      properties:
+        status: {type: string, example: bootstrapped}
+        agent_id: {type: string}
+        access_token: {type: string}
+        roles:
+          type: array
+          items: {type: string}
+    BootstrapResetResponse:
+      type: object
+      properties:
+        status: {type: string, example: reset}
+        bootstrap_used: {type: boolean}
+    RegistryOnboardResponse:
+      type: object
+      properties:
+        status: {type: string, example: registered}
+        agent_id: {type: string}
+    IRProposalResponse:
+      type: object
+      properties:
+        status: {type: string, example: proposal_received}
+        agent_id: {type: string}
+        proposal_id: {type: integer}
+    ErrorResponse:
+      type: object
+      properties:
+        error: {type: string}
+        detail: {type: string}
+    ArenaRunRequest:
+      type: object
+      description: "GraphSpec or GraphixIRGraph payload; validated per agent configuration"
+    ArenaFeedbackRequest:
+      type: object
+      required: [graph_id, agent_id, score]
+      properties:
+        graph_id: {type: string}
+        agent_id: {type: string}
+        score: {type: number}
+        failed_consensus: {type: boolean}
+        rationale: {type: string}
+    ArenaTournamentRequest:
+      type: object
+      required: [proposals, fitness]
+      properties:
+        proposals: {type: array, items: {type: object}}
+        fitness: {type: array, items: {type: number}}
+        embedding_func: {type: string}
+    ArenaFeedbackDispatch:
+      oneOf:
+        - type: object
+          required: [type, proposal_id, score]
+          properties:
+            type: {type: string, enum: ["FeedbackProtocol"]}
+            proposal_id: {type: string}
+            score: {type: number}
+            rationale: {type: string}
+        - type: object
+          required: [type, params]
+          properties:
+            type: {type: string, enum: ["FeedbackQueryNode"]}
+            params:
+              type: object
+              properties:
+                proposal_id: {type: string}
+                limit: {type: integer, default: 10}
+    GatewayLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: {type: string}
+        password: {type: string}
+    GatewayRefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: {type: string}
+    GatewayProcessRequest:
+      type: object
+      properties:
+        input: {}
+    GatewayPlanRequest:
+      type: object
+      required: [goal]
+      properties:
+        goal: {type: string}
+        context: {type: object}
+    GatewayExecuteRequest:
+      type: object
+      required: [plan]
+      properties:
+        plan: {type: object}
+    GatewayLearnRequest:
+      type: object
+      required: [experience]
+      properties:
+        experience: {}
+    GatewayReasonRequest:
+      type: object
+      required: [query]
+      properties:
+        query: {}
+        type: {type: string, enum: [probabilistic, symbolic, causal]}
+        treatment: {type: string}
+        outcome: {type: string}
+        input: {type: array}
+    GatewayMemoryStoreRequest:
+      type: object
+      required: [content]
+      properties:
+        content: {}
+        metadata: {type: object}
+    CoreLoginRequest:
+      type: object
+      required: [api_key]
+      properties:
+        api_key: {type: string}
+        password: {type: string}
+        nonce: {type: string}
+        timestamp: {type: string}
+        proof: {type: string}
+    CoreSubmitGraphRequest:
+      type: object
+      required: [graph]
+      properties:
+        graph: {type: object}
+        priority: {type: integer, minimum: 0, maximum: 10}
+        timeout: {type: integer, minimum: 1, maximum: 300}
+        callback: {type: string, format: uri}
+paths:
+  /auth/nonce:
+    post:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistryNonceRequest' }
+      responses:
+        "200":
+          description: Nonce issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistryNonceResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /auth/login:
+    post:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistryLoginRequest' }
+      responses:
+        "200":
+          description: JWT access token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistryLoginResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /auth/logout:
+    post:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      security: [{BearerAuth: []}]
+      responses:
+        "200":
+          description: Token revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistryLogoutResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /registry/bootstrap:
+    post:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      security: [{BootstrapKey: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistryBootstrapRequest' }
+      responses:
+        "200":
+          description: Agent bootstrapped
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistryBootstrapResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /registry/bootstrap/reset:
+    post:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      security: [{BearerAuth: []}, {BootstrapKey: []}]
+      responses:
+        "200":
+          description: Bootstrap key reset
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BootstrapResetResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /registry/onboard:
+    post:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistryOnboardRequest' }
+      responses:
+        "200":
+          description: Agent registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistryOnboardResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /ir/propose:
+    post:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IRProposalRequest' }
+      responses:
+        "200":
+          description: Proposal accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IRProposalResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /audit/logs:
+    get:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      security: [{BearerAuth: []}]
+      parameters:
+        - in: query
+          name: agent_id
+          schema: {type: string}
+        - in: query
+          name: limit
+          schema: {type: integer, default: 100}
+        - in: query
+          name: offset
+          schema: {type: integer, default: 0}
+      responses:
+        "200":
+          description: Paginated audit logs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogsResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /health:
+    get:
+      servers:
+        - url: https://registry.example.com
+        - url: https://arena.example.com
+      tags: [registry, arena]
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /meta:
+    get:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      responses:
+        "200":
+          description: Service metadata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MetaResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /jwks:
+    get:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      responses:
+        "200":
+          description: JWKS (symmetric placeholder)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JWKSResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /spec:
+    get:
+      servers: [{url: https://registry.example.com}]
+      tags: [registry]
+      responses:
+        "200":
+          description: Minimal spec stub
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SpecResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /api/run/{agent_id}:
+    post:
+      servers: [{url: https://arena.example.com}]
+      tags: [arena]
+      security: [{ApiKeyAuth: []}]
+      parameters:
+        - in: path
+          name: agent_id
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArenaRunRequest' }
+      responses:
+        "200": {description: Agent run result}
+  /api/feedback:
+    post:
+      servers: [{url: https://arena.example.com}]
+      tags: [arena]
+      security: [{ApiKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArenaFeedbackRequest' }
+      responses:
+        "200": {description: Feedback recorded}
+  /api/tournament:
+    post:
+      servers: [{url: https://arena.example.com}]
+      tags: [arena]
+      security: [{ApiKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArenaTournamentRequest' }
+      responses:
+        "200": {description: Winner indices and meta}
+  /api/metrics:
+    get:
+      servers: [{url: https://arena.example.com}]
+      tags: [arena]
+      responses:
+        "200":
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema: {type: string}
+  /api/feedback_dispatch:
+    post:
+      servers: [{url: https://arena.example.com}]
+      tags: [arena]
+      security: [{ApiKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ArenaFeedbackDispatch' }
+      responses:
+        "200": {description: Feedback protocol response}
+    get:
+      servers: [{url: https://arena.example.com}]
+      tags: [arena]
+      responses:
+        "200": {description: Usage examples}
+  /:
+    get:
+      servers:
+        - url: https://arena.example.com
+        - url: https://registry.example.com
+      tags: [arena, registry]
+      responses:
+        "200":
+          description: Service root information
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/ArenaRootResponse' }
+                  - { $ref: '#/components/schemas/RootResponse' }
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+  /health/components:
+    get:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      responses:
+        "200": {description: Component health}
+  /metrics-gateway:
+    get:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      operationId: gatewayMetrics
+      responses:
+        "200":
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema: {type: string}
+  /auth/login-gateway:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      operationId: gatewayLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayLoginRequest' }
+      responses:
+        "200": {description: Access/refresh tokens}
+  /auth/refresh:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayRefreshRequest' }
+      responses:
+        "200": {description: Rotated tokens}
+  /auth/logout-gateway:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token: {type: string}
+      responses:
+        "200": {description: Tokens revoked}
+  /v1/process:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayProcessRequest' }
+      responses:
+        "200": {description: Embedding / modality result}
+  /v1/plan:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayPlanRequest' }
+      responses:
+        "200": {description: Plan generated}
+  /v1/execute:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayExecuteRequest' }
+      responses:
+        "200": {description: Execution result}
+  /v1/learn:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayLearnRequest' }
+      responses:
+        "200": {description: Learning result}
+  /v1/reason:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayReasonRequest' }
+      responses:
+        "200": {description: Reasoning output}
+  /v1/memory/search:
+    get:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: {type: string}
+        - in: query
+          name: k
+          schema: {type: integer, default: 10}
+      responses:
+        "200": {description: Search results}
+  /v1/memory/store:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GatewayMemoryStoreRequest' }
+      responses:
+        "200": {description: Memory stored}
+  /v1/status:
+    get:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: System status}
+  /v1/configure:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        "200": {description: Settings updated}
+  /graphql-gateway:
+    post:
+      servers: [{url: https://gateway.example.com}]
+      tags: [gateway]
+      security: [{BearerAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: {type: string}
+                variables: {type: object}
+      responses:
+        "200": {description: GraphQL result}
+  /auth/login-core:
+    post:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CoreLoginRequest' }
+      responses:
+        "200": {description: JWT issued}
+  /auth/logout-core:
+    post:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      security: [{BearerAuth: []}, {ApiKeyAuth: []}]
+      responses:
+        "200": {description: Logged out}
+  /graphs/submit:
+    post:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      security: [{BearerAuth: []}, {ApiKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CoreSubmitGraphRequest' }
+      responses:
+        "200": {description: Graph submission accepted}
+  /graphs/{graph_id}:
+    get:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      parameters:
+        - in: path
+          name: graph_id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Graph payload}
+  /proposals/create:
+    post:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      security: [{BearerAuth: []}, {ApiKeyAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, graph]
+              properties:
+                title: {type: string}
+                description: {type: string}
+                graph: {type: object}
+      responses:
+        "200": {description: Proposal created}
+  /proposals/{proposal_id}/vote:
+    post:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      security: [{BearerAuth: []}, {ApiKeyAuth: []}]
+      parameters:
+        - in: path
+          name: proposal_id
+          required: true
+          schema: {type: string}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vote]
+              properties:
+                vote: {type: string, enum: [for, against]}
+      responses:
+        "200": {description: Vote recorded}
+  /api/reason:
+    post:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      security: [{BearerAuth: []}, {ApiKeyAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: {}
+                reasoning_type: {type: string}
+      responses:
+        "200": {description: Reasoning result}
+  /graphql-core:
+    post:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      security: [{BearerAuth: []}, {ApiKeyAuth: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: {type: string}
+      responses:
+        "200": {description: GraphQL placeholder}
+  /metrics-core:
+    get:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      responses:
+        "200": {description: Prometheus metrics}
+  /vulcan/insights:
+    get:
+      servers: [{url: https://core-api.example.com}]
+      tags: [core]
+      security: [{BearerAuth: []}, {ApiKeyAuth: []}]
+      responses:
+        "200": {description: Vulcan integration insights}
+  /status:
+    get:
+      servers:
+        - url: https://core-api.example.com
+        - url: https://gateway.example.com
+      tags: [core, gateway]
+      responses:
+        "200": {description: Status payload}
