@@ -83,11 +83,11 @@ Create `demos/omega_phase1_survival.py`:
 #!/usr/bin/env python3
 """
 Phase 1 Demo: Infrastructure Survival
-Makes HTTP calls to running platform
+Makes HTTP REST API calls to running platform - REQUIRED approach
 """
 import requests
 import os
-import time
+import sys
 
 PLATFORM_URL = os.environ.get('PLATFORM_URL', 'http://0.0.0.0:8000')
 API_KEY = os.environ.get('API_KEY', 'dev-key-12345')
@@ -98,8 +98,8 @@ def display_phase1():
     print("="*70)
     print()
     
-    # Call platform API
     try:
+        # ✅ REQUIRED: HTTP REST API call to platform
         response = requests.post(
             f'{PLATFORM_URL}/api/omega/phase1/survival',
             headers={'X-API-Key': API_KEY},
@@ -109,22 +109,41 @@ def display_phase1():
         response.raise_for_status()
         data = response.json()
         
-        # Display results
-        if data['status'] == 'success':
-            print(f"Initial layers: {data['initial']['layers']}")
-            print(f"Final layers: {data['final']['layers']}")
-            print(f"Layers shed: {data['layers_shed']}")
-            print(f"Power reduction: {data['power_reduction_percent']}%")
+        # Display results from API response
+        if data.get('status') == 'success':
+            print("INITIAL ARCHITECTURE:")
+            print(f"  Layers: {data['initial']['layers']}")
+            print(f"  Heads:  {data['initial']['heads']}")
+            print()
+            
+            print("FINAL ARCHITECTURE:")
+            print(f"  Layers: {data['final']['layers']}")
+            print(f"  Heads:  {data['final']['heads']}")
+            print()
+            
+            print("RESULTS:")
+            print(f"  Layers shed: {data['layers_shed']}")
+            print(f"  Power reduction: {data['power_reduction_percent']}%")
+        else:
+            print(f"[ERROR] {data.get('error')}")
             
     except requests.exceptions.ConnectionError:
         print("[ERROR] Cannot connect to platform")
         print("Start it with: uvicorn src.full_platform:app --host 0.0.0.0 --port 8000 --reload")
+        sys.exit(1)
     except Exception as e:
         print(f"[ERROR] {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     display_phase1()
 ```
+
+**This example demonstrates:**
+- ✅ HTTP REST API call (REQUIRED)
+- ✅ Proper error handling
+- ✅ JSON response parsing
+- ❌ NO direct imports (PROHIBITED)
 
 ### Step 3: Test Your Demo
 
