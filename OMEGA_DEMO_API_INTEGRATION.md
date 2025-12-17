@@ -8,19 +8,22 @@
 
 ## Overview
 
-This guide shows how to modify the omega demo files to make **real HTTP API calls** to a running VulcanAMI platform instance, instead of directly importing and calling platform classes.
+This guide shows how to **create new omega demo files** that make **real HTTP API calls** to a running VulcanAMI platform instance, instead of directly importing and calling platform classes.
+
+**Note:** The demo files (omega_phase1_survival.py through omega_phase5_unlearning.py) need to be created by engineers following this guide. They are not included in the repository.
 
 ### Key Changes
 
-**Before (Current):**
-- Demo files directly import platform classes (e.g., `from src.execution.dynamic_architecture import DynamicArchitecture`)
-- Demos instantiate classes and call methods directly
-- Demos run standalone without a server
+**Before (Old Approach - No Longer Used):**
+- Demo files directly imported platform classes (e.g., `from src.execution.dynamic_architecture import DynamicArchitecture`)
+- Demos instantiated classes and called methods directly
+- Demos ran standalone without a server
 
-**After (Target):**
+**Now (New Approach - What You'll Create):**
 - Demo files make HTTP requests to platform API endpoints
 - Platform server must be running first
 - Demos communicate via REST API over HTTP
+- Engineers create demo files following patterns in this guide
 
 ---
 
@@ -628,41 +631,28 @@ Each endpoint:
 
 ---
 
-## Migration Checklist
+## Creation Checklist
 
-For each demo file (phase1 through phase5):
+For each demo file you create (phase1 through phase5):
 
-- [ ] Remove direct platform imports (e.g., `from src.execution.dynamic_architecture import ...`)
+- [ ] Create new file `demos/omega_phaseX_[name].py`
 - [ ] Add `import requests` and `import os`
 - [ ] Add `PLATFORM_URL` and `API_KEY` configuration
 - [ ] Create `call_platform_api()` helper function
-- [ ] Replace direct method calls with HTTP API calls
+- [ ] Make HTTP API call to appropriate endpoint
 - [ ] Parse JSON response and extract relevant data
-- [ ] Update display logic to use API response data
+- [ ] Create display logic using API response data
 - [ ] Add error handling for connection/timeout/auth errors
 - [ ] Test with platform server running
-- [ ] Verify all output matches original demo behavior
+- [ ] Verify output demonstrates the phase capability
 
 ---
 
 ## Complete Example: Phase 1 Demo
 
-Here's a complete example showing the migration:
+Here's a complete example showing what you'll create:
 
-**Before (Direct Import):**
-```python
-from src.execution.dynamic_architecture import DynamicArchitecture, DynamicArchConfig
-
-def display_phase1():
-    config = DynamicArchConfig(enable_validation=True)
-    arch = DynamicArchitecture(model=None, config=config)
-    
-    # Direct method call
-    stats = arch.get_stats()
-    print(f"Layers: {stats.num_layers}")
-```
-
-**After (HTTP API):**
+**Create: demos/omega_phase1_survival.py**
 ```python
 import requests
 import os
