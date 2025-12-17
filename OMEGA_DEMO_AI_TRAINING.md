@@ -1,20 +1,37 @@
 # Omega Sequence Demo - AI/LLM Training Requirements
 
-**Version:** 1.0.0  
-**Date:** 2025-12-03  
+**Version:** 3.0.0  
+**Date:** 2025-12-17  
 **Type:** AI Training Specification for Working Demo
+
+---
+
+## 📝 Update (2025-12-17)
+
+**Good news: API-based approach requires NO additional training!**
+
+**For demo implementation, see:**
+- **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - Quick start
+- **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete guide
+
+**Key points:**
+- New HTTP API approach also requires **NO AI/ML training**
+- Platform endpoints handle all ML operations internally
+- Demo files just call APIs and display results
+- Training requirements below still apply to platform internals (not demos)
 
 ---
 
 ## Executive Summary
 
-This document specifies **all AI/LLM training requirements** needed to make the Omega Sequence demonstration work. For each phase, we identify:
+This document specifies **all AI/LLM training requirements** for the platform components used by the omega demos. With the new API approach, demo creators don't need to worry about these - the platform handles them.
 
+For each phase:
 1. ✅ **No Training Needed** - Works with existing code/rules
-2. 📚 **Training Required** - Needs model fine-tuning or dataset
+2. 📚 **Training Required** - Needs model fine-tuning or dataset  
 3. 🎓 **Training Recommended** - Works without, better with training
 
-**Critical:** Most phases work WITHOUT special AI training. The semantic bridge and some advanced features benefit from training but have fallback implementations.
+**Critical:** Most phases work WITHOUT special AI training. The platform API endpoints handle all complexity.
 
 ---
 

@@ -1,8 +1,29 @@
 # Omega Sequence Demo - Terminal UI/UX Guide
 
-**Version:** 2.0.0  
-**Date:** 2025-12-16  
+**Version:** 3.0.0  
+**Date:** 2025-12-17  
 **Type:** Terminal Interface Specification
+
+---
+
+## 📝 Note About Demo Implementation (2025-12-17)
+
+**This guide covers UI/UX formatting - still applicable with new API approach!**
+
+The demos now use HTTP API calls to a running platform, but the **terminal output formatting** described in this document still applies.
+
+**For demo implementation, see:**
+- **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - How to create demos
+- **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete API guide
+
+**This document covers:**
+- ASCII art and formatting
+- Color schemes
+- Animation timing
+- Progress indicators
+- Status messages
+
+**Apply these UI guidelines to your HTTP-based demo files.**
 
 ---
 
@@ -10,11 +31,11 @@
 
 This document specifies the **terminal user interface** for the Omega Sequence demonstration, including ASCII art, animations, color schemes, and timing requirements to create a professional, engaging experience.
 
-**Note:** This document focuses on the **presentation layer** (how demos look in the terminal). For the **implementation layer** (how to call real platform methods), see [OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md) v2.0.
+**Note:** This document focuses on the **presentation layer** (how demos look in the terminal). Demos now make HTTP calls to running platform endpoints.
 
 **Relationship to Platform Code:**
-- The demos in OMEGA_SEQUENCE_DEMO.md call real platform methods
-- This document describes how to present those results in the terminal
+- Demos make HTTP API calls to running platform
+- This document describes how to present results in the terminal
 - Terminal utilities are presentation-only (not platform functionality)
 
 ---
