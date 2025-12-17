@@ -138,8 +138,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check for DockerHub credentials secret
+        id: check-dockerhub
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            echo "has_dockerhub_creds=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_dockerhub_creds=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Log in to Docker Hub (optional)
-        if: github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME != ''
+        if: github.event_name != 'pull_request' && steps.check-dockerhub.outputs.has_dockerhub_creds == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -421,15 +430,33 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Check for DockerHub credentials secret
+        id: check-dockerhub
+        run: |
+          if [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            echo "has_dockerhub_creds=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_dockerhub_creds=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Login to Docker Hub
-        if: secrets.DOCKERHUB_USERNAME != ''
+        if: steps.check-dockerhub.outputs.has_dockerhub_creds == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Check for AWS credentials secret
+        id: check-aws
+        run: |
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "has_aws_creds=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_aws_creds=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Login to AWS ECR (optional)
-        if: secrets.AWS_ACCESS_KEY_ID != ''
+        if: steps.check-aws.outputs.has_aws_creds == 'true'
         uses: aws-actions/amazon-ecr-login@v2
         env:
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}

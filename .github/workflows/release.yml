@@ -222,8 +222,17 @@ jobs:
           done
           python -m build
 
+      - name: Check for PyPI token secret
+        id: check-pypi
+        run: |
+          if [ -n "${{ secrets.PYPI_API_TOKEN }}" ]; then
+            echo "has_pypi_token=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_pypi_token=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Publish to PyPI
-        if: secrets.PYPI_API_TOKEN != ''
+        if: steps.check-pypi.outputs.has_pypi_token == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
@@ -244,8 +253,17 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Check for Slack webhook secret
+        id: check-slack
+        run: |
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "has_slack_webhook=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_slack_webhook=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send Slack notification
-        if: secrets.SLACK_WEBHOOK_URL != ''
+        if: steps.check-slack.outputs.has_slack_webhook == 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
