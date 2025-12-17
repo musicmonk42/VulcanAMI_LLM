@@ -13,10 +13,11 @@ This is the complete documentation set for building the Omega Sequence demonstra
 | Document | Size | Purpose | Read This If... |
 |----------|------|---------|-----------------|
 | **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** | NEW | **START HERE** - Quick instructions | You want to create demos now |
+| **[OMEGA_DEMO_PREREQUISITES.md](OMEGA_DEMO_PREREQUISITES.md)** | NEW | **Training & templates info** | You need to know what's required |
 | **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** | NEW | API integration guide | You need complete implementation details |
 | **[OMEGA_DEMO_QUICKSTART_API.md](OMEGA_DEMO_QUICKSTART_API.md)** | NEW | Quick reference for API approach | You need API docs and examples |
 | **[OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md)** | 34KB | Technical implementation guide (legacy) | You need platform component details |
-| **[OMEGA_DEMO_AI_TRAINING.md](OMEGA_DEMO_AI_TRAINING.md)** | 35KB | AI/LLM training requirements | You want to know if/what training is needed |
+| **[OMEGA_DEMO_AI_TRAINING.md](OMEGA_DEMO_AI_TRAINING.md)** | 35KB | AI/LLM training requirements | Detailed training analysis |
 | **[OMEGA_DEMO_ROADMAP.md](OMEGA_DEMO_ROADMAP.md)** | 21KB | Step-by-step plan (legacy) | Historical implementation reference |
 | **[OMEGA_DEMO_TERMINAL.md](OMEGA_DEMO_TERMINAL.md)** | 19KB | Terminal UI/UX specifications | You're working on the visual presentation |
 

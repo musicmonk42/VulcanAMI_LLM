@@ -60,16 +60,23 @@ python3 demos/omega_phase2_teleportation.py
    - Complete code template
    - Checklist
 
+### Prerequisites & Requirements
+2. **[OMEGA_DEMO_PREREQUISITES.md](OMEGA_DEMO_PREREQUISITES.md)** ⭐ Training & Templates Info
+   - What training is needed (NONE!)
+   - What templates are required (defaults included!)
+   - Optional enhancements
+   - Configuration files guide
+
 ### Complete Guides
-2. **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Full implementation guide
-3. **[OMEGA_DEMO_QUICKSTART_API.md](OMEGA_DEMO_QUICKSTART_API.md)** - Quick API reference
-4. **[OMEGA_DEMO_INDEX.md](OMEGA_DEMO_INDEX.md)** - Documentation index
+3. **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Full implementation guide
+4. **[OMEGA_DEMO_QUICKSTART_API.md](OMEGA_DEMO_QUICKSTART_API.md)** - Quick API reference
+5. **[OMEGA_DEMO_INDEX.md](OMEGA_DEMO_INDEX.md)** - Documentation index
 
 ### Reference (Still Useful)
-5. **[OMEGA_DEMO_TERMINAL.md](OMEGA_DEMO_TERMINAL.md)** - UI/UX formatting
-6. **[OMEGA_DEMO_AI_TRAINING.md](OMEGA_DEMO_AI_TRAINING.md)** - Training info
-7. **[OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md)** - Platform component details
-8. **[OMEGA_DEMO_ROADMAP.md](OMEGA_DEMO_ROADMAP.md)** - Historical reference
+6. **[OMEGA_DEMO_TERMINAL.md](OMEGA_DEMO_TERMINAL.md)** - UI/UX formatting
+7. **[OMEGA_DEMO_AI_TRAINING.md](OMEGA_DEMO_AI_TRAINING.md)** - Detailed training analysis
+8. **[OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md)** - Platform component details
+9. **[OMEGA_DEMO_ROADMAP.md](OMEGA_DEMO_ROADMAP.md)** - Historical reference
 
 ---
 
@@ -120,11 +127,21 @@ All endpoints are:
 - Documented
 
 ### Documentation
-- ✅ 8 complete documentation files
+- ✅ 10 complete documentation files
 - ✅ Step-by-step instructions
 - ✅ Complete code examples
 - ✅ API specifications
 - ✅ Troubleshooting guides
+- ✅ Prerequisites & training info ⭐ NEW
+
+### Prerequisites (All Included!)
+- ✅ NO training required for any phase
+- ✅ NO templates needed (defaults in platform)
+- ✅ Optional configs for customization only
+- ✅ ZK circuits pre-compiled and ready
+- ✅ Attack patterns built into API
+- ✅ CSIU axioms hardcoded in platform
+- ✅ See [OMEGA_DEMO_PREREQUISITES.md](OMEGA_DEMO_PREREQUISITES.md) for details
 
 ---
 
