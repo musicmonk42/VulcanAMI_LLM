@@ -2,7 +2,29 @@
 
 **Version:** 2.0.0  
 **Date:** 2025-12-16  
-**Status:** Working Code Documentation with Real Platform Methods
+**Status:** Legacy Reference - See New API Approach Below
+
+---
+
+## ⚠️ IMPORTANT UPDATE (2025-12-17)
+
+**This document describes the legacy direct-import approach.**
+
+**For the NEW API-based approach (recommended), see:**
+- **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - Quick start
+- **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete guide
+- **[OMEGA_DEMO_QUICKSTART_API.md](OMEGA_DEMO_QUICKSTART_API.md)** - Quick reference
+
+**Key differences:**
+- **NEW:** Demos make HTTP calls to running platform (`uvicorn src.full_platform:app`)
+- **OLD (this doc):** Demos directly import platform classes
+- **NEW:** Production-ready client-server architecture
+- **OLD (this doc):** Standalone scripts
+
+**This document remains useful for:**
+- Understanding platform component details
+- Learning about the underlying platform classes
+- Historical reference
 
 ---
 

@@ -1,8 +1,50 @@
 # Omega Sequence Demo - Implementation Roadmap
 
-**Version:** 2.0.0  
-**Date:** 2025-12-16  
+**Version:** 3.0.0  
+**Date:** 2025-12-17  
 **Type:** Step-by-Step Implementation Guide
+
+---
+
+## ⚠️ IMPORTANT UPDATE (2025-12-17)
+
+**This roadmap has been superseded by the new API-based approach.**
+
+### Use These New Guides Instead:
+
+1. **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - **START HERE**
+   - Quick instructions for creating demos
+   - 2-3 hours to complete
+   - Uses running platform via HTTP API
+
+2. **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete Guide
+   - Full implementation details
+   - All 5 phases documented
+   - Request/response formats
+
+3. **[OMEGA_DEMO_QUICKSTART_API.md](OMEGA_DEMO_QUICKSTART_API.md)** - Quick Reference
+   - API endpoint reference
+   - curl test commands
+   - Common patterns
+
+### New Approach Summary:
+
+**Before (this roadmap - 7 days):**
+- Direct import of platform classes
+- Standalone scripts
+- 17-23 hours of work
+
+**Now (new approach - 2-3 hours):**
+- HTTP calls to running platform
+- Client-server architecture
+- Production-ready endpoints
+- Much faster implementation
+
+---
+
+## Legacy Roadmap (Historical Reference)
+
+**The content below is kept for historical reference only.**
 
 ---
 
