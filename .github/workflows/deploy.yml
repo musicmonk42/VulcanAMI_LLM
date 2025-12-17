@@ -315,8 +315,17 @@ jobs:
     if: always() && needs.determine-environment.outputs.deploy == 'true'
 
     steps:
+      - name: Check for Slack webhook secret
+        id: check-slack
+        run: |
+          if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+            echo "has_slack_webhook=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_slack_webhook=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send Slack notification
-        if: secrets.SLACK_WEBHOOK_URL != ''
+        if: steps.check-slack.outputs.has_slack_webhook == 'true'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
