@@ -2,6 +2,8 @@
 
 **Quick Reference Guide**
 
+⚠️ **CRITICAL REQUIREMENT:** All Omega demos **MUST** use the platform REST API via HTTP calls. Direct imports of platform classes are **NOT ALLOWED**. This is non-negotiable - demos must work against a real, running platform instance to be valid demonstrations.
+
 ---
 
 ## 📚 Documentation Suite
@@ -14,11 +16,11 @@ This is the complete documentation set for building the Omega Sequence demonstra
 |----------|------|---------|-----------------|
 | **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** | NEW | **START HERE** - Quick instructions | You want to create demos now |
 | **[OMEGA_DEMO_PREREQUISITES.md](OMEGA_DEMO_PREREQUISITES.md)** | NEW | **Training & templates info** | You need to know what's required |
-| **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** | NEW | API integration guide | You need complete implementation details |
+| **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** | NEW | **REQUIRED** API integration guide | You need complete implementation details |
 | **[OMEGA_DEMO_QUICKSTART_API.md](OMEGA_DEMO_QUICKSTART_API.md)** | NEW | Quick reference for API approach | You need API docs and examples |
-| **[OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md)** | 34KB | Technical implementation guide (legacy) | You need platform component details |
+| **[OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md)** | 34KB | **DEPRECATED** - Reference only | Historical platform component details |
 | **[OMEGA_DEMO_AI_TRAINING.md](OMEGA_DEMO_AI_TRAINING.md)** | 35KB | AI/LLM training requirements | Detailed training analysis |
-| **[OMEGA_DEMO_ROADMAP.md](OMEGA_DEMO_ROADMAP.md)** | 21KB | Step-by-step plan (legacy) | Historical implementation reference |
+| **[OMEGA_DEMO_ROADMAP.md](OMEGA_DEMO_ROADMAP.md)** | 21KB | **DEPRECATED** - Reference only | Historical implementation reference |
 | **[OMEGA_DEMO_TERMINAL.md](OMEGA_DEMO_TERMINAL.md)** | 19KB | Terminal UI/UX specifications | You're working on the visual presentation |
 
 **Total Documentation:** 109KB, 3,859 lines
@@ -29,7 +31,9 @@ This is the complete documentation set for building the Omega Sequence demonstra
 
 **Want to build the demo? Start here:**
 
-### New API-Based Approach (Recommended)
+### REST API Approach (REQUIRED - ONLY VALID APPROACH)
+
+⚠️ **This is the ONLY valid approach. Direct imports are NOT ALLOWED.**
 
 1. **Read [OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - Start here (5 min)
 2. **Start the platform** - `uvicorn src.full_platform:app --host 0.0.0.0 --port 8000 --reload`
@@ -40,11 +44,13 @@ This is the complete documentation set for building the Omega Sequence demonstra
 
 **Estimated time:** 2-3 hours
 
-### Legacy Approach (Reference Only)
+### ~~Legacy Approach~~ (DEPRECATED - DO NOT USE)
 
-For historical context:
-- [OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md) - Direct import approach (v1.0)
-- [OMEGA_DEMO_ROADMAP.md](OMEGA_DEMO_ROADMAP.md) - Original 7-day plan
+⚠️ **WARNING:** The following documents describe deprecated approaches that are NO LONGER VALID:
+- ~~[OMEGA_SEQUENCE_DEMO.md](OMEGA_SEQUENCE_DEMO.md)~~ - Direct import approach (**DEPRECATED**)
+- ~~[OMEGA_DEMO_ROADMAP.md](OMEGA_DEMO_ROADMAP.md)~~ - Original plan for direct imports (**DEPRECATED**)
+
+These documents are kept for historical reference only. **DO NOT** follow their implementation patterns.
 
 ---
 
@@ -244,9 +250,11 @@ VulcanAMI_LLM/
 
 ## 🎬 Running the Demo
 
-### NEW: API-Based Approach (Recommended)
+### REST API Approach (REQUIRED - ONLY VALID METHOD)
 
-The demos now use a **running platform** via HTTP API calls:
+⚠️ **REQUIREMENT:** Demos MUST use HTTP API calls to a running platform. Direct imports are NOT ALLOWED.
+
+The demos use a **running platform** via HTTP API calls:
 
 **Step 1: Start the Platform**
 ```bash

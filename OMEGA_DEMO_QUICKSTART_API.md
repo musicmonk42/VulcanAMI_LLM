@@ -1,6 +1,8 @@
-# Omega Demo Quick Start - API Mode
+# Omega Demo Quick Start - REST API (REQUIRED)
 
 **Quick reference for running omega demos against a live platform**
+
+⚠️ **CRITICAL REQUIREMENT:** All demos MUST use REST API via HTTP calls. This is the ONLY valid approach.
 
 ---
 
@@ -23,17 +25,21 @@ python3 demos/omega_phase1_survival.py  # Your new HTTP-based demo
 
 ## What Changed?
 
-### Before
-Demo files directly imported platform classes:
+### ~~Before~~ (DEPRECATED - DO NOT USE)
+
+❌ **PROHIBITED:** Demo files directly imported platform classes:
 ```python
+# ❌ DO NOT DO THIS
 from src.execution.dynamic_architecture import DynamicArchitecture
 arch = DynamicArchitecture(...)
 stats = arch.get_stats()  # Direct call
 ```
 
-### After  
-Demo files make HTTP calls to running platform:
+### Now (REQUIRED APPROACH)
+
+✅ **REQUIRED:** Demo files make HTTP calls to running platform:
 ```python
+# ✓ DO THIS
 import requests
 response = requests.post(
     'http://0.0.0.0:8000/api/omega/phase1/survival',
@@ -41,6 +47,12 @@ response = requests.post(
 )
 data = response.json()  # API response
 ```
+
+**Why this is mandatory:**
+- Demonstrates production client-server architecture
+- Validates REST API endpoints are functional
+- Proves platform works as a deployable service
+- Enables any HTTP client (not just Python)
 
 ---
 
@@ -102,6 +114,8 @@ curl -X POST http://0.0.0.0:8000/api/omega/phase1/survival \
 ---
 
 ## Demo File Template
+
+⚠️ **REQUIREMENT:** Use this template structure. HTTP REST API calls are MANDATORY.
 
 ```python
 #!/usr/bin/env python3
@@ -254,6 +268,8 @@ For complete implementation guide, see:
 
 ## Development Workflow
 
+⚠️ **MANDATORY STEPS:** Follow this workflow. Do NOT use direct imports.
+
 1. **Start platform** (Terminal 1)
    ```bash
    uvicorn src.full_platform:app --host 0.0.0.0 --port 8000 --reload
@@ -271,7 +287,8 @@ For complete implementation guide, see:
 
 3. **Create demo files** (Terminal 2)
    - Follow patterns in OMEGA_DEMO_API_INTEGRATION.md
-   - Use HTTP requests instead of direct imports
+   - ✅ REQUIRED: Use HTTP requests
+   - ❌ PROHIBITED: Do NOT use direct imports
    - Test each phase individually
 
 4. **Run demos** (Terminal 2)

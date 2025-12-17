@@ -1,29 +1,43 @@
 # Omega Demo API Integration Guide
 
-**Version:** 1.0.0  
+**Version:** 2.0.0  
 **Date:** 2025-12-17  
-**Purpose:** Guide engineers to create omega demos that make real HTTP calls to the running platform
+**Purpose:** REQUIRED guide for creating omega demos that make HTTP calls to the running platform
+
+⚠️ **CRITICAL:** This is the ONLY valid approach for creating Omega demos. Direct imports of platform classes are STRICTLY PROHIBITED.
 
 ---
 
 ## Overview
 
-This guide shows how to **create new omega demo files** that make **real HTTP API calls** to a running VulcanAMI platform instance, instead of directly importing and calling platform classes.
+This guide shows how to **create new omega demo files** that make **HTTP REST API calls** to a running VulcanAMI platform instance.
 
 **Note:** The demo files (omega_phase1_survival.py through omega_phase5_unlearning.py) need to be created by engineers following this guide. They are not included in the repository.
 
-### Key Changes
+### REQUIRED Approach
 
-**Before (Old Approach - No Longer Used):**
-- Demo files directly imported platform classes (e.g., `from src.execution.dynamic_architecture import DynamicArchitecture`)
-- Demos instantiated classes and called methods directly
-- Demos ran standalone without a server
+⚠️ **MANDATORY:** All demos MUST use HTTP REST API calls to the running platform.
 
-**Now (New Approach - What You'll Create):**
-- Demo files make HTTP requests to platform API endpoints
-- Platform server must be running first
-- Demos communicate via REST API over HTTP
-- Engineers create demo files following patterns in this guide
+**Why this is REQUIRED:**
+- Demonstrates real production architecture (client-server)
+- Proves the platform works as a deployable service
+- Validates that API endpoints are functional
+- Enables language-agnostic clients (not Python-only)
+- Shows enterprise-ready deployment patterns
+
+### PROHIBITED Approach
+
+❌ **DO NOT USE:**
+- Direct imports of platform classes (e.g., `from src.execution.dynamic_architecture import DynamicArchitecture`)
+- Instantiating platform classes directly in demo code
+- Calling platform methods without going through the REST API
+
+**Why direct imports are PROHIBITED:**
+- Doesn't demonstrate production architecture
+- Doesn't validate API endpoints
+- Creates tight coupling between demos and implementation
+- Not representative of real client usage
+- Defeats the purpose of having a REST API
 
 ---
 

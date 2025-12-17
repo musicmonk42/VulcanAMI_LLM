@@ -8,13 +8,18 @@
 
 ## 📝 Note About Demo Implementation (2025-12-17)
 
-**This guide covers UI/UX formatting - still applicable with new API approach!**
+**This guide covers UI/UX formatting - STILL FULLY APPLICABLE with REST API approach!**
 
-The demos now use HTTP API calls to a running platform, but the **terminal output formatting** described in this document still applies.
+⚠️ **CRITICAL:** The demos MUST use HTTP REST API calls to a running platform (see [OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)), but the **terminal output formatting** described in this document fully applies.
+
+**Implementation Requirements:**
+- ✅ Demos MUST use HTTP REST API calls (not direct imports)
+- ✅ Terminal formatting from this document MUST be applied
+- ✅ UI/UX guidelines below are still fully valid
 
 **For demo implementation, see:**
-- **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - How to create demos
-- **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete API guide
+- **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - How to create demos (REQUIRED)
+- **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete API guide (REQUIRED)
 
 **This document covers:**
 - ASCII art and formatting
@@ -23,7 +28,7 @@ The demos now use HTTP API calls to a running platform, but the **terminal outpu
 - Progress indicators
 - Status messages
 
-**Apply these UI guidelines to your HTTP-based demo files.**
+**Apply these UI guidelines to your HTTP REST API-based demo files.**
 
 ---
 
@@ -47,7 +52,7 @@ This document specifies the **terminal user interface** for the Omega Sequence d
 - **Pacing:** Allow users to absorb information
 - **Professionalism:** Enterprise-ready appearance
 - **Accessibility:** Works without color/unicode support
-- **Platform First:** Terminal formatting doesn't replace real platform calls
+- **Platform First:** Terminal formatting doesn't replace real REST API calls (REQUIRED)
 
 ### Technical Constraints
 - Terminal width: 70-80 characters (standard)

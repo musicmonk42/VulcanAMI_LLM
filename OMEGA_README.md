@@ -3,6 +3,8 @@
 **Last Updated:** 2025-12-17  
 **Status:** Ready for Engineers
 
+⚠️ **CRITICAL REQUIREMENT:** All demos **MUST** use the platform REST API. Direct imports of platform classes are **NOT ALLOWED**. This ensures demos work against a real, running platform instance.
+
 ---
 
 ## 🚀 Quick Start (2-3 Hours)
@@ -82,7 +84,9 @@ python3 demos/omega_phase2_teleportation.py
 
 ## 🎯 What You're Building
 
-5 demo files that showcase VulcanAMI platform capabilities:
+5 demo files that showcase VulcanAMI platform capabilities **via REST API calls**:
+
+**REQUIREMENT:** All demos MUST make HTTP POST requests to the running platform API endpoints. This is not optional - it ensures the demos work with a real platform instance, not mock/stub code.
 
 ### Phase 1: Infrastructure Survival
 - **Endpoint:** `/api/omega/phase1/survival`
@@ -148,9 +152,11 @@ All endpoints are:
 ## ⏳ What You Need to Do
 
 Create 5 Python files that:
-1. Make HTTP calls to the running platform
+1. **MUST** make HTTP POST requests to the running platform REST API
 2. Display results in terminal
 3. Follow UI/UX guidelines from OMEGA_DEMO_TERMINAL.md
+
+**CRITICAL:** Do NOT directly import platform classes (e.g., `from src.execution.dynamic_architecture import DynamicArchitecture`). All platform interaction MUST be via HTTP REST API calls using the `requests` library.
 
 **Time:** 2-3 hours total
 

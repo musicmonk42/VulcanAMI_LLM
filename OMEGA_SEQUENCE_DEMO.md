@@ -2,29 +2,40 @@
 
 **Version:** 2.0.0  
 **Date:** 2025-12-16  
-**Status:** Legacy Reference - See New API Approach Below
+**Status:** ⚠️ DEPRECATED - FOR REFERENCE ONLY
 
 ---
 
-## ⚠️ IMPORTANT UPDATE (2025-12-17)
+## ⚠️ CRITICAL: THIS DOCUMENT IS DEPRECATED
 
-**This document describes the legacy direct-import approach.**
+**DO NOT USE THIS DOCUMENT FOR IMPLEMENTATION**
 
-**For the NEW API-based approach (recommended), see:**
-- **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - Quick start
-- **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete guide
+This document describes a **DEPRECATED** approach using direct imports of platform classes. This approach is **NO LONGER VALID** and **MUST NOT BE USED** for creating Omega demos.
+
+**For the REQUIRED REST API approach, see:**
+- **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - ⚠️ START HERE
+- **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete REQUIRED guide
 - **[OMEGA_DEMO_QUICKSTART_API.md](OMEGA_DEMO_QUICKSTART_API.md)** - Quick reference
 
-**Key differences:**
-- **NEW:** Demos make HTTP calls to running platform (`uvicorn src.full_platform:app`)
-- **OLD (this doc):** Demos directly import platform classes
-- **NEW:** Production-ready client-server architecture
-- **OLD (this doc):** Standalone scripts
+**Why this approach is deprecated:**
+- ❌ Does NOT demonstrate production architecture
+- ❌ Does NOT validate REST API endpoints
+- ❌ Creates tight coupling between demos and implementation
+- ❌ Not representative of real client usage
+- ❌ Defeats the purpose of having a REST API
 
-**This document remains useful for:**
+**Why REST API is REQUIRED:**
+- ✅ Demonstrates real client-server architecture
+- ✅ Proves platform works as a deployable service
+- ✅ Validates API endpoints are functional
+- ✅ Enables language-agnostic clients
+- ✅ Shows enterprise-ready patterns
+
+**This document remains available ONLY for:**
 - Understanding platform component details
 - Learning about the underlying platform classes
 - Historical reference
+- **NOT for implementation guidance**
 
 ---
 

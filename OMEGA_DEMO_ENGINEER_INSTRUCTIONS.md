@@ -2,17 +2,43 @@
 
 **READ THIS FIRST before creating demo files**
 
+⚠️ **CRITICAL REQUIREMENT:** You MUST create demos that use HTTP REST API calls to the running platform. Direct imports of platform classes (e.g., `from src.execution.dynamic_architecture import DynamicArchitecture`) are **STRICTLY PROHIBITED**. This is non-negotiable.
+
+**Why REST API is Required:**
+- Demonstrates real client-server architecture
+- Proves platform works as a service (not just as a library)
+- Enables language-agnostic clients (not just Python)
+- Shows production-ready deployment patterns
+- Validates API endpoints are functional
+
 ---
 
 ## What You Need to Do
 
-Create 5 new demo files that make HTTP calls to the running platform:
+Create 5 new demo files that **MUST** make HTTP calls to the running platform:
 
 1. `demos/omega_phase1_survival.py` - Infrastructure survival demo
 2. `demos/omega_phase2_teleportation.py` - Cross-domain reasoning demo
 3. `demos/omega_phase3_immunization.py` - Adversarial defense demo
 4. `demos/omega_phase4_csiu.py` - Safety governance demo
 5. `demos/omega_phase5_unlearning.py` - Provable unlearning demo
+
+⚠️ **PROHIBITED:** Do NOT use direct imports like:
+```python
+# ❌ WRONG - This is NOT ALLOWED
+from src.execution.dynamic_architecture import DynamicArchitecture
+arch = DynamicArchitecture()
+```
+
+✅ **REQUIRED:** Use HTTP REST API calls like:
+```python
+# ✓ CORRECT - This is REQUIRED
+import requests
+response = requests.post(
+    'http://0.0.0.0:8000/api/omega/phase1/survival',
+    headers={'X-API-Key': 'dev-key-12345'}
+)
+```
 
 ---
 

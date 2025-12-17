@@ -2,22 +2,24 @@
 
 **Version:** 3.0.0  
 **Date:** 2025-12-17  
-**Type:** Step-by-Step Implementation Guide
+**Type:** ⚠️ DEPRECATED - FOR HISTORICAL REFERENCE ONLY
 
 ---
 
-## ⚠️ IMPORTANT UPDATE (2025-12-17)
+## ⚠️ CRITICAL: THIS DOCUMENT IS DEPRECATED
 
-**This roadmap has been superseded by the new API-based approach.**
+**DO NOT USE THIS ROADMAP FOR IMPLEMENTATION**
 
-### Use These New Guides Instead:
+This roadmap describes a **DEPRECATED** approach using direct imports of platform classes. This approach is **NO LONGER VALID** and **MUST NOT BE USED**.
 
-1. **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - **START HERE**
+### Use These REQUIRED Guides Instead:
+
+1. **[OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md](OMEGA_DEMO_ENGINEER_INSTRUCTIONS.md)** - ⚠️ **START HERE**
    - Quick instructions for creating demos
    - 2-3 hours to complete
-   - Uses running platform via HTTP API
+   - Uses running platform via HTTP REST API (REQUIRED)
 
-2. **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete Guide
+2. **[OMEGA_DEMO_API_INTEGRATION.md](OMEGA_DEMO_API_INTEGRATION.md)** - Complete REQUIRED Guide
    - Full implementation details
    - All 5 phases documented
    - Request/response formats
@@ -27,24 +29,28 @@
    - curl test commands
    - Common patterns
 
-### New Approach Summary:
+### Why REST API Approach is MANDATORY:
 
-**Before (this roadmap - 7 days):**
-- Direct import of platform classes
-- Standalone scripts
-- 17-23 hours of work
+**~~Before~~ (this roadmap - DEPRECATED):**
+- ❌ Direct import of platform classes - NOT ALLOWED
+- ❌ Standalone scripts - NOT production-representative
+- ❌ 17-23 hours of work
+- ❌ Doesn't validate API endpoints
 
-**Now (new approach - 2-3 hours):**
-- HTTP calls to running platform
-- Client-server architecture
-- Production-ready endpoints
-- Much faster implementation
+**Now (REQUIRED approach - 2-3 hours):**
+- ✅ HTTP REST API calls to running platform - MANDATORY
+- ✅ Real client-server architecture
+- ✅ Production-ready endpoints validated
+- ✅ Language-agnostic (not Python-only)
+- ✅ Much faster implementation
 
 ---
 
-## Legacy Roadmap (Historical Reference)
+## ~~Legacy Roadmap~~ (DEPRECATED - DO NOT USE)
 
-**The content below is kept for historical reference only.**
+**⚠️ WARNING: The content below is DEPRECATED and MUST NOT be used for implementation.**
+
+This is kept for historical reference only. Do NOT follow these instructions.
 
 ---
 
