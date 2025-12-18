@@ -15,7 +15,7 @@ buildArgs = ["REJECT_INSECURE_JWT=ack"]
 [deploy]
 # Health check configuration
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 300  # Increased to 5 minutes for ML model loading
 # Restart policy
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
