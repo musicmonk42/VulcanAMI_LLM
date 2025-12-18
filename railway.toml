@@ -5,16 +5,16 @@
 #
 # IMPORTANT: The REJECT_INSECURE_JWT build argument is required to acknowledge
 # that no insecure JWT secrets are embedded in the Docker image.
+#
+# NOTE: Railway passes environment variables to Docker builds. You must set
+# REJECT_INSECURE_JWT=ack as an environment variable in Railway's service
+# settings (dashboard) for the build to succeed.
 # =============================================================================
 
 [build]
 # Use the Dockerfile for building
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
-
-# Build arguments required for the security check
-[build.args]
-REJECT_INSECURE_JWT = "ack"
 
 [deploy]
 # Health check configuration
