@@ -131,7 +131,7 @@ CMD ["python", "src/vulcan/main.py", "--mode", "production"]
 Build/Run (with license key):
 
 bash
-docker build -t vulcan-agi .
+docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcan-agi .
 docker run -p 8000:8000 -e NOVATRAX_LICENSE_KEY=$KEY vulcan-agi
 Enterprise
 Kubernetes: Helm charts for scaling (replicas: 5+), integrated with enterprise monitoring (Prometheus/Grafana).

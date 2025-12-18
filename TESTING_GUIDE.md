@@ -287,10 +287,10 @@ pytest tests/test_cicd_reproducibility.py --cov=. --cov-report=html
 2. **Build Reproducibility**
    ```bash
    # Build image twice with same tag
-   docker build -t test:1 .
+   docker build --build-arg REJECT_INSECURE_JWT=ack -t test:1 .
    IMAGE1=$(docker images --no-trunc test:1 -q)
    
-   docker build -t test:2 .
+   docker build --build-arg REJECT_INSECURE_JWT=ack -t test:2 .
    IMAGE2=$(docker images --no-trunc test:2 -q)
    
    # Compare (note: timestamps may differ, but layers should match)
