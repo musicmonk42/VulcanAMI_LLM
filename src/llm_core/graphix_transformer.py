@@ -98,8 +98,6 @@ class SimpleTokenizer:
 
         tokens = []
         for word in words:
-            # Ensure word is a string
-            word = str(word)
             if word not in self.word_to_id:
                 # Add new word if space available
                 if self.next_id < self.vocab_size:
