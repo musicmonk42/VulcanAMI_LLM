@@ -93,10 +93,13 @@ class SimpleTokenizer:
         if isinstance(text, str):
             words = text.split()
         else:
-            words = text
+            # Convert all elements to strings to handle mixed types
+            words = [str(w) for w in text]
 
         tokens = []
         for word in words:
+            # Ensure word is a string
+            word = str(word)
             if word not in self.word_to_id:
                 # Add new word if space available
                 if self.next_id < self.vocab_size:
@@ -121,7 +124,8 @@ class SimpleTokenizer:
         Returns:
             Decoded text string
         """
-        words = [self.id_to_word.get(t, self.unk_token) for t in tokens]
+        # Ensure all words are strings before joining
+        words = [str(self.id_to_word.get(t, self.unk_token)) for t in tokens]
         return " ".join(words)
 
     def get_vocab_size(self) -> int:
