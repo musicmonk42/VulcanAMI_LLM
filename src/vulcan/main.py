@@ -193,8 +193,9 @@ class Settings(BaseSettings):
     allowed_modules: List[str] = ["numpy", "pandas", "scipy", "sklearn"]
 
     # API server defaults to localhost for security; override with environment variable
+    # Railway assigns PORT dynamically, so we read from environment with fallback to 8080
     api_host: str = "127.0.0.1"
-    api_port: int = 8080
+    api_port: int = int(os.environ.get("PORT", 8080))
     api_workers: int = 4
     api_title: str = "VULCAN-AGI API"
     api_version: str = "2.0.0"
