@@ -143,7 +143,11 @@ WORKDIR /app
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends curl ca-certificates && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+        libgl1-mesa-glx \
+        libglib2.0-0 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
 
