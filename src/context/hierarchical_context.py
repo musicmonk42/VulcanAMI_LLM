@@ -1121,9 +1121,9 @@ class HierarchicalContext:
         idx = len(self.procedural)
         self.procedural.append(proc)
 
-        # Update index
+        # Update index (ensure term is string for consistency)
         for term in sig:
-            self._procedural_term_index[term].add(idx)
+            self._procedural_term_index[str(term)].add(idx)
 
     def _search_procedural_advanced(
         self, qterms: List[str], k: int
