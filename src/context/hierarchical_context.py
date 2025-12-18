@@ -402,7 +402,7 @@ class HierarchicalContext:
             for p in proc[:10]:
                 if token_count >= max_tokens:
                     break
-                sig_preview = " ".join(p.signature_terms[:6])
+                sig_preview = " ".join(str(t) for t in p.signature_terms[:6])
                 part = f"[PROC] {p.name} :: {sig_preview}"
                 flat_parts.append(part)
                 token_count += len(part.split())
@@ -1091,6 +1091,8 @@ class HierarchicalContext:
         """Upsert procedural pattern"""
         name = (pattern.get("name") or "").strip()
         sig = pattern.get("signature_terms") or []
+        # Ensure all signature terms are strings to avoid join() errors
+        sig = [str(t) for t in sig]
         meta = pattern.get("meta") or {}
 
         if not name:
@@ -1107,8 +1109,8 @@ class HierarchicalContext:
                 p.importance = max(p.importance, importance)
                 if meta:
                     p.meta.update(meta)
-                # Merge signature terms
-                merged = list(dict.fromkeys((p.signature_terms or []) + sig))[:50]
+                # Merge signature terms (ensure all are strings)
+                merged = list(dict.fromkeys([str(t) for t in (p.signature_terms or [])] + sig))[:50]
                 p.signature_terms = merged
                 return
 
