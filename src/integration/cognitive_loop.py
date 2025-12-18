@@ -1163,7 +1163,7 @@ class CognitiveLoop:
             and hasattr(self.vocab, "id_to_token")
         ):
             try:
-                return "".join(self.vocab.id_to_token(t) for t in tokens)
+                return "".join(str(self.vocab.id_to_token(t)) for t in tokens)
             except Exception as e:
                 # Log vocab-based decoding failure
                 logger.warning(f"Vocab-based decoding failed: {e}")
