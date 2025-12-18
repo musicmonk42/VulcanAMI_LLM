@@ -851,6 +851,7 @@ class GraphixVulcanLLM:
             runtime_config=runtime_config,
             observability_manager=observability,
             audit_log=self.audit_log,
+            tokenizer=getattr(self.transformer, 'tokenizer', None),  # Pass tokenizer for proper decoding
         )
 
         # State
