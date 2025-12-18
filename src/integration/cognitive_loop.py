@@ -1151,9 +1151,8 @@ class CognitiveLoop:
 
     def _decode_sync(self, tokens: Tokens) -> str:
         # Handle mixed token types (Union[int, str]) properly
-        # Separate int tokens from string tokens
-        int_tokens = [t for t in tokens if isinstance(t, int)]
-        all_ints = len(int_tokens) == len(tokens)
+        # Check if all tokens are integers efficiently without creating intermediate list
+        all_ints = all(isinstance(t, int) for t in tokens) if tokens else True
 
         # If all tokens are integers, try tokenizer decode
         if all_ints and self.tokenizer and hasattr(self.tokenizer, "decode"):
