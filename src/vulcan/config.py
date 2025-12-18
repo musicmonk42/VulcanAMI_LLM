@@ -1052,7 +1052,7 @@ class ConfigurationManager:
                 "enable_semantic_compression": True,
             },
             "communication_config": {
-                "api_port": 8080,
+                "api_port": int(os.environ.get("PORT", 8080)),
                 "websocket_port": 8081,
                 "grpc_port": 50051,
                 "enable_rest_api": True,
