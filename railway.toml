@@ -1,0 +1,29 @@
+# =============================================================================
+# Railway Deployment Configuration
+# =============================================================================
+# This file configures Railway to build and deploy the VulcanAMI application.
+#
+# IMPORTANT: The REJECT_INSECURE_JWT build argument is required to acknowledge
+# that no insecure JWT secrets are embedded in the Docker image.
+# =============================================================================
+
+[build]
+# Use the Dockerfile for building
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+# Build arguments required for the security check
+[build.args]
+REJECT_INSECURE_JWT = "ack"
+
+[deploy]
+# Health check configuration
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+
+# Restart policy
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Number of replicas (adjust based on your Railway plan)
+numReplicas = 1
