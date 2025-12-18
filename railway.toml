@@ -13,7 +13,7 @@
 
 [build]
 # Use the Dockerfile for building
-builder = "DOCKERFILE"
+builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
@@ -22,7 +22,7 @@ healthcheckPath = "/health"
 healthcheckTimeout = 30
 
 # Restart policy
-restartPolicyType = "ON_FAILURE"
+restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
 # Number of replicas (adjust based on your Railway plan)
