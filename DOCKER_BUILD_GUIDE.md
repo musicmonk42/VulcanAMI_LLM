@@ -280,7 +280,7 @@ docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
 ```
 
 For Railway deployment:
-The `railway.toml` file in this repository already includes the required build argument. If you're still seeing this error on Railway, ensure the `railway.toml` file is present in your repository root.
+Set `REJECT_INSECURE_JWT=ack` as an environment variable in your Railway service's Variables tab. Railway passes environment variables to Docker builds automatically.
 
 For docker-compose:
 ```yaml
@@ -368,20 +368,23 @@ http://localhost:3000
 5. Run smoke tests after deployment
 
 ### Railway Deployment
-Railway deployment is configured via `railway.toml` which automatically passes the required build arguments:
+Railway deployment is configured via `railway.toml`. However, Railway does NOT support `[build.args]` in the TOML configuration. Instead, you must set the `REJECT_INSECURE_JWT` environment variable in Railway's service settings.
 
-```toml
-[build]
-builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+**Setting up Railway for this repository:**
 
-[build.args]
-REJECT_INSECURE_JWT = "ack"
-```
+1. Connect your Railway service to this repository
+2. Go to your service's "Variables" tab in Railway dashboard
+3. Add the following environment variable:
+   ```
+   REJECT_INSECURE_JWT=ack
+   ```
+4. Railway will automatically pass this to the Docker build process
 
-**Important**: Set your JWT secrets as Railway environment variables (not build args):
+**Required Runtime Environment Variables** (also set in Railway's Variables tab):
 - `JWT_SECRET_KEY` - Required, minimum 32 characters
 - `BOOTSTRAP_KEY` - Required for initial setup
+
+The `railway.toml` file configures the Dockerfile location and deployment settings:
 
 ## Additional Resources
 
