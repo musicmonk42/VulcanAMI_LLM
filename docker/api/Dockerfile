@@ -76,7 +76,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
-        libpq5 && \
+        libpq5 \
+        libgl1-mesa-glx \
+        libglib2.0-0 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
