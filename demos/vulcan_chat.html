@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VULCAN Chat</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f1a;
+            color: #e4e4e7;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Simple Header */
+        .header {
+            padding: 16px 24px;
+            background: rgba(20, 20, 35, 0.95);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header h1 {
+            font-size: 1.25em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .header h1 span { font-size: 1.4em; }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85em;
+            color: #9ca3af;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #22c55e;
+        }
+        
+        .status-dot.offline { background: #ef4444; }
+
+        /* Messages */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .messages::-webkit-scrollbar { width: 6px; }
+        .messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+        .message {
+            display: flex;
+            gap: 14px;
+            max-width: 800px;
+            animation: fadeIn 0.25s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+        .message.assistant { align-self: flex-start; }
+        
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .message.user .avatar { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+        .message.assistant .avatar { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+        
+        .bubble {
+            padding: 14px 18px;
+            border-radius: 18px;
+            line-height: 1.55;
+            max-width: 600px;
+        }
+        
+        .message.user .bubble {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-radius: 18px 18px 4px 18px;
+        }
+        
+        .message.assistant .bubble {
+            background: rgba(139, 92, 246, 0.08);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+            border-radius: 18px 18px 18px 4px;
+        }
+        
+        .bubble-text { white-space: pre-wrap; word-break: break-word; }
+        
+        /* Systems indicator - subtle */
+        .systems-used {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .system-tag {
+            font-size: 0.7em;
+            padding: 3px 8px;
+            background: rgba(139, 92, 246, 0.15);
+            border-radius: 10px;
+            color: #a78bfa;
+        }
+        
+        /* Thinking */
+        .thinking {
+            display: flex;
+            gap: 5px;
+            padding: 10px 0;
+        }
+        
+        .thinking span {
+            width: 8px;
+            height: 8px;
+            background: #8b5cf6;
+            border-radius: 50%;
+            animation: bounce 1.4s ease-in-out infinite;
+        }
+        
+        .thinking span:nth-child(2) { animation-delay: 0.2s; }
+        .thinking span:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); opacity: 0.4; }
+            50% { transform: scale(1.3); opacity: 1; }
+        }
+
+        /* Input */
+        .input-area {
+            padding: 16px 24px 24px;
+            background: rgba(20, 20, 35, 0.95);
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 12px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .input-row textarea {
+            flex: 1;
+            padding: 14px 18px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            background: rgba(255,255,255,0.04);
+            color: #e4e4e7;
+            font-size: 15px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            min-height: 52px;
+            max-height: 150px;
+        }
+        
+        .input-row textarea:focus {
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+        }
+        
+        .input-row textarea::placeholder { color: #6b7280; }
+        
+        .send-btn {
+            width: 52px;
+            height: 52px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s, opacity 0.15s;
+        }
+        
+        .send-btn:hover:not(:disabled) { transform: scale(1.05); }
+        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .send-btn svg { width: 20px; height: 20px; }
+
+        /* Welcome */
+        .welcome {
+            text-align: center;
+            padding: 60px 20px;
+            max-width: 600px;
+            margin: auto;
+        }
+        
+        .welcome h2 {
+            font-size: 1.6em;
+            margin-bottom: 16px;
+            background: linear-gradient(90deg, #8b5cf6, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .welcome p { color: #9ca3af; line-height: 1.6; margin-bottom: 12px; }
+        
+        .examples {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 24px;
+        }
+        
+        .example {
+            padding: 10px 18px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        
+        .example:hover {
+            background: rgba(139, 92, 246, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Error */
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Settings button */
+        .settings-btn {
+            background: rgba(255,255,255,0.08);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        
+        .settings-btn:hover { background: rgba(255,255,255,0.15); }
+
+        /* Settings Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+            z-index: 100;
+        }
+        
+        .modal-overlay.open { opacity: 1; visibility: visible; }
+        
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            z-index: 101;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s;
+        }
+        
+        .modal.open { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+        
+        .modal h3 {
+            margin-bottom: 20px;
+            font-size: 1.1em;
+        }
+        
+        .field { margin-bottom: 16px; }
+        
+        .field label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.85em;
+            color: #9ca3af;
+        }
+        
+        .field input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            color: #e4e4e7;
+            font-size: 14px;
+        }
+        
+        .field input:focus { outline: none; border-color: #8b5cf6; }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .modal-actions button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .btn-primary { background: #8b5cf6; color: white; }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: #e4e4e7; }
+
+        @media (max-width: 600px) {
+            .header { padding: 12px 16px; }
+            .messages { padding: 16px; }
+            .input-area { padding: 12px 16px 20px; }
+            .message { max-width: 100%; }
+            .bubble { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span>🧠</span> VULCAN</h1>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div class="status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Connected</span>
+            </div>
+            <button class="settings-btn" onclick="openSettings()">⚙️</button>
+        </div>
+    </div>
+
+    <div class="messages" id="messages">
+        <div class="welcome" id="welcome">
+            <h2>Welcome to VULCAN Chat</h2>
+            <p>I'm powered by a comprehensive cognitive architecture with reasoning engines, memory systems, safety validation, and causal analysis.</p>
+            <p>Just ask me anything — all the complexity is handled behind the scenes.</p>
+            <div class="examples">
+                <div class="example" onclick="ask('What is machine learning?')">What is machine learning?</div>
+                <div class="example" onclick="ask('Help me plan a project')">Help me plan a project</div>
+                <div class="example" onclick="ask('Explain cause and effect')">Explain cause and effect</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <div id="errorBox"></div>
+        <div class="input-row">
+            <textarea id="input" placeholder="Ask anything..." rows="1" onkeydown="handleKey(event)" oninput="resize(this)"></textarea>
+            <button class="send-btn" id="sendBtn" onclick="send()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="overlay" onclick="closeSettings()"></div>
+    <div class="modal" id="modal">
+        <h3>Settings</h3>
+        <div class="field">
+            <label>API URL</label>
+            <input type="text" id="apiUrl" placeholder="http://localhost:8080">
+        </div>
+        <div class="field">
+            <label>API Key (optional)</label>
+            <input type="text" id="apiKey" placeholder="Your API key">
+        </div>
+        <div class="modal-actions">
+            <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+            <button class="btn-primary" onclick="saveAndClose()">Save</button>
+        </div>
+    </div>
+
+    <script>
+        let baseUrl = '';
+        let apiKey = '';
+        let history = [];
+        let busy = false;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            // Auto-detect URL
+            const origin = window.location.origin;
+            baseUrl = origin.startsWith('http') ? origin : 'http://localhost:8080';
+            
+            // Load saved settings
+            const saved = localStorage.getItem('vulcan-settings');
+            if (saved) {
+                const s = JSON.parse(saved);
+                baseUrl = s.baseUrl || baseUrl;
+                apiKey = s.apiKey || '';
+            }
+            
+            document.getElementById('apiUrl').value = baseUrl;
+            document.getElementById('apiKey').value = apiKey;
+            
+            checkStatus();
+            document.getElementById('input').focus();
+        });
+
+        async function checkStatus() {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            
+            try {
+                const r = await fetch(`${baseUrl}/vulcan/health`);
+                if (r.ok) {
+                    dot.classList.remove('offline');
+                    text.textContent = 'Connected';
+                    return;
+                }
+            } catch(e) {}
+            
+            try {
+                const r = await fetch(`${baseUrl}/health`);
+                if (r.ok) {
+                    dot.classList.remove('offline');
+                    text.textContent = 'Connected';
+                    return;
+                }
+            } catch(e) {}
+            
+            dot.classList.add('offline');
+            text.textContent = 'Offline';
+        }
+
+        function openSettings() {
+            document.getElementById('overlay').classList.add('open');
+            document.getElementById('modal').classList.add('open');
+        }
+
+        function closeSettings() {
+            document.getElementById('overlay').classList.remove('open');
+            document.getElementById('modal').classList.remove('open');
+        }
+
+        function saveAndClose() {
+            baseUrl = document.getElementById('apiUrl').value.trim() || baseUrl;
+            apiKey = document.getElementById('apiKey').value.trim();
+            localStorage.setItem('vulcan-settings', JSON.stringify({ baseUrl, apiKey }));
+            closeSettings();
+            checkStatus();
+        }
+
+        function ask(text) {
+            document.getElementById('input').value = text;
+            document.getElementById('welcome').style.display = 'none';
+            send();
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send();
+            }
+        }
+
+        function resize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+        }
+
+        function addMsg(role, text, systems = []) {
+            const welcome = document.getElementById('welcome');
+            if (welcome) welcome.style.display = 'none';
+            
+            const box = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            
+            const avatar = role === 'user' ? '👤' : '🧠';
+            
+            let systemsHtml = '';
+            if (systems.length > 0 && role === 'assistant') {
+                systemsHtml = '<div class="systems-used">' + 
+                    systems.map(s => `<span class="system-tag">${s.replace(/_/g, ' ')}</span>`).join('') + 
+                    '</div>';
+            }
+            
+            div.innerHTML = `
+                <div class="avatar">${avatar}</div>
+                <div class="bubble">
+                    <div class="bubble-text">${escapeHtml(text)}</div>
+                    ${systemsHtml}
+                </div>
+            `;
+            
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+            history.push({ role, content: text });
+        }
+
+        function showThinking() {
+            const box = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = 'message assistant';
+            div.id = 'thinking';
+            div.innerHTML = `
+                <div class="avatar">🧠</div>
+                <div class="bubble">
+                    <div class="thinking"><span></span><span></span><span></span></div>
+                </div>
+            `;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function hideThinking() {
+            const el = document.getElementById('thinking');
+            if (el) el.remove();
+        }
+
+        function showError(msg) {
+            const box = document.getElementById('errorBox');
+            box.innerHTML = `<div class="error">${escapeHtml(msg)}</div>`;
+            setTimeout(() => box.innerHTML = '', 5000);
+        }
+
+        function escapeHtml(t) {
+            const d = document.createElement('div');
+            d.textContent = t;
+            return d.innerHTML;
+        }
+
+        async function send() {
+            const input = document.getElementById('input');
+            const btn = document.getElementById('sendBtn');
+            const msg = input.value.trim();
+            
+            if (!msg || busy) return;
+            
+            busy = true;
+            btn.disabled = true;
+            
+            addMsg('user', msg);
+            input.value = '';
+            input.style.height = 'auto';
+            
+            showThinking();
+            
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (apiKey) headers['X-API-Key'] = apiKey;
+                
+                const res = await fetch(`${baseUrl}/vulcan/v1/chat`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        message: msg,
+                        max_tokens: 1024,
+                        enable_reasoning: true,
+                        enable_memory: true,
+                        enable_safety: true,
+                        enable_planning: true,
+                        enable_causal: true,
+                        history: history.slice(-10)
+                    })
+                });
+                
+                hideThinking();
+                
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || `Error ${res.status}`);
+                }
+                
+                const data = await res.json();
+                const response = data.response || 'No response';
+                const systems = data.systems_used || [];
+                
+                addMsg('assistant', response, systems);
+                
+            } catch(e) {
+                hideThinking();
+                showError(e.message);
+                checkStatus();
+            } finally {
+                busy = false;
+                btn.disabled = false;
+                input.focus();
+            }
+        }
+    </script>
+</body>
+</html>
