@@ -195,8 +195,8 @@ CALLBACK_DOMAIN_ALLOWLIST = [
 # ======================================================================
 # Server Constants
 # ======================================================================
-DEFAULT_PORT = int(os.environ.get("GRAPHIX_API_PORT", "8080"))
-DEFAULT_HOST = os.environ.get("GRAPHIX_API_HOST", "127.0.0.1")
+DEFAULT_PORT = int(os.environ.get("PORT", os.environ.get("GRAPHIX_API_PORT", "8000")))
+DEFAULT_HOST = os.environ.get("GRAPHIX_API_HOST", "0.0.0.0")
 MAX_REQUEST_SIZE = int(
     os.environ.get("GRAPHIX_MAX_REQUEST_SIZE", str(10 * 1024 * 1024))
 )

@@ -564,14 +564,18 @@ class GraphixArena:
     Production-ready Graphix Arena with comprehensive error handling and validation.
     """
 
-    def __init__(self, port: int = 8181, host: str = "127.0.0.1"):
+    def __init__(self, port: int = None, host: str = None):
         """Initialize Graphix Arena.
 
         Args:
-            port: Port to bind to (1024-65535)
-            host: Host address to bind to (default: 127.0.0.1 for localhost)
-                  Set to "0.0.0.0" to bind to all interfaces (less secure)
+            port: Port to bind to (1024-65535). Defaults to PORT env var or 8000.
+            host: Host address to bind to. Defaults to "0.0.0.0" for containerized deployments.
         """
+        # Use environment variables with sensible defaults for containerized deployments
+        if port is None:
+            port = int(os.environ.get("PORT", 8000))
+        if host is None:
+            host = os.environ.get("GRAPHIX_HOST", "0.0.0.0")
         # Validate port
         if not isinstance(port, int) or port < 1024 or port > 65535:
             raise ValueError(f"Port must be between 1024 and 65535, got {port}")

@@ -156,10 +156,10 @@ class UnifiedPlatformSettings(BaseSettings):
     )
 
     # Server configuration
-    # Security: Default to localhost binding for safety
-    # Set UNIFIED_HOST=0.0.0.0 in environment to bind to all interfaces
-    host: str = "127.0.0.1"
-    port: int = 8080
+    # When PORT env var is set (Railway/Heroku), bind to 0.0.0.0 to accept external connections
+    # When running locally (no PORT env var), default to localhost for security
+    host: str = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+    port: int = int(os.environ.get("PORT", 8080))
     workers: int = 1  # Default to 1 for safety
     reload: bool = False
 
