@@ -229,6 +229,10 @@ class CognitiveLoop:
         self._entropy_scores: List[float] = []
         self._speculative_stats: Dict[str, Any] = {}
         self.strategy_weights: Dict[str, float] = {"language": 1.0}
+        # Performance caches - context and world model don't change much per token
+        self._cached_context: Optional[Dict[str, Any]] = None
+        self._context_cache_step: int = -1
+        self._world_model_update_interval: int = 5  # Only update every N tokens
 
     def set_speculative_function(self, fn: SpeculativeFunction) -> None:
         self._speculative_fn = fn
@@ -274,6 +278,9 @@ class CognitiveLoop:
         self._perplex_nll = []
         self._entropy_scores = []
         self._speculative_stats = {}
+        # Reset caches for new generation
+        self._cached_context = None
+        self._context_cache_step = -1
 
         temperature = self.sampling.temperature
         top_k = self.sampling.top_k
@@ -604,29 +611,44 @@ class CognitiveLoop:
             chosen_index = beam_meta.get("chosen_index")
             reasoning_meta["strategy"] = "beam_search"
         else:
-            logger.info("[DIAG] _step: Starting context retrieval...")
-            t_ctx = time.time()
-            retrieved_context = await self._async_safe(
-                self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
-            )
-            sub_times["context_retrieval_ms"] = (time.time() - t_ctx) * 1000
+            # OPTIMIZATION: Cache context retrieval - only fetch on first token or every 10 steps
+            if self._cached_context is None or step == 0 or (step - self._context_cache_step) >= 10:
+                logger.info("[DIAG] _step: Starting context retrieval...")
+                t_ctx = time.time()
+                retrieved_context = await self._async_safe(
+                    self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
+                )
+                sub_times["context_retrieval_ms"] = (time.time() - t_ctx) * 1000
+                # Cache the context for reuse
+                self._cached_context = retrieved_context
+                self._context_cache_step = step
+                logger.info(f"[DIAG] _step: Context retrieved in {sub_times['context_retrieval_ms']:.1f}ms")
+            else:
+                # Reuse cached context
+                retrieved_context = self._cached_context
+                sub_times["context_retrieval_ms"] = 0.0
+                logger.info(f"[DIAG] _step: Using cached context (step {step}, cached at {self._context_cache_step})")
             token_info["retrieved_context"] = retrieved_context
-            logger.info(f"[DIAG] _step: Context retrieved in {sub_times['context_retrieval_ms']:.1f}ms")
 
+            # OPTIMIZATION: Only update world model every N tokens (configurable)
             if self.runtime.attach_world_model_hooks and hasattr(
                 self.bridge, "world_model"
             ):
-                try:
-                    logger.info("[DIAG] _step: Updating world model...")
-                    t_wm_up = time.time()
-                    await self._async_safe(
-                        self.bridge.world_model.update, {"tokens": prompt_tokens}, None
-                    )
-                    sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
-                    logger.info(f"[DIAG] _step: World model updated in {sub_times['wm_update_ms']:.1f}ms")
-                except Exception as e:
-                    # World model update is optional; log errors but continue
-                    logger.debug(f"World model update failed: {e}")
+                if step == 0 or step % self._world_model_update_interval == 0:
+                    try:
+                        logger.info("[DIAG] _step: Updating world model...")
+                        t_wm_up = time.time()
+                        await self._async_safe(
+                            self.bridge.world_model.update, {"tokens": prompt_tokens}, None
+                        )
+                        sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
+                        logger.info(f"[DIAG] _step: World model updated in {sub_times['wm_update_ms']:.1f}ms")
+                    except Exception as e:
+                        # World model update is optional; log errors but continue
+                        logger.debug(f"World model update failed: {e}")
+                else:
+                    sub_times["wm_update_ms"] = 0.0
+                    logger.info(f"[DIAG] _step: Skipping world model update (step {step}, updates every {self._world_model_update_interval} tokens)")
 
             logger.info("[DIAG] _step: Calling transformer.encode()...")
             t_enc = time.time()

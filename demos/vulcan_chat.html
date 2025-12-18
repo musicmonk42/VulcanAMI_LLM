@@ -597,7 +597,7 @@
                 
                 const requestBody = JSON.stringify({
                     message: msg,
-                    max_tokens: 64,  // Reduced from 1024 for faster responses (~5s/token on CPU)
+                    max_tokens: 16,  // Reduced to 16 for faster responses (~5s/token on CPU = ~80s total)
                     enable_reasoning: true,
                     enable_memory: true,
                     enable_safety: true,
