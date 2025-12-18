@@ -1150,15 +1150,23 @@ class CognitiveLoop:
         return self._decode_sync(tokens)
 
     def _decode_sync(self, tokens: Tokens) -> str:
-        if self.tokenizer and hasattr(self.tokenizer, "decode"):
+        # Handle mixed token types (Union[int, str]) properly
+        # Separate int tokens from string tokens
+        int_tokens = [t for t in tokens if isinstance(t, int)]
+        all_ints = len(int_tokens) == len(tokens)
+
+        # If all tokens are integers, try tokenizer decode
+        if all_ints and self.tokenizer and hasattr(self.tokenizer, "decode"):
             try:
                 return self.tokenizer.decode(tokens)
             except Exception as e:
                 # Log sync decoding failure
                 logger.warning(f"Sync decoding failed: {e}")
+
+        # If all tokens are integers, try vocab-based decode
         if (
-            tokens
-            and isinstance(tokens[0], int)
+            all_ints
+            and tokens
             and self.vocab
             and hasattr(self.vocab, "id_to_token")
         ):
@@ -1167,7 +1175,21 @@ class CognitiveLoop:
             except Exception as e:
                 # Log vocab-based decoding failure
                 logger.warning(f"Vocab-based decoding failed: {e}")
-        return " ".join(str(t) for t in tokens)
+
+        # For mixed types or fallback: convert each token to string
+        # For int tokens, try vocab lookup if available; for str tokens, use directly
+        result_parts = []
+        for t in tokens:
+            if isinstance(t, str):
+                result_parts.append(t)
+            elif self.vocab and hasattr(self.vocab, "id_to_token"):
+                try:
+                    result_parts.append(self.vocab.id_to_token(t))
+                except Exception:
+                    result_parts.append(str(t))
+            else:
+                result_parts.append(str(t))
+        return " ".join(result_parts)
 
     def _improvement(self, window: List[float]) -> float:
         if len(window) < 2:

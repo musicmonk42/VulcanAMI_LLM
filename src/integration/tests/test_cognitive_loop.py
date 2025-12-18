@@ -2,7 +2,14 @@
 Tests for cognitive_loop.py
 """
 
-from cognitive_loop import (
+import sys
+
+import pytest
+
+# Import from current directory instead of uploads
+sys.path.insert(0, "/mnt/user-data/outputs")
+
+from integration.cognitive_loop import (
     CognitiveLoop,
     CognitiveLoopResult,
     LoopRuntimeConfig,
@@ -13,12 +20,6 @@ from cognitive_loop import (
     penalize_repetition,
     softmax,
 )
-import sys
-
-import pytest
-
-# Import from current directory instead of uploads
-sys.path.insert(0, "/mnt/user-data/outputs")
 
 
 class MockBridge:
@@ -224,6 +225,41 @@ class TestCognitiveLoop:
         text = await loop._decode(["hello", "world"])
         assert "hello" in text
         assert "world" in text
+
+    @pytest.mark.asyncio
+    async def test_decode_mixed_token_types(self):
+        """Test that decode handles mixed int and str token types."""
+        bridge = MockBridge()
+        transformer = MockTransformer()
+        safety = MockSafety()
+        loop = CognitiveLoop(bridge, transformer, safety)
+
+        # Test with mixed int and str tokens (simulates real-world scenario
+        # where some tokens can't be converted to strings by vocab)
+        mixed_tokens = ["hello", 42, "world", 100]
+        text = await loop._decode(mixed_tokens)
+        assert "hello" in text
+        assert "world" in text
+        # Integer tokens should be converted to strings
+        assert "42" in text
+        assert "100" in text
+
+    @pytest.mark.asyncio
+    async def test_decode_all_int_tokens(self):
+        """Test decode with all integer tokens (fallback behavior)."""
+        bridge = MockBridge()
+        transformer = MockTransformer()
+        safety = MockSafety()
+        loop = CognitiveLoop(bridge, transformer, safety)
+
+        # Test with all integer tokens
+        int_tokens = [1, 2, 3, 4]
+        text = await loop._decode(int_tokens)
+        # Without a proper tokenizer/vocab, integers should be converted to strings
+        assert "1" in text
+        assert "2" in text
+        assert "3" in text
+        assert "4" in text
 
     @pytest.mark.asyncio
     async def test_per_token_consensus(self):
