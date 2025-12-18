@@ -426,11 +426,16 @@
 
         // Init
         document.addEventListener('DOMContentLoaded', () => {
-            // Auto-detect URL
+            // Auto-detect URL - check if running from file:// or local server
             const origin = window.location.origin;
-            baseUrl = origin.startsWith('http') ? origin : 'http://localhost:8080';
+            // file:// URLs have origin "null", handle that case
+            if (!origin || origin === 'null' || origin.startsWith('file')) {
+                baseUrl = 'http://localhost:8080';
+            } else {
+                baseUrl = origin;
+            }
             
-            // Load saved settings
+            // Load saved settings (overrides auto-detect)
             const saved = localStorage.getItem('vulcan-settings');
             if (saved) {
                 const s = JSON.parse(saved);
@@ -449,6 +454,7 @@
             const dot = document.getElementById('statusDot');
             const text = document.getElementById('statusText');
             
+            // Try the /vulcan/health endpoint first (when mounted under full_platform)
             try {
                 const r = await fetch(`${baseUrl}/vulcan/health`);
                 if (r.ok) {
@@ -589,20 +595,42 @@
                 const headers = { 'Content-Type': 'application/json' };
                 if (apiKey) headers['X-API-Key'] = apiKey;
                 
-                const res = await fetch(`${baseUrl}/vulcan/v1/chat`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({
-                        message: msg,
-                        max_tokens: 1024,
-                        enable_reasoning: true,
-                        enable_memory: true,
-                        enable_safety: true,
-                        enable_planning: true,
-                        enable_causal: true,
-                        history: history.slice(-10)
-                    })
+                const requestBody = JSON.stringify({
+                    message: msg,
+                    max_tokens: 1024,
+                    enable_reasoning: true,
+                    enable_memory: true,
+                    enable_safety: true,
+                    enable_planning: true,
+                    enable_causal: true,
+                    history: history.slice(-10)
                 });
+                
+                // Try /vulcan/v1/chat first (when mounted under full_platform.py)
+                let res;
+                try {
+                    res = await fetch(`${baseUrl}/vulcan/v1/chat`, {
+                        method: 'POST',
+                        headers,
+                        body: requestBody
+                    });
+                } catch(e) {
+                    // If that fails, try direct /v1/chat (standalone vulcan)
+                    res = await fetch(`${baseUrl}/v1/chat`, {
+                        method: 'POST',
+                        headers,
+                        body: requestBody
+                    });
+                }
+                
+                // If first attempt got 404, try the alternative endpoint
+                if (res.status === 404) {
+                    res = await fetch(`${baseUrl}/v1/chat`, {
+                        method: 'POST',
+                        headers,
+                        body: requestBody
+                    });
+                }
                 
                 hideThinking();
                 

@@ -1610,10 +1610,17 @@ async def unified_chat(request: UnifiedChatRequest):
                             prob_result = await loop.run_in_executor(
                                 None, deps.probabilistic.predict_with_uncertainty, query_result.embedding
                             )
-                            reasoning_results["probabilistic"] = {
-                                "prediction": prob_result.get("mean") if isinstance(prob_result, dict) else str(prob_result),
-                                "uncertainty": prob_result.get("uncertainty", 0.0) if isinstance(prob_result, dict) else 0.0,
-                            }
+                            # Normalize result to consistent dict format
+                            if isinstance(prob_result, dict):
+                                reasoning_results["probabilistic"] = {
+                                    "prediction": str(prob_result.get("mean", prob_result.get("prediction", ""))),
+                                    "uncertainty": float(prob_result.get("uncertainty", prob_result.get("std", 0.0))),
+                                }
+                            else:
+                                reasoning_results["probabilistic"] = {
+                                    "prediction": str(prob_result),
+                                    "uncertainty": 0.0,
+                                }
                             systems_used.append("probabilistic_reasoning")
                 except Exception as e:
                     logger.debug(f"Probabilistic reasoning skipped: {e}")
@@ -1699,9 +1706,16 @@ async def unified_chat(request: UnifiedChatRequest):
             "conversation_history": request.history[-5:] if request.history else [],  # Last 5 messages
             "memory_context": memory_context[:3] if memory_context else [],
             "reasoning_insights": reasoning_results,
-            "plan": plan_result.to_dict() if plan_result and hasattr(plan_result, "to_dict") else None,
+            "plan": None,
             "world_model_insight": world_model_insight,
         }
+        
+        # Safely convert plan to dict
+        if plan_result:
+            try:
+                llm_context["plan"] = plan_result.to_dict() if hasattr(plan_result, "to_dict") else str(plan_result)
+            except Exception:
+                llm_context["plan"] = str(plan_result)
         
         # Generate response
         response_text = ""
@@ -1711,14 +1725,32 @@ async def unified_chat(request: UnifiedChatRequest):
                 loop = asyncio.get_running_loop()
                 llm = app.state.llm
                 
-                # Build enhanced prompt with context
+                # Build enhanced prompt with context - handle None values explicitly
+                memory_str = ""
+                if memory_context:
+                    try:
+                        memory_str = f"\nRelevant Memory Context: {str(memory_context[:2])}"
+                    except Exception:
+                        memory_str = ""
+                
+                reasoning_str = ""
+                if reasoning_results:
+                    try:
+                        reasoning_str = f"\nReasoning Insights: {str(reasoning_results)}"
+                    except Exception:
+                        reasoning_str = ""
+                
+                plan_str = ""
+                if plan_result:
+                    try:
+                        plan_str = f"\nSuggested Plan: {str(plan_result)}"
+                    except Exception:
+                        plan_str = ""
+                
                 enhanced_prompt = f"""You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture.
 
 User Query: {user_message}
-
-{"Relevant Memory Context: " + str(memory_context[:2]) if memory_context else ""}
-{"Reasoning Insights: " + str(reasoning_results) if reasoning_results else ""}
-{"Suggested Plan: " + str(plan_result) if plan_result else ""}
+{memory_str}{reasoning_str}{plan_str}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
