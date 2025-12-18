@@ -269,6 +269,29 @@ Full build testing:
 
 **Solution**: This typically happens in CI environments with self-signed certificates. The Docker configurations are correct. Build in a standard environment with proper SSL certificates.
 
+### Build fails with REJECT_INSECURE_JWT error
+**Issue**: Build fails with "Refusing to build: set --build-arg REJECT_INSECURE_JWT=ack"
+
+**Solution**: This is a security check to ensure you acknowledge that no JWT secrets are embedded in the image.
+
+For local Docker builds:
+```bash
+docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
+```
+
+For Railway deployment:
+The `railway.toml` file in this repository already includes the required build argument. If you're still seeing this error on Railway, ensure the `railway.toml` file is present in your repository root.
+
+For docker-compose:
+```yaml
+services:
+  your-service:
+    build:
+      context: .
+      args:
+        REJECT_INSECURE_JWT: ack
+```
+
 ### Entrypoint fails with JWT error
 **Issue**: "ERROR: No valid JWT secret provided"
 
@@ -343,6 +366,22 @@ http://localhost:3000
 3. Tag images with git SHA
 4. Deploy with specific tags
 5. Run smoke tests after deployment
+
+### Railway Deployment
+Railway deployment is configured via `railway.toml` which automatically passes the required build arguments:
+
+```toml
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[build.args]
+REJECT_INSECURE_JWT = "ack"
+```
+
+**Important**: Set your JWT secrets as Railway environment variables (not build args):
+- `JWT_SECRET_KEY` - Required, minimum 32 characters
+- `BOOTSTRAP_KEY` - Required for initial setup
 
 ## Additional Resources
 
