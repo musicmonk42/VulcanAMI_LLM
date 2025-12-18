@@ -1191,8 +1191,7 @@ class HierarchicalContext:
         """Convert tokens to text"""
         if not tokens:
             return ""
-        if isinstance(tokens[0], str):
-            return " ".join(tokens)
+        # Always convert all tokens to strings to handle mixed int/str lists
         return " ".join(str(t) for t in tokens)
 
     def _to_text(self, obj: Any) -> str:
