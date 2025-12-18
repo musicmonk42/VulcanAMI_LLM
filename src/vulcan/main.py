@@ -1408,11 +1408,21 @@ async def chat(request: ChatRequest):
     try:
         loop = asyncio.get_running_loop()
         # Non-blocking call to the LLM generation function
-        response = await loop.run_in_executor(
+        result = await loop.run_in_executor(
             None, llm.generate, request.prompt, request.max_tokens
         )
+        
+        # Extract text from GenerationResult object
+        if hasattr(result, 'text'):
+            response_text = result.text
+        elif isinstance(result, str):
+            response_text = result
+        elif isinstance(result, dict) and 'text' in result:
+            response_text = result['text']
+        else:
+            response_text = str(result)
 
-        return {"response": response}
+        return {"response": response_text}
     except Exception as e:
         logger.error(f"LLM chat failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1754,9 +1764,18 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                response_text = await loop.run_in_executor(
+                result = await loop.run_in_executor(
                     None, llm.generate, enhanced_prompt, request.max_tokens
                 )
+                # Extract text from GenerationResult object
+                if hasattr(result, 'text'):
+                    response_text = result.text
+                elif isinstance(result, str):
+                    response_text = result
+                elif isinstance(result, dict) and 'text' in result:
+                    response_text = result['text']
+                else:
+                    response_text = str(result)
                 systems_used.append("llm_generation")
             except Exception as e:
                 logger.error(f"LLM generation failed: {e}")
