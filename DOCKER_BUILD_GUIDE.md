@@ -282,6 +282,13 @@ docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
 For Railway deployment:
 Set `REJECT_INSECURE_JWT=ack` as an environment variable in your Railway service's Variables tab. Railway passes environment variables to Docker builds automatically.
 
+For Google Cloud Build / Cloud Run:
+A `cloudbuild.yaml` file is included in the repository that automatically passes the build argument:
+```bash
+gcloud builds submit --config cloudbuild.yaml .
+```
+Or for Cloud Run source-based deployments, the `cloudbuild.yaml` is automatically detected.
+
 For docker-compose:
 ```yaml
 services:
