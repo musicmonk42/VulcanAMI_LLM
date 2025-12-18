@@ -396,8 +396,8 @@ class GraphixTransformer:
                 return []
             # Check if first element is string or int
             if isinstance(tokens[0], str):
-                # List of strings - join and tokenize
-                text = " ".join(tokens)
+                # List of strings - join and tokenize (convert all to str for safety)
+                text = " ".join(str(t) for t in tokens)
                 return self.tokenizer.encode(text)
             else:
                 # Already token IDs
