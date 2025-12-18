@@ -775,7 +775,7 @@ python src/minimal_executor.py          # Executor demo
 docker compose -f docker-compose.dev.yml up --build
 
 # Individual service
-docker build -t graphix-vulcan .
+docker build --build-arg REJECT_INSECURE_JWT=ack -t graphix-vulcan .
 docker run -p 5000:5000 --env-file .env graphix-vulcan
 ```
 

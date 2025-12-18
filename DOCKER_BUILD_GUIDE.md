@@ -179,11 +179,11 @@ All base images and dependencies use exact versions:
 Always use semantic versioning in production:
 ```bash
 # Good
-docker build -t vulcanami:v1.0.0 .
-docker build -t vulcanami:$(git rev-parse --short HEAD) .
+docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:v1.0.0 .
+docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:$(git rev-parse --short HEAD) .
 
-# Bad (never in production)
-docker build -t vulcanami:latest .
+# Bad (never in production - uses :latest tag)
+docker build --build-arg REJECT_INSECURE_JWT=ack -t vulcanami:latest .
 ```
 
 ## Docker Compose Services

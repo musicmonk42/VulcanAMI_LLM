@@ -237,10 +237,10 @@ Before building for production:
 ### Docker Build Test:
 ```bash
 # Build twice and compare (manual verification)
-docker build -t test1:latest .
+docker build --build-arg REJECT_INSECURE_JWT=ack -t test1:latest .
 IMAGE1_ID=$(docker images test1:latest -q)
 
-docker build -t test2:latest .
+docker build --build-arg REJECT_INSECURE_JWT=ack -t test2:latest .
 IMAGE2_ID=$(docker images test2:latest -q)
 
 # Images should be identical (same layers)
