@@ -22,6 +22,16 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 # =============================================================================
+# CONSTANTS
+# =============================================================================
+
+# Maximum number of memory contexts to include in response generation
+MAX_CONTEXT_ITEMS = 3
+
+# Maximum number of history messages to include in context
+MAX_HISTORY_MESSAGES = 5
+
+# =============================================================================
 # LAZY COMPONENT IMPORTS
 # =============================================================================
 
@@ -39,7 +49,7 @@ def _get_world_model():
             )
 
             VULCANWorldModel = WM
-        except (ImportError, AttributeError, TypeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Could not import VULCANWorldModel: {e}")
             VULCANWorldModel = False
     return VULCANWorldModel if VULCANWorldModel else None
@@ -59,7 +69,7 @@ def _get_unified_reasoner():
             )
 
             UnifiedReasoner = UR
-        except (ImportError, AttributeError, TypeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Could not import UnifiedReasoner: {e}")
             UnifiedReasoner = False
     return UnifiedReasoner if UnifiedReasoner else None
@@ -79,7 +89,7 @@ def _get_hierarchical_memory():
             )
 
             HierarchicalMemory = HM
-        except (ImportError, AttributeError, TypeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Could not import HierarchicalMemory: {e}")
             HierarchicalMemory = False
     return HierarchicalMemory if HierarchicalMemory else None
@@ -99,7 +109,7 @@ def _get_safety_validator():
             )
 
             SafetyValidator = SV
-        except (ImportError, AttributeError, TypeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Could not import SafetyValidator: {e}")
             SafetyValidator = False
     return SafetyValidator if SafetyValidator else None
@@ -119,7 +129,7 @@ def _get_planning_engine():
             )
 
             PlanningEngine = PE
-        except (ImportError, AttributeError, TypeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Could not import PlanningEngine: {e}")
             PlanningEngine = False
     return PlanningEngine if PlanningEngine else None
@@ -139,7 +149,7 @@ def _get_graphix_transformer():
             )
 
             GraphixTransformer = GT
-        except (ImportError, AttributeError, TypeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Could not import GraphixTransformer: {e}")
             GraphixTransformer = False
     return GraphixTransformer if GraphixTransformer else None
@@ -157,7 +167,7 @@ def _get_graph_rag():
             from src.persistant_memory_v46.graph_rag import GraphRAG as GR
 
             GraphRAG = GR
-        except (ImportError, AttributeError, TypeError, Exception) as e:
+        except Exception as e:
             logger.warning(f"Could not import GraphRAG: {e}")
             GraphRAG = False
     return GraphRAG if GraphRAG else None
@@ -582,13 +592,13 @@ class VulcanChatEngine:
 
         # Add memory contexts
         if contexts:
-            context_parts.append(f"Relevant context: {' | '.join(contexts[:3])}")
+            context_parts.append(f"Relevant context: {' | '.join(contexts[:MAX_CONTEXT_ITEMS])}")
 
         # Add conversation history
         history_text = ""
         if request.history:
             history_entries = []
-            for h in request.history[-5:]:  # Last 5 messages
+            for h in request.history[-MAX_HISTORY_MESSAGES:]:
                 history_entries.append(f"{h.role}: {h.content}")
             history_text = "\n".join(history_entries)
             context_parts.append(f"History:\n{history_text}")

@@ -38,8 +38,10 @@ echo ""
 # Check for required dependencies
 echo "Checking dependencies..."
 $PYTHON -c "import fastapi, uvicorn, pydantic" 2>/dev/null || {
-    echo "❌ Missing dependencies. Installing..."
-    pip install fastapi uvicorn pydantic pydantic-settings
+    echo "❌ Missing dependencies. Please install with:"
+    echo "   pip install -r requirements.txt"
+    echo "Or manually: pip install 'fastapi>=0.100.0' 'uvicorn>=0.20.0' 'pydantic>=2.0.0' 'pydantic-settings>=2.0.0'"
+    exit 1
 }
 echo "✓ Dependencies OK"
 echo ""
@@ -49,12 +51,17 @@ echo "Starting VulcanAMI platform..."
 echo "Platform will be available at http://localhost:8080"
 echo ""
 
+# Create secure PID directory
+PID_DIR="${HOME}/.vulcan"
+mkdir -p "$PID_DIR"
+PID_FILE="${PID_DIR}/platform.pid"
+
 # Start platform in background
 $PYTHON src/full_platform.py &
 PLATFORM_PID=$!
 
 # Save PID for cleanup
-echo $PLATFORM_PID > /tmp/vulcan_platform.pid
+echo $PLATFORM_PID > "$PID_FILE"
 
 # Wait for platform to initialize
 echo "Waiting for platform to initialize..."
@@ -116,9 +123,9 @@ fi
 cleanup() {
     echo ""
     echo "Shutting down platform..."
-    if [ -f /tmp/vulcan_platform.pid ]; then
-        kill $(cat /tmp/vulcan_platform.pid) 2>/dev/null || true
-        rm /tmp/vulcan_platform.pid
+    if [ -f "$PID_FILE" ]; then
+        kill $(cat "$PID_FILE") 2>/dev/null || true
+        rm "$PID_FILE"
     fi
     # Kill any remaining processes
     kill $PLATFORM_PID 2>/dev/null || true
