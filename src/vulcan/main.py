@@ -192,10 +192,9 @@ class Settings(BaseSettings):
     enable_sandboxing: bool = True
     allowed_modules: List[str] = ["numpy", "pandas", "scipy", "sklearn"]
 
-    # API server defaults to 0.0.0.0 for containerized deployments (e.g., Railway, Docker)
-    # Override with environment variable HOST or API_HOST if needed
-    api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    # API server defaults to localhost for security; override with environment variable
+    api_host: str = "127.0.0.1"
+    api_port: int = 8080
     api_workers: int = 4
     api_title: str = "VULCAN-AGI API"
     api_version: str = "2.0.0"
