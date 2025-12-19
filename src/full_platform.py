@@ -1616,6 +1616,42 @@ async def lifespan(app: FastAPI):
             icon = "✅" if status else "❌"
             logger.info(f"  {icon} {name}")
         
+        # ================================================================
+        # QUERY ROUTING AND DUAL-MODE LEARNING INTEGRATION
+        # ================================================================
+        try:
+            from vulcan.routing import (
+                initialize_routing_components,
+                get_collaboration_manager,
+                get_telemetry_recorder,
+                get_governance_logger,
+                COLLABORATION_AVAILABLE,
+                TELEMETRY_AVAILABLE,
+            )
+            
+            routing_status = initialize_routing_components()
+            app.state.routing_status = routing_status
+            
+            # Connect tournament manager to telemetry if available
+            if TELEMETRY_AVAILABLE and hasattr(app.state, 'tournament_manager'):
+                telemetry_recorder = get_telemetry_recorder()
+                app.state.telemetry_recorder = telemetry_recorder
+            
+            # Store governance logger
+            app.state.governance_logger = get_governance_logger()
+            
+            components_status["Query Routing Layer"] = True
+            logger.info("  ✅ Query Routing Layer (Dual-Mode Learning)")
+            logger.info("    → User Interaction Mode: utility_memory")
+            logger.info("    → AI Interaction Mode: success/risk_memory")
+            
+        except ImportError as e:
+            components_status["Query Routing Layer"] = False
+            logger.warning(f"  ⚠ Query Routing Layer not available: {e}")
+        except Exception as e:
+            components_status["Query Routing Layer"] = False
+            logger.error(f"  ❌ Query Routing Layer failed: {e}")
+        
         # Summary counts
         # Count mounted FastAPI/Flask services (excluding background processes)
         services_mounted = sum(1 for name, s in service_status.items() 
