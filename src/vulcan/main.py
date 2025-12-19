@@ -114,6 +114,24 @@ except ImportError:
     Redis = None
     REDIS_AVAILABLE = False
 
+# OpenAI integration for high-quality text generation
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+    _openai_client = None
+    
+    def get_openai_client():
+        global _openai_client
+        if _openai_client is None:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if api_key:
+                _openai_client = OpenAI(api_key=api_key)
+        return _openai_client
+except ImportError:
+    OPENAI_AVAILABLE = False
+    def get_openai_client():
+        return None
+
 # ============================================================
 # MOCKED/PLACEHOLDER LLM IMPLEMENTATION
 # This replaces the need for the external 'graphix_vulcan_llm' package
@@ -1399,7 +1417,35 @@ async def update_performance_metric(metric: str, value: float):
 
 @app.post("/llm/chat")
 async def chat(request: ChatRequest):
-    """Conversational interface via LLM."""
+    """Conversational interface via LLM.
+    
+    Uses OpenAI API when OPENAI_API_KEY is set for high-quality responses.
+    Falls back to local model otherwise.
+    """
+    # Try OpenAI first if available
+    openai_client = get_openai_client()
+    if openai_client:
+        try:
+            loop = asyncio.get_running_loop()
+            
+            def call_openai():
+                completion = openai_client.chat.completions.create(
+                    model="gpt-3.5-turbo",  # Cost-effective model
+                    messages=[
+                        {"role": "system", "content": "You are a helpful AI assistant."},
+                        {"role": "user", "content": request.prompt}
+                    ],
+                    max_tokens=min(request.max_tokens, 1000),
+                    temperature=0.7
+                )
+                return completion.choices[0].message.content
+            
+            response_text = await loop.run_in_executor(None, call_openai)
+            return {"response": response_text}
+        except Exception as e:
+            logger.warning(f"OpenAI call failed, falling back to local model: {e}")
+    
+    # Fallback to local LLM
     if not hasattr(app.state, "llm"):
         raise HTTPException(status_code=503, detail="LLM not initialized")
 
@@ -1764,19 +1810,44 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                result = await loop.run_in_executor(
-                    None, llm.generate, enhanced_prompt, request.max_tokens
-                )
-                # Extract text from GenerationResult object
-                if hasattr(result, 'text'):
-                    response_text = result.text
-                elif isinstance(result, str):
-                    response_text = result
-                elif isinstance(result, dict) and 'text' in result:
-                    response_text = result['text']
-                else:
-                    response_text = str(result)
-                systems_used.append("llm_generation")
+                # Try OpenAI first for high-quality responses
+                openai_client = get_openai_client()
+                if openai_client:
+                    try:
+                        def call_openai():
+                            completion = openai_client.chat.completions.create(
+                                model="gpt-3.5-turbo",
+                                messages=[
+                                    {"role": "system", "content": "You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses."},
+                                    {"role": "user", "content": enhanced_prompt}
+                                ],
+                                max_tokens=min(request.max_tokens, 1000),
+                                temperature=0.7
+                            )
+                            return completion.choices[0].message.content
+                        
+                        response_text = await loop.run_in_executor(None, call_openai)
+                        systems_used.append("openai_llm")
+                    except Exception as e:
+                        logger.warning(f"OpenAI call failed, falling back to local model: {e}")
+                        # Fall through to local LLM
+                        response_text = ""
+                
+                # Fallback to local LLM if OpenAI failed or not available
+                if not response_text:
+                    result = await loop.run_in_executor(
+                        None, llm.generate, enhanced_prompt, request.max_tokens
+                    )
+                    # Extract text from GenerationResult object
+                    if hasattr(result, 'text'):
+                        response_text = result.text
+                    elif isinstance(result, str):
+                        response_text = result
+                    elif isinstance(result, dict) and 'text' in result:
+                        response_text = result['text']
+                    else:
+                        response_text = str(result)
+                    systems_used.append("llm_generation")
             except Exception as e:
                 logger.error(f"LLM generation failed: {e}")
                 # Fallback response
