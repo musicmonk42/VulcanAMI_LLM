@@ -1575,6 +1575,73 @@ async def chat(request: ChatRequest):
     loop = asyncio.get_running_loop()
     
     # ================================================================
+    # STEP -1: QUERY ROUTING LAYER - Analyze query BEFORE all processing
+    # This is the critical integration that routes queries to the right systems
+    # ================================================================
+    routing_plan = None
+    routing_stats = {}
+    try:
+        from vulcan.routing import (
+            route_query,
+            log_to_governance,
+            record_telemetry,
+            get_governance_logger,
+            get_query_analyzer,
+            get_telemetry_recorder,
+            QUERY_ROUTER_AVAILABLE,
+            GOVERNANCE_AVAILABLE,
+            TELEMETRY_AVAILABLE,
+        )
+        
+        if QUERY_ROUTER_AVAILABLE:
+            # Analyze query and create processing plan
+            routing_plan = route_query(request.prompt, source="user")
+            systems_used.append("query_router")
+            
+            routing_stats = {
+                "query_id": routing_plan.query_id,
+                "query_type": routing_plan.query_type.value,
+                "complexity_score": routing_plan.complexity_score,
+                "uncertainty_score": routing_plan.uncertainty_score,
+                "collaboration_needed": routing_plan.collaboration_needed,
+                "arena_participation": routing_plan.arena_participation,
+                "agent_tasks_planned": len(routing_plan.agent_tasks),
+                "requires_governance": routing_plan.requires_governance,
+                "governance_sensitivity": routing_plan.governance_sensitivity.value,
+                "pii_detected": routing_plan.pii_detected,
+                "sensitive_topics": routing_plan.sensitive_topics,
+            }
+            
+            logger.info(
+                f"[VULCAN] Query routed: id={routing_plan.query_id}, "
+                f"type={routing_plan.query_type.value}, tasks={len(routing_plan.agent_tasks)}, "
+                f"collab={routing_plan.collaboration_needed}, arena={routing_plan.arena_participation}"
+            )
+            
+            # Log to governance IMMEDIATELY if required
+            if GOVERNANCE_AVAILABLE and routing_plan.requires_audit:
+                log_to_governance(
+                    action_type="query_processed",
+                    details={
+                        "query_id": routing_plan.query_id,
+                        "query_type": routing_plan.query_type.value,
+                        "complexity_score": routing_plan.complexity_score,
+                        "pii_detected": routing_plan.pii_detected,
+                        "sensitive_topics": routing_plan.sensitive_topics,
+                        "governance_sensitivity": routing_plan.governance_sensitivity.value,
+                    },
+                    severity="warning" if routing_plan.governance_sensitivity.value in ("high", "critical") else "info",
+                    query_id=routing_plan.query_id,
+                )
+                systems_used.append("governance_logger")
+                logger.info(f"[VULCAN] Governance logged for query {routing_plan.query_id}")
+                
+    except ImportError as e:
+        logger.debug(f"[VULCAN] Routing layer not available: {e}")
+    except Exception as e:
+        logger.warning(f"[VULCAN] Query routing failed: {e}", exc_info=True)
+    
+    # ================================================================
     # STEP 0: INPUT GATEKEEPER - Validate query before processing
     # ================================================================
     try:
@@ -1609,9 +1676,10 @@ async def chat(request: ChatRequest):
         processed_prompt = request.prompt
     
     # ================================================================
-    # STEP 1: Route Through Agent Pool (ALWAYS TRY - track stats)
+    # STEP 1: Route Through Agent Pool - Use routing plan's tasks!
     # ================================================================
     job_id = None
+    submitted_jobs = []  # Track all submitted job IDs
     try:
         # Import at the start to catch import errors
         from vulcan.orchestrator.agent_lifecycle import AgentCapability
@@ -1627,61 +1695,163 @@ async def chat(request: ChatRequest):
                 "jobs_completed_total": collective.agent_pool.stats.get("total_jobs_completed", 0),
             }
             
-            # Determine query type for specialized agent routing
-            query_lower = processed_prompt.lower()
-            
-            # Route based on query intent
-            if any(kw in query_lower for kw in ["analyze", "pattern", "data", "observe"]):
-                capability = AgentCapability.PERCEPTION
-                task_type = "perception_analysis"
-            elif any(kw in query_lower for kw in ["plan", "step", "strategy", "organize"]):
-                capability = AgentCapability.PLANNING
-                task_type = "planning_task"
-            elif any(kw in query_lower for kw in ["execute", "run", "calculate", "compute"]):
-                capability = AgentCapability.EXECUTION
-                task_type = "execution_task"
-            elif any(kw in query_lower for kw in ["learn", "remember", "teach", "understand"]):
-                capability = AgentCapability.LEARNING
-                task_type = "learning_task"
-            else:
-                capability = AgentCapability.REASONING
-                task_type = "reasoning_task"
-            
-            # Create specialized task graph
-            task_graph = {
-                "id": f"{task_type}_{uuid.uuid4().hex[:12]}",
-                "type": task_type,
-                "capability": capability.value,
-                "nodes": [
-                    {"id": "input", "type": "perception", "params": {"input": processed_prompt}},
-                    {"id": "process", "type": capability.value, "params": {"query": processed_prompt}},
-                    {"id": "output", "type": "generation", "params": {"max_tokens": request.max_tokens}},
-                ],
-                "edges": [
-                    {"from": "input", "to": "process"},
-                    {"from": "process", "to": "output"},
-                ],
-            }
-            
-            # Submit to agent pool
+            # Get timeout from config
             agent_pool_timeout = getattr(deployment.config, "agent_pool_timeout", 15.0)
-            logger.info(f"[VULCAN] Submitting job to agent pool (capability={capability.value}, timeout={agent_pool_timeout}s)")
             
-            job_id = collective.agent_pool.submit_job(
-                graph=task_graph,
-                parameters={"prompt": processed_prompt, "task_type": task_type},
-                priority=2,  # Higher priority for user-facing requests
-                capability_required=capability,
-                timeout_seconds=agent_pool_timeout,
-            )
-            
-            if job_id:
-                # Update stats after submission
-                agent_pool_stats["this_job_id"] = job_id
+            # ============================================================
+            # USE ROUTING PLAN'S AGENT TASKS (if available)
+            # This is the critical connection to the routing layer!
+            # ============================================================
+            if routing_plan and routing_plan.agent_tasks:
+                logger.info(
+                    f"[VULCAN] Using routing plan tasks: {len(routing_plan.agent_tasks)} tasks from plan {routing_plan.query_id}"
+                )
+                
+                for agent_task in routing_plan.agent_tasks:
+                    # Map capability string to enum
+                    capability_map = {
+                        "perception": AgentCapability.PERCEPTION,
+                        "reasoning": AgentCapability.REASONING,
+                        "planning": AgentCapability.PLANNING,
+                        "execution": AgentCapability.EXECUTION,
+                        "learning": AgentCapability.LEARNING,
+                    }
+                    capability = capability_map.get(agent_task.capability, AgentCapability.REASONING)
+                    
+                    # Create task graph from routing plan task
+                    task_graph = {
+                        "id": agent_task.task_id,
+                        "type": agent_task.task_type,
+                        "capability": agent_task.capability,
+                        "nodes": [
+                            {"id": "input", "type": "perception", "params": {"input": agent_task.prompt}},
+                            {"id": "process", "type": agent_task.capability, "params": {"query": agent_task.prompt}},
+                            {"id": "output", "type": "generation", "params": {"max_tokens": request.max_tokens}},
+                        ],
+                        "edges": [
+                            {"from": "input", "to": "process"},
+                            {"from": "process", "to": "output"},
+                        ],
+                    }
+                    
+                    # Submit to agent pool
+                    logger.info(
+                        f"[VULCAN] Submitting routing task to agent pool: "
+                        f"task_id={agent_task.task_id}, capability={agent_task.capability}, priority={agent_task.priority}"
+                    )
+                    
+                    try:
+                        submitted_job_id = collective.agent_pool.submit_job(
+                            graph=task_graph,
+                            parameters={
+                                "prompt": agent_task.prompt,
+                                "task_type": agent_task.task_type,
+                                "source": agent_task.parameters.get("source", "user"),
+                                "is_primary": agent_task.parameters.get("is_primary", True),
+                                **agent_task.parameters,
+                            },
+                            priority=agent_task.priority,
+                            capability_required=capability,
+                            timeout_seconds=agent_task.timeout_seconds or agent_pool_timeout,
+                        )
+                        
+                        if submitted_job_id:
+                            submitted_jobs.append(submitted_job_id)
+                            systems_used.append(f"agent_pool_{agent_task.capability}")
+                            logger.info(f"[VULCAN] Task submitted successfully: {submitted_job_id}")
+                            
+                            # Log task submission to governance
+                            if routing_plan.requires_audit:
+                                try:
+                                    from vulcan.routing import log_to_governance, GOVERNANCE_AVAILABLE
+                                    if GOVERNANCE_AVAILABLE:
+                                        log_to_governance(
+                                            action_type="agent_task_submitted",
+                                            details={
+                                                "task_id": agent_task.task_id,
+                                                "job_id": submitted_job_id,
+                                                "capability": agent_task.capability,
+                                                "task_type": agent_task.task_type,
+                                            },
+                                            severity="info",
+                                            query_id=routing_plan.query_id,
+                                        )
+                                except Exception:
+                                    pass  # Don't fail on governance logging
+                                    
+                    except Exception as task_err:
+                        logger.warning(f"[VULCAN] Failed to submit task {agent_task.task_id}: {task_err}")
+                
+                # Update stats after all submissions
+                agent_pool_stats["jobs_submitted_this_request"] = len(submitted_jobs)
                 agent_pool_stats["jobs_submitted_total"] = collective.agent_pool.stats.get("total_jobs_submitted", 0)
                 agent_pool_stats["jobs_failed_total"] = collective.agent_pool.stats.get("total_jobs_failed", 0)
-                systems_used.append(f"agent_pool_{capability.value}")
-                logger.info(f"[VULCAN] Task submitted to {capability.value} agent: {job_id}")
+                
+                if submitted_jobs:
+                    job_id = submitted_jobs[0]  # Keep first job ID for backwards compatibility
+                    agent_pool_stats["submitted_job_ids"] = submitted_jobs
+                    
+            else:
+                # ============================================================
+                # FALLBACK: Create task from query analysis (if no routing plan)
+                # ============================================================
+                logger.info("[VULCAN] No routing plan tasks - using fallback query analysis")
+                
+                # Determine query type for specialized agent routing
+                query_lower = processed_prompt.lower()
+                
+                # Route based on query intent
+                if any(kw in query_lower for kw in ["analyze", "pattern", "data", "observe"]):
+                    capability = AgentCapability.PERCEPTION
+                    task_type = "perception_analysis"
+                elif any(kw in query_lower for kw in ["plan", "step", "strategy", "organize"]):
+                    capability = AgentCapability.PLANNING
+                    task_type = "planning_task"
+                elif any(kw in query_lower for kw in ["execute", "run", "calculate", "compute"]):
+                    capability = AgentCapability.EXECUTION
+                    task_type = "execution_task"
+                elif any(kw in query_lower for kw in ["learn", "remember", "teach", "understand"]):
+                    capability = AgentCapability.LEARNING
+                    task_type = "learning_task"
+                else:
+                    capability = AgentCapability.REASONING
+                    task_type = "reasoning_task"
+                
+                # Create specialized task graph
+                task_graph = {
+                    "id": f"{task_type}_{uuid.uuid4().hex[:12]}",
+                    "type": task_type,
+                    "capability": capability.value,
+                    "nodes": [
+                        {"id": "input", "type": "perception", "params": {"input": processed_prompt}},
+                        {"id": "process", "type": capability.value, "params": {"query": processed_prompt}},
+                        {"id": "output", "type": "generation", "params": {"max_tokens": request.max_tokens}},
+                    ],
+                    "edges": [
+                        {"from": "input", "to": "process"},
+                        {"from": "process", "to": "output"},
+                    ],
+                }
+                
+                # Submit to agent pool
+                logger.info(f"[VULCAN] Submitting fallback job to agent pool (capability={capability.value}, timeout={agent_pool_timeout}s)")
+                
+                job_id = collective.agent_pool.submit_job(
+                    graph=task_graph,
+                    parameters={"prompt": processed_prompt, "task_type": task_type},
+                    priority=2,  # Higher priority for user-facing requests
+                    capability_required=capability,
+                    timeout_seconds=agent_pool_timeout,
+                )
+                
+                if job_id:
+                    submitted_jobs.append(job_id)
+                    # Update stats after submission
+                    agent_pool_stats["this_job_id"] = job_id
+                    agent_pool_stats["jobs_submitted_total"] = collective.agent_pool.stats.get("total_jobs_submitted", 0)
+                    agent_pool_stats["jobs_failed_total"] = collective.agent_pool.stats.get("total_jobs_failed", 0)
+                    systems_used.append(f"agent_pool_{capability.value}")
+                    logger.info(f"[VULCAN] Fallback task submitted to {capability.value} agent: {job_id}")
         else:
             logger.warning("[VULCAN] Agent pool not available - skipping distributed processing")
                 
@@ -2121,6 +2291,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
     
     # ================================================================
     # STEP 9: Record Interaction Telemetry (Dual-Mode Learning)
+    # Uses routing_plan data from STEP -1 for consistent tracking
     # ================================================================
     try:
         from vulcan.routing import (
@@ -2132,21 +2303,31 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             EXPERIMENT_AVAILABLE,
         )
         
-        # Determine query type from the routing that happened earlier
-        query_type = "general"
-        if "perception" in systems_used or any(s.startswith("agent_pool_perception") for s in systems_used):
-            query_type = "perception"
-        elif "planning" in systems_used or any(s.startswith("agent_pool_planning") for s in systems_used):
-            query_type = "planning"
-        elif "reasoning" in systems_used or any(s.startswith("agent_pool_reasoning") for s in systems_used):
-            query_type = "reasoning"
-        elif any(s.startswith("agent_pool_execution") for s in systems_used):
-            query_type = "execution"
-        elif any(s.startswith("agent_pool_learning") for s in systems_used):
-            query_type = "learning"
+        # Use routing plan query type if available, otherwise infer from systems used
+        if routing_plan:
+            query_type = routing_plan.query_type.value
+            query_id = routing_plan.query_id
+            complexity_score = routing_plan.complexity_score
+            uncertainty_score = routing_plan.uncertainty_score
+        else:
+            query_id = None
+            complexity_score = 0.0
+            uncertainty_score = 0.0
+            query_type = "general"
+            if "perception" in systems_used or any(s.startswith("agent_pool_perception") for s in systems_used):
+                query_type = "perception"
+            elif "planning" in systems_used or any(s.startswith("agent_pool_planning") for s in systems_used):
+                query_type = "planning"
+            elif "reasoning" in systems_used or any(s.startswith("agent_pool_reasoning") for s in systems_used):
+                query_type = "reasoning"
+            elif any(s.startswith("agent_pool_execution") for s in systems_used):
+                query_type = "execution"
+            elif any(s.startswith("agent_pool_learning") for s in systems_used):
+                query_type = "learning"
         
         # Calculate response quality score based on systems engaged
-        quality_score = min(1.0, len(systems_used) / 8)  # Normalize by expected systems
+        vulcan_systems = [s for s in systems_used if not s.startswith("openai") and s != "fallback_message"]
+        quality_score = min(1.0, len(vulcan_systems) / 8)  # Normalize by expected systems
         if gatekeeper_results.get("hallucination_warning"):
             quality_score *= 0.5  # Penalize for hallucination
         
@@ -2156,30 +2337,47 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                 query=processed_prompt,
                 response=response_text,
                 metadata={
+                    "query_id": query_id,
                     "query_type": query_type,
+                    "complexity_score": complexity_score,
+                    "uncertainty_score": uncertainty_score,
                     "systems_used": systems_used,
-                    "vulcan_systems_active": len([s for s in systems_used if not s.startswith("openai") and s != "fallback_message"]),
+                    "vulcan_systems_active": len(vulcan_systems),
                     "response_quality_score": quality_score,
+                    "jobs_submitted": len(submitted_jobs) if submitted_jobs else 0,
+                    "routing_stats": routing_stats if routing_stats else None,
                 },
                 source="user",
-                agent_tasks_submitted=agent_pool_stats.get("jobs_submitted_total", 0),
+                agent_tasks_submitted=len(submitted_jobs) if submitted_jobs else 0,
                 agent_tasks_completed=agent_pool_stats.get("jobs_completed_total", 0),
-                governance_triggered=bool(gatekeeper_results),
-                experiment_triggered=False,
+                governance_triggered=bool(gatekeeper_results) or (routing_plan and routing_plan.requires_governance),
+                experiment_triggered=routing_plan.should_trigger_experiment if routing_plan else False,
             )
             systems_used.append("telemetry_recorded")
+            logger.info(f"[VULCAN] Telemetry recorded: query_id={query_id}, type={query_type}, quality={quality_score:.2f}")
         
-        # Log to governance if needed
-        if GOVERNANCE_AVAILABLE and (gatekeeper_results.get("hallucination_warning") or gatekeeper_results.get("input_validation")):
-            log_to_governance(
-                action_type="query_processed",
-                details={
-                    "query_type": query_type,
-                    "gatekeeper_results": gatekeeper_results,
-                    "systems_used_count": len(systems_used),
-                },
-                severity="warning" if gatekeeper_results.get("hallucination_warning") else "info"
+        # Log response generation to governance
+        if GOVERNANCE_AVAILABLE:
+            # Always log the response generation when routing plan requires audit
+            should_log = (
+                gatekeeper_results.get("hallucination_warning") or 
+                gatekeeper_results.get("input_validation") or
+                (routing_plan and routing_plan.requires_audit)
             )
+            if should_log:
+                log_to_governance(
+                    action_type="response_generated",
+                    details={
+                        "query_id": query_id,
+                        "query_type": query_type,
+                        "systems_used_count": len(systems_used),
+                        "quality_score": quality_score,
+                        "jobs_submitted": len(submitted_jobs) if submitted_jobs else 0,
+                        "gatekeeper_events": gatekeeper_results,
+                    },
+                    severity="warning" if gatekeeper_results.get("hallucination_warning") else "info",
+                    query_id=query_id,
+                )
         
         # Check if experiment should be triggered
         if EXPERIMENT_AVAILABLE:
@@ -2190,18 +2388,22 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                 quality_score=quality_score,
                 error_occurred="fallback_message" in systems_used,
             )
+            
+            # Trigger experiments based on routing plan
+            if routing_plan and routing_plan.should_trigger_experiment:
+                logger.info(f"[VULCAN] Experiment trigger flag set: type={routing_plan.experiment_type}")
         
     except ImportError:
         pass  # Routing not available
     except Exception as e:
-        logger.debug(f"[VULCAN] Telemetry recording failed: {e}")
+        logger.warning(f"[VULCAN] Telemetry recording failed: {e}", exc_info=True)
     
     # ================================================================
     # STEP 10: Build comprehensive response with stats
     # ================================================================
     vulcan_systems_active = len([s for s in systems_used if not s.startswith("openai") and s != "fallback_message"])
     
-    return {
+    response_data = {
         "response": response_text,
         "systems_used": systems_used,
         "vulcan_cognitive_systems_active": vulcan_systems_active,
@@ -2211,8 +2413,26 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             "reasoning": reasoning_insights if reasoning_insights else None,
             "world_model": world_model_insights if world_model_insights else None,
             "meta_reasoning": meta_reasoning_insights if meta_reasoning_insights else None,
-        } if (reasoning_insights or world_model_insights or meta_reasoning_insights) else None
+        } if (reasoning_insights or world_model_insights or meta_reasoning_insights) else None,
     }
+    
+    # Add routing layer stats if available
+    if routing_plan:
+        response_data["routing"] = {
+            "query_id": routing_plan.query_id,
+            "query_type": routing_plan.query_type.value,
+            "learning_mode": routing_plan.learning_mode.value,
+            "complexity_score": routing_plan.complexity_score,
+            "uncertainty_score": routing_plan.uncertainty_score,
+            "tasks_planned": len(routing_plan.agent_tasks),
+            "tasks_submitted": len(submitted_jobs) if submitted_jobs else 0,
+            "collaboration_needed": routing_plan.collaboration_needed,
+            "collaboration_agents": routing_plan.collaboration_agents if routing_plan.collaboration_needed else None,
+            "arena_participation": routing_plan.arena_participation,
+            "governance_triggered": routing_plan.requires_governance,
+        }
+    
+    return response_data
 
 
 @app.post("/llm/reason")
