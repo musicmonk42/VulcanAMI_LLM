@@ -1607,7 +1607,7 @@ async def chat(request: ChatRequest):
                 capability = AgentCapability.REASONING
                 task_type = "reasoning_task"
             
-            # Create specialized task graph (uuid already imported above)
+            # Create specialized task graph
             task_graph = {
                 "id": f"{task_type}_{uuid.uuid4().hex[:12]}",
                 "type": task_type,
