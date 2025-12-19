@@ -402,7 +402,7 @@ class HierarchicalContext:
             for p in proc[:10]:
                 if token_count >= max_tokens:
                     break
-                sig_preview = " ".join(p.signature_terms[:6])
+                sig_preview = " ".join(str(t) for t in p.signature_terms[:6])
                 part = f"[PROC] {p.name} :: {sig_preview}"
                 flat_parts.append(part)
                 token_count += len(part.split())
@@ -1091,6 +1091,8 @@ class HierarchicalContext:
         """Upsert procedural pattern"""
         name = (pattern.get("name") or "").strip()
         sig = pattern.get("signature_terms") or []
+        # Ensure all signature terms are strings to avoid join() errors
+        sig = [str(t) for t in sig]
         meta = pattern.get("meta") or {}
 
         if not name:
@@ -1107,8 +1109,8 @@ class HierarchicalContext:
                 p.importance = max(p.importance, importance)
                 if meta:
                     p.meta.update(meta)
-                # Merge signature terms
-                merged = list(dict.fromkeys((p.signature_terms or []) + sig))[:50]
+                # Merge signature terms (ensure all are strings)
+                merged = list(dict.fromkeys([str(t) for t in (p.signature_terms or [])] + sig))[:50]
                 p.signature_terms = merged
                 return
 
@@ -1119,9 +1121,9 @@ class HierarchicalContext:
         idx = len(self.procedural)
         self.procedural.append(proc)
 
-        # Update index
+        # Update index (ensure term is string for consistency)
         for term in sig:
-            self._procedural_term_index[term].add(idx)
+            self._procedural_term_index[str(term)].add(idx)
 
     def _search_procedural_advanced(
         self, qterms: List[str], k: int
@@ -1191,8 +1193,7 @@ class HierarchicalContext:
         """Convert tokens to text"""
         if not tokens:
             return ""
-        if isinstance(tokens[0], str):
-            return " ".join(tokens)
+        # Always convert all tokens to strings to handle mixed int/str lists
         return " ".join(str(t) for t in tokens)
 
     def _to_text(self, obj: Any) -> str:

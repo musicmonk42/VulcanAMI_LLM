@@ -229,6 +229,10 @@ class CognitiveLoop:
         self._entropy_scores: List[float] = []
         self._speculative_stats: Dict[str, Any] = {}
         self.strategy_weights: Dict[str, float] = {"language": 1.0}
+        # Performance caches - context and world model don't change much per token
+        self._cached_context: Optional[Dict[str, Any]] = None
+        self._context_cache_step: int = -1
+        self._world_model_update_interval: int = 5  # Only update every N tokens
 
     def set_speculative_function(self, fn: SpeculativeFunction) -> None:
         self._speculative_fn = fn
@@ -274,6 +278,9 @@ class CognitiveLoop:
         self._perplex_nll = []
         self._entropy_scores = []
         self._speculative_stats = {}
+        # Reset caches for new generation
+        self._cached_context = None
+        self._context_cache_step = -1
 
         temperature = self.sampling.temperature
         top_k = self.sampling.top_k
@@ -293,17 +300,22 @@ class CognitiveLoop:
             nonlocal temperature, top_k, errors, beam_metadata, speculative_stats, safety_interventions, generated
 
             last_reasoning_meta: Dict[str, Any] = {}
+            logger.info(f"[DIAG] Generator starting: max_steps={max_steps}, enable_stream={self.runtime.enable_stream}")
 
             for step in range(max_steps):
+                logger.info(f"[DIAG] Generator loop step={step}, generated_len={len(generated)}")
+                
                 if self.sampling.use_beam_search and all(
                     b["is_finished"] for b in self._beam_state
                 ):
+                    logger.info("[DIAG] Generator: All beams finished, breaking")
                     break
 
                 if (
                     self.runtime.time_budget_seconds
                     and (time.time() - start) >= self.runtime.time_budget_seconds
                 ):
+                    logger.info("[DIAG] Generator: Time budget exceeded, finalizing")
                     yield await self._finalize(
                         prompt,
                         init_tokens,
@@ -323,6 +335,7 @@ class CognitiveLoop:
                     return
 
                 try:
+                    logger.info(f"[DIAG] Generator: Calling _step({step})...")
                     step_result = await self._step(
                         prompt_tokens=init_tokens + generated,
                         temperature=temperature,
@@ -331,9 +344,11 @@ class CognitiveLoop:
                         stop_strings=stop_str_patterns,
                         step=step,
                     )
+                    logger.info(f"[DIAG] Generator: _step({step}) returned")
                     errors = 0
                 except Exception as e:
                     print(f"Error during cognitive step: {e}\n{traceback.format_exc()}")
+                    logger.error(f"[DIAG] Generator: _step({step}) EXCEPTION: {e}")
                     errors += 1
                     if errors > self.runtime.max_errors:
                         yield await self._finalize(
@@ -358,6 +373,7 @@ class CognitiveLoop:
 
                 token = step_result["token"]
                 token_info = step_result["info"]
+                logger.info(f"[DIAG] Generator: Got token={token} from step")
 
                 reasoning_trace.append(token_info.get("reasoning", {}))
                 last_reasoning_meta = token_info.get("reasoning", {})
@@ -448,11 +464,13 @@ class CognitiveLoop:
                             return
 
                 if token is not None:
+                    logger.info(f"[DIAG] Generator: Token is valid ({token}), will append and possibly yield")
                     if (
                         not self.sampling.use_beam_search
                         and not self.sampling.speculative_enabled
                     ):
                         generated.append(token)
+                        logger.info(f"[DIAG] Generator: Appended token, generated_len now={len(generated)}")
 
                     current_text = await self._decode(generated)
 
@@ -462,7 +480,10 @@ class CognitiveLoop:
                         "token_info": token_info,
                     }
                     if self.runtime.enable_stream:
+                        logger.info(f"[DIAG] Generator: YIELDING stream_chunk for token={token}")
                         yield stream_chunk
+                    else:
+                        logger.info(f"[DIAG] Generator: enable_stream=False, NOT yielding stream_chunk")
 
                     if stream_callback:
                         stream_callback(token, current_text, token_info)
@@ -514,6 +535,8 @@ class CognitiveLoop:
                                 safety_interventions,
                             )
                             return
+                else:
+                    logger.warning(f"[DIAG] Generator: Token is None! Step will continue without yielding")
 
                 if self.sampling.adaptive_temperature:
                     temperature = max(
@@ -562,6 +585,7 @@ class CognitiveLoop:
         stop_strings: Tuple[str, ...],
         step: int,
     ) -> Dict[str, Any]:
+        logger.info(f"[DIAG] _step START step={step}, prompt_len={len(prompt_tokens)}")
         t0 = time.time()
         sub_times = {}  # Timing dictionary
         token_info: Dict[str, Any] = {}
@@ -587,31 +611,52 @@ class CognitiveLoop:
             chosen_index = beam_meta.get("chosen_index")
             reasoning_meta["strategy"] = "beam_search"
         else:
-            t_ctx = time.time()
-            retrieved_context = await self._async_safe(
-                self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
-            )
-            sub_times["context_retrieval_ms"] = (time.time() - t_ctx) * 1000
+            # OPTIMIZATION: Cache context retrieval - only fetch on first token or every 10 steps
+            if self._cached_context is None or step == 0 or (step - self._context_cache_step) >= 10:
+                logger.info("[DIAG] _step: Starting context retrieval...")
+                t_ctx = time.time()
+                retrieved_context = await self._async_safe(
+                    self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
+                )
+                sub_times["context_retrieval_ms"] = (time.time() - t_ctx) * 1000
+                # Cache the context for reuse
+                self._cached_context = retrieved_context
+                self._context_cache_step = step
+                logger.info(f"[DIAG] _step: Context retrieved in {sub_times['context_retrieval_ms']:.1f}ms")
+            else:
+                # Reuse cached context
+                retrieved_context = self._cached_context
+                sub_times["context_retrieval_ms"] = 0.0
+                logger.info(f"[DIAG] _step: Using cached context (step {step}, cached at {self._context_cache_step})")
             token_info["retrieved_context"] = retrieved_context
 
+            # OPTIMIZATION: Only update world model every N tokens (configurable)
             if self.runtime.attach_world_model_hooks and hasattr(
                 self.bridge, "world_model"
             ):
-                try:
-                    t_wm_up = time.time()
-                    await self._async_safe(
-                        self.bridge.world_model.update, {"tokens": prompt_tokens}, None
-                    )
-                    sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
-                except Exception as e:
-                    # World model update is optional; log errors but continue
-                    logger.debug(f"World model update failed: {e}")
+                if step == 0 or step % self._world_model_update_interval == 0:
+                    try:
+                        logger.info("[DIAG] _step: Updating world model...")
+                        t_wm_up = time.time()
+                        await self._async_safe(
+                            self.bridge.world_model.update, {"tokens": prompt_tokens}, None
+                        )
+                        sub_times["wm_update_ms"] = (time.time() - t_wm_up) * 1000
+                        logger.info(f"[DIAG] _step: World model updated in {sub_times['wm_update_ms']:.1f}ms")
+                    except Exception as e:
+                        # World model update is optional; log errors but continue
+                        logger.debug(f"World model update failed: {e}")
+                else:
+                    sub_times["wm_update_ms"] = 0.0
+                    logger.info(f"[DIAG] _step: Skipping world model update (step {step}, updates every {self._world_model_update_interval} tokens)")
 
+            logger.info("[DIAG] _step: Calling transformer.encode()...")
             t_enc = time.time()
             hidden_state = await self._async_safe(
                 self.transformer.encode, prompt_tokens, None
             )
             sub_times["encode_ms"] = (time.time() - t_enc) * 1000
+            logger.info(f"[DIAG] _step: transformer.encode() returned in {sub_times['encode_ms']:.1f}ms, hidden_state={hidden_state is not None}")
             reasoning_meta["hidden_state_shape"] = getattr(hidden_state, "shape", None)
 
             available_strategies = list(self.strategy_weights.keys())
@@ -620,21 +665,26 @@ class CognitiveLoop:
                 available_strategies, weights=strategy_weights
             )[0]
 
+            logger.info("[DIAG] _step: Selecting candidates...")
             t_cand = time.time()
             candidates = await self._select_candidates(hidden_state, retrieved_context)
             sub_times["select_candidates_ms"] = (time.time() - t_cand) * 1000
             reasoning_meta["candidate_count"] = len(candidates)
+            logger.info(f"[DIAG] _step: Selected {len(candidates)} candidates in {sub_times['select_candidates_ms']:.1f}ms")
 
             candidate_scores = None
             if self.runtime.parallel_score_candidates and self.candidate_scorer:
+                logger.info("[DIAG] _step: Parallel scoring candidates...")
                 t_score = time.time()
                 candidate_scores = await self._parallel_score(
                     hidden_state, candidates, retrieved_context
                 )
                 sub_times["parallel_score_ms"] = (time.time() - t_score) * 1000
                 reasoning_meta["candidate_scores"] = candidate_scores
+                logger.info(f"[DIAG] _step: Parallel scoring done in {sub_times['parallel_score_ms']:.1f}ms")
 
             if self.runtime.enable_rerank and candidate_scores and self.reranker:
+                logger.info("[DIAG] _step: Reranking candidates...")
                 bundle = [
                     {"candidate": c, "score": s, "index": i}
                     for i, (c, s) in enumerate(zip(candidates, candidate_scores))
@@ -644,13 +694,17 @@ class CognitiveLoop:
                 sub_times["rerank_ms"] = (time.time() - t_rerank) * 1000
                 candidates = [b["candidate"] for b in reranked]
                 reasoning_meta["reranked"] = True
+                logger.info(f"[DIAG] _step: Reranking done in {sub_times['rerank_ms']:.1f}ms")
 
+            logger.info("[DIAG] _step: Obtaining logits...")
             t_logits = time.time()
             logits = await self._obtain_logits(hidden_state, prompt_tokens, candidates)
             sub_times["get_logits_ms"] = (time.time() - t_logits) * 1000
             token_info["logits"] = logits if self.runtime.attach_logits else None
+            logger.info(f"[DIAG] _step: Logits obtained in {sub_times['get_logits_ms']:.1f}ms, logits_len={len(logits) if logits else 0}")
 
             if self.sampling.speculative_enabled and self.draft_transformer:
+                logger.info("[DIAG] _step: Speculative decoding...")
                 t_spec = time.time()
                 accepted_tokens, token, spec_meta = await self._speculative_decoding(
                     prompt_tokens, temperature, top_k
@@ -658,7 +712,9 @@ class CognitiveLoop:
                 sub_times["speculative_ms"] = (time.time() - t_spec) * 1000
                 token_info["speculative"] = spec_meta
                 prompt_tokens.extend(accepted_tokens)
+                logger.info(f"[DIAG] _step: Speculative decoding done in {sub_times['speculative_ms']:.1f}ms")
             else:
+                logger.info("[DIAG] _step: Sampling token...")
                 t_sample = time.time()
                 chosen_index, adjusted_logits = self._sample(
                     logits=logits,
@@ -667,12 +723,15 @@ class CognitiveLoop:
                     top_k=top_k,
                     top_p=self.sampling.top_p,
                 )
+                logger.info(f"[DIAG] _step: Sampled chosen_index={chosen_index}")
                 token = await self._index_to_token(chosen_index)
                 sub_times["sample_ms"] = (time.time() - t_sample) * 1000
+                logger.info(f"[DIAG] _step: Token resolved: {token} in {sub_times['sample_ms']:.1f}ms")
 
             token_info["chosen_index"] = chosen_index
 
         reasoning_meta["selected_token"] = token
+        logger.info(f"[DIAG] _step END: token={token}, total_time={(time.time() - t0) * 1000:.1f}ms")
 
         safety_event = None
         if (
@@ -896,12 +955,28 @@ class CognitiveLoop:
         return chosen, filtered
 
     async def _index_to_token(self, idx: int) -> Token:
+        # First try using the provided vocab object
         if self.vocab and hasattr(self.vocab, "id_to_token"):
             try:
                 return await asyncio.to_thread(self.vocab.id_to_token, idx)
             except Exception as e:
-                # Log vocab lookup failure, fallback to returning index
-                logger.debug(f"Failed to convert index to token: {e}")
+                # Log vocab lookup failure, try tokenizer
+                logger.debug(f"Failed to convert index to token via vocab: {e}")
+        
+        # Try using the tokenizer's id_to_word dictionary
+        if self.tokenizer and hasattr(self.tokenizer, "id_to_word"):
+            try:
+                id_to_word = self.tokenizer.id_to_word
+                if idx in id_to_word:
+                    return id_to_word[idx]
+                # Modulo the index to fit within known vocabulary for fallback
+                known_ids = list(id_to_word.keys())
+                if known_ids:
+                    fallback_idx = known_ids[idx % len(known_ids)]
+                    return id_to_word[fallback_idx]
+            except Exception as e:
+                logger.debug(f"Failed to convert index to token via tokenizer: {e}")
+        
         return idx
 
     async def _multi_step_beam_search_expansion(

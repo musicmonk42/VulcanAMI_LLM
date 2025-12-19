@@ -54,6 +54,54 @@ class SimpleTokenizer:
     For production use, consider using BPE, WordPiece, or SentencePiece tokenizers.
     """
 
+    # Common English words for basic vocabulary coverage
+    _COMMON_WORDS = [
+        # Common words
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could", "should",
+        "may", "might", "must", "shall", "can", "need", "dare", "ought", "used",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as",
+        "into", "through", "during", "before", "after", "above", "below", "between",
+        "and", "but", "or", "nor", "so", "yet", "both", "either", "neither",
+        "not", "no", "yes", "all", "any", "each", "every", "few", "more", "most",
+        "other", "some", "such", "only", "own", "same", "than", "too", "very",
+        "just", "also", "now", "here", "there", "when", "where", "why", "how",
+        "what", "which", "who", "whom", "this", "that", "these", "those",
+        "I", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them",
+        "my", "your", "his", "its", "our", "their", "mine", "yours", "hers", "ours", "theirs",
+        "myself", "yourself", "himself", "herself", "itself", "ourselves", "themselves",
+        # Common nouns
+        "machine", "learning", "data", "model", "algorithm", "computer", "system", "information",
+        "network", "neural", "deep", "artificial", "intelligence", "training", "prediction",
+        "cat", "dog", "animal", "person", "people", "man", "woman", "child", "time", "year",
+        "day", "way", "thing", "world", "life", "hand", "part", "place", "case", "week",
+        "company", "system", "program", "question", "work", "government", "number", "night",
+        "point", "home", "water", "room", "mother", "area", "money", "story", "fact", "month",
+        "lot", "right", "study", "book", "eye", "job", "word", "business", "issue", "side",
+        "kind", "head", "house", "service", "friend", "father", "power", "hour", "game", "line",
+        # Common verbs
+        "say", "get", "make", "go", "know", "take", "see", "come", "think", "look",
+        "want", "give", "use", "find", "tell", "ask", "work", "seem", "feel", "try",
+        "leave", "call", "keep", "let", "begin", "show", "hear", "play", "run", "move",
+        "like", "live", "believe", "hold", "bring", "happen", "write", "provide", "sit", "stand",
+        "lose", "pay", "meet", "include", "continue", "set", "learn", "change", "lead", "understand",
+        # Common adjectives
+        "good", "new", "first", "last", "long", "great", "little", "own", "old", "right",
+        "big", "high", "different", "small", "large", "next", "early", "young", "important", "few",
+        "public", "bad", "same", "able", "best", "better", "sure", "free", "true", "whole",
+        # Numbers and misc
+        "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "hundred", "thousand", "million", "billion", "first", "second", "third",
+        # Punctuation and symbols (as words)
+        ".", ",", "!", "?", ";", ":", "'", '"', "-", "(", ")", "[", "]", "{", "}",
+        # Additional AI/ML terms
+        "process", "input", "output", "function", "variable", "parameter", "layer", "weight",
+        "bias", "activation", "gradient", "optimization", "loss", "accuracy", "precision",
+        "recall", "classification", "regression", "clustering", "supervised", "unsupervised",
+        "reinforcement", "feature", "vector", "matrix", "tensor", "dimension", "embedding",
+        "transformer", "attention", "encoder", "decoder", "sequence", "token", "vocabulary",
+    ]
+
     def __init__(self, vocab_size: int):
         """Initialize tokenizer.
 
@@ -81,6 +129,13 @@ class SimpleTokenizer:
                 self.id_to_word[self.next_id] = special_token
                 self.next_id += 1
 
+        # Pre-populate with common words so model outputs can be decoded
+        for word in self._COMMON_WORDS:
+            if self.next_id < vocab_size and word not in self.word_to_id:
+                self.word_to_id[word] = self.next_id
+                self.id_to_word[self.next_id] = word
+                self.next_id += 1
+
     def encode(self, text: Union[str, List[str]]) -> List[int]:
         """Encode text to token IDs.
 
@@ -93,7 +148,8 @@ class SimpleTokenizer:
         if isinstance(text, str):
             words = text.split()
         else:
-            words = text
+            # Convert all elements to strings to handle mixed types
+            words = [str(w) for w in text]
 
         tokens = []
         for word in words:
@@ -121,7 +177,8 @@ class SimpleTokenizer:
         Returns:
             Decoded text string
         """
-        words = [self.id_to_word.get(t, self.unk_token) for t in tokens]
+        # Ensure all words are strings before joining
+        words = [str(self.id_to_word.get(t, self.unk_token)) for t in tokens]
         return " ".join(words)
 
     def get_vocab_size(self) -> int:

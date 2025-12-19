@@ -114,6 +114,24 @@ except ImportError:
     Redis = None
     REDIS_AVAILABLE = False
 
+# OpenAI integration for high-quality text generation
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+    _openai_client = None
+    
+    def get_openai_client():
+        global _openai_client
+        if _openai_client is None:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if api_key:
+                _openai_client = OpenAI(api_key=api_key)
+        return _openai_client
+except ImportError:
+    OPENAI_AVAILABLE = False
+    def get_openai_client():
+        return None
+
 # ============================================================
 # MOCKED/PLACEHOLDER LLM IMPLEMENTATION
 # This replaces the need for the external 'graphix_vulcan_llm' package
@@ -1399,23 +1417,130 @@ async def update_performance_metric(metric: str, value: float):
 
 @app.post("/llm/chat")
 async def chat(request: ChatRequest):
-    """Conversational interface via LLM."""
-    if not hasattr(app.state, "llm"):
-        raise HTTPException(status_code=503, detail="LLM not initialized")
+    """Conversational interface via LLM.
+    
+    Uses Vulcan's cognitive systems (memory, reasoning) enhanced with 
+    OpenAI for language generation when OPENAI_API_KEY is set.
+    Falls back to local model otherwise.
+    """
+    systems_used = []
+    memory_context = None
+    reasoning_insights = None
+    
+    # ================================================================
+    # STEP 1: Query Vulcan's Long-Term Memory
+    # ================================================================
+    deps = getattr(app.state, "deps", None)
+    if deps and hasattr(deps, "memory") and deps.memory:
+        try:
+            memory_context = await asyncio.get_running_loop().run_in_executor(
+                None, deps.memory.retrieve, request.prompt, 3
+            )
+            if memory_context:
+                systems_used.append("long_term_memory")
+                logger.info(f"[VULCAN] Retrieved {len(memory_context)} relevant memories")
+        except Exception as e:
+            logger.debug(f"Memory retrieval failed: {e}")
+    
+    # ================================================================
+    # STEP 2: Vulcan Reasoning Systems
+    # ================================================================
+    if deps and hasattr(deps, "reasoning") and deps.reasoning:
+        try:
+            reasoning_result = await asyncio.get_running_loop().run_in_executor(
+                None, deps.reasoning.reason, request.prompt, {}
+            )
+            if reasoning_result:
+                reasoning_insights = reasoning_result
+                systems_used.append("reasoning_engine")
+                logger.info(f"[VULCAN] Applied reasoning analysis")
+        except Exception as e:
+            logger.debug(f"Reasoning failed: {e}")
+    
+    # ================================================================
+    # STEP 3: Build Enhanced Prompt with Vulcan Context
+    # ================================================================
+    memory_str = ""
+    if memory_context:
+        try:
+            memory_str = f"\n\nRelevant Memory Context: {str(memory_context[:2])}"
+        except Exception:
+            pass
+    
+    reasoning_str = ""
+    if reasoning_insights:
+        try:
+            reasoning_str = f"\n\nReasoning Insights: {str(reasoning_insights)[:500]}"
+        except Exception:
+            pass
+    
+    enhanced_prompt = f"""You are VULCAN, an advanced AI assistant with a comprehensive cognitive architecture including long-term memory, multi-modal reasoning, world modeling, and planning capabilities.
 
-    llm = app.state.llm
+User Query: {request.prompt}
+{memory_str}{reasoning_str}
 
-    try:
-        loop = asyncio.get_running_loop()
-        # Non-blocking call to the LLM generation function
-        response = await loop.run_in_executor(
-            None, llm.generate, request.prompt, request.max_tokens
-        )
+Provide a helpful, accurate, and comprehensive response based on your analysis."""
 
-        return {"response": response}
-    except Exception as e:
-        logger.error(f"LLM chat failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    # ================================================================
+    # STEP 4: Generate Response (OpenAI or Local)
+    # ================================================================
+    response_text = ""
+    
+    # Try OpenAI first if available
+    openai_client = get_openai_client()
+    if openai_client:
+        try:
+            loop = asyncio.get_running_loop()
+            
+            def call_openai():
+                completion = openai_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are VULCAN, an advanced AI assistant with comprehensive cognitive capabilities including memory, reasoning, world modeling, and planning."},
+                        {"role": "user", "content": enhanced_prompt}
+                    ],
+                    max_tokens=min(request.max_tokens, 1000),
+                    temperature=0.7
+                )
+                return completion.choices[0].message.content
+            
+            response_text = await loop.run_in_executor(None, call_openai)
+            systems_used.append("openai_language_model")
+            logger.info(f"[VULCAN] Response generated via OpenAI with Vulcan context")
+        except Exception as e:
+            logger.warning(f"OpenAI call failed, falling back to local model: {e}")
+    
+    # Fallback to local LLM if OpenAI failed or not available
+    if not response_text:
+        if not hasattr(app.state, "llm"):
+            raise HTTPException(status_code=503, detail="LLM not initialized")
+
+        llm = app.state.llm
+
+        try:
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None, llm.generate, enhanced_prompt, request.max_tokens
+            )
+            
+            if hasattr(result, 'text'):
+                response_text = result.text
+            elif isinstance(result, str):
+                response_text = result
+            elif isinstance(result, dict) and 'text' in result:
+                response_text = result['text']
+            else:
+                response_text = str(result)
+            
+            systems_used.append("local_llm")
+        except Exception as e:
+            logger.error(f"LLM chat failed: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=str(e))
+
+    return {
+        "response": response_text,
+        "systems_used": systems_used
+    }
 
 
 @app.post("/llm/reason")
@@ -1754,10 +1879,44 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                response_text = await loop.run_in_executor(
-                    None, llm.generate, enhanced_prompt, request.max_tokens
-                )
-                systems_used.append("llm_generation")
+                # Try OpenAI first for high-quality responses
+                openai_client = get_openai_client()
+                if openai_client:
+                    try:
+                        def call_openai():
+                            completion = openai_client.chat.completions.create(
+                                model="gpt-3.5-turbo",
+                                messages=[
+                                    {"role": "system", "content": "You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses."},
+                                    {"role": "user", "content": enhanced_prompt}
+                                ],
+                                max_tokens=min(request.max_tokens, 1000),
+                                temperature=0.7
+                            )
+                            return completion.choices[0].message.content
+                        
+                        response_text = await loop.run_in_executor(None, call_openai)
+                        systems_used.append("openai_llm")
+                    except Exception as e:
+                        logger.warning(f"OpenAI call failed, falling back to local model: {e}")
+                        # Fall through to local LLM
+                        response_text = ""
+                
+                # Fallback to local LLM if OpenAI failed or not available
+                if not response_text:
+                    result = await loop.run_in_executor(
+                        None, llm.generate, enhanced_prompt, request.max_tokens
+                    )
+                    # Extract text from GenerationResult object
+                    if hasattr(result, 'text'):
+                        response_text = result.text
+                    elif isinstance(result, str):
+                        response_text = result
+                    elif isinstance(result, dict) and 'text' in result:
+                        response_text = result['text']
+                    else:
+                        response_text = str(result)
+                    systems_used.append("llm_generation")
             except Exception as e:
                 logger.error(f"LLM generation failed: {e}")
                 # Fallback response
