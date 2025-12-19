@@ -955,12 +955,28 @@ class CognitiveLoop:
         return chosen, filtered
 
     async def _index_to_token(self, idx: int) -> Token:
+        # First try using the provided vocab object
         if self.vocab and hasattr(self.vocab, "id_to_token"):
             try:
                 return await asyncio.to_thread(self.vocab.id_to_token, idx)
             except Exception as e:
-                # Log vocab lookup failure, fallback to returning index
-                logger.debug(f"Failed to convert index to token: {e}")
+                # Log vocab lookup failure, try tokenizer
+                logger.debug(f"Failed to convert index to token via vocab: {e}")
+        
+        # Try using the tokenizer's id_to_word dictionary
+        if self.tokenizer and hasattr(self.tokenizer, "id_to_word"):
+            try:
+                id_to_word = self.tokenizer.id_to_word
+                if idx in id_to_word:
+                    return id_to_word[idx]
+                # Modulo the index to fit within known vocabulary for fallback
+                known_ids = list(id_to_word.keys())
+                if known_ids:
+                    fallback_idx = known_ids[idx % len(known_ids)]
+                    return id_to_word[fallback_idx]
+            except Exception as e:
+                logger.debug(f"Failed to convert index to token via tokenizer: {e}")
+        
         return idx
 
     async def _multi_step_beam_search_expansion(
