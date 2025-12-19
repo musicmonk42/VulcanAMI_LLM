@@ -659,6 +659,10 @@ class AgentPoolManager:
                 return job_id
 
         # FIXED: Execute task outside the lock to avoid blocking other submissions
+        # Note: This is safe because:
+        # 1. The agent is in WORKING state, so other threads won't assign work to it
+        # 2. The metadata object belongs to this agent and won't be deleted while working
+        # 3. provenance is task-specific and only modified by the owning task
         if agent_id:
             self._execute_job_sync(job_id, agent_id, graph, parameters, metadata)
 
@@ -680,6 +684,11 @@ class AgentPoolManager:
         
         Called OUTSIDE the lock to avoid blocking other submissions.
         
+        Thread safety notes:
+        - The agent is in WORKING state, so other threads won't assign new work to it
+        - Provenance objects are task-specific (one per job_id) and only modified here
+        - The metadata object is owned by this agent during task execution
+        
         Args:
             job_id: Job identifier
             agent_id: Agent identifier
@@ -688,12 +697,15 @@ class AgentPoolManager:
             metadata: Agent metadata
         """
         logger.info(f"Agent {agent_id} starting job {job_id}")
+        provenance = None
+        
         try:
-            # Get provenance for the task
+            # Get provenance for the task (thread-safe access)
             with self.lock:
                 provenance = self.provenance_records.get(job_id)
-            if provenance:
-                provenance.start_execution()
+                if provenance:
+                    # Start execution while holding lock to prevent concurrent modification
+                    provenance.start_execution()
 
             # Build task dict for execution
             exec_task = {
