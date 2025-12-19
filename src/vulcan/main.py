@@ -2537,6 +2537,203 @@ async def unified_chat(request: UnifiedChatRequest):
         context = {"user_query": user_message, "history": request.history}
         
         # ================================================================
+        # STEP 0: QUERY ROUTING LAYER - Analyze and route query
+        # This is the critical integration that activates the learning systems
+        # ================================================================
+        routing_plan = None
+        routing_stats = {}
+        agent_pool_stats = {}
+        submitted_jobs = []  # Track all submitted job IDs
+        
+        try:
+            from vulcan.routing import (
+                route_query,
+                log_to_governance,
+                record_telemetry,
+                get_governance_logger,
+                get_query_analyzer,
+                get_telemetry_recorder,
+                QUERY_ROUTER_AVAILABLE,
+                GOVERNANCE_AVAILABLE,
+                TELEMETRY_AVAILABLE,
+            )
+            
+            if QUERY_ROUTER_AVAILABLE:
+                # Analyze query and create processing plan
+                routing_plan = route_query(user_message, source="user")
+                systems_used.append("query_router")
+                
+                routing_stats = {
+                    "query_id": routing_plan.query_id,
+                    "query_type": routing_plan.query_type.value,
+                    "complexity_score": routing_plan.complexity_score,
+                    "uncertainty_score": routing_plan.uncertainty_score,
+                    "collaboration_needed": routing_plan.collaboration_needed,
+                    "arena_participation": routing_plan.arena_participation,
+                    "agent_tasks_planned": len(routing_plan.agent_tasks),
+                    "requires_governance": routing_plan.requires_governance,
+                    "pii_detected": routing_plan.pii_detected,
+                }
+                
+                logger.info(
+                    f"[VULCAN/v1/chat] Query routed: id={routing_plan.query_id}, "
+                    f"type={routing_plan.query_type.value}, tasks={len(routing_plan.agent_tasks)}"
+                )
+                
+                # Log to governance IMMEDIATELY if required
+                if GOVERNANCE_AVAILABLE and routing_plan.requires_audit:
+                    log_to_governance(
+                        action_type="query_processed",
+                        details={
+                            "query_id": routing_plan.query_id,
+                            "query_type": routing_plan.query_type.value,
+                            "complexity_score": routing_plan.complexity_score,
+                            "pii_detected": routing_plan.pii_detected,
+                        },
+                        severity="info",
+                        query_id=routing_plan.query_id,
+                    )
+                    systems_used.append("governance_logger")
+                    logger.info(f"[VULCAN/v1/chat] Governance logged for query {routing_plan.query_id}")
+                    
+        except ImportError as e:
+            logger.debug(f"[VULCAN/v1/chat] Routing layer not available: {e}")
+        except Exception as e:
+            logger.warning(f"[VULCAN/v1/chat] Query routing failed: {e}", exc_info=True)
+        
+        # ================================================================
+        # STEP 0.5: Submit tasks to Agent Pool
+        # ================================================================
+        try:
+            from vulcan.orchestrator.agent_lifecycle import AgentCapability
+            import uuid as uuid_mod
+            
+            if hasattr(deployment, "collective") and hasattr(deployment.collective, "agent_pool") and deployment.collective.agent_pool:
+                pool = deployment.collective.agent_pool
+                pool_status = pool.get_pool_status()
+                agent_pool_stats = {
+                    "total_agents": pool_status.get("total_agents", 0),
+                    "idle_agents": pool_status.get("state_distribution", {}).get("idle", 0),
+                    "working_agents": pool_status.get("state_distribution", {}).get("working", 0),
+                    "jobs_submitted_total": pool.stats.get("total_jobs_submitted", 0),
+                    "jobs_completed_total": pool.stats.get("total_jobs_completed", 0),
+                }
+                
+                # Map capability string to enum
+                capability_map = {
+                    "perception": AgentCapability.PERCEPTION,
+                    "reasoning": AgentCapability.REASONING,
+                    "planning": AgentCapability.PLANNING,
+                    "execution": AgentCapability.EXECUTION,
+                    "learning": AgentCapability.LEARNING,
+                }
+                
+                if routing_plan and routing_plan.agent_tasks:
+                    logger.info(
+                        f"[VULCAN/v1/chat] Submitting {len(routing_plan.agent_tasks)} tasks to agent pool"
+                    )
+                    
+                    for agent_task in routing_plan.agent_tasks:
+                        capability = capability_map.get(agent_task.capability, AgentCapability.REASONING)
+                        
+                        task_graph = {
+                            "id": agent_task.task_id,
+                            "type": agent_task.task_type,
+                            "capability": agent_task.capability,
+                            "nodes": [
+                                {"id": "input", "type": "perception", "params": {"input": agent_task.prompt}},
+                                {"id": "process", "type": agent_task.capability, "params": {"query": agent_task.prompt}},
+                                {"id": "output", "type": "generation", "params": {"max_tokens": request.max_tokens}},
+                            ],
+                            "edges": [
+                                {"from": "input", "to": "process"},
+                                {"from": "process", "to": "output"},
+                            ],
+                        }
+                        
+                        try:
+                            submitted_job_id = pool.submit_job(
+                                graph=task_graph,
+                                parameters={"prompt": agent_task.prompt, "task_type": agent_task.task_type},
+                                priority=agent_task.priority,
+                                capability_required=capability,
+                                timeout_seconds=agent_task.timeout_seconds or 15.0,
+                            )
+                            
+                            if submitted_job_id:
+                                submitted_jobs.append(submitted_job_id)
+                                systems_used.append(f"agent_pool_{agent_task.capability}")
+                                logger.info(f"[VULCAN/v1/chat] ✓ Task submitted: {submitted_job_id} to {agent_task.capability}")
+                                
+                        except Exception as task_err:
+                            logger.warning(f"[VULCAN/v1/chat] Failed to submit task: {task_err}")
+                    
+                    # Update stats
+                    agent_pool_stats["jobs_submitted_this_request"] = len(submitted_jobs)
+                    agent_pool_stats["jobs_submitted_total"] = pool.stats.get("total_jobs_submitted", 0)
+                    
+                else:
+                    # Fallback: Create task from query type
+                    logger.info("[VULCAN/v1/chat] No routing plan - using query keyword analysis")
+                    
+                    query_lower = user_message.lower()
+                    if any(kw in query_lower for kw in ["analyze", "pattern", "data", "observe"]):
+                        capability = AgentCapability.PERCEPTION
+                        task_type = "perception_analysis"
+                    elif any(kw in query_lower for kw in ["plan", "step", "strategy", "organize"]):
+                        capability = AgentCapability.PLANNING
+                        task_type = "planning_task"
+                    elif any(kw in query_lower for kw in ["execute", "run", "calculate", "compute"]):
+                        capability = AgentCapability.EXECUTION
+                        task_type = "execution_task"
+                    elif any(kw in query_lower for kw in ["learn", "remember", "teach", "understand"]):
+                        capability = AgentCapability.LEARNING
+                        task_type = "learning_task"
+                    else:
+                        capability = AgentCapability.REASONING
+                        task_type = "reasoning_task"
+                    
+                    task_graph = {
+                        "id": f"{task_type}_{uuid_mod.uuid4().hex[:12]}",
+                        "type": task_type,
+                        "capability": capability.value,
+                        "nodes": [
+                            {"id": "input", "type": "perception", "params": {"input": user_message}},
+                            {"id": "process", "type": capability.value, "params": {"query": user_message}},
+                            {"id": "output", "type": "generation", "params": {"max_tokens": request.max_tokens}},
+                        ],
+                        "edges": [
+                            {"from": "input", "to": "process"},
+                            {"from": "process", "to": "output"},
+                        ],
+                    }
+                    
+                    try:
+                        job_id = pool.submit_job(
+                            graph=task_graph,
+                            parameters={"prompt": user_message, "task_type": task_type},
+                            priority=2,
+                            capability_required=capability,
+                            timeout_seconds=15.0,
+                        )
+                        
+                        if job_id:
+                            submitted_jobs.append(job_id)
+                            agent_pool_stats["this_job_id"] = job_id
+                            agent_pool_stats["jobs_submitted_this_request"] = 1
+                            agent_pool_stats["jobs_submitted_total"] = pool.stats.get("total_jobs_submitted", 0)
+                            systems_used.append(f"agent_pool_{capability.value}")
+                            logger.info(f"[VULCAN/v1/chat] ✓ Fallback task submitted: {job_id} to {capability.value}")
+                            
+                    except Exception as task_err:
+                        logger.warning(f"[VULCAN/v1/chat] Failed to submit fallback task: {task_err}")
+                        
+        except ImportError as e:
+            logger.debug(f"[VULCAN/v1/chat] Agent pool imports not available: {e}")
+        except Exception as e:
+            logger.warning(f"[VULCAN/v1/chat] Agent pool routing failed: {e}", exc_info=True)
+        
+        # ================================================================
         # STEP 1: Safety Validation (CSIU Framework)
         # ================================================================
         safety_result = {"safe": True, "reason": "No safety constraints violated"}
@@ -2873,6 +3070,34 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         else:
             metadata["reasoning_type"] = "direct"
         
+        # ================================================================
+        # STEP 9: Record Telemetry for Meta-Learning
+        # ================================================================
+        try:
+            from vulcan.routing import (
+                record_telemetry,
+                TELEMETRY_AVAILABLE,
+            )
+            
+            if TELEMETRY_AVAILABLE:
+                record_telemetry(
+                    query=user_message,
+                    response=response_text,
+                    metadata={
+                        "query_id": routing_stats.get("query_id", "unknown"),
+                        "query_type": routing_stats.get("query_type", "unknown"),
+                        "complexity_score": routing_stats.get("complexity_score", 0.0),
+                        "systems_used": systems_used,
+                        "jobs_submitted": len(submitted_jobs),
+                        "latency_ms": latency_ms,
+                        "success": True,
+                    },
+                    source="user",
+                )
+                logger.info(f"[VULCAN/v1/chat] Telemetry recorded for query")
+        except Exception as e:
+            logger.debug(f"[VULCAN/v1/chat] Telemetry recording failed: {e}")
+        
         return {
             "response": response_text,
             "metadata": metadata,
@@ -2881,6 +3106,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             "reasoning_type": metadata["reasoning_type"],
             "safety_status": metadata["safety_status"],
             "memory_results": metadata["memory_results"],
+            # NEW: Include routing and agent pool stats
+            "routing": routing_stats if routing_stats else None,
+            "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
         }
         
     except Exception as e:
