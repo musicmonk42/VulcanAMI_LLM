@@ -1507,6 +1507,16 @@ async def chat(request: ChatRequest):
     7. Generate response using Vulcan's local LLM (or OpenAI fallback)
     8. OUTPUT GATEKEEPER: Validate response against ground truth
     """
+    # Configuration constants for response building
+    CONTEXT_TRUNCATION_LIMITS = {
+        "memory": 300,
+        "reasoning": 400,
+        "world_model": 300,
+        "meta_reasoning": 200,
+    }
+    MIN_MEANINGFUL_RESPONSE_LENGTH = 10
+    MOCK_RESPONSE_MARKER = "Mock response"
+    
     if not hasattr(app.state, "deployment") or app.state.deployment is None:
         raise HTTPException(status_code=503, detail="VULCAN deployment not initialized")
     
@@ -1595,8 +1605,9 @@ async def chat(request: ChatRequest):
                 task_type = "reasoning_task"
             
             # Create specialized task graph
+            import uuid
             task_graph = {
-                "id": f"{task_type}_{int(time.time() * 1000)}",
+                "id": f"{task_type}_{uuid.uuid4().hex[:12]}",
                 "type": task_type,
                 "capability": capability.value,
                 "nodes": [
@@ -1611,12 +1622,13 @@ async def chat(request: ChatRequest):
             }
             
             # Submit to agent pool
+            agent_pool_timeout = getattr(deployment.config, "agent_pool_timeout", 15.0)
             job_id = collective.agent_pool.submit_job(
                 graph=task_graph,
                 parameters={"prompt": processed_prompt, "task_type": task_type},
                 priority=2,  # Higher priority for user-facing requests
                 capability_required=capability,
-                timeout_seconds=15.0,  # Reasonable timeout
+                timeout_seconds=agent_pool_timeout,
             )
             
             if job_id:
@@ -1910,28 +1922,28 @@ async def chat(request: ChatRequest):
     
     if memory_context:
         try:
-            memory_str = f"Relevant memories: {str(memory_context)[:300]}"
+            memory_str = f"Relevant memories: {str(memory_context)[:CONTEXT_TRUNCATION_LIMITS['memory']]}"
             context_parts.append(memory_str)
         except Exception:
             pass
     
     if reasoning_insights:
         try:
-            reasoning_str = f"Reasoning analysis: {json.dumps(reasoning_insights, default=str)[:400]}"
+            reasoning_str = f"Reasoning analysis: {json.dumps(reasoning_insights, default=str)[:CONTEXT_TRUNCATION_LIMITS['reasoning']]}"
             context_parts.append(reasoning_str)
         except Exception:
             pass
     
     if world_model_insights:
         try:
-            world_str = f"World model insights: {json.dumps(world_model_insights, default=str)[:300]}"
+            world_str = f"World model insights: {json.dumps(world_model_insights, default=str)[:CONTEXT_TRUNCATION_LIMITS['world_model']]}"
             context_parts.append(world_str)
         except Exception:
             pass
     
     if meta_reasoning_insights:
         try:
-            meta_str = f"Meta-reasoning: {json.dumps(meta_reasoning_insights, default=str)[:200]}"
+            meta_str = f"Meta-reasoning: {json.dumps(meta_reasoning_insights, default=str)[:CONTEXT_TRUNCATION_LIMITS['meta_reasoning']]}"
             context_parts.append(meta_str)
         except Exception:
             pass
@@ -1970,7 +1982,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                 response_text = str(result)
             
             # Only use if we got a meaningful response
-            if response_text and len(response_text.strip()) > 10 and "Mock response" not in response_text:
+            if response_text and len(response_text.strip()) > MIN_MEANINGFUL_RESPONSE_LENGTH and MOCK_RESPONSE_MARKER not in response_text:
                 systems_used.append("vulcan_local_llm")
                 logger.info("[VULCAN] Response generated via Vulcan's local LLM")
             else:
