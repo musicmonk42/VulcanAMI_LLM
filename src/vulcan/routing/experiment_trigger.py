@@ -512,7 +512,7 @@ class ExperimentTrigger:
                     return sum(1 for t in telemetry if t.get("source") == "user")
         except Exception as e:
             logger.debug(f"[ExperimentTrigger] Could not read telemetry count: {e}")
-        return len([q for q in self._recent_query_types])
+        return len(self._recent_query_types)
     
     def _get_experiment_parameters(self, condition: ExperimentCondition) -> Dict[str, Any]:
         """Get parameters for an experiment based on condition."""

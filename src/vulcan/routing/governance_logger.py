@@ -84,6 +84,9 @@ SQLITE_PRAGMAS = [
 MAX_LOG_QUERY_LIMIT = 1000
 DEFAULT_LOG_QUERY_LIMIT = 100
 
+# Request truncation limit
+MAX_REQUEST_LENGTH = 2000
+
 
 # ============================================================
 # ENUMS
@@ -575,7 +578,7 @@ class GovernanceLogger:
                         session_id,
                         risk_level,
                         reason,
-                        original_request[:2000] if original_request else None,  # Truncate
+                        original_request[:MAX_REQUEST_LENGTH] if original_request else None,  # Truncate
                         1 if blocked else 0
                     ))
                     entry_id = cursor.lastrowid
