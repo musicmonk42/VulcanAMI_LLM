@@ -1269,6 +1269,28 @@ class GraphixArena:
                 },
             )
 
+            # Record agent task as AI interaction for meta-learning
+            try:
+                from vulcan.routing import record_ai_interaction, TELEMETRY_AVAILABLE
+                if TELEMETRY_AVAILABLE:
+                    record_ai_interaction(
+                        interaction_type="agent_communication",
+                        sender="arena",
+                        receiver=agent_id,
+                        message_type="task_execution",
+                        query=task_prompt[:200] if task_prompt else "",
+                        result={"status": result.get("status", "success")},
+                        metadata={
+                            "graph_id": graph_id,
+                            "audit_label": audit_label,
+                            "has_drift_info": drift_info is not None,
+                        }
+                    )
+            except ImportError:
+                pass  # Routing not available
+            except Exception as e:
+                logger.debug(f"Agent task telemetry recording failed: {e}")
+
             # Add supplementary data
             if drift_info is not None:
                 result["drift_info"] = drift_info
@@ -1347,6 +1369,28 @@ class GraphixArena:
             winner_indices = self.tournament_manager.run_adaptive_tournament(
                 proposals, fitness, embedding_func, meta=meta
             )
+
+            # Record tournament as AI-to-AI interaction for meta-learning
+            try:
+                from vulcan.routing import record_ai_interaction, TELEMETRY_AVAILABLE
+                if TELEMETRY_AVAILABLE:
+                    record_ai_interaction(
+                        interaction_type="tournament",
+                        sender="arena",
+                        receiver="tournament_manager",
+                        message_type="tournament_run",
+                        query=f"Tournament with {len(proposals)} proposals",
+                        result={"winner_count": len(winner_indices), "meta": meta},
+                        metadata={
+                            "proposals_count": len(proposals),
+                            "diversity_penalty": self.tournament_manager.diversity_penalty,
+                            "winner_percentage": self.tournament_manager.winner_percentage,
+                        }
+                    )
+            except ImportError:
+                pass  # Routing not available
+            except Exception as e:
+                logger.debug(f"Tournament telemetry recording failed: {e}")
 
             return {"winners": winner_indices, "meta": meta}
 

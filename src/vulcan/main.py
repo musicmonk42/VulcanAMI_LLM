@@ -582,6 +582,46 @@ async def lifespan(app: FastAPI):
             deps_status = deployment.collective.deps.get_status()
             logger.info(f"📊 System Status: {deps_status['available_count']}/{deps_status['total_dependencies']} subsystems active")
             
+            # ================================================================
+            # QUERY ROUTING INTEGRATION - Dual-Mode Learning Support
+            # ================================================================
+            try:
+                from vulcan.routing import (
+                    initialize_routing_components,
+                    get_collaboration_manager,
+                    get_telemetry_recorder,
+                    get_governance_logger,
+                    COLLABORATION_AVAILABLE,
+                )
+                
+                routing_status = initialize_routing_components()
+                logger.info("✓ Query Routing Layer initialized")
+                
+                # Connect agent pool to collaboration manager
+                if COLLABORATION_AVAILABLE:
+                    collab_manager = get_collaboration_manager()
+                    if hasattr(deployment.collective, 'agent_pool') and deployment.collective.agent_pool:
+                        collab_manager.set_agent_pool(deployment.collective.agent_pool)
+                        logger.info("  ✓ Agent Collaboration connected to Agent Pool")
+                    
+                    telemetry_recorder = get_telemetry_recorder()
+                    collab_manager.set_telemetry_recorder(telemetry_recorder)
+                    logger.info("  ✓ AI Interaction Telemetry recording enabled")
+                
+                # Store routing components in app.state for endpoint access
+                app.state.routing_status = routing_status
+                app.state.telemetry_recorder = get_telemetry_recorder()
+                app.state.governance_logger = get_governance_logger()
+                
+                logger.info("✓ Dual-Mode Learning System activated")
+                logger.info("  ✓ MODE 1: User Interaction Telemetry → utility_memory")
+                logger.info("  ✓ MODE 2: AI-to-AI Interaction Telemetry → success/risk_memory")
+                
+            except ImportError as e:
+                logger.warning(f"Query Routing Layer not available: {e}")
+            except Exception as e:
+                logger.warning(f"Query Routing Layer initialization failed: {e}", exc_info=True)
+            
         except Exception as e:
             logger.error(f"Error during subsystem activation: {e}", exc_info=True)
             logger.warning("Continuing with partial subsystem activation")
@@ -2080,7 +2120,84 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         logger.debug(f"[VULCAN] Output gatekeeper failed: {e}")
     
     # ================================================================
-    # STEP 9: Build comprehensive response with stats
+    # STEP 9: Record Interaction Telemetry (Dual-Mode Learning)
+    # ================================================================
+    try:
+        from vulcan.routing import (
+            record_telemetry,
+            log_to_governance,
+            get_experiment_trigger,
+            TELEMETRY_AVAILABLE,
+            GOVERNANCE_AVAILABLE,
+            EXPERIMENT_AVAILABLE,
+        )
+        
+        # Determine query type from the routing that happened earlier
+        query_type = "general"
+        if "perception" in systems_used or any(s.startswith("agent_pool_perception") for s in systems_used):
+            query_type = "perception"
+        elif "planning" in systems_used or any(s.startswith("agent_pool_planning") for s in systems_used):
+            query_type = "planning"
+        elif "reasoning" in systems_used or any(s.startswith("agent_pool_reasoning") for s in systems_used):
+            query_type = "reasoning"
+        elif any(s.startswith("agent_pool_execution") for s in systems_used):
+            query_type = "execution"
+        elif any(s.startswith("agent_pool_learning") for s in systems_used):
+            query_type = "learning"
+        
+        # Calculate response quality score based on systems engaged
+        quality_score = min(1.0, len(systems_used) / 8)  # Normalize by expected systems
+        if gatekeeper_results.get("hallucination_warning"):
+            quality_score *= 0.5  # Penalize for hallucination
+        
+        # Record telemetry for meta-learning
+        if TELEMETRY_AVAILABLE:
+            record_telemetry(
+                query=processed_prompt,
+                response=response_text,
+                metadata={
+                    "query_type": query_type,
+                    "systems_used": systems_used,
+                    "vulcan_systems_active": len([s for s in systems_used if not s.startswith("openai") and s != "fallback_message"]),
+                    "response_quality_score": quality_score,
+                },
+                source="user",
+                agent_tasks_submitted=agent_pool_stats.get("jobs_submitted_total", 0),
+                agent_tasks_completed=agent_pool_stats.get("jobs_completed_total", 0),
+                governance_triggered=bool(gatekeeper_results),
+                experiment_triggered=False,
+            )
+            systems_used.append("telemetry_recorded")
+        
+        # Log to governance if needed
+        if GOVERNANCE_AVAILABLE and (gatekeeper_results.get("hallucination_warning") or gatekeeper_results.get("input_validation")):
+            log_to_governance(
+                action_type="query_processed",
+                details={
+                    "query_type": query_type,
+                    "gatekeeper_results": gatekeeper_results,
+                    "systems_used_count": len(systems_used),
+                },
+                severity="warning" if gatekeeper_results.get("hallucination_warning") else "info"
+            )
+        
+        # Check if experiment should be triggered
+        if EXPERIMENT_AVAILABLE:
+            trigger = get_experiment_trigger()
+            trigger.record_interaction(
+                query_type=query_type,
+                source="user",
+                quality_score=quality_score,
+                error_occurred="fallback_message" in systems_used,
+            )
+        
+    except ImportError:
+        pass  # Routing not available
+    except Exception as e:
+        logger.debug(f"[VULCAN] Telemetry recording failed: {e}")
+    
+    # ================================================================
+    # STEP 10: Build comprehensive response with stats
     # ================================================================
     vulcan_systems_active = len([s for s in systems_used if not s.startswith("openai") and s != "fallback_message"])
     
@@ -2786,6 +2903,121 @@ async def cognitive_status():
         },
         "timestamp": time.time()
     }
+
+
+@app.get("/v1/routing/status")
+async def routing_status():
+    """
+    Get detailed status of VULCAN's Query Routing and Dual-Mode Learning Integration.
+    
+    Shows:
+    - Query Router status (query classification, complexity scoring)
+    - Agent Collaboration status (multi-agent sessions)
+    - Telemetry status (user/AI interaction counts, memory populations)
+    - Governance status (audit logs, compliance checks, quarantine)
+    - Experiment Trigger status (conditions, proposals)
+    """
+    status = {
+        "routing_layer": {
+            "initialized": False,
+            "components": {}
+        },
+        "dual_mode_learning": {
+            "user_interactions": 0,
+            "ai_interactions": 0,
+            "total_collaborations": 0,
+            "tournaments_triggered": 0,
+            "experiments_triggered": 0,
+        },
+        "memory_populations": {},
+        "governance": {
+            "audit_logs": 0,
+            "compliance_checks": 0,
+            "quarantine_logs": 0,
+        },
+        "timestamp": time.time()
+    }
+    
+    try:
+        from vulcan.routing import (
+            get_routing_status,
+            get_telemetry_recorder,
+            get_governance_logger,
+            get_experiment_trigger,
+            get_collaboration_manager,
+            QUERY_ROUTER_AVAILABLE,
+            COLLABORATION_AVAILABLE,
+            TELEMETRY_AVAILABLE,
+            GOVERNANCE_AVAILABLE,
+            EXPERIMENT_AVAILABLE,
+        )
+        
+        # Get comprehensive routing status
+        routing_info = get_routing_status()
+        status["routing_layer"]["initialized"] = routing_info.get("initialized", False)
+        status["routing_layer"]["components"] = routing_info.get("components", {})
+        
+        # Get telemetry stats
+        if TELEMETRY_AVAILABLE:
+            try:
+                recorder = get_telemetry_recorder()
+                telemetry_stats = recorder.get_stats()
+                status["dual_mode_learning"]["user_interactions"] = telemetry_stats.get("user_interactions", 0)
+                status["dual_mode_learning"]["ai_interactions"] = telemetry_stats.get("ai_interactions", 0)
+                status["dual_mode_learning"]["agent_collaborations"] = telemetry_stats.get("agent_collaborations", 0)
+                status["dual_mode_learning"]["tournaments_triggered"] = telemetry_stats.get("tournaments", 0)
+                status["telemetry_stats"] = telemetry_stats
+            except Exception as e:
+                status["telemetry_stats"] = {"error": str(e)}
+        
+        # Get collaboration stats
+        if COLLABORATION_AVAILABLE:
+            try:
+                collab_manager = get_collaboration_manager()
+                collab_stats = collab_manager.get_stats()
+                status["dual_mode_learning"]["total_collaborations"] = collab_stats.get("total_collaborations", 0)
+                status["collaboration_stats"] = collab_stats
+            except Exception as e:
+                status["collaboration_stats"] = {"error": str(e)}
+        
+        # Get governance stats
+        if GOVERNANCE_AVAILABLE:
+            try:
+                gov_logger = get_governance_logger()
+                gov_stats = gov_logger.get_stats()
+                status["governance"]["audit_logs"] = gov_stats.get("audit_log_count", 0)
+                status["governance"]["compliance_checks"] = gov_stats.get("compliance_check_count", 0)
+                status["governance"]["quarantine_logs"] = gov_stats.get("quarantine_count", 0)
+                status["governance_stats"] = gov_stats
+            except Exception as e:
+                status["governance_stats"] = {"error": str(e)}
+        
+        # Get experiment stats
+        if EXPERIMENT_AVAILABLE:
+            try:
+                trigger = get_experiment_trigger()
+                exp_stats = trigger.get_stats()
+                status["dual_mode_learning"]["experiments_triggered"] = exp_stats.get("experiments_triggered", 0)
+                status["experiment_stats"] = exp_stats
+            except Exception as e:
+                status["experiment_stats"] = {"error": str(e)}
+        
+        # Get query router stats
+        if QUERY_ROUTER_AVAILABLE:
+            try:
+                from vulcan.routing import get_query_analyzer
+                analyzer = get_query_analyzer()
+                router_stats = analyzer.get_stats()
+                status["query_router_stats"] = router_stats
+            except Exception as e:
+                status["query_router_stats"] = {"error": str(e)}
+        
+    except ImportError:
+        status["routing_layer"]["error"] = "Routing module not available"
+    except Exception as e:
+        status["routing_layer"]["error"] = str(e)
+    
+    return status
 
 
 @app.post("/v1/checkpoint")
