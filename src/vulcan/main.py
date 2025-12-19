@@ -1698,6 +1698,23 @@ async def chat(request: ChatRequest):
             # Get timeout from config
             agent_pool_timeout = getattr(deployment.config, "agent_pool_timeout", 15.0)
             
+            # Map capability string to enum (defined once, outside loop)
+            capability_map = {
+                "perception": AgentCapability.PERCEPTION,
+                "reasoning": AgentCapability.REASONING,
+                "planning": AgentCapability.PLANNING,
+                "execution": AgentCapability.EXECUTION,
+                "learning": AgentCapability.LEARNING,
+            }
+            
+            # Helper function to update agent pool stats (avoid duplication)
+            def _update_agent_pool_stats():
+                agent_pool_stats["jobs_submitted_this_request"] = len(submitted_jobs)
+                agent_pool_stats["jobs_submitted_total"] = collective.agent_pool.stats.get("total_jobs_submitted", 0)
+                agent_pool_stats["jobs_failed_total"] = collective.agent_pool.stats.get("total_jobs_failed", 0)
+                if submitted_jobs:
+                    agent_pool_stats["submitted_job_ids"] = submitted_jobs
+            
             # ============================================================
             # USE ROUTING PLAN'S AGENT TASKS (if available)
             # This is the critical connection to the routing layer!
@@ -1708,14 +1725,6 @@ async def chat(request: ChatRequest):
                 )
                 
                 for agent_task in routing_plan.agent_tasks:
-                    # Map capability string to enum
-                    capability_map = {
-                        "perception": AgentCapability.PERCEPTION,
-                        "reasoning": AgentCapability.REASONING,
-                        "planning": AgentCapability.PLANNING,
-                        "execution": AgentCapability.EXECUTION,
-                        "learning": AgentCapability.LEARNING,
-                    }
                     capability = capability_map.get(agent_task.capability, AgentCapability.REASONING)
                     
                     # Create task graph from routing plan task
@@ -1760,11 +1769,11 @@ async def chat(request: ChatRequest):
                             systems_used.append(f"agent_pool_{agent_task.capability}")
                             logger.info(f"[VULCAN] Task submitted successfully: {submitted_job_id}")
                             
-                            # Log task submission to governance
+                            # Log task submission to governance (reuse import from STEP -1)
                             if routing_plan.requires_audit:
                                 try:
-                                    from vulcan.routing import log_to_governance, GOVERNANCE_AVAILABLE
-                                    if GOVERNANCE_AVAILABLE:
+                                    # Use already-imported log_to_governance from STEP -1
+                                    if 'log_to_governance' in dir() and 'GOVERNANCE_AVAILABLE' in dir() and GOVERNANCE_AVAILABLE:
                                         log_to_governance(
                                             action_type="agent_task_submitted",
                                             details={
@@ -1776,20 +1785,17 @@ async def chat(request: ChatRequest):
                                             severity="info",
                                             query_id=routing_plan.query_id,
                                         )
-                                except Exception:
-                                    pass  # Don't fail on governance logging
+                                except Exception as gov_err:
+                                    logger.debug(f"[VULCAN] Governance logging skipped: {gov_err}")
                                     
                     except Exception as task_err:
                         logger.warning(f"[VULCAN] Failed to submit task {agent_task.task_id}: {task_err}")
                 
                 # Update stats after all submissions
-                agent_pool_stats["jobs_submitted_this_request"] = len(submitted_jobs)
-                agent_pool_stats["jobs_submitted_total"] = collective.agent_pool.stats.get("total_jobs_submitted", 0)
-                agent_pool_stats["jobs_failed_total"] = collective.agent_pool.stats.get("total_jobs_failed", 0)
+                _update_agent_pool_stats()
                 
                 if submitted_jobs:
                     job_id = submitted_jobs[0]  # Keep first job ID for backwards compatibility
-                    agent_pool_stats["submitted_job_ids"] = submitted_jobs
                     
             else:
                 # ============================================================
@@ -1846,10 +1852,9 @@ async def chat(request: ChatRequest):
                 
                 if job_id:
                     submitted_jobs.append(job_id)
-                    # Update stats after submission
+                    # Update stats after submission using helper function
                     agent_pool_stats["this_job_id"] = job_id
-                    agent_pool_stats["jobs_submitted_total"] = collective.agent_pool.stats.get("total_jobs_submitted", 0)
-                    agent_pool_stats["jobs_failed_total"] = collective.agent_pool.stats.get("total_jobs_failed", 0)
+                    _update_agent_pool_stats()
                     systems_used.append(f"agent_pool_{capability.value}")
                     logger.info(f"[VULCAN] Fallback task submitted to {capability.value} agent: {job_id}")
         else:
