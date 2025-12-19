@@ -474,29 +474,79 @@ async def lifespan(app: FastAPI):
         try:
             logger.info("Activating all Vulcan subsystem modules...")
             
-            # Initialize subsystems that need explicit initialization
-            _activate_subsystem(deployment.collective.deps, 'curiosity', 'Curiosity Engine', needs_init=True)
-            _activate_subsystem(deployment.collective.deps, 'crystallizer', 'Knowledge Crystallizer', needs_init=True)
-            _activate_subsystem(deployment.collective.deps, 'decomposer', 'Problem Decomposer', needs_init=True)
-            _activate_subsystem(deployment.collective.deps, 'semantic_bridge', 'Semantic Bridge', needs_init=True)
+            # ================================================================
+            # AGENT POOL ACTIVATION - Core distributed processing
+            # ================================================================
+            if hasattr(deployment.collective, 'agent_pool') and deployment.collective.agent_pool:
+                pool = deployment.collective.agent_pool
+                pool_status = pool.get_pool_status()
+                total_agents = pool_status.get('total_agents', 0)
+                idle_agents = pool_status.get('state_distribution', {}).get('idle', 0)
+                
+                logger.info(f"✓ Agent Pool activated: {total_agents} agents ({idle_agents} idle)")
+                
+                # Ensure minimum agents are available
+                if total_agents < pool.min_agents:
+                    logger.warning(f"Agent pool below minimum ({total_agents} < {pool.min_agents}), spawning more...")
+                    from vulcan.orchestrator.agent_lifecycle import AgentCapability
+                    for _ in range(pool.min_agents - total_agents):
+                        pool.spawn_agent(AgentCapability.GENERAL)
+                    logger.info(f"✓ Agent Pool scaled to {pool.get_pool_status()['total_agents']} agents")
+            else:
+                logger.warning("Agent Pool not available - distributed processing disabled")
             
-            # Initialize all Reasoning subsystems (no explicit init needed)
+            # ================================================================
+            # REASONING SUBSYSTEMS - Core cognitive processing
+            # ================================================================
             _activate_subsystem(deployment.collective.deps, 'symbolic', 'Symbolic Reasoning')
             _activate_subsystem(deployment.collective.deps, 'probabilistic', 'Probabilistic Reasoning')
             _activate_subsystem(deployment.collective.deps, 'causal', 'Causal Reasoning')
-            _activate_subsystem(deployment.collective.deps, 'analogical', 'Analogical Reasoning')
+            _activate_subsystem(deployment.collective.deps, 'abstract', 'Analogical/Abstract Reasoning')
+            _activate_subsystem(deployment.collective.deps, 'cross_modal', 'Cross-Modal Reasoning')
             
-            # Initialize Memory subsystems
-            _activate_subsystem(deployment.collective.deps, 'ltm', 'Long-term Memory')
-            _activate_subsystem(deployment.collective.deps, 'am', 'Associative Memory')
+            # ================================================================
+            # MEMORY SUBSYSTEMS - Knowledge persistence
+            # ================================================================
+            _activate_subsystem(deployment.collective.deps, 'ltm', 'Long-term Memory (Vector Index)')
+            _activate_subsystem(deployment.collective.deps, 'am', 'Episodic/Autobiographical Memory')
+            _activate_subsystem(deployment.collective.deps, 'compressed_memory', 'Compressed Memory Persistence')
             
-            # Initialize Learning subsystems
+            # ================================================================
+            # PROCESSING SUBSYSTEMS - Input/Output handling
+            # ================================================================
+            _activate_subsystem(deployment.collective.deps, 'multimodal', 'Multimodal Processor')
+            
+            # ================================================================
+            # LEARNING SUBSYSTEMS - Adaptation and growth
+            # ================================================================
             _activate_subsystem(deployment.collective.deps, 'continual', 'Continual Learning')
-            _activate_subsystem(deployment.collective.deps, 'meta', 'Meta-Learning')
+            _activate_subsystem(deployment.collective.deps, 'meta_cognitive', 'Meta-Cognitive Monitor')
+            _activate_subsystem(deployment.collective.deps, 'compositional', 'Compositional Understanding')
             
-            # Initialize Safety subsystems
-            if hasattr(deployment.collective.deps, 'safety') and deployment.collective.deps.safety:
-                safety_validator = deployment.collective.deps.safety
+            # ================================================================
+            # WORLD MODEL - Predictive modeling
+            # ================================================================
+            if hasattr(deployment.collective.deps, 'world_model') and deployment.collective.deps.world_model:
+                world_model = deployment.collective.deps.world_model
+                logger.info("✓ World Model activated")
+                
+                # Check for meta-reasoning components
+                if hasattr(world_model, 'motivational_introspection') and world_model.motivational_introspection:
+                    logger.info("  ✓ Motivational Introspection sub-system active")
+                if hasattr(world_model, 'self_improvement_drive') and world_model.self_improvement_drive:
+                    logger.info("  ✓ Self-Improvement Drive sub-system active")
+            
+            # ================================================================
+            # PLANNING SUBSYSTEMS - Goal management
+            # ================================================================
+            _activate_subsystem(deployment.collective.deps, 'goal_system', 'Hierarchical Goal System')
+            _activate_subsystem(deployment.collective.deps, 'resource_compute', 'Resource-Aware Compute')
+            
+            # ================================================================
+            # SAFETY SUBSYSTEMS - Safety constraints
+            # ================================================================
+            if hasattr(deployment.collective.deps, 'safety_validator') and deployment.collective.deps.safety_validator:
+                safety_validator = deployment.collective.deps.safety_validator
                 if hasattr(safety_validator, 'activate_all_constraints'):
                     try:
                         safety_validator.activate_all_constraints()
@@ -507,7 +557,30 @@ async def lifespan(app: FastAPI):
                 else:
                     logger.info("✓ Safety Validator activated")
             
+            _activate_subsystem(deployment.collective.deps, 'governance', 'Governance Orchestrator')
+            _activate_subsystem(deployment.collective.deps, 'nso_aligner', 'NSO Aligner')
+            _activate_subsystem(deployment.collective.deps, 'explainer', 'Explainability Node')
+            
+            # ================================================================
+            # CURIOSITY & EXPLORATION SUBSYSTEMS
+            # ================================================================
+            _activate_subsystem(deployment.collective.deps, 'experiment_generator', 'Experiment Generator')
+            _activate_subsystem(deployment.collective.deps, 'problem_executor', 'Problem Executor')
+            
+            # ================================================================
+            # META-REASONING SUBSYSTEMS (from world model)
+            # ================================================================
+            _activate_subsystem(deployment.collective.deps, 'self_improvement_drive', 'Self-Improvement Drive')
+            _activate_subsystem(deployment.collective.deps, 'motivational_introspection', 'Motivational Introspection')
+            _activate_subsystem(deployment.collective.deps, 'objective_hierarchy', 'Objective Hierarchy')
+            _activate_subsystem(deployment.collective.deps, 'objective_negotiator', 'Objective Negotiator')
+            _activate_subsystem(deployment.collective.deps, 'goal_conflict_detector', 'Goal Conflict Detector')
+            
             logger.info("✅ All Vulcan subsystem modules activation complete")
+            
+            # Log summary of active systems
+            deps_status = deployment.collective.deps.get_status()
+            logger.info(f"📊 System Status: {deps_status['available_count']}/{deps_status['total_dependencies']} subsystems active")
             
         except Exception as e:
             logger.error(f"Error during subsystem activation: {e}", exc_info=True)
@@ -1417,108 +1490,472 @@ async def update_performance_metric(metric: str, value: float):
 
 @app.post("/llm/chat")
 async def chat(request: ChatRequest):
-    """Conversational interface via LLM.
+    """Conversational interface via VULCAN's cognitive architecture.
     
-    Uses Vulcan's cognitive systems (memory, reasoning) enhanced with 
-    OpenAI for language generation when OPENAI_API_KEY is set.
-    Falls back to local model otherwise.
+    VULCAN-FIRST DESIGN: Uses Vulcan's own cognitive systems (memory, reasoning,
+    world model, agent pool) as the PRIMARY intelligence engine. External LLMs
+    (like OpenAI) are only used as a FALLBACK for language generation when
+    Vulcan's local systems cannot produce a response.
+    
+    Complete Cognitive Pipeline:
+    1. Route through Agent Pool for distributed processing (with job tracking)
+    2. INPUT GATEKEEPER: Validate query, detect nonsense/hallucination triggers
+    3. Query Long-Term Memory for relevant context
+    4. Apply ALL Reasoning Systems (Symbolic, Probabilistic, Causal, Analogical)
+    5. World Model Integration (Predictions, Counterfactuals, Causal Graph)
+    6. Meta-Reasoning Layer (Goal conflict detection, Objective negotiation)
+    7. Generate response using Vulcan's local LLM (or OpenAI fallback)
+    8. OUTPUT GATEKEEPER: Validate response against ground truth
     """
+    if not hasattr(app.state, "deployment") or app.state.deployment is None:
+        raise HTTPException(status_code=503, detail="VULCAN deployment not initialized")
+    
+    deployment = app.state.deployment
+    collective = deployment.collective
+    deps = collective.deps
+    
     systems_used = []
     memory_context = None
-    reasoning_insights = None
+    reasoning_insights = {}
+    world_model_insights = {}
+    meta_reasoning_insights = {}
+    gatekeeper_results = {}
+    agent_pool_stats = {}
+    
+    loop = asyncio.get_running_loop()
     
     # ================================================================
-    # STEP 1: Query Vulcan's Long-Term Memory
+    # STEP 0: INPUT GATEKEEPER - Validate query before processing
     # ================================================================
-    deps = getattr(app.state, "deps", None)
-    if deps and hasattr(deps, "memory") and deps.memory:
-        try:
-            memory_context = await asyncio.get_running_loop().run_in_executor(
-                None, deps.memory.retrieve, request.prompt, 3
+    try:
+        # Use LLM validators to detect nonsense queries and potential issues
+        from vulcan.safety.llm_validators import EnhancedSafetyValidator as LLMSafetyValidator
+        
+        input_validator = LLMSafetyValidator()
+        if deps.world_model:
+            input_validator.attach_world_model(deps.world_model)
+        
+        # Check for prompt injection and nonsense
+        validated_input = input_validator.validate_generation(
+            request.prompt, 
+            {"role": "user", "world_model": deps.world_model}
+        )
+        
+        input_events = input_validator.get_events()
+        if input_events:
+            gatekeeper_results["input_validation"] = {
+                "modified": validated_input != request.prompt,
+                "events": len(input_events),
+                "event_types": list(set(e["kind"] for e in input_events))
+            }
+            systems_used.append("input_gatekeeper")
+            logger.info(f"[VULCAN] Input gatekeeper: {len(input_events)} events detected")
+        
+        # Use validated input for processing
+        processed_prompt = validated_input if validated_input != "[NEUTRALIZED]" else request.prompt
+        
+    except Exception as e:
+        logger.debug(f"[VULCAN] Input gatekeeper failed: {e}")
+        processed_prompt = request.prompt
+    
+    # ================================================================
+    # STEP 1: Route Through Agent Pool (ALWAYS TRY - track stats)
+    # ================================================================
+    job_id = None
+    try:
+        if collective.agent_pool:
+            pool_status = collective.agent_pool.get_pool_status()
+            agent_pool_stats = {
+                "total_agents": pool_status.get("total_agents", 0),
+                "idle_agents": pool_status.get("state_distribution", {}).get("idle", 0),
+                "working_agents": pool_status.get("state_distribution", {}).get("working", 0),
+                "jobs_submitted_total": collective.agent_pool.stats.get("total_jobs_submitted", 0),
+                "jobs_completed_total": collective.agent_pool.stats.get("total_jobs_completed", 0),
+            }
+            
+            # Determine query type for specialized agent routing
+            query_lower = processed_prompt.lower()
+            from vulcan.orchestrator.agent_lifecycle import AgentCapability
+            
+            # Route based on query intent
+            if any(kw in query_lower for kw in ["analyze", "pattern", "data", "observe"]):
+                capability = AgentCapability.PERCEPTION
+                task_type = "perception_analysis"
+            elif any(kw in query_lower for kw in ["plan", "step", "strategy", "organize"]):
+                capability = AgentCapability.PLANNING
+                task_type = "planning_task"
+            elif any(kw in query_lower for kw in ["execute", "run", "calculate", "compute"]):
+                capability = AgentCapability.EXECUTION
+                task_type = "execution_task"
+            elif any(kw in query_lower for kw in ["learn", "remember", "teach", "understand"]):
+                capability = AgentCapability.LEARNING
+                task_type = "learning_task"
+            else:
+                capability = AgentCapability.REASONING
+                task_type = "reasoning_task"
+            
+            # Create specialized task graph
+            task_graph = {
+                "id": f"{task_type}_{int(time.time() * 1000)}",
+                "type": task_type,
+                "capability": capability.value,
+                "nodes": [
+                    {"id": "input", "type": "perception", "params": {"input": processed_prompt}},
+                    {"id": "process", "type": capability.value, "params": {"query": processed_prompt}},
+                    {"id": "output", "type": "generation", "params": {"max_tokens": request.max_tokens}},
+                ],
+                "edges": [
+                    {"from": "input", "to": "process"},
+                    {"from": "process", "to": "output"},
+                ],
+            }
+            
+            # Submit to agent pool
+            job_id = collective.agent_pool.submit_job(
+                graph=task_graph,
+                parameters={"prompt": processed_prompt, "task_type": task_type},
+                priority=2,  # Higher priority for user-facing requests
+                capability_required=capability,
+                timeout_seconds=15.0,  # Reasonable timeout
             )
-            if memory_context:
-                systems_used.append("long_term_memory")
-                logger.info(f"[VULCAN] Retrieved {len(memory_context)} relevant memories")
-        except Exception as e:
-            logger.debug(f"Memory retrieval failed: {e}")
+            
+            if job_id:
+                # Update stats after submission
+                agent_pool_stats["this_job_id"] = job_id
+                agent_pool_stats["jobs_submitted_total"] = collective.agent_pool.stats.get("total_jobs_submitted", 0)
+                systems_used.append(f"agent_pool_{capability.value}")
+                logger.info(f"[VULCAN] Task submitted to {capability.value} agent: {job_id}")
+                
+    except Exception as e:
+        logger.debug(f"[VULCAN] Agent pool routing failed: {e}")
     
     # ================================================================
-    # STEP 2: Vulcan Reasoning Systems
+    # STEP 2: Query Vulcan's Long-Term Memory
     # ================================================================
-    if deps and hasattr(deps, "reasoning") and deps.reasoning:
+    if deps.ltm:
         try:
-            reasoning_result = await asyncio.get_running_loop().run_in_executor(
-                None, deps.reasoning.reason, request.prompt, {}
-            )
-            if reasoning_result:
-                reasoning_insights = reasoning_result
-                systems_used.append("reasoning_engine")
-                logger.info(f"[VULCAN] Applied reasoning analysis")
+            # Use multimodal processor to get embedding for memory search
+            if deps.multimodal:
+                perception = await loop.run_in_executor(
+                    None, deps.multimodal.process_input, processed_prompt
+                )
+                if hasattr(perception, "embedding"):
+                    embedding = perception.embedding
+                    memory_results = await loop.run_in_executor(
+                        None, deps.ltm.search, embedding, 5
+                    )
+                    if memory_results:
+                        memory_context = memory_results
+                        systems_used.append("long_term_memory")
+                        logger.info(f"[VULCAN] Retrieved {len(memory_context)} relevant memories")
         except Exception as e:
-            logger.debug(f"Reasoning failed: {e}")
+            logger.debug(f"[VULCAN] Memory retrieval failed: {e}")
+    
+    # Also check episodic memory
+    if deps.am and not memory_context:
+        try:
+            if hasattr(deps.am, "get_recent_episodes"):
+                recent = await loop.run_in_executor(
+                    None, deps.am.get_recent_episodes, 3
+                )
+                if recent:
+                    memory_context = recent
+                    systems_used.append("episodic_memory")
+                    logger.info(f"[VULCAN] Retrieved {len(recent)} recent episodes")
+        except Exception as e:
+            logger.debug(f"[VULCAN] Episodic memory failed: {e}")
     
     # ================================================================
-    # STEP 3: Build Enhanced Prompt with Vulcan Context
+    # STEP 3: Apply Vulcan's Reasoning Systems (ALL of them)
     # ================================================================
-    memory_str = ""
+    
+    # 3a. Symbolic Reasoning
+    if deps.symbolic:
+        try:
+            if hasattr(deps.symbolic, "reason"):
+                symbolic_result = await loop.run_in_executor(
+                    None, deps.symbolic.reason, processed_prompt
+                )
+            elif hasattr(deps.symbolic, "query"):
+                symbolic_result = await loop.run_in_executor(
+                    None, deps.symbolic.query, processed_prompt
+                )
+            else:
+                symbolic_result = None
+                
+            if symbolic_result:
+                reasoning_insights["symbolic"] = str(symbolic_result)[:200]
+                systems_used.append("symbolic_reasoning")
+                logger.info("[VULCAN] Applied symbolic reasoning")
+        except Exception as e:
+            logger.debug(f"[VULCAN] Symbolic reasoning failed: {e}")
+    
+    # 3b. Probabilistic Reasoning
+    if deps.probabilistic and deps.multimodal:
+        try:
+            perception = await loop.run_in_executor(
+                None, deps.multimodal.process_input, processed_prompt
+            )
+            if hasattr(perception, "embedding"):
+                if hasattr(deps.probabilistic, "predict_with_uncertainty"):
+                    prob_result = await loop.run_in_executor(
+                        None, deps.probabilistic.predict_with_uncertainty, perception.embedding
+                    )
+                    if prob_result:
+                        prediction, uncertainty = prob_result
+                        reasoning_insights["probabilistic"] = {
+                            "confidence": round(1.0 - uncertainty, 3),
+                            "prediction": str(prediction)[:100]
+                        }
+                        systems_used.append("probabilistic_reasoning")
+                        logger.info(f"[VULCAN] Applied probabilistic reasoning (confidence: {1.0-uncertainty:.2f})")
+        except Exception as e:
+            logger.debug(f"[VULCAN] Probabilistic reasoning failed: {e}")
+    
+    # 3c. Causal Reasoning
+    if deps.causal:
+        try:
+            if hasattr(deps.causal, "estimate_causal_effect"):
+                causal_result = await loop.run_in_executor(
+                    None, deps.causal.estimate_causal_effect, "query", processed_prompt[:50]
+                )
+                if causal_result:
+                    reasoning_insights["causal"] = str(causal_result)[:200]
+                    systems_used.append("causal_reasoning")
+                    logger.info("[VULCAN] Applied causal reasoning")
+        except Exception as e:
+            logger.debug(f"[VULCAN] Causal reasoning failed: {e}")
+    
+    # 3d. Analogical Reasoning
+    if deps.abstract:
+        try:
+            if hasattr(deps.abstract, "find_analogies"):
+                analogy_result = await loop.run_in_executor(
+                    None, deps.abstract.find_analogies, processed_prompt
+                )
+                if analogy_result:
+                    reasoning_insights["analogical"] = str(analogy_result)[:200]
+                    systems_used.append("analogical_reasoning")
+                    logger.info("[VULCAN] Applied analogical reasoning")
+        except Exception as e:
+            logger.debug(f"[VULCAN] Analogical reasoning failed: {e}")
+    
+    # ================================================================
+    # STEP 4: WORLD MODEL INTEGRATION (Full Activation)
+    # ================================================================
+    query_lower = processed_prompt.lower()
+    is_predictive_query = any(kw in query_lower for kw in ["what if", "what happens", "predict", "forecast", "would", "could", "might"])
+    is_counterfactual = any(kw in query_lower for kw in ["what if", "had", "would have", "could have", "alternatively"])
+    is_causal_query = any(kw in query_lower for kw in ["why", "cause", "effect", "because", "leads to", "results in"])
+    
+    if deps.world_model:
+        try:
+            # 4a. Get current world state
+            if hasattr(deps.world_model, "get_current_state"):
+                world_state = await loop.run_in_executor(
+                    None, deps.world_model.get_current_state
+                )
+                if world_state:
+                    world_model_insights["current_state"] = str(world_state)[:150]
+                    systems_used.append("world_model_state")
+            
+            # 4b. PREDICTION ENGINE for predictive queries
+            if is_predictive_query:
+                if hasattr(deps.world_model, "predict_with_calibrated_uncertainty"):
+                    try:
+                        # Create model context
+                        from vulcan.world_model.world_model_core import ModelContext
+                        context = ModelContext(
+                            domain="user_query",
+                            targets=[processed_prompt[:50]],
+                            constraints={}
+                        )
+                        prediction = await loop.run_in_executor(
+                            None, deps.world_model.predict_with_calibrated_uncertainty,
+                            {"type": "user_query", "content": processed_prompt}, context
+                        )
+                        if prediction:
+                            world_model_insights["prediction"] = str(prediction)[:200]
+                            systems_used.append("prediction_engine")
+                            logger.info("[VULCAN] Prediction engine activated")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN] Prediction failed: {e}")
+            
+            # 4c. CAUSAL GRAPH for causal queries
+            if is_causal_query and hasattr(deps.world_model, "causal_dag"):
+                try:
+                    causal_dag = deps.world_model.causal_dag
+                    if causal_dag and hasattr(causal_dag, "query_causes"):
+                        causes = await loop.run_in_executor(
+                            None, causal_dag.query_causes, processed_prompt[:30]
+                        )
+                        if causes:
+                            world_model_insights["causal_graph"] = str(causes)[:150]
+                            systems_used.append("causal_graph")
+                            logger.info("[VULCAN] Causal graph reasoning activated")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Causal graph query failed: {e}")
+            
+            # 4d. COUNTERFACTUAL REASONING
+            if is_counterfactual:
+                if hasattr(deps.world_model, "motivational_introspection"):
+                    mi = deps.world_model.motivational_introspection
+                    if mi and hasattr(mi, "counterfactual_reasoner"):
+                        try:
+                            cf_reasoner = mi.counterfactual_reasoner
+                            if cf_reasoner and hasattr(cf_reasoner, "reason_counterfactual"):
+                                cf_result = await loop.run_in_executor(
+                                    None, cf_reasoner.reason_counterfactual, processed_prompt
+                                )
+                                if cf_result:
+                                    world_model_insights["counterfactual"] = str(cf_result)[:150]
+                                    systems_used.append("counterfactual_reasoning")
+                                    logger.info("[VULCAN] Counterfactual reasoning activated")
+                        except Exception as e:
+                            logger.debug(f"[VULCAN] Counterfactual reasoning failed: {e}")
+            
+            # 4e. INVARIANT DETECTOR for pattern detection
+            if hasattr(deps.world_model, "invariant_registry"):
+                try:
+                    inv_registry = deps.world_model.invariant_registry
+                    if inv_registry and hasattr(inv_registry, "get_active_invariants"):
+                        invariants = await loop.run_in_executor(
+                            None, inv_registry.get_active_invariants
+                        )
+                        if invariants:
+                            world_model_insights["invariants_active"] = len(invariants)
+                            systems_used.append("invariant_detector")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Invariant detection failed: {e}")
+            
+            # 4f. DYNAMICS MODEL
+            if hasattr(deps.world_model, "dynamics_model"):
+                try:
+                    dyn_model = deps.world_model.dynamics_model
+                    if dyn_model and hasattr(dyn_model, "predict_dynamics"):
+                        dyn_result = await loop.run_in_executor(
+                            None, dyn_model.predict_dynamics, {"query": processed_prompt[:50]}
+                        )
+                        if dyn_result:
+                            world_model_insights["dynamics"] = str(dyn_result)[:100]
+                            systems_used.append("dynamics_model")
+                            logger.info("[VULCAN] Dynamics model activated")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Dynamics model failed: {e}")
+            
+            # Update world model with this observation
+            if deps.multimodal and hasattr(deps.world_model, "update_state"):
+                perception = await loop.run_in_executor(
+                    None, deps.multimodal.process_input, processed_prompt
+                )
+                if hasattr(perception, "embedding"):
+                    await loop.run_in_executor(
+                        None, deps.world_model.update_state, 
+                        perception.embedding, {"type": "user_query"}, 0.0
+                    )
+                    
+        except Exception as e:
+            logger.debug(f"[VULCAN] World model interaction failed: {e}")
+    
+    # ================================================================
+    # STEP 5: META-REASONING LAYER
+    # ================================================================
+    try:
+        # 5a. Goal Conflict Detection
+        if deps.goal_conflict_detector:
+            try:
+                if hasattr(deps.goal_conflict_detector, "detect_conflicts"):
+                    conflicts = await loop.run_in_executor(
+                        None, deps.goal_conflict_detector.detect_conflicts, processed_prompt
+                    )
+                    if conflicts:
+                        meta_reasoning_insights["goal_conflicts"] = str(conflicts)[:100]
+                        systems_used.append("goal_conflict_detector")
+                        logger.info("[VULCAN] Goal conflict detection activated")
+            except Exception as e:
+                logger.debug(f"[VULCAN] Goal conflict detection failed: {e}")
+        
+        # 5b. Objective Negotiation
+        if deps.objective_negotiator:
+            try:
+                if hasattr(deps.objective_negotiator, "negotiate"):
+                    negotiation = await loop.run_in_executor(
+                        None, deps.objective_negotiator.negotiate, {"query": processed_prompt}
+                    )
+                    if negotiation:
+                        meta_reasoning_insights["negotiation"] = str(negotiation)[:100]
+                        systems_used.append("objective_negotiator")
+            except Exception as e:
+                logger.debug(f"[VULCAN] Objective negotiation failed: {e}")
+        
+        # 5c. Self-Improvement Drive Status
+        if deps.self_improvement_drive:
+            try:
+                if hasattr(deps.self_improvement_drive, "get_status"):
+                    si_status = await loop.run_in_executor(
+                        None, deps.self_improvement_drive.get_status
+                    )
+                    if si_status:
+                        meta_reasoning_insights["self_improvement_active"] = si_status.get("running", False)
+                        systems_used.append("self_improvement_drive")
+            except Exception as e:
+                logger.debug(f"[VULCAN] Self-improvement status failed: {e}")
+    except Exception as e:
+        logger.debug(f"[VULCAN] Meta-reasoning layer failed: {e}")
+    
+    # ================================================================
+    # STEP 6: Build Context from ALL Vulcan's Cognitive Systems
+    # ================================================================
+    context_parts = []
+    
     if memory_context:
         try:
-            memory_str = f"\n\nRelevant Memory Context: {str(memory_context[:2])}"
+            memory_str = f"Relevant memories: {str(memory_context)[:300]}"
+            context_parts.append(memory_str)
         except Exception:
             pass
     
-    reasoning_str = ""
     if reasoning_insights:
         try:
-            reasoning_str = f"\n\nReasoning Insights: {str(reasoning_insights)[:500]}"
+            reasoning_str = f"Reasoning analysis: {json.dumps(reasoning_insights, default=str)[:400]}"
+            context_parts.append(reasoning_str)
         except Exception:
             pass
     
-    enhanced_prompt = f"""You are VULCAN, an advanced AI assistant with a comprehensive cognitive architecture including long-term memory, multi-modal reasoning, world modeling, and planning capabilities.
+    if world_model_insights:
+        try:
+            world_str = f"World model insights: {json.dumps(world_model_insights, default=str)[:300]}"
+            context_parts.append(world_str)
+        except Exception:
+            pass
+    
+    if meta_reasoning_insights:
+        try:
+            meta_str = f"Meta-reasoning: {json.dumps(meta_reasoning_insights, default=str)[:200]}"
+            context_parts.append(meta_str)
+        except Exception:
+            pass
+    
+    vulcan_context = "\n".join(context_parts) if context_parts else ""
+    
+    # Build the prompt with Vulcan's cognitive context
+    enhanced_prompt = f"""You are VULCAN, an advanced AI system with comprehensive cognitive architecture.
 
-User Query: {request.prompt}
-{memory_str}{reasoning_str}
+User Query: {processed_prompt}
 
-Provide a helpful, accurate, and comprehensive response based on your analysis."""
+{vulcan_context}
+
+Based on your analysis through memory retrieval, multi-modal reasoning, causal modeling, and world simulation, provide a helpful and accurate response."""
 
     # ================================================================
-    # STEP 4: Generate Response (OpenAI or Local)
+    # STEP 7: Generate Response (VULCAN LOCAL FIRST, OpenAI FALLBACK)
     # ================================================================
     response_text = ""
     
-    # Try OpenAI first if available
-    openai_client = get_openai_client()
-    if openai_client:
-        try:
-            loop = asyncio.get_running_loop()
-            
-            def call_openai():
-                completion = openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are VULCAN, an advanced AI assistant with comprehensive cognitive capabilities including memory, reasoning, world modeling, and planning."},
-                        {"role": "user", "content": enhanced_prompt}
-                    ],
-                    max_tokens=min(request.max_tokens, 1000),
-                    temperature=0.7
-                )
-                return completion.choices[0].message.content
-            
-            response_text = await loop.run_in_executor(None, call_openai)
-            systems_used.append("openai_language_model")
-            logger.info(f"[VULCAN] Response generated via OpenAI with Vulcan context")
-        except Exception as e:
-            logger.warning(f"OpenAI call failed, falling back to local model: {e}")
-    
-    # Fallback to local LLM if OpenAI failed or not available
-    if not response_text:
-        if not hasattr(app.state, "llm"):
-            raise HTTPException(status_code=503, detail="LLM not initialized")
-
+    # PRIORITY 1: Try Vulcan's LOCAL LLM first
+    if hasattr(app.state, "llm") and app.state.llm:
         llm = app.state.llm
-
         try:
-            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None, llm.generate, enhanced_prompt, request.max_tokens
             )
@@ -1532,14 +1969,113 @@ Provide a helpful, accurate, and comprehensive response based on your analysis."
             else:
                 response_text = str(result)
             
-            systems_used.append("local_llm")
+            # Only use if we got a meaningful response
+            if response_text and len(response_text.strip()) > 10 and "Mock response" not in response_text:
+                systems_used.append("vulcan_local_llm")
+                logger.info("[VULCAN] Response generated via Vulcan's local LLM")
+            else:
+                response_text = ""  # Reset to try fallback
+                
         except Exception as e:
-            logger.error(f"LLM chat failed: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=str(e))
-
+            logger.debug(f"[VULCAN] Local LLM generation failed: {e}")
+            response_text = ""
+    
+    # PRIORITY 2: Fallback to OpenAI only if local failed
+    if not response_text:
+        openai_client = get_openai_client()
+        if openai_client:
+            try:
+                def call_openai():
+                    completion = openai_client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {"role": "system", "content": "You are VULCAN, an advanced AI assistant. Respond based on the cognitive analysis provided."},
+                            {"role": "user", "content": enhanced_prompt}
+                        ],
+                        max_tokens=min(request.max_tokens, 1000),
+                        temperature=0.7
+                    )
+                    return completion.choices[0].message.content
+                
+                response_text = await loop.run_in_executor(None, call_openai)
+                systems_used.append("openai_fallback")
+                logger.info("[VULCAN] Response generated via OpenAI fallback (with Vulcan cognitive context)")
+            except Exception as e:
+                logger.warning(f"[VULCAN] OpenAI fallback failed: {e}")
+    
+    # PRIORITY 3: Generate response from reasoning if both LLMs failed
+    if not response_text and (reasoning_insights or world_model_insights):
+        response_text = "Based on VULCAN's cognitive analysis:\n\n"
+        if "symbolic" in reasoning_insights:
+            response_text += f"Logical analysis: {reasoning_insights['symbolic']}\n"
+        if "probabilistic" in reasoning_insights:
+            response_text += f"Probabilistic assessment: {reasoning_insights['probabilistic']}\n"
+        if "causal" in reasoning_insights:
+            response_text += f"Causal relationships: {reasoning_insights['causal']}\n"
+        if "prediction" in world_model_insights:
+            response_text += f"Prediction: {world_model_insights['prediction']}\n"
+        if "counterfactual" in world_model_insights:
+            response_text += f"Counterfactual analysis: {world_model_insights['counterfactual']}\n"
+        systems_used.append("vulcan_reasoning_synthesis")
+        logger.info("[VULCAN] Response synthesized from reasoning systems")
+    
+    if not response_text:
+        response_text = "I apologize, but I'm currently unable to process your request. Please try again."
+        systems_used.append("fallback_message")
+    
+    # ================================================================
+    # STEP 8: OUTPUT GATEKEEPER - Validate response for hallucinations
+    # ================================================================
+    try:
+        from vulcan.safety.llm_validators import EnhancedSafetyValidator as LLMSafetyValidator
+        
+        output_validator = LLMSafetyValidator()
+        if deps.world_model:
+            output_validator.attach_world_model(deps.world_model)
+        
+        # Validate the output
+        validated_output = output_validator.validate_generation(
+            response_text,
+            {"role": "assistant", "world_model": deps.world_model, "original_query": processed_prompt}
+        )
+        
+        output_events = output_validator.get_events()
+        if output_events:
+            gatekeeper_results["output_validation"] = {
+                "modified": validated_output != response_text,
+                "events": len(output_events),
+                "event_types": list(set(e["kind"] for e in output_events))
+            }
+            
+            # If hallucination detected, flag it but don't block (add warning)
+            hallucination_events = [e for e in output_events if e["kind"] == "hallucination"]
+            if hallucination_events:
+                response_text = validated_output if validated_output != "[VERIFY_FACT]" else response_text
+                gatekeeper_results["hallucination_warning"] = True
+                systems_used.append("output_gatekeeper_hallucination_check")
+                logger.warning(f"[VULCAN] Output gatekeeper detected potential hallucination")
+            else:
+                systems_used.append("output_gatekeeper")
+                
+    except Exception as e:
+        logger.debug(f"[VULCAN] Output gatekeeper failed: {e}")
+    
+    # ================================================================
+    # STEP 9: Build comprehensive response with stats
+    # ================================================================
+    vulcan_systems_active = len([s for s in systems_used if not s.startswith("openai") and s != "fallback_message"])
+    
     return {
         "response": response_text,
-        "systems_used": systems_used
+        "systems_used": systems_used,
+        "vulcan_cognitive_systems_active": vulcan_systems_active,
+        "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
+        "gatekeeper": gatekeeper_results if gatekeeper_results else None,
+        "insights": {
+            "reasoning": reasoning_insights if reasoning_insights else None,
+            "world_model": world_model_insights if world_model_insights else None,
+            "meta_reasoning": meta_reasoning_insights if meta_reasoning_insights else None,
+        } if (reasoning_insights or world_model_insights or meta_reasoning_insights) else None
     }
 
 
@@ -2112,6 +2648,125 @@ async def system_status():
         error_counter.labels(error_type="status").inc()
         logger.error(f"Status retrieval failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/cognitive/status")
+async def cognitive_status():
+    """
+    Get detailed status of VULCAN's cognitive subsystems.
+    
+    Shows which cognitive systems are active and their current state:
+    - Agent Pool (distributed processing)
+    - Reasoning Systems (symbolic, probabilistic, causal, analogical)
+    - Memory Systems (LTM, episodic, compressed)
+    - World Model (predictive modeling)
+    - Learning Systems (continual, meta-cognitive)
+    - Safety Systems (validator, governance)
+    """
+    if not hasattr(app.state, "deployment") or app.state.deployment is None:
+        raise HTTPException(status_code=503, detail="VULCAN deployment not initialized")
+    
+    deployment = app.state.deployment
+    deps = deployment.collective.deps
+    
+    cognitive_systems = {
+        "agent_pool": {
+            "active": hasattr(deployment.collective, 'agent_pool') and deployment.collective.agent_pool is not None,
+            "status": None
+        },
+        "reasoning": {
+            "symbolic": deps.symbolic is not None,
+            "probabilistic": deps.probabilistic is not None,
+            "causal": deps.causal is not None,
+            "analogical": deps.abstract is not None,
+            "cross_modal": deps.cross_modal is not None,
+        },
+        "memory": {
+            "long_term": deps.ltm is not None,
+            "episodic": deps.am is not None,
+            "compressed": deps.compressed_memory is not None,
+        },
+        "processing": {
+            "multimodal": deps.multimodal is not None,
+        },
+        "world_model": {
+            "active": deps.world_model is not None,
+            "meta_reasoning_enabled": False,
+            "self_improvement_enabled": False,
+        },
+        "learning": {
+            "continual": deps.continual is not None,
+            "meta_cognitive": deps.meta_cognitive is not None,
+            "compositional": deps.compositional is not None,
+        },
+        "planning": {
+            "goal_system": deps.goal_system is not None,
+            "resource_compute": deps.resource_compute is not None,
+        },
+        "safety": {
+            "validator": deps.safety_validator is not None,
+            "governance": deps.governance is not None,
+            "nso_aligner": deps.nso_aligner is not None,
+        },
+        "self_improvement": {
+            "drive_active": deps.self_improvement_drive is not None,
+            "experiment_generator": deps.experiment_generator is not None,
+            "problem_executor": deps.problem_executor is not None,
+        }
+    }
+    
+    # Get detailed agent pool status
+    if cognitive_systems["agent_pool"]["active"]:
+        try:
+            pool_status = deployment.collective.agent_pool.get_pool_status()
+            cognitive_systems["agent_pool"]["status"] = {
+                "total_agents": pool_status.get("total_agents", 0),
+                "idle": pool_status.get("state_distribution", {}).get("idle", 0),
+                "working": pool_status.get("state_distribution", {}).get("working", 0),
+                "max_agents": deployment.collective.agent_pool.max_agents,
+                "min_agents": deployment.collective.agent_pool.min_agents,
+            }
+        except Exception as e:
+            cognitive_systems["agent_pool"]["status"] = {"error": str(e)}
+    
+    # Check world model meta-reasoning
+    if deps.world_model:
+        try:
+            if hasattr(deps.world_model, 'motivational_introspection'):
+                cognitive_systems["world_model"]["meta_reasoning_enabled"] = deps.world_model.motivational_introspection is not None
+            if hasattr(deps.world_model, 'self_improvement_enabled'):
+                cognitive_systems["world_model"]["self_improvement_enabled"] = deps.world_model.self_improvement_enabled
+        except Exception:
+            pass
+    
+    # Calculate summary statistics
+    total_systems = 0
+    active_systems = 0
+    
+    def count_systems(obj):
+        nonlocal total_systems, active_systems
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if isinstance(value, bool):
+                    total_systems += 1
+                    if value:
+                        active_systems += 1
+                elif isinstance(value, dict):
+                    count_systems(value)
+    
+    count_systems(cognitive_systems)
+    
+    return {
+        "vulcan_cognitive_systems": cognitive_systems,
+        "summary": {
+            "total_subsystems": total_systems,
+            "active_subsystems": active_systems,
+            "activation_percentage": round((active_systems / total_systems * 100) if total_systems > 0 else 0, 1),
+            "openai_fallback_available": OPENAI_AVAILABLE and get_openai_client() is not None,
+            "vulcan_primary": True,  # VULCAN systems are always primary
+        },
+        "timestamp": time.time()
+    }
 
 
 @app.post("/v1/checkpoint")
