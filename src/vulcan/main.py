@@ -1573,6 +1573,10 @@ async def chat(request: ChatRequest):
     # ================================================================
     job_id = None
     try:
+        # Import at the start to catch import errors
+        from vulcan.orchestrator.agent_lifecycle import AgentCapability
+        import uuid
+        
         if collective.agent_pool:
             pool_status = collective.agent_pool.get_pool_status()
             agent_pool_stats = {
@@ -1585,7 +1589,6 @@ async def chat(request: ChatRequest):
             
             # Determine query type for specialized agent routing
             query_lower = processed_prompt.lower()
-            from vulcan.orchestrator.agent_lifecycle import AgentCapability
             
             # Route based on query intent
             if any(kw in query_lower for kw in ["analyze", "pattern", "data", "observe"]):
@@ -1604,8 +1607,7 @@ async def chat(request: ChatRequest):
                 capability = AgentCapability.REASONING
                 task_type = "reasoning_task"
             
-            # Create specialized task graph
-            import uuid
+            # Create specialized task graph (uuid already imported above)
             task_graph = {
                 "id": f"{task_type}_{uuid.uuid4().hex[:12]}",
                 "type": task_type,
@@ -1623,6 +1625,8 @@ async def chat(request: ChatRequest):
             
             # Submit to agent pool
             agent_pool_timeout = getattr(deployment.config, "agent_pool_timeout", 15.0)
+            logger.info(f"[VULCAN] Submitting job to agent pool (capability={capability.value}, timeout={agent_pool_timeout}s)")
+            
             job_id = collective.agent_pool.submit_job(
                 graph=task_graph,
                 parameters={"prompt": processed_prompt, "task_type": task_type},
@@ -1635,11 +1639,14 @@ async def chat(request: ChatRequest):
                 # Update stats after submission
                 agent_pool_stats["this_job_id"] = job_id
                 agent_pool_stats["jobs_submitted_total"] = collective.agent_pool.stats.get("total_jobs_submitted", 0)
+                agent_pool_stats["jobs_failed_total"] = collective.agent_pool.stats.get("total_jobs_failed", 0)
                 systems_used.append(f"agent_pool_{capability.value}")
                 logger.info(f"[VULCAN] Task submitted to {capability.value} agent: {job_id}")
+        else:
+            logger.warning("[VULCAN] Agent pool not available - skipping distributed processing")
                 
     except Exception as e:
-        logger.debug(f"[VULCAN] Agent pool routing failed: {e}")
+        logger.warning(f"[VULCAN] Agent pool routing failed: {e}", exc_info=True)
     
     # ================================================================
     # STEP 2: Query Vulcan's Long-Term Memory
@@ -2890,6 +2897,132 @@ async def spawn_agent(request: Request):
 
     except Exception as e:
         logger.error(f"Failed to spawn agent: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/orchestrator/agents/submit-job")
+async def submit_agent_job(request: Request):
+    """
+    Submit a job directly to the agent pool for testing.
+    
+    This endpoint allows direct job submission to verify the agent pool is functioning.
+    
+    Request body:
+    {
+        "task_type": "reasoning_task" | "perception_analysis" | "planning_task" | "execution_task" | "learning_task",
+        "prompt": "Your task description",
+        "priority": 1,
+        "timeout_seconds": 15.0
+    }
+    """
+    if not hasattr(app.state, "deployment"):
+        raise HTTPException(status_code=503, detail="System not initialized")
+
+    deployment = app.state.deployment
+
+    try:
+        body = await request.json()
+        task_type = body.get("task_type", "reasoning_task")
+        prompt = body.get("prompt", "Test job submission")
+        priority = body.get("priority", 1)
+        timeout_seconds = body.get("timeout_seconds", 15.0)
+        
+        from vulcan.orchestrator.agent_lifecycle import AgentCapability
+        import uuid
+        
+        # Map task type to capability
+        capability_map = {
+            "perception_analysis": AgentCapability.PERCEPTION,
+            "planning_task": AgentCapability.PLANNING,
+            "execution_task": AgentCapability.EXECUTION,
+            "learning_task": AgentCapability.LEARNING,
+            "reasoning_task": AgentCapability.REASONING,
+        }
+        capability = capability_map.get(task_type, AgentCapability.GENERAL)
+        
+        if not hasattr(deployment, "collective") or not hasattr(deployment.collective, "agent_pool"):
+            raise HTTPException(status_code=503, detail="Agent pool not available")
+        
+        pool = deployment.collective.agent_pool
+        
+        # Get pool status before submission
+        status_before = pool.get_pool_status()
+        stats_before = {
+            "total_jobs_submitted": pool.stats.get("total_jobs_submitted", 0),
+            "total_jobs_completed": pool.stats.get("total_jobs_completed", 0),
+            "total_jobs_failed": pool.stats.get("total_jobs_failed", 0),
+        }
+        
+        # Create task graph
+        task_graph = {
+            "id": f"{task_type}_{uuid.uuid4().hex[:12]}",
+            "type": task_type,
+            "capability": capability.value,
+            "nodes": [
+                {"id": "input", "type": "perception", "params": {"input": prompt}},
+                {"id": "process", "type": capability.value, "params": {"query": prompt}},
+                {"id": "output", "type": "generation", "params": {"max_tokens": 256}},
+            ],
+            "edges": [
+                {"from": "input", "to": "process"},
+                {"from": "process", "to": "output"},
+            ],
+        }
+        
+        # Submit job
+        logger.info(f"[VULCAN] Direct job submission: task_type={task_type}, capability={capability.value}")
+        
+        job_id = pool.submit_job(
+            graph=task_graph,
+            parameters={"prompt": prompt, "task_type": task_type},
+            priority=priority,
+            capability_required=capability,
+            timeout_seconds=timeout_seconds,
+        )
+        
+        # Get pool status after submission
+        status_after = pool.get_pool_status()
+        stats_after = {
+            "total_jobs_submitted": pool.stats.get("total_jobs_submitted", 0),
+            "total_jobs_completed": pool.stats.get("total_jobs_completed", 0),
+            "total_jobs_failed": pool.stats.get("total_jobs_failed", 0),
+        }
+        
+        # Get job provenance if available
+        provenance = None
+        if job_id in pool.provenance_records:
+            prov = pool.provenance_records[job_id]
+            provenance = {
+                "job_id": prov.job_id,
+                "agent_id": prov.agent_id,
+                "status": prov.status,
+                "error": prov.error,
+            }
+        
+        return {
+            "status": "submitted",
+            "job_id": job_id,
+            "task_type": task_type,
+            "capability": capability.value,
+            "stats_before": stats_before,
+            "stats_after": stats_after,
+            "stats_delta": {
+                "jobs_submitted": stats_after["total_jobs_submitted"] - stats_before["total_jobs_submitted"],
+                "jobs_completed": stats_after["total_jobs_completed"] - stats_before["total_jobs_completed"],
+                "jobs_failed": stats_after["total_jobs_failed"] - stats_before["total_jobs_failed"],
+            },
+            "pool_status": {
+                "total_agents": status_after.get("total_agents", 0),
+                "idle_agents": status_after.get("state_distribution", {}).get("idle", 0),
+                "working_agents": status_after.get("state_distribution", {}).get("working", 0),
+            },
+            "provenance": provenance,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to submit job: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
