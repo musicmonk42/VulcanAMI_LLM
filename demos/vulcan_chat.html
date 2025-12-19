@@ -597,7 +597,7 @@
                 
                 const requestBody = JSON.stringify({
                     message: msg,
-                    max_tokens: 16,  // Reduced to 16 for faster responses (~5s/token on CPU = ~80s total)
+                    max_tokens: 500,  // Higher for OpenAI (fast), will be limited if using slow local model
                     enable_reasoning: true,
                     enable_memory: true,
                     enable_safety: true,
