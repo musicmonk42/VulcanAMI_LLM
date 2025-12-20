@@ -127,8 +127,9 @@ class SecretsManager:
 
             if "SecretString" in secret_value:
                 return secret_value["SecretString"]
-        except Exception as e:
-            logger.debug(f"Failed to initialize platform component: {e}")
+        except Exception:
+            # Silently ignore AWS Secrets Manager errors - logger not available yet
+            pass
         return default
 
 
@@ -346,8 +347,9 @@ def setup_unified_logging():
     if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(encoding="utf-8")
-        except Exception as e:
-            logger.debug(f"Failed to cleanup platform resource: {e}")
+        except Exception:
+            # Silently ignore - logger not available yet at this point
+            pass
 
     # File handler with explicit UTF-8 encoding
     file_handler = logging.FileHandler("unified_platform.log", encoding="utf-8")
