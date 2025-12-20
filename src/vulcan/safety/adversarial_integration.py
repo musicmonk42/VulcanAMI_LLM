@@ -43,19 +43,55 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # CONFIGURABLE THRESHOLDS
 # ============================================================
-# These can be overridden via environment variables
+# Default values
+DEFAULT_ANOMALY_CONFIDENCE_THRESHOLD = 0.9
+DEFAULT_SHAP_DIVERGENCE_THRESHOLD = 0.8
+DEFAULT_SUCCESS_RATE_ALERT_THRESHOLD = 0.8
+DEFAULT_PERIODIC_TEST_INTERVAL = 3600
+
+def _get_threshold_env(name: str, default: float, min_val: float = 0.0, max_val: float = 1.0) -> float:
+    """Get and validate a threshold from environment variable."""
+    try:
+        value = float(os.getenv(name, str(default)))
+        if value < min_val or value > max_val:
+            logger.warning(f"Environment variable {name}={value} out of range [{min_val}, {max_val}], using default {default}")
+            return default
+        return value
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid environment variable {name}, using default {default}")
+        return default
+
+def _get_interval_env(name: str, default: int, min_val: int = 60) -> int:
+    """Get and validate an interval from environment variable."""
+    try:
+        value = int(os.getenv(name, str(default)))
+        if value < min_val:
+            logger.warning(f"Environment variable {name}={value} below minimum {min_val}, using default {default}")
+            return default
+        return value
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid environment variable {name}, using default {default}")
+        return default
 
 # Anomaly detection threshold (0.0-1.0) - higher = more lenient
-ANOMALY_CONFIDENCE_THRESHOLD = float(os.getenv("ADVERSARIAL_ANOMALY_THRESHOLD", "0.9"))
+ANOMALY_CONFIDENCE_THRESHOLD = _get_threshold_env(
+    "ADVERSARIAL_ANOMALY_THRESHOLD", DEFAULT_ANOMALY_CONFIDENCE_THRESHOLD
+)
 
 # SHAP divergence threshold (0.0-1.0) - higher = more lenient  
-SHAP_DIVERGENCE_THRESHOLD = float(os.getenv("ADVERSARIAL_SHAP_THRESHOLD", "0.8"))
+SHAP_DIVERGENCE_THRESHOLD = _get_threshold_env(
+    "ADVERSARIAL_SHAP_THRESHOLD", DEFAULT_SHAP_DIVERGENCE_THRESHOLD
+)
 
 # Success rate threshold for alerts (0.0-1.0) - lower = more sensitive
-SUCCESS_RATE_ALERT_THRESHOLD = float(os.getenv("ADVERSARIAL_SUCCESS_RATE_THRESHOLD", "0.8"))
+SUCCESS_RATE_ALERT_THRESHOLD = _get_threshold_env(
+    "ADVERSARIAL_SUCCESS_RATE_THRESHOLD", DEFAULT_SUCCESS_RATE_ALERT_THRESHOLD
+)
 
-# Periodic testing interval in seconds (default: 1 hour)
-PERIODIC_TEST_INTERVAL = int(os.getenv("ADVERSARIAL_PERIODIC_INTERVAL", "3600"))
+# Periodic testing interval in seconds (default: 1 hour, minimum: 60s)
+PERIODIC_TEST_INTERVAL = _get_interval_env(
+    "ADVERSARIAL_PERIODIC_INTERVAL", DEFAULT_PERIODIC_TEST_INTERVAL
+)
 
 # Global state for adversarial tester singleton
 _ADVERSARIAL_TESTER = None
@@ -220,12 +256,12 @@ def start_periodic_testing(
                 logger.info(f"✅ Adversarial tests complete:")
                 logger.info(f"  - Total tests: {total_tests}")
                 logger.info(f"  - Failures: {failures}")
-                logger.info(f"  - Success rate: {success_rate:.2%}")
+                logger.info(f"  - Success rate: {success_rate:.1%}")
                 logger.info(f"  - Max divergence: {max_divergence:.4f}")
                 
                 # Alert on high failure rate (configurable threshold)
                 if success_rate < SUCCESS_RATE_ALERT_THRESHOLD:
-                    logger.warning(f"⚠️ HIGH FAILURE RATE: {failures} tests failed! (threshold: {SUCCESS_RATE_ALERT_THRESHOLD:.0%})")
+                    logger.warning(f"⚠️ HIGH FAILURE RATE: {failures} tests failed! (threshold: {SUCCESS_RATE_ALERT_THRESHOLD:.1%})")
                 
             except Exception as e:
                 logger.error(f"❌ Periodic adversarial test failed: {e}")
