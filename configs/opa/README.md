@@ -421,7 +421,6 @@ opa eval --profile --data policy.rego --input input.json \
 
 ### Documentation
 
-- **Full Documentation**: [OPA_DOCUMENTATION.md](./OPA_DOCUMENTATION.md)
 - **User Guide**: https://docs.vulcanami.io/opa/user-guide
 - **API Reference**: https://docs.vulcanami.io/opa/api
 

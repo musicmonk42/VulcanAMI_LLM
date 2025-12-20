@@ -395,8 +395,6 @@ The `railway.toml` file configures the Dockerfile location and deployment settin
 
 ## Additional Resources
 
-- [DOCKER_BUILD_VALIDATION.md](DOCKER_BUILD_VALIDATION.md) - Detailed validation report
-- [DOCKER_BUILD_SUMMARY.md](DOCKER_BUILD_SUMMARY.md) - Implementation summary
 - [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) - Reproducibility guide
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment documentation
 - [INFRASTRUCTURE_SECURITY_GUIDE.md](INFRASTRUCTURE_SECURITY_GUIDE.md) - Security guide
