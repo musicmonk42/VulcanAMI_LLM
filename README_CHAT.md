@@ -2,6 +2,30 @@
 
 Simple, beautiful chat interface for VulcanAMI.
 
+## Prerequisites
+
+Before running the platform, ensure you have the required setup:
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Create environment file (recommended):**
+   ```bash
+   cp .env.example .env
+   # Edit .env and configure as needed
+   ```
+
+   The `.env` file helps configure the platform. See `.env.example` for available options.
+
+3. **AWS Configuration (optional):**
+   If you have `boto3` installed and want to use AWS Secrets Manager, ensure AWS is configured:
+   ```bash
+   export AWS_DEFAULT_REGION=us-east-1  # or your preferred region
+   ```
+   If you don't need AWS Secrets Manager, the platform will fall back to environment variables.
+
 ## Quick Start
 
 ### Option 1: All-in-One Script
@@ -160,6 +184,27 @@ python src/full_platform.py
 ```
 
 ## Troubleshooting
+
+### AWS Region Error (NoRegionError)
+
+If you see an error like:
+```
+botocore.exceptions.NoRegionError: You must specify a region.
+```
+
+This happens when `boto3` is installed but AWS is not configured. Solutions:
+
+1. **Set AWS region** (if you want to use AWS Secrets Manager):
+   ```bash
+   export AWS_DEFAULT_REGION=us-east-1
+   ```
+
+2. **Or configure AWS credentials properly**:
+   ```bash
+   aws configure
+   ```
+
+3. **Or ignore AWS** - the platform will fall back to environment variables for secrets.
 
 ### "Offline" status in chat interface
 
