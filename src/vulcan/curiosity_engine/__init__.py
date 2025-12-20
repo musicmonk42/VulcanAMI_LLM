@@ -8,6 +8,11 @@ Components:
 - ExperimentGenerator: Experiment design for addressing gaps
 - DependencyGraph: Knowledge dependency tracking
 - ExplorationBudget: Resource management for exploration
+
+Note: This module uses graceful degradation. When dependencies like numpy
+are not available, classes will be None but availability flags will indicate
+the status. Always check availability flags (e.g., CURIOSITY_ENGINE_AVAILABLE)
+before using the classes in this module.
 """
 
 import logging

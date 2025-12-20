@@ -9,6 +9,11 @@ Components:
 - FallbackChain: Graceful degradation and fallback handling
 - DecompositionLibrary: Pattern library for known decomposition patterns
 - PrincipleLearner: Learning decomposition principles from experience
+
+Note: This module uses graceful degradation. When dependencies like numpy
+are not available, classes will be None but availability flags will indicate
+the status. Always check availability flags (e.g., PROBLEM_DECOMPOSER_AVAILABLE)
+before using the classes in this module.
 """
 
 import logging
