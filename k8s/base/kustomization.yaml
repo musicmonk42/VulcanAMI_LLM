@@ -36,7 +36,7 @@ labels:
 
 images:
   - name: ghcr.io/musicmonk42/vulcanami_llm-api
-    # NOTE: Override newTag during deployment with -k or --set-image
-    # For production, always use a specific version tag (e.g., v1.0.0)
+    # REQUIRED: Override with specific version during deployment
     # Example: kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
-    newTag: v1.0.0
+    # The CI/CD pipeline automatically replaces IMAGE_TAG with the actual version
+    newTag: IMAGE_TAG
