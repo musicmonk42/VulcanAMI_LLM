@@ -30,4 +30,6 @@ configMapGenerator:
 
 images:
   - name: ghcr.io/musicmonk42/vulcanami_llm-api
-    newTag: main
+    # Override with specific version or commit SHA during deployment
+    # Example: kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:main-abc1234
+    newTag: IMAGE_TAG

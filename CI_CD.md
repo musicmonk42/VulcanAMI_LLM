@@ -68,6 +68,11 @@ For detailed testing instructions, see **[TESTING_GUIDE.md](TESTING_GUIDE.md)**.
 - **Test Docker Compose**: Validate Docker Compose configurations (using v2 syntax)
 - **Push to Registries**: Push versioned images on release tags
 
+**Image Tagging Strategy:**
+- Branch builds: `{branch}-{short_sha}` (e.g., `main-abc1234`)
+- Release builds: `v{version}` (e.g., `v1.0.0`)
+- Latest: `latest` tag applied to default branch builds
+
 **Note**: This workflow uses Docker Compose v2 (`docker compose`) which is bundled with Docker Engine.
 
 **Services Built:**

@@ -36,4 +36,7 @@ labels:
 
 images:
   - name: ghcr.io/musicmonk42/vulcanami_llm-api
-    newTag: latest
+    # NOTE: Override newTag during deployment with -k or --set-image
+    # For production, always use a specific version tag (e.g., v1.0.0)
+    # Example: kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+    newTag: v1.0.0
