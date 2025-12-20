@@ -9,6 +9,7 @@ A production-grade AGI system integrating multiple cognitive architectures:
 - Routing: Dual-mode query routing with collaboration support
 - Curiosity Engine: Autonomous knowledge gap exploration
 - Problem Decomposer: Hierarchical problem decomposition
+- Knowledge Crystallizer: Extract and store crystallized knowledge principles
 
 All modules export their key classes and provide availability flags for
 graceful degradation when dependencies are missing.
@@ -173,6 +174,37 @@ except ImportError as e:
     EXECUTOR_AVAILABLE = False
 
 # ============================================================================
+# KNOWLEDGE CRYSTALLIZER MODULE
+# ============================================================================
+try:
+    from .knowledge_crystallizer import (
+        KnowledgeCrystallizer,
+        KnowledgeApplicator,
+        PrincipleExtractor,
+        KnowledgeValidator,
+        VersionedKnowledgeBase,
+        CrystallizationSelector,
+        ContraindicationDatabase,
+        KNOWLEDGE_CRYSTALLIZER_AVAILABLE,
+        PRINCIPLE_EXTRACTOR_AVAILABLE,
+        VALIDATION_ENGINE_AVAILABLE,
+        KNOWLEDGE_STORAGE_AVAILABLE,
+        CRYSTALLIZATION_SELECTOR_AVAILABLE,
+        CONTRAINDICATION_TRACKER_AVAILABLE,
+    )
+
+    CRYSTALLIZER_AVAILABLE = KNOWLEDGE_CRYSTALLIZER_AVAILABLE
+except ImportError as e:
+    logger.warning(f"Knowledge crystallizer module not available: {e}")
+    CRYSTALLIZER_AVAILABLE = False
+    KNOWLEDGE_CRYSTALLIZER_AVAILABLE = False
+    PRINCIPLE_EXTRACTOR_AVAILABLE = False
+    VALIDATION_ENGINE_AVAILABLE = False
+    KNOWLEDGE_STORAGE_AVAILABLE = False
+    CRYSTALLIZATION_SELECTOR_AVAILABLE = False
+    CONTRAINDICATION_TRACKER_AVAILABLE = False
+
+# ============================================================================
 # SAFETY MODULE
 # ============================================================================
 try:
@@ -227,6 +259,7 @@ def get_vulcan_status() -> dict:
         "routing": ROUTING_AVAILABLE,
         "curiosity": CURIOSITY_AVAILABLE,
         "decomposer": DECOMPOSER_AVAILABLE,
+        "crystallizer": CRYSTALLIZER_AVAILABLE,
         "safety": SAFETY_AVAILABLE,
         "config": CONFIG_AVAILABLE,
         "orchestrator": ORCHESTRATOR_AVAILABLE,
@@ -272,6 +305,7 @@ __all__ = [
     "ROUTING_AVAILABLE",
     "CURIOSITY_AVAILABLE",
     "DECOMPOSER_AVAILABLE",
+    "CRYSTALLIZER_AVAILABLE",
     "SAFETY_AVAILABLE",
     "CONFIG_AVAILABLE",
     "ORCHESTRATOR_AVAILABLE",
@@ -286,10 +320,11 @@ available_count = sum(
         ROUTING_AVAILABLE,
         CURIOSITY_AVAILABLE,
         DECOMPOSER_AVAILABLE,
+        CRYSTALLIZER_AVAILABLE,
         SAFETY_AVAILABLE,
     ]
 )
 
 logger.info(
-    f"VULCAN-AGI v{__version__} initialized: {available_count}/7 core modules available"
+    f"VULCAN-AGI v{__version__} initialized: {available_count}/8 core modules available"
 )
