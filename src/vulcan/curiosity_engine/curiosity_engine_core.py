@@ -613,14 +613,21 @@ class SafeExperimentExecutor:
                 # Simulate causal discovery with deterministic values
                 # Use intervention properties to calculate consistent results
                 import hashlib
-                intervention_str = str(intervention.get("variable", "")) + str(intervention.get("value", ""))
-                intervention_hash = int(hashlib.md5(intervention_str.encode()).hexdigest()[:8], 16)
-                
+
+                intervention_str = str(intervention.get("variable", "")) + str(
+                    intervention.get("value", "")
+                )
+                intervention_hash = int(
+                    hashlib.md5(intervention_str.encode()).hexdigest()[:8], 16
+                )
+
                 # Deterministic causal strength based on intervention
-                causal_strength = 0.3 + (intervention_hash % 700) / 1000.0  # Range: 0.3 to 1.0
+                causal_strength = (
+                    0.3 + (intervention_hash % 700) / 1000.0
+                )  # Range: 0.3 to 1.0
                 p_value = (intervention_hash % 100) / 1000.0  # Range: 0.0 to 0.1
                 effect_size = (intervention_hash % 800) / 1000.0  # Range: 0.0 to 0.8
-                
+
                 result["success"] = causal_strength > 0.3
                 result["data"] = {
                     "causal_strength": causal_strength,

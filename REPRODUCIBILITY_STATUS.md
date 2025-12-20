@@ -235,6 +235,8 @@ Status: ✅ All critical tests passed!
 - [x] No hardcoded secrets
 - [x] Version pinning in values.yaml
 - [x] Security best practices enforced
+- [x] Image tags use IMAGE_TAG placeholder for CI/CD automation
+- [x] Kustomize overlays for environment-specific deployments
 
 ### Documentation ✅
 - [x] README with setup instructions

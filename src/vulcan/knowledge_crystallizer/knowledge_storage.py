@@ -28,12 +28,13 @@ from ..security_fixes import safe_pickle_load
 # Optional imports with fallbacks
 try:
     from src.utils.faiss_config import initialize_faiss
-    
+
     faiss, FAISS_AVAILABLE, _ = initialize_faiss()
 except ImportError:
     # Fallback if faiss_config module is not available
     try:
         import faiss
+
         FAISS_AVAILABLE = True
         logging.info("FAISS imported (direct)")
     except ImportError:

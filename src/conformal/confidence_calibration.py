@@ -265,7 +265,7 @@ class ConformalPredictor:
         self.alpha = alpha
         self.calibration_scores = []
         self.fitted = False
-        
+
         logger.info(
             f"ConformalPredictor initialized (alpha={alpha}, coverage_guarantee={1-alpha:.1%})"
         )

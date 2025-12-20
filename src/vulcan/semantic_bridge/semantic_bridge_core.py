@@ -1502,21 +1502,21 @@ class SemanticBridge:
     ) -> Optional[Concept]:
         """
         Simple convenience method to transfer a concept between domains.
-        
+
         This is a high-level wrapper around the sophisticated multi-component architecture:
         - Validates transfer compatibility using TransferEngine
         - Applies safety checks via SafetyValidator
         - Executes the transfer if compatible
         - Registers the transferred concept
-        
+
         Args:
             concept: Concept to transfer
             source_domain: Source domain name
             target_domain: Target domain name
-            
+
         Returns:
             Transferred concept if successful, None otherwise
-            
+
         Example:
             >>> bridge = SemanticBridge()
             >>> cyber_concept = bridge.concept_mapper.concepts["malware_detection"]
@@ -1524,15 +1524,13 @@ class SemanticBridge:
             >>> if bio_concept:
             ...     print("Successfully transferred to biosecurity")
         """
-        logger.info(
-            "Transferring concept from %s to %s", source_domain, target_domain
-        )
-        
+        logger.info("Transferring concept from %s to %s", source_domain, target_domain)
+
         # Step 1: Validate transfer compatibility
         compatibility = self.validate_transfer_compatibility(
             concept, source_domain, target_domain
         )
-        
+
         if not compatibility.is_compatible():
             logger.warning(
                 "Transfer incompatible (score: %.2f, risks: %s)",
@@ -1540,12 +1538,12 @@ class SemanticBridge:
                 compatibility.risks,
             )
             return None
-        
+
         # Step 2: Get transfer decision from engine
         transfer_decision = self.transfer_engine.validate_full_transfer(
             concept, source_domain, target_domain
         )
-        
+
         if not (
             hasattr(transfer_decision, "is_transferable")
             and transfer_decision.is_transferable()
@@ -1555,26 +1553,26 @@ class SemanticBridge:
                 transfer_decision.confidence,
             )
             return None
-        
+
         # Step 3: Execute the transfer
         result = self.transfer_engine.execute_transfer(
             concept, transfer_decision, target_domain
         )
-        
+
         if not result.get("success"):
             logger.error("Transfer execution failed")
             return None
-        
+
         transferred_concept = result.get("transferred_concept")
-        
+
         if not transferred_concept:
             logger.error("No transferred concept returned")
             return None
-        
+
         # Step 4: Register in domain registry
         if target_domain not in self.domain_registry.domains:
             self.domain_registry.register_domain(target_domain)
-        
+
         # Step 5: Update statistics and tracking
         self.total_transfers += 1
         with self._concept_lock:
@@ -1584,12 +1582,12 @@ class SemanticBridge:
                 if concept_id not in self.concept_mapper.concepts:
                     self.concept_mapper.register_concept(transferred_concept)
                     self.index_dirty = True
-        
+
         logger.info(
             "Successfully transferred concept (compatibility: %.2f)",
             compatibility.compatibility_score,
         )
-        
+
         return transferred_concept
 
     def resolve_concept_conflict(

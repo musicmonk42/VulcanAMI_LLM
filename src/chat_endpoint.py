@@ -210,9 +210,7 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., description="User's message/question")
     max_tokens: int = Field(default=1024, description="Maximum tokens in response")
-    enable_reasoning: bool = Field(
-        default=True, description="Enable unified reasoning"
-    )
+    enable_reasoning: bool = Field(default=True, description="Enable unified reasoning")
     enable_memory: bool = Field(default=True, description="Enable memory retrieval")
     enable_safety: bool = Field(default=True, description="Enable safety validation")
     enable_planning: bool = Field(
@@ -390,7 +388,10 @@ class VulcanChatEngine:
                 try:
                     retrieved = self.graph_rag.retrieve(request.message, k=10)
                     if retrieved:
-                        contexts = [r.content if hasattr(r, "content") else str(r) for r in retrieved]
+                        contexts = [
+                            r.content if hasattr(r, "content") else str(r)
+                            for r in retrieved
+                        ]
                         systems_used.append("memory")
                         logger.debug(f"Retrieved {len(contexts)} memory contexts")
                 except Exception as e:
@@ -440,7 +441,11 @@ class VulcanChatEngine:
                         if hasattr(self.planner, "generate_plan"):
                             plan = self.planner.generate_plan(
                                 goal=request.message,
-                                context=reasoning_result if isinstance(reasoning_result, dict) else {},
+                                context=(
+                                    reasoning_result
+                                    if isinstance(reasoning_result, dict)
+                                    else {}
+                                ),
                             )
                         elif hasattr(self.planner, "create_plan"):
                             plan = self.planner.create_plan(
@@ -455,7 +460,11 @@ class VulcanChatEngine:
             # Safety validation
             if request.enable_safety and self.safety:
                 try:
-                    proposal = reasoning_result if isinstance(reasoning_result, dict) else {"query": request.message}
+                    proposal = (
+                        reasoning_result
+                        if isinstance(reasoning_result, dict)
+                        else {"query": request.message}
+                    )
                     context = state if isinstance(state, dict) else {}
 
                     if hasattr(self.safety, "validate_proposal"):
@@ -465,7 +474,9 @@ class VulcanChatEngine:
                     elif hasattr(self.safety, "validate"):
                         safety_check = self.safety.validate(proposal)
                     elif hasattr(self.safety, "validate_action"):
-                        is_safe, reason, _ = self.safety.validate_action(proposal, context)
+                        is_safe, reason, _ = self.safety.validate_action(
+                            proposal, context
+                        )
                         safety_check = {"approved": is_safe, "reason": reason}
                     else:
                         safety_check = {"approved": True}
@@ -509,7 +520,10 @@ class VulcanChatEngine:
                     if self.graph_rag and hasattr(self.graph_rag, "store"):
                         self.graph_rag.store(
                             content=response_text,
-                            metadata={"query": request.message, "timestamp": time.time()},
+                            metadata={
+                                "query": request.message,
+                                "timestamp": time.time(),
+                            },
                         )
 
                     logger.debug("Interaction stored in memory")
@@ -592,7 +606,9 @@ class VulcanChatEngine:
 
         # Add memory contexts
         if contexts:
-            context_parts.append(f"Relevant context: {' | '.join(contexts[:MAX_CONTEXT_ITEMS])}")
+            context_parts.append(
+                f"Relevant context: {' | '.join(contexts[:MAX_CONTEXT_ITEMS])}"
+            )
 
         # Add conversation history
         history_text = ""
@@ -605,7 +621,11 @@ class VulcanChatEngine:
 
         # Build prompt
         full_context = "\n".join(context_parts) if context_parts else ""
-        prompt = f"{full_context}\n\nUser: {request.message}\nAssistant:" if full_context else request.message
+        prompt = (
+            f"{full_context}\n\nUser: {request.message}\nAssistant:"
+            if full_context
+            else request.message
+        )
 
         # Try to generate with LLM
         if self.llm:
@@ -643,11 +663,17 @@ class VulcanChatEngine:
         if reasoning_result:
             if isinstance(reasoning_result, dict):
                 if "conclusion" in reasoning_result:
-                    response_parts.append(f"Based on my analysis: {reasoning_result['conclusion']}")
+                    response_parts.append(
+                        f"Based on my analysis: {reasoning_result['conclusion']}"
+                    )
                 elif "result" in reasoning_result:
-                    response_parts.append(f"Analysis result: {reasoning_result['result']}")
+                    response_parts.append(
+                        f"Analysis result: {reasoning_result['result']}"
+                    )
             elif hasattr(reasoning_result, "conclusion"):
-                response_parts.append(f"Based on my analysis: {reasoning_result.conclusion}")
+                response_parts.append(
+                    f"Based on my analysis: {reasoning_result.conclusion}"
+                )
 
         # Add plan summary
         if plan:

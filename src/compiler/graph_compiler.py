@@ -292,7 +292,7 @@ class GraphCompiler:
         self.optimizer = GraphOptimizer()
         self.logger = logging.getLogger(__name__)
         self.compiled_cache = {}
-        
+
         # Initialize LLVM backend with graceful fallback
         self.llvm_backend = None
         self.llvm_available = False
@@ -302,7 +302,9 @@ class GraphCompiler:
             if self.llvm_available:
                 self.logger.debug("LLVM backend initialized successfully")
         except Exception as e:
-            self.logger.warning(f"LLVM backend unavailable, using interpreter fallback: {e}")
+            self.logger.warning(
+                f"LLVM backend unavailable, using interpreter fallback: {e}"
+            )
             self.llvm_available = False
             self.llvm_backend = None
 
@@ -322,7 +324,7 @@ class GraphCompiler:
             NodeType.TRANSPOSE,
             NodeType.RESHAPE,
         }
-        
+
         # Log initialization
         self.logger.info(
             f"GraphCompiler initialized: optimization_level={optimization_level}, "

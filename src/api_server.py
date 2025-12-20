@@ -93,6 +93,7 @@ logger = logging.getLogger("GraphAPIServer")
 try:
     from src.vulcan.reasoning.unified_reasoning import UnifiedReasoner
     from src.vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
+
     REASONING_AVAILABLE = True
     logger.info("UnifiedReasoner loaded successfully")
 except ImportError:
@@ -100,6 +101,7 @@ except ImportError:
         # Try without src. prefix
         from vulcan.reasoning.unified_reasoning import UnifiedReasoner
         from vulcan.reasoning.reasoning_types import ReasoningType, ReasoningResult
+
         REASONING_AVAILABLE = True
         logger.info("UnifiedReasoner loaded successfully")
     except ImportError as e:
@@ -1614,23 +1616,23 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         if not agent:
             self._send_error(401, "Unauthorized")
             return
-        
+
         if not REASONING_AVAILABLE:
             self._send_error(501, "Reasoning engine not available")
             return
-        
+
         if not self.server_instance:
             self._send_error(500, "Server not initialized")
             return
-        
+
         # Extract request data
         query = data.get("query")
         reasoning_type_str = data.get("reasoning_type")
-        
+
         if not query:
             self._send_error(400, "Missing required field: query")
             return
-        
+
         # Parse reasoning_type if provided
         reasoning_type = None
         if reasoning_type_str:
@@ -1639,7 +1641,7 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             except (ValueError, AttributeError):
                 self._send_error(400, f"Invalid reasoning_type: {reasoning_type_str}")
                 return
-        
+
         try:
             # Thread-safe lazy initialization of reasoner
             with self.server_instance.locks["reasoner"]:
@@ -1648,12 +1650,12 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                     self.server_instance._unified_reasoner = UnifiedReasoner(
                         enable_learning=False,  # Disable learning for API mode
                         enable_safety=True,
-                        max_workers=2  # Limit workers for API server
+                        max_workers=2,  # Limit workers for API server
                     )
                     logger.info("UnifiedReasoner initialized successfully")
-            
+
             reasoner = self.server_instance._unified_reasoner
-            
+
             # Prepare input for reasoner
             # UnifiedReasoner expects:
             # - input_data: raw input (can be str, dict, etc.)
@@ -1665,29 +1667,31 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 # query is already a dict
                 input_data = query.get("query", query)
                 query_dict = query
-            
+
             # Perform reasoning
-            logger.info(f"Reasoning request from agent {agent.id}: query={str(input_data)[:QUERY_PREVIEW_LOG_LENGTH]}, type={reasoning_type}")
-            result = reasoner.reason(
-                input_data=input_data,
-                query=query_dict,
-                reasoning_type=reasoning_type
+            logger.info(
+                f"Reasoning request from agent {agent.id}: query={str(input_data)[:QUERY_PREVIEW_LOG_LENGTH]}, type={reasoning_type}"
             )
-            
+            result = reasoner.reason(
+                input_data=input_data, query=query_dict, reasoning_type=reasoning_type
+            )
+
             # Convert result to JSON-serializable format
             response = {
                 "conclusion": str(result.conclusion),
                 "confidence": float(result.confidence),
-                "reasoning_type": result.reasoning_type.value if result.reasoning_type else "unknown",
+                "reasoning_type": (
+                    result.reasoning_type.value if result.reasoning_type else "unknown"
+                ),
                 "explanation": result.explanation,
                 "uncertainty": float(result.uncertainty),
-                "metadata": result.metadata
+                "metadata": result.metadata,
             }
-            
+
             # Add safety status if available
             if result.safety_status:
                 response["safety_status"] = result.safety_status
-            
+
             # Log audit entry
             self.server_instance.db.log_audit(
                 agent.id,
@@ -1695,13 +1699,15 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 "api/reason",
                 {
                     "query_preview": str(input_data)[:QUERY_PREVIEW_AUDIT_LENGTH],
-                    "reasoning_type": reasoning_type.value if reasoning_type else "auto",
-                    "confidence": result.confidence
-                }
+                    "reasoning_type": (
+                        reasoning_type.value if reasoning_type else "auto"
+                    ),
+                    "confidence": result.confidence,
+                },
             )
-            
+
             self._send_json(response)
-            
+
         except Exception as e:
             logger.error(f"Reasoning request failed: {e}\n{traceback.format_exc()}")
             self._send_error(500, f"Reasoning failed: {str(e)}")
@@ -1868,7 +1874,7 @@ class GraphAPIServer:
         self.rate_limiter.shutdown()
         self.cache.shutdown()
         # Clean up reasoner if it was initialized
-        if hasattr(self, '_unified_reasoner') and self._unified_reasoner:
+        if hasattr(self, "_unified_reasoner") and self._unified_reasoner:
             try:
                 self.logger.info("Shutting down UnifiedReasoner...")
                 self._unified_reasoner.shutdown()

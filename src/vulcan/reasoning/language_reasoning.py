@@ -478,9 +478,7 @@ class SimpleLanguageModel:
         if seed is not None:
             random.seed(seed)
 
-    def get_logits(
-        self, hidden_state: Any, tokens_so_far: List[Any]
-    ) -> List[float]:
+    def get_logits(self, hidden_state: Any, tokens_so_far: List[Any]) -> List[float]:
         """
         Generate logits based on hidden state and context.
         Uses deterministic hashing for consistency.
@@ -494,7 +492,9 @@ class SimpleLanguageModel:
         for i in range(self.vocab_size):
             # Mix hash-based and position-based components
             base = random.gauss(0, 1.5)
-            position_bias = -0.1 * (i / self.vocab_size)  # Slight preference for earlier tokens
+            position_bias = -0.1 * (
+                i / self.vocab_size
+            )  # Slight preference for earlier tokens
             logits.append(base + position_bias)
 
         # Apply context from tokens so far
@@ -587,7 +587,7 @@ class LanguageReasoner:
 
             token_id = result["token_id"]
             confidence = result["reasoning"].get("confidence", 0.5)
-            
+
             # Track generated tokens
             self.generated_tokens.append(token_id)
             generated_text_tokens.append(token_id)

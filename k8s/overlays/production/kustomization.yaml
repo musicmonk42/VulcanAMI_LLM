@@ -30,4 +30,7 @@ configMapGenerator:
 
 images:
   - name: ghcr.io/musicmonk42/vulcanami_llm-api
-    newTag: latest
+    # REQUIRED: Override with specific version during deployment
+    # Example: kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+    # Use IMAGE_TAG variable from CI/CD pipeline for automated deployments
+    newTag: IMAGE_TAG

@@ -638,9 +638,9 @@ class GraphixArena:
             if REGISTRY_BACKENDS_AVAILABLE and InMemoryBackend and DevelopmentKMS:
                 try:
                     # Check environment to determine which backend/KMS to use
-                    env = os.getenv('ENVIRONMENT', 'development')
-                    
-                    if env == 'production':
+                    env = os.getenv("ENVIRONMENT", "development")
+
+                    if env == "production":
                         logger.error(
                             "Production environment detected but only development backends available. "
                             "Please configure production-grade storage (Redis/Postgres) and KMS (AWS/Azure)."
@@ -650,7 +650,9 @@ class GraphixArena:
                         # Development environment - OK to use in-memory backends
                         backend = InMemoryBackend()
                         kms = DevelopmentKMS()
-                        self.registry = LanguageEvolutionRegistry(backend=backend, kms=kms)
+                        self.registry = LanguageEvolutionRegistry(
+                            backend=backend, kms=kms
+                        )
                         logger.info(
                             "✅ LanguageEvolutionRegistry initialized with InMemoryBackend (development mode)"
                         )
@@ -687,17 +689,18 @@ class GraphixArena:
         )
         self.drift_detector = (
             DriftDetector(
-                dim=128,
-                drift_threshold=0.1,
-                history=5,
-                realignment_method="center"
-            ) if DRIFT_DETECTOR_AVAILABLE and DriftDetector else None
+                dim=128, drift_threshold=0.1, history=5, realignment_method="center"
+            )
+            if DRIFT_DETECTOR_AVAILABLE and DriftDetector
+            else None
         )
         if self.drift_detector:
-            logger.info(f"✓ DriftDetector initialized in Arena (dim=128, drift_threshold=0.1, history=5)")
+            logger.info(
+                f"✓ DriftDetector initialized in Arena (dim=128, drift_threshold=0.1, history=5)"
+            )
         else:
             logger.warning(f"⚠ DriftDetector unavailable")
-            
+
         self.tournament_manager = (
             TournamentManager() if TOURNAMENT_AVAILABLE and TournamentManager else None
         )
@@ -716,10 +719,12 @@ class GraphixArena:
             else None
         )
         if self.interpret_engine:
-            logger.info(f"✓ InterpretabilityEngine initialized in Arena (lazy-load ready)")
+            logger.info(
+                f"✓ InterpretabilityEngine initialized in Arena (lazy-load ready)"
+            )
         else:
             logger.warning(f"⚠ InterpretabilityEngine unavailable")
-            
+
         # FIX: use the correct class symbol 'NSOAligner' guarded by availability
         self.nso_aligner = (
             NSOAligner() if NSO_ALIGNER_AVAILABLE and (NSOAligner is not None) else None
@@ -1272,6 +1277,7 @@ class GraphixArena:
             # Record agent task as AI interaction for meta-learning
             try:
                 from vulcan.routing import record_ai_interaction, TELEMETRY_AVAILABLE
+
                 if TELEMETRY_AVAILABLE:
                     record_ai_interaction(
                         interaction_type="agent_communication",
@@ -1284,7 +1290,7 @@ class GraphixArena:
                             "graph_id": graph_id,
                             "audit_label": audit_label,
                             "has_drift_info": drift_info is not None,
-                        }
+                        },
                     )
             except ImportError:
                 pass  # Routing not available
@@ -1373,6 +1379,7 @@ class GraphixArena:
             # Record tournament as AI-to-AI interaction for meta-learning
             try:
                 from vulcan.routing import record_ai_interaction, TELEMETRY_AVAILABLE
+
                 if TELEMETRY_AVAILABLE:
                     record_ai_interaction(
                         interaction_type="tournament",
@@ -1385,7 +1392,7 @@ class GraphixArena:
                             "proposals_count": len(proposals),
                             "diversity_penalty": self.tournament_manager.diversity_penalty,
                             "winner_percentage": self.tournament_manager.winner_percentage,
-                        }
+                        },
                     )
             except ImportError:
                 pass  # Routing not available

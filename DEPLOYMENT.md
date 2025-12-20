@@ -126,6 +126,37 @@ docker compose -f docker-compose.prod.yml logs -f
 
 ### 2. Kubernetes Deployment
 
+#### Image Tagging Strategy
+
+For reproducible deployments, the kustomize overlays use `IMAGE_TAG` as a placeholder that must be replaced with a specific version during deployment. The CI/CD pipeline automatically replaces this placeholder, but for manual deployments, you need to set the image tag:
+
+```bash
+# Option 1: Edit kustomization.yaml directly
+cd k8s/overlays/<environment>  # development, staging, or production
+# Edit kustomization.yaml and replace IMAGE_TAG with your version (e.g., v1.0.0)
+
+# Option 2: Use kustomize edit command for specific environment
+cd k8s/overlays/production
+kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+
+# Or for development
+cd k8s/overlays/development
+kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:develop-abc1234
+
+# Option 3: Use sed for automated replacement (works for any overlay)
+VERSION=v1.0.0
+ENVIRONMENT=production  # or development, staging
+sed -i "s|newTag: IMAGE_TAG|newTag: $VERSION|g" k8s/overlays/$ENVIRONMENT/kustomization.yaml
+
+# Option 4: Replace in all overlays at once
+VERSION=v1.0.0
+for env in development staging production; do
+  sed -i "s|newTag: IMAGE_TAG|newTag: $VERSION|g" k8s/overlays/$env/kustomization.yaml
+done
+```
+
+**Best Practice**: Always use specific version tags (e.g., `v1.0.0`, `main-abc1234`) instead of `latest` for production deployments to ensure reproducibility.
+
 #### Using kubectl with Kustomize
 
 ##### Development Deployment

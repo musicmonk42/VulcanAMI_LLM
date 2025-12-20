@@ -85,17 +85,19 @@ class MemoryIndex:
         # Try to import faiss for fast similarity search
         try:
             from src.utils.faiss_config import initialize_faiss
-            
+
             # Initialize once and store results
             faiss_module, is_available, _ = initialize_faiss()
             self.use_faiss = is_available
             self.faiss = faiss_module
             self.faiss_index = None
-            
+
             if not self.use_faiss:
                 logger.info("FAISS not available, using numpy for similarity search")
         except ImportError:
-            logger.info("FAISS configuration not available, using numpy for similarity search")
+            logger.info(
+                "FAISS configuration not available, using numpy for similarity search"
+            )
             self.use_faiss = False
             self.faiss = None
 

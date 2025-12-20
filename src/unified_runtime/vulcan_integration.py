@@ -44,6 +44,7 @@ try:
     from vulcan.world_model.meta_reasoning.motivational_introspection import (
         MotivationalIntrospection,
     )
+
     VULCAN_AVAILABLE = True
 except ImportError:
     try:
@@ -52,6 +53,7 @@ except ImportError:
         from src.vulcan.world_model.meta_reasoning.motivational_introspection import (
             MotivationalIntrospection,
         )
+
         VULCAN_AVAILABLE = True
     except ImportError as e:
         logger.error(f"CRITICAL: VULCAN components not available: {e}")
@@ -74,10 +76,12 @@ def _lazy_import_world_model():
     """Lazy imports WorldModel to avoid circular dependencies - NO STUBS."""
     try:
         from vulcan.world_model.world_model_core import WorldModel
+
         return WorldModel
     except ImportError:
         try:
             from src.vulcan.world_model.world_model_core import WorldModel
+
             return WorldModel
         except ImportError as e:
             logger.error(f"CRITICAL: Failed to import WorldModel: {e}")
@@ -222,7 +226,9 @@ class VulcanGraphixBridge:
                     )
             except Exception as e:
                 logger.error(f"❌ Failed to initialize VULCAN World Model: {e}")
-                raise RuntimeError("VULCAN World Model initialization failed - no fallback allowed") from e
+                raise RuntimeError(
+                    "VULCAN World Model initialization failed - no fallback allowed"
+                ) from e
 
     def _lazy_import_world_model(self):
         """
@@ -232,16 +238,20 @@ class VulcanGraphixBridge:
         if WorldModel is None:
             try:
                 from vulcan.world_model.world_model_core import WorldModel as WM
+
                 WorldModel = WM  # Assign to global
                 logger.info("WorldModel lazy loaded successfully")
             except ImportError:
                 try:
                     from src.vulcan.world_model.world_model_core import WorldModel as WM
+
                     WorldModel = WM
                     logger.info("WorldModel lazy loaded successfully (src prefix)")
                 except ImportError as e:
                     logger.error(f"CRITICAL: Failed to import VULCAN World Model: {e}")
-                    raise ImportError("WorldModel is required - no stubs allowed") from e
+                    raise ImportError(
+                        "WorldModel is required - no stubs allowed"
+                    ) from e
         return WorldModel
 
     def _validate_graph_structure(self, graph: Dict[str, Any]) -> bool:

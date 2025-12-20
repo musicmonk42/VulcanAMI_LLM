@@ -36,4 +36,7 @@ labels:
 
 images:
   - name: ghcr.io/musicmonk42/vulcanami_llm-api
-    newTag: latest
+    # REQUIRED: Override with specific version during deployment
+    # Example: kustomize edit set image ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+    # The CI/CD pipeline automatically replaces IMAGE_TAG with the actual version
+    newTag: IMAGE_TAG

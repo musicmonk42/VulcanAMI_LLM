@@ -95,9 +95,7 @@ if PROMETHEUS_AVAILABLE:
     request_count = Counter(
         "dqs_requests_total", "Total DQS requests", ["method", "endpoint", "status"]
     )
-    request_duration = Histogram(
-        "dqs_request_duration_seconds", "DQS request duration"
-    )
+    request_duration = Histogram("dqs_request_duration_seconds", "DQS request duration")
     active_requests = Gauge("dqs_active_requests", "Active DQS requests")
     data_quality_score = Gauge("dqs_data_quality_score", "Current data quality score")
 else:
@@ -141,6 +139,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ====================================================================
 # REQUEST TRACKING MIDDLEWARE
 # ====================================================================
@@ -182,6 +181,7 @@ async def track_requests(request: Request, call_next):
         if PROMETHEUS_AVAILABLE and active_requests:
             active_requests.dec()
 
+
 # ====================================================================
 # PYDANTIC MODELS
 # ====================================================================
@@ -195,6 +195,7 @@ class HealthResponse(BaseModel):
     dqs_engine_available: bool = Field(..., description="DQS engine availability")
     database_connected: bool = Field(..., description="Database connection status")
 
+
 class ServiceInfo(BaseModel):
     """Service information model"""
 
@@ -204,14 +205,22 @@ class ServiceInfo(BaseModel):
     features: List[str]
     endpoints: List[str]
 
+
 class DataQualityMetrics(BaseModel):
     """Data quality metrics model"""
 
-    completeness: float = Field(..., ge=0.0, le=1.0, description="Data completeness score")
+    completeness: float = Field(
+        ..., ge=0.0, le=1.0, description="Data completeness score"
+    )
     accuracy: float = Field(..., ge=0.0, le=1.0, description="Data accuracy score")
-    consistency: float = Field(..., ge=0.0, le=1.0, description="Data consistency score")
-    overall_score: float = Field(..., ge=0.0, le=1.0, description="Overall quality score")
+    consistency: float = Field(
+        ..., ge=0.0, le=1.0, description="Data consistency score"
+    )
+    overall_score: float = Field(
+        ..., ge=0.0, le=1.0, description="Overall quality score"
+    )
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
 
 # ====================================================================
 # HEALTH CHECK ENDPOINTS
@@ -248,6 +257,7 @@ async def health_check():
         database_connected=db_connected,
     )
 
+
 @app.get("/ready", tags=["Health"])
 async def readiness_check():
     """
@@ -276,6 +286,7 @@ async def readiness_check():
             detail={"status": "not_ready", "error": str(e)},
         )
 
+
 # ====================================================================
 # METRICS ENDPOINT
 # ====================================================================
@@ -284,9 +295,8 @@ if PROMETHEUS_AVAILABLE:
     @app.get("/metrics", tags=["Monitoring"])
     async def metrics():
         """Prometheus metrics endpoint"""
-        return Response(
-            content=generate_latest(), media_type=CONTENT_TYPE_LATEST
-        )
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 # ====================================================================
 # ROOT ENDPOINT
@@ -323,6 +333,7 @@ async def root():
         endpoints=["/health", "/ready", "/metrics", "/docs", "/redoc"],
     )
 
+
 # ====================================================================
 # DQS ENGINE INTEGRATION
 # ====================================================================
@@ -339,6 +350,7 @@ try:
 except ImportError as e:
     logger.warning(f"⚠️  G-Vulcan DQS module not available: {e}")
     logger.info("Running in standalone mode without DQS classification engine")
+
 
 # ====================================================================
 # DQS API ENDPOINTS
@@ -364,6 +376,7 @@ async def get_quality_metrics():
 
     return metrics
 
+
 # ====================================================================
 # ERROR HANDLERS
 # ====================================================================
@@ -383,6 +396,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         },
     )
 
+
 # ====================================================================
 # STARTUP/SHUTDOWN EVENTS
 # ====================================================================
@@ -391,13 +405,17 @@ async def startup_event():
     """Initialize service on startup"""
     logger.info(f"🚀 Starting {SERVICE_NAME} v{APP_VERSION}")
     logger.info(f"📊 Metrics: {'enabled' if PROMETHEUS_AVAILABLE else 'disabled'}")
-    logger.info(f"🔒 Rate limiting: {'enabled' if RATE_LIMIT_AVAILABLE else 'disabled'}")
+    logger.info(
+        f"🔒 Rate limiting: {'enabled' if RATE_LIMIT_AVAILABLE else 'disabled'}"
+    )
     logger.info(f"🔗 CORS origins: {cors_origins}")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info(f"🛑 Shutting down {SERVICE_NAME}")
+
 
 # ====================================================================
 # MAIN ENTRY POINT

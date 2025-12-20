@@ -37,13 +37,13 @@ Components:
 
 Usage:
     from vulcan.routing import route_query, trigger_agent_collaboration
-    
+
     # Route a user query
     plan = route_query("Analyze this pattern", source="user")
-    
+
     # Route an agent-to-agent query
     plan = route_query("Collaborate on solution", source="agent")
-    
+
     # Trigger multi-agent collaboration
     session = trigger_agent_collaboration(query, ["perception", "reasoning"])
 """
@@ -82,6 +82,7 @@ try:
         route_query,
         get_query_analyzer,
     )
+
     QUERY_ROUTER_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Query router module not available: {e}")
@@ -109,6 +110,7 @@ try:
         trigger_agent_collaboration,
         get_collaboration_manager,
     )
+
     COLLABORATION_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Agent collaboration module not available: {e}")
@@ -133,6 +135,7 @@ try:
         record_ai_interaction,
         get_telemetry_recorder,
     )
+
     TELEMETRY_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Telemetry recorder module not available: {e}")
@@ -156,6 +159,7 @@ try:
         log_to_governance,
         get_governance_logger,
     )
+
     GOVERNANCE_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Governance logger module not available: {e}")
@@ -177,6 +181,7 @@ try:
         get_experiment_trigger,
         generate_experiments_from_interactions,
     )
+
     EXPERIMENT_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Experiment trigger module not available: {e}")
@@ -193,19 +198,20 @@ except ImportError as e:
 # MODULE INITIALIZATION
 # ============================================================
 
+
 def initialize_routing_components() -> dict:
     """
     Initialize all routing components with proper error handling.
-    
+
     Returns:
         dict: Status of each component initialization
     """
     global _ROUTING_COMPONENTS_INITIALIZED
-    
+
     with _ROUTING_SINGLETON_LOCK:
         if _ROUTING_COMPONENTS_INITIALIZED:
             return get_routing_status()
-        
+
         status = {
             "query_router": QUERY_ROUTER_AVAILABLE,
             "collaboration": COLLABORATION_AVAILABLE,
@@ -213,7 +219,7 @@ def initialize_routing_components() -> dict:
             "governance": GOVERNANCE_AVAILABLE,
             "experiment": EXPERIMENT_AVAILABLE,
         }
-        
+
         # Initialize components that need explicit initialization
         if TELEMETRY_AVAILABLE:
             try:
@@ -222,7 +228,7 @@ def initialize_routing_components() -> dict:
             except Exception as e:
                 logger.error(f"✗ Telemetry recorder initialization failed: {e}")
                 status["telemetry"] = False
-        
+
         if GOVERNANCE_AVAILABLE:
             try:
                 get_governance_logger()
@@ -230,21 +236,21 @@ def initialize_routing_components() -> dict:
             except Exception as e:
                 logger.error(f"✗ Governance logger initialization failed: {e}")
                 status["governance"] = False
-        
+
         _ROUTING_COMPONENTS_INITIALIZED = True
-        
+
         available_count = sum(1 for v in status.values() if v)
         logger.info(
             f"Routing components initialized: {available_count}/{len(status)} available"
         )
-        
+
         return status
 
 
 def get_routing_status() -> dict:
     """
     Get the current status of all routing components.
-    
+
     Returns:
         dict: Component availability and statistics
     """
@@ -271,9 +277,9 @@ def get_routing_status() -> dict:
                 "available": EXPERIMENT_AVAILABLE,
                 "stats": None,
             },
-        }
+        },
     }
-    
+
     # Get stats from available components
     if QUERY_ROUTER_AVAILABLE and get_query_analyzer:
         try:
@@ -281,35 +287,35 @@ def get_routing_status() -> dict:
             status["components"]["query_router"]["stats"] = analyzer.get_stats()
         except Exception:
             pass
-    
+
     if COLLABORATION_AVAILABLE and get_collaboration_manager:
         try:
             manager = get_collaboration_manager()
             status["components"]["collaboration"]["stats"] = manager.get_stats()
         except Exception:
             pass
-    
+
     if TELEMETRY_AVAILABLE and get_telemetry_recorder:
         try:
             recorder = get_telemetry_recorder()
             status["components"]["telemetry"]["stats"] = recorder.get_stats()
         except Exception:
             pass
-    
+
     if GOVERNANCE_AVAILABLE and get_governance_logger:
         try:
             gov_logger = get_governance_logger()
             status["components"]["governance"]["stats"] = gov_logger.get_stats()
         except Exception:
             pass
-    
+
     if EXPERIMENT_AVAILABLE and get_experiment_trigger:
         try:
             trigger = get_experiment_trigger()
             status["components"]["experiment"]["stats"] = trigger.get_stats()
         except Exception:
             pass
-    
+
     return status
 
 
