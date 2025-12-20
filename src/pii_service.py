@@ -93,13 +93,17 @@ SERVICE_NAME = "pii-service"
 # ====================================================================
 if PROMETHEUS_AVAILABLE:
     request_count = Counter(
-        "pii_requests_total", "Total PII service requests", ["method", "endpoint", "status"]
+        "pii_requests_total",
+        "Total PII service requests",
+        ["method", "endpoint", "status"],
     )
     request_duration = Histogram(
         "pii_request_duration_seconds", "PII service request duration"
     )
     active_requests = Gauge("pii_active_requests", "Active PII service requests")
-    pii_detections = Counter("pii_detections_total", "Total PII detections", ["pii_type"])
+    pii_detections = Counter(
+        "pii_detections_total", "Total PII detections", ["pii_type"]
+    )
 else:
     request_count = None
     request_duration = None
@@ -140,6 +144,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
 
 # ====================================================================
 # REQUEST TRACKING MIDDLEWARE
@@ -182,6 +187,7 @@ async def track_requests(request: Request, call_next):
         if PROMETHEUS_AVAILABLE and active_requests:
             active_requests.dec()
 
+
 # ====================================================================
 # PYDANTIC MODELS
 # ====================================================================
@@ -192,8 +198,13 @@ class HealthResponse(BaseModel):
     service: str = Field(..., description="Service name")
     version: str = Field(..., description="Service version")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    security_nodes_available: bool = Field(..., description="Security nodes availability")
-    safe_generation_available: bool = Field(..., description="Safe generation availability")
+    security_nodes_available: bool = Field(
+        ..., description="Security nodes availability"
+    )
+    safe_generation_available: bool = Field(
+        ..., description="Safe generation availability"
+    )
+
 
 class ServiceInfo(BaseModel):
     """Service information model"""
@@ -205,15 +216,19 @@ class ServiceInfo(BaseModel):
     endpoints: List[str]
     compliance: List[str]
 
+
 class PIIDetectionResult(BaseModel):
     """PII detection result model"""
 
     text_analyzed: bool
     pii_found: bool
-    pii_types: List[str] = Field(default_factory=list, description="Types of PII detected")
+    pii_types: List[str] = Field(
+        default_factory=list, description="Types of PII detected"
+    )
     redacted_text: Optional[str] = Field(None, description="Text with PII redacted")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
 
 # ====================================================================
 # HEALTH CHECK ENDPOINTS
@@ -251,6 +266,7 @@ async def health_check():
         safe_generation_available=safe_generation_available,
     )
 
+
 @app.get("/ready", tags=["Health"])
 async def readiness_check():
     """
@@ -279,6 +295,7 @@ async def readiness_check():
             detail={"status": "not_ready", "error": str(e)},
         )
 
+
 # ====================================================================
 # METRICS ENDPOINT
 # ====================================================================
@@ -287,9 +304,8 @@ if PROMETHEUS_AVAILABLE:
     @app.get("/metrics", tags=["Monitoring"])
     async def metrics():
         """Prometheus metrics endpoint"""
-        return Response(
-            content=generate_latest(), media_type=CONTENT_TYPE_LATEST
-        )
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 # ====================================================================
 # ROOT ENDPOINT
@@ -334,9 +350,18 @@ async def root():
         version=APP_VERSION,
         description="Enterprise-grade PII detection and protection service for GDPR and compliance",
         features=features,
-        endpoints=["/health", "/ready", "/metrics", "/detect", "/redact", "/docs", "/redoc"],
+        endpoints=[
+            "/health",
+            "/ready",
+            "/metrics",
+            "/detect",
+            "/redact",
+            "/docs",
+            "/redoc",
+        ],
         compliance=["GDPR", "CCPA", "HIPAA"],
     )
+
 
 # ====================================================================
 # SECURITY MODULES INTEGRATION
@@ -361,8 +386,10 @@ except ImportError as e:
 # PII DETECTION API ENDPOINTS
 # ====================================================================
 
+
 class PIIRequest(BaseModel):
     """Request model for PII detection"""
+
     text: str = Field(..., description="Text to analyze for PII")
 
 
@@ -393,6 +420,7 @@ async def detect_pii(request: PIIRequest):
 
     return result
 
+
 @app.post("/redact", response_model=PIIDetectionResult, tags=["PII Detection"])
 async def redact_pii(request: PIIRequest):
     """
@@ -417,6 +445,7 @@ async def redact_pii(request: PIIRequest):
 
     return result
 
+
 # ====================================================================
 # ERROR HANDLERS
 # ====================================================================
@@ -436,6 +465,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         },
     )
 
+
 # ====================================================================
 # STARTUP/SHUTDOWN EVENTS
 # ====================================================================
@@ -444,14 +474,18 @@ async def startup_event():
     """Initialize service on startup"""
     logger.info(f"🚀 Starting {SERVICE_NAME} v{APP_VERSION}")
     logger.info(f"📊 Metrics: {'enabled' if PROMETHEUS_AVAILABLE else 'disabled'}")
-    logger.info(f"🔒 Rate limiting: {'enabled' if RATE_LIMIT_AVAILABLE else 'disabled'}")
+    logger.info(
+        f"🔒 Rate limiting: {'enabled' if RATE_LIMIT_AVAILABLE else 'disabled'}"
+    )
     logger.info(f"🔗 CORS origins: {cors_origins}")
     logger.info(f"🛡️  Compliance modes: GDPR, CCPA, HIPAA")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info(f"🛑 Shutting down {SERVICE_NAME}")
+
 
 # ====================================================================
 # MAIN ENTRY POINT

@@ -267,7 +267,7 @@ class TestVulcanPackVerify:
             # Corrupt the pack by modifying bytes
             with open(pack_file, "r+b") as f:
                 f.seek(50)
-                f.write(b"\xFF" * 10)
+                f.write(b"\xff" * 10)
 
             result = run_vulcan_pack_verify([pack_file], timeout=30)
 

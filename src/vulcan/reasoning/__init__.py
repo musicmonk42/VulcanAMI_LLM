@@ -183,7 +183,11 @@ except ImportError as e:
 # Multimodal Reasoning - Core component
 # ============================================================================
 try:
-    from .multimodal_reasoning import MultimodalReasoner, MultiModalReasoningEngine, CrossModalReasoner
+    from .multimodal_reasoning import (
+        MultimodalReasoner,
+        MultiModalReasoningEngine,
+        CrossModalReasoner,
+    )
 
     MULTIMODAL_AVAILABLE = True
 except ImportError as e:

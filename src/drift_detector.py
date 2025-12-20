@@ -17,12 +17,13 @@ import numpy as np
 # FAISS import with enhanced configuration
 try:
     from src.utils.faiss_config import initialize_faiss
-    
+
     faiss, FAISS_AVAILABLE, _ = initialize_faiss()
 except ImportError:
     # Fallback: try direct import if config module not available
     try:
         import faiss
+
         FAISS_AVAILABLE = True
     except ImportError:
         # FAISS truly not available
@@ -69,9 +70,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("DriftDetector")
 
+
 # Metrics - Handle duplicate registration gracefully with singleton pattern
 class _MetricsRegistry:
     """Singleton registry for DriftDetector metrics to prevent duplicate registration."""
+
     _instance = None
     _initialized = False
     _drift_value_gauge = None
@@ -80,22 +83,37 @@ class _MetricsRegistry:
     _drift_latency = None
     _realignment_operations = None
     _validation_errors = None
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         # Only initialize metrics once at class level
         if not _MetricsRegistry._initialized and PROMETHEUS_AVAILABLE:
             try:
-                _MetricsRegistry._drift_value_gauge = Gauge("drift_detector_drift_value", "Current mean embedding drift")
-                _MetricsRegistry._drift_events = Counter("drift_detector_realignments_total", "Total drift-triggered realignments")
-                _MetricsRegistry._drift_checks = Counter("drift_detector_checks_total", "Total drift checks performed")
-                _MetricsRegistry._drift_latency = Histogram("drift_detector_check_latency_seconds", "Latency of drift detection checks")
-                _MetricsRegistry._realignment_operations = Counter("drift_detector_realignment_operations", "Realignment operations performed")
-                _MetricsRegistry._validation_errors = Counter("drift_detector_validation_errors", "Validation errors encountered")
+                _MetricsRegistry._drift_value_gauge = Gauge(
+                    "drift_detector_drift_value", "Current mean embedding drift"
+                )
+                _MetricsRegistry._drift_events = Counter(
+                    "drift_detector_realignments_total",
+                    "Total drift-triggered realignments",
+                )
+                _MetricsRegistry._drift_checks = Counter(
+                    "drift_detector_checks_total", "Total drift checks performed"
+                )
+                _MetricsRegistry._drift_latency = Histogram(
+                    "drift_detector_check_latency_seconds",
+                    "Latency of drift detection checks",
+                )
+                _MetricsRegistry._realignment_operations = Counter(
+                    "drift_detector_realignment_operations",
+                    "Realignment operations performed",
+                )
+                _MetricsRegistry._validation_errors = Counter(
+                    "drift_detector_validation_errors", "Validation errors encountered"
+                )
                 _MetricsRegistry._initialized = True
                 logger.debug("DriftDetector metrics initialized")
             except ValueError as e:
@@ -104,6 +122,7 @@ class _MetricsRegistry:
                     logger.debug("Metrics already registered, retrieving from registry")
                     # Try to retrieve from registry
                     from prometheus_client import REGISTRY
+
                     for collector in list(REGISTRY._collector_to_names.keys()):
                         if hasattr(collector, "_name"):
                             if collector._name == "drift_detector_drift_value":
@@ -112,9 +131,15 @@ class _MetricsRegistry:
                                 _MetricsRegistry._drift_events = collector
                             elif collector._name == "drift_detector_checks_total":
                                 _MetricsRegistry._drift_checks = collector
-                            elif collector._name == "drift_detector_check_latency_seconds":
+                            elif (
+                                collector._name
+                                == "drift_detector_check_latency_seconds"
+                            ):
                                 _MetricsRegistry._drift_latency = collector
-                            elif collector._name == "drift_detector_realignment_operations":
+                            elif (
+                                collector._name
+                                == "drift_detector_realignment_operations"
+                            ):
                                 _MetricsRegistry._realignment_operations = collector
                             elif collector._name == "drift_detector_validation_errors":
                                 _MetricsRegistry._validation_errors = collector
@@ -130,30 +155,31 @@ class _MetricsRegistry:
             _MetricsRegistry._realignment_operations = None
             _MetricsRegistry._validation_errors = None
             _MetricsRegistry._initialized = True
-    
+
     @property
     def drift_value_gauge(self):
         return _MetricsRegistry._drift_value_gauge
-    
+
     @property
     def drift_events(self):
         return _MetricsRegistry._drift_events
-    
+
     @property
     def drift_checks(self):
         return _MetricsRegistry._drift_checks
-    
+
     @property
     def drift_latency(self):
         return _MetricsRegistry._drift_latency
-    
+
     @property
     def realignment_operations(self):
         return _MetricsRegistry._realignment_operations
-    
+
     @property
     def validation_errors(self):
         return _MetricsRegistry._validation_errors
+
 
 # Create singleton instance
 _metrics = _MetricsRegistry()

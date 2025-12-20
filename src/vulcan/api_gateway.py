@@ -1758,7 +1758,7 @@ class APIGateway:
             }
 
         return web.json_response(health)
-    
+
     async def component_health_check(self, request):
         """
         Detailed component health check endpoint.
@@ -1775,48 +1775,52 @@ class APIGateway:
                 "websocket_support": True,
                 "graphql_support": True,
             }
-            
+
             # Add degraded mode status
             degraded_components = {}
-            if hasattr(self.auth_manager, 'degraded_mode'):
+            if hasattr(self.auth_manager, "degraded_mode"):
                 degraded_components["auth"] = self.auth_manager.degraded_mode
-            if hasattr(self.cache_manager, 'degraded_mode'):
+            if hasattr(self.cache_manager, "degraded_mode"):
                 degraded_components["cache"] = self.cache_manager.degraded_mode
-            if hasattr(self.rate_limiter, 'degraded_mode'):
+            if hasattr(self.rate_limiter, "degraded_mode"):
                 degraded_components["rate_limiter"] = self.rate_limiter.degraded_mode
-            
+
             # Get service count
             service_count = 0
             async with self.service_registry._lock:
                 service_count = len(self.service_registry.services)
-            
+
             # Calculate statistics
             total_components = len(components)
             available_components = sum(1 for v in components.values() if v)
-            
-            return web.json_response({
-                "timestamp": time.time(),
-                "service": "vulcan-api-gateway",
-                "version": "1.0.0",
-                "components": components,
-                "degraded_mode": degraded_components,
-                "registered_services": service_count,
-                "statistics": {
-                    "total": total_components,
-                    "available": available_components,
-                    "missing": total_components - available_components,
-                },
-                "health_summary": {
-                    "status": "healthy" if available_components == total_components and not any(degraded_components.values()) else "degraded",
-                    "components_health": f"{available_components}/{total_components} available",
+
+            return web.json_response(
+                {
+                    "timestamp": time.time(),
+                    "service": "vulcan-api-gateway",
+                    "version": "1.0.0",
+                    "components": components,
+                    "degraded_mode": degraded_components,
+                    "registered_services": service_count,
+                    "statistics": {
+                        "total": total_components,
+                        "available": available_components,
+                        "missing": total_components - available_components,
+                    },
+                    "health_summary": {
+                        "status": (
+                            "healthy"
+                            if available_components == total_components
+                            and not any(degraded_components.values())
+                            else "degraded"
+                        ),
+                        "components_health": f"{available_components}/{total_components} available",
+                    },
                 }
-            })
+            )
         except Exception as e:
             logger.error(f"Component health check failed: {e}")
-            return web.json_response(
-                {"status": "error", "error": str(e)},
-                status=500
-            )
+            return web.json_response({"status": "error", "error": str(e)}, status=500)
 
     async def metrics_endpoint(self, request):
         """Prometheus metrics endpoint."""
@@ -2022,7 +2026,8 @@ class APIGateway:
 
             if planner is None:
                 return web.json_response(
-                    {"error": "Planner not available", "status": "not_initialized"}, status=503
+                    {"error": "Planner not available", "status": "not_initialized"},
+                    status=503,
                 )
 
             plan = planner.generate_plan(goal, context)
@@ -2079,7 +2084,8 @@ class APIGateway:
 
             if learner is None:
                 return web.json_response(
-                    {"error": "Learner not available", "status": "not_initialized"}, status=503
+                    {"error": "Learner not available", "status": "not_initialized"},
+                    status=503,
                 )
 
             result = learner.process_experience(experience)
@@ -2403,12 +2409,18 @@ class APIGateway:
             def resolve_memory_search(self, info, query, k):
                 # Use real memory system
                 try:
-                    memory = self.deployment.collective.deps.ltm if hasattr(self, 'deployment') else None
+                    memory = (
+                        self.deployment.collective.deps.ltm
+                        if hasattr(self, "deployment")
+                        else None
+                    )
                     if memory:
                         results = memory.search(query, k=k)
                         return [str(r) for r in results]
                     else:
-                        logger.warning("GraphQL memory_search: Memory system not initialized")
+                        logger.warning(
+                            "GraphQL memory_search: Memory system not initialized"
+                        )
                         return []
                 except Exception as e:
                     logger.error(f"GraphQL memory_search error: {e}")
@@ -2422,7 +2434,11 @@ class APIGateway:
             def resolve_process(self, info, input):
                 # Use real processing system
                 try:
-                    processor = self.deployment.collective.deps.multimodal if hasattr(self, 'deployment') else None
+                    processor = (
+                        self.deployment.collective.deps.multimodal
+                        if hasattr(self, "deployment")
+                        else None
+                    )
                     if processor:
                         result = processor.process_input(input)
                         return f"Processed: {input} -> {result}"

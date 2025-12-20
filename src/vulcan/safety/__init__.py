@@ -50,7 +50,9 @@ except ImportError:
         from src.vulcan.safety.safety_types import GovernanceOrchestrator
     except ImportError as e:
         logger.error(f"CRITICAL: GovernanceOrchestrator not available: {e}")
-        raise ImportError("GovernanceOrchestrator is required - no stubs allowed") from e
+        raise ImportError(
+            "GovernanceOrchestrator is required - no stubs allowed"
+        ) from e
 
 
 def get_safety_validator():

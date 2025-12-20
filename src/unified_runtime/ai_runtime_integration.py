@@ -288,7 +288,7 @@ class AIProvider(ABC):
 
 class OpenAIProvider(AIProvider):
     """OpenAI API provider implementation"""
-    
+
     # OpenAI Pricing Constants (per 1K tokens) - Update as needed
     GPT4_INPUT_RATE = 0.03
     GPT4_OUTPUT_RATE = 0.06
@@ -550,48 +550,50 @@ class OpenAIProvider(AIProvider):
         try:
             if not AIOHTTP_AVAILABLE:
                 raise ImportError("aiohttp required for OpenAI API calls")
-            
+
             session = await self._get_session()
-            
+
             # Prepare messages format
             if isinstance(prompt, str):
                 messages = [{"role": "user", "content": prompt}]
             else:
                 messages = prompt  # Already in messages format
-            
+
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             }
-            
+
             payload = {
                 "model": task.model or "gpt-3.5-turbo",
                 "messages": messages,
                 "temperature": contract.temperature,
                 "max_tokens": contract.max_tokens or 1024,
             }
-            
+
             if contract.top_p is not None:
                 payload["top_p"] = contract.top_p
             if contract.frequency_penalty:
                 payload["frequency_penalty"] = contract.frequency_penalty
             if contract.presence_penalty:
                 payload["presence_penalty"] = contract.presence_penalty
-            
+
             timeout = aiohttp.ClientTimeout(
                 total=contract.max_latency_ms / 1000 if contract.max_latency_ms else 30
             )
-            
+
             async with session.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=timeout
+                timeout=timeout,
             ) as response:
                 response_data = await response.json()
-                
+
                 if response.status != 200:
-                    error_msg = response_data.get("error", {}).get("message", "Unknown error")
+                    error_msg = response_data.get("error", {}).get(
+                        "message", "Unknown error"
+                    )
                     logger.error(f"OpenAI API error ({response.status}): {error_msg}")
                     return AIResult(
                         status="FAILED",
@@ -600,7 +602,7 @@ class OpenAIProvider(AIProvider):
                         provider_response=response_data,
                         trace_id=task.trace_id,
                     )
-                
+
                 # Extract response
                 choices = response_data.get("choices", [])
                 if not choices:
@@ -610,23 +612,25 @@ class OpenAIProvider(AIProvider):
                         error_code=AI_ERRORS.AI_PROVIDER_ERROR.value,
                         trace_id=task.trace_id,
                     )
-                
+
                 response_text = choices[0].get("message", {}).get("content", "")
                 finish_reason = choices[0].get("finish_reason", "stop")
                 usage = response_data.get("usage", {})
                 total_tokens = usage.get("total_tokens", 0)
                 prompt_tokens = usage.get("prompt_tokens", 0)
                 completion_tokens = usage.get("completion_tokens", 0)
-                
+
                 # Calculate cost using pricing constants
                 model = task.model or "gpt-3.5-turbo"
                 if "gpt-4" in model.lower():
-                    cost = (prompt_tokens / 1000 * self.GPT4_INPUT_RATE) + \
-                           (completion_tokens / 1000 * self.GPT4_OUTPUT_RATE)
+                    cost = (prompt_tokens / 1000 * self.GPT4_INPUT_RATE) + (
+                        completion_tokens / 1000 * self.GPT4_OUTPUT_RATE
+                    )
                 else:
-                    cost = (prompt_tokens / 1000 * self.GPT35_INPUT_RATE) + \
-                           (completion_tokens / 1000 * self.GPT35_OUTPUT_RATE)
-                
+                    cost = (prompt_tokens / 1000 * self.GPT35_INPUT_RATE) + (
+                        completion_tokens / 1000 * self.GPT35_OUTPUT_RATE
+                    )
+
                 return AIResult(
                     status="SUCCESS",
                     data={"text": response_text, "tokens_used": total_tokens},
@@ -635,7 +639,7 @@ class OpenAIProvider(AIProvider):
                     metadata={"model_used": task.model, "finish_reason": finish_reason},
                     trace_id=task.trace_id,
                 )
-                
+
         except asyncio.TimeoutError:
             return AIResult(
                 status="FAILED",
@@ -723,7 +727,7 @@ class OpenAIProvider(AIProvider):
 
 class AnthropicProvider(AIProvider):
     """Anthropic Claude API provider with real implementation"""
-    
+
     # Pricing constants for Claude models (per million tokens)
     CLAUDE_OPUS_INPUT_RATE = 15.0
     CLAUDE_OPUS_OUTPUT_RATE = 75.0
@@ -789,42 +793,52 @@ class AnthropicProvider(AIProvider):
         try:
             if AIOHTTP_AVAILABLE:
                 session = await self._get_session()
-                
+
                 # Prepare request payload - extract prompt from payload dict
                 prompt = task.payload.get("prompt", "")
-                messages = task.payload.get("messages", [{"role": "user", "content": prompt}])
-                
+                messages = task.payload.get(
+                    "messages", [{"role": "user", "content": prompt}]
+                )
+
                 headers = {
                     "x-api-key": self.api_key,
                     "anthropic-version": self.anthropic_version,
                     "content-type": "application/json",
                 }
-                
+
                 payload = {
                     "model": task.model or "claude-3-sonnet-20240229",
                     "messages": messages,
                     "max_tokens": contract.max_tokens or 1024,
                     "temperature": contract.temperature,
                 }
-                
+
                 # Make API call
                 async with session.post(
                     f"{self.base_url}/messages",
                     headers=headers,
                     json=payload,
-                    timeout=aiohttp.ClientTimeout(total=contract.max_latency_ms / 1000 if contract.max_latency_ms else 30)
+                    timeout=aiohttp.ClientTimeout(
+                        total=(
+                            contract.max_latency_ms / 1000
+                            if contract.max_latency_ms
+                            else 30
+                        )
+                    ),
                 ) as response:
                     response_data = await response.json()
-                    
+
                     if response.status != 200:
-                        error_msg = response_data.get("error", {}).get("message", "Unknown error")
+                        error_msg = response_data.get("error", {}).get(
+                            "message", "Unknown error"
+                        )
                         return AIResult(
                             status="FAILED",
                             error=f"Anthropic API error: {error_msg}",
                             error_code=AI_ERRORS.AI_PROVIDER_ERROR.value,
                             trace_id=task.trace_id,
                         )
-                    
+
                     # Extract response
                     content = response_data.get("content", [])
                     text = content[0].get("text", "") if content else ""
@@ -832,27 +846,37 @@ class AnthropicProvider(AIProvider):
                     input_tokens = usage.get("input_tokens", 0)
                     output_tokens = usage.get("output_tokens", 0)
                     total_tokens = input_tokens + output_tokens
-                    
+
                     # Calculate cost using pricing constants
                     model_name = payload["model"].lower()  # Case-insensitive matching
                     if "opus" in model_name:
-                        cost = (input_tokens / 1_000_000 * self.CLAUDE_OPUS_INPUT_RATE) + \
-                               (output_tokens / 1_000_000 * self.CLAUDE_OPUS_OUTPUT_RATE)
+                        cost = (
+                            input_tokens / 1_000_000 * self.CLAUDE_OPUS_INPUT_RATE
+                        ) + (output_tokens / 1_000_000 * self.CLAUDE_OPUS_OUTPUT_RATE)
                     elif "sonnet" in model_name:
-                        cost = (input_tokens / 1_000_000 * self.CLAUDE_SONNET_INPUT_RATE) + \
-                               (output_tokens / 1_000_000 * self.CLAUDE_SONNET_OUTPUT_RATE)
+                        cost = (
+                            input_tokens / 1_000_000 * self.CLAUDE_SONNET_INPUT_RATE
+                        ) + (output_tokens / 1_000_000 * self.CLAUDE_SONNET_OUTPUT_RATE)
                     elif "haiku" in model_name:
-                        cost = (input_tokens / 1_000_000 * self.CLAUDE_HAIKU_INPUT_RATE) + \
-                               (output_tokens / 1_000_000 * self.CLAUDE_HAIKU_OUTPUT_RATE)
+                        cost = (
+                            input_tokens / 1_000_000 * self.CLAUDE_HAIKU_INPUT_RATE
+                        ) + (output_tokens / 1_000_000 * self.CLAUDE_HAIKU_OUTPUT_RATE)
                     else:
                         # Fallback for unknown models
-                        cost = (input_tokens / 1_000_000 * self.CLAUDE_DEFAULT_INPUT_RATE) + \
-                               (output_tokens / 1_000_000 * self.CLAUDE_DEFAULT_OUTPUT_RATE)
-                    
+                        cost = (
+                            input_tokens / 1_000_000 * self.CLAUDE_DEFAULT_INPUT_RATE
+                        ) + (
+                            output_tokens / 1_000_000 * self.CLAUDE_DEFAULT_OUTPUT_RATE
+                        )
+
                     latency_ms = (time.time_ns() - start_time_ns) / 1_000_000.0
                     return AIResult(
                         status="SUCCESS",
-                        data={"text": text, "model": task.model, "tokens_used": total_tokens},
+                        data={
+                            "text": text,
+                            "model": task.model,
+                            "tokens_used": total_tokens,
+                        },
                         latency_ms=latency_ms,
                         cost=cost,
                         provider_response=response_data,
@@ -872,7 +896,7 @@ class AnthropicProvider(AIProvider):
                     provider_response={"fallback": "aiohttp_unavailable"},
                     trace_id=task.trace_id,
                 )
-                
+
         except asyncio.TimeoutError:
             return AIResult(
                 status="FAILED",
@@ -899,7 +923,7 @@ class AnthropicProvider(AIProvider):
 class GrokProvider(AIProvider):
     """
     xAI Grok API provider
-    
+
     NOTE: As of 2024, xAI's Grok does not have a public API.
     This implementation provides a placeholder structure for when the API becomes available.
     For production use, this should not be used - use OpenAI or Anthropic providers instead.
@@ -916,7 +940,7 @@ class GrokProvider(AIProvider):
     async def execute(self, task: AITask, contract: AIContract) -> AIResult:
         """
         Execute Grok API call
-        
+
         IMPORTANT: Grok API is not publicly available yet. This is a placeholder
         implementation that simulates responses. Do NOT use in production.
         Use OpenAI or Anthropic providers for real AI capabilities.
@@ -937,11 +961,11 @@ class GrokProvider(AIProvider):
             "GrokProvider called but xAI Grok API is not publicly available. "
             "This is a placeholder implementation. Use OpenAI or Anthropic instead."
         )
-        
+
         # Placeholder implementation for testing/development only
         data_payload = {}
         response_content: Union[str, Dict, List] = ""
-        
+
         if task.operation == "REASON":
             steps = self._grok_reasoning_steps(task.payload)
             data_payload = {"reasoning_steps": steps}
@@ -1000,7 +1024,8 @@ class GrokProvider(AIProvider):
             status="SUCCESS",
             data=data_payload,
             latency_ms=latency_ms,
-            cost=0.004 * (tokens / 1000),  # Estimated cost - will change when API is available
+            cost=0.004
+            * (tokens / 1000),  # Estimated cost - will change when API is available
             metadata={
                 "provider": "xAI",
                 "version": "placeholder",

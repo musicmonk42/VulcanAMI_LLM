@@ -70,22 +70,22 @@ Example:
     ...     get_adversarial_status,
     ...     shutdown_adversarial_tester
     ... )
-    >>> 
+    >>>
     >>> # Initialize at platform startup
     >>> tester = initialize_adversarial_tester(log_dir="adversarial_logs")
-    >>> 
+    >>>
     >>> # Start background periodic testing (every hour by default)
     >>> start_periodic_testing(tester, interval_seconds=3600, run_immediately=True)
-    >>> 
+    >>>
     >>> # Check query integrity in real-time
     >>> result = check_query_integrity("user query text")
     >>> if not result["safe"]:
     ...     return {"error": result["reason"], "blocked": True}
-    >>> 
+    >>>
     >>> # Get system status for monitoring
     >>> status = get_adversarial_status()
     >>> print(f"Tests run: {status.get('total_logged_attacks', 0)}")
-    >>> 
+    >>>
     >>> # Graceful shutdown
     >>> shutdown_adversarial_tester()
 
@@ -162,9 +162,10 @@ ENV_PERIODIC_INTERVAL = "ADVERSARIAL_PERIODIC_INTERVAL"
 # ENUMS - Status and Result Types
 # ============================================================
 
+
 class IntegrityCheckStatus(Enum):
     """Status codes for query integrity checks."""
-    
+
     PASSED = "passed"
     BLOCKED_ANOMALY = "blocked_anomaly"
     BLOCKED_SAFETY = "blocked_safety"
@@ -175,7 +176,7 @@ class IntegrityCheckStatus(Enum):
 
 class PeriodicTestStatus(Enum):
     """Status codes for periodic testing operations."""
-    
+
     RUNNING = "running"
     STOPPED = "stopped"
     NOT_STARTED = "not_started"
@@ -186,11 +187,12 @@ class PeriodicTestStatus(Enum):
 # DATACLASSES - Structured Result Types
 # ============================================================
 
+
 @dataclass
 class IntegrityCheckResult:
     """
     Result from a query integrity check.
-    
+
     Attributes:
         safe: Whether the query passed all integrity checks
         status: Detailed status code for the check result
@@ -202,6 +204,7 @@ class IntegrityCheckResult:
         details: Full integrity check result dictionary
         timestamp: UTC timestamp when check was performed
     """
+
     safe: bool
     status: IntegrityCheckStatus
     reason: Optional[str] = None
@@ -210,8 +213,10 @@ class IntegrityCheckResult:
     safety_level: Optional[str] = None
     checks_performed: List[str] = field(default_factory=list)
     details: Dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary for serialization."""
         return {
@@ -231,7 +236,7 @@ class IntegrityCheckResult:
 class AdversarialTestSummary:
     """
     Summary of an adversarial test suite run.
-    
+
     Attributes:
         total_tests: Total number of tests executed
         failures: Number of failed tests
@@ -241,14 +246,17 @@ class AdversarialTestSummary:
         timestamp: UTC timestamp when test suite was run
         duration_seconds: Time taken to run the test suite
     """
+
     total_tests: int
     failures: int
     success_rate: float
     max_divergence: float
     tests: Dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     duration_seconds: Optional[float] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert summary to dictionary for serialization."""
         return {
@@ -266,27 +274,25 @@ class AdversarialTestSummary:
 # CONFIGURATION - Environment Variable Handling
 # ============================================================
 
+
 def _get_threshold_env(
-    name: str,
-    default: float,
-    min_val: float = 0.0,
-    max_val: float = 1.0
+    name: str, default: float, min_val: float = 0.0, max_val: float = 1.0
 ) -> float:
     """
     Get and validate a threshold value from environment variable.
-    
+
     Safely retrieves a float threshold from environment variables with
     range validation and fallback to default values.
-    
+
     Args:
         name: Environment variable name
         default: Default value if env var not set or invalid
         min_val: Minimum allowed value (inclusive)
         max_val: Maximum allowed value (inclusive)
-        
+
     Returns:
         Validated threshold value
-        
+
     Example:
         >>> threshold = _get_threshold_env("MY_THRESHOLD", 0.9, 0.0, 1.0)
     """
@@ -294,7 +300,7 @@ def _get_threshold_env(
         raw_value = os.getenv(name)
         if raw_value is None:
             return default
-            
+
         value = float(raw_value)
         if value < min_val or value > max_val:
             logger.warning(
@@ -311,24 +317,22 @@ def _get_threshold_env(
 
 
 def _get_interval_env(
-    name: str,
-    default: int,
-    min_val: int = MIN_PERIODIC_INTERVAL
+    name: str, default: int, min_val: int = MIN_PERIODIC_INTERVAL
 ) -> int:
     """
     Get and validate an interval value from environment variable.
-    
+
     Safely retrieves an integer interval from environment variables with
     minimum value validation and fallback to default values.
-    
+
     Args:
         name: Environment variable name
         default: Default value if env var not set or invalid
         min_val: Minimum allowed value (inclusive)
-        
+
     Returns:
         Validated interval value in seconds
-        
+
     Example:
         >>> interval = _get_interval_env("MY_INTERVAL", 3600, 60)
     """
@@ -336,7 +340,7 @@ def _get_interval_env(
         raw_value = os.getenv(name)
         if raw_value is None:
             return default
-            
+
         value = int(raw_value)
         if value < min_val:
             logger.warning(
@@ -389,11 +393,13 @@ _INITIALIZATION_TIMESTAMP: Optional[str] = None
 # Try to import AdversarialTester with graceful fallback
 try:
     from src.adversarial_tester import AdversarialTester, AttackType
+
     ADVERSARIAL_TESTER_AVAILABLE: bool = True
     logger.debug("AdversarialTester imported from src.adversarial_tester")
 except ImportError:
     try:
         from adversarial_tester import AdversarialTester, AttackType
+
         ADVERSARIAL_TESTER_AVAILABLE = True
         logger.debug("AdversarialTester imported from adversarial_tester")
     except ImportError:
@@ -410,6 +416,7 @@ except ImportError:
 # PUBLIC API - Initialization Functions
 # ============================================================
 
+
 def initialize_adversarial_tester(
     log_dir: str = "adversarial_logs",
     interpret_engine: Optional[Any] = None,
@@ -418,14 +425,14 @@ def initialize_adversarial_tester(
 ) -> Optional["AdversarialTester"]:
     """
     Initialize the adversarial tester singleton.
-    
+
     This function should be called during platform startup to create and
     configure the AdversarialTester instance. The tester is maintained as
     a singleton to ensure consistent state across all platform components.
-    
+
     Subsequent calls return the existing instance unless force_reinit is True,
     which is useful for testing or configuration updates.
-    
+
     Args:
         log_dir: Directory path for adversarial test logs and SQLite database.
             Will be created if it doesn't exist. Default: "adversarial_logs"
@@ -435,13 +442,13 @@ def initialize_adversarial_tester(
             If None, a default aligner is created.
         force_reinit: If True, reinitialize even if already initialized.
             Use with caution as this may disrupt ongoing tests.
-            
+
     Returns:
         AdversarialTester instance if initialization successful, None otherwise.
-        
+
     Raises:
         No exceptions are raised; errors are logged and None is returned.
-        
+
     Example:
         >>> tester = initialize_adversarial_tester(
         ...     log_dir="/var/log/vulcan/adversarial",
@@ -449,56 +456,56 @@ def initialize_adversarial_tester(
         ... )
         >>> if tester is None:
         ...     logger.error("Failed to initialize adversarial testing")
-        
+
     Thread Safety:
         This function is thread-safe. Concurrent calls are serialized via RLock.
-        
+
     See Also:
         get_adversarial_tester: Retrieve existing instance without reinitializing
         shutdown_adversarial_tester: Graceful shutdown and cleanup
     """
     global _ADVERSARIAL_TESTER, _INITIALIZATION_TIMESTAMP
-    
+
     if not ADVERSARIAL_TESTER_AVAILABLE:
         logger.error(
             "AdversarialTester not available - cannot initialize. "
             "Ensure scipy and scikit-learn are installed."
         )
         return None
-    
+
     with _ADVERSARIAL_LOCK:
         if _ADVERSARIAL_TESTER is not None and not force_reinit:
             logger.debug("Returning existing AdversarialTester instance")
             return _ADVERSARIAL_TESTER
-        
+
         try:
             # Create log directory with proper permissions
             log_path = Path(log_dir)
             log_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Log configuration being used
             logger.info("Initializing AdversarialTester with configuration:")
             logger.info(f"  log_dir: {log_dir}")
             logger.info(f"  anomaly_threshold: {ANOMALY_CONFIDENCE_THRESHOLD}")
             logger.info(f"  shap_threshold: {SHAP_DIVERGENCE_THRESHOLD}")
             logger.info(f"  success_rate_threshold: {SUCCESS_RATE_ALERT_THRESHOLD}")
-            
+
             # Initialize the tester
             _ADVERSARIAL_TESTER = AdversarialTester(
                 interpret_engine=interpret_engine,
                 nso_aligner=nso_aligner,
                 log_dir=log_dir,
             )
-            
+
             # Record initialization timestamp
             _INITIALIZATION_TIMESTAMP = datetime.now(timezone.utc).isoformat()
-            
+
             logger.info(f"✓ AdversarialTester initialized successfully")
             logger.info(f"  Database: {log_path / 'adversarial_logs.db'}")
             logger.info(f"  Timestamp: {_INITIALIZATION_TIMESTAMP}")
-            
+
             return _ADVERSARIAL_TESTER
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize AdversarialTester: {e}", exc_info=True)
             _ADVERSARIAL_TESTER = None
@@ -509,16 +516,16 @@ def initialize_adversarial_tester(
 def get_adversarial_tester() -> Optional["AdversarialTester"]:
     """
     Get the current adversarial tester singleton instance.
-    
+
     This function provides access to the initialized AdversarialTester
     without reinitializing it. Returns None if not yet initialized.
-    
+
     Returns:
         AdversarialTester instance or None if not initialized
-        
+
     Thread Safety:
         This function is thread-safe.
-        
+
     Example:
         >>> tester = get_adversarial_tester()
         >>> if tester:
@@ -532,6 +539,7 @@ def get_adversarial_tester() -> Optional["AdversarialTester"]:
 # PUBLIC API - Periodic Testing Functions
 # ============================================================
 
+
 def start_periodic_testing(
     tester: Optional["AdversarialTester"] = None,
     interval_seconds: int = DEFAULT_PERIODIC_TEST_INTERVAL,
@@ -540,15 +548,15 @@ def start_periodic_testing(
 ) -> bool:
     """
     Start periodic adversarial testing in a background daemon thread.
-    
+
     This function spawns a background thread that runs comprehensive
     adversarial test suites at regular intervals. This provides continuous
     security monitoring to detect any degradation in system robustness.
-    
+
     The thread runs as a daemon, ensuring it doesn't prevent process
     shutdown. For graceful shutdown with proper cleanup, use
     stop_periodic_testing() before process exit.
-    
+
     Args:
         tester: AdversarialTester instance to use. If None, uses the
             singleton instance from get_adversarial_tester().
@@ -559,12 +567,12 @@ def start_periodic_testing(
             Default: 512
         run_immediately: If True, runs the first test immediately rather
             than waiting for the first interval. Default: True
-            
+
     Returns:
         True if periodic testing started successfully, False if:
         - No AdversarialTester available
         - Periodic testing already running
-        
+
     Example:
         >>> tester = initialize_adversarial_tester()
         >>> success = start_periodic_testing(
@@ -574,50 +582,52 @@ def start_periodic_testing(
         ... )
         >>> if success:
         ...     logger.info("Periodic adversarial testing enabled")
-        
+
     Thread Safety:
         This function is thread-safe. Only one periodic testing thread
         can run at a time.
-        
+
     See Also:
         stop_periodic_testing: Stop the background testing thread
         run_single_test: Run a single test suite manually
     """
     global _PERIODIC_THREAD, _PERIODIC_RUNNING
-    
+
     if tester is None:
         tester = get_adversarial_tester()
-    
+
     if tester is None:
         logger.error(
             "Cannot start periodic testing - no AdversarialTester available. "
             "Call initialize_adversarial_tester() first."
         )
         return False
-    
+
     with _ADVERSARIAL_LOCK:
         if _PERIODIC_RUNNING:
-            logger.warning("Periodic testing already running - ignoring duplicate start request")
+            logger.warning(
+                "Periodic testing already running - ignoring duplicate start request"
+            )
             return True
-    
+
     def _run_periodic_tests() -> None:
         """
         Background thread function for periodic adversarial testing.
-        
+
         This is an internal function that runs in a daemon thread.
         It executes test suites at the configured interval until
         _PERIODIC_RUNNING is set to False.
         """
         global _PERIODIC_RUNNING
         _PERIODIC_RUNNING = True
-        
+
         logger.info(
             f"🔒 Starting periodic adversarial testing "
             f"(interval: {interval_seconds}s, tensor_size: {tensor_size})"
         )
-        
+
         is_first_run = run_immediately
-        
+
         while _PERIODIC_RUNNING:
             if is_first_run:
                 is_first_run = False
@@ -627,17 +637,17 @@ def start_periodic_testing(
                     if not _PERIODIC_RUNNING:
                         break
                     time.sleep(1)
-            
+
             if not _PERIODIC_RUNNING:
                 break
-            
+
             start_time = time.time()
             try:
                 logger.info("🔒 Starting periodic adversarial test suite...")
-                
+
                 # Generate base tensor for testing
                 base_tensor = np.random.randn(tensor_size).astype(np.float32)
-                
+
                 # Run full test suite
                 results = tester.run_adversarial_suite(
                     base_tensor=base_tensor,
@@ -645,25 +655,25 @@ def start_periodic_testing(
                         "id": f"periodic_check_{int(time.time())}",
                         "type": "system_integrity",
                         "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
+                    },
                 )
-                
+
                 duration = time.time() - start_time
-                
+
                 # Extract and log results
                 summary = results.get("summary", {})
                 total_tests = summary.get("total_tests", 0)
                 failures = summary.get("failures", 0)
                 success_rate = summary.get("success_rate", 0.0)
                 max_divergence = summary.get("max_divergence", 0.0)
-                
+
                 logger.info("✅ Adversarial test suite complete:")
                 logger.info(f"  • Total tests: {total_tests}")
                 logger.info(f"  • Failures: {failures}")
                 logger.info(f"  • Success rate: {success_rate:.1%}")
                 logger.info(f"  • Max divergence: {max_divergence:.4f}")
                 logger.info(f"  • Duration: {duration:.2f}s")
-                
+
                 # Alert on high failure rate
                 if success_rate < SUCCESS_RATE_ALERT_THRESHOLD:
                     logger.warning(
@@ -671,15 +681,12 @@ def start_periodic_testing(
                         f"{failures}/{total_tests} tests failed "
                         f"(threshold: {SUCCESS_RATE_ALERT_THRESHOLD:.0%})"
                     )
-                    
+
             except Exception as e:
-                logger.error(
-                    f"❌ Periodic adversarial test failed: {e}",
-                    exc_info=True
-                )
-        
+                logger.error(f"❌ Periodic adversarial test failed: {e}", exc_info=True)
+
         logger.info("🔒 Periodic adversarial testing stopped")
-    
+
     # Start background thread
     _PERIODIC_THREAD = threading.Thread(
         target=_run_periodic_tests,
@@ -687,49 +694,51 @@ def start_periodic_testing(
         daemon=True,
     )
     _PERIODIC_THREAD.start()
-    
-    logger.info(f"✓ Periodic adversarial testing thread started (interval: {interval_seconds}s)")
+
+    logger.info(
+        f"✓ Periodic adversarial testing thread started (interval: {interval_seconds}s)"
+    )
     return True
 
 
 def stop_periodic_testing(timeout: float = 5.0) -> bool:
     """
     Stop the periodic adversarial testing background thread.
-    
+
     This function signals the background thread to stop and waits for
     it to complete. Use this for graceful shutdown to ensure any
     in-progress tests complete cleanly.
-    
+
     Args:
         timeout: Maximum time to wait for thread to stop in seconds.
             Default: 5.0 seconds
-            
+
     Returns:
         True if thread stopped successfully, False if timeout occurred
-        
+
     Example:
         >>> success = stop_periodic_testing(timeout=10.0)
         >>> if not success:
         ...     logger.warning("Periodic testing thread did not stop cleanly")
-        
+
     Thread Safety:
         This function is thread-safe.
     """
     global _PERIODIC_RUNNING, _PERIODIC_THREAD
-    
+
     _PERIODIC_RUNNING = False
-    
+
     if _PERIODIC_THREAD is not None:
         _PERIODIC_THREAD.join(timeout=timeout)
         is_alive = _PERIODIC_THREAD.is_alive()
         _PERIODIC_THREAD = None
-        
+
         if is_alive:
             logger.warning(
                 f"Periodic testing thread did not stop within {timeout}s timeout"
             )
             return False
-    
+
     logger.info("✓ Periodic adversarial testing stopped")
     return True
 
@@ -737,18 +746,22 @@ def stop_periodic_testing(timeout: float = 5.0) -> bool:
 def get_periodic_testing_status() -> PeriodicTestStatus:
     """
     Get the current status of periodic adversarial testing.
-    
+
     Returns:
         PeriodicTestStatus enum indicating current state
-        
+
     Example:
         >>> status = get_periodic_testing_status()
         >>> if status == PeriodicTestStatus.RUNNING:
         ...     logger.info("Periodic testing is active")
     """
     global _PERIODIC_RUNNING, _PERIODIC_THREAD
-    
-    if _PERIODIC_RUNNING and _PERIODIC_THREAD is not None and _PERIODIC_THREAD.is_alive():
+
+    if (
+        _PERIODIC_RUNNING
+        and _PERIODIC_THREAD is not None
+        and _PERIODIC_THREAD.is_alive()
+    ):
         return PeriodicTestStatus.RUNNING
     elif _PERIODIC_THREAD is not None and not _PERIODIC_THREAD.is_alive():
         return PeriodicTestStatus.ERROR
@@ -760,41 +773,41 @@ def get_periodic_testing_status() -> PeriodicTestStatus:
 # PUBLIC API - Query Encoding and Integrity Checking
 # ============================================================
 
+
 def encode_query_to_tensor(
-    query: str,
-    tensor_size: int = DEFAULT_TENSOR_SIZE
+    query: str, tensor_size: int = DEFAULT_TENSOR_SIZE
 ) -> np.ndarray:
     """
     Encode a text query to a numeric tensor for adversarial testing.
-    
+
     This function converts text queries into fixed-size numeric tensors
     suitable for adversarial analysis. The encoding is deterministic
     (same query always produces same tensor) using SHA-256 based seeding.
-    
+
     The encoding captures several query characteristics:
     - Character-level features (ASCII values)
     - Length-based features (normalized query and word counts)
     - Random noise seeded by query hash (for adversarial robustness)
-    
+
     Args:
         query: The text query to encode. Empty strings are handled safely.
         tensor_size: Size of output tensor. Default: 512.
             Larger sizes provide more granular encoding but increase
             computation time for integrity checks.
-            
+
     Returns:
         numpy array of shape (tensor_size,) with dtype float32,
         normalized to zero mean and unit standard deviation.
-        
+
     Example:
         >>> tensor = encode_query_to_tensor("What is machine learning?")
         >>> assert tensor.shape == (512,)
         >>> assert tensor.dtype == np.float32
         >>> assert abs(tensor.mean()) < 1e-6  # Normalized
-        
+
     Thread Safety:
         This function is thread-safe (stateless).
-        
+
     Note:
         The encoding is designed for adversarial detection, not semantic
         similarity. Two similar queries may have different tensor representations.
@@ -802,25 +815,25 @@ def encode_query_to_tensor(
     # Handle empty query edge case
     if not query:
         return np.zeros(tensor_size, dtype=np.float32)
-    
+
     # Use SHA-256 hash as a seed for reproducible encoding
-    hash_bytes = hashlib.sha256(query.encode('utf-8')).digest()
-    seed = int.from_bytes(hash_bytes[:4], 'big')
-    
+    hash_bytes = hashlib.sha256(query.encode("utf-8")).digest()
+    seed = int.from_bytes(hash_bytes[:4], "big")
+
     # Create reproducible random state
     rng = np.random.RandomState(seed)
-    
+
     # Extract query characteristics
     query_len = len(query)
     word_count = len(query.split())
-    
+
     # Calculate max character features based on tensor size and ratio
     max_char_features = int(tensor_size * CHAR_FEATURES_RATIO)
-    char_codes = [ord(c) for c in query[:min(len(query), max_char_features)]]
-    
+    char_codes = [ord(c) for c in query[: min(len(query), max_char_features)]]
+
     # Build tensor components with deterministic noise
     base = rng.randn(tensor_size).astype(np.float32)
-    
+
     # Add character-level features (with bounds checking)
     if char_codes:
         char_array = np.array(char_codes, dtype=np.float32)
@@ -830,22 +843,22 @@ def encode_query_to_tensor(
             char_array = (char_array - char_array.mean()) / char_std
         else:
             char_array = char_array - char_array.mean()
-        
+
         # Ensure we don't exceed tensor bounds
         num_char_features = min(len(char_codes), tensor_size)
         base[:num_char_features] += char_array[:num_char_features] * 0.5
-    
+
     # Add length-based features (normalized to reasonable ranges)
     base[0] = min(query_len / 1000.0, 10.0)  # Capped normalized length
     base[1] = min(word_count / 100.0, 10.0)  # Capped normalized word count
-    
+
     # Normalize final tensor safely
     base_std = base.std()
     if base_std > 1e-8:
         base = (base - base.mean()) / base_std
     else:
         base = base - base.mean()
-    
+
     return base
 
 
@@ -856,23 +869,23 @@ def check_query_integrity(
 ) -> Dict[str, Any]:
     """
     Check query integrity using adversarial testing.
-    
+
     This function performs real-time integrity validation on incoming
     queries to detect potential adversarial manipulation, anomalous
     patterns, or out-of-distribution inputs.
-    
+
     The checks performed include:
     - **Anomaly Detection**: Uses Isolation Forest to detect unusual patterns
     - **SHAP Stability**: Checks if SHAP explanations are stable
     - **Safety Level**: NSO alignment audit for safety classification
     - **Statistical Checks**: NaN/Inf detection, range validation
-    
+
     Args:
         query: The user query to check. Required.
         tester: AdversarialTester instance to use. If None, uses the
             singleton from get_adversarial_tester().
         tensor_size: Size of tensor encoding. Default: 512
-        
+
     Returns:
         Dictionary with the following keys:
         - **safe** (bool): True if query passes all integrity checks
@@ -880,28 +893,28 @@ def check_query_integrity(
         - **reason** (Optional[str]): Human-readable reason if blocked
         - **anomaly_score** (Optional[float]): Anomaly confidence (0.0-1.0)
         - **details** (Dict): Full integrity check results
-        
+
     Example:
         >>> result = check_query_integrity("How do I hack a computer?")
         >>> if not result["safe"]:
         ...     return {"error": result["reason"], "blocked": True}
         >>> # Query is safe to process
         >>> process_query(query)
-        
+
     Thread Safety:
         This function is thread-safe.
-        
+
     Performance:
         Typical latency is 1-10ms depending on tensor size and
         available optimizations.
-        
+
     See Also:
         encode_query_to_tensor: Underlying tensor encoding
         IntegrityCheckResult: Structured result type
     """
     if tester is None:
         tester = get_adversarial_tester()
-    
+
     if tester is None:
         # No tester available - allow query but log warning
         logger.debug("AdversarialTester not available - skipping integrity check")
@@ -911,22 +924,22 @@ def check_query_integrity(
             reason=None,
             details={"skipped": True, "reason": "tester_not_available"},
         ).to_dict()
-    
+
     try:
         # Encode query to tensor
         query_tensor = encode_query_to_tensor(query, tensor_size)
-        
+
         # Prepare query metadata (truncate for privacy)
         # Use SHA-256 for query ID (truncated for brevity, not security)
         query_id = hashlib.sha256(query.encode()).hexdigest()[:8]
         truncated_query = query[:MAX_QUERY_LENGTH_FOR_LOGGING]
-        
+
         # Run real-time integrity check
         integrity_results = tester.realtime_integrity_check(
             graph={"query": truncated_query, "id": query_id},
             current_tensor=query_tensor,
         )
-        
+
         # Extract check results
         is_anomaly = integrity_results.get("is_anomaly", False)
         anomaly_confidence = integrity_results.get("anomaly_confidence", 0.0)
@@ -936,12 +949,12 @@ def check_query_integrity(
         has_nan = integrity_results.get("has_nan", False)
         has_inf = integrity_results.get("has_inf", False)
         checks_performed = integrity_results.get("checks_performed", [])
-        
+
         # Determine blocking conditions
         should_block = False
         block_reason = None
         status = IntegrityCheckStatus.PASSED
-        
+
         # Check 1: High-confidence anomaly detection
         if is_anomaly and anomaly_confidence > ANOMALY_CONFIDENCE_THRESHOLD:
             should_block = True
@@ -954,7 +967,7 @@ def check_query_integrity(
                 f"🚨 ANOMALY DETECTED in query [{query_id}]: {truncated_query[:100]}..."
             )
             logger.warning(f"  Anomaly confidence: {anomaly_confidence:.2f}")
-        
+
         # Check 2: Safety level classification
         if safety_level in ("high_risk", "critical"):
             should_block = True
@@ -963,27 +976,29 @@ def check_query_integrity(
             logger.warning(
                 f"⚠️ HIGH-RISK query detected [{query_id}]: safety_level={safety_level}"
             )
-        
+
         # Check 3: Invalid numeric values
         if has_nan or has_inf:
             should_block = True
             status = IntegrityCheckStatus.BLOCKED_INVALID
             block_reason = "Invalid numeric values detected in query encoding"
-            logger.warning(f"⚠️ Invalid values in query [{query_id}]: NaN={has_nan}, Inf={has_inf}")
-        
+            logger.warning(
+                f"⚠️ Invalid values in query [{query_id}]: NaN={has_nan}, Inf={has_inf}"
+            )
+
         # Warning: SHAP instability (logged but not blocking)
         if not shap_stable and shap_divergence > SHAP_DIVERGENCE_THRESHOLD:
             logger.warning(
                 f"⚠️ SHAP unstable [{query_id}]: "
                 f"divergence={shap_divergence:.4f} (threshold: {SHAP_DIVERGENCE_THRESHOLD})"
             )
-        
+
         # Log successful checks at debug level
         if not should_block:
             logger.debug(
                 f"Query [{query_id}] passed integrity checks: {checks_performed}"
             )
-        
+
         return IntegrityCheckResult(
             safe=not should_block,
             status=status,
@@ -994,7 +1009,7 @@ def check_query_integrity(
             checks_performed=checks_performed,
             details=integrity_results,
         ).to_dict()
-        
+
     except Exception as e:
         logger.error(f"Query integrity check failed: {e}", exc_info=True)
         # On error, allow the query but log the issue (fail-open)
@@ -1010,14 +1025,15 @@ def check_query_integrity(
 # PUBLIC API - Status and Monitoring
 # ============================================================
 
+
 def get_adversarial_status() -> Dict[str, Any]:
     """
     Get comprehensive status of the adversarial testing system.
-    
+
     This function provides detailed status information for monitoring,
     debugging, and operational dashboards. It includes system state,
     configuration, and recent activity metrics.
-    
+
     Returns:
         Dictionary with the following keys:
         - **available** (bool): Whether AdversarialTester module is available
@@ -1030,21 +1046,21 @@ def get_adversarial_status() -> Dict[str, Any]:
         - **database_path** (Optional[str]): Path to SQLite audit database
         - **total_logged_attacks** (Optional[int]): Total attacks in database
         - **recent_attacks** (Optional[List]): Last 5 attack records
-        
+
     Example:
         >>> status = get_adversarial_status()
         >>> print(f"System available: {status['available']}")
         >>> print(f"Periodic testing: {status['periodic_running']}")
         >>> print(f"Total logged attacks: {status.get('total_logged_attacks', 0)}")
-        
+
     Thread Safety:
         This function is thread-safe.
-        
+
     Performance:
         May take 10-100ms if database queries are performed.
     """
     global _PERIODIC_RUNNING, _INITIALIZATION_TIMESTAMP
-    
+
     status: Dict[str, Any] = {
         "available": ADVERSARIAL_TESTER_AVAILABLE,
         "initialized": _ADVERSARIAL_TESTER is not None,
@@ -1062,35 +1078,37 @@ def get_adversarial_status() -> Dict[str, Any]:
         "total_logged_attacks": None,
         "recent_attacks": None,
     }
-    
+
     if _ADVERSARIAL_TESTER is not None:
         try:
             # Get attack statistics (thread-safe)
             with _ADVERSARIAL_TESTER.stats_lock:
                 status["attack_stats"] = dict(_ADVERSARIAL_TESTER.attack_stats)
-            
+
             # Get database path
             db_path = _ADVERSARIAL_TESTER.log_dir / "adversarial_logs.db"
             status["database_path"] = str(db_path)
-            
+
             # Get database statistics with proper connection management
             if db_path.exists():
                 conn = None
                 try:
                     conn = sqlite3.connect(str(db_path), timeout=5.0)
                     cursor = conn.cursor()
-                    
+
                     # Total attack count
                     cursor.execute("SELECT COUNT(*) FROM attack_logs")
                     status["total_logged_attacks"] = cursor.fetchone()[0]
-                    
+
                     # Recent attacks
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         SELECT timestamp, attack_type, success, perturbation_norm
                         FROM attack_logs 
                         ORDER BY timestamp DESC 
                         LIMIT 5
-                    """)
+                    """
+                    )
                     status["recent_attacks"] = [
                         {
                             "timestamp": row[0],
@@ -1105,10 +1123,10 @@ def get_adversarial_status() -> Dict[str, Any]:
                 finally:
                     if conn is not None:
                         conn.close()
-                    
+
         except Exception as e:
             logger.error(f"Error getting adversarial status: {e}")
-    
+
     return status
 
 
@@ -1118,57 +1136,57 @@ def run_single_test(
 ) -> Dict[str, Any]:
     """
     Run a single adversarial test suite manually.
-    
+
     This function triggers an immediate, on-demand execution of the
     full adversarial test suite. Useful for:
     - Manual security verification
     - Testing after configuration changes
     - Integration testing and CI/CD pipelines
-    
+
     Args:
         tester: AdversarialTester instance to use. If None, uses the
             singleton from get_adversarial_tester().
         tensor_size: Dimension of test tensors. Default: 512
-        
+
     Returns:
         Test results dictionary with:
         - **timestamp**: When test was run
         - **tests**: Individual test results
         - **summary**: Aggregated statistics
-        
+
         Or error dictionary if test failed:
         - **error**: Error message string
-        
+
     Example:
         >>> results = run_single_test(tensor_size=256)
         >>> if "error" in results:
         ...     logger.error(f"Test failed: {results['error']}")
         >>> else:
         ...     print(f"Success rate: {results['summary']['success_rate']:.1%}")
-        
+
     Thread Safety:
         This function is thread-safe.
-        
+
     Performance:
         May take 1-30 seconds depending on tensor size and system load.
     """
     if tester is None:
         tester = get_adversarial_tester()
-    
+
     if tester is None:
         return {
             "error": "AdversarialTester not available",
             "hint": "Call initialize_adversarial_tester() first",
         }
-    
+
     start_time = time.time()
-    
+
     try:
         logger.info("🔒 Running manual adversarial test suite...")
-        
+
         # Generate deterministic test tensor for reproducibility
         base_tensor = np.random.randn(tensor_size).astype(np.float32)
-        
+
         # Run full test suite
         results = tester.run_adversarial_suite(
             base_tensor=base_tensor,
@@ -1176,22 +1194,22 @@ def run_single_test(
                 "id": f"manual_test_{int(time.time())}",
                 "type": "manual_trigger",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
+            },
         )
-        
+
         duration = time.time() - start_time
-        
+
         # Add duration to summary
         if "summary" in results:
             results["summary"]["duration_seconds"] = round(duration, 3)
-        
+
         logger.info(
             f"✅ Manual test complete in {duration:.2f}s: "
             f"{results.get('summary', {})}"
         )
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Manual adversarial test failed: {e}", exc_info=True)
         return {
@@ -1205,49 +1223,50 @@ def run_single_test(
 # PUBLIC API - Lifecycle Management
 # ============================================================
 
+
 def shutdown_adversarial_tester() -> bool:
     """
     Shutdown the adversarial tester and cleanup all resources.
-    
+
     This function performs graceful shutdown of the adversarial testing
     system, including:
     - Stopping periodic testing thread
     - Closing database connection pool
     - Releasing singleton instance
-    
+
     Should be called during platform shutdown to ensure clean resource
     release and prevent resource leaks.
-    
+
     Returns:
         True if shutdown completed successfully, False if errors occurred
-        
+
     Example:
         >>> # During platform shutdown
         >>> success = shutdown_adversarial_tester()
         >>> if not success:
         ...     logger.warning("Adversarial tester shutdown had errors")
-        
+
     Thread Safety:
         This function is thread-safe.
-        
+
     See Also:
         initialize_adversarial_tester: Initialization counterpart
         stop_periodic_testing: Stop just the periodic testing thread
     """
     global _ADVERSARIAL_TESTER, _PERIODIC_RUNNING, _INITIALIZATION_TIMESTAMP
-    
+
     success = True
-    
+
     # Stop periodic testing first
     if not stop_periodic_testing(timeout=10.0):
         logger.warning("Periodic testing thread did not stop cleanly")
         success = False
-    
+
     # Close database connections and release singleton
     with _ADVERSARIAL_LOCK:
         if _ADVERSARIAL_TESTER is not None:
             try:
-                if hasattr(_ADVERSARIAL_TESTER, 'db_pool'):
+                if hasattr(_ADVERSARIAL_TESTER, "db_pool"):
                     _ADVERSARIAL_TESTER.db_pool.close_all()
                     logger.debug("Database connection pool closed")
             except Exception as e:
@@ -1256,12 +1275,12 @@ def shutdown_adversarial_tester() -> bool:
             finally:
                 _ADVERSARIAL_TESTER = None
                 _INITIALIZATION_TIMESTAMP = None
-    
+
     if success:
         logger.info("✓ AdversarialTester shutdown complete")
     else:
         logger.warning("⚠️ AdversarialTester shutdown completed with errors")
-    
+
     return success
 
 

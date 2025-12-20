@@ -1110,7 +1110,9 @@ class HierarchicalContext:
                 if meta:
                     p.meta.update(meta)
                 # Merge signature terms (ensure all are strings)
-                merged = list(dict.fromkeys([str(t) for t in (p.signature_terms or [])] + sig))[:50]
+                merged = list(
+                    dict.fromkeys([str(t) for t in (p.signature_terms or [])] + sig)
+                )[:50]
                 p.signature_terms = merged
                 return
 

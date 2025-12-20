@@ -116,12 +116,14 @@ except ImportError:
 try:
     from vulcan.safety.safety_validator import initialize_all_safety_components
     from generation.safe_generation import RiskLevel
+
     SAFETY_AVAILABLE = True
 except ImportError:
     try:
         # Try alternative import paths
         from src.vulcan.safety.safety_validator import initialize_all_safety_components
         from src.generation.safe_generation import RiskLevel
+
         SAFETY_AVAILABLE = True
     except ImportError:
         initialize_all_safety_components = None
@@ -157,7 +159,7 @@ class GraphixLLMClient:
     Supports graceful degradation: when OPENAI_API_KEY is not configured or OpenAI
     package is not installed, the client operates in mock mode and returns placeholder
     responses.
-    
+
     Includes multi-layered safety validation:
     - Pre-query validation to block unsafe queries
     - Safety system prompt for governance-aligned responses
@@ -218,7 +220,7 @@ class GraphixLLMClient:
                     f"Failed to initialize OpenAI client: {e}. Running in mock mode."
                 )
                 self.mock_mode = True
-        
+
         # Initialize safety validator if enabled and available
         if self.enable_safety and SAFETY_AVAILABLE:
             try:
@@ -228,7 +230,9 @@ class GraphixLLMClient:
                 self.logger.warning(f"Failed to initialize safety validator: {e}")
                 self.safety_validator = None
         elif self.enable_safety and not SAFETY_AVAILABLE:
-            self.logger.warning("Safety validation requested but safety modules not available")
+            self.logger.warning(
+                "Safety validation requested but safety modules not available"
+            )
 
     @property
     def is_safety_enabled(self) -> bool:
@@ -258,7 +262,7 @@ class GraphixLLMClient:
     ) -> Dict[str, Any]:
         """
         Perform a chat interaction using OpenAI API, returning a Graphix IR graph.
-        
+
         Includes multi-layered safety validation:
         - Pre-query validation to block unsafe queries
         - Safety system prompt injection for safer responses
@@ -291,7 +295,7 @@ class GraphixLLMClient:
 
         last_content = messages[-1].get("content", "") if messages else ""
         proposal_id = hashlib.sha256(last_content.encode()).hexdigest()[:8]
-        
+
         # Safety metadata for response
         safety_info = {
             "safety_enabled": self.is_safety_enabled and not skip_safety,
@@ -299,29 +303,40 @@ class GraphixLLMClient:
             "post_check_passed": True,
             "risk_level": "SAFE",
         }
-        
+
         # Priority 1: Pre-query safety validation
         if self.is_safety_enabled and not skip_safety:
             try:
                 pre_check = self.safety_validator.validate_query(last_content)
                 safety_info["pre_check_passed"] = pre_check.safe
                 safety_info["pre_check_confidence"] = pre_check.confidence
-                
+
                 if not pre_check.safe:
                     # Block the query and return a refusal response
-                    refusal_reason = pre_check.reasons[0] if pre_check.reasons else "Query blocked by safety validation"
-                    self.logger.warning(f"Query blocked by safety validation: {refusal_reason}")
-                    
+                    refusal_reason = (
+                        pre_check.reasons[0]
+                        if pre_check.reasons
+                        else "Query blocked by safety validation"
+                    )
+                    self.logger.warning(
+                        f"Query blocked by safety validation: {refusal_reason}"
+                    )
+
                     response = f"I can't help with that. {refusal_reason}"
                     safety_info["blocked"] = True
                     safety_info["block_reason"] = refusal_reason
-                    
+
                     # Generate IR graph for blocked response
                     ir_graph = self._generate_ir_graph(
-                        proposal_id, last_content, response, model, temperature, 
-                        blocked=True, block_reason=refusal_reason
+                        proposal_id,
+                        last_content,
+                        response,
+                        model,
+                        temperature,
+                        blocked=True,
+                        block_reason=refusal_reason,
                     )
-                    
+
                     return {
                         "response": response,
                         "ir": ir_graph,
@@ -330,37 +345,47 @@ class GraphixLLMClient:
                         "reason": refusal_reason,
                         "safety_info": safety_info,
                     }
-                
+
                 # Priority 3: Risk classification for governance routing
                 risk_level = self.safety_validator.classify_query_risk(last_content)
-                risk_level_name = risk_level.name if hasattr(risk_level, 'name') else str(risk_level)
+                risk_level_name = (
+                    risk_level.name if hasattr(risk_level, "name") else str(risk_level)
+                )
                 safety_info["risk_level"] = risk_level_name
-                
+
                 # For high-risk queries, could integrate governance approval here
                 # Currently logging for awareness; full governance integration would go here
                 is_high_risk = risk_level_name in ("HIGH", "CRITICAL")
                 if is_high_risk:
-                    self.logger.warning(f"High-risk query detected (risk={risk_level_name}): governance approval may be required")
+                    self.logger.warning(
+                        f"High-risk query detected (risk={risk_level_name}): governance approval may be required"
+                    )
                     safety_info["requires_governance"] = True
-                    
+
             except Exception as e:
                 self.logger.error(f"Safety pre-check failed: {e}")
                 safety_info["pre_check_error"] = str(e)
-        
+
         # Prepare messages with safety system prompt (Priority 2)
         messages_with_safety = messages.copy()
         if self.is_safety_enabled and not skip_safety:
             # Add safety system prompt if not already present
-            has_system_prompt = any(m.get("role") == "system" for m in messages_with_safety)
+            has_system_prompt = any(
+                m.get("role") == "system" for m in messages_with_safety
+            )
             if not has_system_prompt:
-                messages_with_safety.insert(0, {"role": "system", "content": SAFETY_SYSTEM_PROMPT})
+                messages_with_safety.insert(
+                    0, {"role": "system", "content": SAFETY_SYSTEM_PROMPT}
+                )
             else:
                 # Prepend safety prompt to existing system message
                 for i, m in enumerate(messages_with_safety):
                     if m.get("role") == "system":
                         messages_with_safety[i] = {
                             "role": "system",
-                            "content": SAFETY_SYSTEM_PROMPT + "\n\n" + m.get("content", "")
+                            "content": SAFETY_SYSTEM_PROMPT
+                            + "\n\n"
+                            + m.get("content", ""),
                         }
                         break
 
@@ -381,32 +406,44 @@ class GraphixLLMClient:
             except Exception as e:
                 self.logger.error(f"OpenAI API error: {str(e)}")
                 raise
-        
+
         # Priority 4: Post-generation validation
         if self.is_safety_enabled and not skip_safety:
             try:
-                post_check = self.safety_validator.validate_response(response, last_content)
+                post_check = self.safety_validator.validate_response(
+                    response, last_content
+                )
                 safety_info["post_check_passed"] = post_check.safe
                 safety_info["post_check_confidence"] = post_check.confidence
-                
+
                 if not post_check.safe:
                     # Response failed safety validation - could implement retry with stricter constraints
-                    post_reason = post_check.reasons[0] if post_check.reasons else "Response blocked by safety validation"
-                    self.logger.warning(f"Response failed post-generation safety check: {post_reason}")
-                    
+                    post_reason = (
+                        post_check.reasons[0]
+                        if post_check.reasons
+                        else "Response blocked by safety validation"
+                    )
+                    self.logger.warning(
+                        f"Response failed post-generation safety check: {post_reason}"
+                    )
+
                     # Replace with a safe refusal response
                     response = f"I apologize, but I cannot provide that response as it may contain content that violates our safety policies. {post_reason}"
                     safety_info["response_replaced"] = True
                     safety_info["replacement_reason"] = post_reason
-                    
+
             except Exception as e:
                 self.logger.error(f"Safety post-check failed: {e}")
                 safety_info["post_check_error"] = str(e)
 
         # Generate IR graph for Graphix platform
         ir_graph = self._generate_ir_graph(
-            proposal_id, last_content, response, model, temperature,
-            safety_info=safety_info
+            proposal_id,
+            last_content,
+            response,
+            model,
+            temperature,
+            safety_info=safety_info,
         )
 
         # Log interaction for ObservabilityManager
@@ -418,10 +455,11 @@ class GraphixLLMClient:
             "response": response,
             "ir": ir_graph,
             "proposal_id": proposal_id,
-            "safe": safety_info.get("pre_check_passed", True) and safety_info.get("post_check_passed", True),
+            "safe": safety_info.get("pre_check_passed", True)
+            and safety_info.get("post_check_passed", True),
             "safety_info": safety_info,
         }
-    
+
     def _generate_ir_graph(
         self,
         proposal_id: str,
@@ -435,7 +473,7 @@ class GraphixLLMClient:
     ) -> Dict[str, Any]:
         """
         Generate an IR graph for the Graphix platform.
-        
+
         Args:
             proposal_id: Unique proposal identifier
             prompt: The original user prompt
@@ -445,7 +483,7 @@ class GraphixLLMClient:
             blocked: Whether the query was blocked by safety validation
             block_reason: Reason for blocking if applicable
             safety_info: Safety validation metadata
-        
+
         Returns:
             Dict containing the IR graph structure
         """
@@ -458,54 +496,68 @@ class GraphixLLMClient:
             },
             {"id": "output", "type": "OutputNode", "value": response},
         ]
-        
+
         # Add safety node if validation was performed
         if safety_info and safety_info.get("safety_enabled"):
-            nodes.insert(1, {
-                "id": "safety_check",
-                "type": "SafetyValidationNode",
-                "params": {
-                    "pre_check_passed": safety_info.get("pre_check_passed", True),
-                    "post_check_passed": safety_info.get("post_check_passed", True),
-                    "risk_level": safety_info.get("risk_level", "SAFE"),
+            nodes.insert(
+                1,
+                {
+                    "id": "safety_check",
+                    "type": "SafetyValidationNode",
+                    "params": {
+                        "pre_check_passed": safety_info.get("pre_check_passed", True),
+                        "post_check_passed": safety_info.get("post_check_passed", True),
+                        "risk_level": safety_info.get("risk_level", "SAFE"),
+                    },
                 },
-            })
-        
+            )
+
         edges = [
             {
                 "from": "prompt",
-                "to": {"node": "safety_check" if safety_info and safety_info.get("safety_enabled") else "generate", "port": "input"},
+                "to": {
+                    "node": (
+                        "safety_check"
+                        if safety_info and safety_info.get("safety_enabled")
+                        else "generate"
+                    ),
+                    "port": "input",
+                },
                 "type": "data",
             },
         ]
-        
+
         if safety_info and safety_info.get("safety_enabled"):
-            edges.append({
-                "from": "safety_check",
-                "to": {"node": "generate", "port": "input"},
+            edges.append(
+                {
+                    "from": "safety_check",
+                    "to": {"node": "generate", "port": "input"},
+                    "type": "data",
+                }
+            )
+
+        edges.append(
+            {
+                "from": "generate",
+                "to": {"node": "output", "port": "input"},
                 "type": "data",
-            })
-        
-        edges.append({
-            "from": "generate",
-            "to": {"node": "output", "port": "input"},
-            "type": "data",
-        })
-        
+            }
+        )
+
         metadata = {
             "agent_id": self.agent_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "model": model,
             "mock_mode": self.mock_mode,
         }
-        
+
         if blocked:
             metadata["blocked"] = True
             metadata["block_reason"] = block_reason
-        
+
         if safety_info:
             metadata["safety_info"] = safety_info
-        
+
         return {
             "id": proposal_id,
             "type": "Graph",

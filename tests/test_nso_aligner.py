@@ -238,7 +238,7 @@ class TestHomographDetection:
 
     def test_detect_invisible_characters(self, nso_aligner):
         """Test detecting invisible characters."""
-        text = "hello\u200Bworld"  # Zero-width space
+        text = "hello\u200bworld"  # Zero-width space
 
         result = nso_aligner._detect_homograph_attack(text)
 

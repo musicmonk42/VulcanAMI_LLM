@@ -25,7 +25,7 @@ def initialize_llvm():
     MUST call initialization functions BEFORE Target.from_default_triple().
     """
     logger.info("Initializing LLVM backend...")
-    
+
     # Initialize LLVM core first
     try:
         if hasattr(llvm, "initialize"):
@@ -58,7 +58,7 @@ def initialize_llvm():
             logger.warning(f"Native ASM printer initialization issue: {e}")
     except Exception as e:
         logger.warning(f"Native ASM printer initialization uncertain: {e}")
-    
+
     # Initialize native ASM parser
     try:
         if hasattr(llvm, "initialize_native_asmparser"):
@@ -209,11 +209,11 @@ class LLVMBackend:
     def _create_execution_engine(self):
         """
         Create LLVM execution engine with proper error handling and diagnostics.
-        
+
         This method attempts to create an MCJIT execution engine for JIT compilation.
         If creation fails (e.g., due to platform limitations), it logs detailed
         diagnostic information and continues without execution engine support.
-        
+
         The compiler can still function for IR generation and analysis even without
         a working execution engine.
         """
@@ -235,7 +235,7 @@ class LLVMBackend:
             self.execution_engine = llvm.create_mcjit_compiler(
                 backing_mod, target_machine
             )
-            
+
             logger.info(
                 f"✓ LLVM execution engine created successfully "
                 f"(optimization level: {self.optimization_level})"
@@ -245,28 +245,29 @@ class LLVMBackend:
             # Log detailed diagnostic information but don't fail
             # Some tests and use cases may not need execution
             self.execution_engine = None
-            
+
             # Determine if this is expected or concerning
             error_type = type(e).__name__
             error_msg = str(e)
-            
+
             # Build diagnostic message
             diagnostic_parts = [
                 f"LLVM execution engine creation failed ({error_type}): {error_msg}",
                 f"Optimization level: {self.optimization_level}",
                 f"Triple: {llvm.get_default_triple()}",
             ]
-            
+
             # Add context about impact
             diagnostic_parts.append(
                 "Impact: JIT compilation unavailable. "
                 "Compiler can still generate and analyze IR. "
                 "For production JIT execution, ensure LLVM/MCJIT is properly configured."
             )
-            
+
             # Try to get CPU capabilities for additional diagnostics
             try:
                 from src.utils.cpu_capabilities import get_cpu_capabilities
+
                 caps = get_cpu_capabilities()
                 diagnostic_parts.append(
                     f"CPU: {caps.architecture}, "
@@ -274,7 +275,7 @@ class LLVMBackend:
                 )
             except (ImportError, AttributeError) as cpu_err:
                 logger.debug(f"Could not get CPU capabilities: {cpu_err}")
-            
+
             # Log as info (not warning) since this is often expected in test/dev environments
             logger.info("\n".join(diagnostic_parts))
 

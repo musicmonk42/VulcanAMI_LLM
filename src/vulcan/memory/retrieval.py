@@ -18,12 +18,13 @@ import numpy as np
 # FAISS for vector search - Enhanced with CPU capability detection
 try:
     from src.utils.faiss_config import initialize_faiss
-    
+
     faiss, HAS_FAISS, _ = initialize_faiss()
 except ImportError:
     # Fallback if faiss_config module is not available
     try:
         import faiss
+
         logging.info("FAISS library imported successfully")
         HAS_FAISS = True
     except (ImportError, ModuleNotFoundError) as e:

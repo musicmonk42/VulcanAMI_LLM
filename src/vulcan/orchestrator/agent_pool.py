@@ -655,7 +655,7 @@ class AgentPoolManager:
                 # Update statistics
                 with self.stats_lock:
                     self.stats["total_jobs_failed"] += 1
-                
+
                 return job_id
 
         # FIXED: Execute task outside the lock to avoid blocking other submissions
@@ -674,21 +674,21 @@ class AgentPoolManager:
         agent_id: str,
         graph: Dict[str, Any],
         parameters: Optional[Dict[str, Any]],
-        metadata: AgentMetadata
+        metadata: AgentMetadata,
     ):
         """
         Execute a job synchronously.
-        
+
         FIXED: This method executes tasks synchronously instead of relying on
         stub worker processes that don't actually process tasks.
-        
+
         Called OUTSIDE the lock to avoid blocking other submissions.
-        
+
         Thread safety notes:
         - The agent is in WORKING state, so other threads won't assign new work to it
         - Provenance objects are task-specific (one per job_id) and only modified here
         - The metadata object is owned by this agent during task execution
-        
+
         Args:
             job_id: Job identifier
             agent_id: Agent identifier
@@ -698,7 +698,7 @@ class AgentPoolManager:
         """
         logger.info(f"Agent {agent_id} starting job {job_id}")
         provenance = None
-        
+
         try:
             # Get provenance for the task (thread-safe access)
             with self.lock:

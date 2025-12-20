@@ -92,19 +92,25 @@ logger = logging.getLogger(__name__)
 # ====================================================================
 APP_VERSION = "1.0.0"
 SERVICE_NAME = "api-gateway"
-DEPLOYMENT_MODE = os.environ.get("GATEWAY_MODE", "fastapi")  # fastapi, vulcan, or hybrid
+DEPLOYMENT_MODE = os.environ.get(
+    "GATEWAY_MODE", "fastapi"
+)  # fastapi, vulcan, or hybrid
 
 # ====================================================================
 # METRICS (if prometheus available)
 # ====================================================================
 if PROMETHEUS_AVAILABLE:
     request_count = Counter(
-        "api_gateway_requests_total", "Total API Gateway requests", ["method", "endpoint", "status"]
+        "api_gateway_requests_total",
+        "Total API Gateway requests",
+        ["method", "endpoint", "status"],
     )
     request_duration = Histogram(
         "api_gateway_request_duration_seconds", "API Gateway request duration"
     )
-    active_requests = Gauge("api_gateway_active_requests", "Active API Gateway requests")
+    active_requests = Gauge(
+        "api_gateway_active_requests", "Active API Gateway requests"
+    )
 else:
     request_count = None
     request_duration = None
@@ -144,6 +150,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
 
 # ====================================================================
 # REQUEST TRACKING MIDDLEWARE
@@ -186,6 +193,7 @@ async def track_requests(request: Request, call_next):
         if PROMETHEUS_AVAILABLE and active_requests:
             active_requests.dec()
 
+
 # ====================================================================
 # PYDANTIC MODELS
 # ====================================================================
@@ -196,8 +204,13 @@ class HealthResponse(BaseModel):
     service: str = Field(..., description="Service name")
     version: str = Field(..., description="Service version")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    vulcan_gateway_available: bool = Field(..., description="VULCAN AGI Gateway availability")
-    deployment_mode: str = Field(..., description="Deployment mode (fastapi/vulcan/hybrid)")
+    vulcan_gateway_available: bool = Field(
+        ..., description="VULCAN AGI Gateway availability"
+    )
+    deployment_mode: str = Field(
+        ..., description="Deployment mode (fastapi/vulcan/hybrid)"
+    )
+
 
 class ServiceInfo(BaseModel):
     """Service information model"""
@@ -210,6 +223,7 @@ class ServiceInfo(BaseModel):
     endpoints: List[str]
     notes: List[str]
 
+
 # ====================================================================
 # HEALTH CHECK ENDPOINTS (Container Orchestration)
 # ====================================================================
@@ -218,7 +232,7 @@ async def health_check():
     """
     Health check endpoint for container orchestration (Kubernetes/Docker).
     Returns service health status and VULCAN AGI component availability.
-    
+
     Note: This FastAPI endpoint provides container-friendly health checks.
     The VULCAN AGI Gateway (aiohttp) has its own health endpoints at /v1/health.
     """
@@ -239,12 +253,13 @@ async def health_check():
         deployment_mode=DEPLOYMENT_MODE,
     )
 
+
 @app.get("/ready", tags=["Health"])
 async def readiness_check():
     """
     Readiness check endpoint for container orchestration.
     Validates that the service is ready to accept traffic.
-    
+
     Note: This checks FastAPI app readiness. VULCAN AGI Gateway
     has its own readiness checks built into its aiohttp app.
     """
@@ -258,6 +273,7 @@ async def readiness_check():
         # Check if VULCAN Gateway is available (class import)
         try:
             from src.vulcan.api_gateway import APIGateway
+
             checks["vulcan_gateway_class"] = True
         except ImportError:
             pass
@@ -266,11 +282,20 @@ async def readiness_check():
         if DEPLOYMENT_MODE == "hybrid" and not checks["vulcan_gateway_class"]:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={"status": "not_ready", "checks": checks, "reason": "Hybrid mode requires VULCAN Gateway"},
+                detail={
+                    "status": "not_ready",
+                    "checks": checks,
+                    "reason": "Hybrid mode requires VULCAN Gateway",
+                },
             )
 
         if all(checks.values()) or DEPLOYMENT_MODE == "fastapi":
-            return {"status": "ready", "service": SERVICE_NAME, "mode": DEPLOYMENT_MODE, "checks": checks}
+            return {
+                "status": "ready",
+                "service": SERVICE_NAME,
+                "mode": DEPLOYMENT_MODE,
+                "checks": checks,
+            }
         else:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -291,7 +316,7 @@ async def component_health():
     """
     Detailed component health check endpoint.
     Returns status of all gateway components and downstream services.
-    
+
     This endpoint provides comprehensive visibility into:
     - Gateway service status
     - VULCAN AGI Gateway availability
@@ -306,14 +331,15 @@ async def component_health():
             "metrics": PROMETHEUS_AVAILABLE,
             "rate_limiter": RATE_LIMIT_AVAILABLE,
         }
-        
+
         # Check VULCAN Gateway availability
         try:
             from src.vulcan.api_gateway import APIGateway
+
             components["vulcan_gateway"] = True
         except ImportError:
             pass
-        
+
         # Check if we can access service discovery
         try:
             # This would check if service discovery is working
@@ -321,11 +347,11 @@ async def component_health():
             components["service_discovery"] = components["vulcan_gateway"]
         except Exception:
             pass
-        
+
         # Calculate statistics
         total_components = len(components)
         available_components = sum(1 for v in components.values() if v)
-        
+
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "service": SERVICE_NAME,
@@ -338,9 +364,13 @@ async def component_health():
                 "missing": total_components - available_components,
             },
             "health_summary": {
-                "status": "healthy" if available_components == total_components else "degraded",
+                "status": (
+                    "healthy"
+                    if available_components == total_components
+                    else "degraded"
+                ),
                 "components_health": f"{available_components}/{total_components} available",
-            }
+            },
         }
     except Exception as e:
         logger.error(f"Component health check failed: {e}")
@@ -348,6 +378,7 @@ async def component_health():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"status": "error", "error": str(e)},
         )
+
 
 # ====================================================================
 # METRICS ENDPOINT
@@ -357,13 +388,12 @@ if PROMETHEUS_AVAILABLE:
     @app.get("/metrics", tags=["Monitoring"])
     async def metrics():
         """Prometheus metrics endpoint (FastAPI metrics)
-        
+
         Note: VULCAN AGI Gateway exposes its own Prometheus metrics.
         This endpoint exposes FastAPI-specific metrics.
         """
-        return Response(
-            content=generate_latest(), media_type=CONTENT_TYPE_LATEST
-        )
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 
 # ====================================================================
 # ROOT ENDPOINT
@@ -397,7 +427,9 @@ async def root():
 
     if vulcan_integration:
         notes.append("VULCAN AGI Gateway class is available for integration")
-        notes.append("VULCAN endpoints: /v1/execute, /v1/reason, /v1/learn, /v1/memory/*, /ws, /graphql")
+        notes.append(
+            "VULCAN endpoints: /v1/execute, /v1/reason, /v1/learn, /v1/memory/*, /ws, /graphql"
+        )
 
     return ServiceInfo(
         service="VulcanAMI API Gateway (FastAPI Container Wrapper)",
@@ -408,6 +440,7 @@ async def root():
         endpoints=["/health", "/ready", "/metrics", "/docs", "/redoc"],
         notes=notes,
     )
+
 
 # ====================================================================
 # VULCAN AGI GATEWAY INTEGRATION
@@ -436,10 +469,11 @@ try:
     # TODO: For hybrid mode, integrate VULCAN Gateway routes
     # This would require mounting the aiohttp app or proxying requests
     # Example: app.mount("/v1", ...)
-    
+
 except ImportError as e:
     logger.warning(f"⚠️  VULCAN AGI Gateway not available: {e}")
     logger.info("Running in FastAPI-only mode (health/metrics endpoints)")
+
 
 # ====================================================================
 # ERROR HANDLERS
@@ -460,6 +494,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         },
     )
 
+
 # ====================================================================
 # STARTUP/SHUTDOWN EVENTS
 # ====================================================================
@@ -470,7 +505,9 @@ async def startup_event():
     logger.info(f"🚀 Starting {SERVICE_NAME} v{APP_VERSION}")
     logger.info(f"📦 Deployment mode: {DEPLOYMENT_MODE}")
     logger.info(f"📊 Metrics: {'enabled' if PROMETHEUS_AVAILABLE else 'disabled'}")
-    logger.info(f"🔒 Rate limiting: {'enabled' if RATE_LIMIT_AVAILABLE else 'disabled'}")
+    logger.info(
+        f"🔒 Rate limiting: {'enabled' if RATE_LIMIT_AVAILABLE else 'disabled'}"
+    )
     logger.info(f"🔗 CORS origins: {cors_origins}")
     logger.info("")
     logger.info("Architecture Notes:")
@@ -479,10 +516,12 @@ async def startup_event():
     logger.info("- Both services are independent and can coexist")
     logger.info("=" * 80)
 
+
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info(f"🛑 Shutting down {SERVICE_NAME}")
+
 
 # ====================================================================
 # MAIN ENTRY POINT
@@ -495,7 +534,9 @@ if __name__ == "__main__":
 
     logger.info(f"Starting FastAPI Gateway on {host}:{port}")
     logger.info(f"Note: VULCAN AGI Gateway (aiohttp) runs separately on port 8080")
-    logger.info(f"Use GATEWAY_MODE env var to configure: fastapi (default), vulcan, or hybrid")
+    logger.info(
+        f"Use GATEWAY_MODE env var to configure: fastapi (default), vulcan, or hybrid"
+    )
 
     uvicorn.run(
         app,
@@ -504,4 +545,3 @@ if __name__ == "__main__":
         log_level="info",
         access_log=True,
     )
-

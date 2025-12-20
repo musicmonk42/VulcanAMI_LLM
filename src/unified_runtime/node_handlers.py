@@ -488,12 +488,12 @@ async def generative_node_handler(
     # Use real AI runtime if available, fallback to mock for tests/demo
     generated_text = None
     tokens_used = 0
-    
+
     if hasattr(runtime, "ai_runtime") and runtime.ai_runtime:
         try:
             # Import AI runtime classes
             from .ai_runtime_integration import AIContract, AITask
-            
+
             # Create AI task for text generation
             task = AITask(
                 operation="generate",
@@ -502,7 +502,7 @@ async def generative_node_handler(
                 payload={"prompt": prompt},
                 context=processed_input,
             )
-            
+
             # Create contract with constraints
             contract = AIContract(
                 temperature=temperature,
@@ -510,16 +510,22 @@ async def generative_node_handler(
                 max_latency_ms=params.get("max_latency_ms", 5000.0),
                 min_accuracy=params.get("min_accuracy", 0.8),
             )
-            
+
             # Execute task through AI runtime
             result = runtime.ai_runtime.execute_task(task, contract)
-            
+
             if result.status == "SUCCESS" and result.data:
-                generated_text = result.data.get("text", result.data.get("completion", ""))
-                tokens_used = result.data.get("tokens", len(prompt.split()) + len(generated_text.split()))
+                generated_text = result.data.get(
+                    "text", result.data.get("completion", "")
+                )
+                tokens_used = result.data.get(
+                    "tokens", len(prompt.split()) + len(generated_text.split())
+                )
                 logger.info(f"Successfully generated text using {provider} provider")
             else:
-                logger.warning(f"AI generation failed: {result.error}, falling back to mock")
+                logger.warning(
+                    f"AI generation failed: {result.error}, falling back to mock"
+                )
                 generated_text = f"Generated response to: {prompt[:50]}..."
                 tokens_used = min(len(prompt.split()), max_tokens)
         except Exception as e:
@@ -582,34 +588,42 @@ async def transformer_embedding_node(
         # Xavier initialization: sqrt(6 / (fan_in + fan_out))
         limit = np.sqrt(6.0 / (seq_len + d_model))
         embedding_table = np.random.uniform(-limit, limit, size=(max_len, d_model))
-        
+
         # Get embeddings for tokens
         if seq_len > 0 and isinstance(tokens[0], int):
             # Token indices
-            embedded_result = [embedding_table[min(t, max_len-1)].tolist() for t in tokens[:seq_len]]
+            embedded_result = [
+                embedding_table[min(t, max_len - 1)].tolist() for t in tokens[:seq_len]
+            ]
         else:
             # Use Xavier init for unknown tokens
-            embedded_result = [[np.random.uniform(-limit, limit) for _ in range(d_model)] for _ in range(seq_len)]
-        
+            embedded_result = [
+                [np.random.uniform(-limit, limit) for _ in range(d_model)]
+                for _ in range(seq_len)
+            ]
+
         # Add sinusoidal positional encoding (standard in transformers)
         # Pre-compute frequency values to avoid redundant calculations
         position_encoding = np.zeros((seq_len, d_model))
         positions = np.arange(seq_len)
         div_term = np.exp(np.arange(0, d_model, 2) * -(np.log(10000.0) / d_model))
-        
+
         position_encoding[:, 0::2] = np.sin(positions[:, np.newaxis] * div_term)
         if d_model % 2 == 0:
             position_encoding[:, 1::2] = np.cos(positions[:, np.newaxis] * div_term)
         else:
-            position_encoding[:, 1::2] = np.cos(positions[:, np.newaxis] * div_term[:-1])
-        
+            position_encoding[:, 1::2] = np.cos(
+                positions[:, np.newaxis] * div_term[:-1]
+            )
+
         # Combine embeddings and positional encoding
         embedded_result = (np.array(embedded_result) + position_encoding).tolist()
     else:
         # Pure Python fallback with Xavier initialization
         limit = (6.0 / (seq_len + d_model)) ** 0.5
         embedded_result = [
-            [random.uniform(-limit, limit) for _ in range(d_model)] for _ in range(seq_len)
+            [random.uniform(-limit, limit) for _ in range(d_model)]
+            for _ in range(seq_len)
         ]
 
     return {"embedded_output": embedded_result, "d_model": d_model, "seq_len": seq_len}
@@ -706,10 +720,10 @@ async def ffn_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
         # This is better than random weights for neural network layers
         fan_in_w1 = d_model
         fan_in_w2 = d_ff
-        
+
         he_init_w1 = np.sqrt(2.0 / fan_in_w1)
         he_init_w2 = np.sqrt(2.0 / fan_in_w2)
-        
+
         # Initialize weights using He initialization (better than random)
         np.random.seed(42)  # For reproducibility in demo mode
         W1 = np.random.randn(d_model, d_ff) * he_init_w1
@@ -724,7 +738,9 @@ async def ffn_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
         # GELU activation (more accurate than simple ReLU)
         # GELU(x) = 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
         sqrt_2_over_pi = np.sqrt(2.0 / np.pi)
-        H_activated = 0.5 * H * (1.0 + np.tanh(sqrt_2_over_pi * (H + 0.044715 * np.power(H, 3))))
+        H_activated = (
+            0.5 * H * (1.0 + np.tanh(sqrt_2_over_pi * (H + 0.044715 * np.power(H, 3))))
+        )
 
         # Linear 2: H_activated * W2 + B2
         Y = np.matmul(H_activated, W2) + B2
@@ -732,10 +748,15 @@ async def ffn_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
         output = Y.tolist()
 
     except (ImportError, Exception) as e:
-        logger.warning(f"FFN node calculation failed ({e}). Returning input as fallback.")
+        logger.warning(
+            f"FFN node calculation failed ({e}). Returning input as fallback."
+        )
         output = input_tensor  # Simple passthrough if calculation fails
 
-    return {"output": output, "message": "FFN executed with proper weight initialization"}
+    return {
+        "output": output,
+        "message": "FFN executed with proper weight initialization",
+    }
 
 
 # --- END NEW LLM Node Handlers ---
