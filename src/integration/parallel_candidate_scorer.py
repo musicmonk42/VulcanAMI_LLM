@@ -424,7 +424,8 @@ class SimpleTokenizer:
 
     def decode(self, tokens: List[int]) -> str:
         """Decode token IDs to text."""
-        words = [self.id_to_word.get(t, "<UNK>") for t in tokens]
+        # Ensure all words are strings before joining
+        words = [str(self.id_to_word.get(t, "<UNK>")) for t in tokens]
         return " ".join(words)
 
     def get_vocab_size(self) -> int:

@@ -570,7 +570,7 @@ def load_config(config_path: Optional[str]) -> Dict[str, Any]:
             dropout=0.1,
         ),
         "generation": {
-            "max_tokens": 128,
+            "max_tokens": 64,  # Reduced from 128 for faster responses on CPU (~5s/token)
             "temperature": 0.7,
             "top_k": 50,
             "top_p": 0.9,
@@ -851,6 +851,7 @@ class GraphixVulcanLLM:
             runtime_config=runtime_config,
             observability_manager=observability,
             audit_log=self.audit_log,
+            tokenizer=getattr(self.transformer, 'tokenizer', None),  # Pass tokenizer for proper decoding
         )
 
         # State

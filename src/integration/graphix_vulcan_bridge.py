@@ -572,7 +572,7 @@ class GraphixVulcanBridge:
 
         # 2. Retrieve memory context
         tokens = observation.get("tokens") or []
-        query = observation.get("prompt") or " ".join(tokens)
+        query = observation.get("prompt") or " ".join(str(t) for t in tokens)
 
         mem_tuple, cache_hit = await self._safe_call_async(
             self.memory.aretrieve_context,
