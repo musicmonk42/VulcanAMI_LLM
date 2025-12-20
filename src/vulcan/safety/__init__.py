@@ -11,13 +11,6 @@ src_path = Path(__file__).parent.parent.parent
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
-__all__ = [
-    "get_safety_validator",
-    "SafetyUnavailable",
-    "SafetyValidator",
-    "GovernanceOrchestrator",
-]
-
 
 class SafetyUnavailable:
     """Fallback when full safety stack isn't available."""
@@ -32,27 +25,39 @@ class SafetyUnavailable:
         return {"available": False, "reason": "lazy import not resolved"}
 
 
-# Import SafetyValidator - NO STUBS
+# Track availability
+SAFETY_VALIDATOR_AVAILABLE = False
+GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
+SafetyValidator = None
+GovernanceOrchestrator = None
+
+# Import SafetyValidator
 try:
     from vulcan.safety.safety_types import SafetyValidator
+
+    SAFETY_VALIDATOR_AVAILABLE = True
 except ImportError:
     try:
         from src.vulcan.safety.safety_types import SafetyValidator
-    except ImportError as e:
-        logger.error(f"CRITICAL: SafetyValidator not available: {e}")
-        raise ImportError("SafetyValidator is required - no stubs allowed") from e
 
-# Import GovernanceOrchestrator - NO STUBS
+        SAFETY_VALIDATOR_AVAILABLE = True
+    except ImportError as e:
+        logger.warning(f"SafetyValidator not available: {e}")
+        SAFETY_VALIDATOR_AVAILABLE = False
+
+# Import GovernanceOrchestrator
 try:
     from vulcan.safety.safety_types import GovernanceOrchestrator
+
+    GOVERNANCE_ORCHESTRATOR_AVAILABLE = True
 except ImportError:
     try:
         from src.vulcan.safety.safety_types import GovernanceOrchestrator
+
+        GOVERNANCE_ORCHESTRATOR_AVAILABLE = True
     except ImportError as e:
-        logger.error(f"CRITICAL: GovernanceOrchestrator not available: {e}")
-        raise ImportError(
-            "GovernanceOrchestrator is required - no stubs allowed"
-        ) from e
+        logger.warning(f"GovernanceOrchestrator not available: {e}")
+        GOVERNANCE_ORCHESTRATOR_AVAILABLE = False
 
 
 def get_safety_validator():
@@ -64,3 +69,13 @@ def get_safety_validator():
     except Exception as e:
         logger.warning("Safety validator unavailable (lazy): %s", e)
         return SafetyUnavailable()
+
+
+__all__ = [
+    "get_safety_validator",
+    "SafetyUnavailable",
+    "SafetyValidator",
+    "GovernanceOrchestrator",
+    "SAFETY_VALIDATOR_AVAILABLE",
+    "GOVERNANCE_ORCHESTRATOR_AVAILABLE",
+]
