@@ -40,6 +40,23 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# CONFIGURABLE THRESHOLDS
+# ============================================================
+# These can be overridden via environment variables
+
+# Anomaly detection threshold (0.0-1.0) - higher = more lenient
+ANOMALY_CONFIDENCE_THRESHOLD = float(os.getenv("ADVERSARIAL_ANOMALY_THRESHOLD", "0.9"))
+
+# SHAP divergence threshold (0.0-1.0) - higher = more lenient  
+SHAP_DIVERGENCE_THRESHOLD = float(os.getenv("ADVERSARIAL_SHAP_THRESHOLD", "0.8"))
+
+# Success rate threshold for alerts (0.0-1.0) - lower = more sensitive
+SUCCESS_RATE_ALERT_THRESHOLD = float(os.getenv("ADVERSARIAL_SUCCESS_RATE_THRESHOLD", "0.8"))
+
+# Periodic testing interval in seconds (default: 1 hour)
+PERIODIC_TEST_INTERVAL = int(os.getenv("ADVERSARIAL_PERIODIC_INTERVAL", "3600"))
+
 # Global state for adversarial tester singleton
 _ADVERSARIAL_TESTER = None
 _ADVERSARIAL_LOCK = threading.RLock()
@@ -206,9 +223,9 @@ def start_periodic_testing(
                 logger.info(f"  - Success rate: {success_rate:.2%}")
                 logger.info(f"  - Max divergence: {max_divergence:.4f}")
                 
-                # Alert on high failure rate
-                if success_rate < 0.8:
-                    logger.warning(f"⚠️ HIGH FAILURE RATE: {failures} tests failed!")
+                # Alert on high failure rate (configurable threshold)
+                if success_rate < SUCCESS_RATE_ALERT_THRESHOLD:
+                    logger.warning(f"⚠️ HIGH FAILURE RATE: {failures} tests failed! (threshold: {SUCCESS_RATE_ALERT_THRESHOLD:.0%})")
                 
             except Exception as e:
                 logger.error(f"❌ Periodic adversarial test failed: {e}")
@@ -347,9 +364,10 @@ def check_query_integrity(
         should_block = False
         block_reason = None
         
-        if is_anomaly and anomaly_confidence > 0.9:
+        # Use configurable anomaly confidence threshold
+        if is_anomaly and anomaly_confidence > ANOMALY_CONFIDENCE_THRESHOLD:
             should_block = True
-            block_reason = f"High-confidence anomaly detected (score: {anomaly_confidence:.2f})"
+            block_reason = f"High-confidence anomaly detected (score: {anomaly_confidence:.2f}, threshold: {ANOMALY_CONFIDENCE_THRESHOLD})"
             logger.warning(f"🚨 ANOMALY DETECTED in query: {query[:100]}...")
             logger.warning(f"Anomaly confidence: {anomaly_confidence:.2f}")
         
@@ -362,8 +380,9 @@ def check_query_integrity(
             should_block = True
             block_reason = "Invalid numeric values detected in query encoding"
         
-        if not shap_stable and integrity_results.get("shap_divergence", 0) > 0.8:
-            logger.warning(f"⚠️ SHAP unstable: divergence={integrity_results.get('shap_divergence', 0):.4f}")
+        # Use configurable SHAP divergence threshold
+        if not shap_stable and integrity_results.get("shap_divergence", 0) > SHAP_DIVERGENCE_THRESHOLD:
+            logger.warning(f"⚠️ SHAP unstable: divergence={integrity_results.get('shap_divergence', 0):.4f} (threshold: {SHAP_DIVERGENCE_THRESHOLD})")
         
         # Log all check results
         checks_passed = integrity_results.get("checks_performed", [])

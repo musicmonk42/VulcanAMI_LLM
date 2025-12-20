@@ -333,12 +333,14 @@ class GraphixLLMClient:
                 
                 # Priority 3: Risk classification for governance routing
                 risk_level = self.safety_validator.classify_query_risk(last_content)
-                safety_info["risk_level"] = risk_level.name if hasattr(risk_level, 'name') else str(risk_level)
+                risk_level_name = risk_level.name if hasattr(risk_level, 'name') else str(risk_level)
+                safety_info["risk_level"] = risk_level_name
                 
                 # For high-risk queries, could integrate governance approval here
                 # Currently logging for awareness; full governance integration would go here
-                if hasattr(risk_level, 'value') and risk_level.value >= 3:  # HIGH or CRITICAL
-                    self.logger.warning(f"High-risk query detected (risk={risk_level.name}): governance approval may be required")
+                is_high_risk = risk_level_name in ("HIGH", "CRITICAL")
+                if is_high_risk:
+                    self.logger.warning(f"High-risk query detected (risk={risk_level_name}): governance approval may be required")
                     safety_info["requires_governance"] = True
                     
             except Exception as e:

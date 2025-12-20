@@ -1140,15 +1140,16 @@ async def lifespan(app: FastAPI):
                             vulcan_module.app.state.adversarial_tester = adversarial_tester
                             logger.info("✓ AdversarialTester initialized")
                             
-                            # Start periodic adversarial testing (every hour)
+                            # Start periodic adversarial testing (interval from environment or default: 1 hour)
+                            from vulcan.safety.adversarial_integration import PERIODIC_TEST_INTERVAL
                             periodic_started = start_periodic_testing(
                                 tester=adversarial_tester,
-                                interval_seconds=3600,  # 1 hour
+                                interval_seconds=PERIODIC_TEST_INTERVAL,
                                 run_immediately=True,   # Run first test immediately
                             )
                             
                             if periodic_started:
-                                logger.info("🔒 Periodic adversarial testing started (interval: 3600s)")
+                                logger.info(f"🔒 Periodic adversarial testing started (interval: {PERIODIC_TEST_INTERVAL}s)")
                             else:
                                 logger.warning("Failed to start periodic adversarial testing")
                         else:

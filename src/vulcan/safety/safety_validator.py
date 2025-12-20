@@ -14,6 +14,9 @@ Revision / Fix Notes (Applied):
 """
 
 from __future__ import annotations
+
+import re
+
 from .safety_types import (
     ActionType,
     ComplianceStandard,
@@ -41,6 +44,18 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
+
+# Import RiskLevel for query risk classification
+try:
+    from ..generation.safe_generation import RiskLevel
+    RISK_LEVEL_AVAILABLE = True
+except ImportError:
+    try:
+        from src.generation.safe_generation import RiskLevel
+        RISK_LEVEL_AVAILABLE = True
+    except ImportError:
+        RiskLevel = None
+        RISK_LEVEL_AVAILABLE = False
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
@@ -1613,7 +1628,6 @@ class EnhancedSafetyValidator(SafetyValidator):
              "Requests for security bypass guides are not allowed"),
         ]
         
-        import re
         for pattern, reason in attack_patterns:
             if re.search(pattern, query):
                 violations.append(SafetyViolationType.ETHICAL)
@@ -1686,7 +1700,6 @@ class EnhancedSafetyValidator(SafetyValidator):
                 logger.error(f"Response validator {validator.__class__.__name__} failed: {e}")
         
         # Check for PII patterns in response
-        import re
         pii_patterns = [
             (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "email address"),
             (r"\b\d{3}-\d{2}-\d{4}\b", "SSN"),
@@ -1729,16 +1742,15 @@ class EnhancedSafetyValidator(SafetyValidator):
         Returns:
             RiskLevel enum value
         """
-        from ..generation.safe_generation import RiskLevel
+        if not RISK_LEVEL_AVAILABLE or RiskLevel is None:
+            # Fallback: return a string-based risk level
+            return "HIGH" if self._shutdown else "SAFE"
         
         if self._shutdown:
             return RiskLevel.HIGH  # Conservative fallback
         
         # Start with base risk assessment
         risk_score = 0.0
-        
-        # Check for high-risk patterns
-        import re
         
         # Critical risk patterns (should be blocked)
         critical_patterns = [
