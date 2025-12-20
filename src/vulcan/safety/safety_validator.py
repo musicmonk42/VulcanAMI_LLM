@@ -14,6 +14,9 @@ Revision / Fix Notes (Applied):
 """
 
 from __future__ import annotations
+
+import re
+
 from .safety_types import (
     ActionType,
     ComplianceStandard,
@@ -41,6 +44,18 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
+
+# Import RiskLevel for query risk classification
+try:
+    from ..generation.safe_generation import RiskLevel
+    RISK_LEVEL_AVAILABLE = True
+except ImportError:
+    try:
+        from src.generation.safe_generation import RiskLevel
+        RISK_LEVEL_AVAILABLE = True
+    except ImportError:
+        RiskLevel = None
+        RISK_LEVEL_AVAILABLE = False
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
@@ -1543,6 +1558,267 @@ class EnhancedSafetyValidator(SafetyValidator):
             except Exception as e:
                 logger.error(f"World model validation failed: {e}")
         return token
+
+    def validate_query(self, query: str) -> SafetyReport:
+        """
+        Pre-check validation for incoming queries before LLM processing.
+        
+        This validates queries for:
+        - Prompt injection attempts
+        - Toxicity/harmful content requests
+        - Requests for operational attack guides (phishing, social engineering, exploits)
+        - Privacy violations
+        - Ethical violations
+        
+        Args:
+            query: The user query to validate
+            
+        Returns:
+            SafetyReport with safe=True if query is acceptable, safe=False with reasons otherwise
+        """
+        if self._shutdown:
+            return SafetyReport(
+                safe=False,
+                confidence=0.0,
+                violations=[SafetyViolationType.VALIDATION_ERROR],
+                reasons=["Safety validator is shut down"],
+            )
+        
+        violations = []
+        reasons = []
+        confidence = 1.0
+        
+        # Use existing LLM validators for pre-check
+        context = {"query": query, "phase": "pre_check"}
+        
+        for validator in self.llm_validators:
+            try:
+                if not validator.check(query, context):
+                    validator_name = validator.__class__.__name__
+                    if validator_name == "PromptInjectionValidator":
+                        violations.append(SafetyViolationType.ADVERSARIAL)
+                        reasons.append("Query contains potential prompt injection attempt")
+                        confidence = min(confidence, 0.3)
+                    elif validator_name == "ToxicityValidator":
+                        violations.append(SafetyViolationType.ETHICAL)
+                        reasons.append("Query contains harmful or toxic content")
+                        confidence = min(confidence, 0.2)
+                    elif validator_name == "EthicalValidator":
+                        violations.append(SafetyViolationType.ETHICAL)
+                        reasons.append("Query raises ethical concerns")
+                        confidence = min(confidence, 0.4)
+                    else:
+                        violations.append(SafetyViolationType.OPERATIONAL)
+                        reasons.append(f"Query failed {validator_name} validation")
+                        confidence = min(confidence, 0.5)
+            except Exception as e:
+                logger.error(f"Query validator {validator.__class__.__name__} failed: {e}")
+        
+        # Additional pattern-based checks for operational attack guides
+        attack_patterns = [
+            (r"(?i)\b(how\s+to\s+)?(phish|phishing)\s+(attack|someone|users?)\b", 
+             "Requests for phishing attack guides are not allowed"),
+            (r"(?i)\b(how\s+to\s+)?(social\s+engineer|social\s+engineering)\s+(attack|someone|users?)\b",
+             "Requests for social engineering guides are not allowed"),
+            (r"(?i)\b(how\s+to\s+)?(write|create|build)\s+(malware|virus|exploit|ransomware)\b",
+             "Requests for creating malware or exploits are not allowed"),
+            (r"(?i)\b(how\s+to\s+)?(hack|break\s+into|exploit)\s+(a\s+)?(computer|system|network|server)\b",
+             "Requests for hacking guides are not allowed"),
+            (r"(?i)\b(how\s+to\s+)?bypass\s+(security|authentication|firewall)\b",
+             "Requests for security bypass guides are not allowed"),
+        ]
+        
+        for pattern, reason in attack_patterns:
+            if re.search(pattern, query):
+                violations.append(SafetyViolationType.ETHICAL)
+                reasons.append(reason)
+                confidence = min(confidence, 0.1)
+        
+        return SafetyReport(
+            safe=len(violations) == 0,
+            confidence=confidence,
+            violations=violations,
+            reasons=reasons,
+            metadata={"query_length": len(query), "phase": "pre_check"},
+        )
+
+    def validate_response(
+        self, response: str, original_query: str
+    ) -> SafetyReport:
+        """
+        Post-generation validation for LLM responses.
+        
+        This validates responses for:
+        - Harmful content in the generated response
+        - Privacy violations (PII leakage)
+        - Consistency with safety policies
+        - Hallucination indicators
+        
+        Args:
+            response: The LLM-generated response to validate
+            original_query: The original user query for context
+            
+        Returns:
+            SafetyReport with safe=True if response is acceptable, safe=False with reasons otherwise
+        """
+        if self._shutdown:
+            return SafetyReport(
+                safe=False,
+                confidence=0.0,
+                violations=[SafetyViolationType.VALIDATION_ERROR],
+                reasons=["Safety validator is shut down"],
+            )
+        
+        violations = []
+        reasons = []
+        confidence = 1.0
+        
+        # Use existing LLM validators for post-check
+        context = {"query": original_query, "response": response, "phase": "post_check"}
+        
+        for validator in self.llm_validators:
+            try:
+                if not validator.check(response, context):
+                    validator_name = validator.__class__.__name__
+                    if validator_name == "ToxicityValidator":
+                        violations.append(SafetyViolationType.ETHICAL)
+                        reasons.append("Response contains harmful or toxic content")
+                        confidence = min(confidence, 0.2)
+                    elif validator_name == "HallucinationValidator":
+                        violations.append(SafetyViolationType.UNCERTAINTY)
+                        reasons.append("Response may contain hallucinated information")
+                        confidence = min(confidence, 0.4)
+                    elif validator_name == "EthicalValidator":
+                        violations.append(SafetyViolationType.ETHICAL)
+                        reasons.append("Response raises ethical concerns")
+                        confidence = min(confidence, 0.4)
+                    else:
+                        violations.append(SafetyViolationType.OPERATIONAL)
+                        reasons.append(f"Response failed {validator_name} validation")
+                        confidence = min(confidence, 0.5)
+            except Exception as e:
+                logger.error(f"Response validator {validator.__class__.__name__} failed: {e}")
+        
+        # Check for PII patterns in response
+        pii_patterns = [
+            (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "email address"),
+            (r"\b\d{3}-\d{2}-\d{4}\b", "SSN"),
+            (r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b", "credit card number"),
+            (r"\b(\+\d{1,3}[-.]?)?\(?\d{3}\)?[-.]?\d{3}[-.]?\d{4}\b", "phone number"),
+        ]
+        
+        for pattern, pii_type in pii_patterns:
+            if re.search(pattern, response):
+                violations.append(SafetyViolationType.PRIVACY)
+                reasons.append(f"Response may contain {pii_type}")
+                confidence = min(confidence, 0.3)
+        
+        return SafetyReport(
+            safe=len(violations) == 0,
+            confidence=confidence,
+            violations=violations,
+            reasons=reasons,
+            metadata={
+                "response_length": len(response),
+                "query_length": len(original_query),
+                "phase": "post_check",
+            },
+        )
+
+    def classify_query_risk(self, query: str) -> "RiskLevel":
+        """
+        Classify the risk level of a query for governance routing.
+        
+        Risk Levels:
+        - SAFE: Normal queries that don't require special handling
+        - LOW: Queries that need monitoring
+        - MEDIUM: Queries that need human-assisted review
+        - HIGH: Queries requiring governance approval before processing
+        - CRITICAL: Queries that should be blocked
+        
+        Args:
+            query: The user query to classify
+            
+        Returns:
+            RiskLevel enum value
+        """
+        if not RISK_LEVEL_AVAILABLE or RiskLevel is None:
+            # Fallback: return a string-based risk level
+            return "HIGH" if self._shutdown else "SAFE"
+        
+        if self._shutdown:
+            return RiskLevel.HIGH  # Conservative fallback
+        
+        # Start with base risk assessment
+        risk_score = 0.0
+        
+        # Critical risk patterns (should be blocked)
+        critical_patterns = [
+            r"(?i)\b(how\s+to\s+)?(kill|murder|assassinate)\s+(someone|a\s+person|people)\b",
+            r"(?i)\b(create|make|build)\s+(a\s+)?(bomb|explosive|weapon)\b",
+            r"(?i)\b(how\s+to\s+)?(hack|exploit)\s+(nuclear|power\s+grid|infrastructure)\b",
+        ]
+        
+        for pattern in critical_patterns:
+            if re.search(pattern, query):
+                return RiskLevel.CRITICAL
+        
+        # High risk patterns (need governance approval)
+        high_risk_patterns = [
+            r"(?i)\b(how\s+to\s+)?(phish|social\s+engineer)\b",
+            r"(?i)\b(write|create)\s+(malware|virus|exploit)\b",
+            r"(?i)\b(bypass|circumvent)\s+(security|authentication)\b",
+            r"(?i)\b(personal|private)\s+(data|information)\s+(of|about)\b",
+            r"(?i)\b(manipulate|deceive|trick)\s+(people|users?|someone)\b",
+        ]
+        
+        for pattern in high_risk_patterns:
+            if re.search(pattern, query):
+                risk_score = max(risk_score, 0.8)
+        
+        # Medium risk patterns
+        medium_risk_patterns = [
+            r"(?i)\b(vulnerability|vulnerabilities|CVE-\d+)\b",
+            r"(?i)\b(password|credential)\s+(crack|brute\s*force)\b",
+            r"(?i)\b(scrape|harvest)\s+(data|emails|information)\b",
+            r"(?i)\b(automate|bot)\s+(spam|messages|emails)\b",
+        ]
+        
+        for pattern in medium_risk_patterns:
+            if re.search(pattern, query):
+                risk_score = max(risk_score, 0.5)
+        
+        # Low risk patterns (need monitoring)
+        low_risk_patterns = [
+            r"(?i)\b(security|penetration)\s+test(ing)?\b",
+            r"(?i)\b(ethical\s+)?hack(ing)?\b",
+            r"(?i)\b(reverse\s+engineer)\b",
+        ]
+        
+        for pattern in low_risk_patterns:
+            if re.search(pattern, query):
+                risk_score = max(risk_score, 0.3)
+        
+        # Use LLM validators for additional scoring
+        context = {"query": query, "phase": "risk_classification"}
+        for validator in self.llm_validators:
+            try:
+                if not validator.check(query, context):
+                    risk_score = max(risk_score, 0.6)
+            except Exception:
+                pass
+        
+        # Convert score to RiskLevel
+        if risk_score >= 0.9:
+            return RiskLevel.CRITICAL
+        elif risk_score >= 0.7:
+            return RiskLevel.HIGH
+        elif risk_score >= 0.5:
+            return RiskLevel.MEDIUM
+        elif risk_score >= 0.2:
+            return RiskLevel.LOW
+        else:
+            return RiskLevel.SAFE
 
     async def validate_action_comprehensive_async(
         self,

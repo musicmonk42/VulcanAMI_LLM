@@ -6,9 +6,11 @@
 # - Determines learning mode (user interaction vs AI-to-AI)
 # - Decomposes queries into agent pool tasks
 # - Detects collaboration and tournament triggers
+# - Integrated safety validation for query pre-check
 #
 # PRODUCTION-READY: Thread-safe, validated patterns, comprehensive logging
 # SECURITY: PII detection, self-modification detection, governance triggers
+# SAFETY: Multi-layered safety validation with risk classification
 # ============================================================
 
 """
@@ -29,6 +31,8 @@ Features:
     - PII and sensitive topic detection
     - Self-modification request detection
     - Governance and audit flag determination
+    - Safety validation integration (pre-query and risk classification)
+    - Compliance checking (GDPR, HIPAA, ITU F.748.53, EU AI Act)
 
 Thread Safety:
     All public methods are thread-safe. The QueryAnalyzer maintains
@@ -47,6 +51,49 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# SAFETY VALIDATOR INTEGRATION
+# ============================================================
+
+# Try to import safety validator components
+try:
+    from ..safety.safety_validator import initialize_all_safety_components
+    SAFETY_VALIDATOR_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.safety.safety_validator import initialize_all_safety_components
+        SAFETY_VALIDATOR_AVAILABLE = True
+    except ImportError:
+        initialize_all_safety_components = None
+        SAFETY_VALIDATOR_AVAILABLE = False
+        logger.warning("Safety validator not available for query routing")
+
+# Try to import RiskLevel from safe_generation
+try:
+    from ...generation.safe_generation import RiskLevel
+    RISK_LEVEL_AVAILABLE = True
+except ImportError:
+    try:
+        from src.generation.safe_generation import RiskLevel
+        RISK_LEVEL_AVAILABLE = True
+    except ImportError:
+        RiskLevel = None
+        RISK_LEVEL_AVAILABLE = False
+        logger.debug("RiskLevel not available - will use local risk classification")
+
+# Try to import adversarial integration for real-time query checking
+try:
+    from ..safety.adversarial_integration import check_query_integrity
+    ADVERSARIAL_CHECK_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.safety.adversarial_integration import check_query_integrity
+        ADVERSARIAL_CHECK_AVAILABLE = True
+    except ImportError:
+        check_query_integrity = None
+        ADVERSARIAL_CHECK_AVAILABLE = False
+        logger.debug("Adversarial check not available for query routing")
 
 # ============================================================
 # CONSTANTS - Query Classification Keywords
@@ -276,6 +323,10 @@ class ProcessingPlan:
         detected_patterns: Patterns detected in query
         pii_detected: Whether PII was detected
         sensitive_topics: List of sensitive topics found
+        safety_validated: Whether safety validation was performed
+        safety_passed: Whether the query passed safety validation
+        safety_risk_level: Risk level from safety classification
+        safety_reasons: Reasons for safety blocking if applicable
     """
     query_id: str
     original_query: str
@@ -316,6 +367,18 @@ class ProcessingPlan:
     pii_detected: bool = False
     sensitive_topics: List[str] = field(default_factory=list)
     
+    # Safety validation results
+    safety_validated: bool = False
+    safety_passed: bool = True
+    safety_risk_level: str = "SAFE"
+    safety_reasons: List[str] = field(default_factory=list)
+    
+    # Adversarial validation results
+    adversarial_checked: bool = False
+    adversarial_safe: bool = True
+    adversarial_anomaly_score: Optional[float] = None
+    adversarial_details: Dict[str, Any] = field(default_factory=dict)
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -339,6 +402,13 @@ class ProcessingPlan:
             "detected_patterns": self.detected_patterns,
             "pii_detected": self.pii_detected,
             "sensitive_topics": self.sensitive_topics,
+            "safety_validated": self.safety_validated,
+            "safety_passed": self.safety_passed,
+            "safety_risk_level": self.safety_risk_level,
+            "safety_reasons": self.safety_reasons,
+            "adversarial_checked": self.adversarial_checked,
+            "adversarial_safe": self.adversarial_safe,
+            "adversarial_anomaly_score": self.adversarial_anomaly_score,
         }
 
 
@@ -353,6 +423,7 @@ class QueryAnalyzer:
     
     Thread-safe implementation with compiled regex patterns for performance.
     Supports dual-mode learning detection and comprehensive security analysis.
+    Integrates with safety validators for pre-query safety checks.
     
     Usage:
         analyzer = QueryAnalyzer()
@@ -361,10 +432,18 @@ class QueryAnalyzer:
         # Check collaboration requirements
         if plan.collaboration_needed:
             trigger_collaboration(plan.collaboration_agents)
+        
+        # Check safety validation
+        if not plan.safety_passed:
+            return refusal_response(plan.safety_reasons)
     """
     
-    def __init__(self):
-        """Initialize the query analyzer with compiled patterns."""
+    def __init__(self, enable_safety_validation: bool = True):
+        """Initialize the query analyzer with compiled patterns and optional safety validation.
+        
+        Args:
+            enable_safety_validation: Whether to enable safety validation (default: True)
+        """
         # Compile regex patterns for performance
         self._pii_patterns = tuple(
             re.compile(p, re.IGNORECASE) for p in PII_PATTERNS
@@ -386,9 +465,41 @@ class QueryAnalyzer:
             "tournaments_triggered": 0,
             "governance_triggers": 0,
             "pii_detections": 0,
+            "safety_blocks": 0,
+            "high_risk_queries": 0,
+            "adversarial_blocks": 0,
         }
         
+        # Safety validator integration
+        self._enable_safety_validation = enable_safety_validation
+        self._safety_validator = None
+        
+        if enable_safety_validation and SAFETY_VALIDATOR_AVAILABLE:
+            try:
+                self._safety_validator = initialize_all_safety_components()
+                logger.info("Safety validator integrated with QueryAnalyzer")
+            except Exception as e:
+                logger.warning(f"Failed to initialize safety validator: {e}")
+                self._safety_validator = None
+        elif enable_safety_validation and not SAFETY_VALIDATOR_AVAILABLE:
+            logger.warning("Safety validation requested but safety modules not available")
+        
+        # Adversarial check integration
+        self._enable_adversarial_check = enable_safety_validation and ADVERSARIAL_CHECK_AVAILABLE
+        if self._enable_adversarial_check:
+            logger.info("Adversarial check integrated with QueryAnalyzer")
+        
         logger.debug("QueryAnalyzer initialized with compiled patterns")
+    
+    @property
+    def is_safety_enabled(self) -> bool:
+        """Check if safety validation is enabled and available."""
+        return self._enable_safety_validation and self._safety_validator is not None
+    
+    @property
+    def is_adversarial_check_enabled(self) -> bool:
+        """Check if adversarial checking is enabled and available."""
+        return self._enable_adversarial_check
     
     def analyze(self, query: str, session_id: Optional[str] = None) -> QueryPlan:
         """
@@ -426,12 +537,14 @@ class QueryAnalyzer:
         self,
         query: str,
         source: Literal["user", "agent", "arena"] = "user",
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        skip_safety: bool = False
     ) -> ProcessingPlan:
         """
         Route query and determine learning mode with full dual-mode support.
         
         This is the primary method for query analysis, providing:
+        - Safety validation (pre-query check and risk classification)
         - Learning mode detection (user vs AI interaction)
         - Query type classification
         - Complexity and uncertainty scoring
@@ -444,9 +557,10 @@ class QueryAnalyzer:
             query: The input query to analyze
             source: Query source - "user", "agent", or "arena"
             session_id: Optional session identifier for tracking
+            skip_safety: Skip safety validation (use with caution, default: False)
             
         Returns:
-            ProcessingPlan with comprehensive routing information
+            ProcessingPlan with comprehensive routing information including safety status
         """
         # Validate input
         if not query or not isinstance(query, str):
@@ -516,6 +630,14 @@ class QueryAnalyzer:
             }
         )
         
+        # Priority 1 & 3: Safety validation and risk classification
+        if self.is_safety_enabled and not skip_safety and query:
+            self._perform_safety_validation(query, plan)
+        
+        # Adversarial integrity check (real-time)
+        if self.is_adversarial_check_enabled and not skip_safety and query:
+            self._perform_adversarial_check(query, plan)
+        
         # Security analysis
         self._perform_security_analysis(query, query_lower, plan)
         
@@ -537,15 +659,107 @@ class QueryAnalyzer:
                 self._stats["governance_triggers"] += 1
             if plan.pii_detected:
                 self._stats["pii_detections"] += 1
+            if not plan.safety_passed:
+                self._stats["safety_blocks"] += 1
+            if plan.safety_risk_level in ("HIGH", "CRITICAL"):
+                self._stats["high_risk_queries"] += 1
+            if not plan.adversarial_safe:
+                self._stats["adversarial_blocks"] += 1
         
         logger.info(
             f"[QueryRouter] {query_id}: source={source}, mode={learning_mode.value}, "
             f"type={query_type.value}, tasks={len(plan.agent_tasks)}, "
             f"collab={collaboration_needed}, arena={arena_participation}, "
-            f"complexity={complexity_score:.2f}, uncertainty={uncertainty_score:.2f}"
+            f"complexity={complexity_score:.2f}, uncertainty={uncertainty_score:.2f}, "
+            f"safety_passed={plan.safety_passed}, risk_level={plan.safety_risk_level}, "
+            f"adversarial_safe={plan.adversarial_safe}"
         )
         
         return plan
+    
+    def _perform_adversarial_check(self, query: str, plan: ProcessingPlan) -> None:
+        """
+        Perform adversarial integrity check on the query.
+        
+        This checks for:
+        - Anomalous input patterns
+        - Adversarial manipulation attempts
+        - Out-of-distribution inputs
+        
+        Args:
+            query: The query to check
+            plan: ProcessingPlan to update with results
+        """
+        if not ADVERSARIAL_CHECK_AVAILABLE or check_query_integrity is None:
+            return
+        
+        try:
+            result = check_query_integrity(query)
+            
+            plan.adversarial_checked = True
+            plan.adversarial_safe = result.get("safe", True)
+            plan.adversarial_anomaly_score = result.get("anomaly_score")
+            plan.adversarial_details = result.get("details", {})
+            
+            if not plan.adversarial_safe:
+                reason = result.get("reason", "Adversarial pattern detected")
+                plan.detected_patterns.append(f"adversarial_block:{reason}")
+                plan.safety_reasons.append(reason)
+                logger.warning(f"[Adversarial] Query blocked: {reason}")
+                
+        except Exception as e:
+            logger.error(f"[Adversarial] Check failed: {e}")
+            plan.adversarial_checked = False
+    
+    def _perform_safety_validation(self, query: str, plan: ProcessingPlan) -> None:
+        """
+        Perform safety validation on the query using the integrated safety validator.
+        
+        Updates the plan with safety validation results including:
+        - Pre-query safety check
+        - Risk level classification
+        - Governance requirements for high-risk queries
+        
+        Args:
+            query: The query to validate
+            plan: ProcessingPlan to update with safety results
+        """
+        if not self._safety_validator:
+            return
+        
+        try:
+            # Priority 1: Pre-query validation
+            pre_check = self._safety_validator.validate_query(query)
+            plan.safety_validated = True
+            plan.safety_passed = pre_check.safe
+            
+            if not pre_check.safe:
+                plan.safety_reasons = pre_check.reasons.copy() if pre_check.reasons else ["Query blocked by safety validation"]
+                plan.detected_patterns.append("safety_violation")
+                logger.warning(f"[Safety] Query blocked: {plan.safety_reasons[0] if plan.safety_reasons else 'Unknown reason'}")
+            
+            # Priority 3: Risk classification
+            try:
+                risk_level = self._safety_validator.classify_query_risk(query)
+                if hasattr(risk_level, 'name'):
+                    plan.safety_risk_level = risk_level.name
+                else:
+                    plan.safety_risk_level = str(risk_level)
+                
+                # High-risk queries require governance approval
+                if plan.safety_risk_level in ("HIGH", "CRITICAL"):
+                    plan.requires_governance = True
+                    plan.governance_sensitivity = GovernanceSensitivity.CRITICAL if plan.safety_risk_level == "CRITICAL" else GovernanceSensitivity.HIGH
+                    plan.detected_patterns.append(f"high_risk_query:{plan.safety_risk_level}")
+                    logger.warning(f"[Safety] High-risk query detected (risk={plan.safety_risk_level}): governance approval required")
+                    
+            except Exception as e:
+                logger.error(f"[Safety] Risk classification failed: {e}")
+                plan.safety_risk_level = "UNKNOWN"
+                
+        except Exception as e:
+            logger.error(f"[Safety] Safety validation failed: {e}")
+            plan.safety_validated = False
     
     def _classify_query_type(self, query_lower: str) -> QueryType:
         """
@@ -998,7 +1212,7 @@ class QueryAnalyzer:
         Get comprehensive router statistics (thread-safe).
         
         Returns:
-            Dictionary with query counts, type distribution, and trigger counts
+            Dictionary with query counts, type distribution, trigger counts, and safety stats
         """
         with self._lock:
             return {
@@ -1010,6 +1224,11 @@ class QueryAnalyzer:
                 "tournaments_triggered": self._stats["tournaments_triggered"],
                 "governance_triggers": self._stats["governance_triggers"],
                 "pii_detections": self._stats["pii_detections"],
+                "safety_blocks": self._stats.get("safety_blocks", 0),
+                "high_risk_queries": self._stats.get("high_risk_queries", 0),
+                "adversarial_blocks": self._stats.get("adversarial_blocks", 0),
+                "safety_validation_enabled": self.is_safety_enabled,
+                "adversarial_check_enabled": self.is_adversarial_check_enabled,
             }
 
 
