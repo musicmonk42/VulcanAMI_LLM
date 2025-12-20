@@ -119,3 +119,5 @@ This spec is a template for the next era of AI-native, self-improving systems—
 - Generate canonical IR JSON/YAML examples from NL specs.
 - Design a feedback protocol for self-improvement and optimization loops.
 - Draft a language evolution policy for safe grammar extension by AI agents.
+
+For additional documentation, refer to the main [README.md](../README.md) and [COMPREHENSIVE_REPO_OVERVIEW.md](../COMPREHENSIVE_REPO_OVERVIEW.md).
