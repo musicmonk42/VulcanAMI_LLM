@@ -82,6 +82,19 @@ except ImportError:
         RISK_LEVEL_AVAILABLE = False
         logger.debug("RiskLevel not available - will use local risk classification")
 
+# Try to import adversarial integration for real-time query checking
+try:
+    from ..safety.adversarial_integration import check_query_integrity
+    ADVERSARIAL_CHECK_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.safety.adversarial_integration import check_query_integrity
+        ADVERSARIAL_CHECK_AVAILABLE = True
+    except ImportError:
+        check_query_integrity = None
+        ADVERSARIAL_CHECK_AVAILABLE = False
+        logger.debug("Adversarial check not available for query routing")
+
 # ============================================================
 # CONSTANTS - Query Classification Keywords
 # ============================================================
@@ -360,6 +373,12 @@ class ProcessingPlan:
     safety_risk_level: str = "SAFE"
     safety_reasons: List[str] = field(default_factory=list)
     
+    # Adversarial validation results
+    adversarial_checked: bool = False
+    adversarial_safe: bool = True
+    adversarial_anomaly_score: Optional[float] = None
+    adversarial_details: Dict[str, Any] = field(default_factory=dict)
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -387,6 +406,9 @@ class ProcessingPlan:
             "safety_passed": self.safety_passed,
             "safety_risk_level": self.safety_risk_level,
             "safety_reasons": self.safety_reasons,
+            "adversarial_checked": self.adversarial_checked,
+            "adversarial_safe": self.adversarial_safe,
+            "adversarial_anomaly_score": self.adversarial_anomaly_score,
         }
 
 
@@ -445,6 +467,7 @@ class QueryAnalyzer:
             "pii_detections": 0,
             "safety_blocks": 0,
             "high_risk_queries": 0,
+            "adversarial_blocks": 0,
         }
         
         # Safety validator integration
@@ -461,12 +484,22 @@ class QueryAnalyzer:
         elif enable_safety_validation and not SAFETY_VALIDATOR_AVAILABLE:
             logger.warning("Safety validation requested but safety modules not available")
         
+        # Adversarial check integration
+        self._enable_adversarial_check = enable_safety_validation and ADVERSARIAL_CHECK_AVAILABLE
+        if self._enable_adversarial_check:
+            logger.info("Adversarial check integrated with QueryAnalyzer")
+        
         logger.debug("QueryAnalyzer initialized with compiled patterns")
     
     @property
     def is_safety_enabled(self) -> bool:
         """Check if safety validation is enabled and available."""
         return self._enable_safety_validation and self._safety_validator is not None
+    
+    @property
+    def is_adversarial_check_enabled(self) -> bool:
+        """Check if adversarial checking is enabled and available."""
+        return self._enable_adversarial_check
     
     def analyze(self, query: str, session_id: Optional[str] = None) -> QueryPlan:
         """
@@ -601,6 +634,10 @@ class QueryAnalyzer:
         if self.is_safety_enabled and not skip_safety and query:
             self._perform_safety_validation(query, plan)
         
+        # Adversarial integrity check (real-time)
+        if self.is_adversarial_check_enabled and not skip_safety and query:
+            self._perform_adversarial_check(query, plan)
+        
         # Security analysis
         self._perform_security_analysis(query, query_lower, plan)
         
@@ -626,16 +663,53 @@ class QueryAnalyzer:
                 self._stats["safety_blocks"] += 1
             if plan.safety_risk_level in ("HIGH", "CRITICAL"):
                 self._stats["high_risk_queries"] += 1
+            if not plan.adversarial_safe:
+                self._stats["adversarial_blocks"] += 1
         
         logger.info(
             f"[QueryRouter] {query_id}: source={source}, mode={learning_mode.value}, "
             f"type={query_type.value}, tasks={len(plan.agent_tasks)}, "
             f"collab={collaboration_needed}, arena={arena_participation}, "
             f"complexity={complexity_score:.2f}, uncertainty={uncertainty_score:.2f}, "
-            f"safety_passed={plan.safety_passed}, risk_level={plan.safety_risk_level}"
+            f"safety_passed={plan.safety_passed}, risk_level={plan.safety_risk_level}, "
+            f"adversarial_safe={plan.adversarial_safe}"
         )
         
         return plan
+    
+    def _perform_adversarial_check(self, query: str, plan: ProcessingPlan) -> None:
+        """
+        Perform adversarial integrity check on the query.
+        
+        This checks for:
+        - Anomalous input patterns
+        - Adversarial manipulation attempts
+        - Out-of-distribution inputs
+        
+        Args:
+            query: The query to check
+            plan: ProcessingPlan to update with results
+        """
+        if not ADVERSARIAL_CHECK_AVAILABLE or check_query_integrity is None:
+            return
+        
+        try:
+            result = check_query_integrity(query)
+            
+            plan.adversarial_checked = True
+            plan.adversarial_safe = result.get("safe", True)
+            plan.adversarial_anomaly_score = result.get("anomaly_score")
+            plan.adversarial_details = result.get("details", {})
+            
+            if not plan.adversarial_safe:
+                reason = result.get("reason", "Adversarial pattern detected")
+                plan.detected_patterns.append(f"adversarial_block:{reason}")
+                plan.safety_reasons.append(reason)
+                logger.warning(f"[Adversarial] Query blocked: {reason}")
+                
+        except Exception as e:
+            logger.error(f"[Adversarial] Check failed: {e}")
+            plan.adversarial_checked = False
     
     def _perform_safety_validation(self, query: str, plan: ProcessingPlan) -> None:
         """
@@ -1152,7 +1226,9 @@ class QueryAnalyzer:
                 "pii_detections": self._stats["pii_detections"],
                 "safety_blocks": self._stats.get("safety_blocks", 0),
                 "high_risk_queries": self._stats.get("high_risk_queries", 0),
+                "adversarial_blocks": self._stats.get("adversarial_blocks", 0),
                 "safety_validation_enabled": self.is_safety_enabled,
+                "adversarial_check_enabled": self.is_adversarial_check_enabled,
             }
 
 

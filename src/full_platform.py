@@ -1120,6 +1120,46 @@ async def lifespan(app: FastAPI):
                         else:
                             logger.info("✓ Safety Validator activated")
                     
+                    # ================================================================
+                    # ADVERSARIAL TESTER INITIALIZATION
+                    # ================================================================
+                    try:
+                        from vulcan.safety.adversarial_integration import (
+                            initialize_adversarial_tester,
+                            start_periodic_testing,
+                            get_adversarial_status,
+                        )
+                        
+                        # Initialize adversarial tester
+                        adversarial_tester = initialize_adversarial_tester(
+                            log_dir="adversarial_logs"
+                        )
+                        
+                        if adversarial_tester:
+                            # Store reference in app state for API access
+                            vulcan_module.app.state.adversarial_tester = adversarial_tester
+                            logger.info("✓ AdversarialTester initialized")
+                            
+                            # Start periodic adversarial testing (every hour)
+                            periodic_started = start_periodic_testing(
+                                tester=adversarial_tester,
+                                interval_seconds=3600,  # 1 hour
+                                run_immediately=True,   # Run first test immediately
+                            )
+                            
+                            if periodic_started:
+                                logger.info("🔒 Periodic adversarial testing started (interval: 3600s)")
+                            else:
+                                logger.warning("Failed to start periodic adversarial testing")
+                        else:
+                            logger.warning("AdversarialTester not available - adversarial testing disabled")
+                            
+                    except ImportError as e:
+                        logger.warning(f"Adversarial integration module not available: {e}")
+                    except Exception as adv_err:
+                        logger.error(f"Failed to initialize adversarial tester: {adv_err}")
+                    # ================================================================
+                    
                     logger.info("✅ All Vulcan subsystem modules activation complete")
                     
                 except Exception as subsys_err:
@@ -1692,6 +1732,16 @@ async def lifespan(app: FastAPI):
         logger.info("=" * 70)
         logger.info(f"Shutting down Unified Platform (Worker {worker_id})...")
         logger.info("=" * 70)
+
+        # Shutdown adversarial tester
+        try:
+            from vulcan.safety.adversarial_integration import shutdown_adversarial_tester
+            shutdown_adversarial_tester()
+            logger.info("✓ AdversarialTester shutdown complete")
+        except ImportError:
+            pass
+        except Exception as adv_err:
+            logger.error(f"Error during adversarial tester shutdown: {adv_err}")
 
         # Cleanup background processes
         if hasattr(app.state, "background_processes"):
@@ -2576,6 +2626,110 @@ async def omega_phase3_immunization(request: Request, auth: Dict = Depends(verif
         }
     except Exception as e:
         logger.error(f"Omega Phase 3 failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/adversarial/status")
+async def adversarial_status(auth: Dict = Depends(verify_authentication)):
+    """
+    Get current adversarial testing system status.
+    
+    Returns information about:
+    - Whether AdversarialTester is available and initialized
+    - Whether periodic testing is running
+    - Attack statistics
+    - Recent attack logs from database
+    """
+    try:
+        from vulcan.safety.adversarial_integration import get_adversarial_status
+        status = get_adversarial_status()
+        return {
+            "status": "success",
+            "adversarial_testing": status
+        }
+    except ImportError:
+        return {
+            "status": "warning",
+            "message": "Adversarial integration module not available",
+            "adversarial_testing": {"available": False, "initialized": False}
+        }
+    except Exception as e:
+        logger.error(f"Failed to get adversarial status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/adversarial/run-test")
+async def run_adversarial_test(auth: Dict = Depends(verify_authentication)):
+    """
+    Manually trigger a single adversarial test suite run.
+    
+    This runs the full adversarial test suite immediately and returns the results.
+    Useful for on-demand security verification.
+    """
+    try:
+        from vulcan.safety.adversarial_integration import run_single_test
+        results = run_single_test()
+        
+        if "error" in results:
+            return {
+                "status": "error",
+                "message": results["error"],
+                "results": None
+            }
+        
+        return {
+            "status": "success",
+            "results": results
+        }
+    except ImportError:
+        return {
+            "status": "error",
+            "message": "Adversarial integration module not available"
+        }
+    except Exception as e:
+        logger.error(f"Failed to run adversarial test: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/adversarial/check-query")
+async def check_query_adversarial(request: Request, auth: Dict = Depends(verify_authentication)):
+    """
+    Check a query for adversarial patterns using the adversarial tester.
+    
+    Request body:
+    {
+        "query": "The query text to check"
+    }
+    
+    Returns integrity check results including anomaly detection.
+    """
+    try:
+        from vulcan.safety.adversarial_integration import check_query_integrity
+        
+        data = await request.json()
+        query = data.get("query", "")
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        result = check_query_integrity(query)
+        
+        return {
+            "status": "success",
+            "query_safe": result["safe"],
+            "block_reason": result.get("reason"),
+            "anomaly_score": result.get("anomaly_score"),
+            "details": result.get("details", {})
+        }
+    except ImportError:
+        return {
+            "status": "warning",
+            "message": "Adversarial integration module not available",
+            "query_safe": True,  # Allow query if module not available
+            "details": {"skipped": True}
+        }
+    except Exception as e:
+        logger.error(f"Failed to check query: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
