@@ -35,11 +35,68 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# =============================================================================
+# ENVIRONMENT LOADING - CRITICAL FOR RAILWAY DEPLOYMENT
+# =============================================================================
+# Load environment variables from .env file BEFORE importing anything else
+# This ensures all modules see the correct environment configuration
+try:
+    from dotenv import load_dotenv
+    
+    # Try multiple .env locations for Railway and local development
+    env_paths = [
+        Path("/app/.env"),           # Docker/Railway container path
+        Path(".env"),                # Current directory
+        Path(__file__).parent.parent / ".env",  # Project root relative to src/
+    ]
+    
+    env_loaded = False
+    for env_path in env_paths:
+        if env_path.exists():
+            load_dotenv(env_path, override=True)
+            print(f"✅ Loaded environment from: {env_path}")
+            env_loaded = True
+            break
+    
+    if not env_loaded:
+        print("⚠️  No .env file found, using system environment variables")
+        
+except ImportError:
+    print("⚠️  python-dotenv not installed, using system environment variables only")
+
+# Verify critical keys are present and log status
+_REQUIRED_KEYS = ["OPENAI_API_KEY", "JWT_SECRET_KEY"]
+_OPTIONAL_KEYS = ["ANTHROPIC_API_KEY", "GRAPHIX_API_KEY", "VULCAN_LLM_API_KEY"]
+
+_missing_required = [key for key in _REQUIRED_KEYS if not os.getenv(key)]
+_missing_optional = [key for key in _OPTIONAL_KEYS if not os.getenv(key)]
+
+if _missing_required:
+    print(f"⚠️  Missing REQUIRED environment variables: {_missing_required}")
+    print("💡 Set these in Railway dashboard, .env file, or system environment")
+else:
+    print("✅ All required environment variables are set")
+
+if _missing_optional:
+    print(f"ℹ️  Optional environment variables not set: {_missing_optional}")
+
+# Log OpenAI key status specifically (important for chat functionality)
+_openai_key = os.getenv("OPENAI_API_KEY")
+if _openai_key:
+    # Show just enough to verify it's set, not the full key
+    _key_preview = f"{_openai_key[:8]}...{_openai_key[-4:]}" if len(_openai_key) > 16 else "(short key)"
+    print(f"✅ OPENAI_API_KEY configured: {_key_preview} (length: {len(_openai_key)})")
+else:
+    print("❌ OPENAI_API_KEY not set - chat features will use fallback responses")
+
+# =============================================================================
+
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.api_key import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.middleware.wsgi import WSGIMiddleware
 
@@ -177,7 +234,7 @@ class UnifiedPlatformSettings(BaseSettings):
     vulcan_attr: str = "app"
     arena_module: str = "src.graphix_arena"
     arena_attr: str = "app"
-    registry_module: str = "app"
+    registry_module: str = "src.governance.app"
     registry_attr: str = "app"
     api_gateway_module: str = "src.api_gateway"
     api_gateway_attr: str = "app"
@@ -190,6 +247,9 @@ class UnifiedPlatformSettings(BaseSettings):
     api_server_port: int = 8001
     registry_grpc_port: int = 50051
     listener_port: int = 8084
+    
+    # Standalone service host bindings (default to localhost for security)
+    listener_host: str = os.environ.get("LISTENER_HOST", "127.0.0.1")
 
     # Enable/disable individual services
     enable_api_gateway: bool = True
@@ -199,6 +259,14 @@ class UnifiedPlatformSettings(BaseSettings):
     enable_registry_grpc: bool = True
     enable_listener: bool = True
     enable_chat_endpoint: bool = True
+    
+    # Cloud platform detection (for logging purposes)
+    _is_cloud_platform: bool = bool(
+        os.environ.get("RAILWAY_ENVIRONMENT")  # Railway detection
+        or os.environ.get("RAILWAY_SERVICE_NAME")  # Alternative Railway detection
+        or os.environ.get("RENDER")  # Render.com detection
+        or os.environ.get("HEROKU_APP_NAME")  # Heroku detection
+    )
 
     # Chat endpoint configuration
     chat_mount: str = "/chat"
@@ -991,6 +1059,21 @@ async def lifespan(app: FastAPI):
                 "Wildcard '*' detected in CORS origins; this is discouraged in production. Consider restricting to specific origins."
             )
 
+        # Log cloud platform detection and background service status
+        if settings._is_cloud_platform:
+            cloud_provider = (
+                "Railway" if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME")
+                else "Render" if os.environ.get("RENDER")
+                else "Heroku" if os.environ.get("HEROKU_APP_NAME")
+                else "cloud platform"
+            )
+            logger.info(f"☁️  {cloud_provider} deployment detected")
+            logger.info("💡 Note: Background services (api_server, registry_grpc, listener) run on internal ports")
+        
+        logger.info(f"Background services: api_server={'✓' if settings.enable_api_server else '✗'}, "
+                    f"registry_grpc={'✓' if settings.enable_registry_grpc else '✗'}, "
+                    f"listener={'✓' if settings.enable_listener else '✗'}")
+
         # Import and mount services
         logger.info("=" * 70)
         logger.info("Importing services...")
@@ -1282,21 +1365,30 @@ async def lifespan(app: FastAPI):
                 # ================================================================
 
                 # Initialize LLM component if available
-                try:
-                    from graphix_vulcan_llm import GraphixVulcanLLM
+                # Check environment variable to enable/disable GraphixVulcanLLM
+                enable_graphix_vulcan_llm = os.getenv('ENABLE_GRAPHIX_VULCAN_LLM', 'true').lower() == 'true'
+                
+                if enable_graphix_vulcan_llm:
+                    try:
+                        from graphix_vulcan_llm import GraphixVulcanLLM
 
-                    llm_instance = GraphixVulcanLLM(
-                        config_path="configs/llm_config.yaml"
-                    )
-                    vulcan_module.app.state.llm = llm_instance
-                    logger.info("✓ VULCAN LLM initialized")
-                except ImportError:
-                    logger.info("GraphixVulcanLLM not available, using mock")
-                    from unittest.mock import MagicMock
+                        llm_instance = GraphixVulcanLLM(
+                            config_path="configs/llm_config.yaml"
+                        )
+                        vulcan_module.app.state.llm = llm_instance
+                        logger.info("✓ VULCAN LLM initialized (real mode)")
+                    except ImportError:
+                        logger.info("GraphixVulcanLLM not available, using mock")
+                        from unittest.mock import MagicMock
 
-                    vulcan_module.app.state.llm = MagicMock()
-                except Exception as llm_err:
-                    logger.warning(f"LLM initialization failed: {llm_err}, using mock")
+                        vulcan_module.app.state.llm = MagicMock()
+                    except Exception as llm_err:
+                        logger.warning(f"LLM initialization failed: {llm_err}, using mock")
+                        from unittest.mock import MagicMock
+
+                        vulcan_module.app.state.llm = MagicMock()
+                else:
+                    logger.info("GraphixVulcanLLM disabled via ENABLE_GRAPHIX_VULCAN_LLM=false, using mock")
                     from unittest.mock import MagicMock
 
                     vulcan_module.app.state.llm = MagicMock()
@@ -1426,6 +1518,29 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting API Server on port {settings.api_server_port}..."
                 )
+                # Build environment for API server
+                # - Use GRAPHIX_API_PORT to avoid conflict with main app's PORT
+                # - Pass GRAPHIX_JWT_SECRET if available, otherwise enable ephemeral secret
+                # - Share JWT_SECRET_KEY from main platform if GRAPHIX_JWT_SECRET not set
+                api_server_env = {
+                    **os.environ,
+                    "GRAPHIX_API_PORT": str(settings.api_server_port),
+                    "GRAPHIX_API_HOST": "0.0.0.0",
+                }
+                # Remove PORT to prevent api_server from using main app's port
+                api_server_env.pop("PORT", None)
+                
+                # Ensure JWT secret is available for api_server
+                if not os.environ.get("GRAPHIX_JWT_SECRET"):
+                    # Try to use JWT_SECRET_KEY from main platform
+                    jwt_key = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET")
+                    if jwt_key:
+                        api_server_env["GRAPHIX_JWT_SECRET"] = jwt_key
+                    else:
+                        # Allow ephemeral secret for development/cloud deployments
+                        api_server_env["ALLOW_EPHEMERAL_SECRET"] = "true"
+                        logger.warning("API Server will use ephemeral JWT secret (no persistent JWT_SECRET configured)")
+                
                 # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 # This avoids issues with Windows event loop policy and uvicorn --reload
                 api_server_proc = subprocess.Popen(
@@ -1434,10 +1549,7 @@ async def lifespan(app: FastAPI):
                         "-m",
                         "src.api_server",
                     ],
-                    env={
-                        **os.environ,
-                        "API_SERVER_PORT": str(settings.api_server_port),
-                    },
+                    env=api_server_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
@@ -1466,6 +1578,15 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting Registry gRPC Server on port {settings.registry_grpc_port}..."
                 )
+                # Build environment for Registry gRPC server
+                registry_env = {
+                    **os.environ,
+                    "REGISTRY_PORT": str(settings.registry_grpc_port),
+                    "REGISTRY_DB_PATH": os.environ.get("REGISTRY_DB_PATH", "registry.db"),
+                }
+                # Remove PORT to prevent conflict with main app
+                registry_env.pop("PORT", None)
+                
                 # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 registry_grpc_proc = subprocess.Popen(
                     [
@@ -1473,10 +1594,7 @@ async def lifespan(app: FastAPI):
                         "-m",
                         "src.governance.registry_api_server",
                     ],
-                    env={
-                        **os.environ,
-                        "REGISTRY_PORT": str(settings.registry_grpc_port),
-                    },
+                    env=registry_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
@@ -1509,6 +1627,14 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting Listener Service on port {settings.listener_port}..."
                 )
+                # Build environment for Listener service
+                listener_env = {
+                    **os.environ,
+                    "LISTENER_DB_PATH": os.environ.get("LISTENER_DB_PATH", "listener_registry.db"),
+                }
+                # Remove PORT to prevent conflict with main app
+                listener_env.pop("PORT", None)
+                
                 # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 listener_proc = subprocess.Popen(
                     [
@@ -1518,8 +1644,9 @@ async def lifespan(app: FastAPI):
                         "--port",
                         str(settings.listener_port),
                         "--host",
-                        settings.host,
+                        settings.listener_host,  # Configurable via LISTENER_HOST env var
                     ],
+                    env=listener_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
@@ -2007,6 +2134,32 @@ if settings.cors_enabled:
     )
 
 
+# =============================================================================
+# STATIC FILE SERVING (for vulcan_chat.html and demos)
+# =============================================================================
+# Mount demos directory at /demos for legacy access to demo files
+# This provides backward compatibility for existing links to demo resources
+_demos_dir = Path(__file__).parent.parent / "demos"
+if _demos_dir.exists():
+    app.mount("/demos", StaticFiles(directory=str(_demos_dir)), name="demos")
+    logger.info(f"✓ Mounted demos files from {_demos_dir} at /demos")
+    logger.info("  → vulcan_chat.html available at /demos/vulcan_chat.html")
+
+# Mount static directory at /static for the main chat interface and static assets
+# The root endpoint (/) serves static/index.html directly
+_static_dir = Path(__file__).parent.parent / "static"
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+    logger.info(f"✓ Mounted static files from {_static_dir} at /static")
+
+
+# Convenience redirect: /vulcan_chat.html -> /demos/vulcan_chat.html
+@app.get("/vulcan_chat.html")
+async def vulcan_chat_redirect():
+    """Redirect /vulcan_chat.html to /demos/vulcan_chat.html for convenience."""
+    return RedirectResponse(url="/demos/vulcan_chat.html", status_code=301)
+
+
 # Request logging and metrics middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -2043,10 +2196,29 @@ async def log_requests(request: Request, call_next):
 # =============================================================================
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
+@app.get("/")
+async def root():
     """
-    Enhanced root endpoint with flash messaging, live service health, and API explorer.
+    Root endpoint serves the chat interface (vulcan_chat.html).
+    For platform status, visit /status instead.
+    """
+    static_index = Path(__file__).parent.parent / "static" / "index.html"
+    if static_index.exists():
+        return FileResponse(static_index, media_type="text/html")
+    # Fallback to demos directory if static/index.html doesn't exist
+    demos_chat = Path(__file__).parent.parent / "demos" / "vulcan_chat.html"
+    if demos_chat.exists():
+        return FileResponse(demos_chat, media_type="text/html")
+    return HTMLResponse(
+        content="<h1>Chat interface not found</h1><p>Neither <code>static/index.html</code> nor <code>demos/vulcan_chat.html</code> were found. Please check your installation.</p>",
+        status_code=404
+    )
+
+
+@app.get("/status", response_class=HTMLResponse)
+async def status_page(request: Request):
+    """
+    Status page with flash messaging, live service health, and API explorer.
     """
     base_url = f"http://{request.url.hostname}:{request.url.port or settings.port}"
 
@@ -2202,7 +2374,7 @@ async def root(request: Request):
             <p><strong>Mount Path:</strong> <code>{status.get("mount_path")}</code></p>
             <p><strong>Import Path:</strong> <code>{status.get("import_path", "N/A")}</code></p>
             {health_status}
-            <div classs="links">
+            <div class="links">
                 <a href="{status.get("mount_path")}">🔗 Service Root</a>
                 {f'<a href="{status.get("docs_url")}">📚 API Docs</a>' if status.get("docs_url") else ""}
                 {f'<a href="{status.get("health_path")}">🏥 Health</a>' if status.get("health_path") else ""}

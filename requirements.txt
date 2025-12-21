@@ -342,8 +342,8 @@ python-engineio==4.12.2
 python-hcl2==7.3.1
 python-jose==3.5.0
 python-json-logger==3.3.0
-python-magic-bin; sys_platform == "win32"
-python-magic; sys_platform != "win32"
+python-magic-bin==0.4.14; sys_platform == "win32"
+python-magic==0.4.27; sys_platform != "win32"
 python-multipart==0.0.12
 python-socketio==5.13.0
 python-utils==3.9.1

@@ -120,6 +120,27 @@ config:
   logLevel: INFO
   pythonUnbuffered: "1"
 
+# LLM Configuration (CRITICAL for chat features)
+llm:
+  # OpenAI API configuration
+  openai:
+    enabled: true
+    # API key must be set via secrets (see secrets.openaiApiKey)
+    model: "gpt-3.5-turbo"
+    maxTokens: 1000
+    temperature: 0.7
+  # Anthropic API configuration (optional)
+  anthropic:
+    enabled: false
+    # API key must be set via secrets (see secrets.anthropicApiKey)
+  # Self-improvement configuration
+  selfImprovement:
+    enabled: false
+    approvalRequired: true
+    checkIntervalSeconds: 120
+    maxCostPerSession: 2.0
+    maxCostPerDay: 10.0
+
 # Database configuration
 postgres:
   enabled: true
@@ -154,6 +175,10 @@ secrets:
   bootstrapKey: ""  # REQUIRED
   postgresPassword: ""  # REQUIRED
   redisPassword: ""  # REQUIRED
+  # LLM API Keys (REQUIRED for chat features)
+  openaiApiKey: ""  # REQUIRED for OpenAI chat functionality
+  anthropicApiKey: ""  # Optional: For Claude model support
+  graphixApiKey: ""  # Optional: For Graphix services
 
 # Security Configuration (Optional - for enhanced security)
 # HuggingFace Model Pinning: Pin models to specific commit hashes

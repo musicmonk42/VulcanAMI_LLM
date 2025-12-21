@@ -1,4 +1,5 @@
 {
+  "check_interval_seconds": 86400,
   "drives": {
     "self_improvement": {
       "enabled": true,
@@ -8,6 +9,7 @@
       "triggers": [
         {
           "type": "on_startup",
+          "enabled": false,
           "cooldown_minutes": 60
         },
         {

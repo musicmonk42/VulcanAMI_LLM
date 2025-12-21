@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import secrets
+import sys
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -145,9 +146,13 @@ else:
     pass
 
 # Logging setup (structured audit logging secondary)
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# Use stdout instead of stderr so Railway/cloud platforms classify logs correctly
+# (stderr is often treated as error-level regardless of actual log level)
+_stdout_handler = logging.StreamHandler(sys.stdout)
+_stdout_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 )
+logging.basicConfig(level=logging.INFO, handlers=[_stdout_handler])
 logger = logging.getLogger("GraphixRegistry")
 audit_logger = logging.getLogger("GraphixRegistryAudit")
 

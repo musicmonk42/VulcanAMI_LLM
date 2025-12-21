@@ -1,7 +1,22 @@
 # =============================================================================
-# Graphix / Vulcan Unified Platform Secure Container Build
+# VulcanAMI Full Platform - Unified Secure Container Build
 # =============================================================================
-# Hardened Dockerfile with:
+# This is the MAIN Dockerfile for deploying the complete VulcanAMI platform.
+# Used by Railway, and recommended for single-container deployments.
+#
+# WHAT THIS BUILDS:
+# - Complete VulcanAMI platform via src/full_platform.py
+# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
+# - Graphix Registry API
+# - All 71+ integrated services behind a unified interface
+#
+# FOR MICROSERVICE DEPLOYMENTS:
+# Use the service-specific Dockerfiles in docker/ directory:
+# - docker/api/Dockerfile    - API Gateway microservice
+# - docker/dqs/Dockerfile    - Data Quality Service
+# - docker/pii/Dockerfile    - PII Detection Service
+#
+# SECURITY FEATURES:
 # - Multi-stage build (builder + runtime)
 # - Non-root execution (graphix user uid 1001)
 # - Mandatory acknowledgement of NOT embedding insecure JWT secret
@@ -109,8 +124,14 @@ RUN pip install --no-cache-dir cyclonedx-bom && \
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
 
+# Copy GraphixVulcanLLM (main LLM module at project root)
+COPY graphix_vulcan_llm.py ./graphix_vulcan_llm.py
+
 # Copy configuration files (required by application)
 COPY configs/ ./configs/
+
+# Copy demo files (including vulcan_chat.html)
+COPY demos/ ./demos/
 
 # Install local package (graphix) if setup.py exists
 RUN if [ -f setup.py ]; then \
@@ -119,7 +140,8 @@ RUN if [ -f setup.py ]; then \
     fi
 
 # Download spacy language model if spacy is installed
-RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)"
+# Using en_core_web_lg for better accuracy (required for self-improvement features)
+RUN python -m spacy download en_core_web_lg || echo "Spacy model download failed (non-critical)"
 
 # Pre-compile Python bytecode (optional performance / tamper evidence)
 RUN python -m compileall -q src
@@ -160,9 +182,19 @@ RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin graphix && \
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/graphix_vulcan_llm.py ./graphix_vulcan_llm.py
 COPY --from=builder /app/configs ./configs
+# Copy demo files (including vulcan_chat.html)
+COPY --from=builder /app/demos ./demos
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
+
+# Create writable directories for self-improvement features
+# These directories need to be writable by the graphix user at runtime
+# Note: /app/src is intentionally writable to enable self-improvement features
+# For higher security deployments, consider mounting a separate volume for generated code
+RUN mkdir -p /app/data /app/data/backups && \
+    chown -R graphix:graphix /app/src /app/data /app/configs
 
 # Add hardened entrypoint script
 # This updated script enforces:
@@ -194,6 +226,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # Entrypoint ensures runtime secrets are provided securely
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# Default command (can be overridden by docker run arguments)
-# Adjust if you want to run another service (e.g., full_platform.py)
-CMD ["python", "src/api_server.py"]
+# Default command - runs the full platform which includes:
+# - Graphix Registry API
+# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
+# - All 71+ services integrated behind the chat interface
+# Note: The PORT environment variable is used for flexibility (default 8000)
+CMD ["sh", "-c", "uvicorn src.full_platform:app --host 0.0.0.0 --port ${PORT:-8000}"]

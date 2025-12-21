@@ -631,7 +631,6 @@ pytest tests/test_cicd_reproducibility.py -v
 - `REPRODUCIBILITY_STATUS.md` (11,938 bytes): Current reproducibility status
 - `REPRODUCIBILITY_AUDIT_2024-12-04.md` (19,205 bytes): Detailed audit
 - `REPRODUCIBILITY_TEST_SUMMARY.md` (8,439 bytes): Test results
-- `VALIDATION_SUMMARY.md` (7,066 bytes): Validation results
 - `PYLINT_SUMMARY.md` (2,448 bytes): Code quality metrics
 - `BUG_FIXES_SUMMARY.md` (5,765 bytes): Bug fix documentation
 

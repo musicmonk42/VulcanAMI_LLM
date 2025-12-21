@@ -634,10 +634,28 @@ class SelfImprovementDrive:
                         logger.debug(f"Failed to load CSIU weights: {e}")
 
                 logger.info(f"Loaded state from {self.state_path}")
+                logger.info(
+                    f"State loaded: {len(state.completed_objectives)} completed, "
+                    f"{state.improvements_this_session} this session, "
+                    f"last_improvement={state.last_improvement:.0f}"
+                )
                 return state
+            else:
+                # State file doesn't exist - warn about potential persistence issues
+                logger.warning(
+                    f"⚠️ State file not found at: {self.state_path} - "
+                    f"Starting with empty state. If running in a container, "
+                    f"ensure a persistent volume is mounted to {self.state_path.parent} "
+                    f"to prevent repeated improvement attempts."
+                )
         except Exception as e:
             logger.warning(f"Failed to load state: {e}, using new state")
 
+        # Return new state with warning about fresh start
+        logger.warning(
+            "🆕 Starting with fresh self-improvement state. "
+            "This may cause repeated improvement attempts if state persistence is not configured."
+        )
         return SelfImprovementState()
 
     def _save_state(self):
@@ -1335,6 +1353,10 @@ class SelfImprovementDrive:
 
         # Handle dict-based triggers (new format)
         if isinstance(trigger_config, dict):
+            # Check if trigger is explicitly disabled
+            if not trigger_config.get("enabled", True):
+                return False
+
             trigger_type = trigger_config.get("type")
 
             if trigger_type == TriggerType.ON_STARTUP.value:
@@ -1416,9 +1438,15 @@ class SelfImprovementDrive:
         This is called by Vulcan's motivational system to decide if the
         system should focus on self-improvement right now.
         """
-        # Check if enabled
+        # SAFEGUARD: Check environment variable kill switch first
+        kill_switch = os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "1").lower()
+        if kill_switch in ("0", "false", "no", "off"):
+            logger.debug("Self-improvement disabled via VULCAN_ENABLE_SELF_IMPROVEMENT=0")
+            return False
+
+        # Check if enabled in config
         if not self.config.get("enabled", True):
-            logger.debug("Self-improvement drive disabled")
+            logger.debug("Self-improvement drive disabled in config")
             return False
 
         # Check resource limits (may update tokens from context increment)
@@ -1431,6 +1459,17 @@ class SelfImprovementDrive:
         max_changes = int(self.config["constraints"]["max_changes_per_session"])
         if self.state.improvements_this_session >= max_changes:
             logger.info(f"Reached max changes limit ({max_changes}) for this session")
+            return False
+
+        # SAFEGUARD: Prevent infinite loop by checking minimum time between improvements
+        # Use environment variable SELF_IMPROVEMENT_MIN_INTERVAL or default to 3600 seconds (1 hour)
+        min_interval = int(os.getenv("SELF_IMPROVEMENT_MIN_INTERVAL", "3600"))
+        time_since_last = time.time() - self.state.last_improvement
+        if time_since_last < min_interval:
+            logger.debug(
+                f"Skipping trigger: only {time_since_last:.0f}s since last improvement "
+                f"(minimum interval: {min_interval}s)"
+            )
             return False
 
         # Evaluate all triggers
