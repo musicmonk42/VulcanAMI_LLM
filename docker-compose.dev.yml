@@ -327,6 +327,15 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - PYTHONUNBUFFERED=1
       - CORS_ORIGINS=http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000
+      # LLM Configuration (REQUIRED for chat features)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GRAPHIX_API_KEY=${GRAPHIX_API_KEY:-}
+      - VULCAN_LLM_API_KEY=${VULCAN_LLM_API_KEY:-${OPENAI_API_KEY:-}}
+      # Self-improvement configuration
+      - ENABLE_SELF_IMPROVEMENT=${ENABLE_SELF_IMPROVEMENT:-0}
+      - INTRINSIC_DRIVES_ENABLED=${INTRINSIC_DRIVES_ENABLED:-False}
+      - INTRINSIC_DRIVES_APPROVAL_REQUIRED=${INTRINSIC_DRIVES_APPROVAL_REQUIRED:-True}
     ports:
       # NOTE: Port 8000 conflicts with api-gateway service if both run simultaneously.
       # Use profiles to avoid conflict:

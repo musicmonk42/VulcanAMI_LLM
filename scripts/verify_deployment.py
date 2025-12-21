@@ -147,13 +147,17 @@ def check_environment() -> None:
         "PORT",
     ]
     
+    def truncate_secret(value: str) -> str:
+        """Truncate a secret value for safe display."""
+        if len(value) > 12:
+            return f"{value[:4]}...{value[-4:]}"
+        return "(set)"
+    
     print("\nRequired Variables:")
     for var in REQUIRED_VARS:
         value = os.getenv(var)
         if value:
-            # Show truncated value for security
-            display = f"{value[:4]}...{value[-4:]}" if len(value) > 12 else "(set)"
-            print(f"  ✅ {var}: {display}")
+            print(f"  ✅ {var}: {truncate_secret(value)}")
         else:
             print(f"  ❌ {var}: NOT SET")
     
@@ -161,8 +165,7 @@ def check_environment() -> None:
     for var in OPTIONAL_VARS:
         value = os.getenv(var)
         if value:
-            display = f"{value[:4]}...{value[-4:]}" if len(value) > 12 else "(set)"
-            print(f"  ✓ {var}: {display}")
+            print(f"  ✓ {var}: {truncate_secret(value)}")
         else:
             print(f"  - {var}: not set")
 

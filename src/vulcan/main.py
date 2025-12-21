@@ -147,11 +147,11 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
     def get_openai_client():
-        logger.warning("OpenAI package not installed - OpenAI features unavailable")
+        logger.warning("OpenAI package not installed - install with: pip install openai")
         return None
 
     def get_openai_init_error():
-        return "OpenAI package not installed"
+        return "OpenAI package not installed - install with: pip install openai"
 
 
 # ============================================================
