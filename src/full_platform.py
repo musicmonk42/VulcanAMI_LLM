@@ -2137,14 +2137,16 @@ if settings.cors_enabled:
 # =============================================================================
 # STATIC FILE SERVING (for vulcan_chat.html and demos)
 # =============================================================================
-# Mount demos directory to serve vulcan_chat.html and other static UI files
+# Mount demos directory at /demos for legacy access to demo files
+# This provides backward compatibility for existing links to demo resources
 _demos_dir = Path(__file__).parent.parent / "demos"
 if _demos_dir.exists():
     app.mount("/demos", StaticFiles(directory=str(_demos_dir)), name="demos")
     logger.info(f"✓ Mounted demos files from {_demos_dir} at /demos")
     logger.info("  → vulcan_chat.html available at /demos/vulcan_chat.html")
 
-# Mount static directory for the main chat interface
+# Mount static directory at /static for the main chat interface and static assets
+# The root endpoint (/) serves static/index.html directly
 _static_dir = Path(__file__).parent.parent / "static"
 if _static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
@@ -2207,7 +2209,10 @@ async def root():
     demos_chat = Path(__file__).parent.parent / "demos" / "vulcan_chat.html"
     if demos_chat.exists():
         return FileResponse(demos_chat, media_type="text/html")
-    return HTMLResponse(content="<h1>Chat interface not found. Please check installation.</h1>", status_code=404)
+    return HTMLResponse(
+        content="<h1>Chat interface not found</h1><p>Neither <code>static/index.html</code> nor <code>demos/vulcan_chat.html</code> were found. Please check your installation.</p>",
+        status_code=404
+    )
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -2369,7 +2374,7 @@ async def status_page(request: Request):
             <p><strong>Mount Path:</strong> <code>{status.get("mount_path")}</code></p>
             <p><strong>Import Path:</strong> <code>{status.get("import_path", "N/A")}</code></p>
             {health_status}
-            <div classs="links">
+            <div class="links">
                 <a href="{status.get("mount_path")}">🔗 Service Root</a>
                 {f'<a href="{status.get("docs_url")}">📚 API Docs</a>' if status.get("docs_url") else ""}
                 {f'<a href="{status.get("health_path")}">🏥 Health</a>' if status.get("health_path") else ""}
