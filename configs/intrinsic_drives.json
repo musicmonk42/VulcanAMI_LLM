@@ -8,6 +8,7 @@
       "triggers": [
         {
           "type": "on_startup",
+          "enabled": false,
           "cooldown_minutes": 60
         },
         {

@@ -1335,6 +1335,10 @@ class SelfImprovementDrive:
 
         # Handle dict-based triggers (new format)
         if isinstance(trigger_config, dict):
+            # Check if trigger is explicitly disabled
+            if not trigger_config.get("enabled", True):
+                return False
+
             trigger_type = trigger_config.get("type")
 
             if trigger_type == TriggerType.ON_STARTUP.value:
