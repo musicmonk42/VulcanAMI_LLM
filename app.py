@@ -643,6 +643,11 @@ def apply_security_headers(resp):
         "geolocation=(), microphone=(), camera=(), payment=()"
     )
     # Relaxed CSP for chat interface - allows CDN scripts and inline styles
+    # NOTE: 'unsafe-inline' and 'unsafe-eval' are required for:
+    # - marked.js (Markdown rendering) which may use eval internally
+    # - highlight.js (syntax highlighting) for code blocks
+    # - Inline event handlers in the chat HTML
+    # For production, consider moving to nonce-based CSP if security requirements increase
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
