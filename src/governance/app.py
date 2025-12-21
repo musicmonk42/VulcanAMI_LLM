@@ -21,10 +21,7 @@ from flask import Flask, jsonify, request
 
 from .registry_api import RegistryAPI, InMemoryBackend, SimpleKMS
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# Configure logging - use module-level logger
 logger = logging.getLogger(__name__)
 
 # Create Flask app
