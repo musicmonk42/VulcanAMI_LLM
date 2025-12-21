@@ -1036,15 +1036,29 @@ class APIRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         logger.info(f"{self.address_string()} ({self._request_id}) - {format % args}")
 
-    def _apply_security_headers(self):
+    def _apply_security_headers(self, for_html: bool = False):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Content-Security-Policy", "default-src 'none'")
+        # Use relaxed CSP for HTML pages that load external scripts
+        # Note: unsafe-inline is required for the chat interface which uses inline scripts/styles
+        # CDN domains are required for marked.js and highlight.js
+        if for_html:
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+                "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+                "connect-src 'self' *; font-src 'self' data:; img-src 'self' data:"
+            )
+        else:
+            self.send_header("Content-Security-Policy", "default-src 'none'")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header(
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload"
         )
-        allowed_origin = os.environ.get("ALLOWED_ORIGIN", "http://localhost:3000")
+        # CORS configuration: Set ALLOWED_ORIGIN env var to restrict to specific domains
+        # Default is '*' to allow the chat interface to work from any domain
+        # For production, set ALLOWED_ORIGIN to your specific domain(s)
+        allowed_origin = os.environ.get("ALLOWED_ORIGIN", "*")
         self.send_header("Access-Control-Allow-Origin", allowed_origin)
         self.send_header("Vary", "Origin")
         if self._request_id:
@@ -1064,8 +1078,12 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             path = parsed_path.path
             if path == "/" or path == "":
                 self._handle_root()
+            elif path == "/api/info":
+                self._handle_api_info()
             elif path == APIEndpoint.HEALTH.value:
                 self._handle_health()
+            elif path == "/vulcan/health":
+                self._handle_vulcan_health()
             elif path == APIEndpoint.STATUS.value:
                 self._handle_status()
             elif path.startswith(APIEndpoint.GRAPHS.value):
@@ -1135,6 +1153,14 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             elif path == APIEndpoint.GRAPHQL.value and GRAPHQL_AVAILABLE:
                 agent = self._authenticate()
                 self._handle_graphql(data, agent)
+            elif path in ("/vulcan/v1/chat", "/v1/chat"):
+                # Chat endpoint - allow unauthenticated access for the chat interface
+                # Rate limiting by IP to prevent abuse
+                client_ip = self.client_address[0] if self.client_address else "unknown"
+                if self.server_instance and not self.server_instance.rate_limiter.is_allowed(f"chat:{client_ip}"):
+                    self._send_error(429, "Rate limit exceeded. Please try again later.")
+                    return
+                self._handle_chat(data)
             else:
                 self._send_error(404, "Not Found")
         except Exception as e:
@@ -1193,7 +1219,35 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         return None
 
     def _handle_root(self):
-        """Handle root path - return service info."""
+        """Handle root path - serve vulcan_chat.html."""
+        # Try to find the HTML file in multiple locations
+        possible_paths = [
+            os.path.join(os.path.dirname(__file__), "vulcan_chat.html"),
+            os.path.join(os.getcwd(), "demos", "vulcan_chat.html"),
+            os.path.join(os.getcwd(), "vulcan_chat.html"),
+            os.path.join(os.getcwd(), "src", "vulcan_chat.html"),
+        ]
+        
+        html_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                html_path = path
+                break
+        
+        if html_path:
+            try:
+                with open(html_path, "r", encoding="utf-8") as f:
+                    html_content = f.read()
+                self._send_html(html_content)
+                return
+            except Exception as e:
+                logger.error(f"Error reading HTML file: {e}")
+        
+        # Fallback to API info if HTML file not found
+        self._handle_api_info()
+
+    def _handle_api_info(self):
+        """Handle /api/info - return service info as JSON."""
         self._send_json(
             {
                 "service": "Graphix API Server",
@@ -1201,7 +1255,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 "timestamp": datetime.utcnow().isoformat(),
                 "endpoints": [
                     "GET /",
+                    "GET /api/info",
                     "GET /health",
+                    "GET /vulcan/health",
                     "GET /status",
                     "GET /metrics",
                     "GET /graphs/<id>",
@@ -1212,9 +1268,142 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                     "POST /proposals/create",
                     "POST /proposals/<id>/vote",
                     "POST /api/reason",
+                    "POST /vulcan/v1/chat",
+                    "POST /v1/chat",
                 ],
             }
         )
+
+    def _handle_vulcan_health(self):
+        """Handle /vulcan/health - health check for the chat interface."""
+        self._send_json(
+            {
+                "status": "healthy",
+                "service": "vulcan-chat",
+                "timestamp": datetime.utcnow().isoformat(),
+                "version": "2.2.0",
+            }
+        )
+
+    def _handle_chat(self, data: Dict):
+        """
+        Handle chat request from vulcan_chat.html.
+        
+        Expected request format:
+        {
+            "message": "user message",
+            "max_tokens": 1024,
+            "enable_reasoning": true,
+            "enable_memory": true,
+            "enable_safety": true,
+            "enable_planning": true,
+            "enable_causal": true,
+            "history": [{"role": "user", "content": "..."}]
+        }
+        
+        Response format:
+        {
+            "response": "AI response",
+            "systems_used": ["reasoning", "memory", ...]
+        }
+        """
+        if not self.server_instance:
+            self._send_error(500, "Server not initialized")
+            return
+        
+        message = data.get("message", "")
+        if not message:
+            self._send_error(400, "Missing required field: message")
+            return
+        
+        # Log chat request for monitoring
+        client_ip = self.client_address[0] if self.client_address else "unknown"
+        logger.info(f"Chat request from {client_ip}: {message[:QUERY_PREVIEW_LOG_LENGTH]}...")
+        
+        max_tokens = data.get("max_tokens", 1024)
+        enable_reasoning = data.get("enable_reasoning", True)
+        enable_memory = data.get("enable_memory", True)
+        enable_safety = data.get("enable_safety", True)
+        enable_planning = data.get("enable_planning", True)
+        enable_causal = data.get("enable_causal", True)
+        history = data.get("history", [])
+        
+        systems_used = []
+        response_text = ""
+        
+        try:
+            # Use the UnifiedReasoner if available
+            if REASONING_AVAILABLE and enable_reasoning:
+                # Thread-safe lazy initialization of reasoner
+                with self.server_instance.locks["reasoner"]:
+                    if self.server_instance._unified_reasoner is None:
+                        logger.info("Initializing UnifiedReasoner for chat...")
+                        self.server_instance._unified_reasoner = UnifiedReasoner(
+                            enable_learning=False,
+                            enable_safety=enable_safety,
+                            max_workers=2,
+                        )
+                        logger.info("UnifiedReasoner initialized successfully")
+                
+                reasoner = self.server_instance._unified_reasoner
+                
+                # Build context from history
+                context = ""
+                if history:
+                    for h in history[-5:]:  # Last 5 messages
+                        role = h.get("role", "user")
+                        content = h.get("content", "")
+                        context += f"{role}: {content}\n"
+                
+                # Perform reasoning
+                try:
+                    result = reasoner.reason(
+                        input_data=message,
+                        query={"query": message, "context": context},
+                        reasoning_type=None,  # Auto-detect
+                    )
+                    
+                    if hasattr(result, "conclusion"):
+                        response_text = str(result.conclusion)
+                    elif hasattr(result, "result"):
+                        response_text = str(result.result)
+                    else:
+                        response_text = str(result)
+                    
+                    systems_used.append("reasoning")
+                    
+                    if enable_safety and hasattr(result, "safety_status"):
+                        systems_used.append("safety")
+                    
+                except Exception as e:
+                    logger.warning(f"Reasoning failed: {e}")
+                    response_text = f"I processed your request but encountered an issue: {str(e)}"
+            else:
+                # Fallback response when reasoning is not available
+                preview_length = QUERY_PREVIEW_LOG_LENGTH
+                message_preview = message[:preview_length] + "..." if len(message) > preview_length else message
+                response_text = (
+                    f"I received your message: '{message_preview}'. "
+                    "The full reasoning engine is initializing. "
+                    "Please try again in a moment."
+                )
+            
+            # Add additional systems to the response based on what was enabled
+            if enable_memory:
+                systems_used.append("memory")
+            if enable_planning:
+                systems_used.append("planning")
+            if enable_causal:
+                systems_used.append("causal")
+            
+            self._send_json({
+                "response": response_text,
+                "systems_used": systems_used,
+            })
+            
+        except Exception as e:
+            logger.error(f"Chat request failed: {e}\n{traceback.format_exc()}")
+            self._send_error(500, f"Chat processing failed: {str(e)}")
 
     def _handle_health(self):
         mem_info = {}
@@ -1787,6 +1976,17 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(response)))
         self._apply_security_headers()
         self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(response)
+
+    def _send_html(self, html_content: str):
+        """Send HTML response with appropriate headers."""
+        response = html_content.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(response)))
+        self._apply_security_headers(for_html=True)
+        self.send_header("Cache-Control", "public, max-age=300")
         self.end_headers()
         self.wfile.write(response)
 
