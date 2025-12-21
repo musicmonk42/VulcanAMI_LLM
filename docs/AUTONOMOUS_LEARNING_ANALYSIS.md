@@ -301,3 +301,84 @@ But lacks:
 - Vocabulary growth tracking
 
 The architecture is designed for autonomous self-improvement of its internal model, not for learning from external API responses.
+
+---
+
+## 8. Deployment Issue: "GraphixVulcanLLM not available"
+
+### Root Cause Analysis
+
+When the warning `"GraphixVulcanLLM not available, using mock"` appears in deployment, it indicates that the import of `graphix_vulcan_llm.py` is failing.
+
+**Investigation Findings:**
+
+1. **The import statement** (from `src/full_platform.py:1373`):
+   ```python
+   from graphix_vulcan_llm import GraphixVulcanLLM
+   ```
+
+2. **The try/except block** (from `src/full_platform.py:1372-1394`):
+   ```python
+   if enable_graphix_vulcan_llm:
+       try:
+           from graphix_vulcan_llm import GraphixVulcanLLM
+           llm_instance = GraphixVulcanLLM(config_path="configs/llm_config.yaml")
+           vulcan_module.app.state.llm = llm_instance
+           logger.info("✓ VULCAN LLM initialized (real mode)")
+       except ImportError:
+           logger.info("GraphixVulcanLLM not available, using mock")
+           from unittest.mock import MagicMock
+           vulcan_module.app.state.llm = MagicMock()
+   ```
+
+3. **Environment variable check** (from `src/full_platform.py:1369`):
+   ```python
+   enable_graphix_vulcan_llm = os.getenv('ENABLE_GRAPHIX_VULCAN_LLM', 'true').lower() == 'true'
+   ```
+   Default is `true` - no environment variable needed to enable.
+
+4. **MockGraphixVulcanLLM fallback** (from `src/vulcan/main.py:163-194`):
+   ```python
+   class MockGraphixVulcanLLM:
+       """Mock implementation of GraphixVulcanLLM for safe execution."""
+       def __init__(self, config_path: str):
+           self.config_path = config_path
+           self.logger = logging.getLogger("MockLLM")
+           self.bridge = MagicMock()
+           
+       def generate(self, prompt: str, max_tokens: int) -> str:
+           return f"Mock response to: {prompt[:50]}"
+   ```
+
+### Identified Issue: Missing File in Docker Image
+
+**The file `graphix_vulcan_llm.py` was NOT being copied into the Docker image.**
+
+The Dockerfile's builder stage only copied:
+- `src/` directory
+- `configs/` directory
+- `demos/` directory
+
+But `graphix_vulcan_llm.py` exists at the project root level, outside `src/`.
+
+### Fix Applied
+
+Updated `Dockerfile` to include `graphix_vulcan_llm.py`:
+
+**In builder stage (line 128):**
+```dockerfile
+# Copy GraphixVulcanLLM (main LLM module at project root)
+COPY graphix_vulcan_llm.py ./graphix_vulcan_llm.py
+```
+
+**In runtime stage (line 185):**
+```dockerfile
+COPY --from=builder /app/graphix_vulcan_llm.py ./graphix_vulcan_llm.py
+```
+
+### Verification
+
+After this fix, the Docker container will have:
+- `/app/graphix_vulcan_llm.py` - The LLM module
+- `PYTHONPATH=/app` - Ensures Python can find the module
+- Import `from graphix_vulcan_llm import GraphixVulcanLLM` will succeed

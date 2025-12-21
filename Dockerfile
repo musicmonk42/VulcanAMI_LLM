@@ -124,6 +124,9 @@ RUN pip install --no-cache-dir cyclonedx-bom && \
 # Copy application source (builder keeps full code to run compile step)
 COPY src/ ./src
 
+# Copy GraphixVulcanLLM (main LLM module at project root)
+COPY graphix_vulcan_llm.py ./graphix_vulcan_llm.py
+
 # Copy configuration files (required by application)
 COPY configs/ ./configs/
 
@@ -179,6 +182,7 @@ RUN useradd -r -u 1001 -d /app -s /usr/sbin/nologin graphix && \
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/graphix_vulcan_llm.py ./graphix_vulcan_llm.py
 COPY --from=builder /app/configs ./configs
 # Copy demo files (including vulcan_chat.html)
 COPY --from=builder /app/demos ./demos
