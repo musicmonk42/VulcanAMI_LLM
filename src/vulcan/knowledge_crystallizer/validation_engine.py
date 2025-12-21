@@ -44,10 +44,10 @@ except ImportError:
     )
 
 try:
-    pass
-
+    import signal
     SIGNAL_AVAILABLE = True
 except ImportError:
+    signal = None
     SIGNAL_AVAILABLE = False
     logging.warning("signal module not available, timeout handling will be limited")
 
