@@ -2079,10 +2079,34 @@ class WorldModel:
 
         logger.info("🔄 Autonomous improvement loop starting")
 
-        check_interval = 60  # Check every minute
+        # Check interval can be configured via environment variable
+        # Default to 86400 seconds (24 hours) to prevent cost drain from frequent checks
+        # Set SELF_IMPROVEMENT_INTERVAL to lower values (e.g., 60) only for development
+        check_interval = int(os.getenv("SELF_IMPROVEMENT_INTERVAL", "86400"))
+        logger.info(f"Self-improvement check interval: {check_interval} seconds")
+
+        # Safeguard: Check kill switch at the start of the loop
+        kill_switch_env = os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "1").lower()
+        if kill_switch_env in ("0", "false", "no", "off"):
+            logger.warning(
+                "🛑 Self-improvement disabled via VULCAN_ENABLE_SELF_IMPROVEMENT=0. "
+                "Exiting autonomous improvement loop."
+            )
+            self.improvement_running = False
+            return
 
         while self.improvement_running:
             try:
+                # Re-check kill switch each iteration (allows runtime disable)
+                kill_switch_env = os.getenv("VULCAN_ENABLE_SELF_IMPROVEMENT", "1").lower()
+                if kill_switch_env in ("0", "false", "no", "off"):
+                    logger.warning(
+                        "🛑 Self-improvement disabled via VULCAN_ENABLE_SELF_IMPROVEMENT=0. "
+                        "Stopping autonomous improvement loop."
+                    )
+                    self.improvement_running = False
+                    break
+
                 # Build current context
                 context = self._build_improvement_context()
 
