@@ -3426,58 +3426,75 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                # Try OpenAI first for high-quality responses
-                openai_client = get_openai_client()
-                if openai_client:
-                    try:
+                # ================================================================
+                # VULCAN-FIRST DESIGN: Local LLM first, OpenAI as fallback
+                # OpenAI is used ONLY for language generation, not for reasoning
+                # ================================================================
 
-                        def call_openai():
-                            completion = openai_client.chat.completions.create(
-                                model="gpt-3.5-turbo",
-                                messages=[
-                                    {
-                                        "role": "system",
-                                        "content": "You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses.",
-                                    },
-                                    {"role": "user", "content": enhanced_prompt},
-                                ],
-                                max_tokens=min(request.max_tokens, 1000),
-                                temperature=0.7,
-                            )
-                            return completion.choices[0].message.content
-
-                        response_text = await loop.run_in_executor(None, call_openai)
-                        systems_used.append("openai_llm")
-                    except Exception as e:
-                        # Log the full error details for debugging on Railway
-                        logger.error(
-                            f"OpenAI API call failed: {type(e).__name__}: {e}"
-                        )
-                        # Include error type for better diagnostics
-                        logger.debug(f"OpenAI error traceback: {traceback.format_exc()}")
-                        # Fall through to local LLM
-                        response_text = ""
+                # PRIORITY 1: Try Vulcan's LOCAL LLM first
+                result = await loop.run_in_executor(
+                    None, llm.generate, enhanced_prompt, request.max_tokens
+                )
+                # Extract text from GenerationResult object
+                if hasattr(result, "text"):
+                    response_text = result.text
+                elif isinstance(result, str):
+                    response_text = result
+                elif isinstance(result, dict) and "text" in result:
+                    response_text = result["text"]
                 else:
-                    # Log why OpenAI is not available for debugging
-                    init_error = get_openai_init_error()
-                    logger.info(f"OpenAI client not available: {init_error}")
-                    response_text = ""
+                    response_text = str(result)
 
-                # Fallback to local LLM if OpenAI failed or not available
+                # Only use if we got a meaningful response (not a mock)
+                if (
+                    response_text
+                    and len(response_text.strip()) > 10
+                    and "Mock response" not in response_text
+                ):
+                    systems_used.append("vulcan_local_llm")
+                    logger.info("[VULCAN] Response generated via Vulcan's local LLM")
+                else:
+                    response_text = ""  # Reset to try fallback
+
+                # PRIORITY 2: Fallback to OpenAI only if local LLM failed
+                # Note: OpenAI is used ONLY for language generation here
                 if not response_text:
-                    result = await loop.run_in_executor(
-                        None, llm.generate, enhanced_prompt, request.max_tokens
-                    )
-                    # Extract text from GenerationResult object
-                    if hasattr(result, "text"):
-                        response_text = result.text
-                    elif isinstance(result, str):
-                        response_text = result
-                    elif isinstance(result, dict) and "text" in result:
-                        response_text = result["text"]
+                    openai_client = get_openai_client()
+                    if openai_client:
+                        try:
+
+                            def call_openai():
+                                completion = openai_client.chat.completions.create(
+                                    model="gpt-3.5-turbo",
+                                    messages=[
+                                        {
+                                            "role": "system",
+                                            "content": "You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses.",
+                                        },
+                                        {"role": "user", "content": enhanced_prompt},
+                                    ],
+                                    max_tokens=min(request.max_tokens, 1000),
+                                    temperature=0.7,
+                                )
+                                return completion.choices[0].message.content
+
+                            response_text = await loop.run_in_executor(None, call_openai)
+                            systems_used.append("openai_fallback")
+                            logger.info(
+                                "[VULCAN] Response generated via OpenAI fallback (with Vulcan cognitive context)"
+                            )
+                        except Exception as e:
+                            # Log the full error details for debugging on Railway
+                            logger.error(
+                                f"OpenAI API call failed: {type(e).__name__}: {e}"
+                            )
+                            # Include error type for better diagnostics
+                            logger.debug(f"OpenAI error traceback: {traceback.format_exc()}")
+                            response_text = ""
                     else:
-                        response_text = str(result)
-                    systems_used.append("llm_generation")
+                        # Log why OpenAI is not available for debugging
+                        init_error = get_openai_init_error()
+                        logger.info(f"OpenAI client not available: {init_error}")
             except Exception as e:
                 logger.error(f"LLM generation failed: {e}")
                 # Fallback response
