@@ -2855,6 +2855,10 @@ async def unified_chat(request: UnifiedChatRequest):
     """
     start_time = time.time()
 
+    # Constants for response validation (matches /llm/chat endpoint)
+    MIN_MEANINGFUL_RESPONSE_LENGTH = 10
+    MOCK_RESPONSE_MARKER = "Mock response"
+
     if not hasattr(app.state, "deployment"):
         raise HTTPException(status_code=503, detail="System not initialized")
 
@@ -3448,8 +3452,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 # Only use if we got a meaningful response (not a mock)
                 if (
                     response_text
-                    and len(response_text.strip()) > 10
-                    and "Mock response" not in response_text
+                    and len(response_text.strip()) > MIN_MEANINGFUL_RESPONSE_LENGTH
+                    and MOCK_RESPONSE_MARKER not in response_text
                 ):
                     systems_used.append("vulcan_local_llm")
                     logger.info("[VULCAN] Response generated via Vulcan's local LLM")
