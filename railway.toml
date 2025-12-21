@@ -3,11 +3,26 @@
 # =============================================================================
 # This file configures Railway to build and deploy the VulcanAMI application.
 #
+# WHAT GETS DEPLOYED:
+# - Complete VulcanAMI platform via src/full_platform.py
+# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
+# - Graphix Registry API
+# - All 71+ integrated services
+#
 # IMPORTANT: The REJECT_INSECURE_JWT build argument is required to acknowledge
 # that no insecure JWT secrets are embedded in the Docker image.
+#
+# REQUIRED ENVIRONMENT VARIABLES (set in Railway dashboard):
+# - JWT_SECRET_KEY: Strong secret for JWT signing (min 32 chars)
+# - CORS_ORIGINS: Comma-separated list of allowed origins
+#
+# OPTIONAL ENVIRONMENT VARIABLES:
+# - PORT: Server port (Railway sets this automatically)
+# - LOG_LEVEL: Logging level (default: INFO)
+# - OPENAI_API_KEY: For external LLM integration
 # =============================================================================
 [build]
-# Use the Dockerfile for building
+# Use the main Dockerfile for building the full platform
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 buildArgs = ["REJECT_INSECURE_JWT=ack"]

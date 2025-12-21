@@ -165,13 +165,16 @@ docker-build-no-cache: ## Build Docker image without cache
 		.
 
 .PHONY: docker-run
-docker-run: ## Run Docker container
-	@echo "$(GREEN)Running Docker container...$(NC)"
+docker-run: ## Run Docker container (full platform)
+	@echo "$(GREEN)Running Docker container (full platform)...$(NC)"
 	docker run --rm -it \
 		--name $(CONTAINER_MAIN) \
 		-e JWT_SECRET_KEY=$$(openssl rand -base64 48) \
+		-e JWT_SECRET=$$(openssl rand -base64 48) \
+		-e GRAPHIX_JWT_SECRET=$$(openssl rand -base64 48) \
 		-e BOOTSTRAP_KEY=$$(openssl rand -base64 32) \
-		-p 5000:5000 \
+		-e PORT=8000 \
+		-p 8000:8000 \
 		$(IMAGE_MAIN):$(TAG)
 
 .PHONY: docker-shell

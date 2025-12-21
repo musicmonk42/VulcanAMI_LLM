@@ -1,5 +1,16 @@
 # =============================================================================
-# API Gateway Service Dockerfile
+# API Gateway Service Dockerfile (Microservice Mode)
+# =============================================================================
+# This Dockerfile builds the API Gateway microservice for distributed deployments.
+# 
+# For the FULL VulcanAMI platform (including /vulcan/v1/chat endpoint),
+# use the main Dockerfile at the repository root instead:
+#   docker build -f Dockerfile --build-arg REJECT_INSECURE_JWT=ack .
+#
+# The main Dockerfile runs src/full_platform.py which includes:
+# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
+# - Graphix Registry API
+# - All 71+ integrated services
 # =============================================================================
 
 FROM python:3.10.11-slim AS builder

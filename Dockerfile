@@ -1,7 +1,22 @@
 # =============================================================================
-# Graphix / Vulcan Unified Platform Secure Container Build
+# VulcanAMI Full Platform - Unified Secure Container Build
 # =============================================================================
-# Hardened Dockerfile with:
+# This is the MAIN Dockerfile for deploying the complete VulcanAMI platform.
+# Used by Railway, and recommended for single-container deployments.
+#
+# WHAT THIS BUILDS:
+# - Complete VulcanAMI platform via src/full_platform.py
+# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
+# - Graphix Registry API
+# - All 71+ integrated services behind a unified interface
+#
+# FOR MICROSERVICE DEPLOYMENTS:
+# Use the service-specific Dockerfiles in docker/ directory:
+# - docker/api/Dockerfile    - API Gateway microservice
+# - docker/dqs/Dockerfile    - Data Quality Service
+# - docker/pii/Dockerfile    - PII Detection Service
+#
+# SECURITY FEATURES:
 # - Multi-stage build (builder + runtime)
 # - Non-root execution (graphix user uid 1001)
 # - Mandatory acknowledgement of NOT embedding insecure JWT secret

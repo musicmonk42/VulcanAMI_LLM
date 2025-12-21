@@ -293,6 +293,74 @@ services:
   # VulcanAMI Core Services
   ############################################################################
 
+  # Full Platform (Same as Railway deployment)
+  # This service runs the complete VulcanAMI platform including:
+  # - VULCAN cognitive platform with /vulcan/v1/chat endpoint
+  # - Graphix Registry API
+  # - All 71+ integrated services
+  full-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        REJECT_INSECURE_JWT: ack
+    container_name: vulcanami-full-platform
+    hostname: full-platform
+    environment:
+      - ENVIRONMENT=development
+      - VERSION=4.6.0
+      - PORT=8000
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-jwt-secret-key-change-in-production-minimum-32-chars}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-key-change-in-production-minimum-32-chars}
+      - GRAPHIX_JWT_SECRET=${GRAPHIX_JWT_SECRET:-dev-jwt-secret-key-change-in-production-minimum-32-chars}
+      - BOOTSTRAP_KEY=${BOOTSTRAP_KEY:-dev-bootstrap-key-change-in-production}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-vulcanami}
+      - POSTGRES_USER=${POSTGRES_USER:-vulcanami}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-vulcanami_dev_password}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000
+    ports:
+      - "8000:8000"  # Main API (conflicts with api-gateway if both run)
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./demos:/app/demos:ro
+      - logs:/var/log/vulcanami
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - vulcanami-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    labels:
+      - "com.vulcanami.service=full-platform"
+      - "com.vulcanami.type=unified"
+    profiles:
+      - full  # Only starts with: docker compose --profile full up
+
   # Data Quality System (DQS)
   dqs-service:
     build:
