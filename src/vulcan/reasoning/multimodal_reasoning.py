@@ -43,7 +43,9 @@ logger = logging.getLogger(__name__)
 
 # Try to import optional dependencies
 try:
-    pass
+    from sklearn.preprocessing import StandardScaler, RobustScaler
+    from sklearn.decomposition import PCA
+    from sklearn.cluster import KMeans
 
     SKLEARN_AVAILABLE = True
 except ImportError:
@@ -1685,14 +1687,14 @@ class MultiModalReasoningEngine:
             common_keys = set(features1.keys()) & set(features2.keys())
             if not common_keys:
                 return {"score": 0.0, "mapping": {}, "confidence": 0.0}
-
+            
             # Compute alignment score based on feature similarity
             similarities = []
             mapping = {}
             for key in common_keys:
                 val1 = features1[key]
                 val2 = features2[key]
-
+                
                 # Handle different types
                 if isinstance(val1, (int, float)) and isinstance(val2, (int, float)):
                     # Normalized difference for numeric values
@@ -1709,18 +1711,14 @@ class MultiModalReasoningEngine:
                     # Type mismatch
                     similarities.append(0.0)
                     mapping[key] = 0.0
-
+            
             # Average similarity as alignment score
             score = sum(similarities) / len(similarities) if similarities else 0.0
-
+            
             # Confidence based on number of aligned features
             confidence = len(common_keys) / max(len(features1), len(features2))
 
-            return {
-                "score": float(score),
-                "mapping": mapping,
-                "confidence": float(confidence),
-            }
+            return {"score": float(score), "mapping": mapping, "confidence": float(confidence)}
         except Exception:
             return {"score": 0.0, "mapping": {}, "confidence": 0.0}
 
