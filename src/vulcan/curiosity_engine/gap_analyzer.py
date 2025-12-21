@@ -19,7 +19,8 @@ import numpy as np
 
 # Optional imports with fallbacks
 try:
-    pass
+    from scipy import stats
+    from scipy.stats import zscore
 
     SCIPY_AVAILABLE = True
 except ImportError:
