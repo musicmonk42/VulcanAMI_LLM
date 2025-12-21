@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
@@ -2023,8 +2023,6 @@ if _demos_dir.exists():
 @app.get("/vulcan_chat.html")
 async def vulcan_chat_redirect():
     """Redirect /vulcan_chat.html to /static/vulcan_chat.html for convenience."""
-    from fastapi.responses import RedirectResponse
-
     return RedirectResponse(url="/static/vulcan_chat.html", status_code=301)
 
 

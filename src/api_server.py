@@ -2175,9 +2175,9 @@ def main():
 
     # Security: Never print full credentials to logs (they can leak via CI artifacts, log aggregators, etc.)
     def _mask(s: str, visible: int = 4) -> str:
-        """Mask a secret, showing only first few chars."""
+        """Mask a secret, showing only first few chars. Always returns same-length mask to avoid leaking length info."""
         if len(s) <= visible:
-            return "****"
+            return "*" * 8  # Fixed length mask for short secrets
         return s[:visible] + "..." + ("*" * 4)
 
     print("\nTest Agents Created (credentials masked for security):")

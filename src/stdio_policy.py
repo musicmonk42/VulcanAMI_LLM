@@ -319,13 +319,14 @@ def _patch_colorama(cfg: StdIOConfig) -> bool:
     # Use simple init() to avoid wrap=False conflicting with other boolean args.
     # When wrap=False, features like strip require wrapping to function.
     # Simplest container-friendly option: just call init() with defaults,
-    # or use just_fix_windows_console() on Windows.
+    # or use just_fix_windows_console() which is cross-platform in colorama 0.4.6+.
     try:
         if disable:
             # If color is disabled, just use plain init without wrapping
             colorama.init()
         else:
             # Try modern API first (colorama 0.4.6+), fallback to simple init
+            # just_fix_windows_console() is cross-platform and safer
             if hasattr(colorama, "just_fix_windows_console"):
                 colorama.just_fix_windows_console()
             else:
