@@ -48,8 +48,8 @@ except ImportError:
     logger.warning("scikit-learn not available. Calibration disabled.")
 
 try:
-    pass
-
+    from scipy import stats
+    from scipy.optimize import minimize
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
