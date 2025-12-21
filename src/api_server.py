@@ -1040,6 +1040,8 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         # Use relaxed CSP for HTML pages that load external scripts
+        # Note: unsafe-inline is required for the chat interface which uses inline scripts/styles
+        # CDN domains are required for marked.js and highlight.js
         if for_html:
             self.send_header(
                 "Content-Security-Policy",
@@ -1053,7 +1055,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         self.send_header(
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload"
         )
-        # Allow any origin for the chat interface
+        # CORS configuration: Set ALLOWED_ORIGIN env var to restrict to specific domains
+        # Default is '*' to allow the chat interface to work from any domain
+        # For production, set ALLOWED_ORIGIN to your specific domain(s)
         allowed_origin = os.environ.get("ALLOWED_ORIGIN", "*")
         self.send_header("Access-Control-Allow-Origin", allowed_origin)
         self.send_header("Vary", "Origin")
@@ -1151,6 +1155,11 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 self._handle_graphql(data, agent)
             elif path in ("/vulcan/v1/chat", "/v1/chat"):
                 # Chat endpoint - allow unauthenticated access for the chat interface
+                # Rate limiting by IP to prevent abuse
+                client_ip = self.client_address[0] if self.client_address else "unknown"
+                if self.server_instance and not self.server_instance.rate_limiter.is_allowed(f"chat:{client_ip}"):
+                    self._send_error(429, "Rate limit exceeded. Please try again later.")
+                    return
                 self._handle_chat(data)
             else:
                 self._send_error(404, "Not Found")
@@ -1307,6 +1316,10 @@ class APIRequestHandler(BaseHTTPRequestHandler):
             self._send_error(400, "Missing required field: message")
             return
         
+        # Log chat request for monitoring
+        client_ip = self.client_address[0] if self.client_address else "unknown"
+        logger.info(f"Chat request from {client_ip}: {message[:QUERY_PREVIEW_LOG_LENGTH]}...")
+        
         max_tokens = data.get("max_tokens", 1024)
         enable_reasoning = data.get("enable_reasoning", True)
         enable_memory = data.get("enable_memory", True)
@@ -1367,8 +1380,10 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                     response_text = f"I processed your request but encountered an issue: {str(e)}"
             else:
                 # Fallback response when reasoning is not available
+                preview_length = QUERY_PREVIEW_LOG_LENGTH
+                message_preview = message[:preview_length] + "..." if len(message) > preview_length else message
                 response_text = (
-                    f"I received your message: '{message[:100]}...'. "
+                    f"I received your message: '{message_preview}'. "
                     "The full reasoning engine is initializing. "
                     "Please try again in a moment."
                 )
