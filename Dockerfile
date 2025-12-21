@@ -112,6 +112,9 @@ COPY src/ ./src
 # Copy configuration files (required by application)
 COPY configs/ ./configs/
 
+# Copy demo files (including vulcan_chat.html)
+COPY demos/ ./demos/
+
 # Install local package (graphix) if setup.py exists
 RUN if [ -f setup.py ]; then \
         echo "Installing local package from setup.py"; \
@@ -161,6 +164,8 @@ COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/configs ./configs
+# Copy demo files (including vulcan_chat.html)
+COPY --from=builder /app/demos ./demos
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
 
