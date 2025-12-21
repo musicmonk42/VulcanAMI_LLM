@@ -247,6 +247,9 @@ class UnifiedPlatformSettings(BaseSettings):
     api_server_port: int = 8001
     registry_grpc_port: int = 50051
     listener_port: int = 8084
+    
+    # Standalone service host bindings (default to localhost for security)
+    listener_host: str = os.environ.get("LISTENER_HOST", "127.0.0.1")
 
     # Enable/disable individual services
     enable_api_gateway: bool = True
@@ -256,6 +259,14 @@ class UnifiedPlatformSettings(BaseSettings):
     enable_registry_grpc: bool = True
     enable_listener: bool = True
     enable_chat_endpoint: bool = True
+    
+    # Cloud platform detection (for logging purposes)
+    _is_cloud_platform: bool = bool(
+        os.environ.get("RAILWAY_ENVIRONMENT")  # Railway detection
+        or os.environ.get("RAILWAY_SERVICE_NAME")  # Alternative Railway detection
+        or os.environ.get("RENDER")  # Render.com detection
+        or os.environ.get("HEROKU_APP_NAME")  # Heroku detection
+    )
 
     # Chat endpoint configuration
     chat_mount: str = "/chat"
@@ -1048,6 +1059,21 @@ async def lifespan(app: FastAPI):
                 "Wildcard '*' detected in CORS origins; this is discouraged in production. Consider restricting to specific origins."
             )
 
+        # Log cloud platform detection and background service status
+        if settings._is_cloud_platform:
+            cloud_provider = (
+                "Railway" if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME")
+                else "Render" if os.environ.get("RENDER")
+                else "Heroku" if os.environ.get("HEROKU_APP_NAME")
+                else "cloud platform"
+            )
+            logger.info(f"☁️  {cloud_provider} deployment detected")
+            logger.info("💡 Note: Background services (api_server, registry_grpc, listener) run on internal ports")
+        
+        logger.info(f"Background services: api_server={'✓' if settings.enable_api_server else '✗'}, "
+                    f"registry_grpc={'✓' if settings.enable_registry_grpc else '✗'}, "
+                    f"listener={'✓' if settings.enable_listener else '✗'}")
+
         # Import and mount services
         logger.info("=" * 70)
         logger.info("Importing services...")
@@ -1492,6 +1518,29 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting API Server on port {settings.api_server_port}..."
                 )
+                # Build environment for API server
+                # - Use GRAPHIX_API_PORT to avoid conflict with main app's PORT
+                # - Pass GRAPHIX_JWT_SECRET if available, otherwise enable ephemeral secret
+                # - Share JWT_SECRET_KEY from main platform if GRAPHIX_JWT_SECRET not set
+                api_server_env = {
+                    **os.environ,
+                    "GRAPHIX_API_PORT": str(settings.api_server_port),
+                    "GRAPHIX_API_HOST": "0.0.0.0",
+                }
+                # Remove PORT to prevent api_server from using main app's port
+                api_server_env.pop("PORT", None)
+                
+                # Ensure JWT secret is available for api_server
+                if not os.environ.get("GRAPHIX_JWT_SECRET"):
+                    # Try to use JWT_SECRET_KEY from main platform
+                    jwt_key = os.environ.get("JWT_SECRET_KEY") or os.environ.get("JWT_SECRET")
+                    if jwt_key:
+                        api_server_env["GRAPHIX_JWT_SECRET"] = jwt_key
+                    else:
+                        # Allow ephemeral secret for development/cloud deployments
+                        api_server_env["ALLOW_EPHEMERAL_SECRET"] = "true"
+                        logger.warning("API Server will use ephemeral JWT secret (no persistent JWT_SECRET configured)")
+                
                 # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 # This avoids issues with Windows event loop policy and uvicorn --reload
                 api_server_proc = subprocess.Popen(
@@ -1500,10 +1549,7 @@ async def lifespan(app: FastAPI):
                         "-m",
                         "src.api_server",
                     ],
-                    env={
-                        **os.environ,
-                        "API_SERVER_PORT": str(settings.api_server_port),
-                    },
+                    env=api_server_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
@@ -1532,6 +1578,15 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting Registry gRPC Server on port {settings.registry_grpc_port}..."
                 )
+                # Build environment for Registry gRPC server
+                registry_env = {
+                    **os.environ,
+                    "REGISTRY_PORT": str(settings.registry_grpc_port),
+                    "REGISTRY_DB_PATH": os.environ.get("REGISTRY_DB_PATH", "registry.db"),
+                }
+                # Remove PORT to prevent conflict with main app
+                registry_env.pop("PORT", None)
+                
                 # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 registry_grpc_proc = subprocess.Popen(
                     [
@@ -1539,10 +1594,7 @@ async def lifespan(app: FastAPI):
                         "-m",
                         "src.governance.registry_api_server",
                     ],
-                    env={
-                        **os.environ,
-                        "REGISTRY_PORT": str(settings.registry_grpc_port),
-                    },
+                    env=registry_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
@@ -1575,6 +1627,14 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting Listener Service on port {settings.listener_port}..."
                 )
+                # Build environment for Listener service
+                listener_env = {
+                    **os.environ,
+                    "LISTENER_DB_PATH": os.environ.get("LISTENER_DB_PATH", "listener_registry.db"),
+                }
+                # Remove PORT to prevent conflict with main app
+                listener_env.pop("PORT", None)
+                
                 # Use subprocess.Popen instead of asyncio.create_subprocess_exec
                 listener_proc = subprocess.Popen(
                     [
@@ -1584,8 +1644,9 @@ async def lifespan(app: FastAPI):
                         "--port",
                         str(settings.listener_port),
                         "--host",
-                        settings.host,
+                        settings.listener_host,  # Configurable via LISTENER_HOST env var
                     ],
+                    env=listener_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                 )
