@@ -1532,7 +1532,10 @@ class ConfigurationManager:
     # FIX: Add new validate_env method as requested
     def validate_env(self):
         if not os.getenv("OPENAI_API_KEY"):
-            logger.warning("OPENAI_API_KEY missing - set it for real AI")
+            logger.info(
+                "OPENAI_API_KEY not set - running in offline/local mode. "
+                "Set OPENAI_API_KEY in environment for external LLM integration."
+            )
         logger.info("Env validated")
         return True
 
