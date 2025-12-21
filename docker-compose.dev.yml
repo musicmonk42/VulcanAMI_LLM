@@ -328,7 +328,12 @@ services:
       - PYTHONUNBUFFERED=1
       - CORS_ORIGINS=http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000
     ports:
-      - "8000:8000"  # Main API (conflicts with api-gateway if both run)
+      # NOTE: Port 8000 conflicts with api-gateway service if both run simultaneously.
+      # Use profiles to avoid conflict:
+      #   - docker compose --profile full up    # Runs full-platform only
+      #   - docker compose up                   # Runs microservices (api-gateway, dqs, pii)
+      # Or change this to "8001:8000" to run both simultaneously
+      - "8000:8000"
     volumes:
       - ./configs:/app/configs:ro
       - ./demos:/app/demos:ro
