@@ -41,7 +41,7 @@ from .warm_pool import WarmStartPool
 
 # Optional components that might not be available
 try:
-    pass
+    from ..contextual_bandit import AdaptiveBanditOrchestrator, BanditContext
 
     BANDIT_AVAILABLE = True
 except ImportError:
