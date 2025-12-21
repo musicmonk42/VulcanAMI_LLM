@@ -129,6 +129,69 @@ services:
   # Application Services
   ############################################################################
 
+  # Full Platform (Same as Railway deployment - includes VULCAN chat endpoint)
+  # This is the recommended deployment for the complete VulcanAMI experience
+  full-platform:
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-musicmonk42/vulcanami_llm}:${VERSION:-latest}
+    container_name: vulcanami-full-platform-prod
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - VERSION=${VERSION:-latest}
+      - PORT=8000
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - JWT_SECRET=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - GRAPHIX_JWT_SECRET=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - BOOTSTRAP_KEY=${BOOTSTRAP_KEY:?BOOTSTRAP_KEY is required}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-vulcanami}
+      - POSTGRES_USER=${POSTGRES_USER:-vulcanami}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - vulcanami-prod
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    profiles:
+      - full  # Only starts with: docker compose --profile full up
+
+  # API Gateway (Microservice - for distributed deployments)
   api-gateway:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-musicmonk42/vulcanami_llm}-api:${VERSION:-latest}
     container_name: vulcanami-api-prod
