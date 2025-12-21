@@ -93,7 +93,7 @@ else:
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
@@ -2140,16 +2140,22 @@ if settings.cors_enabled:
 # Mount demos directory to serve vulcan_chat.html and other static UI files
 _demos_dir = Path(__file__).parent.parent / "demos"
 if _demos_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(_demos_dir)), name="static")
-    logger.info(f"✓ Mounted static files from {_demos_dir} at /static")
-    logger.info("  → vulcan_chat.html available at /static/vulcan_chat.html")
+    app.mount("/demos", StaticFiles(directory=str(_demos_dir)), name="demos")
+    logger.info(f"✓ Mounted demos files from {_demos_dir} at /demos")
+    logger.info("  → vulcan_chat.html available at /demos/vulcan_chat.html")
+
+# Mount static directory for the main chat interface
+_static_dir = Path(__file__).parent.parent / "static"
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+    logger.info(f"✓ Mounted static files from {_static_dir} at /static")
 
 
-# Convenience redirect: /vulcan_chat.html -> /static/vulcan_chat.html
+# Convenience redirect: /vulcan_chat.html -> /demos/vulcan_chat.html
 @app.get("/vulcan_chat.html")
 async def vulcan_chat_redirect():
-    """Redirect /vulcan_chat.html to /static/vulcan_chat.html for convenience."""
-    return RedirectResponse(url="/static/vulcan_chat.html", status_code=301)
+    """Redirect /vulcan_chat.html to /demos/vulcan_chat.html for convenience."""
+    return RedirectResponse(url="/demos/vulcan_chat.html", status_code=301)
 
 
 # Request logging and metrics middleware
@@ -2188,10 +2194,26 @@ async def log_requests(request: Request, call_next):
 # =============================================================================
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
+@app.get("/")
+async def root():
     """
-    Enhanced root endpoint with flash messaging, live service health, and API explorer.
+    Root endpoint serves the chat interface (vulcan_chat.html).
+    For platform status, visit /status instead.
+    """
+    static_index = Path(__file__).parent.parent / "static" / "index.html"
+    if static_index.exists():
+        return FileResponse(static_index, media_type="text/html")
+    # Fallback to demos directory if static/index.html doesn't exist
+    demos_chat = Path(__file__).parent.parent / "demos" / "vulcan_chat.html"
+    if demos_chat.exists():
+        return FileResponse(demos_chat, media_type="text/html")
+    return HTMLResponse(content="<h1>Chat interface not found. Please check installation.</h1>", status_code=404)
+
+
+@app.get("/status", response_class=HTMLResponse)
+async def status_page(request: Request):
+    """
+    Status page with flash messaging, live service health, and API explorer.
     """
     base_url = f"http://{request.url.hostname}:{request.url.port or settings.port}"
 
