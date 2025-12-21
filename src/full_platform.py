@@ -234,7 +234,7 @@ class UnifiedPlatformSettings(BaseSettings):
     vulcan_attr: str = "app"
     arena_module: str = "src.graphix_arena"
     arena_attr: str = "app"
-    registry_module: str = "app"
+    registry_module: str = "src.governance.app"
     registry_attr: str = "app"
     api_gateway_module: str = "src.api_gateway"
     api_gateway_attr: str = "app"
@@ -1339,21 +1339,30 @@ async def lifespan(app: FastAPI):
                 # ================================================================
 
                 # Initialize LLM component if available
-                try:
-                    from graphix_vulcan_llm import GraphixVulcanLLM
+                # Check environment variable to enable/disable GraphixVulcanLLM
+                enable_graphix_vulcan_llm = os.getenv('ENABLE_GRAPHIX_VULCAN_LLM', 'true').lower() == 'true'
+                
+                if enable_graphix_vulcan_llm:
+                    try:
+                        from graphix_vulcan_llm import GraphixVulcanLLM
 
-                    llm_instance = GraphixVulcanLLM(
-                        config_path="configs/llm_config.yaml"
-                    )
-                    vulcan_module.app.state.llm = llm_instance
-                    logger.info("✓ VULCAN LLM initialized")
-                except ImportError:
-                    logger.info("GraphixVulcanLLM not available, using mock")
-                    from unittest.mock import MagicMock
+                        llm_instance = GraphixVulcanLLM(
+                            config_path="configs/llm_config.yaml"
+                        )
+                        vulcan_module.app.state.llm = llm_instance
+                        logger.info("✓ VULCAN LLM initialized (real mode)")
+                    except ImportError:
+                        logger.info("GraphixVulcanLLM not available, using mock")
+                        from unittest.mock import MagicMock
 
-                    vulcan_module.app.state.llm = MagicMock()
-                except Exception as llm_err:
-                    logger.warning(f"LLM initialization failed: {llm_err}, using mock")
+                        vulcan_module.app.state.llm = MagicMock()
+                    except Exception as llm_err:
+                        logger.warning(f"LLM initialization failed: {llm_err}, using mock")
+                        from unittest.mock import MagicMock
+
+                        vulcan_module.app.state.llm = MagicMock()
+                else:
+                    logger.info("GraphixVulcanLLM disabled via ENABLE_GRAPHIX_VULCAN_LLM=false, using mock")
                     from unittest.mock import MagicMock
 
                     vulcan_module.app.state.llm = MagicMock()
