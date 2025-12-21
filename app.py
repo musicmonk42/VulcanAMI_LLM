@@ -642,8 +642,17 @@ def apply_security_headers(resp):
     resp.headers["Permissions-Policy"] = (
         "geolocation=(), microphone=(), camera=(), payment=()"
     )
+    # Relaxed CSP for chat interface - allows CDN scripts and inline styles
     resp.headers["Content-Security-Policy"] = (
-        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' https:; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
     )
     resp.headers["Strict-Transport-Security"] = (
         "max-age=31536000; includeSubDomains; preload"
