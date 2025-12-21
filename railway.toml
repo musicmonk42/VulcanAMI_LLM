@@ -14,12 +14,21 @@
 #
 # REQUIRED ENVIRONMENT VARIABLES (set in Railway dashboard):
 # - JWT_SECRET_KEY: Strong secret for JWT signing (min 32 chars)
-# - CORS_ORIGINS: Comma-separated list of allowed origins
+# - OPENAI_API_KEY: For LLM chat features
 #
 # OPTIONAL ENVIRONMENT VARIABLES:
 # - PORT: Server port (Railway sets this automatically)
 # - LOG_LEVEL: Logging level (default: INFO)
-# - OPENAI_API_KEY: For external LLM integration
+# - ANTHROPIC_API_KEY: For Claude model support
+# - GRAPHIX_API_KEY: For Graphix services
+# - VULCAN_LLM_API_KEY: For self-improvement features (defaults to OPENAI_API_KEY)
+# - DATABASE_URL: PostgreSQL connection string
+# - REDIS_URL: Redis connection string
+#
+# DEBUGGING:
+# - Check /vulcan/v1/llm/status endpoint to verify LLM configuration
+# - Check /health endpoint for overall platform health
+# - Check Railway logs for startup messages about environment variables
 # =============================================================================
 [build]
 # Use the main Dockerfile for building the full platform

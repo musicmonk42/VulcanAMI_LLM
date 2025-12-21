@@ -28,6 +28,7 @@ from threading import Thread
 from contextlib import asynccontextmanager
 import time
 import socket  # <-- ADDED
+import traceback
 import logging
 import json
 import hmac
@@ -120,20 +121,37 @@ try:
 
     OPENAI_AVAILABLE = True
     _openai_client = None
+    _openai_init_error = None
 
     def get_openai_client():
-        global _openai_client
-        if _openai_client is None:
+        global _openai_client, _openai_init_error
+        if _openai_client is None and _openai_init_error is None:
             api_key = os.getenv("OPENAI_API_KEY")
             if api_key:
-                _openai_client = OpenAI(api_key=api_key)
+                try:
+                    _openai_client = OpenAI(api_key=api_key)
+                    logger.info("OpenAI client initialized successfully")
+                except Exception as e:
+                    _openai_init_error = str(e)
+                    logger.error(f"Failed to initialize OpenAI client: {e}")
+            else:
+                _openai_init_error = "OPENAI_API_KEY environment variable not set"
+                logger.warning("OPENAI_API_KEY not set - OpenAI fallback disabled")
         return _openai_client
+
+    def get_openai_init_error():
+        """Return any error from OpenAI initialization for diagnostics."""
+        return _openai_init_error
 
 except ImportError:
     OPENAI_AVAILABLE = False
 
     def get_openai_client():
+        logger.warning("OpenAI package not installed - install with: pip install openai")
         return None
+
+    def get_openai_init_error():
+        return "OpenAI package not installed - install with: pip install openai"
 
 
 # ============================================================
@@ -2480,7 +2498,12 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                     "[VULCAN] Response generated via OpenAI fallback (with Vulcan cognitive context)"
                 )
             except Exception as e:
-                logger.warning(f"[VULCAN] OpenAI fallback failed: {e}")
+                # Log full error details for Railway debugging
+                logger.error(f"[VULCAN] OpenAI fallback failed: {type(e).__name__}: {e}")
+        else:
+            # Log why OpenAI client is not available
+            init_error = get_openai_init_error()
+            logger.warning(f"[VULCAN] OpenAI client not available for fallback: {init_error}")
 
     # PRIORITY 3: Generate response from reasoning if both LLMs failed
     if not response_text and (reasoning_insights or world_model_insights):
@@ -3413,11 +3436,19 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                         response_text = await loop.run_in_executor(None, call_openai)
                         systems_used.append("openai_llm")
                     except Exception as e:
-                        logger.warning(
-                            f"OpenAI call failed, falling back to local model: {e}"
+                        # Log the full error details for debugging on Railway
+                        logger.error(
+                            f"OpenAI API call failed: {type(e).__name__}: {e}"
                         )
+                        # Include error type for better diagnostics
+                        logger.debug(f"OpenAI error traceback: {traceback.format_exc()}")
                         # Fall through to local LLM
                         response_text = ""
+                else:
+                    # Log why OpenAI is not available for debugging
+                    init_error = get_openai_init_error()
+                    logger.info(f"OpenAI client not available: {init_error}")
+                    response_text = ""
 
                 # Fallback to local LLM if OpenAI failed or not available
                 if not response_text:
@@ -3791,6 +3822,46 @@ async def cognitive_status():
             and get_openai_client() is not None,
             "vulcan_primary": True,  # VULCAN systems are always primary
         },
+        "timestamp": time.time(),
+    }
+
+
+@app.get("/v1/llm/status")
+async def llm_status():
+    """
+    Diagnostic endpoint to check LLM availability and configuration.
+    
+    Use this to debug OpenAI API issues on Railway or other deployments.
+    """
+    openai_key_set = bool(os.getenv("OPENAI_API_KEY"))
+    openai_key_length = len(os.getenv("OPENAI_API_KEY", "")) if openai_key_set else 0
+    
+    # Check OpenAI client status
+    openai_client = get_openai_client()
+    init_error = get_openai_init_error()
+    
+    return {
+        "openai": {
+            "package_available": OPENAI_AVAILABLE,
+            "api_key_set": openai_key_set,
+            "api_key_length": openai_key_length,  # For debugging truncated keys
+            "client_initialized": openai_client is not None,
+            "initialization_error": init_error,
+        },
+        "local_llm": {
+            "available": hasattr(app.state, "llm") and app.state.llm is not None,
+            "type": type(getattr(app.state, "llm", None)).__name__ if hasattr(app.state, "llm") else None,
+        },
+        "fallback_chain": [
+            "1. VULCAN Local LLM (if available)",
+            "2. OpenAI API (gpt-3.5-turbo)",
+            "3. Reasoning-based response generation",
+            "4. Static fallback message",
+        ],
+        "recommendation": (
+            "OpenAI ready" if openai_client else
+            f"OpenAI not available: {init_error or 'Unknown reason'}"
+        ),
         "timestamp": time.time(),
     }
 
