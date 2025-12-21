@@ -247,6 +247,9 @@ class UnifiedPlatformSettings(BaseSettings):
     api_server_port: int = 8001
     registry_grpc_port: int = 50051
     listener_port: int = 8084
+    
+    # Standalone service host bindings (default to localhost for security)
+    listener_host: str = os.environ.get("LISTENER_HOST", "127.0.0.1")
 
     # Enable/disable individual services
     enable_api_gateway: bool = True
@@ -1641,7 +1644,7 @@ async def lifespan(app: FastAPI):
                         "--port",
                         str(settings.listener_port),
                         "--host",
-                        "127.0.0.1",  # Bind to localhost for security (internal service)
+                        settings.listener_host,  # Configurable via LISTENER_HOST env var
                     ],
                     env=listener_env,
                     stdout=subprocess.PIPE,

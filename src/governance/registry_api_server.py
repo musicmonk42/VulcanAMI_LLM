@@ -1033,18 +1033,18 @@ class SecurityAuditEngine:
         """Retrieve the entire audit log, ordered by timestamp."""
         return self.db.get_full_audit_log()
 
-    def _compute_entry_hash_internal(self, entry: Dict, previous_hash: str) -> str:
+    def _build_entry_hash_data(self, entry: Dict, previous_hash: str) -> str:
         """
-        Internal method to compute hash for an audit log entry.
+        Build the canonical JSON string for hash computation.
         
         Args:
             entry: The audit log entry
             previous_hash: Hash of the previous entry (for chain linking)
             
         Returns:
-            SHA-256 hash of the entry
+            Canonical JSON string for hashing
         """
-        entry_data = json.dumps({
+        return json.dumps({
             "timestamp": entry.get("timestamp", ""),
             "action": entry.get("action", ""),
             "details": entry.get("details", {}),
@@ -1052,7 +1052,25 @@ class SecurityAuditEngine:
             "entity_type": entry.get("entity_type", ""),
             "previous_hash": previous_hash,
         }, sort_keys=True)
+
+    def compute_entry_hash(self, entry: Dict, previous_hash: str = None) -> str:
+        """
+        Compute the SHA-256 hash for an audit log entry.
         
+        This method is used both for integrity verification and for 
+        computing hashes when adding new entries to the audit log chain.
+        
+        Args:
+            entry: The audit log entry
+            previous_hash: Hash of the previous entry (for chain linking).
+                          Defaults to genesis hash (64 zeros) if None.
+            
+        Returns:
+            SHA-256 hash of the entry as hex string
+        """
+        if previous_hash is None:
+            previous_hash = "0" * 64
+        entry_data = self._build_entry_hash_data(entry, previous_hash)
         return hashlib.sha256(entry_data.encode()).hexdigest()
 
     def verify_audit_log_integrity(self) -> bool:
@@ -1078,8 +1096,8 @@ class SecurityAuditEngine:
             previous_hash = "0" * 64  # Genesis hash
             
             for i, entry in enumerate(audit_logs):
-                # Compute expected hash for this entry using shared method
-                computed_hash = self._compute_entry_hash_internal(entry, previous_hash)
+                # Compute expected hash for this entry
+                computed_hash = self.compute_entry_hash(entry, previous_hash)
                 
                 # If entry has a stored hash, verify it matches
                 stored_hash = entry.get("entry_hash")
@@ -1101,21 +1119,6 @@ class SecurityAuditEngine:
         except Exception as e:
             self.logger.error(f"Failed integrity check: {e}")
             return False
-
-    def compute_entry_hash(self, entry: Dict, previous_hash: str = None) -> str:
-        """
-        Compute the hash for an audit log entry.
-        
-        Args:
-            entry: The audit log entry
-            previous_hash: Hash of the previous entry (for chain linking)
-            
-        Returns:
-            SHA-256 hash of the entry
-        """
-        if previous_hash is None:
-            previous_hash = "0" * 64
-        return self._compute_entry_hash_internal(entry, previous_hash)
 
 
 # --- gRPC Service Implementation ---

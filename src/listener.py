@@ -25,6 +25,7 @@ import sqlite3
 import sys
 import threading
 import time
+import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -224,18 +225,26 @@ class ListenerAgentRegistry:
         Verify a cryptographic signature from an agent.
         
         Signature Scheme:
-        The client computes: signature = HMAC-SHA256(api_key, message)
-        The server verifies by computing the same HMAC with the stored api_key_hash.
+        -----------------
+        The server stores SHA256(api_key) as api_key_hash.
         
-        Since we store SHA256(api_key) as api_key_hash, the client should compute:
-          signature = HMAC-SHA256(SHA256(api_key), message)
+        Client Signature Generation:
+            derived_key = SHA256(api_key)  # Same as stored api_key_hash
+            signature = HMAC-SHA256(derived_key, message)
         
-        This allows verification without storing the raw API key.
+        Server Verification:
+            expected = HMAC-SHA256(api_key_hash, message)
+            valid = constant_time_compare(expected, signature)
+        
+        This scheme ensures:
+        1. Raw API keys are never stored on the server
+        2. HMAC provides message integrity and authentication
+        3. Constant-time comparison prevents timing attacks
         
         Args:
             agent_id: The agent making the request
             message: The message that was signed (typically the request body)
-            signature: The hex-encoded HMAC signature
+            signature: The hex-encoded HMAC-SHA256 signature
             
         Returns:
             True if signature is valid, False otherwise
@@ -253,11 +262,9 @@ class ListenerAgentRegistry:
 
         try:
             # Verify signature using stored api_key_hash as the HMAC key
-            # Client must compute: HMAC-SHA256(SHA256(api_key), message)
-            # This is secure because:
-            # 1. We never store the raw API key
-            # 2. The hash acts as a derived key
-            # 3. HMAC provides integrity and authentication
+            # Client computes: HMAC-SHA256(SHA256(api_key), message)
+            # Server computes: HMAC-SHA256(api_key_hash, message)
+            # These match because api_key_hash = SHA256(api_key)
             expected_sig = hmac.new(
                 agent["api_key_hash"].encode(),
                 message.encode(),
@@ -397,8 +404,6 @@ class ListenerGraphRuntime:
         Returns:
             Execution result dictionary
         """
-        import uuid
-        
         execution_id = str(uuid.uuid4())
         started_at = datetime.utcnow()
         
