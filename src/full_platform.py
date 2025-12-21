@@ -35,6 +35,62 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# =============================================================================
+# ENVIRONMENT LOADING - CRITICAL FOR RAILWAY DEPLOYMENT
+# =============================================================================
+# Load environment variables from .env file BEFORE importing anything else
+# This ensures all modules see the correct environment configuration
+try:
+    from dotenv import load_dotenv
+    
+    # Try multiple .env locations for Railway and local development
+    env_paths = [
+        Path("/app/.env"),           # Docker/Railway container path
+        Path(".env"),                # Current directory
+        Path(__file__).parent.parent / ".env",  # Project root relative to src/
+    ]
+    
+    env_loaded = False
+    for env_path in env_paths:
+        if env_path.exists():
+            load_dotenv(env_path, override=True)
+            print(f"✅ Loaded environment from: {env_path}")
+            env_loaded = True
+            break
+    
+    if not env_loaded:
+        print("⚠️  No .env file found, using system environment variables")
+        
+except ImportError:
+    print("⚠️  python-dotenv not installed, using system environment variables only")
+
+# Verify critical keys are present and log status
+_REQUIRED_KEYS = ["OPENAI_API_KEY", "JWT_SECRET_KEY"]
+_OPTIONAL_KEYS = ["ANTHROPIC_API_KEY", "GRAPHIX_API_KEY", "VULCAN_LLM_API_KEY"]
+
+_missing_required = [key for key in _REQUIRED_KEYS if not os.getenv(key)]
+_missing_optional = [key for key in _OPTIONAL_KEYS if not os.getenv(key)]
+
+if _missing_required:
+    print(f"⚠️  Missing REQUIRED environment variables: {_missing_required}")
+    print("💡 Set these in Railway dashboard, .env file, or system environment")
+else:
+    print("✅ All required environment variables are set")
+
+if _missing_optional:
+    print(f"ℹ️  Optional environment variables not set: {_missing_optional}")
+
+# Log OpenAI key status specifically (important for chat functionality)
+_openai_key = os.getenv("OPENAI_API_KEY")
+if _openai_key:
+    # Show just enough to verify it's set, not the full key
+    _key_preview = f"{_openai_key[:8]}...{_openai_key[-4:]}" if len(_openai_key) > 16 else "(short key)"
+    print(f"✅ OPENAI_API_KEY configured: {_key_preview} (length: {len(_openai_key)})")
+else:
+    print("❌ OPENAI_API_KEY not set - chat features will use fallback responses")
+
+# =============================================================================
+
 from fastapi import Depends, FastAPI, HTTPException, Request, Security, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response

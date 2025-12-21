@@ -28,6 +28,7 @@ from threading import Thread
 from contextlib import asynccontextmanager
 import time
 import socket  # <-- ADDED
+import traceback
 import logging
 import json
 import hmac
@@ -2501,7 +2502,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                 logger.error(f"[VULCAN] OpenAI fallback failed: {type(e).__name__}: {e}")
         else:
             # Log why OpenAI client is not available
-            init_error = get_openai_init_error() if 'get_openai_init_error' in dir() else "Unknown"
+            init_error = get_openai_init_error()
             logger.warning(f"[VULCAN] OpenAI client not available for fallback: {init_error}")
 
     # PRIORITY 3: Generate response from reasoning if both LLMs failed
@@ -3440,13 +3441,12 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                             f"OpenAI API call failed: {type(e).__name__}: {e}"
                         )
                         # Include error type for better diagnostics
-                        import traceback
                         logger.debug(f"OpenAI error traceback: {traceback.format_exc()}")
                         # Fall through to local LLM
                         response_text = ""
                 else:
                     # Log why OpenAI is not available for debugging
-                    init_error = get_openai_init_error() if 'get_openai_init_error' in dir() else "Unknown"
+                    init_error = get_openai_init_error()
                     logger.info(f"OpenAI client not available: {init_error}")
                     response_text = ""
 
@@ -3838,7 +3838,7 @@ async def llm_status():
     
     # Check OpenAI client status
     openai_client = get_openai_client()
-    init_error = get_openai_init_error() if 'get_openai_init_error' in dir() else None
+    init_error = get_openai_init_error()
     
     return {
         "openai": {
