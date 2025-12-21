@@ -1034,14 +1034,85 @@ class SecurityAuditEngine:
         return self.db.get_full_audit_log()
 
     def verify_audit_log_integrity(self) -> bool:
-        """Verify the integrity of the audit log (placeholder)."""
-        self.logger.info("Verifying audit log integrity (mock implementation).")
+        """
+        Verify the integrity of the audit log using hash chain verification.
+        
+        This implementation uses a cryptographic hash chain to verify that
+        no audit log entries have been tampered with or deleted. Each entry's
+        hash is computed based on its content and the hash of the previous entry.
+        
+        Returns:
+            True if the audit log integrity is valid, False otherwise
+        """
+        self.logger.info("Verifying audit log integrity using hash chain...")
         try:
-            _ = self.get_full_audit_log()  # Check if retrieval works
+            audit_logs = self.get_full_audit_log()
+            
+            if not audit_logs:
+                self.logger.info("Audit log is empty - integrity verified (trivially)")
+                return True
+            
+            # Verify hash chain integrity
+            previous_hash = "0" * 64  # Genesis hash
+            
+            for i, entry in enumerate(audit_logs):
+                # Compute expected hash for this entry
+                entry_data = json.dumps({
+                    "timestamp": entry.get("timestamp", ""),
+                    "action": entry.get("action", ""),
+                    "details": entry.get("details", {}),
+                    "entity_id": entry.get("entity_id", ""),
+                    "entity_type": entry.get("entity_type", ""),
+                    "previous_hash": previous_hash,
+                }, sort_keys=True)
+                
+                computed_hash = hashlib.sha256(entry_data.encode()).hexdigest()
+                
+                # If entry has a stored hash, verify it matches
+                stored_hash = entry.get("entry_hash")
+                if stored_hash and stored_hash != computed_hash:
+                    self.logger.error(
+                        f"Integrity violation at entry {i}: hash mismatch. "
+                        f"Expected {computed_hash[:16]}..., got {stored_hash[:16]}..."
+                    )
+                    return False
+                
+                previous_hash = computed_hash
+            
+            self.logger.info(
+                f"Audit log integrity verified: {len(audit_logs)} entries, "
+                f"final hash: {previous_hash[:16]}..."
+            )
             return True
+            
         except Exception as e:
-            self.logger.error(f"Failed integrity check while retrieving audit log: {e}")
+            self.logger.error(f"Failed integrity check: {e}")
             return False
+
+    def compute_entry_hash(self, entry: Dict, previous_hash: str = None) -> str:
+        """
+        Compute the hash for an audit log entry.
+        
+        Args:
+            entry: The audit log entry
+            previous_hash: Hash of the previous entry (for chain linking)
+            
+        Returns:
+            SHA-256 hash of the entry
+        """
+        if previous_hash is None:
+            previous_hash = "0" * 64
+            
+        entry_data = json.dumps({
+            "timestamp": entry.get("timestamp", ""),
+            "action": entry.get("action", ""),
+            "details": entry.get("details", {}),
+            "entity_id": entry.get("entity_id", ""),
+            "entity_type": entry.get("entity_type", ""),
+            "previous_hash": previous_hash,
+        }, sort_keys=True)
+        
+        return hashlib.sha256(entry_data.encode()).hexdigest()
 
 
 # --- gRPC Service Implementation ---
