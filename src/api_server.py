@@ -2173,10 +2173,18 @@ def main():
     bob = server.register_agent("Bob", ["user"], password=bob_password)
     admin = server.register_agent("Admin", ["admin", "govern"], password=admin_password)
 
-    print("\nTest Agents Created (store these securely):")
-    print(f"  Alice: API Key: {alice.api_key}  Password: {alice_password}")
-    print(f"  Bob:   API Key: {bob.api_key}  Password: {bob_password}")
-    print(f"  Admin: API Key: {admin.api_key}  Password: {admin_password}")
+    # Security: Never print full credentials to logs (they can leak via CI artifacts, log aggregators, etc.)
+    def _mask(s: str, visible: int = 4) -> str:
+        """Mask a secret, showing only first few chars."""
+        if len(s) <= visible:
+            return "****"
+        return s[:visible] + "..." + ("*" * 4)
+
+    print("\nTest Agents Created (credentials masked for security):")
+    print(f"  Alice: API Key: {_mask(alice.api_key)}  Password: ********")
+    print(f"  Bob:   API Key: {_mask(bob.api_key)}  Password: ********")
+    print(f"  Admin: API Key: {_mask(admin.api_key)}  Password: ********")
+    print("  Note: Full credentials are stored internally. Use agent IDs for reference.")
 
     server.start()
 

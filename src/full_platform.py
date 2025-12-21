@@ -40,6 +40,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.security.api_key import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.middleware.wsgi import WSGIMiddleware
 
@@ -2005,6 +2006,26 @@ if settings.cors_enabled:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["Authorization", "Content-Type", "X-API-Key"],
     )
+
+
+# =============================================================================
+# STATIC FILE SERVING (for vulcan_chat.html and demos)
+# =============================================================================
+# Mount demos directory to serve vulcan_chat.html and other static UI files
+_demos_dir = Path(__file__).parent.parent / "demos"
+if _demos_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_demos_dir)), name="static")
+    logger.info(f"✓ Mounted static files from {_demos_dir} at /static")
+    logger.info("  → vulcan_chat.html available at /static/vulcan_chat.html")
+
+
+# Convenience redirect: /vulcan_chat.html -> /static/vulcan_chat.html
+@app.get("/vulcan_chat.html")
+async def vulcan_chat_redirect():
+    """Redirect /vulcan_chat.html to /static/vulcan_chat.html for convenience."""
+    from fastapi.responses import RedirectResponse
+
+    return RedirectResponse(url="/static/vulcan_chat.html", status_code=301)
 
 
 # Request logging and metrics middleware
