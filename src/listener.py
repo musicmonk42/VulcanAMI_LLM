@@ -221,9 +221,16 @@ class ListenerAgentRegistry:
         signature: str
     ) -> bool:
         """
-        Verify a cryptographic signature from an agent using HMAC-SHA256.
+        Verify a cryptographic signature from an agent.
         
-        The signature is expected to be: HMAC-SHA256(api_key, message) encoded as hex.
+        Signature Scheme:
+        The client computes: signature = HMAC-SHA256(api_key, message)
+        The server verifies by computing the same HMAC with the stored api_key_hash.
+        
+        Since we store SHA256(api_key) as api_key_hash, the client should compute:
+          signature = HMAC-SHA256(SHA256(api_key), message)
+        
+        This allows verification without storing the raw API key.
         
         Args:
             agent_id: The agent making the request
@@ -245,8 +252,12 @@ class ListenerAgentRegistry:
             return False
 
         try:
-            # The signature should be HMAC-SHA256 of the message using the API key hash as the key
-            # This is a secure pattern where we use the stored hash as a derived key
+            # Verify signature using stored api_key_hash as the HMAC key
+            # Client must compute: HMAC-SHA256(SHA256(api_key), message)
+            # This is secure because:
+            # 1. We never store the raw API key
+            # 2. The hash acts as a derived key
+            # 3. HMAC provides integrity and authentication
             expected_sig = hmac.new(
                 agent["api_key_hash"].encode(),
                 message.encode(),

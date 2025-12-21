@@ -1641,7 +1641,7 @@ async def lifespan(app: FastAPI):
                         "--port",
                         str(settings.listener_port),
                         "--host",
-                        "0.0.0.0",  # Bind to all interfaces for internal service
+                        "127.0.0.1",  # Bind to localhost for security (internal service)
                     ],
                     env=listener_env,
                     stdout=subprocess.PIPE,

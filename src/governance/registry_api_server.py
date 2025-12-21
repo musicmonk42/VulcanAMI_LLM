@@ -1033,6 +1033,28 @@ class SecurityAuditEngine:
         """Retrieve the entire audit log, ordered by timestamp."""
         return self.db.get_full_audit_log()
 
+    def _compute_entry_hash_internal(self, entry: Dict, previous_hash: str) -> str:
+        """
+        Internal method to compute hash for an audit log entry.
+        
+        Args:
+            entry: The audit log entry
+            previous_hash: Hash of the previous entry (for chain linking)
+            
+        Returns:
+            SHA-256 hash of the entry
+        """
+        entry_data = json.dumps({
+            "timestamp": entry.get("timestamp", ""),
+            "action": entry.get("action", ""),
+            "details": entry.get("details", {}),
+            "entity_id": entry.get("entity_id", ""),
+            "entity_type": entry.get("entity_type", ""),
+            "previous_hash": previous_hash,
+        }, sort_keys=True)
+        
+        return hashlib.sha256(entry_data.encode()).hexdigest()
+
     def verify_audit_log_integrity(self) -> bool:
         """
         Verify the integrity of the audit log using hash chain verification.
@@ -1056,17 +1078,8 @@ class SecurityAuditEngine:
             previous_hash = "0" * 64  # Genesis hash
             
             for i, entry in enumerate(audit_logs):
-                # Compute expected hash for this entry
-                entry_data = json.dumps({
-                    "timestamp": entry.get("timestamp", ""),
-                    "action": entry.get("action", ""),
-                    "details": entry.get("details", {}),
-                    "entity_id": entry.get("entity_id", ""),
-                    "entity_type": entry.get("entity_type", ""),
-                    "previous_hash": previous_hash,
-                }, sort_keys=True)
-                
-                computed_hash = hashlib.sha256(entry_data.encode()).hexdigest()
+                # Compute expected hash for this entry using shared method
+                computed_hash = self._compute_entry_hash_internal(entry, previous_hash)
                 
                 # If entry has a stored hash, verify it matches
                 stored_hash = entry.get("entry_hash")
@@ -1102,17 +1115,7 @@ class SecurityAuditEngine:
         """
         if previous_hash is None:
             previous_hash = "0" * 64
-            
-        entry_data = json.dumps({
-            "timestamp": entry.get("timestamp", ""),
-            "action": entry.get("action", ""),
-            "details": entry.get("details", {}),
-            "entity_id": entry.get("entity_id", ""),
-            "entity_type": entry.get("entity_type", ""),
-            "previous_hash": previous_hash,
-        }, sort_keys=True)
-        
-        return hashlib.sha256(entry_data.encode()).hexdigest()
+        return self._compute_entry_hash_internal(entry, previous_hash)
 
 
 # --- gRPC Service Implementation ---
