@@ -84,9 +84,13 @@ except ImportError:
     ARGON2_AVAILABLE = False
 
 # Configure logging EARLY
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# Use stdout instead of stderr so Railway/cloud platforms classify logs correctly
+# (stderr is often treated as error-level regardless of actual log level)
+_stdout_handler = logging.StreamHandler(sys.stdout)
+_stdout_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 )
+logging.basicConfig(level=logging.INFO, handlers=[_stdout_handler])
 logger = logging.getLogger("GraphAPIServer")
 
 # Vulcan reasoning imports (after logger initialization)
@@ -1058,7 +1062,9 @@ class APIRequestHandler(BaseHTTPRequestHandler):
         try:
             parsed_path = urllib.parse.urlparse(self.path)
             path = parsed_path.path
-            if path == APIEndpoint.HEALTH.value:
+            if path == "/" or path == "":
+                self._handle_root()
+            elif path == APIEndpoint.HEALTH.value:
                 self._handle_health()
             elif path == APIEndpoint.STATUS.value:
                 self._handle_status()
@@ -1185,6 +1191,30 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                 self.server_instance.db.save_agent(agent)
             return agent
         return None
+
+    def _handle_root(self):
+        """Handle root path - return service info."""
+        self._send_json(
+            {
+                "service": "Graphix API Server",
+                "version": "2.2.0",
+                "timestamp": datetime.utcnow().isoformat(),
+                "endpoints": [
+                    "GET /",
+                    "GET /health",
+                    "GET /status",
+                    "GET /metrics",
+                    "GET /graphs/<id>",
+                    "GET /vulcan/insights",
+                    "POST /auth/login",
+                    "POST /auth/logout",
+                    "POST /graphs/submit",
+                    "POST /proposals/create",
+                    "POST /proposals/<id>/vote",
+                    "POST /api/reason",
+                ],
+            }
+        )
 
     def _handle_health(self):
         mem_info = {}
