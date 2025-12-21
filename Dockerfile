@@ -137,7 +137,8 @@ RUN if [ -f setup.py ]; then \
     fi
 
 # Download spacy language model if spacy is installed
-RUN python -m spacy download en_core_web_sm || echo "Spacy model download failed (non-critical)"
+# Using en_core_web_lg for better accuracy (required for self-improvement features)
+RUN python -m spacy download en_core_web_lg || echo "Spacy model download failed (non-critical)"
 
 # Pre-compile Python bytecode (optional performance / tamper evidence)
 RUN python -m compileall -q src
@@ -184,6 +185,13 @@ COPY --from=builder /app/demos ./demos
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
 
+# Create writable directories for self-improvement features
+# These directories need to be writable by the graphix user at runtime
+# Note: /app/src is intentionally writable to enable self-improvement features
+# For higher security deployments, consider mounting a separate volume for generated code
+RUN mkdir -p /app/data /app/data/backups && \
+    chown -R graphix:graphix /app/src /app/data /app/configs
+
 # Add hardened entrypoint script
 # This updated script enforces:
 # - JWT secret presence
@@ -218,4 +226,5 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 # - Graphix Registry API
 # - VULCAN cognitive platform with /vulcan/v1/chat endpoint
 # - All 71+ services integrated behind the chat interface
-CMD ["python", "src/full_platform.py"]
+# Note: The PORT environment variable is used for flexibility (default 8000)
+CMD ["sh", "-c", "uvicorn src.full_platform:app --host 0.0.0.0 --port ${PORT:-8000}"]
