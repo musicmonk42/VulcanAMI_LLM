@@ -199,6 +199,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # Entrypoint ensures runtime secrets are provided securely
 ENTRYPOINT ["/app/entrypoint.sh"]
 
-# Default command (can be overridden by docker run arguments)
-# Adjust if you want to run another service (e.g., full_platform.py)
-CMD ["python", "src/api_server.py"]
+# Default command - runs the full platform which includes:
+# - Graphix Registry API
+# - VULCAN cognitive platform with /vulcan/v1/chat endpoint
+# - All 71+ services integrated behind the chat interface
+CMD ["python", "src/full_platform.py"]

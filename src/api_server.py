@@ -1364,7 +1364,22 @@ class APIRequestHandler(BaseHTTPRequestHandler):
                     )
                     
                     if hasattr(result, "conclusion"):
-                        response_text = str(result.conclusion)
+                        conclusion = result.conclusion
+                        # Handle filtered results gracefully - provide user-friendly response
+                        if isinstance(conclusion, dict) and conclusion.get("filtered"):
+                            # Safety filter was applied - provide a friendly response
+                            response_text = (
+                                "I'm sorry, I couldn't generate a complete response for that query. "
+                                "Please try rephrasing your question or ask something else."
+                            )
+                        elif isinstance(conclusion, dict) and conclusion.get("error"):
+                            # Error in reasoning - provide a friendly response
+                            response_text = (
+                                "I encountered an issue processing your request. "
+                                "Please try again or rephrase your question."
+                            )
+                        else:
+                            response_text = str(conclusion)
                     elif hasattr(result, "result"):
                         response_text = str(result.result)
                     else:
