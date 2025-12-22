@@ -163,9 +163,9 @@ class SelfImprovementState:
     )  # [{timestamp, cost_usd}]
 
     def __post_init__(self):
-        """Initialize last_improvement to current time if still at default 0."""
-        if self.last_improvement == 0:
-            self.last_improvement = time.time()
+        """Initialize tracking attributes. Keep last_improvement at 0 for fresh state."""
+        # Don't initialize last_improvement - keep it at 0 to allow immediate triggers
+        pass
 
 
 class SelfImprovementDrive:
@@ -1394,6 +1394,10 @@ class SelfImprovementDrive:
                     return True
 
             elif trigger_type == TriggerType.PERIODIC.value:
+                # Don't fire periodic trigger on fresh state - need a baseline to measure from
+                if self.state.last_improvement == 0:
+                    return False
+                
                 interval_hours = trigger_config.get("interval_hours", 24)
                 jitter_minutes = trigger_config.get("random_jitter_minutes", 0)
 
@@ -1463,9 +1467,21 @@ class SelfImprovementDrive:
 
         # SAFEGUARD: Prevent infinite loop by checking minimum time between improvements
         # Use environment variable SELF_IMPROVEMENT_MIN_INTERVAL or default to 3600 seconds (1 hour)
+        # EXCEPTION: Allow immediate trigger on fresh state (last_improvement == 0)
         min_interval = int(os.getenv("SELF_IMPROVEMENT_MIN_INTERVAL", "3600"))
         time_since_last = time.time() - self.state.last_improvement
-        if time_since_last < min_interval:
+        
+        # Check if this is a fresh state that should be allowed to trigger immediately
+        # Fresh state indicators:
+        # 1. last_improvement is 0 (never run before)
+        # 2. OR session just started (within 60 seconds) - handles state loaded from disk
+        is_fresh_state = (
+            self.state.last_improvement == 0 
+            or (time.time() - self.state.session_start_time) < 60
+        )
+        
+        # Only enforce minimum interval if NOT a fresh state
+        if not is_fresh_state and time_since_last < min_interval:
             logger.debug(
                 f"Skipping trigger: only {time_since_last:.0f}s since last improvement "
                 f"(minimum interval: {min_interval}s)"
