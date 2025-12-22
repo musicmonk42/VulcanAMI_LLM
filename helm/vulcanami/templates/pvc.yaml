@@ -1,0 +1,45 @@
+{{- if .Values.persistence.memoryStore.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vulcanami.fullname" . }}-memory-store
+  labels:
+    {{- include "vulcanami.labels" . | nindent 4 }}
+    component: memory-system
+  {{- if .Values.persistence.memoryStore.retain }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.memoryStore.accessMode }}
+  {{- if .Values.persistence.memoryStore.storageClass }}
+  storageClassName: {{ .Values.persistence.memoryStore.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.memoryStore.size }}
+---
+{{- end }}
+{{- if .Values.persistence.cache.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vulcanami.fullname" . }}-cache
+  labels:
+    {{- include "vulcanami.labels" . | nindent 4 }}
+    component: memory-system
+  {{- if .Values.persistence.cache.retain }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.cache.accessMode }}
+  {{- if .Values.persistence.cache.storageClass }}
+  storageClassName: {{ .Values.persistence.cache.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.cache.size }}
+{{- end }}

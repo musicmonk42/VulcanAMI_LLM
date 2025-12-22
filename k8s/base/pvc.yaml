@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vulcanami-memory-store
+  namespace: vulcanami
+  labels:
+    app: vulcanami
+    component: memory-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vulcanami-cache
+  namespace: vulcanami
+  labels:
+    app: vulcanami
+    component: memory-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

@@ -27,6 +27,42 @@ spec:
       serviceAccountName: {{ include "vulcanami.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if and .Values.memorySystem.enabled .Values.memorySystem.milvus.bootstrap.enabled }}
+      initContainers:
+      - name: milvus-bootstrap
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - python
+          - -m
+          - gvulcan.vector.milvus_bootstrap
+          - --config
+          - {{ .Values.memorySystem.milvus.bootstrap.configPath }}
+          - --host
+          - {{ .Values.memorySystem.milvus.host }}
+          - --port
+          - "{{ .Values.memorySystem.milvus.port }}"
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: configs
+          mountPath: /configs
+          readOnly: true
+        env:
+        - name: MILVUS_HOST
+          value: {{ .Values.memorySystem.milvus.host | quote }}
+        - name: MILVUS_PORT
+          value: {{ .Values.memorySystem.milvus.port | quote }}
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+      {{- end }}
       containers:
       - name: {{ .Chart.Name }}
         securityContext:
@@ -127,17 +163,63 @@ spec:
         - name: API_HOST
           value: {{ .Values.security.bindHost | default "0.0.0.0" | quote }}
         {{- end }}
+        {{- if .Values.memorySystem.enabled }}
+        # Vulcan Memory System v46 environment variables
+        envFrom:
+        - configMapRef:
+            name: {{ include "vulcanami.fullname" . }}-memory-config
+        {{- if .Values.secrets.awsAccessKeyId }}
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: awsAccessKeyId
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "vulcanami.fullname" . }}-secrets
+              key: awsSecretAccessKey
+        {{- end }}
+        {{- end }}
         # Volumes for readOnlyRootFilesystem compatibility
         volumeMounts:
         - name: tmp
           mountPath: /tmp
         - name: app-data
           mountPath: /app/data
+        {{- if .Values.memorySystem.enabled }}
+        - name: configs
+          mountPath: /configs
+          readOnly: true
+        {{- if .Values.persistence.memoryStore.enabled }}
+        - name: memory-store
+          mountPath: {{ .Values.memorySystem.paths.memoryStore }}
+        {{- end }}
+        {{- if .Values.persistence.cache.enabled }}
+        - name: cache
+          mountPath: {{ .Values.memorySystem.paths.cacheRoot }}
+        {{- end }}
+        {{- end }}
       volumes:
       - name: tmp
         emptyDir: {}
       - name: app-data
         emptyDir: {}
+      {{- if .Values.memorySystem.enabled }}
+      - name: configs
+        configMap:
+          name: {{ include "vulcanami.fullname" . }}-memory-config
+      {{- if .Values.persistence.memoryStore.enabled }}
+      - name: memory-store
+        persistentVolumeClaim:
+          claimName: {{ include "vulcanami.fullname" . }}-memory-store
+      {{- end }}
+      {{- if .Values.persistence.cache.enabled }}
+      - name: cache
+        persistentVolumeClaim:
+          claimName: {{ include "vulcanami.fullname" . }}-cache
+      {{- end }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

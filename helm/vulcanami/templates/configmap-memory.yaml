@@ -1,0 +1,44 @@
+{{- if .Values.memorySystem.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vulcanami.fullname" . }}-memory-config
+  labels:
+    {{- include "vulcanami.labels" . | nindent 4 }}
+    component: memory-system
+data:
+  # Milvus configuration
+  MILVUS_HOST: {{ .Values.memorySystem.milvus.host | quote }}
+  MILVUS_PORT: {{ .Values.memorySystem.milvus.port | quote }}
+  
+  # S3/PackfileStore configuration
+  S3_BUCKET: {{ .Values.memorySystem.s3.bucket | quote }}
+  AWS_REGION: {{ .Values.memorySystem.s3.region | quote }}
+  {{- if .Values.memorySystem.s3.endpointUrl }}
+  S3_ENDPOINT_URL: {{ .Values.memorySystem.s3.endpointUrl | quote }}
+  {{- end }}
+  
+  # Packfile configuration
+  PACKFILE_SIZE_MB: {{ .Values.memorySystem.packfile.sizeMb | quote }}
+  COMPRESSION: {{ .Values.memorySystem.packfile.compression | quote }}
+  ENCRYPTION: {{ .Values.memorySystem.packfile.encryption | quote }}
+  
+  # LSM configuration
+  COMPACTION_STRATEGY: {{ .Values.memorySystem.lsm.compactionStrategy | quote }}
+  BLOOM_FILTER: {{ .Values.memorySystem.lsm.bloomFilter | quote }}
+  
+  # Index configuration
+  INDEX_TYPE: {{ .Values.memorySystem.indexType | quote }}
+  
+  # Unlearning configuration
+  UNLEARNING_METHOD: {{ .Values.memorySystem.unlearning.method | quote }}
+  UNLEARNING_ENABLE_VERIFICATION: {{ .Values.memorySystem.unlearning.enableVerification | quote }}
+  
+  # ZK prover configuration
+  PROOF_SYSTEM: {{ .Values.memorySystem.zk.proofSystem | quote }}
+  
+  # Storage paths
+  MEMORY_STORE_PATH: {{ .Values.memorySystem.paths.memoryStore | quote }}
+  CACHE_ROOT: {{ .Values.memorySystem.paths.cacheRoot | quote }}
+  CONFIG_PATH: {{ .Values.memorySystem.paths.configPath | quote }}
+{{- end }}

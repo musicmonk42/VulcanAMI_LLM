@@ -312,6 +312,48 @@ helm-template: ## Show Helm template output
 	helm template vulcanami ./helm/vulcanami
 
 ################################################################################
+# Vulcan Memory System v46
+################################################################################
+
+.PHONY: install-memory
+install-memory: ## Install Vulcan Memory System packages
+	@echo "$(GREEN)Installing Vulcan Memory System packages...$(NC)"
+	pip install -e ./src/persistant_memory_v46 || pip install ./src/persistant_memory_v46
+	pip install -e ./src/gvulcan || pip install ./src/gvulcan
+
+.PHONY: test-memory
+test-memory: ## Run memory system integration tests
+	@echo "$(GREEN)Running memory system tests...$(NC)"
+	pytest src/persistant_memory_v46/tests/ -v --tb=short || echo "No persistant_memory_v46 tests found"
+	pytest src/gvulcan/tests/ -v --tb=short || echo "No gvulcan tests found"
+
+.PHONY: k8s-bootstrap-milvus
+k8s-bootstrap-milvus: ## Bootstrap Milvus collections in Kubernetes
+	@echo "$(GREEN)Bootstrapping Milvus collections...$(NC)"
+	kubectl exec -n vulcanami-development deploy/vulcanami-api -- \
+		python -m gvulcan.vector.milvus_bootstrap \
+		--config /app/configs/vector/milvus/collections.yaml \
+		--host milvus-service \
+		--port 19530
+
+.PHONY: docker-bootstrap-milvus
+docker-bootstrap-milvus: ## Bootstrap Milvus collections in Docker Compose
+	@echo "$(GREEN)Bootstrapping Milvus collections in Docker...$(NC)"
+	docker compose -f $(DOCKER_COMPOSE_PROD) exec full-platform \
+		python -m gvulcan.vector.milvus_bootstrap \
+		--config /app/configs/vector/milvus/collections.yaml \
+		--host milvus \
+		--port 19530
+
+.PHONY: memory-status
+memory-status: ## Check memory system status
+	@echo "$(GREEN)Checking memory system status...$(NC)"
+	@echo "Checking Milvus connectivity..."
+	@docker compose -f $(DOCKER_COMPOSE_PROD) exec milvus curl -s http://localhost:9091/healthz || echo "Milvus not running"
+	@echo "Checking S3/MinIO connectivity..."
+	@docker compose -f $(DOCKER_COMPOSE_PROD) exec minio curl -s http://localhost:9000/minio/health/live || echo "MinIO not running"
+
+################################################################################
 # CI/CD
 ################################################################################
 

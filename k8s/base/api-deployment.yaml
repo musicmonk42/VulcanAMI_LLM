@@ -29,6 +29,47 @@ spec:
         seccompProfile:
           type: RuntimeDefault
 
+      # Init container for Milvus bootstrap (creates vector collections if they don't exist)
+      initContainers:
+      - name: milvus-bootstrap
+        image: ghcr.io/musicmonk42/vulcanami_llm-api:v1.0.0
+        imagePullPolicy: IfNotPresent
+        command:
+          - python
+          - -m
+          - gvulcan.vector.milvus_bootstrap
+          - --config
+          - /app/configs/vector/milvus/collections.yaml
+          - --host
+          - milvus-service
+          - --port
+          - "19530"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        env:
+        - name: MILVUS_HOST
+          value: "milvus-service"
+        - name: MILVUS_PORT
+          value: "19530"
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+
       containers:
       - name: api
         # Pin to specific version with digest for production
@@ -61,6 +102,10 @@ spec:
           mountPath: /tmp
         - name: app-data
           mountPath: /app/data
+        - name: memory-store
+          mountPath: /app/memory_store
+        - name: cache
+          mountPath: /tmp/vulcan_cache
 
         env:
         - name: JWT_SECRET_KEY
@@ -88,6 +133,17 @@ spec:
             secretKeyRef:
               name: vulcanami-secrets
               key: MINIO_SECRET_KEY
+        # AWS credentials for S3 storage
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vulcanami-secrets
+              key: AWS_SECRET_ACCESS_KEY
         envFrom:
         - configMapRef:
             name: vulcanami-config
@@ -115,12 +171,18 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
 
-      # Volumes for readOnlyRootFilesystem compatibility
+      # Volumes for readOnlyRootFilesystem compatibility and memory system
       volumes:
       - name: tmp
         emptyDir: {}
       - name: app-data
         emptyDir: {}
+      - name: memory-store
+        persistentVolumeClaim:
+          claimName: vulcanami-memory-store
+      - name: cache
+        persistentVolumeClaim:
+          claimName: vulcanami-cache
 
       restartPolicy: Always
 ---
