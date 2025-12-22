@@ -371,17 +371,19 @@ class LogitsCache:
         self.max_size = max_size
         self.ttl_seconds = ttl_seconds
         self._cache: OrderedDict = OrderedDict()
-        self._timestamps: Dict[str, float] = {}
+        self._timestamps: Dict[tuple, float] = {}
         self._lock = threading.RLock()
     
-    def _compute_key(self, tokens: Tokens, context_hash: Optional[str] = None) -> str:
-        """Compute cache key from last N tokens and optional context."""
+    def _compute_key(self, tokens: Tokens, context_hash: Optional[str] = None) -> tuple:
+        """Compute cache key from last N tokens and optional context.
+        
+        Uses tuple for efficient hashing instead of MD5.
+        """
         # Use last 20 tokens for key (sufficient for pattern matching)
         key_tokens = tokens[-20:] if len(tokens) > 20 else tokens
-        key_str = str(key_tokens)
         if context_hash:
-            key_str += f"_{context_hash}"
-        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
+            return (tuple(key_tokens), context_hash)
+        return tuple(key_tokens)
     
     def get(self, tokens: Tokens, context_hash: Optional[str] = None) -> Optional[List[float]]:
         """Get cached logits if available."""
@@ -556,6 +558,7 @@ class CognitiveLoop:
         # Token index cache for fast lookups (OrderedDict for LRU eviction)
         self._token_index_cache: OrderedDict = OrderedDict()
         self._token_index_cache_lock = threading.RLock()
+        self._token_index_cache_max_size: int = 10000  # Configurable
         
         # Performance metrics
         self._perf_metrics = {
@@ -1471,12 +1474,15 @@ class CognitiveLoop:
         # Use standard resolution
         token = await self._index_to_token(idx)
         
-        # Cache the result with LRU eviction
+        # Cache the result with batch LRU eviction
         with self._token_index_cache_lock:
-            # Evict oldest if at max size
-            max_cache_size = 10000
-            while len(self._token_index_cache) >= max_cache_size:
-                self._token_index_cache.popitem(last=False)  # Remove oldest
+            # Batch evict 10% of cache when full to avoid tight loop eviction
+            if len(self._token_index_cache) >= self._token_index_cache_max_size:
+                # Remove 10% of oldest entries
+                evict_count = max(1, self._token_index_cache_max_size // 10)
+                for _ in range(evict_count):
+                    if self._token_index_cache:
+                        self._token_index_cache.popitem(last=False)
             self._token_index_cache[idx] = token
         
         return token

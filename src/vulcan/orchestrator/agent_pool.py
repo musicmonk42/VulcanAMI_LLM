@@ -233,11 +233,12 @@ class PriorityJobQueue:
             max_size: Maximum queue size
         """
         self.max_size = max_size
-        self._queues: Dict[int, List[Tuple[float, str, Dict]]] = {
+        self._queues: Dict[int, List[Tuple[int, str, Dict]]] = {
             i: [] for i in range(5)
         }
         self._lock = threading.RLock()
         self._size = 0
+        self._counter = 0  # Monotonic counter for FIFO ordering
         self._stats = {
             "total_enqueued": 0,
             "total_dequeued": 0,
@@ -262,10 +263,11 @@ class PriorityJobQueue:
             if self._size >= self.max_size:
                 return False
             
-            timestamp = time.time()
-            # Use positive timestamp for FIFO within same priority level
-            # heapq is a min-heap, so smaller timestamps (older jobs) are popped first
-            heapq.heappush(self._queues[priority], (timestamp, job_id, job_data))
+            # Use monotonic counter for reliable FIFO ordering under high load
+            # (more reliable than time.time() which may have precision issues)
+            sequence = self._counter
+            self._counter += 1
+            heapq.heappush(self._queues[priority], (sequence, job_id, job_data))
             self._size += 1
             self._stats["total_enqueued"] += 1
             self._stats["priority_distribution"][priority] += 1
