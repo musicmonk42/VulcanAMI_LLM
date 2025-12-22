@@ -706,12 +706,13 @@ class MockUnifiedRuntime:
     Returns mock execution results.
     """
 
-    def execute_graph(self, graph: Dict[str, Any]) -> Dict[str, Any]:
+    def execute_graph(self, graph: Dict[str, Any], agent_id: str = "unknown") -> Dict[str, Any]:
         """
         Mock graph execution.
         
         Args:
             graph: The graph to execute
+            agent_id: The agent submitting the graph (unused in mock)
             
         Returns:
             Mock execution result
