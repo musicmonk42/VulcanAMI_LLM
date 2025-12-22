@@ -1239,6 +1239,59 @@ class QueryAnalyzer:
                 parameters={"is_primary": False, "support_type": "planning", "source": source}
             ))
         
+        # Creative task support (Phase 2: Auto-inject introspection nodes)
+        # FIX: Ensures introspection nodes are added to task graph for creative queries
+        creative_count = sum(1 for ind in CREATIVE_INDICATORS if ind in query_lower)
+        
+        if creative_count > 0 and plan and plan.complexity_score >= 0.3:
+            logger.info(
+                f"[Creative Task] Detected {creative_count} creative indicators "
+                f"with complexity={plan.complexity_score:.2f}. Auto-injecting introspection nodes."
+            )
+            
+            # Create introspection support task
+            # This task will call the INTROSPECT node to retrieve agent state
+            tasks.insert(0, AgentTask(  # Insert at start so it runs first
+                task_id=f"task_{base_task_id}_introspect",
+                task_type="introspection_support",
+                capability="reasoning",
+                prompt=(
+                    f"INTROSPECTION REQUIRED: Before responding to the creative task, "
+                    f"check your internal state (entropy, valence, curiosity, energy). "
+                    f"Task: {query[:100]}"
+                ),
+                priority=3,  # Higher priority - should run first
+                timeout_seconds=5.0,
+                parameters={
+                    "is_primary": False,
+                    "support_type": "introspection",
+                    "source": source,
+                    "introspection_fields": ["all"],
+                    "node_type": "INTROSPECT"  # Hint to use INTROSPECT node
+                }
+            ))
+            
+            # Create memory query support task
+            # This task will call the QUERY_MEMORIES node
+            tasks.insert(1, AgentTask(  # Insert after introspection
+                task_id=f"task_{base_task_id}_memories",
+                task_type="memory_query_support",
+                capability="perception",
+                prompt=(
+                    f"MEMORY QUERY REQUIRED: Retrieve relevant past experiences "
+                    f"for creative task: {query[:100]}"
+                ),
+                priority=2,  # Run after introspection, before primary
+                timeout_seconds=5.0,
+                parameters={
+                    "is_primary": False,
+                    "support_type": "memory_query",
+                    "source": source,
+                    "memory_limit": 5,
+                    "node_type": "QUERY_MEMORIES"  # Hint to use QUERY_MEMORIES node
+                }
+            ))
+        
         return tasks
     
     def _determine_experiment_trigger(
