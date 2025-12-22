@@ -138,6 +138,27 @@ COMPLEXITY_INDICATORS: Tuple[str, ...] = (
     "holistic", "end-to-end", "complete"
 )
 
+# Creative/expressive task indicators (FIX: Creative Brain Recognition)
+# Creative tasks require genuine internal reasoning, not just LLM forwarding
+CREATIVE_INDICATORS: Tuple[str, ...] = (
+    # Creative verbs - actions requiring genuine reasoning
+    "write", "create", "compose", "craft", "generate", "design",
+    "invent", "imagine", "express", "build", "make", "produce",
+    "develop", "formulate", "construct", "devise", "author",
+    # Artistic forms - specific creative outputs
+    "poem", "story", "narrative", "tale", "essay", "article",
+    "song", "lyrics", "script", "dialogue", "character",
+    "metaphor", "prose", "verse", "stanza", "haiku", "sonnet",
+    # Emotional/expressive terms - requires internal state reasoning
+    "feel", "emotion", "express feelings", "convey", "capture",
+    "evoke", "resonate", "touch", "move", "inspire",
+    "reflect", "explore feelings", "emotional", "emotive",
+    # Creative adjectives - signals depth required
+    "creative", "artistic", "original", "unique", "novel",
+    "innovative", "imaginative", "expressive", "poetic",
+    "authentic", "genuine", "heartfelt", "personal", "intimate",
+)
+
 # Uncertainty indicators (triggers arena tournament)
 UNCERTAINTY_INDICATORS: Tuple[str, ...] = (
     "best approach", "which method", "optimal", "should I",
@@ -844,9 +865,17 @@ class QueryAnalyzer:
         elif word_count > 10:
             score += 0.05
         
-        # Complexity indicators
+        # Complexity indicators (analytical tasks)
         indicator_count = sum(1 for ind in COMPLEXITY_INDICATORS if ind in query_lower)
         score += min(0.4, indicator_count * 0.1)
+        
+        # Creative indicators (FIX: Creative Brain Recognition)
+        # Creative tasks require genuine internal reasoning, not just LLM forwarding
+        creative_count = sum(1 for ind in CREATIVE_INDICATORS if ind in query_lower)
+        if creative_count > 0:
+            # Higher weight for creative tasks - they need actual agent reasoning
+            score += min(0.5, creative_count * 0.15)
+            logger.debug(f"[Creative Task] Detected {creative_count} creative indicators, boosting complexity")
         
         # Multiple questions or sentences
         question_count = query_lower.count("?")
