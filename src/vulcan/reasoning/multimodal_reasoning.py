@@ -5,6 +5,8 @@ Fixed version with complete ModalityType definition and numerical stability impr
 FULLY IMPLEMENTED VERSION with real feature extraction.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import threading

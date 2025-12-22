@@ -3,6 +3,8 @@ VULCAN-AGI Learning Module - Unified Integration
 Coordinates: Continual + Curriculum + Meta + RLHF + World Model + Metacognition
 """
 
+from __future__ import annotations
+
 import asyncio
 import concurrent.futures
 import logging
