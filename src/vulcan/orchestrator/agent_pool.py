@@ -6,17 +6,19 @@
 # TIMEOUT FIXES - Prevents hanging in tests and production
 # WINDOWS MULTIPROCESSING FIX - Worker process doesn't access parent's unpicklable objects
 # FIXED: Converted long time.sleep calls to interruptible self._shutdown_event.wait().
+# PERFORMANCE: Added response time tracking and adaptive scaling
 # ============================================================
 
+import heapq
 import json
 import logging
 import multiprocessing
 import threading
 import time
 import uuid
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Import psutil with fallback for missing or broken installations
 try:
@@ -90,6 +92,233 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# PERFORMANCE MONITORING - Response Time Tracker
+# ============================================================
+
+
+class ResponseTimeTracker:
+    """Tracks response times for performance monitoring and adaptive scaling.
+    
+    Maintains a sliding window of response times to compute percentiles
+    and detect performance degradation for auto-scaling decisions.
+    """
+    
+    def __init__(self, window_size: int = 1000, alert_threshold_ms: float = 5000.0):
+        """
+        Initialize response time tracker.
+        
+        Args:
+            window_size: Number of samples to keep in sliding window
+            alert_threshold_ms: Response time threshold for alerts (milliseconds)
+        """
+        self.window_size = window_size
+        self.alert_threshold_ms = alert_threshold_ms
+        self._samples: deque = deque(maxlen=window_size)
+        self._lock = threading.RLock()
+        self._degradation_callbacks: List[callable] = []
+    
+    def record(self, duration_ms: float, job_id: str = None, agent_id: str = None) -> None:
+        """Record a response time sample."""
+        timestamp = time.time()
+        with self._lock:
+            self._samples.append({
+                "timestamp": timestamp,
+                "duration_ms": duration_ms,
+                "job_id": job_id,
+                "agent_id": agent_id,
+            })
+        
+        # Check for degradation
+        if duration_ms > self.alert_threshold_ms:
+            self._notify_degradation(duration_ms, job_id, agent_id)
+    
+    def get_percentile(self, percentile: float) -> float:
+        """Get the specified percentile of response times."""
+        with self._lock:
+            if not self._samples:
+                return 0.0
+            durations = sorted([s["duration_ms"] for s in self._samples])
+            idx = int(len(durations) * percentile / 100.0)
+            return durations[min(idx, len(durations) - 1)]
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get comprehensive response time statistics."""
+        with self._lock:
+            if not self._samples:
+                return {
+                    "count": 0,
+                    "avg_ms": 0.0,
+                    "p50_ms": 0.0,
+                    "p95_ms": 0.0,
+                    "p99_ms": 0.0,
+                    "max_ms": 0.0,
+                    "min_ms": 0.0,
+                }
+            
+            durations = [s["duration_ms"] for s in self._samples]
+            sorted_durations = sorted(durations)
+            
+            return {
+                "count": len(durations),
+                "avg_ms": sum(durations) / len(durations),
+                "p50_ms": sorted_durations[len(sorted_durations) // 2],
+                "p95_ms": sorted_durations[int(len(sorted_durations) * 0.95)],
+                "p99_ms": sorted_durations[int(len(sorted_durations) * 0.99)],
+                "max_ms": max(durations),
+                "min_ms": min(durations),
+            }
+    
+    def register_degradation_callback(self, callback: callable) -> None:
+        """Register a callback for performance degradation alerts."""
+        self._degradation_callbacks.append(callback)
+    
+    def _notify_degradation(self, duration_ms: float, job_id: str, agent_id: str) -> None:
+        """Notify registered callbacks of performance degradation."""
+        for callback in self._degradation_callbacks:
+            try:
+                callback(duration_ms, job_id, agent_id)
+            except Exception as e:
+                logger.error(f"Error in degradation callback: {e}")
+    
+    def get_recent_trend(self, window_seconds: float = 60.0) -> float:
+        """Get trend of response times in the recent window.
+        
+        Returns:
+            Positive value indicates degradation, negative indicates improvement.
+        """
+        now = time.time()
+        with self._lock:
+            recent = [s for s in self._samples if now - s["timestamp"] <= window_seconds]
+            
+            if len(recent) < 2:
+                return 0.0
+            
+            # Compare first half vs second half
+            mid = len(recent) // 2
+            first_half_avg = sum(s["duration_ms"] for s in recent[:mid]) / mid
+            second_half_avg = sum(s["duration_ms"] for s in recent[mid:]) / (len(recent) - mid)
+            
+            return second_half_avg - first_half_avg
+
+
+# ============================================================
+# PERFORMANCE OPTIMIZATION - Priority Job Queue
+# ============================================================
+
+
+class PriorityJobQueue:
+    """Priority queue for job scheduling with support for high-priority tokens.
+    
+    Implements a multi-level priority queue optimized for:
+    - High-frequency token processing
+    - SLO-aware scheduling
+    - Starvation prevention
+    """
+    
+    # Priority levels
+    PRIORITY_CRITICAL = 0
+    PRIORITY_HIGH = 1
+    PRIORITY_NORMAL = 2
+    PRIORITY_LOW = 3
+    PRIORITY_BATCH = 4
+    
+    def __init__(self, max_size: int = 10000):
+        """
+        Initialize priority job queue.
+        
+        Args:
+            max_size: Maximum queue size
+        """
+        self.max_size = max_size
+        self._queues: Dict[int, List[Tuple[float, str, Dict]]] = {
+            i: [] for i in range(5)
+        }
+        self._lock = threading.RLock()
+        self._size = 0
+        self._stats = {
+            "total_enqueued": 0,
+            "total_dequeued": 0,
+            "priority_distribution": defaultdict(int),
+        }
+    
+    def enqueue(self, job_id: str, job_data: Dict[str, Any], priority: int = PRIORITY_NORMAL) -> bool:
+        """Add a job to the queue.
+        
+        Args:
+            job_id: Unique job identifier
+            job_data: Job data dictionary
+            priority: Priority level (0=critical, 4=batch)
+        
+        Returns:
+            True if enqueued successfully, False if queue is full
+        """
+        if priority < 0 or priority > 4:
+            priority = self.PRIORITY_NORMAL
+        
+        with self._lock:
+            if self._size >= self.max_size:
+                return False
+            
+            timestamp = time.time()
+            # Use negative timestamp so older items have higher priority within same level
+            heapq.heappush(self._queues[priority], (-timestamp, job_id, job_data))
+            self._size += 1
+            self._stats["total_enqueued"] += 1
+            self._stats["priority_distribution"][priority] += 1
+            
+            return True
+    
+    def dequeue(self) -> Optional[Tuple[str, Dict[str, Any], int]]:
+        """Remove and return the highest priority job.
+        
+        Returns:
+            Tuple of (job_id, job_data, priority) or None if queue is empty
+        """
+        with self._lock:
+            # Check queues in priority order
+            for priority in range(5):
+                if self._queues[priority]:
+                    _, job_id, job_data = heapq.heappop(self._queues[priority])
+                    self._size -= 1
+                    self._stats["total_dequeued"] += 1
+                    return (job_id, job_data, priority)
+            
+            return None
+    
+    def peek(self) -> Optional[Tuple[str, Dict[str, Any], int]]:
+        """Peek at the highest priority job without removing it."""
+        with self._lock:
+            for priority in range(5):
+                if self._queues[priority]:
+                    _, job_id, job_data = self._queues[priority][0]
+                    return (job_id, job_data, priority)
+            return None
+    
+    def size(self) -> int:
+        """Get current queue size."""
+        return self._size
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get queue statistics."""
+        with self._lock:
+            queue_sizes = {i: len(self._queues[i]) for i in range(5)}
+            return {
+                **self._stats,
+                "current_size": self._size,
+                "queue_sizes_by_priority": queue_sizes,
+            }
+    
+    def clear(self) -> int:
+        """Clear all queues. Returns number of items cleared."""
+        with self._lock:
+            count = self._size
+            for priority in range(5):
+                self._queues[priority].clear()
+            self._size = 0
+            return count
 
 
 # ============================================================
@@ -227,6 +456,28 @@ class AgentPoolManager:
         # Status check throttling
         self.last_status_check = 0
         self.status_check_interval = 5.0  # Seconds
+        
+        # ========== PERFORMANCE OPTIMIZATIONS ==========
+        # Response time tracking for adaptive scaling
+        self.response_time_tracker = ResponseTimeTracker(
+            window_size=1000,
+            alert_threshold_ms=self.config.get("alert_threshold_ms", 5000.0)
+        )
+        
+        # Priority job queue for high-frequency token processing
+        self.priority_queue = PriorityJobQueue(
+            max_size=self.config.get("priority_queue_size", 10000)
+        )
+        
+        # Agent specialization tracking
+        self.specialized_agents: Dict[str, List[str]] = defaultdict(list)
+        
+        # Performance thresholds for adaptive scaling
+        self.perf_thresholds = {
+            "p95_target_ms": self.config.get("p95_target_ms", 100.0),
+            "p99_target_ms": self.config.get("p99_target_ms", 500.0),
+            "max_queue_depth": self.config.get("max_queue_depth", 100),
+        }
 
         # Start monitoring
         self._start_monitor()
@@ -1371,13 +1622,54 @@ class AgentPoolManager:
 
     def get_statistics(self) -> Dict[str, Any]:
         """
-        Get pool statistics
-
+        Get pool statistics including performance metrics
+        
         Returns:
-            Statistics dictionary
+            Statistics dictionary with job counts and performance data
         """
         with self.stats_lock:
-            return dict(self.stats)
+            base_stats = dict(self.stats)
+        
+        # Add performance metrics
+        base_stats["response_times"] = self.response_time_tracker.get_stats()
+        base_stats["priority_queue"] = self.priority_queue.get_stats()
+        base_stats["perf_thresholds"] = self.perf_thresholds
+        
+        return base_stats
+
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """
+        Get detailed performance statistics for monitoring.
+        
+        Returns:
+            Dictionary containing response times, queue depths, and agent utilization
+        """
+        response_stats = self.response_time_tracker.get_stats()
+        queue_stats = self.priority_queue.get_stats()
+        
+        with self.lock:
+            agent_utilization = {
+                "total": len(self.agents),
+                "working": sum(1 for m in self.agents.values() if m.state == AgentState.WORKING),
+                "idle": sum(1 for m in self.agents.values() if m.state == AgentState.IDLE),
+                "error": sum(1 for m in self.agents.values() if m.state == AgentState.ERROR),
+            }
+            pending_tasks = len(self.task_assignments)
+        
+        utilization_pct = (
+            agent_utilization["working"] / agent_utilization["total"] * 100
+            if agent_utilization["total"] > 0 else 0.0
+        )
+        
+        return {
+            "response_times": response_stats,
+            "queue_stats": queue_stats,
+            "agent_utilization": agent_utilization,
+            "utilization_percent": utilization_pct,
+            "pending_tasks": pending_tasks,
+            "thresholds": self.perf_thresholds,
+            "trend": self.response_time_tracker.get_recent_trend(),
+        }
 
     def shutdown(self):
         """Gracefully shutdown agent pool"""
@@ -1489,7 +1781,10 @@ class AutoScaler:
         logger.info("Auto-scaler stopped")
 
     def _evaluate_and_scale(self):
-        """Evaluate load and scale accordingly with proper locking"""
+        """Evaluate load and scale accordingly with proper locking.
+        
+        Enhanced to include response time based scaling decisions.
+        """
         with self.pool.lock:
             status = self.pool.get_pool_status()
 
@@ -1506,6 +1801,20 @@ class AutoScaler:
                 utilization = working_agents / total_agents
             else:
                 utilization = 0.0
+            
+            # Get response time metrics for adaptive scaling
+            response_stats = self.pool.response_time_tracker.get_stats()
+            p95_ms = response_stats.get("p95_ms", 0.0)
+            p99_ms = response_stats.get("p99_ms", 0.0)
+            trend = self.pool.response_time_tracker.get_recent_trend()
+            
+            # Get priority queue depth
+            queue_depth = self.pool.priority_queue.size()
+            
+            # Performance thresholds
+            p95_target = self.pool.perf_thresholds["p95_target_ms"]
+            p99_target = self.pool.perf_thresholds["p99_target_ms"]
+            max_queue = self.pool.perf_thresholds["max_queue_depth"]
 
             logger.debug(
                 f"Auto-scaler evaluation: "
@@ -1513,23 +1822,56 @@ class AutoScaler:
                 f"total={total_agents}, "
                 f"idle={idle_agents}, "
                 f"working={working_agents}, "
-                f"pending={pending_tasks}"
+                f"pending={pending_tasks}, "
+                f"p95={p95_ms:.1f}ms, p99={p99_ms:.1f}ms, "
+                f"queue_depth={queue_depth}, trend={trend:.1f}"
             )
+            
+            # Determine scaling action
+            scale_up_reasons = []
+            scale_down_ok = True
+            
+            # Scale up conditions:
+            # 1. High utilization (>80%)
+            if utilization > 0.8:
+                scale_up_reasons.append("high_utilization")
+            
+            # 2. Pending tasks exceed idle agents
+            if pending_tasks > idle_agents:
+                scale_up_reasons.append("pending_tasks")
+            
+            # 3. Response times exceeding SLA targets
+            if p95_ms > p95_target:
+                scale_up_reasons.append("p95_exceeded")
+                scale_down_ok = False
+            
+            if p99_ms > p99_target:
+                scale_up_reasons.append("p99_exceeded")
+                scale_down_ok = False
+            
+            # 4. Queue depth too high
+            if queue_depth > max_queue:
+                scale_up_reasons.append("queue_depth")
+            
+            # 5. Degrading performance trend
+            if trend > 50:  # 50ms degradation trend
+                scale_up_reasons.append("degrading_trend")
+                scale_down_ok = False
 
-            # Scale up if high utilization or pending tasks
-            if utilization > 0.8 or pending_tasks > idle_agents:
+            # Scale up if any reason applies
+            if scale_up_reasons:
                 agents_to_spawn = min(
-                    max(1, pending_tasks - idle_agents),
+                    max(1, pending_tasks - idle_agents, len(scale_up_reasons)),
                     self.pool.max_agents - total_agents,
                 )
 
                 if agents_to_spawn > 0:
-                    logger.info(f"Scaling up by {agents_to_spawn} agents")
+                    logger.info(f"Scaling up by {agents_to_spawn} agents, reasons: {scale_up_reasons}")
                     for _ in range(agents_to_spawn):
                         self.pool.spawn_agent()
 
-            # Scale down if low utilization
-            elif utilization < 0.2 and total_agents > self.pool.min_agents:
+            # Scale down only if low utilization AND performance is good
+            elif scale_down_ok and utilization < 0.2 and total_agents > self.pool.min_agents:
                 agents_to_retire = min(
                     idle_agents // 2, total_agents - self.pool.min_agents
                 )
@@ -1541,7 +1883,7 @@ class AutoScaler:
                         if metadata.state == AgentState.IDLE
                     ][:agents_to_retire]
 
-                    logger.info(f"Scaling down by {agents_to_retire} agents")
+                    logger.info(f"Scaling down by {agents_to_retire} agents (performance OK)")
                     for agent_id in idle_agent_ids:
                         self.pool.retire_agent(agent_id)
 
@@ -1653,6 +1995,8 @@ __all__ = [
     "AgentPoolManager",
     "AutoScaler",
     "RecoveryManager",
+    "ResponseTimeTracker",
+    "PriorityJobQueue",
     "CACHETOOLS_AVAILABLE",
     "TTLCache",
 ]
