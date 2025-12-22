@@ -1688,7 +1688,7 @@ class OpenAIKnowledgeDistiller:
         by Vulcan's GovernedTrainer and SelfImprovingTraining systems.
         
         Args:
-            local_llm: Reference to Vulcan's local LLM (for domain detection)
+            local_llm: Reference to Vulcan's local LLM (optional, for future use)
             storage_path: Path to store training examples persistently
             max_buffer_size: Maximum buffer size before flush to disk
             retention_days: Days to retain training examples before expiry
