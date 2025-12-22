@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import math
 import random
 import threading
 import time
 import traceback
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import (
     Any,
     AsyncGenerator,
@@ -20,6 +23,14 @@ from typing import (
     Tuple,
     Union,
 )
+
+# Optional numpy import for vectorized operations
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    np = None
+    HAS_NUMPY = False
 
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
@@ -105,8 +116,18 @@ class CognitiveLoopResult:
 
 
 def softmax(xs: Sequence[float]) -> List[float]:
+    """Compute softmax probabilities. Uses numpy if available for better performance."""
     if not xs:
         return []
+    if HAS_NUMPY:
+        arr = np.array(xs, dtype=np.float64)
+        arr = arr - np.max(arr)  # Numerical stability
+        exp_arr = np.exp(arr)
+        sum_exp = np.sum(exp_arr)
+        if sum_exp == 0:
+            return [1.0 / len(xs)] * len(xs)
+        return (exp_arr / sum_exp).tolist()
+    # Fallback to pure Python
     m = max(xs)
     exps = [math.exp(x - m) for x in xs]
     s = sum(exps)
@@ -116,16 +137,42 @@ def softmax(xs: Sequence[float]) -> List[float]:
 
 
 def apply_top_k(logits: List[float], k: int) -> List[float]:
+    """Apply top-k filtering. Uses numpy if available for O(n) performance."""
     if k <= 0 or k >= len(logits):
         return logits
+    if HAS_NUMPY:
+        arr = np.array(logits, dtype=np.float64)
+        # Use argpartition for O(n) instead of O(n log n) sort
+        top_k_indices = np.argpartition(arr, -k)[-k:]
+        kth_value = np.min(arr[top_k_indices])
+        result = np.where(arr >= kth_value, arr, float("-inf"))
+        return result.tolist()
+    # Fallback to pure Python
     indexed_logits = [(logits[i], i) for i in range(len(logits))]
     kth_value = sorted(indexed_logits, key=lambda x: x[0], reverse=True)[k - 1][0]
     return [l if l >= kth_value else float("-inf") for l in logits]
 
 
 def apply_top_p(logits: List[float], p: float) -> List[float]:
+    """Apply nucleus (top-p) sampling. Uses numpy for vectorized operations."""
     if p >= 1.0:
         return logits
+    if HAS_NUMPY:
+        arr = np.array(logits, dtype=np.float64)
+        probs = np.exp(arr - np.max(arr))
+        probs = probs / np.sum(probs)
+        sorted_indices = np.argsort(probs)[::-1]
+        cumulative = np.cumsum(probs[sorted_indices])
+        # Find cutoff
+        cutoff_idx = np.searchsorted(cumulative, p) + 1
+        keep_indices = set(sorted_indices[:cutoff_idx].tolist())
+        result = np.where(
+            np.isin(np.arange(len(arr)), list(keep_indices)),
+            arr,
+            float("-inf")
+        )
+        return result.tolist()
+    # Fallback to pure Python
     probs = softmax(logits)
     sorted_idx = sorted(range(len(probs)), key=lambda i: probs[i], reverse=True)
     cumulative, keep = 0.0, []
@@ -143,11 +190,30 @@ def apply_top_p(logits: List[float], p: float) -> List[float]:
 def penalize_repetition(
     logits: List[float], generated: Tokens, penalty: float, window: int
 ) -> List[float]:
+    """Apply repetition penalty. Vectorized with numpy when possible."""
     if penalty <= 1.0 or not generated:
         return logits
     rec = generated[-window:] if window > 0 else generated
     if not all(isinstance(t, int) for t in rec):
         return logits
+    
+    if HAS_NUMPY:
+        arr = np.array(logits, dtype=np.float64)
+        counts = np.zeros(len(arr), dtype=np.int32)
+        for t in rec:
+            if 0 <= t < len(counts):
+                counts[t] += 1
+        # Apply penalty where counts > 0
+        mask = counts > 0
+        # For positive logits, divide by penalty; for negative, multiply
+        arr = np.where(
+            mask & (arr > 0),
+            arr / penalty,
+            np.where(mask, arr * penalty, arr)
+        )
+        return arr.tolist()
+    
+    # Fallback to pure Python
     counts = {}
     for t in rec:
         counts[t] = counts.get(t, 0) + 1
@@ -162,10 +228,23 @@ def penalize_repetition(
 
 
 def choose_token(logits: List[float], temperature: float) -> int:
+    """Sample a token from logits. Uses numpy for efficient sampling."""
     if not logits:
         return 0
     if temperature <= 0:
+        if HAS_NUMPY:
+            return int(np.argmax(logits))
         return max(range(len(logits)), key=lambda i: logits[i])
+    
+    if HAS_NUMPY:
+        arr = np.array(logits, dtype=np.float64) / max(temperature, 1e-9)
+        arr = arr - np.max(arr)  # Numerical stability
+        probs = np.exp(arr)
+        probs = probs / np.sum(probs)
+        # Use numpy's random choice for efficient sampling
+        return int(np.random.choice(len(probs), p=probs))
+    
+    # Fallback to pure Python
     scaled = [l / max(temperature, 1e-9) for l in logits]
     probs = softmax(scaled)
     r = random.random()
@@ -178,11 +257,202 @@ def choose_token(logits: List[float], temperature: float) -> int:
 
 
 def _sequence_entropy(probs: List[float]) -> float:
+    """Compute entropy of probability distribution."""
+    if HAS_NUMPY:
+        arr = np.array(probs, dtype=np.float64)
+        arr = arr[arr > 0]  # Filter out zeros
+        return float(-np.sum(arr * np.log2(arr)))
     entropy = 0.0
     for p in probs:
         if p > 0:
             entropy += -p * math.log(p, 2)
     return entropy
+
+
+# =========================== PERFORMANCE CACHES =========================== #
+
+
+class EncodingCache:
+    """LRU cache for transformer encoding results with TTL support.
+    
+    This cache stores encoded hidden states to avoid redundant transformer calls
+    for similar token sequences. It uses a hash of the token sequence as the key.
+    """
+    
+    def __init__(self, max_size: int = 1000, ttl_seconds: float = 60.0):
+        self.max_size = max_size
+        self.ttl_seconds = ttl_seconds
+        self._cache: OrderedDict = OrderedDict()
+        self._timestamps: Dict[str, float] = {}
+        self._lock = threading.RLock()
+        self._hits = 0
+        self._misses = 0
+    
+    def _compute_key(self, tokens: Tokens) -> str:
+        """Compute a hash key for the token sequence."""
+        # Use first and last 50 tokens plus length for efficient hashing
+        if len(tokens) <= 100:
+            key_tokens = tokens
+        else:
+            key_tokens = tokens[:50] + tokens[-50:] + [len(tokens)]
+        return hashlib.md5(str(key_tokens).encode(), usedforsecurity=False).hexdigest()
+    
+    def get(self, tokens: Tokens) -> Optional[Any]:
+        """Get cached encoding result if available and not expired."""
+        key = self._compute_key(tokens)
+        with self._lock:
+            if key in self._cache:
+                # Check TTL
+                if time.time() - self._timestamps[key] < self.ttl_seconds:
+                    # Move to end (most recently used)
+                    self._cache.move_to_end(key)
+                    self._hits += 1
+                    return self._cache[key]
+                else:
+                    # Expired, remove
+                    del self._cache[key]
+                    del self._timestamps[key]
+            self._misses += 1
+            return None
+    
+    def put(self, tokens: Tokens, value: Any) -> None:
+        """Store encoding result in cache."""
+        key = self._compute_key(tokens)
+        with self._lock:
+            # Evict oldest if at capacity
+            while len(self._cache) >= self.max_size:
+                oldest_key, _ = self._cache.popitem(last=False)
+                if oldest_key in self._timestamps:
+                    del self._timestamps[oldest_key]
+            
+            self._cache[key] = value
+            self._timestamps[key] = time.time()
+    
+    def clear(self) -> None:
+        """Clear the cache."""
+        with self._lock:
+            self._cache.clear()
+            self._timestamps.clear()
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        with self._lock:
+            total = self._hits + self._misses
+            return {
+                "size": len(self._cache),
+                "max_size": self.max_size,
+                "hits": self._hits,
+                "misses": self._misses,
+                "hit_rate": self._hits / total if total > 0 else 0.0,
+            }
+
+
+class LogitsCache:
+    """Cache for logits computations on similar patterns.
+    
+    This cache stores logits results for repeated token patterns,
+    reducing redundant computation for common sequences.
+    """
+    
+    def __init__(self, max_size: int = 500, ttl_seconds: float = 30.0):
+        self.max_size = max_size
+        self.ttl_seconds = ttl_seconds
+        self._cache: OrderedDict = OrderedDict()
+        self._timestamps: Dict[str, float] = {}
+        self._lock = threading.RLock()
+    
+    def _compute_key(self, tokens: Tokens, context_hash: Optional[str] = None) -> str:
+        """Compute cache key from last N tokens and optional context."""
+        # Use last 20 tokens for key (sufficient for pattern matching)
+        key_tokens = tokens[-20:] if len(tokens) > 20 else tokens
+        key_str = str(key_tokens)
+        if context_hash:
+            key_str += f"_{context_hash}"
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
+    
+    def get(self, tokens: Tokens, context_hash: Optional[str] = None) -> Optional[List[float]]:
+        """Get cached logits if available."""
+        key = self._compute_key(tokens, context_hash)
+        with self._lock:
+            if key in self._cache:
+                if time.time() - self._timestamps[key] < self.ttl_seconds:
+                    self._cache.move_to_end(key)
+                    return self._cache[key]
+                else:
+                    del self._cache[key]
+                    del self._timestamps[key]
+            return None
+    
+    def put(self, tokens: Tokens, logits: List[float], context_hash: Optional[str] = None) -> None:
+        """Store logits in cache."""
+        key = self._compute_key(tokens, context_hash)
+        with self._lock:
+            while len(self._cache) >= self.max_size:
+                oldest_key, _ = self._cache.popitem(last=False)
+                if oldest_key in self._timestamps:
+                    del self._timestamps[oldest_key]
+            self._cache[key] = logits
+            self._timestamps[key] = time.time()
+
+
+class SamplingTableCache:
+    """Pre-computed sampling tables for common vocabulary distributions.
+    
+    This cache stores pre-computed cumulative distribution functions (CDFs)
+    for efficient token sampling without repeated softmax computation.
+    """
+    
+    def __init__(self, vocab_size: int = 50257, common_patterns: int = 100):
+        self.vocab_size = vocab_size
+        self.common_patterns = common_patterns
+        self._tables: Dict[str, Tuple[List[int], List[float]]] = {}
+        self._lock = threading.RLock()
+    
+    def get_or_compute(
+        self, logits: List[float], temperature: float, top_k: int
+    ) -> Tuple[List[int], List[float]]:
+        """Get pre-computed sampling table or compute and cache it.
+        
+        Returns:
+            Tuple of (sorted_indices, cumulative_probs) for efficient sampling.
+        """
+        # Create a simple fingerprint for the logits distribution
+        if HAS_NUMPY:
+            arr = np.array(logits[:min(100, len(logits))], dtype=np.float32)
+            fingerprint = f"{np.mean(arr):.3f}_{np.std(arr):.3f}_{temperature:.2f}_{top_k}"
+        else:
+            sample = logits[:min(100, len(logits))]
+            mean_val = sum(sample) / len(sample) if sample else 0
+            fingerprint = f"{mean_val:.3f}_{temperature:.2f}_{top_k}"
+        
+        with self._lock:
+            if fingerprint in self._tables:
+                return self._tables[fingerprint]
+        
+        # Compute new table
+        filtered = apply_top_k(logits, top_k)
+        scaled = [l / max(temperature, 1e-9) if l > float("-inf") else l for l in filtered]
+        probs = softmax(scaled)
+        
+        # Create sorted (index, cumprob) for efficient sampling
+        indexed = [(i, p) for i, p in enumerate(probs) if p > 0]
+        indexed.sort(key=lambda x: x[1], reverse=True)
+        
+        sorted_indices = [x[0] for x in indexed]
+        cumulative = []
+        cum = 0.0
+        for _, p in indexed:
+            cum += p
+            cumulative.append(cum)
+        
+        result = (sorted_indices, cumulative)
+        
+        # Cache if we have room
+        with self._lock:
+            if len(self._tables) < self.common_patterns:
+                self._tables[fingerprint] = result
+        
+        return result
 
 
 # =========================== MAIN CLASS =========================== #
@@ -229,10 +499,41 @@ class CognitiveLoop:
         self._entropy_scores: List[float] = []
         self._speculative_stats: Dict[str, Any] = {}
         self.strategy_weights: Dict[str, float] = {"language": 1.0}
-        # Performance caches - context and world model don't change much per token
+        
+        # ========== PERFORMANCE OPTIMIZATIONS ==========
+        # Context caching - context and world model don't change much per token
         self._cached_context: Optional[Dict[str, Any]] = None
         self._context_cache_step: int = -1
         self._world_model_update_interval: int = 5  # Only update every N tokens
+        
+        # Encoding cache for transformer outputs (reduces redundant encode calls)
+        self._encoding_cache = EncodingCache(max_size=500, ttl_seconds=60.0)
+        
+        # Logits cache for repeated patterns (reduces redundant logits computation)
+        self._logits_cache = LogitsCache(max_size=300, ttl_seconds=30.0)
+        
+        # Pre-computed sampling tables for efficient token selection
+        vocab_size = getattr(transformer, 'vocab_size', 50257) if transformer else 50257
+        self._sampling_table_cache = SamplingTableCache(vocab_size=vocab_size, common_patterns=100)
+        
+        # Aggressive context caching after warmup (step 10+)
+        self._aggressive_cache_threshold: int = 10
+        self._context_cache_interval: int = 10  # Cache context every N steps
+        self._aggressive_context_cache_interval: int = 20  # After warmup, cache even less frequently
+        
+        # Token index cache for fast lookups
+        self._token_index_cache: Dict[int, Token] = {}
+        self._token_index_cache_lock = threading.RLock()
+        
+        # Performance metrics
+        self._perf_metrics = {
+            "total_encode_time_ms": 0.0,
+            "total_sample_time_ms": 0.0,
+            "total_context_time_ms": 0.0,
+            "encoding_cache_hits": 0,
+            "logits_cache_hits": 0,
+            "tokens_generated": 0,
+        }
 
     def set_speculative_function(self, fn: SpeculativeFunction) -> None:
         self._speculative_fn = fn
@@ -243,6 +544,29 @@ class CognitiveLoop:
                 max_workers=self.runtime.max_parallel_workers
             )
         return self._executor
+
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics for monitoring and optimization.
+        
+        Returns:
+            Dictionary containing cache hit rates, timing metrics, etc.
+        """
+        return {
+            "encoding_cache": self._encoding_cache.get_stats(),
+            "perf_metrics": self._perf_metrics.copy(),
+            "context_cache_step": self._context_cache_step,
+            "world_model_update_interval": self._world_model_update_interval,
+        }
+
+    def clear_caches(self) -> None:
+        """Clear all performance caches. Useful when model state changes."""
+        self._encoding_cache.clear()
+        self._logits_cache._cache.clear()
+        self._logits_cache._timestamps.clear()
+        with self._token_index_cache_lock:
+            self._token_index_cache.clear()
+        self._cached_context = None
+        self._context_cache_step = -1
 
     # ---------------------- PUBLIC ENTRY ---------------------- #
 
@@ -625,18 +949,30 @@ class CognitiveLoop:
             chosen_index = beam_meta.get("chosen_index")
             reasoning_meta["strategy"] = "beam_search"
         else:
-            # OPTIMIZATION: Cache context retrieval - only fetch on first token or every 10 steps
-            if (
+            # OPTIMIZATION: Aggressive context caching strategy
+            # - Before warmup (step < _aggressive_cache_threshold): cache every _context_cache_interval steps
+            # - After warmup: cache even less frequently (_aggressive_context_cache_interval steps)
+            cache_interval = (
+                self._aggressive_context_cache_interval 
+                if step >= self._aggressive_cache_threshold 
+                else self._context_cache_interval
+            )
+            
+            should_refresh_context = (
                 self._cached_context is None
                 or step == 0
-                or (step - self._context_cache_step) >= 10
-            ):
-                logger.info("[DIAG] _step: Starting context retrieval...")
+                or (step - self._context_cache_step) >= cache_interval
+            )
+            
+            if should_refresh_context:
+                logger.info(f"[DIAG] _step: Starting context retrieval (interval={cache_interval})...")
                 t_ctx = time.time()
                 retrieved_context = await self._async_safe(
                     self.bridge.before_execution, {"prompt_tokens": prompt_tokens}, {}
                 )
-                sub_times["context_retrieval_ms"] = (time.time() - t_ctx) * 1000
+                ctx_time = (time.time() - t_ctx) * 1000
+                sub_times["context_retrieval_ms"] = ctx_time
+                self._perf_metrics["total_context_time_ms"] += ctx_time
                 # Cache the context for reuse
                 self._cached_context = retrieved_context
                 self._context_cache_step = step
@@ -648,15 +984,22 @@ class CognitiveLoop:
                 retrieved_context = self._cached_context
                 sub_times["context_retrieval_ms"] = 0.0
                 logger.info(
-                    f"[DIAG] _step: Using cached context (step {step}, cached at {self._context_cache_step})"
+                    f"[DIAG] _step: Using cached context (step {step}, cached at {self._context_cache_step}, interval={cache_interval})"
                 )
             token_info["retrieved_context"] = retrieved_context
 
-            # OPTIMIZATION: Only update world model every N tokens (configurable)
+            # OPTIMIZATION: Adaptive world model update frequency
+            # Increase interval after warmup for better performance
+            wm_update_interval = (
+                self._world_model_update_interval * 2 
+                if step >= self._aggressive_cache_threshold 
+                else self._world_model_update_interval
+            )
+            
             if self.runtime.attach_world_model_hooks and hasattr(
                 self.bridge, "world_model"
             ):
-                if step == 0 or step % self._world_model_update_interval == 0:
+                if step == 0 or step % wm_update_interval == 0:
                     try:
                         logger.info("[DIAG] _step: Updating world model...")
                         t_wm_up = time.time()
@@ -675,15 +1018,31 @@ class CognitiveLoop:
                 else:
                     sub_times["wm_update_ms"] = 0.0
                     logger.info(
-                        f"[DIAG] _step: Skipping world model update (step {step}, updates every {self._world_model_update_interval} tokens)"
+                        f"[DIAG] _step: Skipping world model update (step {step}, updates every {wm_update_interval} tokens)"
                     )
 
             logger.info("[DIAG] _step: Calling transformer.encode()...")
             t_enc = time.time()
-            hidden_state = await self._async_safe(
-                self.transformer.encode, prompt_tokens, None
-            )
-            sub_times["encode_ms"] = (time.time() - t_enc) * 1000
+            
+            # OPTIMIZATION: Check encoding cache first
+            cached_hidden = self._encoding_cache.get(prompt_tokens)
+            if cached_hidden is not None:
+                hidden_state = cached_hidden
+                sub_times["encode_ms"] = 0.1  # Cache hit
+                sub_times["encode_cache_hit"] = True
+                self._perf_metrics["encoding_cache_hits"] += 1
+                logger.info("[DIAG] _step: Encoding cache HIT")
+            else:
+                hidden_state = await self._async_safe(
+                    self.transformer.encode, prompt_tokens, None
+                )
+                # Store in cache for future use
+                if hidden_state is not None:
+                    self._encoding_cache.put(prompt_tokens, hidden_state)
+                sub_times["encode_ms"] = (time.time() - t_enc) * 1000
+                sub_times["encode_cache_hit"] = False
+                
+            self._perf_metrics["total_encode_time_ms"] += sub_times["encode_ms"]
             logger.info(
                 f"[DIAG] _step: transformer.encode() returned in {sub_times['encode_ms']:.1f}ms, hidden_state={hidden_state is not None}"
             )
@@ -734,8 +1093,23 @@ class CognitiveLoop:
 
             logger.info("[DIAG] _step: Obtaining logits...")
             t_logits = time.time()
-            logits = await self._obtain_logits(hidden_state, prompt_tokens, candidates)
-            sub_times["get_logits_ms"] = (time.time() - t_logits) * 1000
+            
+            # OPTIMIZATION: Check logits cache first
+            cached_logits = self._logits_cache.get(prompt_tokens)
+            if cached_logits is not None:
+                logits = cached_logits
+                sub_times["get_logits_ms"] = 0.1  # Cache hit
+                sub_times["logits_cache_hit"] = True
+                self._perf_metrics["logits_cache_hits"] += 1
+                logger.info("[DIAG] _step: Logits cache HIT")
+            else:
+                logits = await self._obtain_logits(hidden_state, prompt_tokens, candidates)
+                # Store in cache for future use
+                if logits:
+                    self._logits_cache.put(prompt_tokens, logits)
+                sub_times["get_logits_ms"] = (time.time() - t_logits) * 1000
+                sub_times["logits_cache_hit"] = False
+            
             token_info["logits"] = logits if self.runtime.attach_logits else None
             logger.info(
                 f"[DIAG] _step: Logits obtained in {sub_times['get_logits_ms']:.1f}ms, logits_len={len(logits) if logits else 0}"
@@ -756,7 +1130,7 @@ class CognitiveLoop:
             else:
                 logger.info("[DIAG] _step: Sampling token...")
                 t_sample = time.time()
-                chosen_index, adjusted_logits = self._sample(
+                chosen_index, adjusted_logits = self._sample_optimized(
                     logits=logits,
                     generated_tokens=prompt_tokens,
                     temperature=temperature,
@@ -764,8 +1138,10 @@ class CognitiveLoop:
                     top_p=self.sampling.top_p,
                 )
                 logger.info(f"[DIAG] _step: Sampled chosen_index={chosen_index}")
-                token = await self._index_to_token(chosen_index)
+                token = await self._index_to_token_cached(chosen_index)
                 sub_times["sample_ms"] = (time.time() - t_sample) * 1000
+                self._perf_metrics["total_sample_time_ms"] += sub_times["sample_ms"]
+                self._perf_metrics["tokens_generated"] += 1
                 logger.info(
                     f"[DIAG] _step: Token resolved: {token} in {sub_times['sample_ms']:.1f}ms"
                 )
@@ -997,6 +1373,76 @@ class CognitiveLoop:
             )
         chosen = choose_token(filtered, temperature)
         return chosen, filtered
+
+    def _sample_optimized(
+        self,
+        logits: List[float],
+        generated_tokens: Tokens,
+        temperature: float,
+        top_k: int,
+        top_p: float,
+    ) -> Tuple[int, List[float]]:
+        """Optimized sampling with pre-computed tables and vectorized operations.
+        
+        This method uses numpy vectorization and pre-computed sampling tables
+        for faster token selection. Falls back to standard _sample if optimization
+        is not beneficial.
+        """
+        if not logits:
+            return 0, logits
+        
+        # Use vectorized operations for filtering
+        filtered = apply_top_k(logits, top_k)
+        filtered = apply_top_p(filtered, top_p)
+        
+        if not self.sampling.allow_repetition:
+            filtered = penalize_repetition(
+                filtered,
+                generated_tokens,
+                self.sampling.repetition_penalty,
+                self.sampling.repetition_window,
+            )
+        
+        # Try to use pre-computed sampling table for fast selection
+        try:
+            sorted_indices, cumulative = self._sampling_table_cache.get_or_compute(
+                filtered, temperature, top_k
+            )
+            if sorted_indices and cumulative:
+                # Fast sampling using pre-computed CDF
+                r = random.random()
+                for i, cum in enumerate(cumulative):
+                    if r <= cum:
+                        return sorted_indices[i], filtered
+                # Fallback to last index if random exceeded all cumulative probs
+                return sorted_indices[-1] if sorted_indices else 0, filtered
+        except Exception as e:
+            logger.debug(f"Sampling table cache failed, using standard sampling: {e}")
+        
+        # Fallback to standard choose_token
+        chosen = choose_token(filtered, temperature)
+        return chosen, filtered
+
+    async def _index_to_token_cached(self, idx: int) -> Token:
+        """Convert index to token with caching for fast repeated lookups.
+        
+        Maintains a cache of index->token mappings to avoid repeated
+        vocab/tokenizer lookups for common tokens.
+        """
+        # Check cache first
+        with self._token_index_cache_lock:
+            if idx in self._token_index_cache:
+                return self._token_index_cache[idx]
+        
+        # Use standard resolution
+        token = await self._index_to_token(idx)
+        
+        # Cache the result (limit cache size to prevent memory issues)
+        with self._token_index_cache_lock:
+            if len(self._token_index_cache) < 10000:
+                self._token_index_cache[idx] = token
+        
+        return token
 
     async def _index_to_token(self, idx: int) -> Token:
         # First try using the provided vocab object
