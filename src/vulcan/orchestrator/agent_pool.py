@@ -263,8 +263,9 @@ class PriorityJobQueue:
                 return False
             
             timestamp = time.time()
-            # Use negative timestamp so older items have higher priority within same level
-            heapq.heappush(self._queues[priority], (-timestamp, job_id, job_data))
+            # Use positive timestamp for FIFO within same priority level
+            # heapq is a min-heap, so smaller timestamps (older jobs) are popped first
+            heapq.heappush(self._queues[priority], (timestamp, job_id, job_data))
             self._size += 1
             self._stats["total_enqueued"] += 1
             self._stats["priority_distribution"][priority] += 1

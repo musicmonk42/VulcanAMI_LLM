@@ -154,7 +154,13 @@ def apply_top_k(logits: List[float], k: int) -> List[float]:
 
 
 def apply_top_p(logits: List[float], p: float) -> List[float]:
-    """Apply nucleus (top-p) sampling. Uses numpy for vectorized operations."""
+    """Apply nucleus (top-p) sampling. Uses numpy for vectorized operations.
+    
+    Note: This function computes probabilities to determine which tokens to keep
+    (those that together have cumulative probability mass >= p), but returns
+    the original logits for the kept tokens (not probabilities). This is the
+    correct behavior for nucleus sampling.
+    """
     if p >= 1.0:
         return logits
     if HAS_NUMPY:
@@ -166,9 +172,10 @@ def apply_top_p(logits: List[float], p: float) -> List[float]:
         # Find cutoff
         cutoff_idx = np.searchsorted(cumulative, p) + 1
         keep_indices = set(sorted_indices[:cutoff_idx].tolist())
+        # Return original logits for kept indices, -inf for filtered ones
         result = np.where(
             np.isin(np.arange(len(arr)), list(keep_indices)),
-            arr,
+            arr,  # Original logits for kept tokens
             float("-inf")
         )
         return result.tolist()
@@ -183,7 +190,7 @@ def apply_top_p(logits: List[float], p: float) -> List[float]:
             break
     out = [float("-inf")] * len(logits)
     for idx in keep:
-        out[idx] = logits[idx]
+        out[idx] = logits[idx]  # Original logits
     return out
 
 
@@ -288,14 +295,20 @@ class EncodingCache:
         self._hits = 0
         self._misses = 0
     
-    def _compute_key(self, tokens: Tokens) -> str:
-        """Compute a hash key for the token sequence."""
+    def _compute_key(self, tokens: Tokens) -> tuple:
+        """Compute a cache key for the token sequence.
+        
+        Uses tuple directly for hashing (faster than MD5 string conversion).
+        Only uses first/last tokens plus length for large sequences.
+        """
         # Use first and last 50 tokens plus length for efficient hashing
         if len(tokens) <= 100:
-            key_tokens = tokens
+            # Use tuple directly - hashable and efficient
+            return tuple(tokens)
         else:
-            key_tokens = tokens[:50] + tokens[-50:] + [len(tokens)]
-        return hashlib.md5(str(key_tokens).encode(), usedforsecurity=False).hexdigest()
+            # For long sequences, use fingerprint tuple
+            key_tokens = tokens[:50] + tokens[-50:]
+            return (tuple(key_tokens), len(tokens))
     
     def get(self, tokens: Tokens) -> Optional[Any]:
         """Get cached encoding result if available and not expired."""
@@ -416,14 +429,33 @@ class SamplingTableCache:
         Returns:
             Tuple of (sorted_indices, cumulative_probs) for efficient sampling.
         """
-        # Create a simple fingerprint for the logits distribution
+        # Create a comprehensive fingerprint for the logits distribution
+        # Use statistical moments across full array for better coverage
         if HAS_NUMPY:
-            arr = np.array(logits[:min(100, len(logits))], dtype=np.float32)
-            fingerprint = f"{np.mean(arr):.3f}_{np.std(arr):.3f}_{temperature:.2f}_{top_k}"
+            arr = np.array(logits, dtype=np.float32)
+            # Compute moments across full array
+            mean_val = float(np.mean(arr))
+            std_val = float(np.std(arr))
+            # Add min/max for distribution shape
+            min_val = float(np.min(arr))
+            max_val = float(np.max(arr))
+            # Add skewness approximation (for distribution asymmetry)
+            median_val = float(np.median(arr))
+            fingerprint = (
+                f"{mean_val:.3f}_{std_val:.3f}_{min_val:.3f}_{max_val:.3f}_"
+                f"{median_val:.3f}_{temperature:.2f}_{top_k}_{len(logits)}"
+            )
         else:
-            sample = logits[:min(100, len(logits))]
-            mean_val = sum(sample) / len(sample) if sample else 0
-            fingerprint = f"{mean_val:.3f}_{temperature:.2f}_{top_k}"
+            # Pure Python fallback
+            if logits:
+                mean_val = sum(logits) / len(logits)
+                sorted_logits = sorted(logits)
+                min_val = sorted_logits[0]
+                max_val = sorted_logits[-1]
+                median_val = sorted_logits[len(sorted_logits) // 2]
+                fingerprint = f"{mean_val:.3f}_{min_val:.3f}_{max_val:.3f}_{median_val:.3f}_{temperature:.2f}_{top_k}_{len(logits)}"
+            else:
+                fingerprint = f"empty_{temperature:.2f}_{top_k}"
         
         with self._lock:
             if fingerprint in self._tables:
@@ -521,8 +553,8 @@ class CognitiveLoop:
         self._context_cache_interval: int = 10  # Cache context every N steps
         self._aggressive_context_cache_interval: int = 20  # After warmup, cache even less frequently
         
-        # Token index cache for fast lookups
-        self._token_index_cache: Dict[int, Token] = {}
+        # Token index cache for fast lookups (OrderedDict for LRU eviction)
+        self._token_index_cache: OrderedDict = OrderedDict()
         self._token_index_cache_lock = threading.RLock()
         
         # Performance metrics
@@ -1427,20 +1459,25 @@ class CognitiveLoop:
         """Convert index to token with caching for fast repeated lookups.
         
         Maintains a cache of index->token mappings to avoid repeated
-        vocab/tokenizer lookups for common tokens.
+        vocab/tokenizer lookups for common tokens. Uses OrderedDict for LRU eviction.
         """
         # Check cache first
         with self._token_index_cache_lock:
             if idx in self._token_index_cache:
+                # Move to end (most recently used) for LRU
+                self._token_index_cache.move_to_end(idx)
                 return self._token_index_cache[idx]
         
         # Use standard resolution
         token = await self._index_to_token(idx)
         
-        # Cache the result (limit cache size to prevent memory issues)
+        # Cache the result with LRU eviction
         with self._token_index_cache_lock:
-            if len(self._token_index_cache) < 10000:
-                self._token_index_cache[idx] = token
+            # Evict oldest if at max size
+            max_cache_size = 10000
+            while len(self._token_index_cache) >= max_cache_size:
+                self._token_index_cache.popitem(last=False)  # Remove oldest
+            self._token_index_cache[idx] = token
         
         return token
 
