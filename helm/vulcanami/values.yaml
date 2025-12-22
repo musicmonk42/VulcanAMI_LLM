@@ -168,6 +168,62 @@ minio:
   secretKeySecretName: ""  # REQUIRED: Secret containing MinIO secret key
   secretKeySecretKey: "secretKey"  # Key in the secret
 
+# Vulcan Memory System v46 Configuration
+memorySystem:
+  enabled: true
+  # Milvus vector database configuration
+  milvus:
+    host: milvus-service
+    port: 19530
+    # Enable init container to bootstrap collections
+    bootstrap:
+      enabled: true
+      configPath: /configs/vector/milvus/collections.yaml
+  # S3/PackfileStore configuration
+  s3:
+    bucket: vulcanami-memory
+    region: us-east-1
+    endpointUrl: ""  # Leave empty for AWS S3, or set for MinIO/LocalStack
+  # Packfile configuration
+  packfile:
+    sizeMb: 32
+    compression: zstd
+    encryption: AES256
+  # LSM tree configuration
+  lsm:
+    compactionStrategy: adaptive
+    bloomFilter: true
+  # Index configuration
+  indexType: disk_based_tier_c
+  # Unlearning configuration
+  unlearning:
+    method: gradient_surgery
+    enableVerification: true
+  # ZK prover configuration
+  zk:
+    proofSystem: groth16
+  # Persistent storage paths
+  paths:
+    memoryStore: /app/memory_store
+    cacheRoot: /tmp/vulcan_cache
+    configPath: /app/configs
+
+# Persistent Volume Claims for memory system
+persistence:
+  memoryStore:
+    enabled: true
+    storageClass: ""  # Uses default storage class if empty
+    accessMode: ReadWriteOnce
+    size: 50Gi
+    # Set to true to keep PVC when helm release is deleted
+    retain: true
+  cache:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+    retain: false
+
 # Secrets (REQUIRED: Must be set via --set-string or external secret management)
 # Empty values will cause deployment validation to fail
 secrets:
@@ -179,6 +235,9 @@ secrets:
   openaiApiKey: ""  # REQUIRED for OpenAI chat functionality
   anthropicApiKey: ""  # Optional: For Claude model support
   graphixApiKey: ""  # Optional: For Graphix services
+  # AWS Credentials for Memory System (required if using S3)
+  awsAccessKeyId: ""  # Optional: For S3 storage
+  awsSecretAccessKey: ""  # Optional: For S3 storage
 
 # Security Configuration (Optional - for enhanced security)
 # HuggingFace Model Pinning: Pin models to specific commit hashes

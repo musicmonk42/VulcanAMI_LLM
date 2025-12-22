@@ -6,6 +6,8 @@ namespace: vulcanami
 resources:
   - namespace.yaml
   - secret.yaml
+  - configmap.yaml
+  - pvc.yaml
   - api-deployment.yaml
   - api-networkpolicy.yaml
   - ingress.yaml
@@ -13,21 +15,6 @@ resources:
   - postgres-networkpolicy.yaml
   - redis-deployment.yaml
   - redis-networkpolicy.yaml
-
-configMapGenerator:
-  - name: vulcanami-config
-    literals:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=INFO
-      - PYTHONUNBUFFERED=1
-      - POSTGRES_HOST=postgres-service
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=vulcanami
-      - POSTGRES_USER=vulcanami
-      - REDIS_HOST=redis-service
-      - REDIS_PORT=6379
-      - MINIO_ENDPOINT=http://minio-service:9000
-      - MINIO_ACCESS_KEY=minioadmin
 
 labels:
   - pairs:
