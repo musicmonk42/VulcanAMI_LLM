@@ -217,6 +217,10 @@ class HybridLLMExecutor:
     # Constants for response quality evaluation
     MIN_MEANINGFUL_LENGTH = 10
     MOCK_RESPONSE_MARKER = "Mock response"
+    # Maximum length for local response in ensemble mode
+    ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
+    # Valid execution modes
+    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble")
 
     def __init__(
         self,
@@ -225,6 +229,7 @@ class HybridLLMExecutor:
         mode: str = "parallel",
         timeout: float = 30.0,
         ensemble_min_confidence: float = 0.7,
+        openai_max_tokens: int = 1000,
     ):
         """
         Initialize the hybrid executor.
@@ -235,12 +240,22 @@ class HybridLLMExecutor:
             mode: Execution mode (local_first, openai_first, parallel, ensemble)
             timeout: Timeout for parallel/ensemble execution
             ensemble_min_confidence: Minimum confidence for ensemble selection
+            openai_max_tokens: Maximum tokens for OpenAI API calls
         """
         self.local_llm = local_llm
         self.openai_client_getter = openai_client_getter or get_openai_client
-        self.mode = mode.lower()
+        # Validate mode
+        mode_lower = mode.lower()
+        if mode_lower not in self.VALID_MODES:
+            self.logger = logging.getLogger("HybridLLMExecutor")
+            self.logger.warning(
+                f"Invalid mode '{mode}', defaulting to 'parallel'. Valid modes: {self.VALID_MODES}"
+            )
+            mode_lower = "parallel"
+        self.mode = mode_lower
         self.timeout = timeout
         self.ensemble_min_confidence = ensemble_min_confidence
+        self.openai_max_tokens = openai_max_tokens
         self.logger = logging.getLogger("HybridLLMExecutor")
 
     async def execute(
@@ -385,24 +400,15 @@ class HybridLLMExecutor:
                 except Exception as e:
                     self.logger.debug(f"Task failed: {e}")
 
-            # Cancel pending tasks
+            # Cancel pending tasks and clean up
             for task in pending:
                 task.cancel()
                 try:
                     await task
                 except asyncio.CancelledError:
                     pass
-
-            # Try to get remaining results from pending that may have partially completed
-            for task in pending:
-                try:
-                    if not task.cancelled() and task.done():
-                        result = task.result()
-                        if task == tasks[0]:
-                            results["local"] = result
-                        else:
-                            results["openai"] = result
                 except Exception:
+                    # Ignore any other exceptions from cancelled tasks
                     pass
 
             # Select the best available result
@@ -503,7 +509,8 @@ class HybridLLMExecutor:
                 and local_str.strip() != openai_str.strip()
             ):
                 # Local has different content - could be valuable reasoning
-                combined_response = f"{openai_str}\n\n[Additional Analysis from VULCAN Local LLM]:\n{local_str[:500]}"
+                truncated_local = local_str[: self.ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH]
+                combined_response = f"{openai_str}\n\n[Additional Analysis from VULCAN Local LLM]:\n{truncated_local}"
 
             return {
                 "text": combined_response,
@@ -570,6 +577,8 @@ class HybridLLMExecutor:
             return None
 
         try:
+            # Use configurable max_tokens limit
+            effective_max_tokens = min(max_tokens, self.openai_max_tokens)
 
             def call_openai():
                 completion = openai_client.chat.completions.create(
@@ -578,7 +587,7 @@ class HybridLLMExecutor:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    max_tokens=min(max_tokens, 1000),
+                    max_tokens=effective_max_tokens,
                     temperature=temperature,
                 )
                 return completion.choices[0].message.content
@@ -693,6 +702,8 @@ class Settings(BaseSettings):
     llm_ensemble_min_confidence: float = Field(
         default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"
     )
+    # Maximum tokens for OpenAI API calls
+    llm_openai_max_tokens: int = Field(default=1000, env="LLM_OPENAI_MAX_TOKENS")
 
     class Config:
         env_file = ".env"
@@ -2883,6 +2894,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         mode=settings.llm_execution_mode,
         timeout=settings.llm_parallel_timeout,
         ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+        openai_max_tokens=settings.llm_openai_max_tokens,
     )
 
     # Execute hybrid LLM request
@@ -3826,6 +3838,7 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                     mode=settings.llm_execution_mode,
                     timeout=settings.llm_parallel_timeout,
                     ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+                    openai_max_tokens=settings.llm_openai_max_tokens,
                 )
 
                 try:
