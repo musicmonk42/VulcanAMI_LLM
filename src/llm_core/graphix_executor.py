@@ -699,17 +699,17 @@ class GraphixExecutor:
             if isinstance(token, int):
                 token_id = token
             elif isinstance(token, str):
-                # String tokens: use hash to get a consistent token ID
+                # String tokens: use abs(hash()) to ensure positive token IDs
                 # This handles words like 'understand', 'neither', 'like', 'no'
-                token_id = hash(token) % self.vocab_size
+                token_id = abs(hash(token)) % self.vocab_size
             else:
-                # For other types, try int conversion, fallback to 0 if it fails
+                # For other types, try int conversion, fallback to hash if it fails
                 try:
                     token_id = int(token)
                 except (ValueError, TypeError):
                     logger.debug(f"Cannot convert token to int: {token}, using hash")
-                    token_id = hash(str(token)) % self.vocab_size
-            token_id = token_id % self.vocab_size  # Ensure in vocab range
+                    token_id = abs(hash(str(token))) % self.vocab_size
+            token_id = abs(token_id) % self.vocab_size  # Ensure positive and in vocab range
 
             # Extract embedding
             start_idx = token_id * self.hidden_size
