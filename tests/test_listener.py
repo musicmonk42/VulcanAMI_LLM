@@ -21,11 +21,29 @@ from listener import (
     MIN_CONTENT_LENGTH,
     RATE_LIMIT_WINDOW,
     GraphixListener,
-    MockAgentRegistry,
-    MockUnifiedRuntime,
     RateLimiter,
     RequestHandler,
 )
+
+
+class MockAgentRegistry:
+    """Mock agent registry for testing - always returns True for signature verification."""
+
+    def verify_signature(self, agent_id: str, message: str, signature: str) -> bool:
+        """Mock signature verification - always returns True."""
+        return True
+
+
+class MockUnifiedRuntime:
+    """Mock runtime for testing - returns mock execution results."""
+
+    def execute_graph(self, graph, agent_id: str = "unknown"):
+        """Mock graph execution."""
+        nodes = graph.get("nodes", [])
+        return {
+            "status": "mock_executed",
+            "nodes_processed": len(nodes),
+        }
 
 
 @pytest.fixture
@@ -310,7 +328,7 @@ class TestGraphixListener:
 
     def test_initialization(self):
         """Test listener initialization."""
-        listener = GraphixListener(host="127.0.0.1", port=8182, use_mock=True)
+        listener = GraphixListener(host="127.0.0.1", port=8182)
 
         assert listener.host == "127.0.0.1"
         assert listener.port == 8182
@@ -320,42 +338,42 @@ class TestGraphixListener:
     def test_initialization_with_custom_rate_limit(self):
         """Test initialization with custom rate limit."""
         listener = GraphixListener(
-            host="127.0.0.1", port=8182, use_mock=True, max_requests_per_minute=100
+            host="127.0.0.1", port=8182, max_requests_per_minute=100
         )
 
         assert listener.rate_limiter.max_requests == 100
 
     def test_stop_without_start(self):
         """Test stopping listener that hasn't started."""
-        listener = GraphixListener(use_mock=True)
+        listener = GraphixListener()
 
         # Should not raise
         listener.stop()
 
     def test_stop_twice(self):
         """Test stopping listener twice."""
-        listener = GraphixListener(use_mock=True)
+        listener = GraphixListener()
 
         listener.stop()
         listener.stop()  # Should not raise
 
     def test_initialization_default_host_port(self):
         """Test initialization with default host and port."""
-        listener = GraphixListener(use_mock=True)
+        listener = GraphixListener()
 
         assert listener.host == "127.0.0.1"
         assert listener.port == 8181
 
     def test_shutdown_event_created(self):
         """Test that shutdown event is created."""
-        listener = GraphixListener(use_mock=True)
+        listener = GraphixListener()
 
         assert listener.shutdown_event is not None
         assert not listener.shutdown_event.is_set()
 
     def test_stop_sets_shutdown_event(self):
         """Test that stop sets the shutdown event."""
-        listener = GraphixListener(use_mock=True)
+        listener = GraphixListener()
 
         listener.stop()
 
