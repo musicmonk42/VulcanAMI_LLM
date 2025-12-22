@@ -193,6 +193,412 @@ try:
 except ImportError:
     GraphixVulcanLLM = MockGraphixVulcanLLM
 
+
+# ============================================================
+# HYBRID LLM EXECUTOR
+# Enables simultaneous use of OpenAI and Vulcan's internal LLM
+# ============================================================
+
+
+class HybridLLMExecutor:
+    """
+    Executes LLM requests using both OpenAI and Vulcan's local LLM.
+
+    Supports multiple execution modes:
+    - local_first: Try Vulcan's local LLM first, fallback to OpenAI
+    - openai_first: Try OpenAI first, fallback to local LLM
+    - parallel: Run both simultaneously, use first successful response
+    - ensemble: Run both, combine/select best response based on quality
+
+    This allows VulcanAMI_LLM to leverage both its native reasoning capabilities
+    AND OpenAI's language generation without conflicts.
+    """
+
+    # Constants for response quality evaluation
+    MIN_MEANINGFUL_LENGTH = 10
+    MOCK_RESPONSE_MARKER = "Mock response"
+
+    def __init__(
+        self,
+        local_llm: Optional[Any] = None,
+        openai_client_getter: Optional[Any] = None,
+        mode: str = "parallel",
+        timeout: float = 30.0,
+        ensemble_min_confidence: float = 0.7,
+    ):
+        """
+        Initialize the hybrid executor.
+
+        Args:
+            local_llm: Vulcan's local LLM instance
+            openai_client_getter: Function to get OpenAI client (lazy loading)
+            mode: Execution mode (local_first, openai_first, parallel, ensemble)
+            timeout: Timeout for parallel/ensemble execution
+            ensemble_min_confidence: Minimum confidence for ensemble selection
+        """
+        self.local_llm = local_llm
+        self.openai_client_getter = openai_client_getter or get_openai_client
+        self.mode = mode.lower()
+        self.timeout = timeout
+        self.ensemble_min_confidence = ensemble_min_confidence
+        self.logger = logging.getLogger("HybridLLMExecutor")
+
+    async def execute(
+        self,
+        prompt: str,
+        max_tokens: int = 1000,
+        temperature: float = 0.7,
+        system_prompt: str = "You are VULCAN, an advanced AI assistant.",
+    ) -> Dict[str, Any]:
+        """
+        Execute LLM request using configured mode.
+
+        Args:
+            prompt: The input prompt
+            max_tokens: Maximum tokens for response
+            temperature: Sampling temperature
+            system_prompt: System prompt for OpenAI
+
+        Returns:
+            Dict with 'text', 'source', 'systems_used', and optional 'metadata'
+        """
+        loop = asyncio.get_running_loop()
+
+        if self.mode == "local_first":
+            return await self._execute_local_first(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        elif self.mode == "openai_first":
+            return await self._execute_openai_first(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        elif self.mode == "parallel":
+            return await self._execute_parallel(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        elif self.mode == "ensemble":
+            return await self._execute_ensemble(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        else:
+            self.logger.warning(f"Unknown mode '{self.mode}', defaulting to parallel")
+            return await self._execute_parallel(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+
+    async def _execute_local_first(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Try local LLM first, fallback to OpenAI."""
+        systems_used = []
+
+        # Try local LLM
+        local_result = await self._call_local_llm(loop, prompt, max_tokens)
+        if self._is_valid_response(local_result):
+            systems_used.append("vulcan_local_llm")
+            return {
+                "text": local_result,
+                "source": "local",
+                "systems_used": systems_used,
+            }
+
+        # Fallback to OpenAI
+        openai_result = await self._call_openai(
+            loop, prompt, max_tokens, temperature, system_prompt
+        )
+        if openai_result:
+            systems_used.append("openai_fallback")
+            return {
+                "text": openai_result,
+                "source": "openai",
+                "systems_used": systems_used,
+            }
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _execute_openai_first(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Try OpenAI first, fallback to local LLM."""
+        systems_used = []
+
+        # Try OpenAI
+        openai_result = await self._call_openai(
+            loop, prompt, max_tokens, temperature, system_prompt
+        )
+        if openai_result:
+            systems_used.append("openai_llm")
+            return {
+                "text": openai_result,
+                "source": "openai",
+                "systems_used": systems_used,
+            }
+
+        # Fallback to local
+        local_result = await self._call_local_llm(loop, prompt, max_tokens)
+        if self._is_valid_response(local_result):
+            systems_used.append("vulcan_local_llm_fallback")
+            return {
+                "text": local_result,
+                "source": "local",
+                "systems_used": systems_used,
+            }
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _execute_parallel(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Run both LLMs simultaneously, use first successful response."""
+        systems_used = []
+
+        async def local_task():
+            return await self._call_local_llm(loop, prompt, max_tokens)
+
+        async def openai_task():
+            return await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+
+        # Run both tasks concurrently with timeout
+        try:
+            tasks = [
+                asyncio.create_task(local_task()),
+                asyncio.create_task(openai_task()),
+            ]
+
+            # Wait for first successful result or all to complete
+            done, pending = await asyncio.wait(
+                tasks, timeout=self.timeout, return_when=asyncio.FIRST_COMPLETED
+            )
+
+            results = {"local": None, "openai": None}
+
+            for task in done:
+                try:
+                    result = task.result()
+                    # Determine which task completed
+                    if task == tasks[0]:
+                        results["local"] = result
+                    else:
+                        results["openai"] = result
+                except Exception as e:
+                    self.logger.debug(f"Task failed: {e}")
+
+            # Cancel pending tasks
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+            # Try to get remaining results from pending that may have partially completed
+            for task in pending:
+                try:
+                    if not task.cancelled() and task.done():
+                        result = task.result()
+                        if task == tasks[0]:
+                            results["local"] = result
+                        else:
+                            results["openai"] = result
+                except Exception:
+                    pass
+
+            # Select the best available result
+            local_valid = self._is_valid_response(results["local"])
+            openai_valid = results["openai"] is not None and len(
+                str(results["openai"]).strip()
+            ) > self.MIN_MEANINGFUL_LENGTH
+
+            if local_valid and openai_valid:
+                # Both succeeded - prefer the one that completed first (already have it)
+                # For parallel mode, prefer OpenAI for language quality
+                systems_used.extend(["vulcan_local_llm", "openai_llm"])
+                return {
+                    "text": results["openai"],
+                    "source": "parallel_both",
+                    "systems_used": systems_used,
+                    "metadata": {
+                        "local_response_available": True,
+                        "openai_response_available": True,
+                        "local_response_preview": str(results["local"])[:100],
+                    },
+                }
+            elif openai_valid:
+                systems_used.append("openai_llm")
+                return {
+                    "text": results["openai"],
+                    "source": "openai",
+                    "systems_used": systems_used,
+                }
+            elif local_valid:
+                systems_used.append("vulcan_local_llm")
+                return {
+                    "text": results["local"],
+                    "source": "local",
+                    "systems_used": systems_used,
+                }
+
+        except asyncio.TimeoutError:
+            self.logger.warning("Parallel execution timed out")
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _execute_ensemble(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Run both LLMs, combine/select best response based on quality."""
+        systems_used = []
+
+        async def local_task():
+            return await self._call_local_llm(loop, prompt, max_tokens)
+
+        async def openai_task():
+            return await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+
+        # Run both tasks concurrently
+        try:
+            local_result, openai_result = await asyncio.wait_for(
+                asyncio.gather(local_task(), openai_task(), return_exceptions=True),
+                timeout=self.timeout,
+            )
+
+            # Handle exceptions from gather
+            if isinstance(local_result, Exception):
+                self.logger.debug(f"Local LLM failed: {local_result}")
+                local_result = None
+            if isinstance(openai_result, Exception):
+                self.logger.debug(f"OpenAI failed: {openai_result}")
+                openai_result = None
+
+        except asyncio.TimeoutError:
+            self.logger.warning("Ensemble execution timed out")
+            return {"text": "", "source": "none", "systems_used": systems_used}
+
+        local_valid = self._is_valid_response(local_result)
+        openai_valid = openai_result is not None and len(
+            str(openai_result).strip()
+        ) > self.MIN_MEANINGFUL_LENGTH
+
+        if local_valid and openai_valid:
+            # Both succeeded - evaluate and combine
+            systems_used.extend(["vulcan_local_llm", "openai_llm"])
+
+            # Ensemble strategy: Use OpenAI for final language quality,
+            # but enrich with local LLM insights if available
+            local_str = str(local_result)
+            openai_str = str(openai_result)
+
+            # Simple ensemble: If local response contains unique insights not in OpenAI,
+            # append them. Otherwise, use OpenAI response (better language quality).
+            combined_response = openai_str
+
+            # Check if local has meaningful additional content
+            if (
+                len(local_str) > 50
+                and self.MOCK_RESPONSE_MARKER not in local_str
+                and local_str.strip() != openai_str.strip()
+            ):
+                # Local has different content - could be valuable reasoning
+                combined_response = f"{openai_str}\n\n[Additional Analysis from VULCAN Local LLM]:\n{local_str[:500]}"
+
+            return {
+                "text": combined_response,
+                "source": "ensemble",
+                "systems_used": systems_used,
+                "metadata": {
+                    "ensemble_mode": True,
+                    "local_length": len(local_str),
+                    "openai_length": len(openai_str),
+                },
+            }
+        elif openai_valid:
+            systems_used.append("openai_llm")
+            return {
+                "text": openai_result,
+                "source": "openai",
+                "systems_used": systems_used,
+            }
+        elif local_valid:
+            systems_used.append("vulcan_local_llm")
+            return {
+                "text": local_result,
+                "source": "local",
+                "systems_used": systems_used,
+            }
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _call_local_llm(
+        self, loop, prompt: str, max_tokens: int
+    ) -> Optional[str]:
+        """Call Vulcan's local LLM."""
+        if not self.local_llm:
+            return None
+
+        try:
+            result = await loop.run_in_executor(
+                None, self.local_llm.generate, prompt, max_tokens
+            )
+
+            if hasattr(result, "text"):
+                return result.text
+            elif isinstance(result, str):
+                return result
+            elif isinstance(result, dict) and "text" in result:
+                return result["text"]
+            else:
+                return str(result)
+        except Exception as e:
+            self.logger.debug(f"Local LLM call failed: {e}")
+            return None
+
+    async def _call_openai(
+        self,
+        loop,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        system_prompt: str,
+    ) -> Optional[str]:
+        """Call OpenAI API."""
+        openai_client = self.openai_client_getter()
+        if not openai_client:
+            return None
+
+        try:
+
+            def call_openai():
+                completion = openai_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=min(max_tokens, 1000),
+                    temperature=temperature,
+                )
+                return completion.choices[0].message.content
+
+            return await loop.run_in_executor(None, call_openai)
+        except Exception as e:
+            self.logger.debug(f"OpenAI call failed: {e}")
+            return None
+
+    def _is_valid_response(self, response: Optional[str]) -> bool:
+        """Check if response is valid and meaningful."""
+        if not response:
+            return False
+        response_str = str(response).strip()
+        return (
+            len(response_str) > self.MIN_MEANINGFUL_LENGTH
+            and self.MOCK_RESPONSE_MARKER not in response_str
+        )
+
+
 # ============================================================
 # CONFIGURATION WITH ENVIRONMENT VARIABLES
 # ============================================================
@@ -273,6 +679,20 @@ class Settings(BaseSettings):
     self_improvement_approval_required: bool = True
     # self.improvement_max_cost_usd is duplicated, using the new one
     self_improvement_check_interval_s: int = 60  # duplicated, using new name
+
+    # LLM Execution Mode Configuration
+    # Modes: "local_first" (default), "openai_first", "parallel", "ensemble"
+    # - local_first: Try Vulcan's local LLM first, fallback to OpenAI
+    # - openai_first: Try OpenAI first, fallback to local LLM
+    # - parallel: Run both simultaneously, use first successful response
+    # - ensemble: Run both, combine/select best response based on quality
+    llm_execution_mode: str = Field(default="parallel", env="LLM_EXECUTION_MODE")
+    # Timeout for parallel/ensemble execution (seconds)
+    llm_parallel_timeout: float = Field(default=30.0, env="LLM_PARALLEL_TIMEOUT")
+    # For ensemble mode: minimum confidence threshold for response selection
+    llm_ensemble_min_confidence: float = Field(
+        default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"
+    )
 
     class Config:
         env_file = ".env"
@@ -2448,77 +2868,50 @@ User Query: {processed_prompt}
 Based on your analysis through memory retrieval, multi-modal reasoning, causal modeling, and world simulation, provide a helpful and accurate response."""
 
     # ================================================================
-    # STEP 7: Generate Response (VULCAN LOCAL FIRST, OpenAI FALLBACK)
+    # STEP 7: Generate Response (HYBRID LLM EXECUTION)
+    # Uses both OpenAI and Vulcan's local LLM based on configured mode
     # ================================================================
     response_text = ""
 
-    # PRIORITY 1: Try Vulcan's LOCAL LLM first
-    if hasattr(app.state, "llm") and app.state.llm:
-        llm = app.state.llm
-        try:
-            result = await loop.run_in_executor(
-                None, llm.generate, enhanced_prompt, request.max_tokens
-            )
+    # Get local LLM if available
+    local_llm = app.state.llm if hasattr(app.state, "llm") else None
 
-            if hasattr(result, "text"):
-                response_text = result.text
-            elif isinstance(result, str):
-                response_text = result
-            elif isinstance(result, dict) and "text" in result:
-                response_text = result["text"]
-            else:
-                response_text = str(result)
+    # Create hybrid executor with configured mode
+    hybrid_executor = HybridLLMExecutor(
+        local_llm=local_llm,
+        openai_client_getter=get_openai_client,
+        mode=settings.llm_execution_mode,
+        timeout=settings.llm_parallel_timeout,
+        ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+    )
 
-            # Only use if we got a meaningful response
-            if (
-                response_text
-                and len(response_text.strip()) > MIN_MEANINGFUL_RESPONSE_LENGTH
-                and MOCK_RESPONSE_MARKER not in response_text
-            ):
-                systems_used.append("vulcan_local_llm")
-                logger.info("[VULCAN] Response generated via Vulcan's local LLM")
-            else:
-                response_text = ""  # Reset to try fallback
+    # Execute hybrid LLM request
+    try:
+        llm_result = await hybrid_executor.execute(
+            prompt=enhanced_prompt,
+            max_tokens=request.max_tokens,
+            temperature=0.7,
+            system_prompt="You are VULCAN, an advanced AI assistant. Respond based on the cognitive analysis provided.",
+        )
 
-        except Exception as e:
-            logger.debug(f"[VULCAN] Local LLM generation failed: {e}")
-            response_text = ""
+        response_text = llm_result.get("text", "")
+        llm_systems = llm_result.get("systems_used", [])
+        systems_used.extend(llm_systems)
 
-    # PRIORITY 2: Fallback to OpenAI only if local failed
-    if not response_text:
-        openai_client = get_openai_client()
-        if openai_client:
-            try:
+        source = llm_result.get("source", "unknown")
+        logger.info(
+            f"[VULCAN] Response generated via hybrid execution (mode={settings.llm_execution_mode}, source={source})"
+        )
 
-                def call_openai():
-                    completion = openai_client.chat.completions.create(
-                        model="gpt-3.5-turbo",
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": "You are VULCAN, an advanced AI assistant. Respond based on the cognitive analysis provided.",
-                            },
-                            {"role": "user", "content": enhanced_prompt},
-                        ],
-                        max_tokens=min(request.max_tokens, 1000),
-                        temperature=0.7,
-                    )
-                    return completion.choices[0].message.content
+        # Add metadata to response if available
+        if llm_result.get("metadata"):
+            logger.debug(f"[VULCAN] Hybrid LLM metadata: {llm_result['metadata']}")
 
-                response_text = await loop.run_in_executor(None, call_openai)
-                systems_used.append("openai_fallback")
-                logger.info(
-                    "[VULCAN] Response generated via OpenAI fallback (with Vulcan cognitive context)"
-                )
-            except Exception as e:
-                # Log full error details for Railway debugging
-                logger.error(f"[VULCAN] OpenAI fallback failed: {type(e).__name__}: {e}")
-        else:
-            # Log why OpenAI client is not available
-            init_error = get_openai_init_error()
-            logger.warning(f"[VULCAN] OpenAI client not available for fallback: {init_error}")
+    except Exception as e:
+        logger.error(f"[VULCAN] Hybrid LLM execution failed: {type(e).__name__}: {e}")
+        response_text = ""
 
-    # PRIORITY 3: Generate response from reasoning if both LLMs failed
+    # FALLBACK: Generate response from reasoning if hybrid execution failed
     if not response_text and (reasoning_insights or world_model_insights):
         response_text = "Based on VULCAN's cognitive analysis:\n\n"
         if "symbolic" in reasoning_insights:
@@ -3426,69 +3819,54 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                # Try OpenAI first for high-quality responses
-                openai_client = get_openai_client()
-                if openai_client:
-                    try:
+                # Use hybrid LLM execution for simultaneous OpenAI + Local LLM
+                hybrid_executor = HybridLLMExecutor(
+                    local_llm=llm,
+                    openai_client_getter=get_openai_client,
+                    mode=settings.llm_execution_mode,
+                    timeout=settings.llm_parallel_timeout,
+                    ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+                )
 
-                        def call_openai():
-                            completion = openai_client.chat.completions.create(
-                                model="gpt-3.5-turbo",
-                                messages=[
-                                    {
-                                        "role": "system",
-                                        "content": "You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses.",
-                                    },
-                                    {"role": "user", "content": enhanced_prompt},
-                                ],
-                                max_tokens=min(request.max_tokens, 1000),
-                                temperature=0.7,
-                            )
-                            return completion.choices[0].message.content
+                try:
+                    llm_result = await hybrid_executor.execute(
+                        prompt=enhanced_prompt,
+                        max_tokens=request.max_tokens,
+                        temperature=0.7,
+                        system_prompt="You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses.",
+                    )
 
-                        response_text = await loop.run_in_executor(None, call_openai)
-                        systems_used.append("openai_llm")
-                    except Exception as e:
-                        # Log the full error details for debugging on Railway
-                        logger.error(
-                            f"OpenAI API call failed: {type(e).__name__}: {e}"
-                        )
-                        # Include error type for better diagnostics
-                        logger.debug(f"OpenAI error traceback: {traceback.format_exc()}")
-                        # Fall through to local LLM
-                        response_text = ""
-                else:
-                    # Log why OpenAI is not available for debugging
-                    init_error = get_openai_init_error()
-                    logger.info(f"OpenAI client not available: {init_error}")
+                    response_text = llm_result.get("text", "")
+                    llm_systems = llm_result.get("systems_used", [])
+                    systems_used.extend(llm_systems)
+
+                    source = llm_result.get("source", "unknown")
+                    logger.info(
+                        f"[VULCAN] Multi-turn response via hybrid execution (mode={settings.llm_execution_mode}, source={source})"
+                    )
+
+                except Exception as e:
+                    logger.error(f"Hybrid LLM execution failed: {type(e).__name__}: {e}")
                     response_text = ""
 
-                # Fallback to local LLM if OpenAI failed or not available
+                # Fallback if hybrid execution returned nothing
                 if not response_text:
-                    result = await loop.run_in_executor(
-                        None, llm.generate, enhanced_prompt, request.max_tokens
-                    )
-                    # Extract text from GenerationResult object
-                    if hasattr(result, "text"):
-                        response_text = result.text
-                    elif isinstance(result, str):
-                        response_text = result
-                    elif isinstance(result, dict) and "text" in result:
-                        response_text = result["text"]
-                    else:
-                        response_text = str(result)
-                    systems_used.append("llm_generation")
+                    response_text = f"I understand your query about: {user_message}. "
+                    if reasoning_results:
+                        response_text += "Based on my analysis, I can provide insights from multiple reasoning systems. "
+                    if plan_result:
+                        response_text += (
+                            "I've also generated a plan to help address your request. "
+                        )
+                    response_text += "However, I encountered an issue generating a detailed response. Please try again."
+                    systems_used.append("fallback_message")
+
             except Exception as e:
-                logger.error(f"LLM generation failed: {e}")
-                # Fallback response
+                logger.error(f"LLM generation block failed: {e}")
                 response_text = f"I understand your query about: {user_message}. "
-                if reasoning_results:
-                    response_text += "Based on my analysis, I can provide insights from multiple reasoning systems. "
-                if plan_result:
-                    response_text += (
-                        "I've also generated a plan to help address your request. "
-                    )
-                response_text += "However, I encountered an issue generating a detailed response. Please try again."
+                response_text += "However, I encountered an issue processing your request. Please try again."
+                systems_used.append("error_fallback")
+
         else:
             # Fallback when LLM is not available
             response_text = f"Processing your query: '{user_message}'\n\n"
@@ -3655,6 +4033,100 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e), "timestamp": time.time()}
+
+
+@app.get("/v1/llm/config")
+async def get_llm_config():
+    """
+    Get current LLM execution configuration.
+
+    Returns the hybrid LLM execution settings that control how OpenAI
+    and Vulcan's local LLM work together.
+    """
+    openai_client = get_openai_client()
+    openai_init_error = get_openai_init_error()
+
+    return {
+        "execution_mode": settings.llm_execution_mode,
+        "parallel_timeout": settings.llm_parallel_timeout,
+        "ensemble_min_confidence": settings.llm_ensemble_min_confidence,
+        "available_modes": ["local_first", "openai_first", "parallel", "ensemble"],
+        "mode_descriptions": {
+            "local_first": "Try Vulcan's local LLM first, fallback to OpenAI if needed",
+            "openai_first": "Try OpenAI first, fallback to local LLM if needed",
+            "parallel": "Run both simultaneously, use first successful response",
+            "ensemble": "Run both, combine/select best response based on quality",
+        },
+        "providers": {
+            "openai": {
+                "available": openai_client is not None,
+                "error": openai_init_error if openai_client is None else None,
+            },
+            "local_llm": {
+                "available": hasattr(app.state, "llm") and app.state.llm is not None,
+            },
+        },
+        "timestamp": time.time(),
+    }
+
+
+class LLMConfigUpdate(BaseModel):
+    """Request model for updating LLM configuration."""
+
+    execution_mode: Optional[str] = Field(
+        None, description="LLM execution mode: local_first, openai_first, parallel, ensemble"
+    )
+    parallel_timeout: Optional[float] = Field(
+        None, ge=1.0, le=120.0, description="Timeout for parallel execution (1-120 seconds)"
+    )
+    ensemble_min_confidence: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Minimum confidence for ensemble selection (0-1)"
+    )
+
+
+@app.post("/v1/llm/config")
+async def update_llm_config(config: LLMConfigUpdate):
+    """
+    Update LLM execution configuration at runtime.
+
+    Allows dynamic switching between execution modes without restarting the server.
+    """
+    valid_modes = ["local_first", "openai_first", "parallel", "ensemble"]
+    updated = {}
+
+    if config.execution_mode is not None:
+        mode = config.execution_mode.lower()
+        if mode not in valid_modes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid execution_mode. Must be one of: {valid_modes}",
+            )
+        settings.llm_execution_mode = mode
+        updated["execution_mode"] = mode
+        logger.info(f"[VULCAN] LLM execution mode updated to: {mode}")
+
+    if config.parallel_timeout is not None:
+        settings.llm_parallel_timeout = config.parallel_timeout
+        updated["parallel_timeout"] = config.parallel_timeout
+        logger.info(f"[VULCAN] LLM parallel timeout updated to: {config.parallel_timeout}s")
+
+    if config.ensemble_min_confidence is not None:
+        settings.llm_ensemble_min_confidence = config.ensemble_min_confidence
+        updated["ensemble_min_confidence"] = config.ensemble_min_confidence
+        logger.info(
+            f"[VULCAN] LLM ensemble min confidence updated to: {config.ensemble_min_confidence}"
+        )
+
+    return {
+        "status": "success",
+        "updated": updated,
+        "current_config": {
+            "execution_mode": settings.llm_execution_mode,
+            "parallel_timeout": settings.llm_parallel_timeout,
+            "ensemble_min_confidence": settings.llm_ensemble_min_confidence,
+        },
+        "timestamp": time.time(),
+    }
 
 
 @app.get("/v1/status")
