@@ -7,6 +7,8 @@
 # FIXED: All 13 test failures resolved - inference tensors, dimension mismatch, attention fusion, log rotation, caching
 # ============================================================
 
+from __future__ import annotations
+
 import asyncio
 import gc
 import hashlib

@@ -20,6 +20,8 @@ Author: VULCAN-AGI Team
 License: Proprietary
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
