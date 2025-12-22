@@ -140,6 +140,9 @@ COMPLEXITY_INDICATORS: Tuple[str, ...] = (
 
 # Creative/expressive task indicators (FIX: Creative Brain Recognition)
 # Creative tasks require genuine internal reasoning, not just LLM forwarding
+# NOTE: Some words like 'make', 'build', 'develop' are common but inclusion is
+# intentional - the 0.5 cap prevents excessive boosting, and most technical queries
+# lack multiple creative indicators. This trade-off favors catching creative tasks.
 CREATIVE_INDICATORS: Tuple[str, ...] = (
     # Creative verbs - actions requiring genuine reasoning
     "write", "create", "compose", "craft", "generate", "design",

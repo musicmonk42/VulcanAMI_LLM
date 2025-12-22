@@ -2463,9 +2463,8 @@ async def introspect_node(node: Dict, context: NodeContext, inputs: Dict) -> Dic
 
     if agent_metadata:
         tasks_completed = getattr(agent_metadata, "tasks_completed", 0)
-        error_count = getattr(agent_metadata, "tasks_failed", 0) + len(
-            getattr(agent_metadata, "error_history", [])
-        )
+        # Use only tasks_failed to avoid double-counting errors that may also be in error_history
+        error_count = getattr(agent_metadata, "tasks_failed", 0)
 
     if "all" in fields or "entropy" in fields:
         # Entropy: uncertainty level based on recent failure rate
@@ -2567,7 +2566,7 @@ async def query_memories_node(node: Dict, context: NodeContext, inputs: Dict) ->
                             "memory_id": getattr(mem, "id", str(id(mem))),
                             "content": getattr(mem, "content", str(mem)),
                             "relevance": getattr(mem, "relevance", 0.5),
-                            "timestamp": getattr(mem, "timestamp", time.time()),
+                            "timestamp": getattr(mem, "timestamp", None),  # None indicates missing timestamp
                         })
         except Exception as e:
             logger.warning(f"Memory query failed: {e}")
