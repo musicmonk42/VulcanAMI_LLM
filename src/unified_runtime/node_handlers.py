@@ -2411,6 +2411,193 @@ async def meta_node_handler(node: Dict, context: NodeContext, inputs: Dict) -> D
 
 
 # ============================================================================
+# INTROSPECTION NODE HANDLER (FIX: Creative Brain - Phase 2)
+# ============================================================================
+
+
+async def introspect_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
+    """
+    Introspection node - returns agent's internal state for creative reasoning.
+
+    This node enables agents to access their own internal state including:
+    - entropy (uncertainty level)
+    - curiosity (exploration drive)
+    - valence (emotional tone)
+    - energy (computational budget)
+
+    Node format:
+    {
+        "id": "introspect_1",
+        "type": "INTROSPECT",
+        "params": {
+            "fields": ["entropy", "curiosity", "valence", "energy"]
+        }
+    }
+
+    Args:
+        node: Node definition with params.fields specifying which state fields to return
+        context: NodeContext containing runtime and graph information
+        inputs: Input values from upstream nodes
+
+    Returns:
+        Dictionary with agent internal state values
+    """
+    params = node.get("params", {})
+    fields = params.get("fields", ["all"])
+
+    # Try to get agent metadata from context
+    agent_metadata = None
+    agent_id = "unknown"
+
+    # Check context.metadata for agent info
+    if context.metadata:
+        agent_metadata = context.metadata.get("agent_metadata")
+        agent_id = context.metadata.get("agent_id", "unknown")
+
+    # Calculate internal state
+    result = {}
+
+    # Default values if no agent metadata available
+    tasks_completed = 0
+    error_count = 0
+
+    if agent_metadata:
+        tasks_completed = getattr(agent_metadata, "tasks_completed", 0)
+        error_count = getattr(agent_metadata, "tasks_failed", 0) + len(
+            getattr(agent_metadata, "error_history", [])
+        )
+
+    if "all" in fields or "entropy" in fields:
+        # Entropy: uncertainty level based on recent failure rate
+        # Higher entropy = more uncertainty
+        if tasks_completed > 0 or error_count > 0:
+            total = max(1, tasks_completed + error_count)
+            failure_rate = error_count / total
+            result["entropy"] = min(1.0, 0.3 + failure_rate * 0.7)
+        else:
+            result["entropy"] = 0.5  # Default neutral entropy
+
+    if "all" in fields or "curiosity" in fields:
+        # Curiosity: task exploration drive
+        # Could track task type diversity in production
+        curiosity = getattr(agent_metadata, "curiosity", 0.5) if agent_metadata else 0.5
+        result["curiosity"] = curiosity
+
+    if "all" in fields or "valence" in fields:
+        # Emotional valence: positive for success, negative for failure
+        # Range: -1.0 (very negative) to 1.0 (very positive)
+        if tasks_completed > 0 or error_count > 0:
+            total = max(1, tasks_completed + error_count)
+            success_rate = tasks_completed / total
+            result["valence"] = (success_rate - 0.5) * 2  # Maps 0-1 to -1 to 1
+        else:
+            result["valence"] = 0.0  # Default neutral valence
+
+    if "all" in fields or "energy" in fields:
+        # Computational budget: decreases with task count
+        # Simple model: 1.0 at start, decreases with task count
+        result["energy"] = max(0.1, 1.0 - (tasks_completed / 1000))
+
+    logger.debug(
+        f"[Introspection] Agent {agent_id} state: entropy={result.get('entropy', 'N/A'):.2f}, "
+        f"curiosity={result.get('curiosity', 'N/A'):.2f}, "
+        f"valence={result.get('valence', 'N/A'):.2f}, "
+        f"energy={result.get('energy', 'N/A'):.2f}"
+    )
+
+    return {
+        "state": result,
+        "agent_id": agent_id,
+        "has_agent_metadata": agent_metadata is not None,
+        "message": "Introspection complete - internal state retrieved",
+    }
+
+
+async def query_memories_node(node: Dict, context: NodeContext, inputs: Dict) -> Dict:
+    """
+    Memory query node - searches agent memory for relevant past experiences.
+
+    This node enables agents to retrieve semantically similar memories
+    for use in creative and reasoning tasks.
+
+    Node format:
+    {
+        "id": "memory_query_1",
+        "type": "QUERY_MEMORIES",
+        "params": {
+            "query": "experiences related to loss and sadness",
+            "limit": 5
+        }
+    }
+
+    Args:
+        node: Node definition with query parameters
+        context: NodeContext containing runtime and memory access
+        inputs: Input values (can override query via "query" input)
+
+    Returns:
+        Dictionary with retrieved memories and relevance scores
+    """
+    params = node.get("params", {})
+
+    # Query can come from params or inputs
+    query = inputs.get("query", params.get("query", ""))
+    limit = params.get("limit", 5)
+
+    # Get agent ID from context
+    agent_id = context.metadata.get("agent_id", "unknown") if context.metadata else "unknown"
+
+    # Try to access memory system if available
+    memories = []
+
+    # Check if runtime has memory access
+    if context.runtime and hasattr(context.runtime, "memory_store"):
+        try:
+            memory_store = context.runtime.memory_store
+            if hasattr(memory_store, "query") or hasattr(memory_store, "semantic_search"):
+                # Use semantic search if available
+                search_method = getattr(
+                    memory_store, "semantic_search", getattr(memory_store, "query", None)
+                )
+                if search_method:
+                    raw_memories = search_method(query=query, limit=limit)
+                    # Convert to standard format
+                    for mem in raw_memories:
+                        memories.append({
+                            "memory_id": getattr(mem, "id", str(id(mem))),
+                            "content": getattr(mem, "content", str(mem)),
+                            "relevance": getattr(mem, "relevance", 0.5),
+                            "timestamp": getattr(mem, "timestamp", time.time()),
+                        })
+        except Exception as e:
+            logger.warning(f"Memory query failed: {e}")
+
+    # If no memories retrieved, provide placeholder response
+    if not memories:
+        memories = [
+            {
+                "memory_id": "placeholder",
+                "content": f"[Memory search for: {query}]",
+                "relevance": 0.5,
+                "note": "Memory system integration pending - placeholder response",
+            }
+        ]
+
+    logger.debug(
+        f"[Memory Query] Agent {agent_id} queried '{query[:50]}...', "
+        f"retrieved {len(memories)} memories"
+    )
+
+    return {
+        "memories": memories,
+        "query": query,
+        "agent_id": agent_id,
+        "count": len(memories),
+        "message": f"Retrieved {len(memories)} memories for query",
+    }
+
+
+# ============================================================================
 # DISPATCHER INTEGRATION
 # ============================================================================
 
@@ -2511,6 +2698,11 @@ def get_node_handlers() -> Dict[str, Callable]:
         # Utility nodes
         "NormalizeNode": normalize_node,
         "CNNNode": cnn_node_handler,  # Placeholder
+        # Introspection nodes (FIX: Creative Brain - Phase 2)
+        "INTROSPECT": introspect_node,
+        "IntrospectNode": introspect_node,  # Alias
+        "QUERY_MEMORIES": query_memories_node,
+        "QueryMemoriesNode": query_memories_node,  # Alias
     }
 
 
