@@ -23,10 +23,11 @@ import uvicorn
 import numpy as np
 import msgpack
 from unittest.mock import MagicMock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from threading import Thread
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+import threading
 import time
 import socket  # <-- ADDED
 import traceback
@@ -736,7 +737,7 @@ class PIIRedactor:
         self.redaction_count = 0
         self.secrets_detected = 0
     
-    def redact(self, text: str) -> tuple[str, Dict[str, int]]:
+    def redact(self, text: str) -> Tuple[str, Dict[str, int]]:
         """
         Redact PII and secrets from text.
         
@@ -842,7 +843,7 @@ class GovernanceSensitivityChecker:
         prompt: str,
         response: str,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> tuple[bool, str, List[str]]:
+    ) -> Tuple[bool, str, List[str]]:
         """
         Check if content is marked sensitive by governance rules.
         
@@ -943,7 +944,7 @@ class ExampleQualityValidator:
         prompt: str,
         response: str,
         local_response: Optional[str] = None,
-    ) -> tuple[bool, float, List[str]]:
+    ) -> Tuple[bool, float, List[str]]:
         """
         Validate an example for training suitability.
         
@@ -1346,7 +1347,7 @@ class PromotionGate:
         self,
         eval_results: Dict[str, Any],
         training_metadata: Dict[str, Any],
-    ) -> tuple[bool, Dict[str, Any]]:
+    ) -> Tuple[bool, Dict[str, Any]]:
         """
         Evaluate if weights should be promoted.
         
