@@ -38,10 +38,11 @@ try:
     if env_path.exists():
         load_dotenv(dotenv_path=env_path)
         print(f"✅ Loaded environment variables from: {env_path}")
-    else:
-        print(f"⚠️  .env file not found at: {env_path}")
+    # FIX: Don't warn about missing .env file - it's optional in containerized environments
+    # Environment variables are typically injected via Docker/K8s, not .env files
 except ImportError:
-    print("⚠️  python-dotenv not installed - using system environment variables")
+    # Silently fall back to system environment variables (expected in containers)
+    pass
 except Exception as e:
     print(f"❌ Error loading .env: {e}")
 

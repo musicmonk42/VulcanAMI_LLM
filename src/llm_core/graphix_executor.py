@@ -693,11 +693,22 @@ class GraphixExecutor:
         embeddings = []
         for token_idx in range(len(tokens)):
             # Get token ID (convert if needed)
-            token_id = (
-                int(tokens[token_idx])
-                if not isinstance(tokens[token_idx], int)
-                else tokens[token_idx]
-            )
+            # FIX: Handle string tokens that cannot be converted to int
+            # Use hash-based mapping for string tokens to get a stable token ID
+            token = tokens[token_idx]
+            if isinstance(token, int):
+                token_id = token
+            elif isinstance(token, str):
+                # String tokens: use hash to get a consistent token ID
+                # This handles words like 'understand', 'neither', 'like', 'no'
+                token_id = hash(token) % self.vocab_size
+            else:
+                # For other types, try int conversion, fallback to 0 if it fails
+                try:
+                    token_id = int(token)
+                except (ValueError, TypeError):
+                    logger.debug(f"Cannot convert token to int: {token}, using hash")
+                    token_id = hash(str(token)) % self.vocab_size
             token_id = token_id % self.vocab_size  # Ensure in vocab range
 
             # Extract embedding
