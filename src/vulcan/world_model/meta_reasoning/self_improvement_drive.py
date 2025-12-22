@@ -641,20 +641,23 @@ class SelfImprovementDrive:
                 )
                 return state
             else:
-                # State file doesn't exist - warn about potential persistence issues
-                logger.warning(
-                    f"⚠️ State file not found at: {self.state_path} - "
-                    f"Starting with empty state. If running in a container, "
-                    f"ensure a persistent volume is mounted to {self.state_path.parent} "
-                    f"to prevent repeated improvement attempts."
+                # FIX: State file doesn't exist - this is expected on first run
+                # Use INFO level and create the directory/file proactively
+                logger.info(
+                    f"State file not found at: {self.state_path} - "
+                    f"This is expected on first run. Creating new state file."
                 )
+                # Create the directory if it doesn't exist
+                try:
+                    self.state_path.parent.mkdir(parents=True, exist_ok=True)
+                except Exception as dir_e:
+                    logger.debug(f"Could not create state directory: {dir_e}")
         except Exception as e:
             logger.warning(f"Failed to load state: {e}, using new state")
 
-        # Return new state with warning about fresh start
-        logger.warning(
-            "🆕 Starting with fresh self-improvement state. "
-            "This may cause repeated improvement attempts if state persistence is not configured."
+        # Return new state - use INFO level for fresh start (expected behavior)
+        logger.info(
+            "Starting with fresh self-improvement state."
         )
         return SelfImprovementState()
 
