@@ -10,6 +10,8 @@ FULLY IMPLEMENTED VERSION with:
 - Deep attribute understanding
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
