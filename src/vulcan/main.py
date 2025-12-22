@@ -1616,13 +1616,37 @@ class ShadowModelEvaluator:
 
 class OpenAIKnowledgeDistiller:
     """
-    Production-grade knowledge distillation from OpenAI to Vulcan's LLM.
+    Capture layer for OpenAI knowledge distillation.
     
-    Implements comprehensive safeguards:
+    ARCHITECTURAL NOTE:
+    This component is responsible ONLY for capturing and storing external
+    experience artifacts from OpenAI. It does NOT perform training directly.
+    
+    Training is delegated to Vulcan's existing systems:
+    - GovernedTrainer: Consensus-based weight updates
+    - SelfImprovingTraining: Meta-learning orchestrator
+    - train_llm_with_self_improvement.py: Full training loop
+    
+    The capture → train flow is:
+    
+        main.py (inference)
+            └─ OpenAI response
+            └─ capture_response() → Distillation Store (JSONL)
+                                        ↓
+        [Async/Batched - via GovernedTrainer]
+            └─ GovernedTrainer reads from Distillation Store
+            └─ Proposes weight updates
+            └─ ConsensusEngine approves/rejects
+            └─ SelfImprovingTraining evaluates
+            └─ Promotion or rollback
+    
+    Implements comprehensive capture safeguards:
     
     A) Capture Layer (Privacy & Consent)
-       - Policy gate: only capture when training_opt_in=true
+       - Policy gate: only capture when training_opt_in=true (per-session)
        - PII redaction before storage
+       - Secrets hard rejection
+       - Governance sensitivity check
        - Full provenance tracking
     
     B) Quality Filtering (Garbage-in Prevention)
@@ -1631,20 +1655,19 @@ class OpenAIKnowledgeDistiller:
        - Diversity sampling (no duplicate Q&As)
        - Domain-specific validators
     
-    C) Training Schedule (Catastrophic Forgetting Prevention)
-       - Offline batch training (not during requests)
-       - Shadow model evaluation before promotion
-       - Regression checks on golden test set
+    C) Storage Format
+       - JSONL format for training system consumption
+       - Optional encryption at rest
+       - Provenance hashes for integrity
+       - Retention limits with automatic cleanup
     
-    D) Safety/Governance
-       - CSIU/governance integration
-       - Signed provenance for audit trail
-       - Configurable retention limits
+    DOES NOT:
+    - Perform weight updates (GovernedTrainer does this)
+    - Run evaluation (SelfImprovingTraining does this)
+    - Promote/rollback weights (ConsensusEngine governs this)
     """
     
     # Configuration defaults
-    DEFAULT_BATCH_SIZE = 32
-    DEFAULT_TRAINING_INTERVAL_S = 300  # 5 minutes
     DEFAULT_MAX_BUFFER_SIZE = 1000
     DEFAULT_RETENTION_DAYS = 30
     
@@ -1652,39 +1675,30 @@ class OpenAIKnowledgeDistiller:
         self,
         local_llm: Optional[Any] = None,
         storage_path: str = "data/distillation_examples.json",
-        batch_size: int = DEFAULT_BATCH_SIZE,
-        training_interval_s: int = DEFAULT_TRAINING_INTERVAL_S,
         max_buffer_size: int = DEFAULT_MAX_BUFFER_SIZE,
-        auto_train: bool = False,  # Default OFF - require explicit training
-        learning_rate: float = 0.0001,
         retention_days: int = DEFAULT_RETENTION_DAYS,
         require_opt_in: bool = True,  # Privacy-first default
         enable_pii_redaction: bool = True,
         enable_governance_check: bool = True,
     ):
         """
-        Initialize the production-grade knowledge distiller.
+        Initialize the capture layer for knowledge distillation.
+        
+        NOTE: This component only captures artifacts. Training is handled
+        by Vulcan's GovernedTrainer and SelfImprovingTraining systems.
         
         Args:
-            local_llm: Vulcan's local LLM instance to train
+            local_llm: Reference to Vulcan's local LLM (for domain detection)
             storage_path: Path to store training examples persistently
-            batch_size: Number of examples before triggering training
-            training_interval_s: Time interval for periodic training
-            max_buffer_size: Maximum buffer size before forced training
-            auto_train: Whether to automatically trigger training (default: False)
-            learning_rate: Learning rate for distillation training
+            max_buffer_size: Maximum buffer size before flush to disk
             retention_days: Days to retain training examples before expiry
             require_opt_in: Require explicit opt-in for capture (default: True)
             enable_pii_redaction: Enable PII redaction (default: True)
-            enable_governance_check: Check governance/CSIU before training
+            enable_governance_check: Check governance/CSIU before capture
         """
         self.local_llm = local_llm
         self.storage_path = Path(storage_path)
-        self.batch_size = batch_size
-        self.training_interval_s = training_interval_s
         self.max_buffer_size = max_buffer_size
-        self.auto_train = auto_train
-        self.learning_rate = learning_rate
         self.retention_days = retention_days
         self.require_opt_in = require_opt_in
         self.enable_pii_redaction = enable_pii_redaction
@@ -1692,13 +1706,13 @@ class OpenAIKnowledgeDistiller:
         
         self.logger = logging.getLogger("OpenAIKnowledgeDistiller")
         
-        # Initialize components
+        # Initialize capture components
         self.pii_redactor = PIIRedactor()
         self.quality_validator = ExampleQualityValidator()
-        self.shadow_evaluator = ShadowModelEvaluator()
         self.governance_checker = GovernanceSensitivityChecker()
         
         # Initialize storage backend (JSONL with optional encryption)
+        # Training systems (GovernedTrainer, SelfImprovingTraining) read from here
         storage_dir = str(self.storage_path.parent / "distillation")
         self.storage_backend = DistillationStorageBackend(
             storage_path=storage_dir,
@@ -1706,26 +1720,11 @@ class OpenAIKnowledgeDistiller:
             encryption_key=os.getenv("DISTILLATION_ENCRYPTION_KEY"),
         )
         
-        # Initialize promotion gate
-        self.promotion_gate = PromotionGate(
-            storage_backend=self.storage_backend,
-            min_eval_score=0.7,
-            allow_regressions=0,
-        )
-        
-        # Thread-safe buffers
+        # Thread-safe buffer for capture (flushed to storage periodically)
         self._buffer_lock = threading.Lock()
-        self._training_buffer: List[Dict[str, Any]] = []
-        self._replay_buffer: List[Dict[str, Any]] = []  # For catastrophic forgetting prevention
+        self._capture_buffer: List[Dict[str, Any]] = []
         
-        # Training state
-        self._last_training_time = time.time()
-        self._is_training = False
-        self._shadow_model_weights: Optional[Dict[str, Any]] = None
-        self._pending_promotion = False
-        self._current_training_id: Optional[str] = None
-        
-        # Statistics with detailed tracking
+        # Capture statistics (training stats live in GovernedTrainer)
         self.stats = {
             "examples_captured": 0,
             "examples_rejected": 0,
@@ -1733,13 +1732,9 @@ class OpenAIKnowledgeDistiller:
             "pii_redactions": 0,
             "secrets_detected": 0,
             "governance_sensitive_rejections": 0,
-            "training_runs": 0,
-            "successful_promotions": 0,
-            "failed_promotions": 0,
-            "total_loss": 0.0,
             "average_quality_score": 0.0,
             "opt_in_required_skips": 0,
-            "governance_rejections": 0,
+            "buffer_flushes": 0,
         }
         
         # Audit log for governance
@@ -1753,28 +1748,23 @@ class OpenAIKnowledgeDistiller:
         self._load_state()
         
         self.logger.info(
-            f"OpenAI Knowledge Distiller initialized (Production Mode). "
+            f"OpenAI Knowledge Distiller (Capture Layer) initialized. "
             f"Opt-in required: {require_opt_in}, PII redaction: {enable_pii_redaction}, "
-            f"Auto-train: {auto_train}, Governance check: {enable_governance_check}"
+            f"Governance check: {enable_governance_check}. "
+            f"Training delegated to GovernedTrainer/SelfImprovingTraining."
         )
     
     def _load_state(self):
-        """Load existing state from storage."""
+        """Load existing capture state from storage."""
         if self.storage_path.exists():
             try:
                 with open(self.storage_path, "r") as f:
                     data = json.load(f)
-                    self._training_buffer = data.get("examples", [])
-                    self._replay_buffer = data.get("replay_buffer", [])
+                    self._capture_buffer = data.get("capture_buffer", [])
                     self.stats = {**self.stats, **data.get("stats", {})}
                     
-                    # Load baseline scores for evaluator
-                    baseline = data.get("baseline_scores", {})
-                    self.shadow_evaluator.baseline_scores = baseline
-                    
                     self.logger.info(
-                        f"Loaded {len(self._training_buffer)} training examples, "
-                        f"{len(self._replay_buffer)} replay examples"
+                        f"Loaded {len(self._capture_buffer)} pending capture examples"
                     )
                     
                     # Clean expired examples
@@ -1784,14 +1774,12 @@ class OpenAIKnowledgeDistiller:
                 self.logger.warning(f"Failed to load existing state: {e}")
     
     def _save_state(self):
-        """Persist state to storage."""
+        """Persist capture state to storage."""
         try:
             with open(self.storage_path, "w") as f:
                 json.dump({
-                    "examples": self._training_buffer,
-                    "replay_buffer": self._replay_buffer,
+                    "capture_buffer": self._capture_buffer,
                     "stats": self.stats,
-                    "baseline_scores": self.shadow_evaluator.baseline_scores,
                     "last_save": time.time(),
                 }, f, indent=2)
         except Exception as e:
@@ -1805,15 +1793,15 @@ class OpenAIKnowledgeDistiller:
         expiry_threshold = time.time() - (self.retention_days * 86400)
         
         with self._buffer_lock:
-            original_count = len(self._training_buffer)
-            self._training_buffer = [
-                ex for ex in self._training_buffer
+            original_count = len(self._capture_buffer)
+            self._capture_buffer = [
+                ex for ex in self._capture_buffer
                 if ex.get("timestamp", 0) > expiry_threshold
             ]
-            removed = original_count - len(self._training_buffer)
+            removed = original_count - len(self._capture_buffer)
             
             if removed > 0:
-                self.logger.info(f"Cleaned {removed} expired training examples")
+                self.logger.info(f"Cleaned {removed} expired capture examples")
     
     def _log_audit(self, action: str, details: Dict[str, Any]):
         """Log action for governance audit trail."""
@@ -1828,6 +1816,36 @@ class OpenAIKnowledgeDistiller:
         # Limit audit log size
         if len(self._audit_log) > self._max_audit_entries:
             self._audit_log = self._audit_log[-self._max_audit_entries:]
+    
+    def _flush_to_storage(self):
+        """
+        Flush capture buffer to JSONL storage for training system consumption.
+        
+        The stored examples are consumed by:
+        - GovernedTrainer: For consensus-based weight updates
+        - SelfImprovingTraining: For meta-learning orchestration
+        """
+        with self._buffer_lock:
+            if not self._capture_buffer:
+                return 0
+            
+            examples_to_flush = self._capture_buffer.copy()
+            self._capture_buffer.clear()
+        
+        flushed = 0
+        for example in examples_to_flush:
+            if self.storage_backend.append_example(example):
+                flushed += 1
+        
+        self.stats["buffer_flushes"] += 1
+        self._save_state()
+        
+        self.logger.info(
+            f"Flushed {flushed} examples to distillation store "
+            f"(available for GovernedTrainer)"
+        )
+        
+        return flushed
     
     def capture_response(
         self,
@@ -1973,9 +1991,9 @@ class OpenAIKnowledgeDistiller:
             "pii_redacted": bool(pii_stats),
         }
         
-        # Store example
+        # Store example in capture buffer
         with self._buffer_lock:
-            self._training_buffer.append(example)
+            self._capture_buffer.append(example)
             self.stats["examples_captured"] += 1
             
             # Update running average quality
@@ -1995,12 +2013,13 @@ class OpenAIKnowledgeDistiller:
         
         self.logger.debug(
             f"Captured example (quality: {quality_score:.2f}, "
-            f"buffer: {len(self._training_buffer)})"
+            f"buffer: {len(self._capture_buffer)})"
         )
         
-        # Check if training should be triggered
-        if self.auto_train:
-            self._check_training_trigger()
+        # Flush to storage when buffer is full
+        # (Training systems will consume from storage asynchronously)
+        if len(self._capture_buffer) >= self.max_buffer_size:
+            self._flush_to_storage()
         
         return True
     
@@ -2019,289 +2038,35 @@ class OpenAIKnowledgeDistiller:
         else:
             return "general"
     
-    def _check_training_trigger(self):
-        """Check if training should be triggered."""
-        buffer_size = len(self._training_buffer)
-        current_time = time.time()
-        
-        should_train = False
-        trigger_reason = ""
-        
-        if buffer_size >= self.batch_size:
-            should_train = True
-            trigger_reason = f"batch_size ({buffer_size} >= {self.batch_size})"
-        elif (current_time - self._last_training_time) >= self.training_interval_s:
-            if buffer_size > 0:
-                should_train = True
-                trigger_reason = f"time_interval ({self.training_interval_s}s elapsed)"
-        elif buffer_size >= self.max_buffer_size:
-            should_train = True
-            trigger_reason = f"max_buffer ({buffer_size})"
-        
-        if should_train and not self._is_training:
-            self.logger.info(f"Training triggered: {trigger_reason}")
-            Thread(target=self._run_training_pipeline, daemon=True).start()
-    
-    def _run_training_pipeline(self):
+    def flush(self) -> int:
         """
-        Execute the full training pipeline with safeguards.
+        Manually flush capture buffer to storage.
         
-        Pipeline stages:
-        1. Governance check
-        2. Sample selection (with replay buffer for catastrophic forgetting prevention)
-        3. Shadow model training
-        4. Evaluation against golden set + regression suite
-        5. Promotion decision via PromotionGate
-        6. Provenance record creation (required for promotion)
+        Called when you want to make captured examples immediately
+        available to the training systems (GovernedTrainer, SelfImprovingTraining).
+        
+        Returns:
+            Number of examples flushed
         """
-        if self._is_training:
-            return
-        
-        self._is_training = True
-        self._current_training_id = hashlib.sha256(
-            f"{time.time()}{os.getpid()}".encode()
-        ).hexdigest()[:16]
-        
-        try:
-            # ================================================================
-            # STAGE 1: Governance check
-            # ================================================================
-            if self.enable_governance_check:
-                if not self._check_governance_approval():
-                    self.stats["governance_rejections"] += 1
-                    self.logger.warning("Training blocked by governance check")
-                    return
-            
-            # ================================================================
-            # STAGE 2: Sample selection with replay buffer
-            # ================================================================
-            with self._buffer_lock:
-                if not self._training_buffer:
-                    return
-                
-                # Take batch for training
-                training_examples = self._training_buffer[:self.batch_size]
-                self._training_buffer = self._training_buffer[self.batch_size:]
-                
-                # Add replay samples (prevents catastrophic forgetting)
-                replay_samples = self._replay_buffer[:min(8, len(self._replay_buffer))]
-            
-            all_examples = training_examples + replay_samples
-            self.logger.info(
-                f"Training ID {self._current_training_id}: "
-                f"{len(training_examples)} new + {len(replay_samples)} replay examples"
-            )
-            
-            # ================================================================
-            # STAGE 3: Shadow model training (offline, not during requests)
-            # ================================================================
-            loss = self._train_shadow_model(all_examples)
-            
-            training_metadata = {
-                "training_id": self._current_training_id,
-                "examples_count": len(all_examples),
-                "new_examples": len(training_examples),
-                "replay_examples": len(replay_samples),
-                "loss": loss,
-                "timestamp": time.time(),
-            }
-            
-            # ================================================================
-            # STAGE 4: Evaluation against golden set + regression suite
-            # ================================================================
-            eval_results = self.shadow_evaluator.evaluate_model(self.local_llm)
-            
-            # ================================================================
-            # STAGE 5: Promotion decision via PromotionGate
-            # ================================================================
-            approved, decision = self.promotion_gate.evaluate_for_promotion(
-                eval_results, training_metadata
-            )
-            
-            # ================================================================
-            # STAGE 6: Execute promotion OR rollback
-            # ================================================================
-            if approved:
-                # Create provenance record BEFORE promotion (required)
-                provenance = self.promotion_gate.create_provenance_record(
-                    training_metadata, eval_results, decision
-                )
-                
-                # Now promote weights
-                self._promote_weights()
-                self.stats["successful_promotions"] += 1
-                
-                # Update baseline scores after successful promotion
-                self.shadow_evaluator.update_baseline(eval_results.get("scores", {}))
-                
-                # Update replay buffer with successful examples
-                with self._buffer_lock:
-                    self._replay_buffer.extend(training_examples[:8])
-                    # Keep replay buffer bounded
-                    if len(self._replay_buffer) > 100:
-                        self._replay_buffer = self._replay_buffer[-100:]
-                
-                self.logger.info(
-                    f"✓ Training {self._current_training_id} promoted. "
-                    f"Loss: {loss:.4f}, Eval: {eval_results['average_score']:.2f}, "
-                    f"Provenance: {provenance['record_id']}"
-                )
-            else:
-                # Rollback and log rejection
-                self._rollback_weights()
-                self.stats["failed_promotions"] += 1
-                
-                # Still create provenance record for audit trail
-                self.promotion_gate.create_provenance_record(
-                    training_metadata, eval_results, decision
-                )
-                
-                self.logger.warning(
-                    f"✗ Training {self._current_training_id} rejected. "
-                    f"Reasons: {decision.get('reasons', [])}"
-                )
-            
-            # Update stats
-            self.stats["training_runs"] += 1
-            self.stats["total_loss"] += loss
-            self._last_training_time = time.time()
-            
-            # Log audit
-            self._log_audit("training_complete", {
-                "training_id": self._current_training_id,
-                "examples": len(all_examples),
-                "loss": loss,
-                "eval_score": eval_results["average_score"],
-                "promoted": approved,
-                "rejection_reasons": decision.get("reasons", []),
-            })
-            
-            # Save state
-            self._save_state()
-            
-            # Store examples to JSONL backend for persistence
-            for example in training_examples:
-                self.storage_backend.append_example(example)
-            
-        except Exception as e:
-            self.logger.error(f"Training pipeline failed: {e}")
-            traceback.print_exc()
-            self._log_audit("training_error", {
-                "training_id": self._current_training_id,
-                "error": str(e),
-            })
-        
-        finally:
-            self._is_training = False
-            self._current_training_id = None
-    
-    def _check_governance_approval(self) -> bool:
-        """Check if training is approved by governance/CSIU."""
-        # Integration point for CSIU/governance system
-        # For now, always approve but log for audit
-        self._log_audit("governance_check", {"result": "approved"})
-        return True
-    
-    def _train_shadow_model(self, examples: List[Dict[str, Any]]) -> float:
-        """Train on examples and return loss."""
-        if not self.local_llm:
-            return 0.0
-        
-        total_loss = 0.0
-        
-        for example in examples:
-            prompt = example.get("instruction", "")
-            target = example.get("teacher_answer", "")
-            quality = example.get("labels", {}).get("quality_score", 1.0)
-            
-            try:
-                # Generate current output
-                if hasattr(self.local_llm, "generate"):
-                    current = self.local_llm.generate(prompt, max_tokens=min(len(target), 500))
-                else:
-                    current = ""
-                
-                # Calculate loss
-                loss = self._calculate_loss(current, target, quality)
-                total_loss += loss
-                
-                # Apply update if supported
-                if hasattr(self.local_llm, "train_on_example"):
-                    self.local_llm.train_on_example(prompt, target, self.learning_rate)
-                    
-            except Exception as e:
-                self.logger.debug(f"Example training failed: {e}")
-        
-        return total_loss / max(len(examples), 1)
-    
-    def _calculate_loss(self, current: str, target: str, weight: float) -> float:
-        """Calculate training loss (simplified)."""
-        if not target:
-            return 0.0
-        
-        # Token overlap as proxy for loss
-        current_tokens = set(current.lower().split())
-        target_tokens = set(target.lower().split())
-        
-        if not target_tokens:
-            return 0.0
-        
-        overlap = len(current_tokens & target_tokens)
-        similarity = overlap / len(target_tokens)
-        
-        return (1 - similarity) * weight
-    
-    def _promote_weights(self):
-        """Promote shadow model weights to production."""
-        # In production, this would swap model weights
-        self._pending_promotion = False
-        self.logger.info("Weights promoted to production")
-    
-    def _rollback_weights(self):
-        """Rollback to previous weights."""
-        # In production, this would restore previous weights
-        self._pending_promotion = False
-        self.logger.info("Weights rolled back")
-    
-    def force_training(self) -> Dict[str, Any]:
-        """Force immediate training on buffered examples."""
-        if self._is_training:
-            return {"status": "training_in_progress"}
-        
-        if len(self._training_buffer) == 0:
-            return {"status": "no_examples", "message": "No examples in buffer"}
-        
-        # Run training synchronously
-        Thread(target=self._run_training_pipeline, daemon=True).start()
-        
-        return {
-            "status": "training_started",
-            "examples_queued": len(self._training_buffer),
-            "timestamp": time.time(),
-        }
+        return self._flush_to_storage()
     
     def get_status(self) -> Dict[str, Any]:
-        """Get comprehensive status."""
+        """Get current status of the capture layer."""
         return {
-            "enabled": self.local_llm is not None,
+            "enabled": True,
             "config": {
-                "auto_train": self.auto_train,
-                "batch_size": self.batch_size,
                 "require_opt_in": self.require_opt_in,
                 "pii_redaction": self.enable_pii_redaction,
+                "governance_check": self.enable_governance_check,
                 "retention_days": self.retention_days,
+                "max_buffer_size": self.max_buffer_size,
             },
             "state": {
-                "buffer_size": len(self._training_buffer),
-                "replay_buffer_size": len(self._replay_buffer),
-                "is_training": self._is_training,
-                "last_training_time": self._last_training_time,
+                "buffer_size": len(self._capture_buffer),
+                "storage_stats": self.storage_backend.get_stats(),
             },
             "stats": self.stats,
-            "evaluation": {
-                "baseline_scores": self.shadow_evaluator.baseline_scores,
-                "history_count": len(self.shadow_evaluator.evaluation_history),
-            },
+            "note": "Training delegated to GovernedTrainer/SelfImprovingTraining",
         }
     
     def get_audit_log(self, limit: int = 100) -> List[Dict[str, Any]]:
@@ -2309,10 +2074,10 @@ class OpenAIKnowledgeDistiller:
         return self._audit_log[-limit:]
     
     def clear_buffer(self) -> int:
-        """Clear training buffer."""
+        """Clear capture buffer without flushing to storage."""
         with self._buffer_lock:
-            count = len(self._training_buffer)
-            self._training_buffer.clear()
+            count = len(self._capture_buffer)
+            self._capture_buffer.clear()
             self._save_state()
             self._log_audit("clear_buffer", {"examples_cleared": count})
             return count
@@ -5959,12 +5724,19 @@ async def get_distillation_status():
 
 
 @app.post("/v1/distillation/train")
-async def trigger_distillation_training():
+async def trigger_distillation_flush():
     """
-    Force immediate training on all buffered examples.
+    Flush captured examples to storage for training system consumption.
 
-    This triggers knowledge distillation training synchronously,
-    training Vulcan's local LLM on captured OpenAI responses.
+    NOTE: Training is handled by Vulcan's GovernedTrainer and SelfImprovingTraining
+    systems, NOT by main.py. This endpoint flushes captured examples to JSONL storage
+    where they can be consumed by the training pipeline.
+    
+    The correct training flow is:
+    1. main.py captures OpenAI responses → JSONL storage
+    2. GovernedTrainer reads from storage → proposes weight updates
+    3. ConsensusEngine approves/rejects updates
+    4. SelfImprovingTraining evaluates and promotes/rollbacks
     """
     distiller = get_knowledge_distiller()
     if distiller is None:
@@ -5973,9 +5745,15 @@ async def trigger_distillation_training():
             detail="Knowledge distillation is not enabled",
         )
 
-    result = distiller.force_training()
-    logger.info(f"[VULCAN] Distillation training triggered: {result}")
-    return result
+    flushed_count = distiller.flush()
+    logger.info(f"[VULCAN] Distillation examples flushed: {flushed_count}")
+    return {
+        "status": "flushed",
+        "examples_flushed": flushed_count,
+        "storage_path": str(distiller.storage_backend.storage_path),
+        "note": "Training is handled by GovernedTrainer/SelfImprovingTraining",
+        "timestamp": time.time(),
+    }
 
 
 @app.delete("/v1/distillation/buffer")
@@ -6002,25 +5780,29 @@ async def clear_distillation_buffer():
 
 
 class DistillationConfigUpdate(BaseModel):
-    """Request model for updating distillation configuration."""
+    """Request model for updating distillation capture configuration."""
 
-    auto_train: Optional[bool] = Field(
-        None, description="Whether to automatically trigger training"
+    require_opt_in: Optional[bool] = Field(
+        None, description="Whether to require per-session opt-in for capture"
     )
-    batch_size: Optional[int] = Field(
-        None, ge=1, le=1000, description="Number of examples before triggering training"
+    enable_pii_redaction: Optional[bool] = Field(
+        None, description="Whether to enable PII redaction"
     )
-    learning_rate: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Learning rate for distillation training"
+    enable_governance_check: Optional[bool] = Field(
+        None, description="Whether to enable governance sensitivity checks"
+    )
+    max_buffer_size: Optional[int] = Field(
+        None, ge=1, le=10000, description="Maximum buffer size before auto-flush"
     )
 
 
 @app.post("/v1/distillation/config")
 async def update_distillation_config(config: DistillationConfigUpdate):
     """
-    Update knowledge distillation configuration at runtime.
+    Update knowledge distillation capture configuration at runtime.
 
-    Allows dynamic adjustment of distillation parameters.
+    NOTE: This updates capture settings only. Training parameters are
+    managed by GovernedTrainer and SelfImprovingTraining systems.
     """
     distiller = get_knowledge_distiller()
     if distiller is None:
@@ -6031,32 +5813,31 @@ async def update_distillation_config(config: DistillationConfigUpdate):
 
     updated = {}
 
-    if config.auto_train is not None:
-        distiller.auto_train = config.auto_train
-        settings.distillation_auto_train = config.auto_train
-        updated["auto_train"] = config.auto_train
-        logger.info(f"[VULCAN] Distillation auto_train updated to: {config.auto_train}")
+    if config.require_opt_in is not None:
+        distiller.require_opt_in = config.require_opt_in
+        updated["require_opt_in"] = config.require_opt_in
+        logger.info(f"[VULCAN] Distillation require_opt_in updated to: {config.require_opt_in}")
 
-    if config.batch_size is not None:
-        distiller.batch_size = config.batch_size
-        settings.distillation_batch_size = config.batch_size
-        updated["batch_size"] = config.batch_size
-        logger.info(f"[VULCAN] Distillation batch_size updated to: {config.batch_size}")
+    if config.enable_pii_redaction is not None:
+        distiller.enable_pii_redaction = config.enable_pii_redaction
+        updated["enable_pii_redaction"] = config.enable_pii_redaction
+        logger.info(f"[VULCAN] Distillation enable_pii_redaction updated to: {config.enable_pii_redaction}")
 
-    if config.learning_rate is not None:
-        distiller.learning_rate = config.learning_rate
-        settings.distillation_learning_rate = config.learning_rate
-        updated["learning_rate"] = config.learning_rate
-        logger.info(f"[VULCAN] Distillation learning_rate updated to: {config.learning_rate}")
+    if config.enable_governance_check is not None:
+        distiller.enable_governance_check = config.enable_governance_check
+        updated["enable_governance_check"] = config.enable_governance_check
+        logger.info(f"[VULCAN] Distillation enable_governance_check updated to: {config.enable_governance_check}")
+
+    if config.max_buffer_size is not None:
+        distiller.max_buffer_size = config.max_buffer_size
+        updated["max_buffer_size"] = config.max_buffer_size
+        logger.info(f"[VULCAN] Distillation max_buffer_size updated to: {config.max_buffer_size}")
 
     return {
         "status": "success",
         "updated": updated,
-        "current_config": {
-            "auto_train": distiller.auto_train,
-            "batch_size": distiller.batch_size,
-            "learning_rate": distiller.learning_rate,
-        },
+        "current_config": distiller.get_status()["config"],
+        "note": "Training config managed by GovernedTrainer/SelfImprovingTraining",
         "timestamp": time.time(),
     }
 
