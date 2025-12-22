@@ -164,10 +164,7 @@ spec:
           value: {{ .Values.security.bindHost | default "0.0.0.0" | quote }}
         {{- end }}
         {{- if .Values.memorySystem.enabled }}
-        # Vulcan Memory System v46 environment variables
-        envFrom:
-        - configMapRef:
-            name: {{ include "vulcanami.fullname" . }}-memory-config
+        # Vulcan Memory System v46 AWS credentials
         {{- if .Values.secrets.awsAccessKeyId }}
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
@@ -180,6 +177,10 @@ spec:
               name: {{ include "vulcanami.fullname" . }}-secrets
               key: awsSecretAccessKey
         {{- end }}
+        # Vulcan Memory System v46 environment variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: {{ include "vulcanami.fullname" . }}-memory-config
         {{- end }}
         # Volumes for readOnlyRootFilesystem compatibility
         volumeMounts:

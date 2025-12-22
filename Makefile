@@ -318,12 +318,14 @@ helm-template: ## Show Helm template output
 .PHONY: install-memory
 install-memory: ## Install Vulcan Memory System packages
 	@echo "$(GREEN)Installing Vulcan Memory System packages...$(NC)"
+	# Note: 'persistant' spelling matches the actual directory name
 	pip install -e ./src/persistant_memory_v46 || pip install ./src/persistant_memory_v46
 	pip install -e ./src/gvulcan || pip install ./src/gvulcan
 
 .PHONY: test-memory
 test-memory: ## Run memory system integration tests
 	@echo "$(GREEN)Running memory system tests...$(NC)"
+	# Note: 'persistant' spelling matches the actual directory name
 	pytest src/persistant_memory_v46/tests/ -v --tb=short || echo "No persistant_memory_v46 tests found"
 	pytest src/gvulcan/tests/ -v --tb=short || echo "No gvulcan tests found"
 
