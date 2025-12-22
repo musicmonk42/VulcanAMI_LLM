@@ -672,6 +672,57 @@ REGISTRY_AVAILABLE = True  # Always available with built-in implementation
 RUNTIME_AVAILABLE = True   # Always available with built-in implementation
 
 
+class MockAgentRegistry:
+    """
+    Mock agent registry for testing purposes.
+    
+    Always returns True for signature verification.
+    """
+
+    def verify_signature(
+        self,
+        agent_id: str,
+        message: str,
+        signature: str
+    ) -> bool:
+        """
+        Mock signature verification - always returns True.
+        
+        Args:
+            agent_id: The agent making the request
+            message: The message that was signed
+            signature: The signature to verify
+            
+        Returns:
+            Always True for testing
+        """
+        return True
+
+
+class MockUnifiedRuntime:
+    """
+    Mock runtime for testing purposes.
+    
+    Returns mock execution results.
+    """
+
+    def execute_graph(self, graph: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Mock graph execution.
+        
+        Args:
+            graph: The graph to execute
+            
+        Returns:
+            Mock execution result
+        """
+        nodes = graph.get("nodes", [])
+        return {
+            "status": "mock_executed",
+            "nodes_processed": len(nodes),
+        }
+
+
 class RateLimiter:
     """Thread-safe rate limiter for request throttling."""
 
@@ -1105,6 +1156,7 @@ class GraphixListener:
         port: int = 8181,
         max_requests_per_minute: int = MAX_REQUESTS_PER_MINUTE,
         db_path: str = LISTENER_DB_PATH,
+        use_mock: bool = False,
     ):
         """
         Initialize listener server.
@@ -1114,6 +1166,7 @@ class GraphixListener:
             port: Port to listen on
             max_requests_per_minute: Rate limit per client
             db_path: Path to SQLite database for persistent storage
+            use_mock: Use mock implementations for testing (default: False)
         """
         self.host = host
         self.port = port
@@ -1124,31 +1177,37 @@ class GraphixListener:
         self.init_lock = threading.RLock()
 
         with self.init_lock:
-            # Initialize registry - prefer full implementation if available
-            if FULL_REGISTRY_AVAILABLE:
-                try:
-                    self.registry = FullAgentRegistry()
-                    logger.info("Using full AgentRegistry from src.agent_registry")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize full AgentRegistry: {e}")
+            # Use mock implementations if requested (for testing)
+            if use_mock:
+                self.registry = MockAgentRegistry()
+                self.runtime = MockUnifiedRuntime()
+                logger.info("Using mock implementations for testing")
+            else:
+                # Initialize registry - prefer full implementation if available
+                if FULL_REGISTRY_AVAILABLE:
+                    try:
+                        self.registry = FullAgentRegistry()
+                        logger.info("Using full AgentRegistry from src.agent_registry")
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize full AgentRegistry: {e}")
+                        self.registry = ListenerAgentRegistry(db_path=db_path)
+                        logger.info("Using ListenerAgentRegistry (built-in implementation)")
+                else:
                     self.registry = ListenerAgentRegistry(db_path=db_path)
                     logger.info("Using ListenerAgentRegistry (built-in implementation)")
-            else:
-                self.registry = ListenerAgentRegistry(db_path=db_path)
-                logger.info("Using ListenerAgentRegistry (built-in implementation)")
 
-            # Initialize runtime - prefer full implementation if available
-            if FULL_RUNTIME_AVAILABLE:
-                try:
-                    self.runtime = FullUnifiedRuntime()
-                    logger.info("Using full UnifiedRuntime from src.unified_runtime")
-                except Exception as e:
-                    logger.warning(f"Failed to initialize full UnifiedRuntime: {e}")
+                # Initialize runtime - prefer full implementation if available
+                if FULL_RUNTIME_AVAILABLE:
+                    try:
+                        self.runtime = FullUnifiedRuntime()
+                        logger.info("Using full UnifiedRuntime from src.unified_runtime")
+                    except Exception as e:
+                        logger.warning(f"Failed to initialize full UnifiedRuntime: {e}")
+                        self.runtime = ListenerGraphRuntime(db_path=db_path)
+                        logger.info("Using ListenerGraphRuntime (built-in implementation)")
+                else:
                     self.runtime = ListenerGraphRuntime(db_path=db_path)
                     logger.info("Using ListenerGraphRuntime (built-in implementation)")
-            else:
-                self.runtime = ListenerGraphRuntime(db_path=db_path)
-                logger.info("Using ListenerGraphRuntime (built-in implementation)")
 
             # Initialize rate limiter
             self.rate_limiter = RateLimiter(max_requests=max_requests_per_minute)
