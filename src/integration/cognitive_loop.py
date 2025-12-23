@@ -95,6 +95,13 @@ class LoopRuntimeConfig:
     early_stop_entropy_delta: Optional[float] = None
     score_window: int = 10
     attach_token_rationale: bool = True
+    # PERFORMANCE: New options to control logging and caching behavior
+    enable_verbose_logging: bool = False  # Enable detailed [DIAG] logging (default: False for performance)
+    log_interval: int = 10  # Only log diagnostic messages every N steps
+    context_cache_interval: int = 10  # Refresh context cache every N steps
+    aggressive_cache_threshold: int = 10  # Step after which to use aggressive caching
+    aggressive_context_cache_interval: int = 20  # Context cache interval after warmup
+    world_model_update_interval: int = 5  # Update world model every N steps
 
 
 @dataclass
@@ -538,7 +545,8 @@ class CognitiveLoop:
         # Context caching - context and world model don't change much per token
         self._cached_context: Optional[Dict[str, Any]] = None
         self._context_cache_step: int = -1
-        self._world_model_update_interval: int = 5  # Only update every N tokens
+        # PERF: Use config values for cache intervals
+        self._world_model_update_interval: int = self.runtime.world_model_update_interval
         
         # Encoding cache for transformer outputs (reduces redundant encode calls)
         self._encoding_cache = EncodingCache(max_size=500, ttl_seconds=60.0)
@@ -550,10 +558,10 @@ class CognitiveLoop:
         vocab_size = getattr(transformer, 'vocab_size', 50257) if transformer else 50257
         self._sampling_table_cache = SamplingTableCache(vocab_size=vocab_size, common_patterns=100)
         
-        # Aggressive context caching after warmup (step 10+)
-        self._aggressive_cache_threshold: int = 10
-        self._context_cache_interval: int = 10  # Cache context every N steps
-        self._aggressive_context_cache_interval: int = 20  # After warmup, cache even less frequently
+        # PERF: Use config values for aggressive caching thresholds
+        self._aggressive_cache_threshold: int = self.runtime.aggressive_cache_threshold
+        self._context_cache_interval: int = self.runtime.context_cache_interval
+        self._aggressive_context_cache_interval: int = self.runtime.aggressive_context_cache_interval
         
         # Token index cache for fast lookups (OrderedDict for LRU eviction)
         self._token_index_cache: OrderedDict = OrderedDict()
