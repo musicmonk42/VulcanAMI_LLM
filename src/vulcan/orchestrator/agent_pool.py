@@ -7,12 +7,14 @@
 # WINDOWS MULTIPROCESSING FIX - Worker process doesn't access parent's unpicklable objects
 # FIXED: Converted long time.sleep calls to interruptible self._shutdown_event.wait().
 # PERFORMANCE: Added response time tracking and adaptive scaling
+# PERFORMANCE: Added simple_mode support for reduced overhead
 # ============================================================
 
 import heapq
 import json
 import logging
 import multiprocessing
+import os
 import threading
 import time
 import uuid
@@ -92,6 +94,27 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# SIMPLE MODE CONFIGURATION - Performance Optimization
+# ============================================================
+
+# Import simple mode configuration with fallback
+try:
+    from src.vulcan.simple_mode import (
+        DEFAULT_MIN_AGENTS as SIMPLE_MODE_MIN_AGENTS,
+        DEFAULT_MAX_AGENTS as SIMPLE_MODE_MAX_AGENTS,
+        MAX_PROVENANCE_RECORDS as SIMPLE_MODE_MAX_PROVENANCE,
+        AGENT_CHECK_INTERVAL as SIMPLE_MODE_CHECK_INTERVAL,
+        SIMPLE_MODE,
+    )
+except ImportError:
+    # Fallback if simple_mode not available
+    SIMPLE_MODE = os.getenv("VULCAN_SIMPLE_MODE", "false").lower() in ("true", "1", "yes", "on")
+    SIMPLE_MODE_MIN_AGENTS = int(os.getenv("MIN_AGENTS", "1" if SIMPLE_MODE else "10"))
+    SIMPLE_MODE_MAX_AGENTS = int(os.getenv("MAX_AGENTS", "5" if SIMPLE_MODE else "100"))
+    SIMPLE_MODE_MAX_PROVENANCE = int(os.getenv("MAX_PROVENANCE_RECORDS", "50" if SIMPLE_MODE else "1000"))
+    SIMPLE_MODE_CHECK_INTERVAL = int(os.getenv("AGENT_CHECK_INTERVAL", "300" if SIMPLE_MODE else "30"))
 
 
 # ============================================================
@@ -406,8 +429,8 @@ class AgentPoolManager:
 
     def __init__(
         self,
-        max_agents: int = 1000,
-        min_agents: int = 10,
+        max_agents: int = None,
+        min_agents: int = None,
         task_queue_type: str = "custom",
         provenance_ttl: int = 3600,
         task_timeout_seconds: int = 300,
@@ -417,24 +440,29 @@ class AgentPoolManager:
         Initialize Agent Pool Manager
 
         Args:
-            max_agents: Maximum number of agents in pool
-            min_agents: Minimum number of agents to maintain
+            max_agents: Maximum number of agents in pool (defaults to SIMPLE_MODE value)
+            min_agents: Minimum number of agents to maintain (defaults to SIMPLE_MODE value)
             task_queue_type: Type of task queue ('ray', 'celery', 'custom')
             provenance_ttl: Time-to-live for provenance records in seconds
             task_timeout_seconds: Default timeout for task assignments
             config: Optional configuration dictionary.
         """
         self.config = config or {}
-        self.max_agents = max_agents
-        self.min_agents = min_agents
+        
+        # PERFORMANCE: Use simple_mode defaults if not explicitly provided
+        # This reduces agent pool overhead when VULCAN_SIMPLE_MODE=true
+        self.max_agents = max_agents if max_agents is not None else SIMPLE_MODE_MAX_AGENTS
+        self.min_agents = min_agents if min_agents is not None else SIMPLE_MODE_MIN_AGENTS
         self.task_timeout_seconds = task_timeout_seconds
 
         # Agent tracking
         self.agents: Dict[str, AgentMetadata] = {}
         self.agent_processes: Dict[str, multiprocessing.Process] = {}
 
-        # FIXED: Use TTLCache for provenance to prevent unbounded memory growth
-        self.provenance_records = TTLCache(maxsize=10000, ttl=provenance_ttl)
+        # PERFORMANCE: Use bounded provenance records from simple_mode configuration
+        # This prevents memory leaks from unbounded provenance growth
+        max_provenance = self.config.get("max_provenance_records", SIMPLE_MODE_MAX_PROVENANCE)
+        self.provenance_records = TTLCache(maxsize=max_provenance, ttl=provenance_ttl)
         if not CACHETOOLS_AVAILABLE:
             # Manual TTL tracking when using fallback
             self.provenance_creation_times: Dict[str, float] = {}
