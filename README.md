@@ -114,9 +114,9 @@ Note: Platform components and integrations are configurable; enterprise deployme
 
 ## Quick start (development)
 
-**📚 New to the project?** See [NEW_ENGINEER_SETUP.md](NEW_ENGINEER_SETUP.md) for step-by-step Docker, Kubernetes, and Helm deployment instructions.
+**📚 New to the project?** See [docs/NEW_ENGINEER_SETUP.md](docs/NEW_ENGINEER_SETUP.md) for step-by-step Docker, Kubernetes, and Helm deployment instructions.
 
-**⚡ Quick Reference:** See [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for common commands and troubleshooting.
+**⚡ Quick Reference:** See [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) for common commands and troubleshooting.
 
 Important: The steps below are for internal or licensed development environments only. Do not expose development services to the public internet.
 
@@ -251,10 +251,10 @@ Status: ✅ 100% READY FOR DEVELOPMENT ✓
 **Docker Compose v2 Note**: This repository uses modern Docker Compose v2 syntax (`docker compose` not `docker-compose`). Docker Compose v2 is bundled with Docker Engine 20.10.13+.
 
 For comprehensive testing documentation, see:
-- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Complete testing guide
-- [CI_CD.md](CI_CD.md) - CI/CD pipeline documentation
-- [REPRODUCIBLE_BUILDS.md](REPRODUCIBLE_BUILDS.md) - Reproducible build guide
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment instructions
+- **[docs/TESTING_GUIDE.md](docs/TESTING_GUIDE.md)** - Complete testing guide
+- [docs/CI_CD.md](docs/CI_CD.md) - CI/CD pipeline documentation
+- [docs/REPRODUCIBLE_BUILDS.md](docs/REPRODUCIBLE_BUILDS.md) - Reproducible build guide
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) - Deployment instructions
 
 ---
 
@@ -362,8 +362,8 @@ VulcanAMI is structured as a **layered AI operating system** that integrates mul
   - Security scanning integrated into CI/CD
 
 **For complete architecture documentation, see:**
-- [COMPLETE_PLATFORM_ARCHITECTURE.md](COMPLETE_PLATFORM_ARCHITECTURE.md) - Full system architecture
-- [COMPREHENSIVE_REPO_OVERVIEW.md](COMPREHENSIVE_REPO_OVERVIEW.md) - Repository overview
+- [docs/COMPLETE_PLATFORM_ARCHITECTURE.md](docs/COMPLETE_PLATFORM_ARCHITECTURE.md) - Full system architecture
+- [docs/COMPREHENSIVE_REPO_OVERVIEW.md](docs/COMPREHENSIVE_REPO_OVERVIEW.md) - Repository overview
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Detailed architecture documentation
 
 ---
@@ -412,13 +412,13 @@ This repository supports multiple deployment options:
 **Kubernetes (Recommended)**
 - Kustomize overlays for different environments
 - Helm charts for templated deployments
-- See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions
+- See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions
 
 **Azure Kubernetes Service (AKS)**
 - Automated GitHub Actions workflow included
 - CI/CD pipeline with `.github/workflows/azure-kubernetes-service-helm.yml`
 - **Prerequisites**: Configure `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets
-- See [DEPLOYMENT.md](DEPLOYMENT.md#4-azure-aks-deployment) and [CI_CD.md](CI_CD.md#azure-aks-deployment-workflow) for setup
+- See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#4-azure-aks-deployment) and [docs/CI_CD.md](docs/CI_CD.md#azure-aks-deployment-workflow) for setup
 
 **Other Cloud Providers**
 - Google GKE
