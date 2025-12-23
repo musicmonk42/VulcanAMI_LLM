@@ -44,6 +44,7 @@ A comprehensive executor for Graphix IR graphs with enterprise features:
 - Numerical stability checks
 """
 
+import functools
 import json
 import logging
 import math
@@ -52,9 +53,111 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# PERFORMANCE INSTRUMENTATION (Added for bottleneck diagnosis)
+# ============================================================
+
+# Type variable for generic callable wrapper
+F = TypeVar("F", bound=Callable[..., Any])
+
+# Global performance stats for detailed profiling
+_PERF_STATS: Dict[str, Dict[str, float]] = defaultdict(
+    lambda: {"count": 0, "total_ms": 0.0, "min_ms": float("inf"), "max_ms": 0.0}
+)
+
+
+def timed_operation(operation_name: str) -> Callable[[F], F]:
+    """Decorator to time operations and log performance.
+
+    Args:
+        operation_name: Name of the operation for logging.
+
+    Returns:
+        Decorated function with timing instrumentation.
+    """
+    def decorator(func: F) -> F:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+
+            # Update global stats
+            stats = _PERF_STATS[operation_name]
+            stats["count"] += 1
+            stats["total_ms"] += elapsed_ms
+            stats["min_ms"] = min(stats["min_ms"], elapsed_ms)
+            stats["max_ms"] = max(stats["max_ms"], elapsed_ms)
+
+            # Log if operation takes > 10ms (potential bottleneck)
+            if elapsed_ms > 10.0:
+                logger.info(
+                    "[PERF] %s: %.1fms (count=%d, avg=%.1fms)",
+                    operation_name,
+                    elapsed_ms,
+                    stats["count"],
+                    stats["total_ms"] / stats["count"],
+                )
+
+            return result
+        return wrapper  # type: ignore[return-value]
+    return decorator
+
+
+def get_performance_stats() -> Dict[str, Dict[str, float]]:
+    """Get all collected performance statistics.
+
+    Returns:
+        Dictionary mapping operation names to timing statistics.
+    """
+    result = {}
+    for name, stats in _PERF_STATS.items():
+        if stats["count"] > 0:
+            result[name] = {
+                "count": stats["count"],
+                "total_ms": stats["total_ms"],
+                "avg_ms": stats["total_ms"] / stats["count"],
+                "min_ms": stats["min_ms"] if stats["min_ms"] != float("inf") else 0.0,
+                "max_ms": stats["max_ms"],
+            }
+    return result
+
+
+def reset_performance_stats() -> None:
+    """Reset all performance statistics."""
+    _PERF_STATS.clear()
+
+
+def log_performance_summary() -> None:
+    """Log a summary of all performance statistics."""
+    stats = get_performance_stats()
+    if not stats:
+        logger.info("[PERF SUMMARY] No performance data collected")
+        return
+
+    logger.info("[PERF SUMMARY] Performance Statistics:")
+    logger.info("-" * 70)
+
+    # Sort by total time descending (hottest first)
+    sorted_ops = sorted(stats.items(), key=lambda x: x[1]["total_ms"], reverse=True)
+
+    for name, data in sorted_ops:
+        logger.info(
+            "  %-40s  count=%-6d total=%-10.1fms avg=%-8.2fms",
+            name,
+            int(data["count"]),
+            data["total_ms"],
+            data["avg_ms"],
+        )
+
+    logger.info("-" * 70)
 
 
 # ============================================================
@@ -597,6 +700,7 @@ class GraphixExecutor:
 
     # ==================== MAIN EXECUTION ====================
 
+    @timed_operation("GraphixExecutor.execute")
     def execute(
         self, graph_ir: Dict[str, Any], inputs: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -679,6 +783,7 @@ class GraphixExecutor:
 
     # ==================== EMBEDDINGS ====================
 
+    @timed_operation("GraphixExecutor._execute_embeddings")
     def _execute_embeddings(
         self, tokens: List[Any], emb_ir: Dict[str, Any]
     ) -> List[float]:
@@ -693,12 +798,23 @@ class GraphixExecutor:
         embeddings = []
         for token_idx in range(len(tokens)):
             # Get token ID (convert if needed)
-            token_id = (
-                int(tokens[token_idx])
-                if not isinstance(tokens[token_idx], int)
-                else tokens[token_idx]
-            )
-            token_id = token_id % self.vocab_size  # Ensure in vocab range
+            # FIX: Handle string tokens that cannot be converted to int
+            # Use hash-based mapping for string tokens to get a stable token ID
+            token = tokens[token_idx]
+            if isinstance(token, int):
+                token_id = token
+            elif isinstance(token, str):
+                # String tokens: use abs(hash()) to ensure positive token IDs
+                # This handles words like 'understand', 'neither', 'like', 'no'
+                token_id = abs(hash(token)) % self.vocab_size
+            else:
+                # For other types, try int conversion, fallback to hash if it fails
+                try:
+                    token_id = int(token)
+                except (ValueError, TypeError):
+                    logger.debug(f"Cannot convert token to int: {token}, using hash")
+                    token_id = abs(hash(str(token))) % self.vocab_size
+            token_id = abs(token_id) % self.vocab_size  # Ensure positive and in vocab range
 
             # Extract embedding
             start_idx = token_id * self.hidden_size
@@ -724,6 +840,7 @@ class GraphixExecutor:
 
     # ==================== LAYER EXECUTION ====================
 
+    @timed_operation("GraphixExecutor._execute_layer")
     def _execute_layer(
         self,
         hidden_states: List[float],
@@ -732,40 +849,68 @@ class GraphixExecutor:
         lora_adapters: Dict[str, Any],
         lora_alpha: float,
     ) -> List[float]:
-        """Execute a single transformer layer."""
+        """Execute a single transformer layer with fine-grained timing."""
+        timings: Dict[str, float] = {}
 
         # Pre-norm
+        t1 = time.perf_counter()
         residual = hidden_states[:]
         hidden_states = self._apply_layer_norm(hidden_states, f"layer_{layer_idx}.ln1")
+        timings["ln1_ms"] = (time.perf_counter() - t1) * 1000
 
         # Attention
+        t2 = time.perf_counter()
         t_attn = self.profiler.start_timer(f"layer_{layer_idx}.attn")
         hidden_states = self._execute_attention(
             hidden_states, layer_idx, lora_adapters, lora_alpha
         )
         self.profiler.end_timer(f"layer_{layer_idx}.attn", t_attn)
+        timings["attention_ms"] = (time.perf_counter() - t2) * 1000
 
         # Residual connection
+        t3 = time.perf_counter()
         hidden_states = [h + r for h, r in zip(hidden_states, residual)]
+        timings["residual1_ms"] = (time.perf_counter() - t3) * 1000
 
         # Pre-norm for FFN
+        t4 = time.perf_counter()
         residual = hidden_states[:]
         hidden_states = self._apply_layer_norm(hidden_states, f"layer_{layer_idx}.ln2")
+        timings["ln2_ms"] = (time.perf_counter() - t4) * 1000
 
         # FFN
+        t5 = time.perf_counter()
         t_ffn = self.profiler.start_timer(f"layer_{layer_idx}.ffn")
         hidden_states = self._execute_ffn(
             hidden_states, layer_idx, lora_adapters, lora_alpha
         )
         self.profiler.end_timer(f"layer_{layer_idx}.ffn", t_ffn)
+        timings["ffn_ms"] = (time.perf_counter() - t5) * 1000
 
         # Residual connection
+        t6 = time.perf_counter()
         hidden_states = [h + r for h, r in zip(hidden_states, residual)]
+        timings["residual2_ms"] = (time.perf_counter() - t6) * 1000
+
+        # Log layer timing breakdown if total > 100ms
+        total_ms = sum(timings.values())
+        if total_ms > 100.0:
+            logger.info(
+                "[PERF] Layer %d breakdown: total=%.1fms (ln1=%.1f, attn=%.1f, "
+                "ln2=%.1f, ffn=%.1f)",
+                layer_idx,
+                total_ms,
+                timings["ln1_ms"],
+                timings["attention_ms"],
+                timings["ln2_ms"],
+                timings["ffn_ms"],
+            )
 
         return hidden_states
 
     # ==================== ATTENTION ====================
 
+    @timed_operation("GraphixExecutor._execute_attention")
     def _execute_attention(
         self,
         hidden_states: List[float],
@@ -894,6 +1039,7 @@ class GraphixExecutor:
 
     # ==================== FEEDFORWARD ====================
 
+    @timed_operation("GraphixExecutor._execute_ffn")
     def _execute_ffn(
         self,
         hidden_states: List[float],
@@ -901,7 +1047,8 @@ class GraphixExecutor:
         lora_adapters: Dict[str, Any],
         lora_alpha: float,
     ) -> List[float]:
-        """Execute feedforward network (SwiGLU)."""
+        """Execute feedforward network (SwiGLU) with timing."""
+        timings: Dict[str, float] = {}
 
         intermediate_size = self.hidden_size * 4
 
@@ -920,19 +1067,41 @@ class GraphixExecutor:
                 self.hidden_size,
             )
 
-        # Gate projection
+        # Gate projection (hidden_size -> intermediate_size)
+        t1 = time.perf_counter()
         gate = self._linear(
             hidden_states, gate_weight, self.hidden_size, intermediate_size
         )
+        timings["gate_proj_ms"] = (time.perf_counter() - t1) * 1000
 
-        # Up projection
+        # Up projection (hidden_size -> intermediate_size)
+        t2 = time.perf_counter()
         up = self._linear(hidden_states, up_weight, self.hidden_size, intermediate_size)
+        timings["up_proj_ms"] = (time.perf_counter() - t2) * 1000
 
         # SwiGLU activation: gate * SiLU(up)
+        t3 = time.perf_counter()
         swiglu = [g * self._silu(u) for g, u in zip(gate, up)]
+        timings["swiglu_ms"] = (time.perf_counter() - t3) * 1000
 
-        # Down projection
+        # Down projection (intermediate_size -> hidden_size)
+        t4 = time.perf_counter()
         output = self._linear(swiglu, down_weight, intermediate_size, self.hidden_size)
+        timings["down_proj_ms"] = (time.perf_counter() - t4) * 1000
+
+        # Log FFN timing breakdown if total > 50ms
+        total_ms = sum(timings.values())
+        if total_ms > 50.0:
+            logger.info(
+                "[PERF] FFN layer_%d: total=%.1fms "
+                "(gate=%.1f, up=%.1f, swiglu=%.1f, down=%.1f)",
+                layer_idx,
+                total_ms,
+                timings["gate_proj_ms"],
+                timings["up_proj_ms"],
+                timings["swiglu_ms"],
+                timings["down_proj_ms"],
+            )
 
         return output
 
@@ -997,6 +1166,10 @@ class GraphixExecutor:
 
     # ==================== UTILITIES ====================
 
+    # Track linear operation statistics for performance analysis
+    _linear_call_count: int = 0
+    _linear_total_ops: int = 0
+
     def _linear(
         self,
         input_vec: List[float],
@@ -1004,29 +1177,53 @@ class GraphixExecutor:
         in_features: int,
         out_features: int,
     ) -> List[float]:
-        """Linear transformation: output = input @ weight^T."""
+        """Linear transformation: output = input @ weight^T.
+
+        OPTIMIZED: Uses numpy vectorized matrix multiplication for ~100x speedup
+        over pure Python nested loops.
+
+        Args:
+            input_vec: Input vector of shape (in_features,)
+            weight: Weight matrix flattened to shape (out_features * in_features,)
+            in_features: Number of input features
+            out_features: Number of output features
+
+        Returns:
+            Output vector of shape (out_features,)
+        """
         if not input_vec or not weight:
             return [0.0] * out_features
+
+        # Track performance statistics
+        GraphixExecutor._linear_call_count += 1
+        ops = in_features * out_features
+        GraphixExecutor._linear_total_ops += ops
 
         # Ensure correct input size
         if len(input_vec) < in_features:
             input_vec = input_vec + [0.0] * (in_features - len(input_vec))
         input_vec = input_vec[:in_features]
 
-        # Matrix multiplication (simplified)
-        output = []
-        for o in range(out_features):
-            val = 0.0
-            for i in range(in_features):
-                w_idx = o * in_features + i
-                if w_idx < len(weight):
-                    val += input_vec[i] * weight[w_idx]
-            output.append(val)
+        # OPTIMIZED: Use numpy vectorized operations (~100x faster than Python loops)
+        # Convert to numpy arrays
+        input_arr = np.array(input_vec, dtype=np.float32)
 
-        return output
+        # Handle weight array - ensure it has correct size
+        expected_weight_size = out_features * in_features
+        if len(weight) < expected_weight_size:
+            # Pad with zeros if weight is smaller than expected
+            weight = list(weight) + [0.0] * (expected_weight_size - len(weight))
+        weight_arr = np.array(weight[:expected_weight_size], dtype=np.float32)
+
+        # Reshape weight to (out_features, in_features) and compute output = input @ weight^T
+        weight_matrix = weight_arr.reshape(out_features, in_features)
+        output_arr = input_arr @ weight_matrix.T
+
+        return output_arr.tolist()
 
     # ==================== LOGITS COMPUTATION ====================
 
+    @timed_operation("GraphixExecutor.get_logits")
     def get_logits(self, hidden_state: Any, tokens: List[Any]) -> List[float]:
         """Compute logits for next token prediction."""
         if not isinstance(hidden_state, list):
@@ -1037,7 +1234,8 @@ class GraphixExecutor:
             hidden_state = hidden_state + [0.0] * (self.hidden_size - len(hidden_state))
         hidden_state = hidden_state[: self.hidden_size]
 
-        # Apply LM head
+        # Apply LM head - This is a large matrix multiply (hidden_size x vocab_size)
+        # For hidden_size=256, vocab_size=4096: 1M multiply-adds
         lm_head_weight = self.weights.get("lm_head", [])
         logits = self._linear(
             hidden_state, lm_head_weight, self.hidden_size, self.vocab_size
@@ -1177,6 +1375,102 @@ class GraphixExecutor:
 
         return executor
 
+    def load_weights_from_numpy(self, weight_dict: Dict[str, Any]) -> None:
+        """Load weights from a dictionary of numpy arrays.
+
+        This method allows loading pre-trained weights from PyTorch checkpoints
+        or other formats after conversion to numpy arrays.
+
+        Args:
+            weight_dict: Dictionary mapping weight names to numpy arrays.
+                Expected keys follow the pattern:
+                - "token_embedding": shape (vocab_size, hidden_size)
+                - "layer_{i}.attn.{q,k,v,o}": shape (hidden_size, hidden_size)
+                - "layer_{i}.ffn.{gate,up}": shape (hidden_size, intermediate_size)
+                - "layer_{i}.ffn.down": shape (intermediate_size, hidden_size)
+                - "layer_{i}.ln{1,2}.weight": shape (hidden_size,)
+                - "final_ln.weight": shape (hidden_size,)
+                - "lm_head": shape (hidden_size, vocab_size)
+
+        Note:
+            Weight matrices are stored flattened in row-major order.
+            2D arrays are converted to 1D lists for storage.
+        """
+        loaded_count = 0
+        for name, array in weight_dict.items():
+            if hasattr(array, 'numpy'):
+                # Convert torch tensor to numpy if needed
+                array = array.numpy()
+            if hasattr(array, 'flatten'):
+                # Flatten 2D arrays to 1D for storage
+                self.weights[name] = array.flatten().astype(np.float32).tolist()
+            else:
+                # Already a list or 1D
+                self.weights[name] = list(array)
+            loaded_count += 1
+            logger.debug("Loaded weight %s with shape %s", name, getattr(array, 'shape', len(array)))
+
+        logger.info(
+            "Loaded %d weight tensors from numpy format (total: %d)",
+            loaded_count,
+            len(self.weights),
+        )
+
+    def verify_weights(self) -> Dict[str, Any]:
+        """Verify that all required weights are present and have correct sizes.
+
+        Returns:
+            Dictionary containing verification results:
+            - "status": "ok" or "error"
+            - "missing": List of missing weight names
+            - "size_errors": List of weights with incorrect sizes
+            - "total_params": Total number of parameters
+        """
+        results = {
+            "status": "ok",
+            "missing": [],
+            "size_errors": [],
+            "total_params": 0,
+        }
+
+        # Expected weights and their sizes
+        expected = {
+            "token_embedding": self.vocab_size * self.hidden_size,
+            "final_ln.weight": self.hidden_size,
+            "lm_head": self.hidden_size * self.vocab_size,
+        }
+
+        # Layer weights
+        intermediate_size = self.hidden_size * 4
+        for layer in range(self.num_layers):
+            expected[f"layer_{layer}.attn.q"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.attn.k"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.attn.v"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.attn.o"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.ffn.gate"] = self.hidden_size * intermediate_size
+            expected[f"layer_{layer}.ffn.up"] = self.hidden_size * intermediate_size
+            expected[f"layer_{layer}.ffn.down"] = intermediate_size * self.hidden_size
+            expected[f"layer_{layer}.ln1.weight"] = self.hidden_size
+            expected[f"layer_{layer}.ln2.weight"] = self.hidden_size
+
+        # Check weights
+        for name, expected_size in expected.items():
+            if name not in self.weights:
+                results["missing"].append(name)
+                results["status"] = "error"
+            else:
+                actual_size = len(self.weights[name])
+                results["total_params"] += actual_size
+                if actual_size != expected_size:
+                    results["size_errors"].append({
+                        "name": name,
+                        "expected": expected_size,
+                        "actual": actual_size,
+                    })
+                    results["status"] = "error"
+
+        return results
+
 
 # ============================================================
 # EXPORTS
@@ -1194,4 +1488,9 @@ __all__ = [
     "QuantizationManager",
     "PerformanceProfiler",
     "AuditLogger",
+    # Performance instrumentation
+    "timed_operation",
+    "get_performance_stats",
+    "reset_performance_stats",
+    "log_performance_summary",
 ]

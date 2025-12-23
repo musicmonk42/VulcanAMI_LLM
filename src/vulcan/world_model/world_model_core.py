@@ -2250,10 +2250,12 @@ class WorldModel:
 
     def _apply_diff_and_commit(
         self, file_path: str, original_code: str, updated_code: str, commit_message: str
-    ) -> str:
+    ) -> Tuple[str, bool]:
         """
         Simulates diff_tools.make_diff, file I/O, and git_tools.commit_changes.
-        Returns the diff summary.
+        Returns tuple of (diff_summary, commit_succeeded).
+        
+        FIX: Returns whether commit actually succeeded to prevent inconsistent logging.
         """
         full_path = self.repo_root / file_path
 
@@ -2280,7 +2282,8 @@ class WorldModel:
             logger.warning(
                 f"Cannot commit: {self.repo_root} is not a Git repository. Skipping commit."
             )
-            return diff_summary
+            # FIX: Return False for commit_succeeded when not a git repo
+            return diff_summary, False
 
         # Execute Git commands using subprocess (robust, non-mock check)
         try:
@@ -2309,7 +2312,7 @@ class WorldModel:
             )
 
             logger.info(f"Git Commit successful: {hash_result.stdout.strip()}")
-            return diff_summary
+            return diff_summary, True
 
         except subprocess.CalledProcessError as e:
             # This happens if 'git commit' runs but there are no actual changes (e.g., LLM returned identical code)
@@ -2317,7 +2320,7 @@ class WorldModel:
                 logger.info(
                     "Commit skipped: No functional changes detected by Git after writing."
                 )
-                return diff_summary
+                return diff_summary, False
             logger.error(f"Git commit failed for {file_path}: {e.stderr}")
             raise RuntimeError(f"Git commit failed: {e.stderr}") from e
         except Exception as e:
@@ -2368,7 +2371,8 @@ class WorldModel:
             self._validate_code_ast(generated_code)
 
             # 6. Apply diff and commit (file I/O + git)
-            diff_summary = self._apply_diff_and_commit(
+            # FIX: _apply_diff_and_commit now returns tuple (diff_summary, commit_succeeded)
+            diff_summary, commit_succeeded = self._apply_diff_and_commit(
                 file_path=generated_file_path,
                 original_code=original_code,
                 updated_code=generated_code,
@@ -2385,10 +2389,17 @@ class WorldModel:
                 "cost_usd": 0.15,  # Placeholder for cost calculation
                 "tokens_used": llm_client.last_tokens_used,
                 "execution_timestamp": time.time(),
+                "committed": commit_succeeded,  # FIX: Track whether commit succeeded
             }
-            logger.info(
-                f"✨ Improvement applied and committed: {objective_type} to {generated_file_path}"
-            )
+            # FIX: Only say "committed" if commit actually succeeded
+            if commit_succeeded:
+                logger.info(
+                    f"✨ Improvement applied and committed: {objective_type} to {generated_file_path}"
+                )
+            else:
+                logger.info(
+                    f"✨ Improvement applied (not committed): {objective_type} to {generated_file_path}"
+                )
 
         except SyntaxError as e:
             result["error"] = f"AST Validation Failed: {str(e)}"

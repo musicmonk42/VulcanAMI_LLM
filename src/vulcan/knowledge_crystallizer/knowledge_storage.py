@@ -28,13 +28,12 @@ from ..security_fixes import safe_pickle_load
 # Optional imports with fallbacks
 try:
     from src.utils.faiss_config import initialize_faiss
-
+    
     faiss, FAISS_AVAILABLE, _ = initialize_faiss()
 except ImportError:
     # Fallback if faiss_config module is not available
     try:
         import faiss
-
         FAISS_AVAILABLE = True
         logging.info("FAISS imported (direct)")
     except ImportError:
@@ -98,33 +97,132 @@ class PrincipleVersion:
         return 0
 
     def reconstruct_principle(self, base_principle: Any) -> Any:
-        """Reconstruct principle from diff"""
+        """
+        Reconstruct principle from diff
+        
+        Args:
+            base_principle: Base principle to apply diff to
+            
+        Returns:
+            Reconstructed principle or None if reconstruction fails
+        """
+        # If we have the full principle stored, return it directly
         if self.principle is not None:
             return self.principle
 
+        # Can't reconstruct without diff or base
         if self.principle_diff is None or base_principle is None:
             return None
 
-        # Apply diff to reconstruct
-        base_str = json.dumps(
-            (
+        try:
+            # Convert base principle to JSON string
+            base_dict = (
                 asdict(base_principle)
                 if hasattr(base_principle, "__dataclass_fields__")
                 else vars(base_principle)
-            ),
-            sort_keys=True,
-        )
-
-        # Apply unified diff
-        base_str.splitlines()
-
-        # Simple diff application (would need more sophisticated logic for production)
-        # For now, return base if diff application fails
+            )
+            base_str = json.dumps(base_dict, sort_keys=True, indent=2)
+            base_lines = base_str.splitlines(keepends=True)
+            
+            # Apply unified diff using difflib
+            # The principle_diff should be a list of unified diff lines
+            patched_lines = list(
+                difflib.restore(self.principle_diff, 2)  # 2 means restore the "new" version
+            )
+            
+            # If restore didn't work, try applying as a patch
+            if not patched_lines:
+                # Try alternative: apply the diff as a patch
+                patched_lines = self._apply_unified_diff(base_lines, self.principle_diff)
+            
+            # Join the patched lines back into a string
+            if patched_lines:
+                patched_str = ''.join(patched_lines)
+                
+                # Parse JSON back to dictionary
+                patched_dict = json.loads(patched_str)
+                
+                # Reconstruct the principle object
+                if hasattr(base_principle, "__dataclass_fields__"):
+                    # For dataclasses, create a new instance
+                    principle_class = type(base_principle)
+                    return principle_class(**patched_dict)
+                else:
+                    # For regular classes, update attributes
+                    reconstructed = copy.deepcopy(base_principle)
+                    for key, value in patched_dict.items():
+                        setattr(reconstructed, key, value)
+                    return reconstructed
+            else:
+                logger.warning("Diff application produced no output, returning base principle")
+                return base_principle
+                
+        except Exception as e:
+            logger.error("Failed to reconstruct principle from diff: %s", e)
+            # Fallback to base principle if reconstruction fails
+            return base_principle
+    
+    def _apply_unified_diff(self, base_lines: List[str], diff_lines: List[str]) -> List[str]:
+        """
+        Apply a unified diff to base lines
+        
+        Args:
+            base_lines: Original lines
+            diff_lines: Unified diff lines
+            
+        Returns:
+            Patched lines
+        """
         try:
-            # This is a simplified reconstruction - proper implementation would use difflib.patch
-            return base_principle
-        except Exception:
-            return base_principle
+            # Simple unified diff application
+            result = []
+            diff_idx = 0
+            base_idx = 0
+            
+            while diff_idx < len(diff_lines):
+                line = diff_lines[diff_idx]
+                
+                if line.startswith('---') or line.startswith('+++'):
+                    # Skip header lines
+                    diff_idx += 1
+                    continue
+                    
+                if line.startswith('@@'):
+                    # Parse hunk header: @@ -start,count +start,count @@
+                    diff_idx += 1
+                    continue
+                    
+                if line.startswith('-'):
+                    # Line removed from base, skip in base
+                    base_idx += 1
+                    diff_idx += 1
+                    
+                elif line.startswith('+'):
+                    # Line added, append to result
+                    result.append(line[1:])
+                    diff_idx += 1
+                    
+                elif line.startswith(' '):
+                    # Context line, unchanged
+                    if base_idx < len(base_lines):
+                        result.append(base_lines[base_idx])
+                        base_idx += 1
+                    diff_idx += 1
+                    
+                else:
+                    # Unknown line format, skip
+                    diff_idx += 1
+            
+            # Add any remaining base lines
+            while base_idx < len(base_lines):
+                result.append(base_lines[base_idx])
+                base_idx += 1
+                
+            return result
+            
+        except Exception as e:
+            logger.error("Error applying unified diff: %s", e)
+            return []
 
 
 @dataclass

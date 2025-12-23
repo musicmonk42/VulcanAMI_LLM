@@ -318,6 +318,8 @@ pydeck==0.9.1
 pydot==4.0.1
 pyflakes==3.4.0
 pygam==0.11.0
+# FIXED: Updated pymilvus to 2.5.18 for grpcio compatibility (2.3.4 required grpcio<=1.58.0)
+pymilvus==2.5.18
 Pygments==2.19.2
 PyJWT==2.10.1
 pylint==4.0.3

@@ -55,12 +55,10 @@ try:
 
         if os.getenv("GRAPHIX_API_KEY"):
             print("✅ GRAPHIX_API_KEY loaded successfully")
-    else:
-        print(f"⚠️ .env file not found at: {env_path}")
-        print("💡 Create a .env file with your API keys to enable LLM features")
+    # FIX: Don't warn about missing .env file - it's optional in containerized environments
+    # Environment variables are typically injected via Docker/K8s, not .env files
 except ImportError:
-    print("⚠️ python-dotenv not installed. Run: pip install python-dotenv")
-    print("💡 API keys will need to be set as system environment variables")
+    # Silently fall back to system environment variables (expected in containers)
     import os
 except Exception as e:
     print(f"❌ Error loading .env: {e}")

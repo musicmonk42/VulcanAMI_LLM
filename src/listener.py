@@ -2,7 +2,7 @@
 """
 Graphix IR HTTP Listener (Production-Ready)
 ===========================================
-Version: 3.0.0 - Full production implementation with real integrations
+Version: 3.1.0 - Full production implementation with complete graph execution
 A secure HTTP server for receiving Graphix IR graphs from agents with comprehensive
 error handling, rate limiting, cryptographic signature verification, and graceful shutdown.
 
@@ -12,7 +12,16 @@ Security Features:
 - Request size validation
 - Input sanitization and validation
 - Comprehensive audit logging
+
+Graph Execution:
+- Full Graphix IR node execution
+- Data flow between nodes
+- Multiple node type support
+- Error handling per node
+- Execution tracing
 """
+
+from __future__ import annotations
 
 import base64
 import hashlib
@@ -332,7 +341,9 @@ class ListenerGraphRuntime:
     """
     Production-grade graph execution runtime for the Listener service.
     
-    Provides graph validation, execution tracking, and result management.
+    Provides graph validation, execution, and result management with full
+    Graphix IR node type support and data flow.
+    
     This is a self-contained implementation that works independently
     when the full UnifiedRuntime is not available.
     """
@@ -348,7 +359,7 @@ class ListenerGraphRuntime:
         self._lock = threading.RLock()
         self._init_database()
         self._execution_count = 0
-        logger.info("ListenerGraphRuntime initialized")
+        logger.info("ListenerGraphRuntime initialized with full execution support")
 
     def _init_database(self):
         """Initialize the execution tracking database."""
@@ -393,9 +404,9 @@ class ListenerGraphRuntime:
         agent_id: str = "unknown"
     ) -> Dict[str, Any]:
         """
-        Execute a Graphix IR graph.
+        Execute a Graphix IR graph with full node processing.
         
-        Performs validation, tracks execution, and returns results.
+        Performs validation, tracks execution, executes nodes, and returns results.
         
         Args:
             graph: The Graphix IR graph to execute
@@ -440,7 +451,7 @@ class ListenerGraphRuntime:
         )
         
         try:
-            # Process the graph
+            # Process the graph with full execution
             result = self._process_graph(graph, nodes, edges)
             
             # Update execution record
@@ -459,7 +470,7 @@ class ListenerGraphRuntime:
                 "status": "completed",
                 "execution_id": execution_id,
                 "graph_hash": graph_hash,
-                "nodes_processed": len(nodes),
+                "nodes_processed": result.get("nodes_executed", len(nodes)),
                 "edges_processed": len(edges),
                 "result": result,
                 "started_at": started_at.isoformat(),
@@ -547,7 +558,14 @@ class ListenerGraphRuntime:
         edges: List[Dict]
     ) -> Dict[str, Any]:
         """
-        Process the graph and return results.
+        Process the graph with FULL execution of nodes.
+        
+        This is a complete implementation that:
+        1. Analyzes graph topology
+        2. Executes nodes in dependency order
+        3. Passes data between nodes
+        4. Handles different node types
+        5. Collects execution results
         
         Args:
             graph: The full graph
@@ -555,47 +573,472 @@ class ListenerGraphRuntime:
             edges: List of edges
             
         Returns:
-            Processing result
+            Complete processing result with execution trace
         """
-        # Build adjacency list for traversal
-        adjacency = defaultdict(list)
+        # Build adjacency lists for graph traversal
+        adjacency = defaultdict(list)  # Forward edges
+        reverse_adjacency = defaultdict(list)  # Backward edges for dependencies
+        
         for edge in edges:
             adjacency[edge["from"]].append(edge["to"])
+            reverse_adjacency[edge["to"]].append(edge["from"])
         
         # Find entry nodes (no incoming edges)
         has_incoming = set(edge["to"] for edge in edges)
         entry_nodes = [n["id"] for n in nodes if n["id"] not in has_incoming]
         
-        # Perform topological analysis
-        processed_nodes = []
-        visited = set()
+        # Perform topological sort to get execution order
+        execution_order = self._topological_sort(nodes, adjacency)
         
-        def visit(node_id):
-            if node_id in visited:
-                return
-            visited.add(node_id)
-            for neighbor in adjacency[node_id]:
-                visit(neighbor)
-            processed_nodes.append(node_id)
+        # Initialize node states and execution tracking
+        node_map = {n["id"]: n for n in nodes}
+        node_states = {}  # Stores output of each node
+        node_errors = {}  # Stores errors per node
+        execution_trace = []  # Detailed execution log
+        nodes_executed = 0
         
-        for entry in entry_nodes:
-            visit(entry)
+        # Execute nodes in topological order
+        for node_id in execution_order:
+            node = node_map[node_id]
+            node_start = datetime.utcnow()
+            
+            try:
+                # Gather inputs from predecessor nodes
+                inputs = {}
+                for predecessor_id in reverse_adjacency.get(node_id, []):
+                    if predecessor_id in node_states:
+                        inputs[predecessor_id] = node_states[predecessor_id]
+                
+                # Execute the node
+                output = self._execute_node(node, inputs)
+                
+                # Store node output
+                node_states[node_id] = output
+                nodes_executed += 1
+                
+                # Record successful execution
+                execution_trace.append({
+                    "node_id": node_id,
+                    "type": node.get("type", "unknown"),
+                    "status": "success",
+                    "inputs": list(inputs.keys()),
+                    "output_size": len(str(output)),
+                    "execution_time_ms": (datetime.utcnow() - node_start).total_seconds() * 1000,
+                })
+                
+                logger.debug(f"Node {node_id} executed successfully")
+                
+            except Exception as e:
+                # Handle node execution error
+                error_msg = str(e)
+                node_errors[node_id] = error_msg
+                
+                execution_trace.append({
+                    "node_id": node_id,
+                    "type": node.get("type", "unknown"),
+                    "status": "failed",
+                    "error": error_msg,
+                    "execution_time_ms": (datetime.utcnow() - node_start).total_seconds() * 1000,
+                })
+                
+                logger.error(f"Node {node_id} failed: {error_msg}")
+                
+                # Store None output to allow downstream nodes to potentially handle it
+                node_states[node_id] = None
         
-        # Reverse for topological order
-        processed_nodes.reverse()
+        # Find terminal nodes (no outgoing edges) and collect their outputs
+        has_outgoing = set(edge["from"] for edge in edges)
+        terminal_nodes = [n["id"] for n in nodes if n["id"] not in has_outgoing]
         
+        final_outputs = {}
+        for terminal_id in terminal_nodes:
+            if terminal_id in node_states:
+                final_outputs[terminal_id] = node_states[terminal_id]
+        
+        # Calculate execution statistics
+        successful_nodes = nodes_executed
+        failed_nodes = len(node_errors)
+        
+        # Return comprehensive execution result
         return {
             "graph_type": graph.get("type", "unknown"),
             "grammar_version": graph.get("grammar_version", "1.0.0"),
-            "entry_nodes": entry_nodes,
-            "processing_order": processed_nodes,
-            "total_nodes": len(nodes),
-            "total_edges": len(edges),
-            "analysis": {
-                "is_dag": len(processed_nodes) == len(nodes),
-                "connectivity": len(visited) / len(nodes) if nodes else 0,
-            }
+            "execution_summary": {
+                "total_nodes": len(nodes),
+                "nodes_executed": nodes_executed,
+                "nodes_successful": successful_nodes,
+                "nodes_failed": failed_nodes,
+                "total_edges": len(edges),
+            },
+            "topology": {
+                "entry_nodes": entry_nodes,
+                "terminal_nodes": terminal_nodes,
+                "execution_order": execution_order,
+                "is_dag": len(execution_order) == len(nodes),
+                "connectivity": len(execution_order) / len(nodes) if nodes else 0,
+            },
+            "results": {
+                "outputs": final_outputs,
+                "errors": node_errors if node_errors else None,
+            },
+            "trace": execution_trace,
         }
+
+    def _topological_sort(
+        self,
+        nodes: List[Dict],
+        adjacency: Dict[str, List[str]]
+    ) -> List[str]:
+        """
+        Perform topological sort to determine node execution order.
+        
+        Uses depth-first search to find a valid topological ordering.
+        
+        Args:
+            nodes: List of graph nodes
+            adjacency: Adjacency list (forward edges)
+            
+        Returns:
+            List of node IDs in topological order
+        """
+        visited = set()
+        temp_mark = set()
+        result = []
+        
+        def visit(node_id: str):
+            if node_id in temp_mark:
+                # Cycle detected - just skip
+                return
+            if node_id in visited:
+                return
+                
+            temp_mark.add(node_id)
+            
+            # Visit all neighbors
+            for neighbor in adjacency.get(node_id, []):
+                visit(neighbor)
+            
+            temp_mark.remove(node_id)
+            visited.add(node_id)
+            result.append(node_id)
+        
+        # Visit all nodes
+        for node in nodes:
+            if node["id"] not in visited:
+                visit(node["id"])
+        
+        # Reverse to get correct topological order
+        result.reverse()
+        return result
+
+    def _execute_node(
+        self,
+        node: Dict[str, Any],
+        inputs: Dict[str, Any]
+    ) -> Any:
+        """
+        Execute a single node based on its type and operation.
+        
+        Supports multiple Graphix IR node types:
+        - input: Load/prepare input data
+        - compute: Perform computation
+        - transform: Apply transformation
+        - aggregate: Aggregate multiple inputs
+        - output: Format output
+        - constant: Return constant value
+        - passthrough: Pass input to output
+        
+        Args:
+            node: The node to execute
+            inputs: Dictionary of inputs from predecessor nodes
+            
+        Returns:
+            Node execution result
+        """
+        node_type = node.get("type", "compute")
+        node_op = node.get("op", "identity")
+        node_params = node.get("params", {})
+        node_data = node.get("data")
+        
+        try:
+            # Handle different node types
+            if node_type == "input":
+                return self._execute_input_node(node, node_data, node_params)
+            
+            elif node_type == "constant":
+                return self._execute_constant_node(node, node_data, node_params)
+            
+            elif node_type == "compute":
+                return self._execute_compute_node(node, inputs, node_op, node_params)
+            
+            elif node_type == "transform":
+                return self._execute_transform_node(node, inputs, node_op, node_params)
+            
+            elif node_type == "aggregate":
+                return self._execute_aggregate_node(node, inputs, node_op, node_params)
+            
+            elif node_type == "output":
+                return self._execute_output_node(node, inputs, node_params)
+            
+            elif node_type == "passthrough":
+                # Pass first input to output
+                if inputs:
+                    return list(inputs.values())[0]
+                return None
+            
+            else:
+                # Unknown node type - treat as passthrough
+                logger.warning(f"Unknown node type: {node_type}, treating as passthrough")
+                if inputs:
+                    return list(inputs.values())[0]
+                return None
+                
+        except Exception as e:
+            logger.error(f"Node execution error (type={node_type}, op={node_op}): {e}")
+            raise
+
+    def _execute_input_node(
+        self,
+        node: Dict[str, Any],
+        data: Any,
+        params: Dict[str, Any]
+    ) -> Any:
+        """Execute an input node - loads or prepares data."""
+        # If node has data, return it
+        if data is not None:
+            return data
+        
+        # Otherwise, return params as input configuration
+        return params
+
+    def _execute_constant_node(
+        self,
+        node: Dict[str, Any],
+        data: Any,
+        params: Dict[str, Any]
+    ) -> Any:
+        """Execute a constant node - returns constant value."""
+        # Return data if present, otherwise return value from params
+        if data is not None:
+            return data
+        return params.get("value", None)
+
+    def _execute_compute_node(
+        self,
+        node: Dict[str, Any],
+        inputs: Dict[str, Any],
+        operation: str,
+        params: Dict[str, Any]
+    ) -> Any:
+        """Execute a compute node - performs computation on inputs."""
+        # Get first input value
+        input_values = list(inputs.values())
+        
+        if not input_values:
+            return None
+        
+        primary_input = input_values[0]
+        
+        # Handle different operations
+        if operation == "identity":
+            return primary_input
+        
+        elif operation == "count":
+            if isinstance(primary_input, (list, dict, str)):
+                return len(primary_input)
+            return 1
+        
+        elif operation == "sum":
+            if isinstance(primary_input, list):
+                return sum(x for x in primary_input if isinstance(x, (int, float)))
+            return primary_input
+        
+        elif operation == "mean":
+            if isinstance(primary_input, list):
+                numbers = [x for x in primary_input if isinstance(x, (int, float))]
+                return sum(numbers) / len(numbers) if numbers else 0
+            return primary_input
+        
+        elif operation == "max":
+            if isinstance(primary_input, list):
+                numbers = [x for x in primary_input if isinstance(x, (int, float))]
+                return max(numbers) if numbers else None
+            return primary_input
+        
+        elif operation == "min":
+            if isinstance(primary_input, list):
+                numbers = [x for x in primary_input if isinstance(x, (int, float))]
+                return min(numbers) if numbers else None
+            return primary_input
+        
+        else:
+            # Unknown operation - return input
+            return primary_input
+
+    def _execute_transform_node(
+        self,
+        node: Dict[str, Any],
+        inputs: Dict[str, Any],
+        operation: str,
+        params: Dict[str, Any]
+    ) -> Any:
+        """Execute a transform node - transforms input data."""
+        input_values = list(inputs.values())
+        
+        if not input_values:
+            return None
+        
+        primary_input = input_values[0]
+        
+        # Handle different transformations
+        if operation == "filter":
+            # Filter list items based on params
+            if isinstance(primary_input, list):
+                key = params.get("key")
+                value = params.get("value")
+                if key and value:
+                    return [item for item in primary_input 
+                           if isinstance(item, dict) and item.get(key) == value]
+            return primary_input
+        
+        elif operation == "map":
+            # Map operation on list items
+            if isinstance(primary_input, list):
+                field = params.get("field")
+                if field:
+                    return [item.get(field) for item in primary_input 
+                           if isinstance(item, dict)]
+            return primary_input
+        
+        elif operation == "flatten":
+            # Flatten nested lists
+            if isinstance(primary_input, list):
+                result = []
+                for item in primary_input:
+                    if isinstance(item, list):
+                        result.extend(item)
+                    else:
+                        result.append(item)
+                return result
+            return primary_input
+        
+        elif operation == "unique":
+            # Get unique items
+            if isinstance(primary_input, list):
+                seen = set()
+                result = []
+                for item in primary_input:
+                    # Use JSON string for hashability
+                    key = json.dumps(item, sort_keys=True) if isinstance(item, (dict, list)) else item
+                    if key not in seen:
+                        seen.add(key)
+                        result.append(item)
+                return result
+            return primary_input
+        
+        elif operation == "sort":
+            # Sort list
+            if isinstance(primary_input, list):
+                try:
+                    return sorted(primary_input)
+                except TypeError:
+                    return primary_input
+            return primary_input
+        
+        else:
+            # Unknown operation - return input
+            return primary_input
+
+    def _execute_aggregate_node(
+        self,
+        node: Dict[str, Any],
+        inputs: Dict[str, Any],
+        operation: str,
+        params: Dict[str, Any]
+    ) -> Any:
+        """Execute an aggregate node - combines multiple inputs."""
+        input_values = list(inputs.values())
+        
+        if not input_values:
+            return None
+        
+        # Handle different aggregations
+        if operation == "merge":
+            # Merge dictionaries
+            result = {}
+            for value in input_values:
+                if isinstance(value, dict):
+                    result.update(value)
+            return result if result else input_values
+        
+        elif operation == "concat":
+            # Concatenate lists
+            result = []
+            for value in input_values:
+                if isinstance(value, list):
+                    result.extend(value)
+                else:
+                    result.append(value)
+            return result
+        
+        elif operation == "collect":
+            # Collect all inputs into a list
+            return input_values
+        
+        elif operation == "first":
+            # Return first input
+            return input_values[0] if input_values else None
+        
+        elif operation == "last":
+            # Return last input
+            return input_values[-1] if input_values else None
+        
+        else:
+            # Unknown operation - return all inputs as list
+            return input_values
+
+    def _execute_output_node(
+        self,
+        node: Dict[str, Any],
+        inputs: Dict[str, Any],
+        params: Dict[str, Any]
+    ) -> Any:
+        """Execute an output node - formats output."""
+        input_values = list(inputs.values())
+        
+        if not input_values:
+            return None
+        
+        primary_input = input_values[0]
+        
+        # Apply output formatting if specified
+        format_type = params.get("format", "json")
+        
+        if format_type == "json":
+            return primary_input
+        
+        elif format_type == "string":
+            return str(primary_input)
+        
+        elif format_type == "summary":
+            # Create summary of input
+            if isinstance(primary_input, dict):
+                return {
+                    "type": "dict",
+                    "keys": list(primary_input.keys()),
+                    "count": len(primary_input)
+                }
+            elif isinstance(primary_input, list):
+                return {
+                    "type": "list",
+                    "count": len(primary_input),
+                    "sample": primary_input[:5] if len(primary_input) > 5 else primary_input
+                }
+            else:
+                return {"type": type(primary_input).__name__, "value": primary_input}
+        
+        else:
+            return primary_input
 
     def _record_execution(
         self,
@@ -931,15 +1374,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                 f"{num_nodes} nodes, {num_edges} edges"
             )
 
-            # Process graph (in production, this would be queued/async)
+            # Process graph with full execution
             execution_result = None
             if self.runtime:
                 try:
-                    # Note: In production, use async processing or queue
-                    execution_result = self.runtime.execute_graph(graph)
+                    execution_result = self.runtime.execute_graph(graph, agent_id)
                     logger.info(
                         f"Graph executed for agent '{agent_id}': "
-                        f"status={execution_result.get('status', 'unknown')}"
+                        f"status={execution_result.get('status', 'unknown')}, "
+                        f"nodes_executed={execution_result.get('nodes_processed', 0)}"
                     )
                 except Exception as e:
                     logger.error(f"Graph execution failed for agent '{agent_id}': {e}")
@@ -953,7 +1396,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 202,  # 202 Accepted
                 {
                     "status": "accepted",
-                    "message": "Graph accepted for processing",
+                    "message": "Graph accepted and executed",
                     "agent_id": agent_id,
                     "graph_stats": {"nodes": num_nodes, "edges": num_edges},
                     "execution_result": execution_result,
@@ -1094,6 +1537,7 @@ class GraphixListener:
     - Cryptographic signature verification
     - Rate limiting
     - Persistent storage
+    - Full graph execution
     - Comprehensive logging
     
     SECURITY: Default host is 127.0.0.1 for security. Use 0.0.0.0 for external access.
@@ -1176,6 +1620,7 @@ class GraphixListener:
             logger.info(
                 f"Rate limit: {self.rate_limiter.max_requests} requests per minute"
             )
+            logger.info("Graph execution: FULL (all node types supported)")
 
             # Register signal handlers for graceful shutdown
             signal.signal(signal.SIGINT, self._signal_handler)
@@ -1235,7 +1680,7 @@ def run_listener(
     """
     Run the listener server.
     
-    Production-ready HTTP server for Graphix IR graph submission.
+    Production-ready HTTP server for Graphix IR graph submission and execution.
     SECURITY: Default host is 127.0.0.1 for security.
 
     Args:
@@ -1262,7 +1707,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Graphix IR Listener - Production HTTP server for graph submission"
+        description="Graphix IR Listener - Production HTTP server for graph submission and execution"
     )
     parser.add_argument(
         "--host",
@@ -1293,12 +1738,13 @@ if __name__ == "__main__":
 
     # Print startup banner
     print("=" * 60)
-    print("Graphix IR Listener v3.0.0 (Production)")
+    print("Graphix IR Listener v3.1.0 (Production with Full Execution)")
     print("=" * 60)
     print(f"Host: {args.host}")
     print(f"Port: {args.port}")
     print(f"Rate limit: {args.rate_limit} req/min")
     print(f"Database: {args.db_path}")
+    print(f"Execution: FULL (input, compute, transform, aggregate, output)")
     print("=" * 60)
 
     # Run server

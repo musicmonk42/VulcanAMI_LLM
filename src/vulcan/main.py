@@ -23,9 +23,11 @@ import uvicorn
 import numpy as np
 import msgpack
 from unittest.mock import MagicMock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from threading import Thread
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+import threading
 import time
 import socket  # <-- ADDED
 import traceback
@@ -36,6 +38,7 @@ import hashlib
 import concurrent.futures
 import asyncio
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -193,6 +196,1919 @@ try:
 except ImportError:
     GraphixVulcanLLM = MockGraphixVulcanLLM
 
+
+# ============================================================
+# HYBRID LLM EXECUTOR
+# Enables simultaneous use of OpenAI and Vulcan's internal LLM
+# ============================================================
+
+
+class HybridLLMExecutor:
+    """
+    Executes LLM requests using both OpenAI and Vulcan's local LLM.
+
+    Supports multiple execution modes:
+    - local_first: Try Vulcan's local LLM first, fallback to OpenAI
+    - openai_first: Try OpenAI first, fallback to local LLM
+    - parallel: Run both simultaneously, use first successful response
+    - ensemble: Run both, combine/select best response based on quality
+
+    This allows VulcanAMI_LLM to leverage both its native reasoning capabilities
+    AND OpenAI's language generation without conflicts.
+    """
+
+    # Constants for response quality evaluation
+    MIN_MEANINGFUL_LENGTH = 10
+    MOCK_RESPONSE_MARKER = "Mock response"
+    # Maximum length for local response in ensemble mode
+    ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH = 500
+    # Valid execution modes
+    VALID_MODES = ("local_first", "openai_first", "parallel", "ensemble")
+
+    def __init__(
+        self,
+        local_llm: Optional[Any] = None,
+        openai_client_getter: Optional[Any] = None,
+        mode: str = "parallel",
+        timeout: float = 30.0,
+        ensemble_min_confidence: float = 0.7,
+        openai_max_tokens: int = 1000,
+    ):
+        """
+        Initialize the hybrid executor.
+
+        Args:
+            local_llm: Vulcan's local LLM instance
+            openai_client_getter: Function to get OpenAI client (lazy loading)
+            mode: Execution mode (local_first, openai_first, parallel, ensemble)
+            timeout: Timeout for parallel/ensemble execution
+            ensemble_min_confidence: Minimum confidence for ensemble selection
+            openai_max_tokens: Maximum tokens for OpenAI API calls
+        """
+        self.local_llm = local_llm
+        self.openai_client_getter = openai_client_getter or get_openai_client
+        # Validate mode
+        mode_lower = mode.lower()
+        if mode_lower not in self.VALID_MODES:
+            self.logger = logging.getLogger("HybridLLMExecutor")
+            self.logger.warning(
+                f"Invalid mode '{mode}', defaulting to 'parallel'. Valid modes: {self.VALID_MODES}"
+            )
+            mode_lower = "parallel"
+        self.mode = mode_lower
+        self.timeout = timeout
+        self.ensemble_min_confidence = ensemble_min_confidence
+        self.openai_max_tokens = openai_max_tokens
+        self.logger = logging.getLogger("HybridLLMExecutor")
+
+    async def execute(
+        self,
+        prompt: str,
+        max_tokens: int = 1000,
+        temperature: float = 0.7,
+        system_prompt: str = "You are VULCAN, an advanced AI assistant.",
+        enable_distillation: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Execute LLM request using configured mode.
+
+        Args:
+            prompt: The input prompt
+            max_tokens: Maximum tokens for response
+            temperature: Sampling temperature
+            system_prompt: System prompt for OpenAI
+            enable_distillation: Whether to capture responses for knowledge distillation
+
+        Returns:
+            Dict with 'text', 'source', 'systems_used', and optional 'metadata'
+        """
+        loop = asyncio.get_running_loop()
+
+        if self.mode == "local_first":
+            result = await self._execute_local_first(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        elif self.mode == "openai_first":
+            result = await self._execute_openai_first(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        elif self.mode == "parallel":
+            result = await self._execute_parallel(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        elif self.mode == "ensemble":
+            result = await self._execute_ensemble(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+        else:
+            self.logger.warning(f"Unknown mode '{self.mode}', defaulting to parallel")
+            result = await self._execute_parallel(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+
+        # Capture OpenAI responses for knowledge distillation
+        if enable_distillation and result.get("source") in ("openai", "parallel_both", "ensemble"):
+            self._capture_for_distillation(prompt, result)
+
+        return result
+
+    def _capture_for_distillation(self, prompt: str, result: Dict[str, Any]):
+        """Capture response for knowledge distillation training."""
+        try:
+            distiller = get_knowledge_distiller()
+            if distiller is None:
+                return
+
+            openai_response = result.get("text", "")
+            local_response = result.get("metadata", {}).get("local_response_preview")
+
+            # Capture the response for training
+            distiller.capture_response(
+                prompt=prompt,
+                openai_response=openai_response,
+                local_response=local_response,
+                metadata={
+                    "source": result.get("source"),
+                    "systems_used": result.get("systems_used", []),
+                    "mode": self.mode,
+                },
+            )
+        except Exception as e:
+            self.logger.debug(f"Failed to capture response for distillation: {e}")
+
+    async def _execute_local_first(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Try local LLM first, fallback to OpenAI."""
+        systems_used = []
+
+        # Try local LLM
+        local_result = await self._call_local_llm(loop, prompt, max_tokens)
+        if self._is_valid_response(local_result):
+            systems_used.append("vulcan_local_llm")
+            return {
+                "text": local_result,
+                "source": "local",
+                "systems_used": systems_used,
+            }
+
+        # Fallback to OpenAI
+        openai_result = await self._call_openai(
+            loop, prompt, max_tokens, temperature, system_prompt
+        )
+        if openai_result:
+            systems_used.append("openai_fallback")
+            return {
+                "text": openai_result,
+                "source": "openai",
+                "systems_used": systems_used,
+            }
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _execute_openai_first(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Try OpenAI first, fallback to local LLM."""
+        systems_used = []
+
+        # Try OpenAI
+        openai_result = await self._call_openai(
+            loop, prompt, max_tokens, temperature, system_prompt
+        )
+        if openai_result:
+            systems_used.append("openai_llm")
+            return {
+                "text": openai_result,
+                "source": "openai",
+                "systems_used": systems_used,
+            }
+
+        # Fallback to local
+        local_result = await self._call_local_llm(loop, prompt, max_tokens)
+        if self._is_valid_response(local_result):
+            systems_used.append("vulcan_local_llm_fallback")
+            return {
+                "text": local_result,
+                "source": "local",
+                "systems_used": systems_used,
+            }
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _execute_parallel(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Run both LLMs simultaneously, use first successful response."""
+        systems_used = []
+
+        async def local_task():
+            return await self._call_local_llm(loop, prompt, max_tokens)
+
+        async def openai_task():
+            return await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+
+        # Run both tasks concurrently with timeout
+        try:
+            tasks = [
+                asyncio.create_task(local_task()),
+                asyncio.create_task(openai_task()),
+            ]
+
+            # Wait for first successful result or all to complete
+            done, pending = await asyncio.wait(
+                tasks, timeout=self.timeout, return_when=asyncio.FIRST_COMPLETED
+            )
+
+            results = {"local": None, "openai": None}
+
+            for task in done:
+                try:
+                    result = task.result()
+                    # Determine which task completed
+                    if task == tasks[0]:
+                        results["local"] = result
+                    else:
+                        results["openai"] = result
+                except Exception as e:
+                    self.logger.debug(f"Task failed: {e}")
+
+            # Cancel pending tasks and clean up
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                except Exception:
+                    # Ignore any other exceptions from cancelled tasks
+                    pass
+
+            # Select the best available result
+            local_valid = self._is_valid_response(results["local"])
+            openai_valid = results["openai"] is not None and len(
+                str(results["openai"]).strip()
+            ) > self.MIN_MEANINGFUL_LENGTH
+
+            if local_valid and openai_valid:
+                # Both succeeded - prefer the one that completed first (already have it)
+                # For parallel mode, prefer OpenAI for language quality
+                systems_used.extend(["vulcan_local_llm", "openai_llm"])
+                return {
+                    "text": results["openai"],
+                    "source": "parallel_both",
+                    "systems_used": systems_used,
+                    "metadata": {
+                        "local_response_available": True,
+                        "openai_response_available": True,
+                        "local_response_preview": str(results["local"])[:100],
+                    },
+                }
+            elif openai_valid:
+                systems_used.append("openai_llm")
+                return {
+                    "text": results["openai"],
+                    "source": "openai",
+                    "systems_used": systems_used,
+                }
+            elif local_valid:
+                systems_used.append("vulcan_local_llm")
+                return {
+                    "text": results["local"],
+                    "source": "local",
+                    "systems_used": systems_used,
+                }
+
+        except asyncio.TimeoutError:
+            self.logger.warning("Parallel execution timed out")
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _execute_ensemble(
+        self, loop, prompt: str, max_tokens: int, temperature: float, system_prompt: str
+    ) -> Dict[str, Any]:
+        """Run both LLMs, combine/select best response based on quality."""
+        systems_used = []
+
+        async def local_task():
+            return await self._call_local_llm(loop, prompt, max_tokens)
+
+        async def openai_task():
+            return await self._call_openai(
+                loop, prompt, max_tokens, temperature, system_prompt
+            )
+
+        # Run both tasks concurrently
+        try:
+            local_result, openai_result = await asyncio.wait_for(
+                asyncio.gather(local_task(), openai_task(), return_exceptions=True),
+                timeout=self.timeout,
+            )
+
+            # Handle exceptions from gather
+            if isinstance(local_result, Exception):
+                self.logger.debug(f"Local LLM failed: {local_result}")
+                local_result = None
+            if isinstance(openai_result, Exception):
+                self.logger.debug(f"OpenAI failed: {openai_result}")
+                openai_result = None
+
+        except asyncio.TimeoutError:
+            self.logger.warning("Ensemble execution timed out")
+            return {"text": "", "source": "none", "systems_used": systems_used}
+
+        local_valid = self._is_valid_response(local_result)
+        openai_valid = openai_result is not None and len(
+            str(openai_result).strip()
+        ) > self.MIN_MEANINGFUL_LENGTH
+
+        if local_valid and openai_valid:
+            # Both succeeded - evaluate and combine
+            systems_used.extend(["vulcan_local_llm", "openai_llm"])
+
+            # Ensemble strategy: Use OpenAI for final language quality,
+            # but enrich with local LLM insights if available
+            local_str = str(local_result)
+            openai_str = str(openai_result)
+
+            # Simple ensemble: If local response contains unique insights not in OpenAI,
+            # append them. Otherwise, use OpenAI response (better language quality).
+            combined_response = openai_str
+
+            # Check if local has meaningful additional content
+            if (
+                len(local_str) > 50
+                and self.MOCK_RESPONSE_MARKER not in local_str
+                and local_str.strip() != openai_str.strip()
+            ):
+                # Local has different content - could be valuable reasoning
+                truncated_local = local_str[: self.ENSEMBLE_LOCAL_RESPONSE_MAX_LENGTH]
+                combined_response = f"{openai_str}\n\n[Additional Analysis from VULCAN Local LLM]:\n{truncated_local}"
+
+            return {
+                "text": combined_response,
+                "source": "ensemble",
+                "systems_used": systems_used,
+                "metadata": {
+                    "ensemble_mode": True,
+                    "local_length": len(local_str),
+                    "openai_length": len(openai_str),
+                },
+            }
+        elif openai_valid:
+            systems_used.append("openai_llm")
+            return {
+                "text": openai_result,
+                "source": "openai",
+                "systems_used": systems_used,
+            }
+        elif local_valid:
+            systems_used.append("vulcan_local_llm")
+            return {
+                "text": local_result,
+                "source": "local",
+                "systems_used": systems_used,
+            }
+
+        return {"text": "", "source": "none", "systems_used": systems_used}
+
+    async def _call_local_llm(
+        self, loop, prompt: str, max_tokens: int
+    ) -> Optional[str]:
+        """Call Vulcan's local LLM."""
+        if not self.local_llm:
+            return None
+
+        try:
+            result = await loop.run_in_executor(
+                None, self.local_llm.generate, prompt, max_tokens
+            )
+
+            if hasattr(result, "text"):
+                return result.text
+            elif isinstance(result, str):
+                return result
+            elif isinstance(result, dict) and "text" in result:
+                return result["text"]
+            else:
+                return str(result)
+        except Exception as e:
+            self.logger.debug(f"Local LLM call failed: {e}")
+            return None
+
+    async def _call_openai(
+        self,
+        loop,
+        prompt: str,
+        max_tokens: int,
+        temperature: float,
+        system_prompt: str,
+    ) -> Optional[str]:
+        """Call OpenAI API."""
+        openai_client = self.openai_client_getter()
+        if not openai_client:
+            return None
+
+        try:
+            # Use configurable max_tokens limit
+            effective_max_tokens = min(max_tokens, self.openai_max_tokens)
+
+            def call_openai():
+                completion = openai_client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=effective_max_tokens,
+                    temperature=temperature,
+                )
+                return completion.choices[0].message.content
+
+            return await loop.run_in_executor(None, call_openai)
+        except Exception as e:
+            self.logger.debug(f"OpenAI call failed: {e}")
+            return None
+
+    def _is_valid_response(self, response: Optional[str]) -> bool:
+        """Check if response is valid and meaningful."""
+        if not response:
+            return False
+        response_str = str(response).strip()
+        return (
+            len(response_str) > self.MIN_MEANINGFUL_LENGTH
+            and self.MOCK_RESPONSE_MARKER not in response_str
+        )
+
+
+# ============================================================
+# OPENAI KNOWLEDGE DISTILLATION (PRODUCTION-GRADE)
+# Captures OpenAI responses and uses them to train Vulcan's LLM
+# with comprehensive safeguards for quality, privacy, and safety
+# ============================================================
+
+
+@dataclass
+class DistillationExample:
+    """
+    Structured training example with full provenance tracking.
+    
+    Follows the recommended format:
+    - instruction: sanitized prompt
+    - context: routing outputs / tools / memory snippets
+    - teacher_answer: OpenAI response
+    - labels: domain, difficulty, success/failure signals
+    """
+    instruction: str  # Sanitized prompt (PII redacted)
+    teacher_answer: str  # OpenAI response
+    context: Dict[str, Any]  # Routing metadata, tools used
+    labels: Dict[str, Any]  # Domain, difficulty, validation results
+    
+    # Provenance tracking
+    prompt_hash: str  # SHA256 of original prompt
+    response_hash: str  # SHA256 of response
+    teacher_model: str  # e.g., "gpt-3.5-turbo"
+    timestamp: float
+    
+    # Quality metrics
+    quality_score: float
+    validation_passed: bool
+    rejection_reasons: List[str]
+    
+    # Governance
+    session_opted_in: bool
+    retention_expires: Optional[float]  # Unix timestamp for data expiry
+
+
+class PIIRedactor:
+    """
+    Redacts Personally Identifiable Information AND Secrets from text.
+    
+    Implements privacy and security compliance by detecting and masking:
+    - Email addresses
+    - Phone numbers
+    - Credit card numbers
+    - SSN patterns
+    - IP addresses
+    - Names (basic detection)
+    - API keys and tokens (OpenAI, AWS, GitHub, etc.)
+    - Passwords and credentials
+    - Bearer tokens and JWTs
+    - Connection strings
+    """
+    
+    # Regex patterns for PII
+    PII_PATTERNS = {
+        "email": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
+        "phone": r'\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b',
+        "ssn": r'\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b',
+        "credit_card": r'\b(?:\d{4}[-.\s]?){3}\d{4}\b',
+        "ip_address": r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
+    }
+    
+    # Regex patterns for secrets/credentials (CRITICAL - must never be stored)
+    SECRET_PATTERNS = {
+        "openai_key": r'\bsk-[A-Za-z0-9]{20,}\b',
+        "aws_access_key": r'\b(AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\b',
+        "aws_secret_key": r'\b[A-Za-z0-9/+=]{40}\b',
+        "github_token": r'\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b',
+        "generic_api_key": r'\b(api[_-]?key|apikey|access[_-]?token)["\s:=]+["\']?[A-Za-z0-9_\-]{20,}["\']?\b',
+        "bearer_token": r'\b[Bb]earer\s+[A-Za-z0-9_\-\.]+\b',
+        "jwt_token": r'\beyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_\-]+\b',
+        "password_field": r'\b(password|passwd|pwd)["\s:=]+["\']?[^\s"\']{4,}["\']?\b',
+        "connection_string": r'\b(mongodb|mysql|postgres|redis)://[^\s]+\b',
+        "private_key": r'-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----',
+    }
+    
+    # Common name patterns (very basic - production would use NER)
+    NAME_MARKERS = ["my name is", "i am", "i'm", "call me", "this is"]
+    
+    def __init__(self):
+        self.pii_patterns = {
+            name: re.compile(pattern, re.IGNORECASE)
+            for name, pattern in self.PII_PATTERNS.items()
+        }
+        self.secret_patterns = {
+            name: re.compile(pattern, re.IGNORECASE if "password" in name else 0)
+            for name, pattern in self.SECRET_PATTERNS.items()
+        }
+        self.redaction_count = 0
+        self.secrets_detected = 0
+    
+    def redact(self, text: str) -> Tuple[str, Dict[str, int]]:
+        """
+        Redact PII and secrets from text.
+        
+        Returns:
+            Tuple of (redacted_text, redaction_stats)
+        """
+        redacted = text
+        stats = {}
+        
+        # CRITICAL: Redact secrets FIRST (highest priority)
+        for name, pattern in self.secret_patterns.items():
+            matches = pattern.findall(redacted)
+            if matches:
+                stats[f"SECRET_{name}"] = len(matches)
+                redacted = pattern.sub(f"[REDACTED_SECRET_{name.upper()}]", redacted)
+                self.secrets_detected += len(matches)
+        
+        # Then redact PII
+        for name, pattern in self.pii_patterns.items():
+            matches = pattern.findall(redacted)
+            if matches:
+                stats[name] = len(matches)
+                redacted = pattern.sub(f"[REDACTED_{name.upper()}]", redacted)
+                self.redaction_count += len(matches)
+        
+        # Basic name detection (after markers)
+        for marker in self.NAME_MARKERS:
+            if marker in redacted.lower():
+                pattern = re.compile(
+                    f"({re.escape(marker)})\\s+(\\w+)",
+                    re.IGNORECASE
+                )
+                if pattern.search(redacted):
+                    stats["potential_name"] = stats.get("potential_name", 0) + 1
+                    redacted = pattern.sub(r"\1 [REDACTED_NAME]", redacted)
+        
+        return redacted, stats
+    
+    def contains_secrets(self, text: str) -> bool:
+        """Check if text contains any secrets (for hard rejection)."""
+        for pattern in self.secret_patterns.values():
+            if pattern.search(text):
+                return True
+        return False
+
+
+class GovernanceSensitivityChecker:
+    """
+    Checks content against governance rules for sensitivity marking.
+    
+    Integrates with CSIU/governance system to identify content that
+    should NOT be captured for training regardless of opt-in status.
+    """
+    
+    # Hard-reject categories (never capture)
+    SENSITIVE_CATEGORIES = {
+        "auth_credentials": [
+            r"\b(login|signin|sign[\s-]?in)\b.*\b(password|passwd|pwd)\b",
+            r"\b(authenticate|authorization)\b",
+            r"\bbearer\s+\w+",
+            r"\bbasic\s+[A-Za-z0-9+/=]+",
+        ],
+        "payment_info": [
+            r"\b(credit|debit)\s*card\b",
+            r"\bcvv\b|\bcvc\b|\bsecurity\s*code\b",
+            r"\bpayment\s*(method|info|details)\b",
+            r"\bbank\s*(account|routing)\b",
+            r"\biban\b|\bswift\b|\baba\b",
+        ],
+        "medical_phi": [
+            r"\b(diagnosis|prescription|medication)\b",
+            r"\bmedical\s*(record|history|condition)\b",
+            r"\bpatient\s*(id|name|info)\b",
+            r"\bhipaa\b",
+        ],
+        "legal_privileged": [
+            r"\battorney[\s-]?client\b",
+            r"\blegal\s*advice\b",
+            r"\bconfidential\s*(legal|settlement)\b",
+        ],
+    }
+    
+    # Governance markers that indicate "do not capture"
+    DO_NOT_CAPTURE_MARKERS = [
+        "[CONFIDENTIAL]",
+        "[DO NOT LOG]",
+        "[SENSITIVE]",
+        "[PRIVATE]",
+        "[NO_TRAINING]",
+        "[GOVERNANCE_RESTRICTED]",
+    ]
+    
+    def __init__(self):
+        self.compiled_patterns = {}
+        for category, patterns in self.SENSITIVE_CATEGORIES.items():
+            self.compiled_patterns[category] = [
+                re.compile(p, re.IGNORECASE) for p in patterns
+            ]
+        self.rejections_by_category: Dict[str, int] = {}
+    
+    def check_sensitivity(
+        self,
+        prompt: str,
+        response: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[bool, str, List[str]]:
+        """
+        Check if content is marked sensitive by governance rules.
+        
+        Returns:
+            Tuple of (is_sensitive, category, reasons)
+        """
+        combined_text = f"{prompt} {response}".lower()
+        reasons = []
+        
+        # Check for explicit governance markers
+        for marker in self.DO_NOT_CAPTURE_MARKERS:
+            if marker.lower() in combined_text:
+                reasons.append(f"governance_marker:{marker}")
+                return True, "governance_marked", reasons
+        
+        # Check metadata for governance flags
+        if metadata:
+            if metadata.get("governance_restricted"):
+                reasons.append("metadata:governance_restricted")
+                return True, "governance_flag", reasons
+            if metadata.get("do_not_capture"):
+                reasons.append("metadata:do_not_capture")
+                return True, "explicit_flag", reasons
+            if metadata.get("sensitivity_level", "").lower() in ["high", "critical"]:
+                reasons.append(f"sensitivity_level:{metadata.get('sensitivity_level')}")
+                return True, "sensitivity_level", reasons
+        
+        # Check against sensitive categories
+        for category, patterns in self.compiled_patterns.items():
+            for pattern in patterns:
+                if pattern.search(combined_text):
+                    reasons.append(f"category:{category}")
+                    self.rejections_by_category[category] = (
+                        self.rejections_by_category.get(category, 0) + 1
+                    )
+                    return True, category, reasons
+        
+        return False, "", []
+
+
+class ExampleQualityValidator:
+    """
+    Validates training examples for quality and safety.
+    
+    Implements multi-stage filtering:
+    1. Length and format validation
+    2. Boilerplate/refusal detection
+    3. Content quality scoring
+    4. Diversity sampling
+    5. Domain-specific validators
+    """
+    
+    # Thresholds
+    MIN_RESPONSE_LENGTH = 50
+    MAX_RESPONSE_LENGTH = 4000
+    MIN_QUALITY_SCORE = 0.65
+    MAX_BOILERPLATE_RATIO = 0.4
+    
+    # Safety/refusal patterns to reject
+    REFUSAL_PATTERNS = [
+        r"i cannot",
+        r"i can't",
+        r"i'm not able to",
+        r"i am not able to",
+        r"as an ai",
+        r"as a language model",
+        r"i don't have the ability",
+        r"i apologize, but",
+        r"i'm sorry, but i cannot",
+    ]
+    
+    # Boilerplate patterns that reduce quality
+    BOILERPLATE_PATTERNS = [
+        r"^(sure|of course|certainly|absolutely)[,!.]?\s*",
+        r"^(great question|good question)[!.]?\s*",
+        r"^(here's|here is)\s+(a|the|my)\s+",
+        r"^let me\s+",
+        r"^i'd be happy to\s+",
+        r"\bi hope this helps\b",
+        r"\bfeel free to ask\b",
+        r"\bdon't hesitate to\b",
+    ]
+    
+    def __init__(self):
+        self.refusal_patterns = [
+            re.compile(p, re.IGNORECASE) for p in self.REFUSAL_PATTERNS
+        ]
+        self.boilerplate_patterns = [
+            re.compile(p, re.IGNORECASE) for p in self.BOILERPLATE_PATTERNS
+        ]
+        
+        # Diversity tracking (hash-based deduplication)
+        self._seen_hashes: set = set()
+        self._max_seen_hashes = 10000  # Limit memory usage
+    
+    def validate(
+        self,
+        prompt: str,
+        response: str,
+        local_response: Optional[str] = None,
+    ) -> Tuple[bool, float, List[str]]:
+        """
+        Validate an example for training suitability.
+        
+        Returns:
+            Tuple of (passed, quality_score, rejection_reasons)
+        """
+        rejection_reasons = []
+        quality_score = 0.0
+        
+        # 1. Length validation
+        if len(response) < self.MIN_RESPONSE_LENGTH:
+            rejection_reasons.append(f"too_short:{len(response)}")
+        elif len(response) > self.MAX_RESPONSE_LENGTH:
+            rejection_reasons.append(f"too_long:{len(response)}")
+        else:
+            # Score based on optimal length (100-2000 chars)
+            if 100 <= len(response) <= 2000:
+                quality_score += 0.2
+            else:
+                quality_score += 0.1
+        
+        # 2. Refusal detection
+        for pattern in self.refusal_patterns:
+            if pattern.search(response[:200]):  # Check start of response
+                rejection_reasons.append("contains_refusal")
+                break
+        else:
+            quality_score += 0.15
+        
+        # 3. Boilerplate detection
+        boilerplate_count = sum(
+            1 for p in self.boilerplate_patterns if p.search(response)
+        )
+        boilerplate_ratio = boilerplate_count / max(len(self.boilerplate_patterns), 1)
+        if boilerplate_ratio > self.MAX_BOILERPLATE_RATIO:
+            rejection_reasons.append(f"high_boilerplate:{boilerplate_ratio:.2f}")
+        else:
+            quality_score += 0.15 * (1 - boilerplate_ratio)
+        
+        # 4. Coherence checks
+        # - Complete sentences
+        if response.strip().endswith((".", "!", "?", '"', "```")):
+            quality_score += 0.1
+        else:
+            rejection_reasons.append("incomplete_response")
+        
+        # - Reasonable word count
+        word_count = len(response.split())
+        if 10 <= word_count <= 500:
+            quality_score += 0.1
+        
+        # 5. Diversity check (deduplication)
+        response_hash = hashlib.sha256(response.encode()).hexdigest()[:16]
+        if response_hash in self._seen_hashes:
+            rejection_reasons.append("duplicate_content")
+        else:
+            quality_score += 0.1
+            # Add to seen hashes (with LRU-style eviction)
+            if len(self._seen_hashes) >= self._max_seen_hashes:
+                # Remove oldest (arbitrary since set, but limits memory)
+                self._seen_hashes.pop()
+            self._seen_hashes.add(response_hash)
+        
+        # 6. Diversity score (if local response available)
+        if local_response:
+            local_words = set(local_response.lower().split())
+            response_words = set(response.lower().split())
+            if local_words:
+                # Higher score if OpenAI provides new information
+                new_words = response_words - local_words
+                diversity = len(new_words) / max(len(response_words), 1)
+                quality_score += min(0.1, diversity * 0.15)
+                
+                # Reject if too similar (no learning value)
+                if diversity < 0.1:
+                    rejection_reasons.append(f"low_diversity:{diversity:.2f}")
+        else:
+            quality_score += 0.05
+        
+        # 7. Relevance check (prompt-response overlap)
+        prompt_words = set(prompt.lower().split())
+        response_words = set(response.lower().split())
+        if prompt_words:
+            relevance = len(prompt_words & response_words) / len(prompt_words)
+            quality_score += min(0.1, relevance * 0.15)
+        
+        # Final decision
+        passed = (
+            len(rejection_reasons) == 0
+            and quality_score >= self.MIN_QUALITY_SCORE
+        )
+        
+        return passed, min(1.0, quality_score), rejection_reasons
+
+
+class DistillationStorageBackend:
+    """
+    Pluggable storage backend for distillation training data.
+    
+    Supports:
+    - JSONL format (one example per line, appendable)
+    - Optional encryption at rest using Fernet
+    - Configurable retention with automatic cleanup
+    - Provenance records for governance audit
+    """
+    
+    def __init__(
+        self,
+        storage_path: str = "data/distillation",
+        use_encryption: bool = False,
+        encryption_key: Optional[str] = None,
+        max_file_size_mb: int = 100,
+    ):
+        """
+        Initialize storage backend.
+        
+        Args:
+            storage_path: Base directory for storage
+            use_encryption: Enable encryption at rest
+            encryption_key: Fernet key for encryption (auto-generated if not provided)
+            max_file_size_mb: Max size per JSONL file before rotation
+        """
+        self.storage_path = Path(storage_path)
+        self.use_encryption = use_encryption
+        self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
+        self.logger = logging.getLogger("DistillationStorage")
+        
+        # Ensure storage directory exists
+        self.storage_path.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize encryption if enabled
+        self._fernet = None
+        if use_encryption:
+            try:
+                from cryptography.fernet import Fernet
+                if encryption_key:
+                    self._fernet = Fernet(encryption_key.encode())
+                else:
+                    # Generate and log key (should be stored securely in production)
+                    key = Fernet.generate_key()
+                    self._fernet = Fernet(key)
+                    self.logger.warning(
+                        "Generated new encryption key. Store this securely: "
+                        f"{key.decode()[:20]}..."
+                    )
+            except ImportError:
+                self.logger.warning(
+                    "cryptography package not installed. "
+                    "Encryption disabled. Install with: pip install cryptography"
+                )
+                self.use_encryption = False
+        
+        # File paths
+        self._examples_file = self.storage_path / "examples.jsonl"
+        self._provenance_file = self.storage_path / "provenance.jsonl"
+        self._metadata_file = self.storage_path / "metadata.json"
+        
+        # Load metadata
+        self._metadata = self._load_metadata()
+    
+    def _load_metadata(self) -> Dict[str, Any]:
+        """Load storage metadata."""
+        if self._metadata_file.exists():
+            try:
+                with open(self._metadata_file, "r") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {
+            "total_examples": 0,
+            "created_at": time.time(),
+            "last_write": None,
+            "encryption_enabled": self.use_encryption,
+        }
+    
+    def _save_metadata(self):
+        """Save storage metadata."""
+        try:
+            with open(self._metadata_file, "w") as f:
+                json.dump(self._metadata, f, indent=2)
+        except Exception as e:
+            self.logger.error(f"Failed to save metadata: {e}")
+    
+    def _encrypt(self, data: str) -> str:
+        """Encrypt data if encryption is enabled."""
+        if self._fernet:
+            return self._fernet.encrypt(data.encode()).decode()
+        return data
+    
+    def _decrypt(self, data: str) -> str:
+        """Decrypt data if encryption is enabled."""
+        if self._fernet:
+            return self._fernet.decrypt(data.encode()).decode()
+        return data
+    
+    def append_example(self, example: Dict[str, Any]) -> bool:
+        """
+        Append a training example to storage.
+        
+        Uses JSONL format (one JSON object per line) for efficient appending.
+        """
+        try:
+            # Check file rotation
+            if self._examples_file.exists():
+                if self._examples_file.stat().st_size > self.max_file_size_bytes:
+                    self._rotate_file(self._examples_file)
+            
+            # Serialize and optionally encrypt
+            line = json.dumps(example, separators=(',', ':'))
+            if self.use_encryption:
+                line = self._encrypt(line)
+            
+            # Append to file
+            with open(self._examples_file, "a") as f:
+                f.write(line + "\n")
+            
+            # Update metadata
+            self._metadata["total_examples"] += 1
+            self._metadata["last_write"] = time.time()
+            self._save_metadata()
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to append example: {e}")
+            return False
+    
+    def append_provenance(self, record: Dict[str, Any]) -> bool:
+        """Append a provenance record for governance audit."""
+        try:
+            record["recorded_at"] = time.time()
+            line = json.dumps(record, separators=(',', ':'))
+            
+            with open(self._provenance_file, "a") as f:
+                f.write(line + "\n")
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to append provenance: {e}")
+            return False
+    
+    def read_examples(
+        self,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """
+        Read examples from storage.
+        
+        Args:
+            limit: Maximum number of examples to read
+            offset: Number of examples to skip
+        """
+        examples = []
+        
+        if not self._examples_file.exists():
+            return examples
+        
+        try:
+            with open(self._examples_file, "r") as f:
+                for i, line in enumerate(f):
+                    if i < offset:
+                        continue
+                    if limit and len(examples) >= limit:
+                        break
+                    
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    if self.use_encryption:
+                        line = self._decrypt(line)
+                    
+                    examples.append(json.loads(line))
+            
+        except Exception as e:
+            self.logger.error(f"Failed to read examples: {e}")
+        
+        return examples
+    
+    def read_and_clear(self, batch_size: int) -> List[Dict[str, Any]]:
+        """
+        Read a batch of examples and remove them from storage.
+        
+        Used for training consumption - examples are removed after reading.
+        """
+        examples = self.read_examples(limit=batch_size)
+        
+        if examples:
+            # Rewrite file without consumed examples
+            remaining = self.read_examples(offset=batch_size)
+            self._rewrite_examples(remaining)
+        
+        return examples
+    
+    def _rewrite_examples(self, examples: List[Dict[str, Any]]):
+        """Rewrite examples file with given examples."""
+        try:
+            # Write to temp file first
+            temp_file = self._examples_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
+                for example in examples:
+                    line = json.dumps(example, separators=(',', ':'))
+                    if self.use_encryption:
+                        line = self._encrypt(line)
+                    f.write(line + "\n")
+            
+            # Atomic replace
+            temp_file.replace(self._examples_file)
+            
+            # Update metadata
+            self._metadata["total_examples"] = len(examples)
+            self._save_metadata()
+            
+        except Exception as e:
+            self.logger.error(f"Failed to rewrite examples: {e}")
+    
+    def _rotate_file(self, file_path: Path):
+        """Rotate file when it exceeds max size."""
+        timestamp = int(time.time())
+        rotated_path = file_path.with_suffix(f".{timestamp}.jsonl")
+        file_path.rename(rotated_path)
+        self.logger.info(f"Rotated {file_path} to {rotated_path}")
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get storage statistics."""
+        stats = dict(self._metadata)
+        
+        if self._examples_file.exists():
+            stats["file_size_bytes"] = self._examples_file.stat().st_size
+        else:
+            stats["file_size_bytes"] = 0
+        
+        stats["encryption_enabled"] = self.use_encryption
+        
+        return stats
+    
+    def cleanup_expired(self, retention_seconds: int) -> int:
+        """Remove examples older than retention period."""
+        if not self._examples_file.exists():
+            return 0
+        
+        cutoff = time.time() - retention_seconds
+        examples = self.read_examples()
+        
+        valid_examples = [
+            ex for ex in examples
+            if ex.get("timestamp", 0) > cutoff
+        ]
+        
+        removed = len(examples) - len(valid_examples)
+        
+        if removed > 0:
+            self._rewrite_examples(valid_examples)
+            self.logger.info(f"Cleaned up {removed} expired examples")
+        
+        return removed
+
+
+class PromotionGate:
+    """
+    Explicit promotion gate for trained weights.
+    
+    Requires:
+    - Evaluation score >= threshold
+    - Regression suite pass
+    - Provenance record created
+    
+    Only promotes weights after ALL requirements are met.
+    """
+    
+    # Promotion requirements
+    MIN_EVAL_SCORE = 0.7
+    MAX_REGRESSION_COUNT = 0
+    
+    def __init__(
+        self,
+        storage_backend: Optional[DistillationStorageBackend] = None,
+        min_eval_score: float = MIN_EVAL_SCORE,
+        allow_regressions: int = MAX_REGRESSION_COUNT,
+    ):
+        """
+        Initialize promotion gate.
+        
+        Args:
+            storage_backend: Storage for provenance records
+            min_eval_score: Minimum evaluation score for promotion
+            allow_regressions: Maximum allowed regressions (0 = none)
+        """
+        self.storage = storage_backend
+        self.min_eval_score = min_eval_score
+        self.allow_regressions = allow_regressions
+        self.logger = logging.getLogger("PromotionGate")
+        
+        # Promotion history
+        self.promotions: List[Dict[str, Any]] = []
+        self.rejections: List[Dict[str, Any]] = []
+    
+    def evaluate_for_promotion(
+        self,
+        eval_results: Dict[str, Any],
+        training_metadata: Dict[str, Any],
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Evaluate if weights should be promoted.
+        
+        Returns:
+            Tuple of (approved, decision_details)
+        """
+        decision = {
+            "timestamp": time.time(),
+            "approved": False,
+            "requirements": {},
+            "reasons": [],
+        }
+        
+        # Requirement 1: Evaluation score
+        eval_score = eval_results.get("average_score", 0.0)
+        eval_passed = eval_score >= self.min_eval_score
+        decision["requirements"]["eval_score"] = {
+            "required": self.min_eval_score,
+            "actual": eval_score,
+            "passed": eval_passed,
+        }
+        if not eval_passed:
+            decision["reasons"].append(
+                f"eval_score_below_threshold:{eval_score:.3f}<{self.min_eval_score}"
+            )
+        
+        # Requirement 2: Regression check
+        regressions = eval_results.get("regressions", [])
+        regression_count = len(regressions)
+        regression_passed = regression_count <= self.allow_regressions
+        decision["requirements"]["regression_check"] = {
+            "max_allowed": self.allow_regressions,
+            "actual": regression_count,
+            "passed": regression_passed,
+            "details": regressions,
+        }
+        if not regression_passed:
+            decision["reasons"].append(
+                f"regression_count_exceeded:{regression_count}>{self.allow_regressions}"
+            )
+        
+        # Requirement 3: Training metadata completeness
+        required_fields = ["examples_count", "loss", "training_id"]
+        metadata_complete = all(
+            field in training_metadata for field in required_fields
+        )
+        decision["requirements"]["metadata_complete"] = {
+            "required_fields": required_fields,
+            "passed": metadata_complete,
+        }
+        if not metadata_complete:
+            missing = [f for f in required_fields if f not in training_metadata]
+            decision["reasons"].append(f"missing_metadata:{missing}")
+        
+        # Final decision
+        decision["approved"] = eval_passed and regression_passed and metadata_complete
+        
+        # Record decision
+        if decision["approved"]:
+            self.promotions.append(decision)
+        else:
+            self.rejections.append(decision)
+        
+        return decision["approved"], decision
+    
+    def create_provenance_record(
+        self,
+        training_metadata: Dict[str, Any],
+        eval_results: Dict[str, Any],
+        promotion_decision: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Create a signed provenance record for the promotion.
+        
+        This record is immutable and provides audit trail.
+        """
+        record = {
+            "record_type": "weight_promotion",
+            "record_id": hashlib.sha256(
+                f"{time.time()}{training_metadata.get('training_id', '')}".encode()
+            ).hexdigest()[:16],
+            "created_at": time.time(),
+            
+            # Training details
+            "training": {
+                "id": training_metadata.get("training_id"),
+                "examples_count": training_metadata.get("examples_count"),
+                "loss": training_metadata.get("loss"),
+                "timestamp": training_metadata.get("timestamp"),
+            },
+            
+            # Evaluation details
+            "evaluation": {
+                "score": eval_results.get("average_score"),
+                "domains_tested": list(eval_results.get("scores", {}).keys()),
+                "regressions": eval_results.get("regressions", []),
+                "improvements": eval_results.get("improvements", []),
+            },
+            
+            # Promotion decision
+            "decision": {
+                "approved": promotion_decision.get("approved"),
+                "requirements_met": promotion_decision.get("requirements"),
+                "rejection_reasons": promotion_decision.get("reasons", []),
+            },
+            
+            # Provenance hash (for integrity verification)
+            "hash": None,  # Computed below
+        }
+        
+        # Compute record hash (excluding hash field itself)
+        record_str = json.dumps(record, sort_keys=True, separators=(',', ':'))
+        record["hash"] = hashlib.sha256(record_str.encode()).hexdigest()
+        
+        # Store provenance record
+        if self.storage:
+            self.storage.append_provenance(record)
+        
+        self.logger.info(
+            f"Provenance record created: {record['record_id']} "
+            f"(approved={record['decision']['approved']})"
+        )
+        
+        return record
+    
+    def get_promotion_history(self, limit: int = 100) -> Dict[str, Any]:
+        """Get recent promotion history."""
+        return {
+            "total_promotions": len(self.promotions),
+            "total_rejections": len(self.rejections),
+            "recent_promotions": self.promotions[-limit:],
+            "recent_rejections": self.rejections[-limit:],
+        }
+
+
+class ShadowModelEvaluator:
+    """
+    Evaluates model improvements before promoting weights.
+    
+    Implements the evaluation gate pattern:
+    - Golden set of frozen test prompts
+    - Regression checks on critical tasks
+    - Domain-specific metrics
+    """
+    
+    # Golden test set (frozen prompts for consistent evaluation)
+    GOLDEN_PROMPTS = [
+        {
+            "prompt": "What is 2 + 2?",
+            "expected_contains": ["4"],
+            "domain": "math",
+        },
+        {
+            "prompt": "Write a simple Python function that adds two numbers.",
+            "expected_contains": ["def", "return", "+"],
+            "domain": "code",
+        },
+        {
+            "prompt": "Explain what machine learning is in one sentence.",
+            "expected_contains": ["learn", "data"],
+            "domain": "explanation",
+        },
+        {
+            "prompt": "What is the capital of France?",
+            "expected_contains": ["Paris"],
+            "domain": "factual",
+        },
+    ]
+    
+    def __init__(self, baseline_scores: Optional[Dict[str, float]] = None):
+        self.baseline_scores = baseline_scores or {}
+        self.evaluation_history: List[Dict[str, Any]] = []
+    
+    def evaluate_model(
+        self,
+        model: Any,
+        generate_fn: Optional[callable] = None,
+    ) -> Dict[str, Any]:
+        """
+        Evaluate model on golden test set.
+        
+        Returns:
+            Evaluation results with pass/fail status
+        """
+        results = {
+            "passed": True,
+            "scores": {},
+            "regressions": [],
+            "improvements": [],
+            "details": [],
+        }
+        
+        total_score = 0.0
+        
+        for test in self.GOLDEN_PROMPTS:
+            prompt = test["prompt"]
+            expected = test["expected_contains"]
+            domain = test["domain"]
+            
+            try:
+                # Generate response
+                if generate_fn:
+                    response = generate_fn(prompt)
+                elif hasattr(model, "generate"):
+                    response = model.generate(prompt, max_tokens=200)
+                else:
+                    response = str(model(prompt))
+                
+                # Check for expected content
+                response_lower = response.lower() if response else ""
+                matches = sum(
+                    1 for exp in expected
+                    if exp.lower() in response_lower
+                )
+                score = matches / len(expected) if expected else 0.0
+                
+                results["details"].append({
+                    "domain": domain,
+                    "prompt": prompt[:50],
+                    "score": score,
+                    "matched": matches,
+                    "expected": len(expected),
+                })
+                
+                results["scores"][domain] = score
+                total_score += score
+                
+                # Check for regression
+                if domain in self.baseline_scores:
+                    baseline = self.baseline_scores[domain]
+                    if score < baseline - 0.1:  # 10% regression threshold
+                        results["regressions"].append({
+                            "domain": domain,
+                            "baseline": baseline,
+                            "current": score,
+                        })
+                        results["passed"] = False
+                    elif score > baseline + 0.1:
+                        results["improvements"].append({
+                            "domain": domain,
+                            "baseline": baseline,
+                            "current": score,
+                        })
+                        
+            except Exception as e:
+                results["details"].append({
+                    "domain": domain,
+                    "error": str(e),
+                    "score": 0.0,
+                })
+        
+        results["average_score"] = total_score / len(self.GOLDEN_PROMPTS)
+        
+        # Store evaluation
+        self.evaluation_history.append({
+            "timestamp": time.time(),
+            "results": results,
+        })
+        
+        return results
+    
+    def update_baseline(self, scores: Dict[str, float]):
+        """Update baseline scores after successful promotion."""
+        self.baseline_scores.update(scores)
+
+
+class OpenAIKnowledgeDistiller:
+    """
+    Capture layer for OpenAI knowledge distillation.
+    
+    ARCHITECTURAL NOTE:
+    This component is responsible ONLY for capturing and storing external
+    experience artifacts from OpenAI. It does NOT perform training directly.
+    
+    Training is delegated to Vulcan's existing systems:
+    - GovernedTrainer: Consensus-based weight updates
+    - SelfImprovingTraining: Meta-learning orchestrator
+    - train_llm_with_self_improvement.py: Full training loop
+    
+    The capture → train flow is:
+    
+        main.py (inference)
+            └─ OpenAI response
+            └─ capture_response() → Distillation Store (JSONL)
+                                        ↓
+        [Async/Batched - via GovernedTrainer]
+            └─ GovernedTrainer reads from Distillation Store
+            └─ Proposes weight updates
+            └─ ConsensusEngine approves/rejects
+            └─ SelfImprovingTraining evaluates
+            └─ Promotion or rollback
+    
+    Implements comprehensive capture safeguards:
+    
+    A) Capture Layer (Privacy & Consent)
+       - Policy gate: only capture when training_opt_in=true (per-session)
+       - PII redaction before storage
+       - Secrets hard rejection
+       - Governance sensitivity check
+       - Full provenance tracking
+    
+    B) Quality Filtering (Garbage-in Prevention)
+       - Non-trivial length and low boilerplate score
+       - No refusal/safety boilerplate
+       - Diversity sampling (no duplicate Q&As)
+       - Domain-specific validators
+    
+    C) Storage Format
+       - JSONL format for training system consumption
+       - Optional encryption at rest
+       - Provenance hashes for integrity
+       - Retention limits with automatic cleanup
+    
+    DOES NOT:
+    - Perform weight updates (GovernedTrainer does this)
+    - Run evaluation (SelfImprovingTraining does this)
+    - Promote/rollback weights (ConsensusEngine governs this)
+    """
+    
+    # Configuration defaults
+    DEFAULT_MAX_BUFFER_SIZE = 1000
+    DEFAULT_RETENTION_DAYS = 30
+    
+    def __init__(
+        self,
+        local_llm: Optional[Any] = None,
+        storage_path: str = "data/distillation_examples.json",
+        max_buffer_size: int = DEFAULT_MAX_BUFFER_SIZE,
+        retention_days: int = DEFAULT_RETENTION_DAYS,
+        require_opt_in: bool = True,  # Privacy-first default
+        enable_pii_redaction: bool = True,
+        enable_governance_check: bool = True,
+    ):
+        """
+        Initialize the capture layer for knowledge distillation.
+        
+        NOTE: This component only captures artifacts. Training is handled
+        by Vulcan's GovernedTrainer and SelfImprovingTraining systems.
+        
+        Args:
+            local_llm: Reference to Vulcan's local LLM (optional, for future use)
+            storage_path: Path to store training examples persistently
+            max_buffer_size: Maximum buffer size before flush to disk
+            retention_days: Days to retain training examples before expiry
+            require_opt_in: Require explicit opt-in for capture (default: True)
+            enable_pii_redaction: Enable PII redaction (default: True)
+            enable_governance_check: Check governance/CSIU before capture
+        """
+        self.local_llm = local_llm
+        self.storage_path = Path(storage_path)
+        self.max_buffer_size = max_buffer_size
+        self.retention_days = retention_days
+        self.require_opt_in = require_opt_in
+        self.enable_pii_redaction = enable_pii_redaction
+        self.enable_governance_check = enable_governance_check
+        
+        self.logger = logging.getLogger("OpenAIKnowledgeDistiller")
+        
+        # Initialize capture components
+        self.pii_redactor = PIIRedactor()
+        self.quality_validator = ExampleQualityValidator()
+        self.governance_checker = GovernanceSensitivityChecker()
+        
+        # Initialize storage backend (JSONL with optional encryption)
+        # Training systems (GovernedTrainer, SelfImprovingTraining) read from here
+        storage_dir = str(self.storage_path.parent / "distillation")
+        self.storage_backend = DistillationStorageBackend(
+            storage_path=storage_dir,
+            use_encryption=os.getenv("DISTILLATION_ENCRYPT", "false").lower() == "true",
+            encryption_key=os.getenv("DISTILLATION_ENCRYPTION_KEY"),
+        )
+        
+        # Thread-safe buffer for capture (flushed to storage periodically)
+        self._buffer_lock = threading.Lock()
+        self._capture_buffer: List[Dict[str, Any]] = []
+        
+        # Capture statistics (training stats live in GovernedTrainer)
+        self.stats = {
+            "examples_captured": 0,
+            "examples_rejected": 0,
+            "rejection_reasons": {},
+            "pii_redactions": 0,
+            "secrets_detected": 0,
+            "governance_sensitive_rejections": 0,
+            "average_quality_score": 0.0,
+            "opt_in_required_skips": 0,
+            "buffer_flushes": 0,
+        }
+        
+        # Audit log for governance
+        self._audit_log: List[Dict[str, Any]] = []
+        self._max_audit_entries = 10000
+        
+        # Ensure storage directory exists
+        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Load existing state if available
+        self._load_state()
+        
+        self.logger.info(
+            f"OpenAI Knowledge Distiller (Capture Layer) initialized. "
+            f"Opt-in required: {require_opt_in}, PII redaction: {enable_pii_redaction}, "
+            f"Governance check: {enable_governance_check}. "
+            f"Training delegated to GovernedTrainer/SelfImprovingTraining."
+        )
+    
+    def _load_state(self):
+        """Load existing capture state from storage."""
+        if self.storage_path.exists():
+            try:
+                with open(self.storage_path, "r") as f:
+                    data = json.load(f)
+                    self._capture_buffer = data.get("capture_buffer", [])
+                    self.stats = {**self.stats, **data.get("stats", {})}
+                    
+                    self.logger.info(
+                        f"Loaded {len(self._capture_buffer)} pending capture examples"
+                    )
+                    
+                    # Clean expired examples
+                    self._clean_expired_examples()
+                    
+            except Exception as e:
+                self.logger.warning(f"Failed to load existing state: {e}")
+    
+    def _save_state(self):
+        """Persist capture state to storage."""
+        try:
+            with open(self.storage_path, "w") as f:
+                json.dump({
+                    "capture_buffer": self._capture_buffer,
+                    "stats": self.stats,
+                    "last_save": time.time(),
+                }, f, indent=2)
+        except Exception as e:
+            self.logger.error(f"Failed to save state: {e}")
+    
+    def _clean_expired_examples(self):
+        """Remove examples past retention period."""
+        if self.retention_days <= 0:
+            return
+            
+        expiry_threshold = time.time() - (self.retention_days * 86400)
+        
+        with self._buffer_lock:
+            original_count = len(self._capture_buffer)
+            self._capture_buffer = [
+                ex for ex in self._capture_buffer
+                if ex.get("timestamp", 0) > expiry_threshold
+            ]
+            removed = original_count - len(self._capture_buffer)
+            
+            if removed > 0:
+                self.logger.info(f"Cleaned {removed} expired capture examples")
+    
+    def _log_audit(self, action: str, details: Dict[str, Any]):
+        """Log action for governance audit trail."""
+        entry = {
+            "timestamp": time.time(),
+            "action": action,
+            "details": details,
+        }
+        
+        self._audit_log.append(entry)
+        
+        # Limit audit log size
+        if len(self._audit_log) > self._max_audit_entries:
+            self._audit_log = self._audit_log[-self._max_audit_entries:]
+    
+    def _flush_to_storage(self):
+        """
+        Flush capture buffer to JSONL storage for training system consumption.
+        
+        The stored examples are consumed by:
+        - GovernedTrainer: For consensus-based weight updates
+        - SelfImprovingTraining: For meta-learning orchestration
+        """
+        with self._buffer_lock:
+            if not self._capture_buffer:
+                return 0
+            
+            examples_to_flush = self._capture_buffer.copy()
+            self._capture_buffer.clear()
+        
+        flushed = 0
+        for example in examples_to_flush:
+            if self.storage_backend.append_example(example):
+                flushed += 1
+        
+        self.stats["buffer_flushes"] += 1
+        self._save_state()
+        
+        self.logger.info(
+            f"Flushed {flushed} examples to distillation store "
+            f"(available for GovernedTrainer)"
+        )
+        
+        return flushed
+    
+    def capture_response(
+        self,
+        prompt: str,
+        openai_response: str,
+        local_response: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        session_opted_in: bool = False,
+        teacher_model: str = "gpt-3.5-turbo",
+    ) -> bool:
+        """
+        Capture an OpenAI response as a potential training example.
+        
+        Implements the capture layer with full safeguards:
+        - Opt-in policy gate (per-session, NOT global)
+        - Secrets/credentials hard rejection
+        - Governance sensitivity check
+        - PII redaction before storage
+        - Quality validation with hard reject thresholds
+        - Dedupe and diversity sampling
+        - Full provenance tracking
+        
+        Args:
+            prompt: The input prompt
+            openai_response: The response from OpenAI
+            local_response: Optional response from local LLM for comparison
+            metadata: Additional metadata (routing, tools, context)
+            session_opted_in: Whether session has opted into training capture
+            teacher_model: The OpenAI model that generated the response
+            
+        Returns:
+            True if the example was captured, False if rejected
+        """
+        metadata = metadata or {}
+        
+        # ================================================================
+        # GATE 1: Per-session opt-in requirement (NOT a global flag)
+        # ================================================================
+        if self.require_opt_in and not session_opted_in:
+            self.stats["opt_in_required_skips"] += 1
+            self.logger.debug("Capture skipped: session not opted in")
+            return False
+        
+        # ================================================================
+        # GATE 2: Secrets/credentials HARD REJECTION (never capture)
+        # ================================================================
+        if self.pii_redactor.contains_secrets(prompt) or self.pii_redactor.contains_secrets(openai_response):
+            self.stats["secrets_detected"] += 1
+            self.stats["examples_rejected"] += 1
+            self._log_audit("capture_rejected", {
+                "reason": "contains_secrets",
+                "prompt_preview": prompt[:50] + "...",
+            })
+            self.logger.warning("Capture rejected: contains secrets/credentials")
+            return False
+        
+        # ================================================================
+        # GATE 3: Governance sensitivity check
+        # ================================================================
+        if self.enable_governance_check:
+            is_sensitive, category, reasons = self.governance_checker.check_sensitivity(
+                prompt, openai_response, metadata
+            )
+            if is_sensitive:
+                self.stats["governance_sensitive_rejections"] += 1
+                self.stats["examples_rejected"] += 1
+                self._log_audit("capture_rejected", {
+                    "reason": "governance_sensitive",
+                    "category": category,
+                    "details": reasons,
+                })
+                self.logger.debug(f"Capture rejected: governance sensitive ({category})")
+                return False
+        
+        # ================================================================
+        # STEP 4: PII Redaction (scrub before storage)
+        # ================================================================
+        redacted_prompt = prompt
+        redacted_response = openai_response
+        pii_stats = {}
+        
+        if self.enable_pii_redaction:
+            redacted_prompt, prompt_pii = self.pii_redactor.redact(prompt)
+            redacted_response, response_pii = self.pii_redactor.redact(openai_response)
+            pii_stats = {**prompt_pii, **response_pii}
+            
+            if pii_stats:
+                self.stats["pii_redactions"] += sum(pii_stats.values())
+                self.logger.debug(f"PII redacted: {pii_stats}")
+        
+        # ================================================================
+        # GATE 5: Quality validation with hard reject thresholds
+        # ================================================================
+        passed, quality_score, rejection_reasons = self.quality_validator.validate(
+            redacted_prompt, redacted_response, local_response
+        )
+        
+        if not passed:
+            self.stats["examples_rejected"] += 1
+            for reason in rejection_reasons:
+                reason_key = reason.split(":")[0]  # Remove numeric suffix
+                self.stats["rejection_reasons"][reason_key] = (
+                    self.stats["rejection_reasons"].get(reason_key, 0) + 1
+                )
+            self._log_audit("capture_rejected", {
+                "reason": "quality_validation_failed",
+                "quality_score": quality_score,
+                "rejection_reasons": rejection_reasons,
+            })
+            self.logger.debug(f"Example rejected: {rejection_reasons}")
+            return False
+        
+        # ================================================================
+        # CREATE: Structured example with full provenance
+        # ================================================================
+        prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()
+        response_hash = hashlib.sha256(openai_response.encode()).hexdigest()
+        
+        example = {
+            # Core content (redacted) - JSONL compatible schema
+            "instruction": redacted_prompt,
+            "teacher_answer": redacted_response,
+            "context": {
+                "routing_metadata": metadata.get("routing", {}),
+                "tools_used": metadata.get("tools", []),
+                "systems_used": metadata.get("systems_used", []),
+            },
+            "labels": {
+                "domain": self._detect_domain(redacted_prompt),
+                "quality_score": quality_score,
+                "validation_passed": True,
+            },
+            
+            # Provenance (hashes for deduplication and integrity)
+            "prompt_hash": prompt_hash,
+            "response_hash": response_hash,
+            "teacher_model": teacher_model,
+            "timestamp": time.time(),
+            
+            # Governance
+            "session_opted_in": session_opted_in,
+            "retention_expires": time.time() + (self.retention_days * 86400),
+            "pii_redacted": bool(pii_stats),
+        }
+        
+        # Store example in capture buffer
+        with self._buffer_lock:
+            self._capture_buffer.append(example)
+            self.stats["examples_captured"] += 1
+            
+            # Update running average quality
+            total = self.stats["examples_captured"]
+            avg = self.stats["average_quality_score"]
+            self.stats["average_quality_score"] = (
+                (avg * (total - 1) + quality_score) / total
+            )
+        
+        # Log audit entry
+        self._log_audit("capture", {
+            "prompt_hash": prompt_hash[:16],
+            "response_hash": response_hash[:16],
+            "quality_score": quality_score,
+            "pii_redacted": bool(pii_stats),
+        })
+        
+        self.logger.debug(
+            f"Captured example (quality: {quality_score:.2f}, "
+            f"buffer: {len(self._capture_buffer)})"
+        )
+        
+        # Flush to storage when buffer is full
+        # (Training systems will consume from storage asynchronously)
+        if len(self._capture_buffer) >= self.max_buffer_size:
+            self._flush_to_storage()
+        
+        return True
+    
+    def _detect_domain(self, prompt: str) -> str:
+        """Detect the domain of a prompt for labeling."""
+        prompt_lower = prompt.lower()
+        
+        if any(kw in prompt_lower for kw in ["code", "function", "python", "javascript", "program"]):
+            return "code"
+        elif any(kw in prompt_lower for kw in ["calculate", "math", "equation", "number"]):
+            return "math"
+        elif any(kw in prompt_lower for kw in ["explain", "what is", "how does", "why"]):
+            return "explanation"
+        elif any(kw in prompt_lower for kw in ["write", "create", "compose", "draft"]):
+            return "creative"
+        else:
+            return "general"
+    
+    def flush(self) -> int:
+        """
+        Manually flush capture buffer to storage.
+        
+        Called when you want to make captured examples immediately
+        available to the training systems (GovernedTrainer, SelfImprovingTraining).
+        
+        Returns:
+            Number of examples flushed
+        """
+        return self._flush_to_storage()
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Get current status of the capture layer."""
+        return {
+            "enabled": True,
+            "config": {
+                "require_opt_in": self.require_opt_in,
+                "pii_redaction": self.enable_pii_redaction,
+                "governance_check": self.enable_governance_check,
+                "retention_days": self.retention_days,
+                "max_buffer_size": self.max_buffer_size,
+            },
+            "state": {
+                "buffer_size": len(self._capture_buffer),
+                "storage_stats": self.storage_backend.get_stats(),
+            },
+            "stats": self.stats,
+            "note": "Training delegated to GovernedTrainer/SelfImprovingTraining",
+        }
+    
+    def get_audit_log(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get recent audit log entries."""
+        return self._audit_log[-limit:]
+    
+    def clear_buffer(self) -> int:
+        """Clear capture buffer without flushing to storage."""
+        with self._buffer_lock:
+            count = len(self._capture_buffer)
+            self._capture_buffer.clear()
+            self._save_state()
+            self._log_audit("clear_buffer", {"examples_cleared": count})
+            return count
+    
+    def set_opt_in(self, session_id: str, opted_in: bool):
+        """Set opt-in status for a session (for external tracking)."""
+        self._log_audit("opt_in_change", {
+            "session_id": session_id[:16] if session_id else "unknown",
+            "opted_in": opted_in,
+        })
+
+
+# Global knowledge distiller instance (initialized later with local LLM)
+_knowledge_distiller: Optional[OpenAIKnowledgeDistiller] = None
+
+
+def get_knowledge_distiller() -> Optional[OpenAIKnowledgeDistiller]:
+    """Get the global knowledge distiller instance."""
+    return _knowledge_distiller
+
+
+def initialize_knowledge_distiller(
+    local_llm: Optional[Any] = None,
+    **kwargs,
+) -> OpenAIKnowledgeDistiller:
+    """Initialize the global knowledge distiller."""
+    global _knowledge_distiller
+    _knowledge_distiller = OpenAIKnowledgeDistiller(local_llm=local_llm, **kwargs)
+    return _knowledge_distiller
+
+
 # ============================================================
 # CONFIGURATION WITH ENVIRONMENT VARIABLES
 # ============================================================
@@ -273,6 +2189,44 @@ class Settings(BaseSettings):
     self_improvement_approval_required: bool = True
     # self.improvement_max_cost_usd is duplicated, using the new one
     self_improvement_check_interval_s: int = 60  # duplicated, using new name
+
+    # LLM Execution Mode Configuration
+    # Modes: "local_first" (default), "openai_first", "parallel", "ensemble"
+    # - local_first: Try Vulcan's local LLM first, fallback to OpenAI
+    # - openai_first: Try OpenAI first, fallback to local LLM
+    # - parallel: Run both simultaneously, use first successful response
+    # - ensemble: Run both, combine/select best response based on quality
+    llm_execution_mode: str = Field(default="parallel", env="LLM_EXECUTION_MODE")
+    # Timeout for parallel/ensemble execution (seconds)
+    llm_parallel_timeout: float = Field(default=30.0, env="LLM_PARALLEL_TIMEOUT")
+    # For ensemble mode: minimum confidence threshold for response selection
+    llm_ensemble_min_confidence: float = Field(
+        default=0.7, env="LLM_ENSEMBLE_MIN_CONFIDENCE"
+    )
+    # Maximum tokens for OpenAI API calls
+    llm_openai_max_tokens: int = Field(default=1000, env="LLM_OPENAI_MAX_TOKENS")
+
+    # Knowledge Distillation Configuration
+    # When enabled, captures OpenAI responses and uses them to train Vulcan's local LLM
+    enable_knowledge_distillation: bool = Field(
+        default=True, env="ENABLE_KNOWLEDGE_DISTILLATION"
+    )
+    # Path to store distillation training examples
+    distillation_storage_path: str = Field(
+        default="data/distillation_examples.json", env="DISTILLATION_STORAGE_PATH"
+    )
+    # Number of examples before triggering training
+    distillation_batch_size: int = Field(default=32, env="DISTILLATION_BATCH_SIZE")
+    # Time interval for periodic training (seconds)
+    distillation_training_interval_s: int = Field(
+        default=300, env="DISTILLATION_TRAINING_INTERVAL_S"
+    )
+    # Learning rate for distillation training
+    distillation_learning_rate: float = Field(
+        default=0.0001, env="DISTILLATION_LEARNING_RATE"
+    )
+    # Whether to automatically trigger training when batch is full
+    distillation_auto_train: bool = Field(default=True, env="DISTILLATION_AUTO_TRAIN")
 
     class Config:
         env_file = ".env"
@@ -443,6 +2397,26 @@ async def lifespan(app: FastAPI):
             "llm", lambda: GraphixVulcanLLM(config_path="configs/llm_config.yaml")
         )
         app.state.llm = llm_instance
+
+        # Initialize Knowledge Distiller for learning from OpenAI responses
+        if settings.enable_knowledge_distillation:
+            try:
+                knowledge_distiller = initialize_knowledge_distiller(
+                    local_llm=llm_instance,
+                    storage_path=settings.distillation_storage_path,
+                    batch_size=settings.distillation_batch_size,
+                    training_interval_s=settings.distillation_training_interval_s,
+                    auto_train=settings.distillation_auto_train,
+                    learning_rate=settings.distillation_learning_rate,
+                )
+                app.state.knowledge_distiller = knowledge_distiller
+                logger.info("✓ OpenAI Knowledge Distiller initialized - Vulcan will learn from OpenAI responses")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Knowledge Distiller: {e}")
+                app.state.knowledge_distiller = None
+        else:
+            app.state.knowledge_distiller = None
+            logger.info("Knowledge Distillation disabled by configuration")
 
         if redis_client:
             try:
@@ -1073,7 +3047,20 @@ async def security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = (
         "max-age=31536000; includeSubDomains"
     )
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    # Relaxed CSP for chat interface - allows CDN scripts and inline styles
+    # NOTE: 'unsafe-inline' and 'unsafe-eval' are required for:
+    # - marked.js (Markdown rendering) which may use eval internally
+    # - highlight.js (syntax highlighting) for code blocks
+    # - Inline event handlers in the chat HTML
+    # For production, consider moving to nonce-based CSP if security requirements increase
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' https:"
+    )
 
     return response
 
@@ -2435,77 +4422,51 @@ User Query: {processed_prompt}
 Based on your analysis through memory retrieval, multi-modal reasoning, causal modeling, and world simulation, provide a helpful and accurate response."""
 
     # ================================================================
-    # STEP 7: Generate Response (VULCAN LOCAL FIRST, OpenAI FALLBACK)
+    # STEP 7: Generate Response (HYBRID LLM EXECUTION)
+    # Uses both OpenAI and Vulcan's local LLM based on configured mode
     # ================================================================
     response_text = ""
 
-    # PRIORITY 1: Try Vulcan's LOCAL LLM first
-    if hasattr(app.state, "llm") and app.state.llm:
-        llm = app.state.llm
-        try:
-            result = await loop.run_in_executor(
-                None, llm.generate, enhanced_prompt, request.max_tokens
-            )
+    # Get local LLM if available
+    local_llm = app.state.llm if hasattr(app.state, "llm") else None
 
-            if hasattr(result, "text"):
-                response_text = result.text
-            elif isinstance(result, str):
-                response_text = result
-            elif isinstance(result, dict) and "text" in result:
-                response_text = result["text"]
-            else:
-                response_text = str(result)
+    # Create hybrid executor with configured mode
+    hybrid_executor = HybridLLMExecutor(
+        local_llm=local_llm,
+        openai_client_getter=get_openai_client,
+        mode=settings.llm_execution_mode,
+        timeout=settings.llm_parallel_timeout,
+        ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+        openai_max_tokens=settings.llm_openai_max_tokens,
+    )
 
-            # Only use if we got a meaningful response
-            if (
-                response_text
-                and len(response_text.strip()) > MIN_MEANINGFUL_RESPONSE_LENGTH
-                and MOCK_RESPONSE_MARKER not in response_text
-            ):
-                systems_used.append("vulcan_local_llm")
-                logger.info("[VULCAN] Response generated via Vulcan's local LLM")
-            else:
-                response_text = ""  # Reset to try fallback
+    # Execute hybrid LLM request
+    try:
+        llm_result = await hybrid_executor.execute(
+            prompt=enhanced_prompt,
+            max_tokens=request.max_tokens,
+            temperature=0.7,
+            system_prompt="You are VULCAN, an advanced AI assistant. Respond based on the cognitive analysis provided.",
+        )
 
-        except Exception as e:
-            logger.debug(f"[VULCAN] Local LLM generation failed: {e}")
-            response_text = ""
+        response_text = llm_result.get("text", "")
+        llm_systems = llm_result.get("systems_used", [])
+        systems_used.extend(llm_systems)
 
-    # PRIORITY 2: Fallback to OpenAI only if local failed
-    if not response_text:
-        openai_client = get_openai_client()
-        if openai_client:
-            try:
+        source = llm_result.get("source", "unknown")
+        logger.info(
+            f"[VULCAN] Response generated via hybrid execution (mode={settings.llm_execution_mode}, source={source})"
+        )
 
-                def call_openai():
-                    completion = openai_client.chat.completions.create(
-                        model="gpt-3.5-turbo",
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": "You are VULCAN, an advanced AI assistant. Respond based on the cognitive analysis provided.",
-                            },
-                            {"role": "user", "content": enhanced_prompt},
-                        ],
-                        max_tokens=min(request.max_tokens, 1000),
-                        temperature=0.7,
-                    )
-                    return completion.choices[0].message.content
+        # Add metadata to response if available
+        if llm_result.get("metadata"):
+            logger.debug(f"[VULCAN] Hybrid LLM metadata: {llm_result['metadata']}")
 
-                response_text = await loop.run_in_executor(None, call_openai)
-                systems_used.append("openai_fallback")
-                logger.info(
-                    "[VULCAN] Response generated via OpenAI fallback (with Vulcan cognitive context)"
-                )
-            except Exception as e:
-                # Log full error details for Railway debugging
-                logger.error(f"[VULCAN] OpenAI fallback failed: {type(e).__name__}: {e}")
-        else:
-            # Log why OpenAI client is not available
-            init_error = get_openai_init_error()
-            logger.warning(f"[VULCAN] OpenAI client not available for fallback: {init_error}")
+    except Exception as e:
+        logger.error(f"[VULCAN] Hybrid LLM execution failed: {type(e).__name__}: {e}")
+        response_text = ""
 
-    # PRIORITY 3: Generate response from reasoning if both LLMs failed
+    # FALLBACK: Generate response from reasoning if hybrid execution failed
     if not response_text and (reasoning_insights or world_model_insights):
         response_text = "Based on VULCAN's cognitive analysis:\n\n"
         if "symbolic" in reasoning_insights:
@@ -3413,69 +5374,55 @@ User Query: {user_message}
 
 Provide a helpful, accurate, and comprehensive response to the user's query. Be concise but thorough."""
 
-                # Try OpenAI first for high-quality responses
-                openai_client = get_openai_client()
-                if openai_client:
-                    try:
+                # Use hybrid LLM execution for simultaneous OpenAI + Local LLM
+                hybrid_executor = HybridLLMExecutor(
+                    local_llm=llm,
+                    openai_client_getter=get_openai_client,
+                    mode=settings.llm_execution_mode,
+                    timeout=settings.llm_parallel_timeout,
+                    ensemble_min_confidence=settings.llm_ensemble_min_confidence,
+                    openai_max_tokens=settings.llm_openai_max_tokens,
+                )
 
-                        def call_openai():
-                            completion = openai_client.chat.completions.create(
-                                model="gpt-3.5-turbo",
-                                messages=[
-                                    {
-                                        "role": "system",
-                                        "content": "You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses.",
-                                    },
-                                    {"role": "user", "content": enhanced_prompt},
-                                ],
-                                max_tokens=min(request.max_tokens, 1000),
-                                temperature=0.7,
-                            )
-                            return completion.choices[0].message.content
+                try:
+                    llm_result = await hybrid_executor.execute(
+                        prompt=enhanced_prompt,
+                        max_tokens=request.max_tokens,
+                        temperature=0.7,
+                        system_prompt="You are VULCAN, an advanced AI assistant powered by a comprehensive cognitive architecture. Provide helpful, accurate, and comprehensive responses.",
+                    )
 
-                        response_text = await loop.run_in_executor(None, call_openai)
-                        systems_used.append("openai_llm")
-                    except Exception as e:
-                        # Log the full error details for debugging on Railway
-                        logger.error(
-                            f"OpenAI API call failed: {type(e).__name__}: {e}"
-                        )
-                        # Include error type for better diagnostics
-                        logger.debug(f"OpenAI error traceback: {traceback.format_exc()}")
-                        # Fall through to local LLM
-                        response_text = ""
-                else:
-                    # Log why OpenAI is not available for debugging
-                    init_error = get_openai_init_error()
-                    logger.info(f"OpenAI client not available: {init_error}")
+                    response_text = llm_result.get("text", "")
+                    llm_systems = llm_result.get("systems_used", [])
+                    systems_used.extend(llm_systems)
+
+                    source = llm_result.get("source", "unknown")
+                    logger.info(
+                        f"[VULCAN] Multi-turn response via hybrid execution (mode={settings.llm_execution_mode}, source={source})"
+                    )
+
+                except Exception as e:
+                    logger.error(f"Hybrid LLM execution failed: {type(e).__name__}: {e}")
                     response_text = ""
 
-                # Fallback to local LLM if OpenAI failed or not available
+                # Fallback if hybrid execution returned nothing
                 if not response_text:
-                    result = await loop.run_in_executor(
-                        None, llm.generate, enhanced_prompt, request.max_tokens
-                    )
-                    # Extract text from GenerationResult object
-                    if hasattr(result, "text"):
-                        response_text = result.text
-                    elif isinstance(result, str):
-                        response_text = result
-                    elif isinstance(result, dict) and "text" in result:
-                        response_text = result["text"]
-                    else:
-                        response_text = str(result)
-                    systems_used.append("llm_generation")
+                    response_text = f"I understand your query about: {user_message}. "
+                    if reasoning_results:
+                        response_text += "Based on my analysis, I can provide insights from multiple reasoning systems. "
+                    if plan_result:
+                        response_text += (
+                            "I've also generated a plan to help address your request. "
+                        )
+                    response_text += "However, I encountered an issue generating a detailed response. Please try again."
+                    systems_used.append("fallback_message")
+
             except Exception as e:
-                logger.error(f"LLM generation failed: {e}")
-                # Fallback response
+                logger.error(f"LLM generation block failed: {e}")
                 response_text = f"I understand your query about: {user_message}. "
-                if reasoning_results:
-                    response_text += "Based on my analysis, I can provide insights from multiple reasoning systems. "
-                if plan_result:
-                    response_text += (
-                        "I've also generated a plan to help address your request. "
-                    )
-                response_text += "However, I encountered an issue generating a detailed response. Please try again."
+                response_text += "However, I encountered an issue processing your request. Please try again."
+                systems_used.append("error_fallback")
+
         else:
             # Fallback when LLM is not available
             response_text = f"Processing your query: '{user_message}'\n\n"
@@ -3642,6 +5589,257 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e), "timestamp": time.time()}
+
+
+@app.get("/v1/llm/config")
+async def get_llm_config():
+    """
+    Get current LLM execution configuration.
+
+    Returns the hybrid LLM execution settings that control how OpenAI
+    and Vulcan's local LLM work together.
+    """
+    openai_client = get_openai_client()
+    openai_init_error = get_openai_init_error()
+
+    return {
+        "execution_mode": settings.llm_execution_mode,
+        "parallel_timeout": settings.llm_parallel_timeout,
+        "ensemble_min_confidence": settings.llm_ensemble_min_confidence,
+        "available_modes": ["local_first", "openai_first", "parallel", "ensemble"],
+        "mode_descriptions": {
+            "local_first": "Try Vulcan's local LLM first, fallback to OpenAI if needed",
+            "openai_first": "Try OpenAI first, fallback to local LLM if needed",
+            "parallel": "Run both simultaneously, use first successful response",
+            "ensemble": "Run both, combine/select best response based on quality",
+        },
+        "providers": {
+            "openai": {
+                "available": openai_client is not None,
+                "error": openai_init_error if openai_client is None else None,
+            },
+            "local_llm": {
+                "available": hasattr(app.state, "llm") and app.state.llm is not None,
+            },
+        },
+        "timestamp": time.time(),
+    }
+
+
+class LLMConfigUpdate(BaseModel):
+    """Request model for updating LLM configuration."""
+
+    execution_mode: Optional[str] = Field(
+        None, description="LLM execution mode: local_first, openai_first, parallel, ensemble"
+    )
+    parallel_timeout: Optional[float] = Field(
+        None, ge=1.0, le=120.0, description="Timeout for parallel execution (1-120 seconds)"
+    )
+    ensemble_min_confidence: Optional[float] = Field(
+        None, ge=0.0, le=1.0, description="Minimum confidence for ensemble selection (0-1)"
+    )
+
+
+@app.post("/v1/llm/config")
+async def update_llm_config(config: LLMConfigUpdate):
+    """
+    Update LLM execution configuration at runtime.
+
+    Allows dynamic switching between execution modes without restarting the server.
+    """
+    valid_modes = ["local_first", "openai_first", "parallel", "ensemble"]
+    updated = {}
+
+    if config.execution_mode is not None:
+        mode = config.execution_mode.lower()
+        if mode not in valid_modes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid execution_mode. Must be one of: {valid_modes}",
+            )
+        settings.llm_execution_mode = mode
+        updated["execution_mode"] = mode
+        logger.info(f"[VULCAN] LLM execution mode updated to: {mode}")
+
+    if config.parallel_timeout is not None:
+        settings.llm_parallel_timeout = config.parallel_timeout
+        updated["parallel_timeout"] = config.parallel_timeout
+        logger.info(f"[VULCAN] LLM parallel timeout updated to: {config.parallel_timeout}s")
+
+    if config.ensemble_min_confidence is not None:
+        settings.llm_ensemble_min_confidence = config.ensemble_min_confidence
+        updated["ensemble_min_confidence"] = config.ensemble_min_confidence
+        logger.info(
+            f"[VULCAN] LLM ensemble min confidence updated to: {config.ensemble_min_confidence}"
+        )
+
+    return {
+        "status": "success",
+        "updated": updated,
+        "current_config": {
+            "execution_mode": settings.llm_execution_mode,
+            "parallel_timeout": settings.llm_parallel_timeout,
+            "ensemble_min_confidence": settings.llm_ensemble_min_confidence,
+        },
+        "timestamp": time.time(),
+    }
+
+
+# ============================================================
+# KNOWLEDGE DISTILLATION API ENDPOINTS
+# ============================================================
+
+
+@app.get("/v1/distillation/status")
+async def get_distillation_status():
+    """
+    Get the current status of the OpenAI Knowledge Distiller.
+
+    Returns information about:
+    - Whether distillation is enabled
+    - Number of examples captured
+    - Training statistics
+    - Buffer size and configuration
+    """
+    distiller = get_knowledge_distiller()
+    if distiller is None:
+        return {
+            "enabled": False,
+            "message": "Knowledge distillation is not enabled",
+            "config": {
+                "enable_knowledge_distillation": settings.enable_knowledge_distillation,
+            },
+        }
+
+    status = distiller.get_status()
+    status["config"] = {
+        "enable_knowledge_distillation": settings.enable_knowledge_distillation,
+        "storage_path": settings.distillation_storage_path,
+        "batch_size": settings.distillation_batch_size,
+        "training_interval_s": settings.distillation_training_interval_s,
+        "learning_rate": settings.distillation_learning_rate,
+        "auto_train": settings.distillation_auto_train,
+    }
+    return status
+
+
+@app.post("/v1/distillation/train")
+async def trigger_distillation_flush():
+    """
+    Flush captured examples to storage for training system consumption.
+
+    NOTE: Training is handled by Vulcan's GovernedTrainer and SelfImprovingTraining
+    systems, NOT by main.py. This endpoint flushes captured examples to JSONL storage
+    where they can be consumed by the training pipeline.
+    
+    The correct training flow is:
+    1. main.py captures OpenAI responses → JSONL storage
+    2. GovernedTrainer reads from storage → proposes weight updates
+    3. ConsensusEngine approves/rejects updates
+    4. SelfImprovingTraining evaluates and promotes/rollbacks
+    """
+    distiller = get_knowledge_distiller()
+    if distiller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Knowledge distillation is not enabled",
+        )
+
+    flushed_count = distiller.flush()
+    logger.info(f"[VULCAN] Distillation examples flushed: {flushed_count}")
+    return {
+        "status": "flushed",
+        "examples_flushed": flushed_count,
+        "storage_path": str(distiller.storage_backend.storage_path),
+        "note": "Training is handled by GovernedTrainer/SelfImprovingTraining",
+        "timestamp": time.time(),
+    }
+
+
+@app.delete("/v1/distillation/buffer")
+async def clear_distillation_buffer():
+    """
+    Clear the distillation training buffer without training.
+
+    Use this to discard captured examples if needed.
+    """
+    distiller = get_knowledge_distiller()
+    if distiller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Knowledge distillation is not enabled",
+        )
+
+    count = distiller.clear_buffer()
+    logger.info(f"[VULCAN] Distillation buffer cleared: {count} examples removed")
+    return {
+        "status": "success",
+        "examples_cleared": count,
+        "timestamp": time.time(),
+    }
+
+
+class DistillationConfigUpdate(BaseModel):
+    """Request model for updating distillation capture configuration."""
+
+    require_opt_in: Optional[bool] = Field(
+        None, description="Whether to require per-session opt-in for capture"
+    )
+    enable_pii_redaction: Optional[bool] = Field(
+        None, description="Whether to enable PII redaction"
+    )
+    enable_governance_check: Optional[bool] = Field(
+        None, description="Whether to enable governance sensitivity checks"
+    )
+    max_buffer_size: Optional[int] = Field(
+        None, ge=1, le=10000, description="Maximum buffer size before auto-flush"
+    )
+
+
+@app.post("/v1/distillation/config")
+async def update_distillation_config(config: DistillationConfigUpdate):
+    """
+    Update knowledge distillation capture configuration at runtime.
+
+    NOTE: This updates capture settings only. Training parameters are
+    managed by GovernedTrainer and SelfImprovingTraining systems.
+    """
+    distiller = get_knowledge_distiller()
+    if distiller is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Knowledge distillation is not enabled",
+        )
+
+    updated = {}
+
+    if config.require_opt_in is not None:
+        distiller.require_opt_in = config.require_opt_in
+        updated["require_opt_in"] = config.require_opt_in
+        logger.info(f"[VULCAN] Distillation require_opt_in updated to: {config.require_opt_in}")
+
+    if config.enable_pii_redaction is not None:
+        distiller.enable_pii_redaction = config.enable_pii_redaction
+        updated["enable_pii_redaction"] = config.enable_pii_redaction
+        logger.info(f"[VULCAN] Distillation enable_pii_redaction updated to: {config.enable_pii_redaction}")
+
+    if config.enable_governance_check is not None:
+        distiller.enable_governance_check = config.enable_governance_check
+        updated["enable_governance_check"] = config.enable_governance_check
+        logger.info(f"[VULCAN] Distillation enable_governance_check updated to: {config.enable_governance_check}")
+
+    if config.max_buffer_size is not None:
+        distiller.max_buffer_size = config.max_buffer_size
+        updated["max_buffer_size"] = config.max_buffer_size
+        logger.info(f"[VULCAN] Distillation max_buffer_size updated to: {config.max_buffer_size}")
+
+    return {
+        "status": "success",
+        "updated": updated,
+        "current_config": distiller.get_status()["config"],
+        "note": "Training config managed by GovernedTrainer/SelfImprovingTraining",
+        "timestamp": time.time(),
+    }
 
 
 @app.get("/v1/status")

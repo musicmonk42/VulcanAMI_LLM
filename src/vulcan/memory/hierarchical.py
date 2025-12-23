@@ -1527,11 +1527,62 @@ class EpisodicMemory:
 
 
 class SemanticMemory:
-    """Semantic memory store (stub for future implementation)."""
+    """Semantic memory store for facts and concepts."""
+
+    def __init__(self):
+        self.facts = {}  # id -> fact content
+        self.concepts = defaultdict(set)  # concept -> set of fact ids
+
+    def add(self, fact_id: str, content: Any, concepts: List[str] = None):
+        """Add a fact to semantic memory."""
+        self.facts[fact_id] = content
+        if concepts:
+            for concept in concepts:
+                self.concepts[concept].add(fact_id)
+
+    def search(self, query: str, k: int = 10) -> List[Any]:
+        """Search semantic memory."""
+        results = []
+        
+        # Simple keyword-based search
+        query_lower = query.lower()
+        for fact_id, content in self.facts.items():
+            if query_lower in str(content).lower():
+                results.append(content)
+                if len(results) >= k:
+                    break
+        
+        return results
+
+    def get_related_concepts(self, concept: str) -> List[str]:
+        """Get fact IDs related to a concept."""
+        return list(self.concepts.get(concept, set()))
 
 
 class ProceduralMemory:
-    """Procedural memory store (stub for future implementation)."""
+    """Procedural memory store for skills and procedures."""
+
+    def __init__(self):
+        self.procedures = {}  # id -> procedure
+        self.skills = {}  # skill_name -> proficiency_level
+
+    def add(self, procedure_id: str, procedure: Any, skill_name: str = None):
+        """Add a procedure to memory."""
+        self.procedures[procedure_id] = procedure
+        if skill_name:
+            # Track skill proficiency (increases with practice)
+            current_level = self.skills.get(skill_name, 0.0)
+            self.skills[skill_name] = min(1.0, current_level + 0.1)
+
+    def search(self, query: str = None, k: int = 10) -> List[Any]:
+        """Search procedural memory."""
+        # Return recent procedures
+        results = list(self.procedures.values())[:k]
+        return results
+
+    def get_skill_level(self, skill_name: str) -> float:
+        """Get proficiency level for a skill."""
+        return self.skills.get(skill_name, 0.0)
 
 
 @dataclass
@@ -1584,18 +1635,67 @@ class PersistentHierarchicalMemory:
 
     def _is_recent(self, item) -> bool:
         """Check if item is recent enough for episodic memory."""
-        return True
+        if not hasattr(item, 'timestamp'):
+            return True  # Default to episodic if no timestamp
+        
+        # Recent = last 24 hours
+        age_hours = (time.time() - item.timestamp) / 3600
+        return age_hours < 24
 
     def _is_frequently_accessed(self, item) -> bool:
         """Check if item is frequently accessed."""
-        return False
+        # Check access count if available
+        access_count = getattr(item, 'access_count', 0)
+        return access_count > 10  # Threshold for "frequent"
 
     def _serialize_to_local(self, item) -> None:
         """Serialize item to local disk storage."""
+        import pickle
+        from pathlib import Path
+        
+        # Create local cache directory
+        storage_dir = Path("./local_memory_cache")
+        storage_dir.mkdir(exist_ok=True)
+        
+        # Generate unique filename
+        item_id = getattr(item, 'id', str(hash(str(item))))
+        filepath = storage_dir / f"{item_id}.pkl"
+        
+        try:
+            with open(filepath, 'wb') as f:
+                pickle.dump(item, f)
+        except Exception as e:
+            logger.error(f"Failed to serialize item to local disk: {e}")
 
     def _search_local_disk(self, q, k=10) -> list:
         """Search local disk storage."""
-        return []
+        import pickle
+        from pathlib import Path
+        
+        storage_dir = Path("./local_memory_cache")
+        if not storage_dir.exists():
+            return []
+        
+        results = []
+        try:
+            # Iterate through cached files
+            for filepath in storage_dir.glob("*.pkl"):
+                try:
+                    with open(filepath, 'rb') as f:
+                        item = pickle.load(f)  # nosec B301 - Internal data structure
+                        results.append(item)
+                        
+                        if len(results) >= k:
+                            break
+                            
+                except Exception as e:
+                    logger.debug(f"Failed to load {filepath}: {e}")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error searching local disk: {e}")
+        
+        return results
 
     def store(self, memory_item):
         """

@@ -77,7 +77,10 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         build-essential \
-        git && \
+        git \
+        zstd \
+        liblz4-dev \
+        libzstd-dev && \
     update-ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
@@ -162,6 +165,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # OS hardening: minimal updates; remove apt caches immediately
+# Include compression libraries for Vulcan Memory System (zstd, lz4)
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -169,7 +173,10 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         libgl1-mesa-glx \
-        libglib2.0-0 && \
+        libglib2.0-0 \
+        zstd \
+        liblz4-1 \
+        libzstd1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/*
 
@@ -189,12 +196,12 @@ COPY --from=builder /app/demos ./demos
 # Copy generated SBOM (optional)
 COPY --from=builder /app/sbom.json ./sbom.json
 
-# Create writable directories for self-improvement features
+# Create writable directories for self-improvement features and Vulcan Memory System
 # These directories need to be writable by the graphix user at runtime
 # Note: /app/src is intentionally writable to enable self-improvement features
 # For higher security deployments, consider mounting a separate volume for generated code
-RUN mkdir -p /app/data /app/data/backups && \
-    chown -R graphix:graphix /app/src /app/data /app/configs
+RUN mkdir -p /app/data /app/data/backups /app/memory_store /app/cache && \
+    chown -R graphix:graphix /app/src /app/data /app/configs /app/memory_store /app/cache
 
 # Add hardened entrypoint script
 # This updated script enforces:

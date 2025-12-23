@@ -469,11 +469,13 @@ class SafetyAwareReasoning:
 
         # Check if result has required structure for ReasoningResult
         if isinstance(result, ReasoningResult):
-            # Note: Low confidence is a quality concern, not a safety concern.
-            # We no longer filter outputs based solely on low confidence values.
-            # The system should gracefully handle low-confidence results and
-            # allow them through, letting downstream consumers decide how to
-            # present them to users.
+            # Check confidence threshold - low confidence is treated as unsafe
+            if hasattr(result, "confidence"):
+                if result.confidence < 0.3:
+                    return {
+                        "is_safe": False,
+                        "reason": f"Confidence too low: {result.confidence:.2f} (threshold: 0.3)",
+                    }
 
             # Check for error indicators in conclusion
             if hasattr(result, "conclusion"):

@@ -1018,12 +1018,11 @@ async def lifespan(app: FastAPI):
 
             if os.getenv("GRAPHIX_API_KEY"):
                 print("✅ GRAPHIX_API_KEY loaded successfully")
-        else:
-            print(f"⚠️ .env file not found at: {env_path}")
-            print("💡 Create a .env file with your API keys to enable LLM features")
+        # FIX: Don't warn about missing .env file - it's optional in containerized environments
+        # Environment variables are typically injected via Docker/K8s, not .env files
     except ImportError:
-        print("⚠️ python-dotenv not installed. Run: pip install python-dotenv")
-        print("💡 API keys will need to be set as system environment variables")
+        # Silently fall back to system environment variables (expected in containers)
+        pass
     except Exception as e:
         print(f"❌ Error loading .env: {e}")
     # ====================================================================
@@ -2107,7 +2106,20 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    response.headers["Content-Security-Policy"] = "default-src 'none'"
+    # Relaxed CSP for chat interface - allows CDN scripts and inline styles
+    # NOTE: 'unsafe-inline' and 'unsafe-eval' are required for:
+    # - marked.js (Markdown rendering) which may use eval internally
+    # - highlight.js (syntax highlighting) for code blocks
+    # - Inline event handlers in the chat HTML
+    # For production, consider moving to nonce-based CSP if security requirements increase
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' https:"
+    )
     response.headers["Strict-Transport-Security"] = (
         "max-age=31536000; includeSubDomains; preload"
     )

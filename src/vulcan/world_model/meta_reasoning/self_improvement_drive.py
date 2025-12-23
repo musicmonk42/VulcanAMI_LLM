@@ -163,9 +163,9 @@ class SelfImprovementState:
     )  # [{timestamp, cost_usd}]
 
     def __post_init__(self):
-        """Initialize last_improvement to current time if still at default 0."""
-        if self.last_improvement == 0:
-            self.last_improvement = time.time()
+        """Initialize tracking attributes. Keep last_improvement at 0 for fresh state."""
+        # Don't initialize last_improvement - keep it at 0 to allow immediate triggers
+        pass
 
 
 class SelfImprovementDrive:
@@ -641,20 +641,23 @@ class SelfImprovementDrive:
                 )
                 return state
             else:
-                # State file doesn't exist - warn about potential persistence issues
-                logger.warning(
-                    f"⚠️ State file not found at: {self.state_path} - "
-                    f"Starting with empty state. If running in a container, "
-                    f"ensure a persistent volume is mounted to {self.state_path.parent} "
-                    f"to prevent repeated improvement attempts."
+                # FIX: State file doesn't exist - this is expected on first run
+                # Use INFO level and create the directory/file proactively
+                logger.info(
+                    f"State file not found at: {self.state_path} - "
+                    f"This is expected on first run. Creating new state file."
                 )
+                # Create the directory if it doesn't exist
+                try:
+                    self.state_path.parent.mkdir(parents=True, exist_ok=True)
+                except Exception as dir_e:
+                    logger.debug(f"Could not create state directory: {dir_e}")
         except Exception as e:
             logger.warning(f"Failed to load state: {e}, using new state")
 
-        # Return new state with warning about fresh start
-        logger.warning(
-            "🆕 Starting with fresh self-improvement state. "
-            "This may cause repeated improvement attempts if state persistence is not configured."
+        # Return new state - use INFO level for fresh start (expected behavior)
+        logger.info(
+            "Starting with fresh self-improvement state."
         )
         return SelfImprovementState()
 
@@ -1394,6 +1397,10 @@ class SelfImprovementDrive:
                     return True
 
             elif trigger_type == TriggerType.PERIODIC.value:
+                # Don't fire periodic trigger on fresh state - need a baseline to measure from
+                if self.state.last_improvement == 0:
+                    return False
+                
                 interval_hours = trigger_config.get("interval_hours", 24)
                 jitter_minutes = trigger_config.get("random_jitter_minutes", 0)
 
@@ -1463,9 +1470,21 @@ class SelfImprovementDrive:
 
         # SAFEGUARD: Prevent infinite loop by checking minimum time between improvements
         # Use environment variable SELF_IMPROVEMENT_MIN_INTERVAL or default to 3600 seconds (1 hour)
+        # EXCEPTION: Allow immediate trigger on fresh state (last_improvement == 0)
         min_interval = int(os.getenv("SELF_IMPROVEMENT_MIN_INTERVAL", "3600"))
         time_since_last = time.time() - self.state.last_improvement
-        if time_since_last < min_interval:
+        
+        # Check if this is a fresh state that should be allowed to trigger immediately
+        # Fresh state indicators:
+        # 1. last_improvement is 0 (never run before)
+        # 2. OR session just started (within 60 seconds) - handles state loaded from disk
+        is_fresh_state = (
+            self.state.last_improvement == 0 
+            or (time.time() - self.state.session_start_time) < 60
+        )
+        
+        # Only enforce minimum interval if NOT a fresh state
+        if not is_fresh_state and time_since_last < min_interval:
             logger.debug(
                 f"Skipping trigger: only {time_since_last:.0f}s since last improvement "
                 f"(minimum interval: {min_interval}s)"

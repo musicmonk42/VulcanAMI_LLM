@@ -897,6 +897,9 @@ catalogue==2.0.10 \
     #   spacy
     #   srsly
     #   thinc
+causal-learn==0.1.4.3 \
+    --hash=sha256:47ca196b786ea3b899e0e0e2c6d607c37c900df9457781f6ab0b97a2c6a747d0
+    # via -r requirements.txt
 cerberus==1.3.7 \
     --hash=sha256:180e7d1fa1a5765cbff7b5c716e52fddddfab859dc8f625b0d563ace4b7a7ab3 \
     --hash=sha256:ecf249665400a0b7a9d5e4ee1ffc234fd5d003186d3e1904f70bc14038642c13

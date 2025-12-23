@@ -25,10 +25,10 @@ except ImportError:
     logging.warning("scikit-learn not available, using fallback clustering")
 
 try:
-    pass
-
+    import networkx as nx
     NETWORKX_AVAILABLE = True
 except ImportError:
+    nx = None
     NETWORKX_AVAILABLE = False
     logging.warning("NetworkX not available, graph analysis limited")
 

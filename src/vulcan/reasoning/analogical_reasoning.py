@@ -10,6 +10,8 @@ FULLY IMPLEMENTED VERSION with:
 - Deep attribute understanding
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
@@ -88,10 +90,12 @@ except ImportError:
     )
 
 try:
-    pass
+    import torch
+    import torch.nn as nn
 
     TORCH_AVAILABLE = True
 except ImportError:
+    torch = None
     TORCH_AVAILABLE = False
     logger.warning("PyTorch not available, neural features disabled")
 
