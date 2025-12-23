@@ -12,10 +12,15 @@
 # - Enhanced documentation aggregation
 # - Security hardening: stricter CORS, auth defaults, token issuance, headers,
 #   constant-time secret comparisons, request size limiting
+# - FIXED: Ghost process prevention for uvicorn --reload mode
 # ============================================================
 
 # NOTE: Subprocess management now uses subprocess.Popen instead of asyncio.create_subprocess_exec
 # This avoids issues with Windows event loop policy when using uvicorn --reload
+
+# NOTE: When using uvicorn --reload, background tasks are only initialized in the
+# main worker process, not in the reloader watcher process. See is_main_process()
+# and the file lock mechanism for ghost process prevention.
 
 # Now proceed with all imports
 import argparse
@@ -149,6 +154,155 @@ try:
 except ImportError:
     arena_module_available = False
     print("⚠️  Arena components not available - Arena API endpoints disabled")
+
+# =============================================================================
+# UVICORN RELOADER DETECTION - GHOST PROCESS PREVENTION
+# =============================================================================
+# When running uvicorn with --reload, there are TWO processes:
+# 1. The reloader/watcher process (parent) - monitors files for changes
+# 2. The worker process (child) - actually runs the ASGI application
+#
+# PROBLEM: The lifespan handler runs in BOTH processes, causing background
+# tasks (like periodic testing) to be initialized twice - the "Ghost Process" issue.
+#
+# SOLUTION: We use a file-based lock to ensure background tasks only initialize
+# in ONE process. The lock is acquired when starting background tasks and
+# released on shutdown.
+# =============================================================================
+
+import tempfile
+
+# Platform-specific file locking
+# fcntl is Unix-only, msvcrt is Windows-only
+_HAVE_FCNTL = False
+_HAVE_MSVCRT = False
+
+try:
+    import fcntl
+    _HAVE_FCNTL = True
+except ImportError:
+    pass
+
+if not _HAVE_FCNTL:
+    try:
+        import msvcrt
+        _HAVE_MSVCRT = True
+    except ImportError:
+        pass
+
+# Global lock file path and file descriptor for background task singleton
+_BACKGROUND_TASK_LOCK_FILE = Path(tempfile.gettempdir()) / "vulcan_platform_background_tasks.lock"
+_background_task_lock_fd = None
+
+
+def is_main_process() -> bool:
+    """
+    Detect if this is the main worker process vs the uvicorn reloader watcher.
+    
+    When uvicorn runs with --reload:
+    - The parent process runs the file watcher (StatReload/WatchFilesReload)
+    - The child process runs the actual ASGI app with lifespan events
+    
+    This function returns True if we should initialize background tasks.
+    
+    Detection methods:
+    1. Check for UVICORN_STARTED environment variable (set by some configurations)
+    2. Check for reload subprocess indicators in environment
+    3. Default to True if detection is inconclusive (single-process mode)
+    
+    Returns:
+        True if background tasks should be initialized, False otherwise
+    """
+    # Method 1: Check if we were spawned as a reload subprocess
+    # Uvicorn's reloader sets specific environment markers
+    # However, this isn't 100% reliable across all uvicorn versions
+    
+    # Method 2: Check sys.argv for reload patterns
+    # If --reload is in argv and we're in the main process with the same PID as parent,
+    # we're likely in the watcher (skip initialization)
+    
+    # For safety, we'll rely on the file lock mechanism instead of detection
+    # This function is kept for logging/debugging purposes
+    return True  # Always return True - the lock mechanism handles the deduplication
+
+
+def acquire_background_task_lock() -> bool:
+    """
+    Acquire an exclusive lock to prevent duplicate background task initialization.
+    
+    Uses file locking (flock on Unix, msvcrt on Windows) to ensure only ONE process
+    initializes background tasks, regardless of how many processes uvicorn spawns.
+    
+    Returns:
+        True if lock was acquired (this process should initialize tasks)
+        False if lock is held by another process (skip initialization)
+    """
+    global _background_task_lock_fd
+    
+    # If no file locking is available, return True (allow initialization)
+    # This means ghost process prevention won't work on unsupported platforms
+    if not _HAVE_FCNTL and not _HAVE_MSVCRT:
+        print("⚠️  File locking not available - ghost process prevention disabled")
+        return True
+    
+    try:
+        # Open/create the lock file
+        _background_task_lock_fd = open(_BACKGROUND_TASK_LOCK_FILE, 'w')
+        
+        if _HAVE_FCNTL:
+            # Unix: Use fcntl.flock for exclusive non-blocking lock
+            fcntl.flock(_background_task_lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        elif _HAVE_MSVCRT:
+            # Windows: Use msvcrt.locking for exclusive non-blocking lock
+            msvcrt.locking(_background_task_lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+        
+        # Write our PID to the lock file for debugging
+        _background_task_lock_fd.write(f"PID: {os.getpid()}\n")
+        _background_task_lock_fd.write(f"Time: {datetime.utcnow().isoformat()}\n")
+        _background_task_lock_fd.flush()
+        
+        return True
+        
+    except (IOError, OSError) as e:
+        # Lock is held by another process - this is expected in multi-process scenarios
+        if _background_task_lock_fd:
+            try:
+                _background_task_lock_fd.close()
+            except Exception:
+                pass
+            _background_task_lock_fd = None
+        return False
+    except Exception as e:
+        # Unexpected error - log and proceed cautiously
+        print(f"⚠️  Warning: Failed to acquire background task lock: {e}")
+        return False
+
+
+def release_background_task_lock():
+    """
+    Release the background task lock during shutdown.
+    """
+    global _background_task_lock_fd
+    
+    if _background_task_lock_fd:
+        try:
+            if _HAVE_FCNTL:
+                fcntl.flock(_background_task_lock_fd.fileno(), fcntl.LOCK_UN)
+            elif _HAVE_MSVCRT:
+                msvcrt.locking(_background_task_lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
+            _background_task_lock_fd.close()
+        except Exception as e:
+            print(f"⚠️  Warning: Failed to release background task lock: {e}")
+        finally:
+            _background_task_lock_fd = None
+        
+        # Optionally clean up the lock file
+        try:
+            if _BACKGROUND_TASK_LOCK_FILE.exists():
+                _BACKGROUND_TASK_LOCK_FILE.unlink()
+        except Exception:
+            pass  # Lock file cleanup is optional
+
 
 # SECRETS MANAGEMENT
 # =============================================================================
@@ -1261,58 +1415,77 @@ async def lifespan(app: FastAPI):
 
                     # ================================================================
                     # ADVERSARIAL TESTER INITIALIZATION
+                    # Ghost Process Prevention: Use file lock to ensure background
+                    # tasks are only initialized in ONE process when using --reload
                     # ================================================================
-                    try:
-                        from vulcan.safety.adversarial_integration import (
-                            initialize_adversarial_tester,
-                            start_periodic_testing,
-                            get_adversarial_status,
-                        )
-
-                        # Initialize adversarial tester
-                        adversarial_tester = initialize_adversarial_tester(
-                            log_dir="adversarial_logs"
-                        )
-
-                        if adversarial_tester:
-                            # Store reference in app state for API access
-                            vulcan_module.app.state.adversarial_tester = (
-                                adversarial_tester
-                            )
-                            logger.info("✓ AdversarialTester initialized")
-
-                            # Start periodic adversarial testing (interval from environment or default: 1 hour)
+                    
+                    # Track if we hold the background task lock
+                    background_tasks_initialized = False
+                    
+                    # Try to acquire lock before starting background tasks
+                    if acquire_background_task_lock():
+                        logger.info("🔒 Acquired background task lock (PID: %d)", os.getpid())
+                        background_tasks_initialized = True
+                        
+                        try:
                             from vulcan.safety.adversarial_integration import (
-                                PERIODIC_TEST_INTERVAL,
+                                initialize_adversarial_tester,
+                                start_periodic_testing,
+                                get_adversarial_status,
                             )
 
-                            periodic_started = start_periodic_testing(
-                                tester=adversarial_tester,
-                                interval_seconds=PERIODIC_TEST_INTERVAL,
-                                run_immediately=True,  # Run first test immediately
+                            # Initialize adversarial tester
+                            adversarial_tester = initialize_adversarial_tester(
+                                log_dir="adversarial_logs"
                             )
 
-                            if periodic_started:
-                                logger.info(
-                                    f"🔒 Periodic adversarial testing started (interval: {PERIODIC_TEST_INTERVAL}s)"
+                            if adversarial_tester:
+                                # Store reference in app state for API access
+                                vulcan_module.app.state.adversarial_tester = (
+                                    adversarial_tester
                                 )
+                                logger.info("✓ AdversarialTester initialized")
+
+                                # Start periodic adversarial testing (interval from environment or default: 1 hour)
+                                from vulcan.safety.adversarial_integration import (
+                                    PERIODIC_TEST_INTERVAL,
+                                )
+
+                                periodic_started = start_periodic_testing(
+                                    tester=adversarial_tester,
+                                    interval_seconds=PERIODIC_TEST_INTERVAL,
+                                    run_immediately=True,  # Run first test immediately
+                                )
+
+                                if periodic_started:
+                                    logger.info(
+                                        f"🔒 Periodic adversarial testing started (interval: {PERIODIC_TEST_INTERVAL}s)"
+                                    )
+                                else:
+                                    logger.warning(
+                                        "Failed to start periodic adversarial testing"
+                                    )
                             else:
                                 logger.warning(
-                                    "Failed to start periodic adversarial testing"
+                                    "AdversarialTester not available - adversarial testing disabled"
                                 )
-                        else:
-                            logger.warning(
-                                "AdversarialTester not available - adversarial testing disabled"
-                            )
 
-                    except ImportError as e:
-                        logger.warning(
-                            f"Adversarial integration module not available: {e}"
+                        except ImportError as e:
+                            logger.warning(
+                                f"Adversarial integration module not available: {e}"
+                            )
+                        except Exception as adv_err:
+                            logger.error(
+                                f"Failed to initialize adversarial tester: {adv_err}"
+                            )
+                    else:
+                        logger.info(
+                            "⏭️  Skipping background task initialization - another process holds the lock (PID: %d)",
+                            os.getpid()
                         )
-                    except Exception as adv_err:
-                        logger.error(
-                            f"Failed to initialize adversarial tester: {adv_err}"
-                        )
+                    
+                    # Store the lock status in app state for cleanup
+                    app.state.background_tasks_initialized = background_tasks_initialized
                     # ================================================================
 
                     logger.info("✅ All Vulcan subsystem modules activation complete")
@@ -1324,42 +1497,47 @@ async def lifespan(app: FastAPI):
                     )
                     logger.warning("Continuing with partial subsystem activation")
 
-                # Start self-improvement drive if enabled
+                # Start self-improvement drive if enabled (only if we hold the background task lock)
                 if vulcan_config.enable_self_improvement:
-                    try:
-                        world_model = vulcan_deployment.collective.deps.world_model
+                    if getattr(app.state, 'background_tasks_initialized', False):
+                        try:
+                            world_model = vulcan_deployment.collective.deps.world_model
 
-                        if world_model:
-                            from vulcan.world_model.meta_reasoning import (
-                                MotivationalIntrospection,
-                            )
+                            if world_model:
+                                from vulcan.world_model.meta_reasoning import (
+                                    MotivationalIntrospection,
+                                )
 
-                            world_model_config = vulcan_config.world_model
-                            config_path = getattr(
-                                world_model_config,
-                                "meta_reasoning_config",
-                                "configs/intrinsic_drives.json",
-                            )
+                                world_model_config = vulcan_config.world_model
+                                config_path = getattr(
+                                    world_model_config,
+                                    "meta_reasoning_config",
+                                    "configs/intrinsic_drives.json",
+                                )
 
-                            introspection = MotivationalIntrospection(
-                                world_model, config_path=config_path
-                            )
-                            logger.info(
-                                "✓ MotivationalIntrospection initialized (modern mode)"
-                            )
+                                introspection = MotivationalIntrospection(
+                                    world_model, config_path=config_path
+                                )
+                                logger.info(
+                                    "✓ MotivationalIntrospection initialized (modern mode)"
+                                )
 
-                        if world_model and hasattr(
-                            world_model, "start_autonomous_improvement"
-                        ):
-                            world_model.start_autonomous_improvement()
-                            logger.info("🚀 Autonomous self-improvement drive started")
-                        else:
-                            logger.warning(
-                                "Self-improvement enabled but world model doesn't support it"
+                            if world_model and hasattr(
+                                world_model, "start_autonomous_improvement"
+                            ):
+                                world_model.start_autonomous_improvement()
+                                logger.info("🚀 Autonomous self-improvement drive started")
+                            else:
+                                logger.warning(
+                                    "Self-improvement enabled but world model doesn't support it"
+                                )
+                        except Exception as si_err:
+                            logger.error(
+                                f"Failed to start self-improvement drive: {si_err}"
                             )
-                    except Exception as si_err:
-                        logger.error(
-                            f"Failed to start self-improvement drive: {si_err}"
+                    else:
+                        logger.info(
+                            "⏭️  Skipping self-improvement drive - background tasks not initialized in this process"
                         )
                 # ================================================================
 
@@ -2015,18 +2193,23 @@ async def lifespan(app: FastAPI):
         logger.info(f"Shutting down Unified Platform (Worker {worker_id})...")
         logger.info("=" * 70)
 
-        # Shutdown adversarial tester
-        try:
-            from vulcan.safety.adversarial_integration import (
-                shutdown_adversarial_tester,
-            )
+        # Shutdown adversarial tester (only if we initialized it)
+        if getattr(app.state, 'background_tasks_initialized', False):
+            try:
+                from vulcan.safety.adversarial_integration import (
+                    shutdown_adversarial_tester,
+                )
 
-            shutdown_adversarial_tester()
-            logger.info("✓ AdversarialTester shutdown complete")
-        except ImportError:
-            pass
-        except Exception as adv_err:
-            logger.error(f"Error during adversarial tester shutdown: {adv_err}")
+                shutdown_adversarial_tester()
+                logger.info("✓ AdversarialTester shutdown complete")
+            except ImportError:
+                pass
+            except Exception as adv_err:
+                logger.error(f"Error during adversarial tester shutdown: {adv_err}")
+            
+            # Release the background task lock
+            release_background_task_lock()
+            logger.info("✓ Background task lock released")
 
         # Cleanup background processes
         if hasattr(app.state, "background_processes"):
