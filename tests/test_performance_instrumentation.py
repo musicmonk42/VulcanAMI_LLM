@@ -391,3 +391,79 @@ class TestThreadSafety:
         assert len(errors) == 0
         stats = tracker.get_stats("thread_test")
         assert stats["count"] > 0
+
+
+class TestThrottledLogger:
+    """Tests for ThrottledLogger class."""
+
+    def test_throttled_logger_initialization(self):
+        """Test ThrottledLogger initializes with correct defaults."""
+        from src.utils.performance_instrumentation import ThrottledLogger
+
+        logger = ThrottledLogger("test")
+        assert logger.name == "test"
+        assert logger.log_interval == 10
+        assert logger.time_interval_ms == 1000.0
+        assert logger._call_count == 0
+
+    def test_throttled_logger_custom_interval(self):
+        """Test ThrottledLogger with custom intervals."""
+        from src.utils.performance_instrumentation import ThrottledLogger
+
+        logger = ThrottledLogger("custom", log_interval=5, time_interval_ms=500.0)
+        assert logger.log_interval == 5
+        assert logger.time_interval_ms == 500.0
+
+    def test_throttled_logger_logs_at_interval(self):
+        """Test that logger respects interval count."""
+        from src.utils.performance_instrumentation import ThrottledLogger
+
+        # Use a very high time interval so only count-based logging triggers
+        logger = ThrottledLogger("interval_test", log_interval=5, time_interval_ms=100000.0)
+
+        # Call _should_log multiple times
+        logged_count = 0
+        for _ in range(20):
+            if logger._should_log():
+                logged_count += 1
+
+        # Should log on 1st (time check triggers for first call with _last_log_time=0),
+        # 5th, 10th, 15th, 20th call = 5 times
+        assert logged_count == 5
+
+    def test_throttled_logger_reset(self):
+        """Test ThrottledLogger reset functionality."""
+        from src.utils.performance_instrumentation import ThrottledLogger
+
+        logger = ThrottledLogger("reset_test", log_interval=5)
+
+        # Make some calls
+        for _ in range(7):
+            logger._should_log()
+
+        assert logger._call_count == 7
+
+        # Reset
+        logger.reset()
+        assert logger._call_count == 0
+        assert logger._last_log_time == 0.0
+
+    def test_get_step_logger(self):
+        """Test get_step_logger returns global instance."""
+        from src.utils.performance_instrumentation import get_step_logger
+
+        logger1 = get_step_logger()
+        logger2 = get_step_logger()
+
+        assert logger1 is logger2
+        assert logger1.name == "STEP"
+
+    def test_get_token_logger(self):
+        """Test get_token_logger returns global instance."""
+        from src.utils.performance_instrumentation import get_token_logger
+
+        logger1 = get_token_logger()
+        logger2 = get_token_logger()
+
+        assert logger1 is logger2
+        assert logger1.name == "TOKEN"

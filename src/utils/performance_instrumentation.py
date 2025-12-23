@@ -536,11 +536,109 @@ def get_generation_performance_tracker() -> GenerationPerformanceTracker:
     return _tracker
 
 
+class ThrottledLogger:
+    """Throttled logger that limits logging frequency for hot paths.
+
+    This class helps reduce logging overhead in performance-critical sections
+    by only logging every N calls or every N milliseconds.
+
+    Attributes:
+        name: Name prefix for log messages.
+        log_interval: Only log every N calls (default: 10).
+        time_interval_ms: Only log every N milliseconds (default: 1000).
+
+    Example:
+        >>> throttled = ThrottledLogger("step", log_interval=10)
+        >>> for i in range(100):
+        ...     throttled.debug(f"Processing step {i}")  # Only logs every 10th call
+    """
+
+    def __init__(
+        self,
+        name: str = "",
+        log_interval: int = 10,
+        time_interval_ms: float = 1000.0,
+    ) -> None:
+        """Initialize the throttled logger.
+
+        Args:
+            name: Name prefix for log messages.
+            log_interval: Only log every N calls.
+            time_interval_ms: Only log every N milliseconds.
+        """
+        self.name = name
+        self.log_interval = log_interval
+        self.time_interval_ms = time_interval_ms
+        self._call_count = 0
+        self._last_log_time = 0.0
+        self._lock = threading.Lock()
+
+    def _should_log(self) -> bool:
+        """Check if we should log based on interval or time."""
+        with self._lock:
+            self._call_count += 1
+            current_time = time.time() * 1000  # Convert to ms
+
+            # Log on interval count
+            if self._call_count % self.log_interval == 0:
+                self._last_log_time = current_time
+                return True
+
+            # Log on time interval
+            if current_time - self._last_log_time >= self.time_interval_ms:
+                self._last_log_time = current_time
+                return True
+
+            return False
+
+    def debug(self, message: str) -> None:
+        """Log at debug level if throttle allows."""
+        if self._should_log():
+            prefix = f"[{self.name}] " if self.name else ""
+            logger.debug(f"{prefix}{message}")
+
+    def info(self, message: str) -> None:
+        """Log at info level if throttle allows."""
+        if self._should_log():
+            prefix = f"[{self.name}] " if self.name else ""
+            logger.info(f"{prefix}{message}")
+
+    def warning(self, message: str) -> None:
+        """Log at warning level if throttle allows."""
+        if self._should_log():
+            prefix = f"[{self.name}] " if self.name else ""
+            logger.warning(f"{prefix}{message}")
+
+    def reset(self) -> None:
+        """Reset the throttle counters."""
+        with self._lock:
+            self._call_count = 0
+            self._last_log_time = 0.0
+
+
+# Global throttled loggers for common hot paths
+_step_logger = ThrottledLogger("STEP", log_interval=10, time_interval_ms=1000.0)
+_token_logger = ThrottledLogger("TOKEN", log_interval=10, time_interval_ms=1000.0)
+
+
+def get_step_logger() -> ThrottledLogger:
+    """Get the global step logger for generation loop logging."""
+    return _step_logger
+
+
+def get_token_logger() -> ThrottledLogger:
+    """Get the global token logger for token processing logging."""
+    return _token_logger
+
+
 __all__ = [
     "GenerationPerformanceMetrics",
     "GenerationPerformanceTracker",
+    "ThrottledLogger",
     "TimingContext",
     "get_generation_performance_tracker",
+    "get_step_logger",
+    "get_token_logger",
     "timed",
     "timed_async",
 ]

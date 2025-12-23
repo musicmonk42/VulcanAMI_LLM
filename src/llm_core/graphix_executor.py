@@ -96,9 +96,10 @@ def timed_operation(operation_name: str) -> Callable[[F], F]:
             stats["min_ms"] = min(stats["min_ms"], elapsed_ms)
             stats["max_ms"] = max(stats["max_ms"], elapsed_ms)
 
-            # Log if operation takes > 10ms (potential bottleneck)
-            if elapsed_ms > 10.0:
-                logger.info(
+            # PERF: Only log truly slow operations (>50ms) and use debug level
+            # Changed from 10ms to 50ms to reduce logging overhead
+            if elapsed_ms > 50.0:
+                logger.debug(
                     "[PERF] %s: %.1fms (count=%d, avg=%.1fms)",
                     operation_name,
                     elapsed_ms,
@@ -892,10 +893,10 @@ class GraphixExecutor:
         hidden_states = [h + r for h, r in zip(hidden_states, residual)]
         timings["residual2_ms"] = (time.perf_counter() - t6) * 1000
 
-        # Log layer timing breakdown if total > 100ms
+        # PERF: Changed to debug level and increased threshold to 200ms
         total_ms = sum(timings.values())
-        if total_ms > 100.0:
-            logger.info(
+        if total_ms > 200.0:
+            logger.debug(
                 "[PERF] Layer %d breakdown: total=%.1fms (ln1=%.1f, attn=%.1f, "
                 "ln2=%.1f, ffn=%.1f)",
                 layer_idx,
@@ -1089,10 +1090,10 @@ class GraphixExecutor:
         output = self._linear(swiglu, down_weight, intermediate_size, self.hidden_size)
         timings["down_proj_ms"] = (time.perf_counter() - t4) * 1000
 
-        # Log FFN timing breakdown if total > 50ms
+        # PERF: Changed to debug level and increased threshold to 100ms
         total_ms = sum(timings.values())
-        if total_ms > 50.0:
-            logger.info(
+        if total_ms > 100.0:
+            logger.debug(
                 "[PERF] FFN layer_%d: total=%.1fms "
                 "(gate=%.1f, up=%.1f, swiglu=%.1f, down=%.1f)",
                 layer_idx,
