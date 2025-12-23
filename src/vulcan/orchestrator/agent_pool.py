@@ -54,6 +54,10 @@ from .task_queues import TaskQueueInterface, create_task_queue
 DEFAULT_FALLBACK_MEMORY_GB = 4.0  # Conservative memory estimate
 DEFAULT_FALLBACK_STORAGE_GB = 100.0  # Conservative storage estimate
 
+# Redis keys for agent pool state persistence
+REDIS_KEY_AGENT_POOL_STATS = "vulcan:agent_pool:stats"
+REDIS_KEY_PROVENANCE_COUNT = "vulcan:agent_pool:provenance_records_count"
+
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
     from cachetools import TTLCache
@@ -435,6 +439,7 @@ class AgentPoolManager:
         provenance_ttl: int = 3600,
         task_timeout_seconds: int = 300,
         config: Dict[str, Any] = None,
+        redis_client: Optional[Any] = None,
     ):
         """
         Initialize Agent Pool Manager
@@ -446,8 +451,12 @@ class AgentPoolManager:
             provenance_ttl: Time-to-live for provenance records in seconds
             task_timeout_seconds: Default timeout for task assignments
             config: Optional configuration dictionary.
+            redis_client: Optional Redis client for state persistence.
         """
         self.config = config or {}
+        
+        # Redis client for state persistence
+        self.redis_client = redis_client
         
         # PERFORMANCE: Use simple_mode defaults if not explicitly provided
         # This reduces agent pool overhead when VULCAN_SIMPLE_MODE=true
@@ -496,7 +505,7 @@ class AgentPoolManager:
         self._last_archive_time = time.time()
         self._archive_lock = threading.Lock()
 
-        # Statistics
+        # Statistics - Initialize with defaults first
         self.stats = {
             "total_jobs_submitted": 0,
             "total_jobs_completed": 0,
@@ -507,6 +516,12 @@ class AgentPoolManager:
             "total_recoveries_successful": 0,
         }
         self.stats_lock = threading.Lock()
+        
+        # Provenance records count - Initialize with default, will be hydrated from Redis
+        self._provenance_records_count = 0
+        
+        # Hydrate state from Redis if available
+        self._hydrate_state_from_redis()
 
         # Status check throttling
         self.last_status_check = 0
@@ -550,6 +565,81 @@ class AgentPoolManager:
             f"queue_type={task_queue_type}, "
             f"cachetools_available={CACHETOOLS_AVAILABLE}"
         )
+
+    def _hydrate_state_from_redis(self) -> None:
+        """
+        Hydrate Agent Pool state from Redis on startup.
+        
+        This method loads persisted statistics and provenance counts from Redis
+        to restore state after container restarts. If Redis is not available or
+        empty, defaults to 0 values (as currently implemented).
+        """
+        if self.redis_client is None:
+            logger.debug("Redis client not available, skipping state hydration")
+            return
+        
+        loaded_stats = {}
+        try:
+            # Load statistics from Redis
+            stats_json = self.redis_client.get(REDIS_KEY_AGENT_POOL_STATS)
+            if stats_json:
+                try:
+                    # Handle both string and bytes responses
+                    if isinstance(stats_json, bytes):
+                        stats_json = stats_json.decode('utf-8')
+                    loaded_stats = json.loads(stats_json)
+                    
+                    # Update stats with loaded values, preserving default structure
+                    with self.stats_lock:
+                        for key, value in loaded_stats.items():
+                            if key in self.stats:
+                                self.stats[key] = value
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.warning(f"Failed to parse stats JSON from Redis: {e}")
+            
+            # Load provenance records count from Redis
+            provenance_count = self.redis_client.get(REDIS_KEY_PROVENANCE_COUNT)
+            if provenance_count:
+                try:
+                    # Handle both string and bytes responses
+                    if isinstance(provenance_count, bytes):
+                        provenance_count = provenance_count.decode('utf-8')
+                    self._provenance_records_count = int(provenance_count)
+                    loaded_stats["provenance_records_count"] = self._provenance_records_count
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Failed to parse provenance count from Redis: {e}")
+            
+            if loaded_stats:
+                logger.info(f"🔄 Hydrated Agent Pool state from Redis: {loaded_stats}")
+            else:
+                logger.debug("No persisted state found in Redis, using defaults")
+                
+        except Exception as e:
+            logger.warning(f"Failed to hydrate state from Redis: {e}. Using default values.")
+
+    def _persist_state_to_redis(self) -> None:
+        """
+        Persist Agent Pool state to Redis for recovery after restarts.
+        
+        This method saves statistics and provenance counts to Redis so they
+        can be restored after container restarts.
+        """
+        if self.redis_client is None:
+            return
+        
+        try:
+            # Persist statistics
+            with self.stats_lock:
+                stats_json = json.dumps(self.stats)
+            self.redis_client.set(REDIS_KEY_AGENT_POOL_STATS, stats_json)
+            
+            # Persist provenance records count
+            provenance_count = len(self.provenance_records)
+            self.redis_client.set(REDIS_KEY_PROVENANCE_COUNT, str(provenance_count))
+            
+            logger.debug(f"Persisted Agent Pool state to Redis: stats and provenance_count={provenance_count}")
+        except Exception as e:
+            logger.warning(f"Failed to persist state to Redis: {e}")
 
     def _init_task_queue(self, task_queue_type: str):
         """Initialize task queue with error handling and fallback"""
@@ -661,6 +751,9 @@ class AgentPoolManager:
                 # Update statistics
                 with self.stats_lock:
                     self.stats["total_agents_spawned"] += 1
+                
+                # Persist state to Redis
+                self._persist_state_to_redis()
 
                 logger.info(
                     f"Spawned agent {agent_id} with capability {capability.value}"
@@ -783,6 +876,9 @@ class AgentPoolManager:
                 # Update statistics
                 with self.stats_lock:
                     self.stats["total_agents_retired"] += 1
+                
+                # Persist state to Redis
+                self._persist_state_to_redis()
 
                 logger.info(f"Agent {agent_id} terminated")
 
@@ -868,6 +964,9 @@ class AgentPoolManager:
             # Update statistics
             with self.stats_lock:
                 self.stats["total_recoveries_attempted"] += 1
+            
+            # Persist state to Redis
+            self._persist_state_to_redis()
 
             return success
 
@@ -927,6 +1026,9 @@ class AgentPoolManager:
             # Update statistics
             with self.stats_lock:
                 self.stats["total_jobs_submitted"] += 1
+            
+            # Persist state to Redis
+            self._persist_state_to_redis()
 
             # FIXED: Archive old provenance if needed
             if time.time() - self._last_archive_time > 3600:
@@ -961,6 +1063,9 @@ class AgentPoolManager:
                 # Update statistics
                 with self.stats_lock:
                     self.stats["total_jobs_failed"] += 1
+                
+                # Persist state to Redis
+                self._persist_state_to_redis()
 
                 return job_id
 
@@ -1273,6 +1378,9 @@ class AgentPoolManager:
             # Update statistics
             with self.stats_lock:
                 self.stats["total_jobs_completed"] += 1
+            
+            # Persist state to Redis
+            self._persist_state_to_redis()
 
             logger.info(
                 f"Agent {agent_id} completed task {task_id} in {duration:.3f}s "
@@ -1296,6 +1404,9 @@ class AgentPoolManager:
             # Update statistics
             with self.stats_lock:
                 self.stats["total_jobs_failed"] += 1
+            
+            # Persist state to Redis
+            self._persist_state_to_redis()
 
             raise
 
