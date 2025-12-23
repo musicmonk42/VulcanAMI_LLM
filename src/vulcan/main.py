@@ -2414,11 +2414,20 @@ logger = logging.getLogger(__name__)
 redis_client = None
 if REDIS_AVAILABLE:
     try:
+        # Configurable timeout values
+        redis_connect_timeout = int(os.getenv("REDIS_CONNECT_TIMEOUT", 5))
+        redis_socket_timeout = int(os.getenv("REDIS_SOCKET_TIMEOUT", 5))
+        
         # Priority 1: Use REDIS_URL if set (Railway, Docker Compose, etc.)
         redis_url = os.getenv("REDIS_URL")
         if redis_url:
             logger.info(f"Connecting to Redis using REDIS_URL")
-            redis_client = Redis.from_url(redis_url, decode_responses=False)
+            redis_client = Redis.from_url(
+                redis_url,
+                decode_responses=False,
+                socket_connect_timeout=redis_connect_timeout,
+                socket_timeout=redis_socket_timeout,
+            )
         else:
             # Priority 2: Use REDIS_HOST/REDIS_PORT (legacy/local dev)
             redis_host = os.getenv("REDIS_HOST", "localhost")
@@ -2429,8 +2438,8 @@ if REDIS_AVAILABLE:
                 port=redis_port,
                 db=0,
                 decode_responses=False,
-                socket_connect_timeout=5,  # 5 second connection timeout
-                socket_timeout=5,  # 5 second operation timeout
+                socket_connect_timeout=redis_connect_timeout,
+                socket_timeout=redis_socket_timeout,
             )
         redis_client.ping()
         logger.info("Redis connection established successfully")
@@ -3011,9 +3020,13 @@ async def lifespan(app: FastAPI):
                     logger.error(f"Failed to cleanup Redis: {e}")
 
         # Release process lock if held (split-brain prevention cleanup)
-        if _process_lock is not None and _process_lock.is_locked():
-            _process_lock.release()
-            logger.info("Process lock released during shutdown")
+        # Always attempt release even if is_locked() returns False (state may be inconsistent)
+        if _process_lock is not None:
+            try:
+                _process_lock.release()
+                logger.info("Process lock released during shutdown")
+            except Exception as e:
+                logger.warning(f"Error releasing process lock during shutdown: {e}")
 
         logger.info("VULCAN-AGI API shutdown complete")
 
