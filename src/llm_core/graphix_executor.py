@@ -44,6 +44,7 @@ A comprehensive executor for Graphix IR graphs with enterprise features:
 - Numerical stability checks
 """
 
+import functools
 import json
 import logging
 import math
@@ -52,9 +53,109 @@ import time
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# PERFORMANCE INSTRUMENTATION (Added for bottleneck diagnosis)
+# ============================================================
+
+# Type variable for generic callable wrapper
+F = TypeVar("F", bound=Callable[..., Any])
+
+# Global performance stats for detailed profiling
+_PERF_STATS: Dict[str, Dict[str, float]] = defaultdict(
+    lambda: {"count": 0, "total_ms": 0.0, "min_ms": float("inf"), "max_ms": 0.0}
+)
+
+
+def timed_operation(operation_name: str) -> Callable[[F], F]:
+    """Decorator to time operations and log performance.
+
+    Args:
+        operation_name: Name of the operation for logging.
+
+    Returns:
+        Decorated function with timing instrumentation.
+    """
+    def decorator(func: F) -> F:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.perf_counter()
+            result = func(*args, **kwargs)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+
+            # Update global stats
+            stats = _PERF_STATS[operation_name]
+            stats["count"] += 1
+            stats["total_ms"] += elapsed_ms
+            stats["min_ms"] = min(stats["min_ms"], elapsed_ms)
+            stats["max_ms"] = max(stats["max_ms"], elapsed_ms)
+
+            # Log if operation takes > 10ms (potential bottleneck)
+            if elapsed_ms > 10.0:
+                logger.info(
+                    "[PERF] %s: %.1fms (count=%d, avg=%.1fms)",
+                    operation_name,
+                    elapsed_ms,
+                    stats["count"],
+                    stats["total_ms"] / stats["count"],
+                )
+
+            return result
+        return wrapper  # type: ignore[return-value]
+    return decorator
+
+
+def get_performance_stats() -> Dict[str, Dict[str, float]]:
+    """Get all collected performance statistics.
+
+    Returns:
+        Dictionary mapping operation names to timing statistics.
+    """
+    result = {}
+    for name, stats in _PERF_STATS.items():
+        if stats["count"] > 0:
+            result[name] = {
+                "count": stats["count"],
+                "total_ms": stats["total_ms"],
+                "avg_ms": stats["total_ms"] / stats["count"],
+                "min_ms": stats["min_ms"] if stats["min_ms"] != float("inf") else 0.0,
+                "max_ms": stats["max_ms"],
+            }
+    return result
+
+
+def reset_performance_stats() -> None:
+    """Reset all performance statistics."""
+    _PERF_STATS.clear()
+
+
+def log_performance_summary() -> None:
+    """Log a summary of all performance statistics."""
+    stats = get_performance_stats()
+    if not stats:
+        logger.info("[PERF SUMMARY] No performance data collected")
+        return
+
+    logger.info("[PERF SUMMARY] Performance Statistics:")
+    logger.info("-" * 70)
+
+    # Sort by total time descending (hottest first)
+    sorted_ops = sorted(stats.items(), key=lambda x: x[1]["total_ms"], reverse=True)
+
+    for name, data in sorted_ops:
+        logger.info(
+            "  %-40s  count=%-6d total=%-10.1fms avg=%-8.2fms",
+            name,
+            int(data["count"]),
+            data["total_ms"],
+            data["avg_ms"],
+        )
+
+    logger.info("-" * 70)
 
 
 # ============================================================
@@ -597,6 +698,7 @@ class GraphixExecutor:
 
     # ==================== MAIN EXECUTION ====================
 
+    @timed_operation("GraphixExecutor.execute")
     def execute(
         self, graph_ir: Dict[str, Any], inputs: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -679,6 +781,7 @@ class GraphixExecutor:
 
     # ==================== EMBEDDINGS ====================
 
+    @timed_operation("GraphixExecutor._execute_embeddings")
     def _execute_embeddings(
         self, tokens: List[Any], emb_ir: Dict[str, Any]
     ) -> List[float]:
@@ -735,6 +838,7 @@ class GraphixExecutor:
 
     # ==================== LAYER EXECUTION ====================
 
+    @timed_operation("GraphixExecutor._execute_layer")
     def _execute_layer(
         self,
         hidden_states: List[float],
@@ -743,40 +847,68 @@ class GraphixExecutor:
         lora_adapters: Dict[str, Any],
         lora_alpha: float,
     ) -> List[float]:
-        """Execute a single transformer layer."""
+        """Execute a single transformer layer with fine-grained timing."""
+        timings: Dict[str, float] = {}
 
         # Pre-norm
+        t1 = time.perf_counter()
         residual = hidden_states[:]
         hidden_states = self._apply_layer_norm(hidden_states, f"layer_{layer_idx}.ln1")
+        timings["ln1_ms"] = (time.perf_counter() - t1) * 1000
 
         # Attention
+        t2 = time.perf_counter()
         t_attn = self.profiler.start_timer(f"layer_{layer_idx}.attn")
         hidden_states = self._execute_attention(
             hidden_states, layer_idx, lora_adapters, lora_alpha
         )
         self.profiler.end_timer(f"layer_{layer_idx}.attn", t_attn)
+        timings["attention_ms"] = (time.perf_counter() - t2) * 1000
 
         # Residual connection
+        t3 = time.perf_counter()
         hidden_states = [h + r for h, r in zip(hidden_states, residual)]
+        timings["residual1_ms"] = (time.perf_counter() - t3) * 1000
 
         # Pre-norm for FFN
+        t4 = time.perf_counter()
         residual = hidden_states[:]
         hidden_states = self._apply_layer_norm(hidden_states, f"layer_{layer_idx}.ln2")
+        timings["ln2_ms"] = (time.perf_counter() - t4) * 1000
 
         # FFN
+        t5 = time.perf_counter()
         t_ffn = self.profiler.start_timer(f"layer_{layer_idx}.ffn")
         hidden_states = self._execute_ffn(
             hidden_states, layer_idx, lora_adapters, lora_alpha
         )
         self.profiler.end_timer(f"layer_{layer_idx}.ffn", t_ffn)
+        timings["ffn_ms"] = (time.perf_counter() - t5) * 1000
 
         # Residual connection
+        t6 = time.perf_counter()
         hidden_states = [h + r for h, r in zip(hidden_states, residual)]
+        timings["residual2_ms"] = (time.perf_counter() - t6) * 1000
+
+        # Log layer timing breakdown if total > 100ms
+        total_ms = sum(timings.values())
+        if total_ms > 100.0:
+            logger.info(
+                "[PERF] Layer %d breakdown: total=%.1fms (ln1=%.1f, attn=%.1f, "
+                "ln2=%.1f, ffn=%.1f)",
+                layer_idx,
+                total_ms,
+                timings["ln1_ms"],
+                timings["attention_ms"],
+                timings["ln2_ms"],
+                timings["ffn_ms"],
+            )
 
         return hidden_states
 
     # ==================== ATTENTION ====================
 
+    @timed_operation("GraphixExecutor._execute_attention")
     def _execute_attention(
         self,
         hidden_states: List[float],
@@ -905,6 +1037,7 @@ class GraphixExecutor:
 
     # ==================== FEEDFORWARD ====================
 
+    @timed_operation("GraphixExecutor._execute_ffn")
     def _execute_ffn(
         self,
         hidden_states: List[float],
@@ -912,7 +1045,8 @@ class GraphixExecutor:
         lora_adapters: Dict[str, Any],
         lora_alpha: float,
     ) -> List[float]:
-        """Execute feedforward network (SwiGLU)."""
+        """Execute feedforward network (SwiGLU) with timing."""
+        timings: Dict[str, float] = {}
 
         intermediate_size = self.hidden_size * 4
 
@@ -931,19 +1065,41 @@ class GraphixExecutor:
                 self.hidden_size,
             )
 
-        # Gate projection
+        # Gate projection (hidden_size -> intermediate_size)
+        t1 = time.perf_counter()
         gate = self._linear(
             hidden_states, gate_weight, self.hidden_size, intermediate_size
         )
+        timings["gate_proj_ms"] = (time.perf_counter() - t1) * 1000
 
-        # Up projection
+        # Up projection (hidden_size -> intermediate_size)
+        t2 = time.perf_counter()
         up = self._linear(hidden_states, up_weight, self.hidden_size, intermediate_size)
+        timings["up_proj_ms"] = (time.perf_counter() - t2) * 1000
 
         # SwiGLU activation: gate * SiLU(up)
+        t3 = time.perf_counter()
         swiglu = [g * self._silu(u) for g, u in zip(gate, up)]
+        timings["swiglu_ms"] = (time.perf_counter() - t3) * 1000
 
-        # Down projection
+        # Down projection (intermediate_size -> hidden_size)
+        t4 = time.perf_counter()
         output = self._linear(swiglu, down_weight, intermediate_size, self.hidden_size)
+        timings["down_proj_ms"] = (time.perf_counter() - t4) * 1000
+
+        # Log FFN timing breakdown if total > 50ms
+        total_ms = sum(timings.values())
+        if total_ms > 50.0:
+            logger.info(
+                "[PERF] FFN layer_%d: total=%.1fms "
+                "(gate=%.1f, up=%.1f, swiglu=%.1f, down=%.1f)",
+                layer_idx,
+                total_ms,
+                timings["gate_proj_ms"],
+                timings["up_proj_ms"],
+                timings["swiglu_ms"],
+                timings["down_proj_ms"],
+            )
 
         return output
 
@@ -1008,6 +1164,10 @@ class GraphixExecutor:
 
     # ==================== UTILITIES ====================
 
+    # Track linear operation statistics for performance analysis
+    _linear_call_count: int = 0
+    _linear_total_ops: int = 0
+
     def _linear(
         self,
         input_vec: List[float],
@@ -1015,16 +1175,44 @@ class GraphixExecutor:
         in_features: int,
         out_features: int,
     ) -> List[float]:
-        """Linear transformation: output = input @ weight^T."""
+        """Linear transformation: output = input @ weight^T.
+
+        PERFORMANCE NOTE: This is the main bottleneck!
+        For hidden_size=256, vocab_size=4096:
+        - This does 256 * 4096 = 1,048,576 multiply-adds PER CALL
+        - With 6 layers, each having ~7 linear ops = 42 calls per token
+        - Total: ~44 million floating point operations per token in pure Python
+
+        Consider using numpy for 100-1000x speedup:
+            import numpy as np
+            return (np.array(input_vec) @ np.array(weight).reshape(out_features, in_features).T).tolist()
+        """
         if not input_vec or not weight:
             return [0.0] * out_features
+
+        # Track performance statistics
+        GraphixExecutor._linear_call_count += 1
+        ops = in_features * out_features
+        GraphixExecutor._linear_total_ops += ops
+
+        # Log periodically for large operations
+        if ops > 100000 and GraphixExecutor._linear_call_count % 10 == 0:
+            logger.debug(
+                "[PERF] _linear: %dx%d = %d ops (total calls: %d, total ops: %d)",
+                in_features,
+                out_features,
+                ops,
+                GraphixExecutor._linear_call_count,
+                GraphixExecutor._linear_total_ops,
+            )
 
         # Ensure correct input size
         if len(input_vec) < in_features:
             input_vec = input_vec + [0.0] * (in_features - len(input_vec))
         input_vec = input_vec[:in_features]
 
-        # Matrix multiplication (simplified)
+        # Matrix multiplication (simplified) - THIS IS THE BOTTLENECK
+        # Pure Python nested loops are ~100-1000x slower than numpy/torch
         output = []
         for o in range(out_features):
             val = 0.0
@@ -1038,6 +1226,7 @@ class GraphixExecutor:
 
     # ==================== LOGITS COMPUTATION ====================
 
+    @timed_operation("GraphixExecutor.get_logits")
     def get_logits(self, hidden_state: Any, tokens: List[Any]) -> List[float]:
         """Compute logits for next token prediction."""
         if not isinstance(hidden_state, list):
@@ -1048,7 +1237,8 @@ class GraphixExecutor:
             hidden_state = hidden_state + [0.0] * (self.hidden_size - len(hidden_state))
         hidden_state = hidden_state[: self.hidden_size]
 
-        # Apply LM head
+        # Apply LM head - This is a large matrix multiply (hidden_size x vocab_size)
+        # For hidden_size=256, vocab_size=4096: 1M multiply-adds
         lm_head_weight = self.weights.get("lm_head", [])
         logits = self._linear(
             hidden_state, lm_head_weight, self.hidden_size, self.vocab_size
@@ -1205,4 +1395,9 @@ __all__ = [
     "QuantizationManager",
     "PerformanceProfiler",
     "AuditLogger",
+    # Performance instrumentation
+    "timed_operation",
+    "get_performance_stats",
+    "reset_performance_stats",
+    "log_performance_summary",
 ]
