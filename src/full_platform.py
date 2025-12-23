@@ -191,39 +191,10 @@ if not _HAVE_FCNTL:
         pass
 
 # Global lock file path and file descriptor for background task singleton
-_BACKGROUND_TASK_LOCK_FILE = Path(tempfile.gettempdir()) / "vulcan_platform_background_tasks.lock"
+# Include port number in filename to allow multiple instances on different ports
+_PLATFORM_PORT = os.environ.get("PORT", os.environ.get("UNIFIED_PORT", "8080"))
+_BACKGROUND_TASK_LOCK_FILE = Path(tempfile.gettempdir()) / f"vulcan_platform_background_tasks_{_PLATFORM_PORT}.lock"
 _background_task_lock_fd = None
-
-
-def is_main_process() -> bool:
-    """
-    Detect if this is the main worker process vs the uvicorn reloader watcher.
-    
-    When uvicorn runs with --reload:
-    - The parent process runs the file watcher (StatReload/WatchFilesReload)
-    - The child process runs the actual ASGI app with lifespan events
-    
-    This function returns True if we should initialize background tasks.
-    
-    Detection methods:
-    1. Check for UVICORN_STARTED environment variable (set by some configurations)
-    2. Check for reload subprocess indicators in environment
-    3. Default to True if detection is inconclusive (single-process mode)
-    
-    Returns:
-        True if background tasks should be initialized, False otherwise
-    """
-    # Method 1: Check if we were spawned as a reload subprocess
-    # Uvicorn's reloader sets specific environment markers
-    # However, this isn't 100% reliable across all uvicorn versions
-    
-    # Method 2: Check sys.argv for reload patterns
-    # If --reload is in argv and we're in the main process with the same PID as parent,
-    # we're likely in the watcher (skip initialization)
-    
-    # For safety, we'll rely on the file lock mechanism instead of detection
-    # This function is kept for logging/debugging purposes
-    return True  # Always return True - the lock mechanism handles the deduplication
 
 
 def acquire_background_task_lock() -> bool:
@@ -232,6 +203,9 @@ def acquire_background_task_lock() -> bool:
     
     Uses file locking (flock on Unix, msvcrt on Windows) to ensure only ONE process
     initializes background tasks, regardless of how many processes uvicorn spawns.
+    
+    The lock file includes the port number, allowing multiple instances of the
+    application to run on different ports without interfering with each other.
     
     Returns:
         True if lock was acquired (this process should initialize tasks)
@@ -257,8 +231,10 @@ def acquire_background_task_lock() -> bool:
             msvcrt.locking(_background_task_lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
         
         # Write our PID to the lock file for debugging
+        from datetime import timezone
         _background_task_lock_fd.write(f"PID: {os.getpid()}\n")
-        _background_task_lock_fd.write(f"Time: {datetime.utcnow().isoformat()}\n")
+        _background_task_lock_fd.write(f"Time: {datetime.now(timezone.utc).isoformat()}\n")
+        _background_task_lock_fd.write(f"Port: {_PLATFORM_PORT}\n")
         _background_task_lock_fd.flush()
         
         return True
