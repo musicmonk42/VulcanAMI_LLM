@@ -1,8 +1,10 @@
 # Graphix & VULCAN-AI: AI-Native Operations Guide
 
 **Version:** 2.2.0  
-**Last Updated:** 2024-11-11  
+**Last Updated:** December 23, 2024  
 **Authors:** Core Engineering Collective (musicmonk42, contributors)
+
+> See also: [OPERATIONS.md](OPERATIONS.md) for comprehensive operations guide
 
 ---
 

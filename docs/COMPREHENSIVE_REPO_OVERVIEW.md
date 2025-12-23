@@ -613,11 +613,11 @@ pytest tests/test_cicd_reproducibility.py -v
 - `CI_CD.md` (14,295 bytes): CI/CD pipeline documentation
 
 **2. Architecture & Design**
-- `COMPLETE_PLATFORM_ARCHITECTURE.md` (44,849 bytes): Full system architecture
+- `ARCHITECTURE_OVERVIEW.md`: Full system architecture (consolidated)
 - `VULCAN_DEEP_DIVE_AUDIT.md` (37,834 bytes): VULCAN subsystem deep-dive
 - `VULCAN_WORLD_MODEL_META_REASONING_DEEP_DIVE.md` (39,945 bytes): Meta-reasoning analysis
-- `docs/ARCHITECTURE.md`: Detailed architecture documentation
-- `docs/UNFLATTENABLE_ROADMAP.md`: Future roadmap
+- `docs/EVOLUTION_ROADMAP.MD`: Feature roadmap with design principles
+- `docs/IMPLEMENTATION_ROADMAP.md`: Technical implementation roadmap
 
 **3. Security & Compliance**
 - `INFRASTRUCTURE_SECURITY_GUIDE.md` (11,989 bytes): Security best practices
@@ -627,8 +627,7 @@ pytest tests/test_cicd_reproducibility.py -v
 - `AUDIT_COMPLETION_SUMMARY.md` (10,368 bytes): Audit completion report
 
 **4. Quality & Testing**
-- `REPRODUCIBLE_BUILDS.md` (10,587 bytes): Reproducibility guide
-- `REPRODUCIBILITY_STATUS.md` (11,938 bytes): Current reproducibility status
+- `REPRODUCIBLE_BUILDS.md`: Reproducibility guide with status (consolidated)
 - `REPRODUCIBILITY_AUDIT_2024-12-04.md` (19,205 bytes): Detailed audit
 - `REPRODUCIBILITY_TEST_SUMMARY.md` (8,439 bytes): Test results
 - `PYLINT_SUMMARY.md` (2,448 bytes): Code quality metrics
@@ -1214,7 +1213,7 @@ curl http://localhost:5000/health
 **Documentation:**
 - 📖 `README.md`: Main documentation
 - 🚀 `QUICKSTART.md`: Getting started guide
-- 🏗️ `COMPLETE_PLATFORM_ARCHITECTURE.md`: Architecture deep-dive
+- 🏗️ `ARCHITECTURE_OVERVIEW.md`: Architecture deep-dive (consolidated)
 - 🧪 `TESTING_GUIDE.md`: Testing procedures
 - 🔐 `INFRASTRUCTURE_SECURITY_GUIDE.md`: Security best practices
 - 📦 `DEPLOYMENT.md`: Production deployment
@@ -1305,8 +1304,7 @@ This product integrates with third-party components under their respective licen
 For exhaustive documentation of every service, function, and class:
 
 - **[COMPLETE_SERVICE_CATALOG.md](docs/COMPLETE_SERVICE_CATALOG.md)** - Complete catalog of all 21,523 functions and 4,353 classes across 557 files
-- **[SERVICE_OVERVIEW.md](docs/SERVICE_OVERVIEW.md)** - High-level service overview organized by functional area  
-- **[COMPLETE_DEEP_DIVE_ANALYSIS.md](docs/COMPLETE_DEEP_DIVE_ANALYSIS.md)** - Deep architectural analysis with insights
+- **[ARCHITECTURE_OVERVIEW.md](docs/ARCHITECTURE_OVERVIEW.md)** - Comprehensive platform architecture (consolidated)
 
 ### Service Statistics
 

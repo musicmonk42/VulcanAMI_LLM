@@ -1,3 +1,17 @@
+# ⚠️ DEPRECATED
+
+**This document has been archived.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+This document (STATE_OF_THE_PROJECT.md) is outdated and has been archived.  
+For current project information, refer to:
+- [README.md](../../README.md) - Project overview
+- [ARCHITECTURE_OVERVIEW.md](../../ARCHITECTURE_OVERVIEW.md) - Architecture documentation
+
+---
+
 # Graphix Vulcan AMI: Comprehensive Project Audit & State Report
 
 **Last Updated:** 2024-12-05  

@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED
+
+**This document has been consolidated.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+For PLATFORM_SERVICES_INVENTORY.md content → See [COMPLETE_SERVICE_CATALOG.md](../../COMPLETE_SERVICE_CATALOG.md)
+
+---
+
 # VulcanAMI Platform Services Inventory & Startup Analysis
 
 **Generated:** 2024-12-15  

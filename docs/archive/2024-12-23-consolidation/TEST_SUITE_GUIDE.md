@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED
+
+**This document has been consolidated.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+For TEST_SUITE_GUIDE.md content → See [TESTING_GUIDE.md](../../TESTING_GUIDE.md)
+
+---
+
 # Graphix IR Test Suite Guide
 
 **Version:** 2.2.0  

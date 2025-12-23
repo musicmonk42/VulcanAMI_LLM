@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED
+
+**This document has been consolidated.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+For COMPLETE_DEEP_DIVE_ANALYSIS.md content → See [ARCHITECTURE_OVERVIEW.md](../../ARCHITECTURE_OVERVIEW.md)
+
+---
+
 # Complete Deep-Dive Repository Analysis
 
 **Generated:** December 2024  

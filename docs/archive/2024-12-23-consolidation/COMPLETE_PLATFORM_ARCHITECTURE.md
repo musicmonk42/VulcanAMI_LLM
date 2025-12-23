@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED
+
+**This document has been consolidated.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+For COMPLETE_PLATFORM_ARCHITECTURE.md content → See [ARCHITECTURE_OVERVIEW.md](../../ARCHITECTURE_OVERVIEW.md)
+
+---
+
 # VulcanAMI Complete Platform Architecture
 
 **Report Date:** December 14, 2024  

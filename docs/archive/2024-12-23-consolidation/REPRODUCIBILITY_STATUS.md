@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED
+
+**This document has been consolidated.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+For REPRODUCIBILITY_STATUS.md content → See status section in [REPRODUCIBLE_BUILDS.md](../../REPRODUCIBLE_BUILDS.md)
+
+---
+
 # Repository Reproducibility Status Report
 
 **Date:** December 14, 2024 (Updated with accurate metrics)  
