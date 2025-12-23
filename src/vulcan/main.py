@@ -137,15 +137,38 @@ class ProcessLock:
     the existing lock file and shut down immediately.
     
     Uses fcntl.flock() on Unix systems for advisory file locking.
+    
+    The lock file path can be configured via:
+    - VULCAN_LOCK_PATH environment variable
+    - Constructor parameter
+    - Default: /var/lock/vulcan_orchestrator.lock (falls back to /tmp if /var/lock doesn't exist)
     """
     
-    LOCK_FILE_PATH = "/tmp/vulcan_orchestrator.lock"
+    # Default paths - /var/lock is preferred for container environments
+    DEFAULT_LOCK_DIR = "/var/lock"
+    FALLBACK_LOCK_DIR = "/tmp"
+    LOCK_FILENAME = "vulcan_orchestrator.lock"
     
     def __init__(self, lock_path: str = None):
-        self.lock_path = lock_path or self.LOCK_FILE_PATH
+        self.lock_path = lock_path or self._get_default_lock_path()
         self._lock_file = None
         self._locked = False
         self._logger = logging.getLogger("ProcessLock")
+    
+    @classmethod
+    def _get_default_lock_path(cls) -> str:
+        """Get the default lock file path, respecting environment variable."""
+        # Priority 1: Environment variable
+        env_path = os.getenv("VULCAN_LOCK_PATH")
+        if env_path:
+            return env_path
+        
+        # Priority 2: /var/lock if it exists and is writable
+        if os.path.isdir(cls.DEFAULT_LOCK_DIR) and os.access(cls.DEFAULT_LOCK_DIR, os.W_OK):
+            return os.path.join(cls.DEFAULT_LOCK_DIR, cls.LOCK_FILENAME)
+        
+        # Priority 3: /tmp as fallback
+        return os.path.join(cls.FALLBACK_LOCK_DIR, cls.LOCK_FILENAME)
     
     def acquire(self) -> bool:
         """
@@ -162,13 +185,22 @@ class ProcessLock:
             return True  # Allow process to continue without lock on non-Unix systems
         
         try:
-            # Create lock file if it doesn't exist
-            self._lock_file = open(self.lock_path, "w")
+            # Ensure parent directory exists
+            lock_dir = os.path.dirname(self.lock_path)
+            if lock_dir and not os.path.exists(lock_dir):
+                os.makedirs(lock_dir, exist_ok=True)
+            
+            # Open file in read/write mode, creating if needed
+            # Using 'a+' mode preserves existing content and creates if not exists
+            # Then seek to beginning for reading existing PID if needed
+            self._lock_file = open(self.lock_path, "a+")
+            self._lock_file.seek(0)
             
             # Try to acquire exclusive lock (non-blocking)
             fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             
-            # Write PID to lock file for debugging
+            # Truncate and write our PID (we now hold the lock)
+            self._lock_file.truncate(0)
             self._lock_file.write(f"{os.getpid()}\n")
             self._lock_file.flush()
             
@@ -179,15 +211,23 @@ class ProcessLock:
             return True
             
         except (IOError, OSError) as e:
-            # Lock is held by another process
+            # Lock is held by another process - try to read existing PID for debugging
+            existing_pid = None
+            if self._lock_file:
+                try:
+                    self._lock_file.seek(0)
+                    existing_pid = self._lock_file.read().strip()
+                except Exception:
+                    pass
+                self._lock_file.close()
+                self._lock_file = None
+            
+            pid_info = f" (held by PID: {existing_pid})" if existing_pid else ""
             self._logger.error(
-                f"Failed to acquire process lock: {e}. "
+                f"Failed to acquire process lock: {e}.{pid_info} "
                 f"Another vulcan.orchestrator instance may be running. "
                 f"Lock file: {self.lock_path}"
             )
-            if self._lock_file:
-                self._lock_file.close()
-                self._lock_file = None
             return False
         except Exception as e:
             self._logger.error(f"Unexpected error acquiring process lock: {e}")
