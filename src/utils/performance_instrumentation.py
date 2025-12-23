@@ -16,8 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class PerformanceMetrics:
-    """Container for performance metrics."""
+class GenerationPerformanceMetrics:
+    """Container for generation-specific performance metrics.
+    
+    Named specifically to avoid conflicts with other PerformanceMetrics classes
+    in the codebase (e.g., in problem_decomposer, stress_tests, etc.).
+    """
     
     # Timing statistics (in milliseconds)
     total_encode_time_ms: float = 0.0
@@ -209,17 +213,20 @@ class TimingContext:
             logger.info(f"[PERF] {self.name}: {self.elapsed_ms:.1f}ms")
 
 
-class PerformanceTracker:
+class GenerationPerformanceTracker:
     """
     Global performance tracker for the generation pipeline.
     
     Provides centralized tracking of performance metrics across
     different components of the system.
+    
+    Named specifically to avoid conflicts with other PerformanceTracker classes
+    in the codebase (e.g., in performance_metrics.py, problem_decomposer, etc.).
     """
     
-    _instance: Optional["PerformanceTracker"] = None
+    _instance: Optional["GenerationPerformanceTracker"] = None
     
-    def __new__(cls) -> "PerformanceTracker":
+    def __new__(cls) -> "GenerationPerformanceTracker":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
@@ -230,7 +237,7 @@ class PerformanceTracker:
             return
         
         self._initialized = True
-        self.metrics = PerformanceMetrics()
+        self.metrics = GenerationPerformanceMetrics()
         self._operation_times: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
         self._enabled = True
     
@@ -256,7 +263,7 @@ class PerformanceTracker:
         """Get statistics for a specific operation."""
         times = self._operation_times.get(operation)
         if not times:
-            return {"count": 0, "avg_ms": 0.0, "p50_ms": 0.0, "p95_ms": 0.0, "p99_ms": 0.0}
+            return {"count": 0, "avg_ms": 0.0, "min_ms": 0.0, "max_ms": 0.0, "p50_ms": 0.0, "p95_ms": 0.0, "p99_ms": 0.0}
         
         sorted_times = sorted(times)
         return {
@@ -280,19 +287,19 @@ class PerformanceTracker:
 
 
 # Global tracker instance
-_tracker = PerformanceTracker()
+_tracker = GenerationPerformanceTracker()
 
 
-def get_performance_tracker() -> PerformanceTracker:
-    """Get the global performance tracker instance."""
+def get_generation_performance_tracker() -> GenerationPerformanceTracker:
+    """Get the global generation performance tracker instance."""
     return _tracker
 
 
 __all__ = [
-    "PerformanceMetrics",
-    "PerformanceTracker",
+    "GenerationPerformanceMetrics",
+    "GenerationPerformanceTracker",
     "TimingContext",
-    "get_performance_tracker",
+    "get_generation_performance_tracker",
     "timed",
     "timed_async",
 ]

@@ -8,28 +8,28 @@ import pytest
 from unittest.mock import patch
 
 from src.utils.performance_instrumentation import (
-    PerformanceMetrics,
-    PerformanceTracker,
+    GenerationPerformanceMetrics,
+    GenerationPerformanceTracker,
     TimingContext,
-    get_performance_tracker,
+    get_generation_performance_tracker,
     timed,
     timed_async,
 )
 
 
-class TestPerformanceMetrics:
-    """Tests for PerformanceMetrics class."""
+class TestGenerationPerformanceMetrics:
+    """Tests for GenerationPerformanceMetrics class."""
     
     def test_init_defaults(self):
         """Test default initialization."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         assert metrics.total_encode_time_ms == 0.0
         assert metrics.tokens_generated == 0
         assert metrics.encoding_cache_hits == 0
     
     def test_record_encode_time(self):
         """Test recording encode times."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         metrics.record_encode_time(100.0)
         metrics.record_encode_time(50.0)
         
@@ -38,7 +38,7 @@ class TestPerformanceMetrics:
     
     def test_record_logits_time(self):
         """Test recording logits times."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         metrics.record_logits_time(25.0)
         
         assert metrics.total_logits_time_ms == 25.0
@@ -46,7 +46,7 @@ class TestPerformanceMetrics:
     
     def test_record_sample_time(self):
         """Test recording sample times."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         metrics.record_sample_time(10.0)
         
         assert metrics.total_sample_time_ms == 10.0
@@ -54,7 +54,7 @@ class TestPerformanceMetrics:
     
     def test_get_percentile(self):
         """Test percentile calculation."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         
         # Add sample data
         for i in range(100):
@@ -69,12 +69,12 @@ class TestPerformanceMetrics:
     
     def test_get_percentile_empty(self):
         """Test percentile with empty data."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         assert metrics.get_percentile(metrics.encode_times, 50) == 0.0
     
     def test_get_summary(self):
         """Test summary generation."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         metrics.tokens_generated = 10
         metrics.total_encode_time_ms = 100.0
         metrics.encoding_cache_hits = 5
@@ -89,7 +89,7 @@ class TestPerformanceMetrics:
     
     def test_reset(self):
         """Test reset functionality."""
-        metrics = PerformanceMetrics()
+        metrics = GenerationPerformanceMetrics()
         metrics.tokens_generated = 10
         metrics.total_encode_time_ms = 100.0
         metrics.record_encode_time(50.0)
@@ -194,19 +194,19 @@ class TestTimedAsyncDecorator:
             await failing_async()
 
 
-class TestPerformanceTracker:
+class TestGenerationPerformanceTracker:
     """Tests for PerformanceTracker singleton."""
     
     def test_singleton_pattern(self):
         """Test that only one instance exists."""
-        tracker1 = get_performance_tracker()
-        tracker2 = get_performance_tracker()
+        tracker1 = get_generation_performance_tracker()
+        tracker2 = get_generation_performance_tracker()
         
         assert tracker1 is tracker2
     
     def test_record_and_get_stats(self):
         """Test recording and retrieving stats."""
-        tracker = get_performance_tracker()
+        tracker = get_generation_performance_tracker()
         tracker.reset()  # Start fresh
         
         tracker.record("test_op", 10.0)
@@ -222,15 +222,17 @@ class TestPerformanceTracker:
     
     def test_get_stats_unknown_operation(self):
         """Test getting stats for unknown operation."""
-        tracker = get_performance_tracker()
+        tracker = get_generation_performance_tracker()
         stats = tracker.get_stats("unknown_op_12345")
         
         assert stats["count"] == 0
         assert stats["avg_ms"] == 0.0
+        assert stats["min_ms"] == 0.0
+        assert stats["max_ms"] == 0.0
     
     def test_enable_disable(self):
         """Test enable/disable functionality."""
-        tracker = get_performance_tracker()
+        tracker = get_generation_performance_tracker()
         tracker.reset()
         
         tracker.disable()
@@ -247,7 +249,7 @@ class TestPerformanceTracker:
     
     def test_reset(self):
         """Test reset functionality."""
-        tracker = get_performance_tracker()
+        tracker = get_generation_performance_tracker()
         tracker.record("reset_test", 100.0)
         
         tracker.reset()
@@ -257,7 +259,7 @@ class TestPerformanceTracker:
     
     def test_get_all_stats(self):
         """Test getting all operation stats."""
-        tracker = get_performance_tracker()
+        tracker = get_generation_performance_tracker()
         tracker.reset()
         
         tracker.record("op1", 10.0)
