@@ -605,7 +605,7 @@ Total: $1.82M (52% savings vs OpenAI)
 
 ### Documentation
 - **Platform Overview:** [README.md](README.md)
-- **Architecture:** [COMPLETE_PLATFORM_ARCHITECTURE.md](COMPLETE_PLATFORM_ARCHITECTURE.md)
+- **Architecture:** [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md)
 - **Service Catalog:** [docs/COMPLETE_SERVICE_CATALOG.md](docs/COMPLETE_SERVICE_CATALOG.md)
 - **API Reference:** [docs/api_reference.md](docs/api_reference.md)
 

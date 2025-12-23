@@ -362,9 +362,9 @@ VulcanAMI is structured as a **layered AI operating system** that integrates mul
   - Security scanning integrated into CI/CD
 
 **For complete architecture documentation, see:**
-- [docs/COMPLETE_PLATFORM_ARCHITECTURE.md](docs/COMPLETE_PLATFORM_ARCHITECTURE.md) - Full system architecture
+- [docs/ARCHITECTURE_OVERVIEW.md](docs/ARCHITECTURE_OVERVIEW.md) - Full system architecture
 - [docs/COMPREHENSIVE_REPO_OVERVIEW.md](docs/COMPREHENSIVE_REPO_OVERVIEW.md) - Repository overview
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - Detailed architecture documentation
+- [docs/INDEX.md](docs/INDEX.md) - Documentation index
 
 ---
 
