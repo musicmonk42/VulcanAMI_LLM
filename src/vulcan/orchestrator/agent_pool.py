@@ -1392,8 +1392,13 @@ class AgentPoolManager:
         Monitor agent health and performance with comprehensive cleanup
 
         FIXED: Converted long time.sleep(10) to interruptible self._shutdown_event.wait(timeout=10).
+        PERFORMANCE FIX: Added periodic statistics reset to prevent memory leaks.
         """
         logger.info("Agent monitor started")
+        
+        # PERFORMANCE: Track iterations for periodic cleanup
+        monitor_iterations = 0
+        STATS_RESET_INTERVAL = 360  # Reset stats every ~1 hour (360 * 10 seconds)
 
         # FIXED: Use interruptible wait
         while not self._shutdown_event.is_set():
@@ -1403,6 +1408,7 @@ class AgentPoolManager:
                     break
 
                 current_time = time.time()
+                monitor_iterations += 1
 
                 with self.lock:
                     # FIXED: Clean up stale task assignments
@@ -1470,6 +1476,11 @@ class AgentPoolManager:
                 for agent_id in agents_to_retire:
                     logger.info(f"Retiring stale/error agent {agent_id}")
                     self.retire_agent(agent_id)
+                
+                # PERFORMANCE FIX: Periodic statistics reset to prevent unbounded growth
+                if monitor_iterations % STATS_RESET_INTERVAL == 0:
+                    logger.info(f"Performing periodic statistics reset (iteration {monitor_iterations})")
+                    self.reset_statistics(preserve_totals=True)
 
             except Exception as e:
                 logger.error(f"Monitor error: {e}", exc_info=True)
@@ -1639,6 +1650,48 @@ class AgentPoolManager:
         base_stats["perf_thresholds"] = self.perf_thresholds
         
         return base_stats
+
+    def reset_statistics(self, preserve_totals: bool = True) -> None:
+        """
+        Reset pool statistics to prevent unbounded memory growth.
+        
+        PERFORMANCE FIX: Called periodically to prevent statistics dictionaries
+        from growing unboundedly over long-running sessions.
+        
+        Args:
+            preserve_totals: If True, keeps cumulative totals but resets windows.
+                           If False, resets everything to zero.
+        """
+        with self.stats_lock:
+            if not preserve_totals:
+                # Full reset
+                self.stats = {
+                    "total_jobs_submitted": 0,
+                    "total_jobs_completed": 0,
+                    "total_jobs_failed": 0,
+                    "total_agents_spawned": 0,
+                    "total_agents_retired": 0,
+                    "total_recoveries_attempted": 0,
+                    "total_recoveries_successful": 0,
+                }
+        
+        # Reset response time tracker's sliding window
+        if hasattr(self, 'response_time_tracker'):
+            with self.response_time_tracker._lock:
+                # Keep only recent samples to prevent unbounded growth
+                if len(self.response_time_tracker._samples) > self.response_time_tracker.window_size:
+                    # Trim to window size
+                    recent = list(self.response_time_tracker._samples)[-self.response_time_tracker.window_size:]
+                    self.response_time_tracker._samples.clear()
+                    self.response_time_tracker._samples.extend(recent)
+        
+        # Reset priority queue statistics periodically
+        if hasattr(self, 'priority_queue'):
+            with self.priority_queue._lock:
+                # Keep cumulative totals but ensure no leaks
+                self.priority_queue._stats["priority_distribution"] = defaultdict(int)
+        
+        logger.debug(f"Statistics reset completed (preserve_totals={preserve_totals})")
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """
