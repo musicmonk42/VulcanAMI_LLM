@@ -2,7 +2,11 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 3
+# IMPORTANT: Set to 1 to prevent split-brain race condition when Redis is unavailable.
+# Without a working Redis connection for state synchronization, multiple replicas
+# will have isolated state and cause oscillating job counts.
+# Increase this only after Redis connectivity is confirmed working.
+replicaCount: 1
 
 image:
   repository: ghcr.io/musicmonk42/vulcanami_llm-api
