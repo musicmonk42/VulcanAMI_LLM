@@ -202,6 +202,20 @@ class ResponseTimeTracker:
             second_half_avg = sum(s["duration_ms"] for s in recent[mid:]) / (len(recent) - mid)
             
             return second_half_avg - first_half_avg
+    
+    def trim_to_window_size(self) -> None:
+        """Trim samples to window size to prevent memory growth.
+        
+        PERFORMANCE FIX: Called periodically to ensure the samples deque
+        doesn't exceed the configured window size.
+        """
+        with self._lock:
+            # The deque has maxlen, but we explicitly trim for safety
+            if len(self._samples) > self.window_size:
+                # Keep only the most recent samples
+                recent = list(self._samples)[-self.window_size:]
+                self._samples.clear()
+                self._samples.extend(recent)
 
 
 # ============================================================
@@ -322,6 +336,16 @@ class PriorityJobQueue:
                 self._queues[priority].clear()
             self._size = 0
             return count
+    
+    def reset_priority_distribution(self) -> None:
+        """Reset the priority distribution statistics.
+        
+        PERFORMANCE FIX: Called periodically to prevent the priority_distribution
+        dictionary from growing unboundedly over long sessions. Preserves total
+        counts but resets the distribution tracking.
+        """
+        with self._lock:
+            self._stats["priority_distribution"] = defaultdict(int)
 
 
 # ============================================================
@@ -1675,21 +1699,13 @@ class AgentPoolManager:
                     "total_recoveries_successful": 0,
                 }
         
-        # Reset response time tracker's sliding window
+        # Reset response time tracker's sliding window using public method
         if hasattr(self, 'response_time_tracker'):
-            with self.response_time_tracker._lock:
-                # Keep only recent samples to prevent unbounded growth
-                if len(self.response_time_tracker._samples) > self.response_time_tracker.window_size:
-                    # Trim to window size
-                    recent = list(self.response_time_tracker._samples)[-self.response_time_tracker.window_size:]
-                    self.response_time_tracker._samples.clear()
-                    self.response_time_tracker._samples.extend(recent)
+            self.response_time_tracker.trim_to_window_size()
         
-        # Reset priority queue statistics periodically
+        # Reset priority queue statistics using public method
         if hasattr(self, 'priority_queue'):
-            with self.priority_queue._lock:
-                # Keep cumulative totals but ensure no leaks
-                self.priority_queue._stats["priority_distribution"] = defaultdict(int)
+            self.priority_queue.reset_priority_distribution()
         
         logger.debug(f"Statistics reset completed (preserve_totals={preserve_totals})")
 
