@@ -5,6 +5,7 @@
 # to avoid thread spawning that causes hangs.
 # ============================================================
 
+import logging
 import time
 import unittest
 import uuid
@@ -13,6 +14,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional
 from unittest.mock import Mock
+
+# Configure logger for test mocks
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # MOCK ENUMS AND DATA CLASSES
@@ -940,7 +944,7 @@ class MockAgentPoolManagerWithRedis(MockAgentPoolManager):
                     pass
             
             if loaded_stats:
-                print(f"🔄 Hydrated Agent Pool state from Redis: {loaded_stats}")
+                logger.info(f"🔄 Hydrated Agent Pool state from Redis: {loaded_stats}")
                 
         except Exception:
             pass  # Fall back to defaults
