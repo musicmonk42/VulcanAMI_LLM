@@ -1,0 +1,125 @@
+# VULCAN Generation Configuration
+# This file contains tunable parameters for token generation and performance optimization
+
+generation:
+  # Sampling parameters
+  temperature: 0.7          # Range: 0.0-2.0. Lower = more deterministic, higher = more creative
+  top_k: 50                 # Number of top tokens to consider. 0 = disabled
+  top_p: 0.9                # Nucleus sampling threshold. 1.0 = disabled
+  
+  # Repetition control
+  repetition_penalty: 1.1   # Penalty for repeated tokens. 1.0 = disabled
+  repetition_window: 50     # Number of recent tokens to check for repetition
+  allow_repetition: false   # Whether to allow repeated tokens
+  
+  # Generation limits
+  max_tokens: 512           # Maximum tokens to generate
+  min_tokens: 1             # Minimum tokens to generate
+  
+  # Stopping conditions
+  stop_tokens:
+    - "</s>"
+    - "<|endoftext|>"
+  stop_strings:
+    - "\n\n"
+  
+  # Beam search (if enabled)
+  use_beam_search: false
+  beam_width: 4
+  beam_length_penalty: 0.7
+  beam_max_expansions: 8
+  
+  # Speculative decoding (if enabled)
+  speculative_enabled: false
+  speculative_draft_steps: 4
+  speculative_max_rejects: 10
+
+performance:
+  # Caching configuration
+  enable_encoding_cache: true
+  encoding_cache_size: 1000           # Max cached hidden states
+  
+  enable_logits_cache: true
+  logits_cache_size: 1000             # Max cached logits
+  logits_cache_ttl_seconds: 300       # Time-to-live for cached logits
+  
+  # Context caching
+  context_cache_interval: 5           # Refresh context every N tokens
+  aggressive_cache_threshold: 10      # After this many tokens, cache more aggressively
+  aggressive_context_cache_interval: 20  # Interval after threshold
+  
+  # World model updates
+  world_model_update_interval: 10     # Update world model every N tokens
+  
+  # KV Cache (executor level)
+  kv_cache_size: 2048                 # Max KV cache entries
+  kv_cache_eviction_policy: "lru"     # Options: lru, lfu, fifo, adaptive
+  
+  # Parallelization
+  max_parallel_workers: 4             # Workers for parallel operations
+  enable_parallel_scoring: false      # Enable parallel candidate scoring
+  
+  # Quantization
+  enable_quantization: false
+  quantization_bits: 8
+
+monitoring:
+  # Timing and instrumentation
+  enable_timing: true
+  timing_log_threshold_ms: 100        # Log operations taking longer than this
+  
+  # Agent pool monitoring
+  enable_agent_status: true
+  agent_status_interval_seconds: 5
+  
+  # Response time tracking
+  response_time_window_size: 1000     # Samples to keep for percentile calculation
+  alert_threshold_ms: 5000            # Alert when response time exceeds this
+  
+  # Performance thresholds for auto-scaling
+  p95_target_ms: 100
+  p99_target_ms: 500
+  max_queue_depth: 100
+  
+  # Logging
+  log_level: INFO                     # DEBUG, INFO, WARNING, ERROR
+  log_perf_metrics: true              # Log detailed performance metrics
+
+safety:
+  # Per-token safety validation
+  safety_per_token: true
+  safety_per_sequence: true
+  
+  # Consensus (if enabled)
+  require_consensus_per_token: false
+  consensus_timeout_seconds: 2.0
+  
+  # Error handling
+  max_errors: 5
+  error_backoff_seconds: 0.05
+  
+  # Time budget
+  time_budget_seconds: null           # null = no budget, or specify seconds
+
+runtime:
+  # Stream generation
+  enable_stream: true
+  
+  # Audit and observability
+  enable_audit: true
+  enable_observability: true
+  
+  # Debugging
+  trace_reasoning: true
+  attach_logits: false
+  attach_probabilities: false
+  attach_world_model_hooks: true
+  attach_token_rationale: true
+  
+  # Strategy selection
+  enable_strategy_bandit_feedback: true
+  
+  # Early stopping
+  early_stop_score_delta: null        # null = disabled
+  early_stop_entropy_delta: null      # null = disabled
+  score_window: 10
