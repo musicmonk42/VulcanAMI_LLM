@@ -5,7 +5,7 @@
 
 def function_a(depth: int = 0):
     """
-    Call function_a and optionally function_b.
+    Function A implementation that optionally calls function_b.
     
     Uses lazy import to avoid circular dependency. The depth parameter prevents
     infinite recursion by limiting the call chain depth.
@@ -17,6 +17,6 @@ def function_a(depth: int = 0):
     if depth < 1:  # Prevent infinite recursion
         # Use local import to avoid circular import at module load time
         # This is the recommended pattern when two modules need to call each other
-        from src.module_b import function_b  # noqa: E402
+        from .module_b import function_b  # noqa: E402
         function_b(depth + 1)
 

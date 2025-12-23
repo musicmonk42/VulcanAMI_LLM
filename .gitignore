@@ -196,3 +196,7 @@ data/backups/
 *.dat
 *.whl
 *.tar.gz
+
+# Runtime state files (test-generated)
+data/agent_state.json
+data/agent_state.json.tmp
