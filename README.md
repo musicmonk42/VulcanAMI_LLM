@@ -19,7 +19,7 @@ Last updated: 2024-12-14
 
 ## Overview
 
-Graphix Vulcan is Novatrax’s AI-native graph execution and governance platform. It enables you to:
+Vulcan AMI (Adaptive Machine Intelligence) is Novatrax’s AI-native graph execution and governance platform. It enables you to:
 
 - Represent complex AI and data workflows as a typed, JSON-based intermediate representation (IR).
 - Validate and execute the graph as a safe, observable, and scalable DAG.
