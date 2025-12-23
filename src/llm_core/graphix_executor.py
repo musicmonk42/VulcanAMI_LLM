@@ -1375,6 +1375,102 @@ class GraphixExecutor:
 
         return executor
 
+    def load_weights_from_numpy(self, weight_dict: Dict[str, Any]) -> None:
+        """Load weights from a dictionary of numpy arrays.
+
+        This method allows loading pre-trained weights from PyTorch checkpoints
+        or other formats after conversion to numpy arrays.
+
+        Args:
+            weight_dict: Dictionary mapping weight names to numpy arrays.
+                Expected keys follow the pattern:
+                - "token_embedding": shape (vocab_size, hidden_size)
+                - "layer_{i}.attn.{q,k,v,o}": shape (hidden_size, hidden_size)
+                - "layer_{i}.ffn.{gate,up}": shape (hidden_size, intermediate_size)
+                - "layer_{i}.ffn.down": shape (intermediate_size, hidden_size)
+                - "layer_{i}.ln{1,2}.weight": shape (hidden_size,)
+                - "final_ln.weight": shape (hidden_size,)
+                - "lm_head": shape (hidden_size, vocab_size)
+
+        Note:
+            Weight matrices are stored flattened in row-major order.
+            2D arrays are converted to 1D lists for storage.
+        """
+        loaded_count = 0
+        for name, array in weight_dict.items():
+            if hasattr(array, 'numpy'):
+                # Convert torch tensor to numpy if needed
+                array = array.numpy()
+            if hasattr(array, 'flatten'):
+                # Flatten 2D arrays to 1D for storage
+                self.weights[name] = array.flatten().astype(np.float32).tolist()
+            else:
+                # Already a list or 1D
+                self.weights[name] = list(array)
+            loaded_count += 1
+            logger.debug("Loaded weight %s with shape %s", name, getattr(array, 'shape', len(array)))
+
+        logger.info(
+            "Loaded %d weight tensors from numpy format (total: %d)",
+            loaded_count,
+            len(self.weights),
+        )
+
+    def verify_weights(self) -> Dict[str, Any]:
+        """Verify that all required weights are present and have correct sizes.
+
+        Returns:
+            Dictionary containing verification results:
+            - "status": "ok" or "error"
+            - "missing": List of missing weight names
+            - "size_errors": List of weights with incorrect sizes
+            - "total_params": Total number of parameters
+        """
+        results = {
+            "status": "ok",
+            "missing": [],
+            "size_errors": [],
+            "total_params": 0,
+        }
+
+        # Expected weights and their sizes
+        expected = {
+            "token_embedding": self.vocab_size * self.hidden_size,
+            "final_ln.weight": self.hidden_size,
+            "lm_head": self.hidden_size * self.vocab_size,
+        }
+
+        # Layer weights
+        intermediate_size = self.hidden_size * 4
+        for layer in range(self.num_layers):
+            expected[f"layer_{layer}.attn.q"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.attn.k"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.attn.v"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.attn.o"] = self.hidden_size * self.hidden_size
+            expected[f"layer_{layer}.ffn.gate"] = self.hidden_size * intermediate_size
+            expected[f"layer_{layer}.ffn.up"] = self.hidden_size * intermediate_size
+            expected[f"layer_{layer}.ffn.down"] = intermediate_size * self.hidden_size
+            expected[f"layer_{layer}.ln1.weight"] = self.hidden_size
+            expected[f"layer_{layer}.ln2.weight"] = self.hidden_size
+
+        # Check weights
+        for name, expected_size in expected.items():
+            if name not in self.weights:
+                results["missing"].append(name)
+                results["status"] = "error"
+            else:
+                actual_size = len(self.weights[name])
+                results["total_params"] += actual_size
+                if actual_size != expected_size:
+                    results["size_errors"].append({
+                        "name": name,
+                        "expected": expected_size,
+                        "actual": actual_size,
+                    })
+                    results["status"] = "error"
+
+        return results
+
 
 # ============================================================
 # EXPORTS
