@@ -874,46 +874,86 @@ class GraphixVulcanLLM:
     # -----------------------------------------------------------
 
     def _get_event_loop(self) -> asyncio.AbstractEventLoop:
-        """Get or create event loop"""
-        if self._event_loop is None or self._event_loop.is_closed():
-            try:
-                loop = asyncio.get_running_loop()
+        """Get or create event loop - OPTIMIZED to reuse existing loops.
+        
+        Performance fix: Avoids creating new event loops on each call.
+        Caches the loop instance and only creates a new one if absolutely necessary.
+        """
+        # Fast path: Return cached loop if still valid
+        if self._event_loop is not None and not self._event_loop.is_closed():
+            return self._event_loop
+        
+        # Try to get an already running loop first
+        try:
+            loop = asyncio.get_running_loop()
+            self._event_loop = loop
+            return self._event_loop
+        except RuntimeError:
+            pass  # No running loop - continue to create/get one
+        
+        # Try to get the event loop from the policy (may already exist)
+        try:
+            loop = asyncio.get_event_loop_policy().get_event_loop()
+            if not loop.is_closed():
                 self._event_loop = loop
-            except RuntimeError:
-                # No running loop, create new one
-                try:
-                    loop = asyncio.get_event_loop_policy().get_event_loop()
-                    if loop.is_closed():
-                        raise RuntimeError("Loop is closed")
-                    self._event_loop = loop
-                except:
-                    self._event_loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(self._event_loop)
+                return self._event_loop
+        except RuntimeError:
+            pass  # No loop available, need to create one
+        
+        # Last resort: Create a new event loop (only happens once typically)
+        logger.debug("Creating new event loop (this should only happen once)")
+        self._event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._event_loop)
         return self._event_loop
+
+    def _check_running_loop(self) -> bool:
+        """Check if there's already a running event loop.
+
+        Returns True if a loop is already running (and run_until_complete would fail),
+        False if it's safe to create and run a new loop.
+        """
+        try:
+            asyncio.get_running_loop()
+            return True  # Loop is running - not safe to use run_until_complete
+        except RuntimeError:
+            return False  # No running loop - safe to proceed
 
     def _run_async(self, coro):
         """Run async coroutine or collect async generator"""
-        loop = self._get_event_loop()
+        # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
+        if self._check_running_loop():
+            logger.warning(
+                "Event loop already running in _run_async() - returning None"
+            )
+            return None
 
-        # Check if it's an async generator
-        if inspect.isasyncgen(coro):
-            logger.debug("Detected async generator, collecting results...")
+        # Create a new event loop for this synchronous context
+        # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
+        loop = asyncio.new_event_loop()
 
-            async def _collect():
-                result = None
-                async for item in coro:
-                    result = item  # Collect last item
-                return result
+        try:
+            # Check if it's an async generator
+            if inspect.isasyncgen(coro):
+                logger.debug("Detected async generator, collecting results...")
 
-            return loop.run_until_complete(_collect())
-        # Check if it's a coroutine
-        elif inspect.iscoroutine(coro):
-            logger.debug("Detected coroutine, awaiting...")
-            return loop.run_until_complete(coro)
-        else:
-            # Not async, return as-is
-            logger.debug("Not async, returning directly")
-            return coro
+                async def _collect():
+                    result = None
+                    async for item in coro:
+                        result = item  # Collect last item
+                    return result
+
+                return loop.run_until_complete(_collect())
+            # Check if it's a coroutine
+            elif inspect.iscoroutine(coro):
+                logger.debug("Detected coroutine, awaiting...")
+                return loop.run_until_complete(coro)
+            else:
+                # Not async, return as-is
+                logger.debug("Not async, returning directly")
+                return coro
+        finally:
+            # Clean up the event loop we created
+            loop.close()
 
     def _is_async_callable(self, obj: Any, method_name: str) -> bool:
         """Check if a method is async"""
@@ -975,98 +1015,95 @@ class GraphixVulcanLLM:
             has_anext = hasattr(gen_result, "__anext__")
             has_tokens = hasattr(gen_result, "tokens")
 
-            logger.info(
+            logger.debug(
                 f"CognitiveLoop returned: type={result_type_name}, has___anext__={has_anext}, has_tokens={has_tokens}"
             )
 
-            # Get event loop once
-            try:
-                loop = asyncio.get_running_loop()
-                logger.info("Using existing running loop")
-            except RuntimeError:
-                logger.info("No running loop - creating new one")
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            # Process based on type
-            if inspect.iscoroutine(gen_result):
-                logger.info("DETECTED COROUTINE - AWAITING")
-                loop_result = loop.run_until_complete(gen_result)
-
-                # Check if the coroutine returned an async generator!
-                result_type_after_await = type(loop_result).__name__
-                logger.info(
-                    f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
+            # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
+            # This happens when generate() is called from run_in_executor() in HybridLLMExecutor
+            if self._check_running_loop():
+                logger.warning(
+                    "Event loop already running - skipping local generation to trigger OpenAI fallback"
                 )
+                return None  # Triggers OpenAI fallback in HybridLLMExecutor
 
-                # If it returned an async generator, consume it
-                if hasattr(loop_result, "__anext__"):
-                    logger.info("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
+            # Create a new event loop for this synchronous context
+            # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
+            loop = asyncio.new_event_loop()
 
-                    async def consume_nested_generator():
-                        logger.info("Consuming nested generator...")
+            try:
+                # Process based on type
+                if inspect.iscoroutine(gen_result):
+                    logger.debug("DETECTED COROUTINE - AWAITING")
+                    loop_result = loop.run_until_complete(gen_result)
+
+                    # Check if the coroutine returned an async generator!
+                    result_type_after_await = type(loop_result).__name__
+                    logger.debug(
+                        f"After awaiting coroutine: type={result_type_after_await}, has_tokens={hasattr(loop_result, 'tokens')}"
+                    )
+
+                    # If it returned an async generator, consume it
+                    if hasattr(loop_result, "__anext__"):
+                        logger.debug("COROUTINE RETURNED ASYNC GENERATOR - CONSUMING IT")
+
+                        async def consume_nested_generator():
+                            results = []
+                            count = 0
+
+                            async for item in loop_result:
+                                count += 1
+                                results.append(item)
+
+                            logger.debug(f"Consumed {count} items from nested generator")
+
+                            if not results:
+                                raise ValueError("Nested generator yielded no items!")
+
+                            return results[-1]
+
+                        loop_result = loop.run_until_complete(consume_nested_generator())
+                        logger.debug(
+                            f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
+                        )
+
+                elif has_anext:
+                    logger.debug("DETECTED ASYNC GENERATOR - CONSUMING")
+
+                    async def consume_generator():
                         results = []
                         count = 0
 
-                        async for item in loop_result:
+                        async for item in gen_result:
                             count += 1
                             results.append(item)
-                            # --- PATCH B ---
-                            logger.debug(
-                                f"  Item {count}: type={type(item).__name__}, has_tokens={hasattr(item, 'tokens')}"
-                            )
 
-                        logger.info(f"Consumed {count} items from nested generator")
+                        logger.debug(f"Consumed {count} items")
 
                         if not results:
-                            raise ValueError("Nested generator yielded no items!")
+                            raise ValueError("Generator yielded no items!")
 
                         return results[-1]
 
-                    loop_result = loop.run_until_complete(consume_nested_generator())
-                    logger.info(
-                        f"After consuming nested generator: type={type(loop_result).__name__}, has_tokens={hasattr(loop_result, 'tokens')}"
+                    loop_result = loop.run_until_complete(consume_generator())
+
+                elif has_tokens:
+                    logger.debug("DETECTED DIRECT RESULT OBJECT")
+                    loop_result = gen_result
+
+                else:
+                    raise TypeError(
+                        f"Unknown return type: type={result_type_name}, "
+                        f"has___anext__={has_anext}, has_tokens={has_tokens}"
                     )
-
-            elif has_anext:
-                logger.info("DETECTED ASYNC GENERATOR - CONSUMING")
-
-                async def consume_generator():
-                    logger.info("Consuming generator...")
-                    results = []
-                    count = 0
-
-                    async for item in gen_result:
-                        count += 1
-                        results.append(item)
-                        # --- PATCH B ---
-                        logger.debug(
-                            f"  Item {count}: type={type(item).__name__}, has_tokens={hasattr(item, 'tokens')}"
-                        )
-
-                    logger.info(f"Consumed {count} items")
-
-                    if not results:
-                        raise ValueError("Generator yielded no items!")
-
-                    return results[-1]
-
-                loop_result = loop.run_until_complete(consume_generator())
-
-            elif has_tokens:
-                logger.info("DETECTED DIRECT RESULT OBJECT")
-                loop_result = gen_result
-
-            else:
-                raise TypeError(
-                    f"Unknown return type: type={result_type_name}, "
-                    f"has___anext__={has_anext}, has_tokens={has_tokens}"
-                )
+            finally:
+                # Clean up the event loop we created
+                loop.close()
 
             # Final check
             final_type = type(loop_result).__name__
             final_has_tokens = hasattr(loop_result, "tokens")
-            logger.info(
+            logger.debug(
                 f"Final result: type={final_type}, has_tokens={final_has_tokens}"
             )
 
@@ -1198,41 +1235,53 @@ class GraphixVulcanLLM:
                 stop_strings=tuple(kwargs.get("stop_strings", [])),
             )
 
-            # Acquire a loop
-            loop = self._get_event_loop()
+            # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
+            if self._check_running_loop():
+                logger.warning(
+                    "Event loop already running in stream() - returning empty result"
+                )
+                return  # Exit generator entirely, yielding nothing to caller
 
-            async def _consume_async_generator(async_gen):
-                # Drive the async generator to produce tokens (callback captures them)
-                async for chunk in async_gen:
-                    # chunk is a dict with keys: token, text, token_info
-                    tok = chunk.get("token")
-                    if (
-                        tok is not None
-                        and isinstance(tok, int)
-                        and tok not in collected_tokens
-                    ):
-                        collected_tokens.append(tok)
+            # Create a new event loop for this synchronous context
+            # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
+            loop = asyncio.new_event_loop()
 
-            # Distinguish coroutine vs async generator
-            if inspect.iscoroutine(gen_result):
-                # Await coroutine to get async generator or final result
-                awaited = loop.run_until_complete(gen_result)
-                if inspect.isasyncgen(awaited):
-                    loop.run_until_complete(_consume_async_generator(awaited))
+            try:
+                async def _consume_async_generator(async_gen):
+                    # Drive the async generator to produce tokens (callback captures them)
+                    async for chunk in async_gen:
+                        # chunk is a dict with keys: token, text, token_info
+                        tok = chunk.get("token")
+                        if (
+                            tok is not None
+                            and isinstance(tok, int)
+                            and tok not in collected_tokens
+                        ):
+                            collected_tokens.append(tok)
+
+                # Distinguish coroutine vs async generator
+                if inspect.iscoroutine(gen_result):
+                    # Await coroutine to get async generator or final result
+                    awaited = loop.run_until_complete(gen_result)
+                    if inspect.isasyncgen(awaited):
+                        loop.run_until_complete(_consume_async_generator(awaited))
+                    else:
+                        # Not streaming (fallback)
+                        if hasattr(awaited, "tokens"):
+                            collected_tokens.extend(
+                                int(t) for t in awaited.tokens if isinstance(t, int)
+                            )
+                elif inspect.isasyncgen(gen_result):
+                    loop.run_until_complete(_consume_async_generator(gen_result))
                 else:
-                    # Not streaming (fallback)
-                    if hasattr(awaited, "tokens"):
+                    # Synchronous fallback result
+                    if hasattr(gen_result, "tokens"):
                         collected_tokens.extend(
-                            int(t) for t in awaited.tokens if isinstance(t, int)
+                            int(t) for t in gen_result.tokens if isinstance(t, int)
                         )
-            elif inspect.isasyncgen(gen_result):
-                loop.run_until_complete(_consume_async_generator(gen_result))
-            else:
-                # Synchronous fallback result
-                if hasattr(gen_result, "tokens"):
-                    collected_tokens.extend(
-                        int(t) for t in gen_result.tokens if isinstance(t, int)
-                    )
+            finally:
+                # Clean up the event loop we created
+                loop.close()
 
             # Yield collected tokens
             for t in collected_tokens:
