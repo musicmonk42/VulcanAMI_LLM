@@ -749,7 +749,6 @@ class CognitiveLoop:
 
                 token = step_result["token"]
                 token_info = step_result["info"]
-                # PERF: Changed from info to debug logging
 
                 reasoning_trace.append(token_info.get("reasoning", {}))
                 last_reasoning_meta = token_info.get("reasoning", {})
@@ -961,7 +960,6 @@ class CognitiveLoop:
         stop_strings: Tuple[str, ...],
         step: int,
     ) -> Dict[str, Any]:
-        # PERF: Reduced to debug logging for per-step diagnostics
         t0 = time.time()
         sub_times = {}  # Timing dictionary
         token_info: Dict[str, Any] = {}
