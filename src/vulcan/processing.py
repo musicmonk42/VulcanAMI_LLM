@@ -61,17 +61,41 @@ except ImportError:
     UnifiedRuntime = None
 
 
+# --- Simple Mode Import ---
+try:
+    from src.vulcan.simple_mode import should_skip_bert, SKIP_BERT_EMBEDDINGS
+except ImportError:
+    # Fallback if simple_mode not available
+    SKIP_BERT_EMBEDDINGS = os.getenv("SKIP_BERT_EMBEDDINGS", "false").lower() in ("true", "1", "yes", "on")
+    def should_skip_bert():
+        return SKIP_BERT_EMBEDDINGS
+
+
 # --- Custom LLM Dependency ---
 # NOTE: In a real system, this would be imported from src.llm_core.graphix_transformer
 class GraphixTransformer:
     """
     Core LLM component with real BERT embeddings.
     Uses pre-trained BERT model for text embeddings.
+    
+    PERFORMANCE: Set SKIP_BERT_EMBEDDINGS=true to skip BERT loading
+    and use lightweight embeddings instead. Saves 3.5s+ per request.
     """
 
     def __init__(self, config=None, embedding_dim=EMBEDDING_DIM):
         self.embedding_dim = embedding_dim
         self.device = "cpu"
+
+        # PERFORMANCE: Skip BERT loading if SKIP_BERT_EMBEDDINGS is set
+        # When skipping, we set attributes to None which causes get_embeddings()
+        # to use the fallback random embeddings path (line ~170). This is intentional
+        # as it avoids the 3.5s+ BERT model load time for simple chat use cases.
+        if should_skip_bert():
+            logger.info("Skipping BERT embeddings - using lightweight fallback (SKIP_BERT_EMBEDDINGS=true)")
+            self.tokenizer = None
+            self.model = None
+            self.projection = None
+            return
 
         # SECURITY: Support model revision pinning (CWE-494 mitigation)
         revision = BERT_MODEL_REVISION if BERT_MODEL_REVISION else "main"
