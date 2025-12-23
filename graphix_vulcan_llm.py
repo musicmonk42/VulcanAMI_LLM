@@ -908,7 +908,7 @@ class GraphixVulcanLLM:
 
     def _check_running_loop(self) -> bool:
         """Check if there's already a running event loop.
-        
+
         Returns True if a loop is already running (and run_until_complete would fail),
         False if it's safe to create and run a new loop.
         """
@@ -1240,7 +1240,7 @@ class GraphixVulcanLLM:
                 logger.warning(
                     "Event loop already running in stream() - returning empty result"
                 )
-                return  # Exit early, yielding nothing
+                return  # Exit generator entirely, yielding nothing to caller
 
             # Create a new event loop for this synchronous context
             # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
