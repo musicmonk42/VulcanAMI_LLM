@@ -106,7 +106,6 @@ try:
         )
         redis_client.ping()
         redis_storage_uri = redis_url
-        logger.info("✅ Connected to Cloud Redis via REDIS_URL")
         print("✅ Connected to Cloud Redis via REDIS_URL")
     else:
         # Priority 2: Use REDIS_HOST/REDIS_PORT (legacy/local dev)
@@ -123,10 +122,8 @@ try:
         )
         redis_client.ping()
         redis_storage_uri = f"redis://{redis_host}:{redis_port}/{redis_db}"
-        logger.info(f"✅ Connected to Localhost Redis at {redis_host}:{redis_port}")
         print(f"✅ Connected to Localhost Redis at {redis_host}:{redis_port}")
 except Exception as e:
-    logger.warning(f"⚠️  Redis not available for rate limiting: {e}")
     print(f"⚠️  Redis not available for rate limiting: {e}")
     print("⚠️  Falling back to in-memory storage (NOT recommended for production)")
     redis_storage_uri = "memory://"
