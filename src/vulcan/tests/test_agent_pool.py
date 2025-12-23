@@ -851,6 +851,255 @@ class TestErrorHandling(unittest.TestCase):
 
 
 # ============================================================
+# TEST: REDIS STATE HYDRATION
+# ============================================================
+
+
+class MockRedisClient:
+    """Mock Redis client for testing state hydration"""
+    
+    def __init__(self):
+        self._store = {}
+    
+    def get(self, key):
+        return self._store.get(key)
+    
+    def set(self, key, value):
+        self._store[key] = value
+        return True
+    
+    def clear(self):
+        self._store.clear()
+
+
+class MockAgentPoolManagerWithRedis(MockAgentPoolManager):
+    """Mock AgentPoolManager with Redis state hydration support"""
+    
+    # Redis key constants
+    REDIS_KEY_AGENT_POOL_STATS = "vulcan:agent_pool:stats"
+    REDIS_KEY_PROVENANCE_COUNT = "vulcan:agent_pool:provenance_records_count"
+    
+    def __init__(
+        self,
+        max_agents: int = 100,
+        min_agents: int = 5,
+        task_queue_type: str = "custom",
+        provenance_ttl: int = 1800,
+        task_timeout_seconds: float = 120.0,
+        redis_client=None,
+    ):
+        # Store redis_client before parent init
+        self.redis_client = redis_client
+        self._provenance_records_count = 0
+        
+        # Call parent init
+        super().__init__(
+            max_agents=max_agents,
+            min_agents=min_agents,
+            task_queue_type=task_queue_type,
+            provenance_ttl=provenance_ttl,
+            task_timeout_seconds=task_timeout_seconds,
+        )
+        
+        # Hydrate state from Redis after initialization
+        self._hydrate_state_from_redis()
+    
+    def _hydrate_state_from_redis(self):
+        """Hydrate Agent Pool state from Redis on startup."""
+        import json
+        
+        if self.redis_client is None:
+            return
+        
+        loaded_stats = {}
+        try:
+            # Load statistics from Redis
+            stats_json = self.redis_client.get(self.REDIS_KEY_AGENT_POOL_STATS)
+            if stats_json:
+                try:
+                    if isinstance(stats_json, bytes):
+                        stats_json = stats_json.decode('utf-8')
+                    loaded_stats = json.loads(stats_json)
+                    
+                    # Update stats with loaded values
+                    for key, value in loaded_stats.items():
+                        if key in self._stats:
+                            self._stats[key] = value
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            
+            # Load provenance records count from Redis
+            provenance_count = self.redis_client.get(self.REDIS_KEY_PROVENANCE_COUNT)
+            if provenance_count:
+                try:
+                    if isinstance(provenance_count, bytes):
+                        provenance_count = provenance_count.decode('utf-8')
+                    self._provenance_records_count = int(provenance_count)
+                    loaded_stats["provenance_records_count"] = self._provenance_records_count
+                except (ValueError, TypeError):
+                    pass
+            
+            if loaded_stats:
+                print(f"🔄 Hydrated Agent Pool state from Redis: {loaded_stats}")
+                
+        except Exception:
+            pass  # Fall back to defaults
+    
+    def _persist_state_to_redis(self):
+        """Persist Agent Pool state to Redis."""
+        import json
+        
+        if self.redis_client is None:
+            return
+        
+        try:
+            # Persist statistics
+            stats_json = json.dumps(self._stats)
+            self.redis_client.set(self.REDIS_KEY_AGENT_POOL_STATS, stats_json)
+            
+            # Persist provenance records count
+            provenance_count = len(self.provenance_records)
+            self.redis_client.set(self.REDIS_KEY_PROVENANCE_COUNT, str(provenance_count))
+        except Exception:
+            pass
+
+
+class TestRedisStateHydration(unittest.TestCase):
+    """Test Redis state hydration functionality"""
+
+    def setUp(self):
+        self.redis_client = MockRedisClient()
+
+    def tearDown(self):
+        self.redis_client.clear()
+
+    def test_hydration_with_no_redis(self):
+        """Test that pool works without Redis client"""
+        pool = MockAgentPoolManagerWithRedis(max_agents=5, min_agents=2, redis_client=None)
+        try:
+            self.assertEqual(pool._stats["total_jobs_submitted"], 0)
+            self.assertEqual(pool._stats["total_jobs_completed"], 0)
+        finally:
+            pool.shutdown()
+
+    def test_hydration_from_empty_redis(self):
+        """Test hydration when Redis is empty falls back to defaults"""
+        pool = MockAgentPoolManagerWithRedis(
+            max_agents=5, min_agents=2, redis_client=self.redis_client
+        )
+        try:
+            self.assertEqual(pool._stats["total_jobs_submitted"], 0)
+            self.assertEqual(pool._stats["total_jobs_completed"], 0)
+        finally:
+            pool.shutdown()
+
+    def test_hydration_restores_stats(self):
+        """Test that stats are restored from Redis on initialization"""
+        import json
+        
+        # Pre-populate Redis with stats
+        stored_stats = {
+            "total_jobs_submitted": 100,
+            "total_jobs_completed": 95,
+            "total_jobs_failed": 5,
+            "total_agents_spawned": 20,
+            "total_agents_retired": 15,
+        }
+        self.redis_client.set(
+            MockAgentPoolManagerWithRedis.REDIS_KEY_AGENT_POOL_STATS,
+            json.dumps(stored_stats)
+        )
+        self.redis_client.set(
+            MockAgentPoolManagerWithRedis.REDIS_KEY_PROVENANCE_COUNT,
+            "50"
+        )
+        
+        # Create pool - should hydrate from Redis
+        pool = MockAgentPoolManagerWithRedis(
+            max_agents=5, min_agents=2, redis_client=self.redis_client
+        )
+        try:
+            self.assertEqual(pool._stats["total_jobs_submitted"], 100)
+            self.assertEqual(pool._stats["total_jobs_completed"], 95)
+            self.assertEqual(pool._stats["total_jobs_failed"], 5)
+            self.assertEqual(pool._stats["total_agents_spawned"], 20)
+            self.assertEqual(pool._stats["total_agents_retired"], 15)
+            self.assertEqual(pool._provenance_records_count, 50)
+        finally:
+            pool.shutdown()
+
+    def test_persist_state_to_redis(self):
+        """Test that state is persisted to Redis"""
+        import json
+        
+        pool = MockAgentPoolManagerWithRedis(
+            max_agents=5, min_agents=2, redis_client=self.redis_client
+        )
+        try:
+            # Modify stats
+            pool._stats["total_jobs_submitted"] = 10
+            pool._stats["total_jobs_completed"] = 8
+            
+            # Persist to Redis
+            pool._persist_state_to_redis()
+            
+            # Verify Redis has the data
+            stored_json = self.redis_client.get(
+                MockAgentPoolManagerWithRedis.REDIS_KEY_AGENT_POOL_STATS
+            )
+            stored_stats = json.loads(stored_json)
+            
+            self.assertEqual(stored_stats["total_jobs_submitted"], 10)
+            self.assertEqual(stored_stats["total_jobs_completed"], 8)
+        finally:
+            pool.shutdown()
+
+    def test_hydration_handles_invalid_json(self):
+        """Test that invalid JSON in Redis is handled gracefully"""
+        # Store invalid JSON
+        self.redis_client.set(
+            MockAgentPoolManagerWithRedis.REDIS_KEY_AGENT_POOL_STATS,
+            "not valid json {{{}"
+        )
+        
+        # Create pool - should fall back to defaults
+        pool = MockAgentPoolManagerWithRedis(
+            max_agents=5, min_agents=2, redis_client=self.redis_client
+        )
+        try:
+            self.assertEqual(pool._stats["total_jobs_submitted"], 0)
+            self.assertEqual(pool._stats["total_jobs_completed"], 0)
+        finally:
+            pool.shutdown()
+
+    def test_hydration_handles_bytes_response(self):
+        """Test that bytes responses from Redis are handled"""
+        import json
+        
+        # Store stats as bytes (like a real Redis client might return)
+        stored_stats = {"total_jobs_submitted": 42, "total_jobs_completed": 40}
+        self.redis_client.set(
+            MockAgentPoolManagerWithRedis.REDIS_KEY_AGENT_POOL_STATS,
+            json.dumps(stored_stats).encode('utf-8')
+        )
+        self.redis_client.set(
+            MockAgentPoolManagerWithRedis.REDIS_KEY_PROVENANCE_COUNT,
+            b"25"
+        )
+        
+        # Create pool - should handle bytes correctly
+        pool = MockAgentPoolManagerWithRedis(
+            max_agents=5, min_agents=2, redis_client=self.redis_client
+        )
+        try:
+            self.assertEqual(pool._stats["total_jobs_submitted"], 42)
+            self.assertEqual(pool._stats["total_jobs_completed"], 40)
+            self.assertEqual(pool._provenance_records_count, 25)
+        finally:
+            pool.shutdown()
+
+
+# ============================================================
 # TEST SUITE RUNNER
 # ============================================================
 
@@ -872,6 +1121,7 @@ def suite():
     test_suite.addTests(loader.loadTestsFromTestCase(TestRecoveryManager))
     test_suite.addTests(loader.loadTestsFromTestCase(TestIntegrationScenarios))
     test_suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
+    test_suite.addTests(loader.loadTestsFromTestCase(TestRedisStateHydration))
 
     return test_suite
 
