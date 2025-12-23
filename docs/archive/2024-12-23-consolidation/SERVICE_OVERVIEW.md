@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED
+
+**This document has been consolidated.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+For SERVICE_OVERVIEW.md content → See [COMPLETE_SERVICE_CATALOG.md](../../COMPLETE_SERVICE_CATALOG.md)
+
+---
+
 # Service Overview and Architecture
 
 **Last Updated:** December 15, 2024  
@@ -5,7 +16,7 @@
 
 This document provides a high-level overview of all services in the VulcanAMI LLM platform, organized by functional area.
 
-> For complete function-level documentation, see [COMPLETE_SERVICE_CATALOG.md](COMPLETE_SERVICE_CATALOG.md)
+> For complete function-level documentation, see [COMPLETE_SERVICE_CATALOG.md](../../COMPLETE_SERVICE_CATALOG.md)
 
 ---
 

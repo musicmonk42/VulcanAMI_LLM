@@ -1,3 +1,14 @@
+# ⚠️ DEPRECATED
+
+**This document has been consolidated.**  
+**Archived:** December 23, 2024
+
+## Migration Path
+
+For UNFLATTENABLE_ROADMAP.md content → See design principles in [EVOLUTION_ROADMAP.MD](../../EVOLUTION_ROADMAP.MD) and [IMPLEMENTATION_ROADMAP.md](../../IMPLEMENTATION_ROADMAP.md)
+
+---
+
 # 🗺️ Unflattenable Roadmap – Preserving Hierarchy & Analog Semantics
 
 **Version:** 2.2.0
