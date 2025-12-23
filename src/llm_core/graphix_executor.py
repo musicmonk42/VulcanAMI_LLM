@@ -55,6 +55,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
+import numpy as np
+
 logger = logging.getLogger(__name__)
 
 
@@ -1177,15 +1179,17 @@ class GraphixExecutor:
     ) -> List[float]:
         """Linear transformation: output = input @ weight^T.
 
-        PERFORMANCE NOTE: This is the main bottleneck!
-        For hidden_size=256, vocab_size=4096:
-        - This does 256 * 4096 = 1,048,576 multiply-adds PER CALL
-        - With 6 layers, each having ~7 linear ops = 42 calls per token
-        - Total: ~44 million floating point operations per token in pure Python
+        OPTIMIZED: Uses numpy vectorized matrix multiplication for ~100x speedup
+        over pure Python nested loops.
 
-        Consider using numpy for 100-1000x speedup:
-            import numpy as np
-            return (np.array(input_vec) @ np.array(weight).reshape(out_features, in_features).T).tolist()
+        Args:
+            input_vec: Input vector of shape (in_features,)
+            weight: Weight matrix flattened to shape (out_features * in_features,)
+            in_features: Number of input features
+            out_features: Number of output features
+
+        Returns:
+            Output vector of shape (out_features,)
         """
         if not input_vec or not weight:
             return [0.0] * out_features
@@ -1195,34 +1199,27 @@ class GraphixExecutor:
         ops = in_features * out_features
         GraphixExecutor._linear_total_ops += ops
 
-        # Log periodically for large operations
-        if ops > 100000 and GraphixExecutor._linear_call_count % 10 == 0:
-            logger.debug(
-                "[PERF] _linear: %dx%d = %d ops (total calls: %d, total ops: %d)",
-                in_features,
-                out_features,
-                ops,
-                GraphixExecutor._linear_call_count,
-                GraphixExecutor._linear_total_ops,
-            )
-
         # Ensure correct input size
         if len(input_vec) < in_features:
             input_vec = input_vec + [0.0] * (in_features - len(input_vec))
         input_vec = input_vec[:in_features]
 
-        # Matrix multiplication (simplified) - THIS IS THE BOTTLENECK
-        # Pure Python nested loops are ~100-1000x slower than numpy/torch
-        output = []
-        for o in range(out_features):
-            val = 0.0
-            for i in range(in_features):
-                w_idx = o * in_features + i
-                if w_idx < len(weight):
-                    val += input_vec[i] * weight[w_idx]
-            output.append(val)
+        # OPTIMIZED: Use numpy vectorized operations (~100x faster than Python loops)
+        # Convert to numpy arrays
+        input_arr = np.array(input_vec, dtype=np.float32)
 
-        return output
+        # Handle weight array - ensure it has correct size
+        expected_weight_size = out_features * in_features
+        if len(weight) < expected_weight_size:
+            # Pad with zeros if weight is smaller than expected
+            weight = list(weight) + [0.0] * (expected_weight_size - len(weight))
+        weight_arr = np.array(weight[:expected_weight_size], dtype=np.float32)
+
+        # Reshape weight to (out_features, in_features) and compute output = input @ weight^T
+        weight_matrix = weight_arr.reshape(out_features, in_features)
+        output_arr = input_arr @ weight_matrix.T
+
+        return output_arr.tolist()
 
     # ==================== LOGITS COMPUTATION ====================
 
