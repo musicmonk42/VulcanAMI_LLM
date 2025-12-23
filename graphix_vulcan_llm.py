@@ -906,23 +906,30 @@ class GraphixVulcanLLM:
         asyncio.set_event_loop(self._event_loop)
         return self._event_loop
 
+    def _check_running_loop(self) -> bool:
+        """Check if there's already a running event loop.
+        
+        Returns True if a loop is already running (and run_until_complete would fail),
+        False if it's safe to create and run a new loop.
+        """
+        try:
+            asyncio.get_running_loop()
+            return True  # Loop is running - not safe to use run_until_complete
+        except RuntimeError:
+            return False  # No running loop - safe to proceed
+
     def _run_async(self, coro):
         """Run async coroutine or collect async generator"""
         # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
-        try:
-            asyncio.get_running_loop()
-            # If we get here, there's already a running loop - can't use run_until_complete
+        if self._check_running_loop():
             logger.warning(
                 "Event loop already running in _run_async() - returning None"
             )
             return None
-        except RuntimeError:
-            # No running loop - safe to create one and proceed
-            pass
 
         # Create a new event loop for this synchronous context
+        # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 
         try:
             # Check if it's an async generator
@@ -947,7 +954,6 @@ class GraphixVulcanLLM:
         finally:
             # Clean up the event loop we created
             loop.close()
-            asyncio.set_event_loop(None)
 
     def _is_async_callable(self, obj: Any, method_name: str) -> bool:
         """Check if a method is async"""
@@ -1015,20 +1021,15 @@ class GraphixVulcanLLM:
 
             # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
             # This happens when generate() is called from run_in_executor() in HybridLLMExecutor
-            try:
-                asyncio.get_running_loop()
-                # If we get here, there's already a running loop - can't use run_until_complete
+            if self._check_running_loop():
                 logger.warning(
                     "Event loop already running - skipping local generation to trigger OpenAI fallback"
                 )
                 return None  # Triggers OpenAI fallback in HybridLLMExecutor
-            except RuntimeError:
-                # No running loop - safe to create one and proceed
-                pass
 
             # Create a new event loop for this synchronous context
+            # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
             loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
 
             try:
                 # Process based on type
@@ -1098,7 +1099,6 @@ class GraphixVulcanLLM:
             finally:
                 # Clean up the event loop we created
                 loop.close()
-                asyncio.set_event_loop(None)
 
             # Final check
             final_type = type(loop_result).__name__
@@ -1236,20 +1236,15 @@ class GraphixVulcanLLM:
             )
 
             # EMERGENCY FIX: Check if we're in an async context where run_until_complete would fail
-            try:
-                asyncio.get_running_loop()
-                # If we get here, there's already a running loop - can't use run_until_complete
+            if self._check_running_loop():
                 logger.warning(
                     "Event loop already running in stream() - returning empty result"
                 )
                 return  # Exit early, yielding nothing
-            except RuntimeError:
-                # No running loop - safe to create one and proceed
-                pass
 
             # Create a new event loop for this synchronous context
+            # Note: We don't call set_event_loop() to avoid affecting the thread's default loop
             loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
 
             try:
                 async def _consume_async_generator(async_gen):
@@ -1287,7 +1282,6 @@ class GraphixVulcanLLM:
             finally:
                 # Clean up the event loop we created
                 loop.close()
-                asyncio.set_event_loop(None)
 
             # Yield collected tokens
             for t in collected_tokens:
