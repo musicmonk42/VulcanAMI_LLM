@@ -25,6 +25,16 @@
 # - DATABASE_URL: PostgreSQL connection string
 # - REDIS_URL: Redis connection string
 #
+# GIT PERSISTENCE (IMPORTANT FOR SELF-IMPROVEMENT):
+# To prevent the "Groundhog Day" loop where self-improvement fixes are lost on
+# container restart, you must enable Git persistence:
+# 1. In Railway dashboard: Settings > Git > Enable "Railway Git Integration"
+# 2. Set environment variable: VULCAN_GIT_PUSH_ENABLED=1
+# 3. Configure Git credentials (Railway provides these automatically with Git Integration)
+#
+# Without Git persistence, any code fixes made by the self-improvement system
+# will be lost when the container restarts or redeploys.
+#
 # DEBUGGING:
 # - Check /vulcan/v1/llm/status endpoint to verify LLM configuration
 # - Check /health endpoint for overall platform health
@@ -43,5 +53,6 @@ healthcheckTimeout = 300  # Increased to 5 minutes for ML model loading
 # Restart policy
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-# Number of replicas (adjust based on your Railway plan)
+# Number of replicas (MUST be 1 to prevent split-brain/ghost process issues)
+# Multiple replicas would cause inconsistent state and duplicate background tasks
 numReplicas = 1

@@ -2507,8 +2507,65 @@ class SelfImprovementDrive:
             logger.error(f"File I/O failed for {file_path}: {e}")
             return False, ""
 
+    def _push_to_remote(self) -> bool:
+        """
+        Push committed changes to remote repository.
+        
+        This method enables Git persistence for self-improvement fixes, preventing
+        the "Groundhog Day" loop where fixes are lost on container restart.
+        
+        Requires:
+        - VULCAN_GIT_PUSH_ENABLED=1 environment variable
+        - Git credentials configured (via SSH key, token, or credential helper)
+        
+        Returns:
+            True if push succeeded, False otherwise
+        """
+        # Check if git push is enabled via environment variable
+        if os.getenv("VULCAN_GIT_PUSH_ENABLED", "0") != "1":
+            logger.debug("Git push disabled (set VULCAN_GIT_PUSH_ENABLED=1 to enable)")
+            return False
+        
+        try:
+            if get_safe_executor is not None:
+                executor = get_safe_executor()
+                push_result = executor.execute_safe(
+                    ["git", "push"], timeout=60
+                )
+                if push_result.success:
+                    logger.info("✅ Self-improvement changes pushed to remote repository")
+                    return True
+                else:
+                    logger.warning(f"Git push failed: {push_result.stderr}")
+                    return False
+            else:
+                result = subprocess.run(
+                    ["git", "push"], capture_output=True, text=True, timeout=60
+                )
+                if result.returncode == 0:
+                    logger.info("✅ Self-improvement changes pushed to remote repository")
+                    return True
+                else:
+                    logger.warning(f"Git push failed: {result.stderr}")
+                    return False
+        except subprocess.TimeoutExpired:
+            logger.warning("Git push timed out after 60 seconds")
+            return False
+        except Exception as e:
+            logger.warning(f"Git push failed: {e}")
+            return False
+
     def _commit_to_version_control(self, file_path: str, message: str) -> str:
-        """Stages and commits changes using git subprocess with safe execution."""
+        """
+        Stages, commits, and optionally pushes changes using git.
+        
+        IMPORTANT: To enable git push (required for persistence in ephemeral containers
+        like Railway), set the VULCAN_GIT_PUSH_ENABLED=1 environment variable and ensure
+        git credentials are configured.
+        
+        Without git push, fixes applied by the self-improvement system will be lost when
+        the container restarts (the "Groundhog Day" loop).
+        """
         try:
             # Use safe executor if available, otherwise fallback to direct subprocess
             if get_safe_executor is not None:
@@ -2529,6 +2586,9 @@ class SelfImprovementDrive:
                 )
 
                 if commit_result.success:
+                    # Try to push changes to persist them (prevents "Groundhog Day" loop)
+                    self._push_to_remote()
+                    
                     # Try to get short hash
                     hash_result = executor.execute_safe(
                         ["git", "rev-parse", "--short", "HEAD"], timeout=10
@@ -2553,6 +2613,9 @@ class SelfImprovementDrive:
                 )
 
                 if result.returncode == 0:
+                    # Try to push changes to persist them (prevents "Groundhog Day" loop)
+                    self._push_to_remote()
+                    
                     hash_proc = subprocess.run(
                         ["git", "rev-parse", "--short", "HEAD"],
                         capture_output=True,
