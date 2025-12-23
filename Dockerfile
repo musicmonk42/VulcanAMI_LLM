@@ -238,4 +238,6 @@ ENTRYPOINT ["/app/entrypoint.sh"]
 # - VULCAN cognitive platform with /vulcan/v1/chat endpoint
 # - All 71+ services integrated behind the chat interface
 # Note: The PORT environment variable is used for flexibility (default 8000)
-CMD ["sh", "-c", "uvicorn src.full_platform:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# PRODUCTION MODE: --workers 1 ensures singleton process (no split-brain)
+# DO NOT use --reload in production as it spawns a parent watcher + child worker
+CMD ["sh", "-c", "uvicorn src.full_platform:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

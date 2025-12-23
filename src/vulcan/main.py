@@ -118,6 +118,126 @@ except ImportError:
     Redis = None
     REDIS_AVAILABLE = False
 
+# File-based locking for split-brain prevention when Redis is unavailable
+try:
+    import fcntl
+
+    FCNTL_AVAILABLE = True
+except ImportError:
+    fcntl = None
+    FCNTL_AVAILABLE = False
+
+
+class ProcessLock:
+    """
+    File-based process lock to prevent split-brain race conditions.
+    
+    This lock serves as a fallback when Redis is unavailable for state synchronization.
+    If a second process attempts to start while the lock is held, it will detect
+    the existing lock file and shut down immediately.
+    
+    Uses fcntl.flock() on Unix systems for advisory file locking.
+    """
+    
+    LOCK_FILE_PATH = "/tmp/vulcan_orchestrator.lock"
+    
+    def __init__(self, lock_path: str = None):
+        self.lock_path = lock_path or self.LOCK_FILE_PATH
+        self._lock_file = None
+        self._locked = False
+        self._logger = logging.getLogger("ProcessLock")
+    
+    def acquire(self) -> bool:
+        """
+        Attempt to acquire the process lock.
+        
+        Returns:
+            True if lock was acquired successfully, False otherwise.
+        """
+        if not FCNTL_AVAILABLE:
+            self._logger.warning(
+                "fcntl not available (non-Unix system). "
+                "File-based locking disabled - split-brain prevention unavailable."
+            )
+            return True  # Allow process to continue without lock on non-Unix systems
+        
+        try:
+            # Create lock file if it doesn't exist
+            self._lock_file = open(self.lock_path, "w")
+            
+            # Try to acquire exclusive lock (non-blocking)
+            fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            
+            # Write PID to lock file for debugging
+            self._lock_file.write(f"{os.getpid()}\n")
+            self._lock_file.flush()
+            
+            self._locked = True
+            self._logger.info(
+                f"Process lock acquired (PID: {os.getpid()}, file: {self.lock_path})"
+            )
+            return True
+            
+        except (IOError, OSError) as e:
+            # Lock is held by another process
+            self._logger.error(
+                f"Failed to acquire process lock: {e}. "
+                f"Another vulcan.orchestrator instance may be running. "
+                f"Lock file: {self.lock_path}"
+            )
+            if self._lock_file:
+                self._lock_file.close()
+                self._lock_file = None
+            return False
+        except Exception as e:
+            self._logger.error(f"Unexpected error acquiring process lock: {e}")
+            if self._lock_file:
+                self._lock_file.close()
+                self._lock_file = None
+            return False
+    
+    def release(self):
+        """Release the process lock."""
+        if not self._locked or not self._lock_file:
+            return
+        
+        try:
+            if FCNTL_AVAILABLE:
+                fcntl.flock(self._lock_file.fileno(), fcntl.LOCK_UN)
+            self._lock_file.close()
+            self._lock_file = None
+            self._locked = False
+            
+            # Remove lock file
+            try:
+                os.remove(self.lock_path)
+            except OSError:
+                pass  # File may have already been removed
+                
+            self._logger.info("Process lock released")
+        except Exception as e:
+            self._logger.warning(f"Error releasing process lock: {e}")
+    
+    def is_locked(self) -> bool:
+        """Check if lock is currently held by this process."""
+        return self._locked
+    
+    def __enter__(self):
+        if not self.acquire():
+            raise RuntimeError(
+                "Failed to acquire process lock - another instance may be running. "
+                "This prevents split-brain race conditions when Redis is unavailable."
+            )
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
+        return False
+
+
+# Global process lock instance (initialized during startup)
+_process_lock: Optional[ProcessLock] = None
+
 # OpenAI integration for high-quality text generation
 try:
     from openai import OpenAI
@@ -2246,19 +2366,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# REDIS CONNECTION WITH REDIS_URL PRIORITY
+# Prioritizes REDIS_URL environment variable for Railway/Docker deployments
+# Falls back to REDIS_HOST/REDIS_PORT for legacy compatibility
+# ============================================================
 redis_client = None
 if REDIS_AVAILABLE:
     try:
-        redis_client = Redis(
-            host=os.getenv("REDIS_HOST", "localhost"),
-            port=int(os.getenv("REDIS_PORT", 6379)),
-            db=0,
-            decode_responses=False,
-        )
+        # Priority 1: Use REDIS_URL if set (Railway, Docker Compose, etc.)
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            logger.info(f"Connecting to Redis using REDIS_URL")
+            redis_client = Redis.from_url(redis_url, decode_responses=False)
+        else:
+            # Priority 2: Use REDIS_HOST/REDIS_PORT (legacy/local dev)
+            redis_host = os.getenv("REDIS_HOST", "localhost")
+            redis_port = int(os.getenv("REDIS_PORT", 6379))
+            logger.info(f"Connecting to Redis at {redis_host}:{redis_port}")
+            redis_client = Redis(
+                host=redis_host,
+                port=redis_port,
+                db=0,
+                decode_responses=False,
+                socket_connect_timeout=5,  # 5 second connection timeout
+                socket_timeout=5,  # 5 second operation timeout
+            )
         redis_client.ping()
-        logger.info("Redis connection established")
+        logger.info("Redis connection established successfully")
     except Exception as e:
-        logger.warning(f"Redis not available: {e}. Using in-process state.")
+        logger.warning(
+            f"Redis not available: {e}. Using in-process state. "
+            f"NOTE: Without Redis, multiple instances cannot synchronize state."
+        )
         redis_client = None
 else:
     logger.warning("Redis library not available. Using in-process state.")
@@ -2282,7 +2422,7 @@ def initialize_component(name, func):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # STARTUP LOGIC
-    global rate_limit_cleanup_thread
+    global rate_limit_cleanup_thread, _process_lock
 
     worker_id = os.getpid()
     startup_complete = False
@@ -2296,6 +2436,33 @@ async def lifespan(app: FastAPI):
         finally:
             logger.info("Test mode shutdown - skipping cleanup")
         return
+
+    # ============================================================
+    # SPLIT-BRAIN PREVENTION: Acquire process lock when Redis unavailable
+    # This ensures only one orchestrator instance can run at a time,
+    # preventing the race condition where multiple processes have
+    # isolated state and cause oscillating job counts.
+    # ============================================================
+    if redis_client is None:
+        logger.warning(
+            "Redis unavailable - acquiring file-based process lock to prevent split-brain"
+        )
+        _process_lock = ProcessLock()
+        if not _process_lock.acquire():
+            logger.critical(
+                "FATAL: Cannot acquire process lock. Another vulcan.orchestrator "
+                "instance is already running. Without Redis for state synchronization, "
+                "running multiple instances would cause a split-brain condition. "
+                "Either start Redis or stop the other instance."
+            )
+            # Raise error to prevent this instance from starting
+            raise RuntimeError(
+                "Split-brain prevention: Another orchestrator instance is running. "
+                "Start Redis for multi-instance support or stop the other process."
+            )
+        logger.info("Process lock acquired - singleton mode active (no Redis)")
+    else:
+        logger.info("Redis available - multi-instance mode supported")
 
     logger.info(
         f"Starting VULCAN-AGI worker {worker_id} in {settings.deployment_mode} mode"
@@ -2802,6 +2969,11 @@ async def lifespan(app: FastAPI):
                     redis_client.delete(f"deployment:{app.state.worker_id}")
                 except Exception as e:
                     logger.error(f"Failed to cleanup Redis: {e}")
+
+        # Release process lock if held (split-brain prevention cleanup)
+        if _process_lock is not None and _process_lock.is_locked():
+            _process_lock.release()
+            logger.info("Process lock released during shutdown")
 
         logger.info("VULCAN-AGI API shutdown complete")
 
