@@ -3922,7 +3922,7 @@ async def chat(request: ChatRequest):
     routing_stats = {}
     try:
         from vulcan.routing import (
-            route_query,
+            route_query_async,
             log_to_governance,
             record_telemetry,
             get_governance_logger,
@@ -3934,8 +3934,9 @@ async def chat(request: ChatRequest):
         )
 
         if QUERY_ROUTER_AVAILABLE:
-            # Analyze query and create processing plan
-            routing_plan = route_query(request.prompt, source="user")
+            # Analyze query and create processing plan using async version
+            # to avoid blocking the event loop with CPU-bound safety validation
+            routing_plan = await route_query_async(request.prompt, source="user")
             systems_used.append("query_router")
 
             routing_stats = {
@@ -5066,7 +5067,7 @@ async def unified_chat(request: UnifiedChatRequest):
 
         try:
             from vulcan.routing import (
-                route_query,
+                route_query_async,
                 log_to_governance,
                 record_telemetry,
                 get_governance_logger,
@@ -5078,8 +5079,9 @@ async def unified_chat(request: UnifiedChatRequest):
             )
 
             if QUERY_ROUTER_AVAILABLE:
-                # Analyze query and create processing plan
-                routing_plan = route_query(user_message, source="user")
+                # Analyze query and create processing plan using async version
+                # to avoid blocking the event loop with CPU-bound safety validation
+                routing_plan = await route_query_async(user_message, source="user")
                 systems_used.append("query_router")
 
                 routing_stats = {

@@ -80,7 +80,9 @@ try:
         analyze_query,
         decompose_to_agent_tasks,
         route_query,
+        route_query_async,
         get_query_analyzer,
+        shutdown_blocking_executor,
     )
 
     QUERY_ROUTER_AVAILABLE = True
@@ -97,7 +99,9 @@ except ImportError as e:
     analyze_query = None
     decompose_to_agent_tasks = None
     route_query = None
+    route_query_async = None
     get_query_analyzer = None
+    shutdown_blocking_executor = None
 
 # Agent Collaboration
 try:
@@ -335,7 +339,9 @@ __all__ = [
     "analyze_query",
     "decompose_to_agent_tasks",
     "route_query",
+    "route_query_async",
     "get_query_analyzer",
+    "shutdown_blocking_executor",
     # Agent Collaboration
     "AgentMessage",
     "AgentCollaborationManager",

@@ -41,6 +41,8 @@ Thread Safety:
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import logging
 import re
 import threading
@@ -248,6 +250,51 @@ class GovernanceSensitivity(str, Enum):
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
+
+# ============================================================
+# THREAD POOL FOR ASYNC OPERATIONS
+# ============================================================
+
+# Configuration for the thread pool executor used for async operations
+# Can be overridden via environment variable VULCAN_SAFETY_THREAD_POOL_SIZE
+import os
+BLOCKING_EXECUTOR_MAX_WORKERS = int(os.environ.get("VULCAN_SAFETY_THREAD_POOL_SIZE", "4"))
+
+# Thread pool executor for offloading CPU-bound blocking operations
+# Used by route_query_async to prevent blocking the main asyncio event loop
+_BLOCKING_EXECUTOR: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_EXECUTOR_LOCK = threading.Lock()
+
+def _get_blocking_executor() -> concurrent.futures.ThreadPoolExecutor:
+    """Get or create the shared thread pool executor for blocking operations."""
+    global _BLOCKING_EXECUTOR
+    if _BLOCKING_EXECUTOR is None:
+        with _EXECUTOR_LOCK:
+            if _BLOCKING_EXECUTOR is None:
+                _BLOCKING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+                    max_workers=BLOCKING_EXECUTOR_MAX_WORKERS,
+                    thread_name_prefix="vulcan_safety_"
+                )
+    return _BLOCKING_EXECUTOR
+
+
+def shutdown_blocking_executor(wait: bool = True) -> None:
+    """
+    Shutdown the blocking executor gracefully.
+    
+    Should be called during application shutdown to ensure proper cleanup
+    of thread pool resources.
+    
+    Args:
+        wait: If True, waits for pending tasks to complete before returning.
+    """
+    global _BLOCKING_EXECUTOR
+    with _EXECUTOR_LOCK:
+        if _BLOCKING_EXECUTOR is not None:
+            _BLOCKING_EXECUTOR.shutdown(wait=wait)
+            _BLOCKING_EXECUTOR = None
+            logger.info("Blocking executor shut down successfully")
 
 
 # ============================================================
@@ -1441,6 +1488,55 @@ def route_query(
     """
     analyzer = get_query_analyzer()
     return analyzer.route_query(query, source, session_id)
+
+
+async def route_query_async(
+    query: str,
+    source: Literal["user", "agent", "arena"] = "user",
+    session_id: Optional[str] = None
+) -> ProcessingPlan:
+    """
+    Async version of route_query that offloads blocking operations to a thread pool.
+    
+    This function should be used in async contexts (FastAPI endpoints, asyncio code)
+    to prevent blocking the main event loop. The CPU-bound safety validation and
+    adversarial check operations are executed in a thread pool executor.
+    
+    Args:
+        query: The input query
+        source: "user" | "agent" | "arena"
+        session_id: Optional session identifier
+        
+    Returns:
+        ProcessingPlan with:
+        - learning_mode: "user_interaction" | "ai_interaction"
+        - agent_tasks: Tasks for agent pool
+        - arena_participation: Should this trigger tournament?
+        - collaboration_needed: Multi-agent deliberation?
+        - telemetry_category: How to record this
+        
+    Example:
+        # In an async FastAPI endpoint
+        @app.post("/query")
+        async def handle_query(request: QueryRequest):
+            plan = await route_query_async(request.prompt, source="user")
+            if not plan.safety_passed:
+                return {"error": "Query blocked by safety validation"}
+            return {"plan": plan.to_dict()}
+    """
+    loop = asyncio.get_running_loop()
+    executor = _get_blocking_executor()
+    
+    # Offload the entire route_query call to a thread pool to avoid blocking
+    # the asyncio event loop with CPU-bound safety validation operations
+    plan = await loop.run_in_executor(
+        executor,
+        route_query,
+        query,
+        source,
+        session_id
+    )
+    return plan
 
 
 def analyze_query(query: str, session_id: Optional[str] = None) -> QueryPlan:

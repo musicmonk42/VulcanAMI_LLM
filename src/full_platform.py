@@ -3211,6 +3211,7 @@ async def check_query_adversarial(
     """
     try:
         from vulcan.safety.adversarial_integration import check_query_integrity
+        import asyncio
 
         data = await request.json()
         query = data.get("query", "")
@@ -3218,7 +3219,9 @@ async def check_query_adversarial(
         if not query:
             raise HTTPException(status_code=400, detail="Query is required")
 
-        result = check_query_integrity(query)
+        # Offload blocking check_query_integrity call to thread pool
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, check_query_integrity, query)
 
         return {
             "status": "success",
