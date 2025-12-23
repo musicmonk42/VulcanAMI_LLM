@@ -628,8 +628,8 @@ class TestReproducibility:
         """Verify key documentation files exist"""
         required_docs = [
             "README.md",
-            "CI_CD.md",
-            "REPRODUCIBLE_BUILDS.md",
+            "docs/CI_CD.md",
+            "docs/REPRODUCIBLE_BUILDS.md",
         ]
 
         missing = []
