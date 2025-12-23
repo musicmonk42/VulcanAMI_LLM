@@ -586,6 +586,11 @@ class HybridLLMExecutor:
                 None, self.local_llm.generate, prompt, max_tokens
             )
 
+            # Handle None result (returned when event loop conflict is detected)
+            if result is None:
+                self.logger.debug("Local LLM returned None - triggering fallback")
+                return None
+
             if hasattr(result, "text"):
                 return result.text
             elif isinstance(result, str):
