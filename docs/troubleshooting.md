@@ -29,10 +29,10 @@ Run these commands to quickly assess system health:
 ```bash
 # ===== Validation Scripts =====
 
-# Quick pre-deployment check (30 seconds)
+# Quick pre-deployment check (30 seconds) - validates core configs only
 ./quick_test.sh quick
 
-# Full comprehensive validation (42+ checks)
+# Full comprehensive validation (42+ checks) - runs all validation tests
 ./test_full_cicd.sh
 
 # Validate all configurations
@@ -175,6 +175,8 @@ kill -9 <PID>
 ```
 
 **Port Allocation Reference:**
+
+> See [COMPLETE_SERVICE_CATALOG.md](COMPLETE_SERVICE_CATALOG.md#port-allocation-and-conflicts) for the complete port allocation matrix.
 
 | Service | Default Port | Environment Variable |
 |---------|--------------|---------------------|
