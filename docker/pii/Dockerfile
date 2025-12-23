@@ -102,4 +102,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8082/health || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python", "-m", "uvicorn", "src.pii_service:app", "--host", "0.0.0.0", "--port", "8082"]
+# PRODUCTION MODE: --workers 1 ensures singleton process (no split-brain/ghost processes)
+# DO NOT use --reload in production as it spawns a parent watcher + child worker
+CMD ["python", "-m", "uvicorn", "src.pii_service:app", "--host", "0.0.0.0", "--port", "8082", "--workers", "1"]
