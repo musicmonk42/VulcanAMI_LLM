@@ -82,6 +82,7 @@ try:
         route_query,
         route_query_async,
         get_query_analyzer,
+        shutdown_blocking_executor,
     )
 
     QUERY_ROUTER_AVAILABLE = True
@@ -100,6 +101,7 @@ except ImportError as e:
     route_query = None
     route_query_async = None
     get_query_analyzer = None
+    shutdown_blocking_executor = None
 
 # Agent Collaboration
 try:
@@ -339,6 +341,7 @@ __all__ = [
     "route_query",
     "route_query_async",
     "get_query_analyzer",
+    "shutdown_blocking_executor",
     # Agent Collaboration
     "AgentMessage",
     "AgentCollaborationManager",

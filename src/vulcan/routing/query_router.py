@@ -256,6 +256,11 @@ class GovernanceSensitivity(str, Enum):
 # THREAD POOL FOR ASYNC OPERATIONS
 # ============================================================
 
+# Configuration for the thread pool executor used for async operations
+# Can be overridden via environment variable VULCAN_SAFETY_THREAD_POOL_SIZE
+import os
+BLOCKING_EXECUTOR_MAX_WORKERS = int(os.environ.get("VULCAN_SAFETY_THREAD_POOL_SIZE", "4"))
+
 # Thread pool executor for offloading CPU-bound blocking operations
 # Used by route_query_async to prevent blocking the main asyncio event loop
 _BLOCKING_EXECUTOR: Optional[concurrent.futures.ThreadPoolExecutor] = None
@@ -268,10 +273,28 @@ def _get_blocking_executor() -> concurrent.futures.ThreadPoolExecutor:
         with _EXECUTOR_LOCK:
             if _BLOCKING_EXECUTOR is None:
                 _BLOCKING_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
-                    max_workers=4,
+                    max_workers=BLOCKING_EXECUTOR_MAX_WORKERS,
                     thread_name_prefix="vulcan_safety_"
                 )
     return _BLOCKING_EXECUTOR
+
+
+def shutdown_blocking_executor(wait: bool = True) -> None:
+    """
+    Shutdown the blocking executor gracefully.
+    
+    Should be called during application shutdown to ensure proper cleanup
+    of thread pool resources.
+    
+    Args:
+        wait: If True, waits for pending tasks to complete before returning.
+    """
+    global _BLOCKING_EXECUTOR
+    with _EXECUTOR_LOCK:
+        if _BLOCKING_EXECUTOR is not None:
+            _BLOCKING_EXECUTOR.shutdown(wait=wait)
+            _BLOCKING_EXECUTOR = None
+            logger.info("Blocking executor shut down successfully")
 
 
 # ============================================================
