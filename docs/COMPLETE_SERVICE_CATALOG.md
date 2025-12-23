@@ -1,5 +1,7 @@
 # Complete Service and Function Catalog
 
+**Version:** 2.2.0  
+**Last Updated:** December 23, 2024  
 **Generated:** December 2024  
 **Total Services:** 71  
 **Total Files:** 557  
@@ -7,6 +9,62 @@
 **Total Classes:** 4353
 
 This document catalogs every service, file, function, and class in the VulcanAMI LLM platform.
+
+---
+
+## Port Allocation and Conflicts
+
+This section documents the default ports used by platform services and known conflicts.
+
+| Service | Default Port | Recommended Port | Environment Variable | Conflicts |
+|---------|--------------|------------------|---------------------|-----------|
+| full_platform.py | 8080 | 8080 | UNIFIED_PORT | - |
+| dqs_service.py | 8080 | 8083 | DQS_PORT | ⚠️ full_platform |
+| Arena | 8181 | 8181 | ARENA_PORT | - |
+| listener.py | 8181 | 8084 | LISTENER_PORT | ⚠️ Arena |
+| api_gateway.py | 8000 | 8000 | API_PORT | - |
+| api_server.py | 8001 | 8001 | GRAPHIX_API_PORT | - |
+| pii_service.py | 8082 | 8082 | PII_PORT | - |
+| registry_api_server.py (gRPC) | 50051 | 50051 | REGISTRY_PORT | - |
+| app.py (Registry Flask) | 5000 | 5000 | PORT | - |
+
+**Critical Conflicts:**
+1. **Port 8080**: full_platform.py vs dqs_service.py (change DQS_PORT to 8083)
+2. **Port 8181**: Arena vs listener.py (change LISTENER_PORT to 8084)
+
+**Note:** Services mounted in unified platform (VULCAN, Arena, Registry) share port 8080 with different URL paths (/vulcan, /arena, /registry).
+
+---
+
+## Service Startup Sequence
+
+For complete platform startup, services should be initialized in this order:
+
+### 1. Infrastructure Services
+- Redis (caching and rate limiting)
+- Database (SQLite/PostgreSQL)
+- MinIO (if using S3 storage)
+
+### 2. Core Services
+- Audit Log Service
+- Agent Registry
+- Observability Manager
+
+### 3. API Services
+- Registry API (Flask) - Port 5000
+- Arena API (FastAPI) - Port 8000
+- API Gateway (if used)
+
+### 4. Execution Services
+- VULCAN-AGI Core
+- Graph Compiler
+- Unified Runtime
+- LLM Core
+
+### 5. Supporting Services
+- Governance Loop
+- Security Audit Engine
+- Hardware Dispatcher
 
 ---
 

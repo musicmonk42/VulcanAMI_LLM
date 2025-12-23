@@ -1,5 +1,10 @@
 # Observability & Telemetry
 
+**Version:** 2.2.0  
+**Last Updated:** December 23, 2024
+
+> See also: [OPERATIONS.md](OPERATIONS.md) for comprehensive operations guide
+
 ## 1. Principles
 High signal, bounded cardinality, multi-layer correlation (node → graph → rolling aggregator → alignment overlay).
 

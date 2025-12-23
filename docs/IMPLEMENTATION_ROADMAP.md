@@ -78,4 +78,30 @@
 
 ---
 
+## Design Principles
+
+> *Consolidated from UNFLATTENABLE_ROADMAP.md*
+
+### Hierarchical Preservation
+Avoid oversimplification of multi-stage reasoning. Preserve:
+- Multi-level graph layering
+- Distributed execution semantics
+- Analog/photonic variability
+- Semantic traceability & provenance
+
+### Core Design Principles
+
+| Principle | Rationale |
+|-----------|-----------|
+| Hierarchical Preservation | Avoid oversimplification of multi-stage reasoning |
+| Analog Fidelity | Capture non-digital performance variance |
+| Semantic Layering | Track conceptual transformations, not just raw ops |
+| Deterministic Auditing | Immutable execution & proposal lineage |
+| Energy Awareness | Sustainable scaling under constrained resources |
+
+### Unflattenable Concepts
+"Unflattenable" design resists collapsing multi-level, heterogeneous computation into a purely uniform digital abstraction. The objective is to minimize information loss and optimize sustainability & cognitive fidelity.
+
+---
+
 > Keep hardware dispatch optional; never block core execution on unavailable external devices. Emulation must remain faithful but bounded.
