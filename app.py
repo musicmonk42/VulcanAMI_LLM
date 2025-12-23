@@ -88,25 +88,41 @@ db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
 # Rate limiter with Redis fallback
+# Prioritizes REDIS_URL environment variable for Railway/cloud deployments
+# Falls back to REDIS_HOST/REDIS_PORT for legacy/local dev compatibility
 redis_storage_uri = None
 redis_client = None
 try:
     import redis
 
-    redis_host = os.environ.get("REDIS_HOST", "localhost")
-    redis_port = int(os.environ.get("REDIS_PORT", 6379))
-    redis_db = int(os.environ.get("REDIS_LIMITER_DB", 1))
-    redis_client = redis.Redis(
-        host=redis_host,
-        port=redis_port,
-        db=redis_db,
-        decode_responses=True,
-        socket_connect_timeout=2,
-        socket_timeout=2,
-    )
-    redis_client.ping()
-    redis_storage_uri = f"redis://{redis_host}:{redis_port}/{redis_db}"
-    print(f"✅ Rate limiter connected to Redis: {redis_storage_uri}")
+    # Priority 1: Use REDIS_URL if set (Railway, Docker Compose, cloud deployments)
+    redis_url = os.environ.get("REDIS_URL")
+    if redis_url:
+        redis_client = redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        redis_client.ping()
+        redis_storage_uri = redis_url
+        print("✅ Connected to Cloud Redis via REDIS_URL")
+    else:
+        # Priority 2: Use REDIS_HOST/REDIS_PORT (legacy/local dev)
+        redis_host = os.environ.get("REDIS_HOST", "localhost")
+        redis_port = int(os.environ.get("REDIS_PORT", 6379))
+        redis_db = int(os.environ.get("REDIS_LIMITER_DB", 1))
+        redis_client = redis.Redis(
+            host=redis_host,
+            port=redis_port,
+            db=redis_db,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        redis_client.ping()
+        redis_storage_uri = f"redis://{redis_host}:{redis_port}/{redis_db}"
+        print(f"✅ Connected to Localhost Redis at {redis_host}:{redis_port}")
 except Exception as e:
     print(f"⚠️  Redis not available for rate limiting: {e}")
     print("⚠️  Falling back to in-memory storage (NOT recommended for production)")

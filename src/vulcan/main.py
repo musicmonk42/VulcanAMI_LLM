@@ -2421,18 +2421,20 @@ if REDIS_AVAILABLE:
         # Priority 1: Use REDIS_URL if set (Railway, Docker Compose, etc.)
         redis_url = os.getenv("REDIS_URL")
         if redis_url:
-            logger.info(f"Connecting to Redis using REDIS_URL")
+            logger.info("Connecting to Cloud Redis using REDIS_URL...")
             redis_client = Redis.from_url(
                 redis_url,
                 decode_responses=False,
                 socket_connect_timeout=redis_connect_timeout,
                 socket_timeout=redis_socket_timeout,
             )
+            redis_client.ping()
+            logger.info("✅ Connected to Cloud Redis successfully")
         else:
             # Priority 2: Use REDIS_HOST/REDIS_PORT (legacy/local dev)
             redis_host = os.getenv("REDIS_HOST", "localhost")
             redis_port = int(os.getenv("REDIS_PORT", 6379))
-            logger.info(f"Connecting to Redis at {redis_host}:{redis_port}")
+            logger.info(f"Connecting to Localhost Redis at {redis_host}:{redis_port}...")
             redis_client = Redis(
                 host=redis_host,
                 port=redis_port,
@@ -2441,8 +2443,8 @@ if REDIS_AVAILABLE:
                 socket_connect_timeout=redis_connect_timeout,
                 socket_timeout=redis_socket_timeout,
             )
-        redis_client.ping()
-        logger.info("Redis connection established successfully")
+            redis_client.ping()
+            logger.info(f"✅ Connected to Localhost Redis at {redis_host}:{redis_port}")
     except Exception as e:
         logger.warning(
             f"Redis not available: {e}. Using in-process state. "
