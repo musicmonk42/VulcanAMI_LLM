@@ -87,6 +87,9 @@ class GraphixTransformer:
         self.device = "cpu"
 
         # PERFORMANCE: Skip BERT loading if SKIP_BERT_EMBEDDINGS is set
+        # When skipping, we set attributes to None which causes get_embeddings()
+        # to use the fallback random embeddings path (line ~170). This is intentional
+        # as it avoids the 3.5s+ BERT model load time for simple chat use cases.
         if should_skip_bert():
             logger.info("Skipping BERT embeddings - using lightweight fallback (SKIP_BERT_EMBEDDINGS=true)")
             self.tokenizer = None

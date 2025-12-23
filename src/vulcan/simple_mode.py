@@ -26,8 +26,16 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def _str_to_bool(value: str, default: bool = False) -> bool:
-    """Convert string to boolean value."""
+def _str_to_bool(value: str | None, default: bool = False) -> bool:
+    """Convert string to boolean value.
+    
+    Args:
+        value: String value to convert, or None.
+        default: Default value if value is None.
+        
+    Returns:
+        Boolean value.
+    """
     if value is None:
         return default
     return value.lower() in ("true", "1", "yes", "on")
