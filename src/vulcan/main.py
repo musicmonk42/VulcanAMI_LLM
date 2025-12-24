@@ -2565,6 +2565,53 @@ def initialize_component(name, func):
 # ============================================================
 
 
+def _sanitize_payload(data: Any) -> Any:
+    """
+    Sanitize payload for JSON serialization by handling None keys and values.
+    
+    JSON does not support None as dictionary keys. This function:
+    - Removes dictionary entries with None keys (which would cause serialization failure)
+    - Recursively processes nested dicts and lists
+    - Converts non-serializable values to strings
+    
+    Args:
+        data: The data to sanitize (dict, list, or any value)
+        
+    Returns:
+        Sanitized data safe for JSON serialization
+        
+    Example:
+        >>> _sanitize_payload({None: "value", "key": "value"})
+        {'key': 'value'}
+        >>> _sanitize_payload({"nested": {None: "bad", "ok": 1}})
+        {'nested': {'ok': 1}}
+    """
+    if isinstance(data, dict):
+        # Filter out None keys and recursively sanitize values
+        # Note: str(k) handles non-string keys (e.g., integers) for JSON compatibility
+        return {
+            str(k): _sanitize_payload(v)
+            for k, v in data.items()
+            if k is not None  # Remove entries with None keys entirely
+        }
+    elif isinstance(data, list):
+        # Recursively sanitize list elements
+        return [_sanitize_payload(item) for item in data]
+    elif isinstance(data, tuple):
+        # Convert tuples to lists for JSON compatibility
+        return [_sanitize_payload(item) for item in data]
+    elif data is None:
+        return None  # None values are fine, just not None keys
+    elif isinstance(data, (str, int, float, bool)):
+        return data
+    else:
+        # For any other type, try to convert to string
+        try:
+            return str(data)
+        except Exception:
+            return "__unserializable__"
+
+
 def _select_arena_agent(routing_plan) -> str:
     """
     Map query type to appropriate Arena agent.
@@ -2708,6 +2755,10 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     # Build payload for Arena
     payload = _build_arena_payload(query, routing_plan, agent_id)
     
+    # CRITICAL FIX: Sanitize payload to remove None keys that cause serialization failures
+    # Error "Cannot serialize non-str key None" occurs when dict has None as key
+    payload = _sanitize_payload(payload)
+    
     # Construct Arena API URL
     # When running via full_platform.py, Arena is mounted at /arena
     # The API endpoint is /api/run/{agent_id}
@@ -2821,6 +2872,9 @@ async def _submit_arena_feedback(
         "score": score,
         "rationale": rationale,
     }
+    
+    # Sanitize payload to ensure JSON serialization compatibility
+    payload = _sanitize_payload(payload)
     
     headers = {
         "X-API-Key": api_key,
@@ -4822,6 +4876,22 @@ async def chat(request: ChatRequest):
         for kw in ["why", "cause", "effect", "because", "leads to", "results in"]
     )
 
+    # PERFORMANCE FIX: Pre-compute embedding ONCE before parallel tasks
+    # This eliminates redundant embedding generation that was causing 19-20s delays
+    _precomputed_embedding_step = None
+    _precomputed_perception = None
+    if deps.multimodal:
+        try:
+            _embed_start = time.perf_counter()
+            _precomputed_perception = await loop.run_in_executor(
+                None, deps.multimodal.process_input, processed_prompt
+            )
+            if hasattr(_precomputed_perception, "embedding"):
+                _precomputed_embedding_step = _precomputed_perception.embedding
+            logger.debug(f"[TIMING] Pre-computed embedding in {time.perf_counter() - _embed_start:.2f}s")
+        except Exception as e:
+            logger.debug(f"[TIMING] Pre-compute embedding failed: {e}")
+
     # Define async task functions for parallel execution
     async def _memory_search_task_process():
         """STEP 2: Query Vulcan's Long-Term Memory"""
@@ -4830,21 +4900,17 @@ async def chat(request: ChatRequest):
 
         if deps.ltm:
             try:
-                if deps.multimodal:
-                    perception = await loop.run_in_executor(
-                        None, deps.multimodal.process_input, processed_prompt
+                # PERFORMANCE FIX: Use pre-computed embedding instead of re-generating
+                if _precomputed_embedding_step is not None:
+                    memory_results = await loop.run_in_executor(
+                        None, deps.ltm.search, _precomputed_embedding_step, 5
                     )
-                    if hasattr(perception, "embedding"):
-                        embedding = perception.embedding
-                        memory_results = await loop.run_in_executor(
-                            None, deps.ltm.search, embedding, 5
+                    if memory_results:
+                        _mem_context = memory_results
+                        _systems.append("long_term_memory")
+                        logger.info(
+                            f"[VULCAN] Retrieved {len(_mem_context)} relevant memories"
                         )
-                        if memory_results:
-                            _mem_context = memory_results
-                            _systems.append("long_term_memory")
-                            logger.info(
-                                f"[VULCAN] Retrieved {len(_mem_context)} relevant memories"
-                            )
             except Exception as e:
                 logger.debug(f"[VULCAN] Memory retrieval failed: {e}")
 
@@ -4890,28 +4956,25 @@ async def chat(request: ChatRequest):
             return None
 
         async def _probabilistic():
-            if deps.probabilistic and deps.multimodal:
+            # PERFORMANCE FIX: Use pre-computed embedding instead of re-generating
+            if deps.probabilistic and _precomputed_embedding_step is not None:
                 try:
-                    perception = await loop.run_in_executor(
-                        None, deps.multimodal.process_input, processed_prompt
-                    )
-                    if hasattr(perception, "embedding"):
-                        if hasattr(deps.probabilistic, "predict_with_uncertainty"):
-                            prob_result = await loop.run_in_executor(
-                                None,
-                                deps.probabilistic.predict_with_uncertainty,
-                                perception.embedding,
+                    if hasattr(deps.probabilistic, "predict_with_uncertainty"):
+                        prob_result = await loop.run_in_executor(
+                            None,
+                            deps.probabilistic.predict_with_uncertainty,
+                            _precomputed_embedding_step,
+                        )
+                        if prob_result:
+                            prediction, uncertainty = prob_result
+                            result = {
+                                "confidence": round(1.0 - uncertainty, 3),
+                                "prediction": str(prediction)[:100],
+                            }
+                            logger.info(
+                                f"[VULCAN] Applied probabilistic reasoning (confidence: {1.0-uncertainty:.2f})"
                             )
-                            if prob_result:
-                                prediction, uncertainty = prob_result
-                                result = {
-                                    "confidence": round(1.0 - uncertainty, 3),
-                                    "prediction": str(prediction)[:100],
-                                }
-                                logger.info(
-                                    f"[VULCAN] Applied probabilistic reasoning (confidence: {1.0-uncertainty:.2f})"
-                                )
-                                return ("probabilistic", result, "probabilistic_reasoning")
+                            return ("probabilistic", result, "probabilistic_reasoning")
                 except Exception as e:
                     logger.debug(f"[VULCAN] Probabilistic reasoning failed: {e}")
             return None
@@ -6124,6 +6187,23 @@ async def unified_chat(request: UnifiedChatRequest):
         plan_result = None
         world_model_insight = None
 
+        # PERFORMANCE FIX: Pre-compute embedding ONCE before parallel tasks
+        # This eliminates redundant embedding generation that was causing 19-20s delays
+        # The embedding is used by memory_search, probabilistic_reasoning, and world_model
+        _precomputed_embedding = None
+        _precomputed_query_result = None
+        if hasattr(deps, "multimodal") and deps.multimodal:
+            try:
+                _embed_start = time.perf_counter()
+                _precomputed_query_result = await loop.run_in_executor(
+                    None, deps.multimodal.process_input, user_message
+                )
+                if hasattr(_precomputed_query_result, "embedding"):
+                    _precomputed_embedding = _precomputed_query_result.embedding
+                logger.debug(f"[TIMING] Pre-computed embedding in {time.perf_counter() - _embed_start:.2f}s")
+            except Exception as e:
+                logger.debug(f"[TIMING] Pre-compute embedding failed: {e}")
+
         # Define async task functions for parallel execution
         async def _memory_search_task():
             """STEP 2: Memory Search (Long-term + Associative Memory)"""
@@ -6133,26 +6213,20 @@ async def unified_chat(request: UnifiedChatRequest):
             if not request.enable_memory:
                 return _mem_context, _systems
 
-            # Search long-term memory
+            # Search long-term memory using pre-computed embedding
             if hasattr(deps, "ltm") and deps.ltm:
                 try:
-                    if hasattr(deps, "multimodal") and deps.multimodal:
+                    if _precomputed_embedding is not None:
                         _op_start = time.perf_counter()
-                        query_result = await loop.run_in_executor(
-                            None, deps.multimodal.process_input, user_message
+                        results = await loop.run_in_executor(
+                            None, deps.ltm.search, _precomputed_embedding, 5
                         )
-                        logger.debug(f"[TIMING] multimodal.process_input took {time.perf_counter() - _op_start:.2f}s")
-                        if hasattr(query_result, "embedding"):
-                            _op_start = time.perf_counter()
-                            results = await loop.run_in_executor(
-                                None, deps.ltm.search, query_result.embedding, 5
+                        logger.debug(f"[TIMING] ltm.search took {time.perf_counter() - _op_start:.2f}s")
+                        if results:
+                            _mem_context.extend(
+                                [{"source": "ltm", "data": r} for r in results[:3]]
                             )
-                            logger.debug(f"[TIMING] ltm.search took {time.perf_counter() - _op_start:.2f}s")
-                            if results:
-                                _mem_context.extend(
-                                    [{"source": "ltm", "data": r} for r in results[:3]]
-                                )
-                                _systems.append("long_term_memory")
+                            _systems.append("long_term_memory")
                 except Exception as e:
                     logger.debug(f"LTM search skipped: {e}")
 
@@ -6205,36 +6279,33 @@ async def unified_chat(request: UnifiedChatRequest):
                 _op_start = time.perf_counter()
                 if hasattr(deps, "probabilistic") and deps.probabilistic:
                     try:
-                        if hasattr(deps, "multimodal") and deps.multimodal:
-                            query_result = await loop.run_in_executor(
-                                None, deps.multimodal.process_input, user_message
+                        # PERFORMANCE FIX: Use pre-computed embedding instead of re-generating
+                        if _precomputed_embedding is not None:
+                            prob_result = await loop.run_in_executor(
+                                None,
+                                deps.probabilistic.predict_with_uncertainty,
+                                _precomputed_embedding,
                             )
-                            if hasattr(query_result, "embedding"):
-                                prob_result = await loop.run_in_executor(
-                                    None,
-                                    deps.probabilistic.predict_with_uncertainty,
-                                    query_result.embedding,
-                                )
-                                if isinstance(prob_result, dict):
-                                    result = {
-                                        "prediction": str(
-                                            prob_result.get(
-                                                "mean", prob_result.get("prediction", "")
-                                            )
-                                        ),
-                                        "uncertainty": float(
-                                            prob_result.get(
-                                                "uncertainty", prob_result.get("std", 0.0)
-                                            )
-                                        ),
-                                    }
-                                else:
-                                    result = {
-                                        "prediction": str(prob_result),
-                                        "uncertainty": 0.0,
-                                    }
-                                logger.debug(f"[TIMING] probabilistic reasoning took {time.perf_counter() - _op_start:.2f}s")
-                                return ("probabilistic", result, "probabilistic_reasoning")
+                            if isinstance(prob_result, dict):
+                                result = {
+                                    "prediction": str(
+                                        prob_result.get(
+                                            "mean", prob_result.get("prediction", "")
+                                        )
+                                    ),
+                                    "uncertainty": float(
+                                        prob_result.get(
+                                            "uncertainty", prob_result.get("std", 0.0)
+                                        )
+                                    ),
+                                }
+                            else:
+                                result = {
+                                    "prediction": str(prob_result),
+                                    "uncertainty": 0.0,
+                                }
+                            logger.debug(f"[TIMING] probabilistic reasoning took {time.perf_counter() - _op_start:.2f}s")
+                            return ("probabilistic", result, "probabilistic_reasoning")
                     except Exception as e:
                         logger.debug(f"Probabilistic reasoning skipped: {e}")
                 return None

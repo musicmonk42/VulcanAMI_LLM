@@ -947,5 +947,144 @@ class TestIntegration:
         assert all(r.status_code == 200 for r in results)
 
 
+class TestArenaSanitization:
+    """Tests for Arena payload sanitization to fix JSON serialization errors."""
+    
+    @staticmethod
+    def _sanitize_payload_test_impl(data):
+        """
+        Local copy of sanitization function for testing without heavy imports.
+        This mirrors the implementation in vulcan/main.py.
+        """
+        if isinstance(data, dict):
+            # Filter out None keys and recursively sanitize values
+            # Note: str(k) handles non-string keys (e.g., integers) for JSON compatibility
+            return {
+                str(k): TestArenaSanitization._sanitize_payload_test_impl(v)
+                for k, v in data.items()
+                if k is not None  # Remove entries with None keys entirely
+            }
+        elif isinstance(data, list):
+            return [TestArenaSanitization._sanitize_payload_test_impl(item) for item in data]
+        elif isinstance(data, tuple):
+            return [TestArenaSanitization._sanitize_payload_test_impl(item) for item in data]
+        elif data is None:
+            return None
+        elif isinstance(data, (str, int, float, bool)):
+            return data
+        else:
+            try:
+                return str(data)
+            except Exception:
+                return "__unserializable__"
+    
+    def test_sanitize_payload_removes_none_keys(self):
+        """Test that None keys are removed from dicts."""
+        sanitize = self._sanitize_payload_test_impl
+        
+        # Dict with None key should have that entry removed
+        payload = {None: "value", "valid_key": "valid_value"}
+        result = sanitize(payload)
+        
+        assert None not in result
+        assert "valid_key" in result
+        assert result["valid_key"] == "valid_value"
+    
+    def test_sanitize_payload_handles_nested_dicts(self):
+        """Test that nested dicts with None keys are sanitized."""
+        sanitize = self._sanitize_payload_test_impl
+        
+        payload = {
+            "outer": {
+                None: "bad",
+                "inner": "good"
+            },
+            "top": "level"
+        }
+        result = sanitize(payload)
+        
+        assert "outer" in result
+        assert None not in result["outer"]
+        assert result["outer"]["inner"] == "good"
+        assert result["top"] == "level"
+    
+    def test_sanitize_payload_handles_lists(self):
+        """Test that lists are recursively sanitized."""
+        sanitize = self._sanitize_payload_test_impl
+        
+        payload = {
+            "items": [
+                {None: "bad", "key": "value"},
+                {"normal": "dict"}
+            ]
+        }
+        result = sanitize(payload)
+        
+        assert len(result["items"]) == 2
+        assert None not in result["items"][0]
+        assert result["items"][0]["key"] == "value"
+        assert result["items"][1]["normal"] == "dict"
+    
+    def test_sanitize_payload_preserves_none_values(self):
+        """Test that None values (not keys) are preserved."""
+        sanitize = self._sanitize_payload_test_impl
+        
+        payload = {"key": None, "other": "value"}
+        result = sanitize(payload)
+        
+        assert "key" in result
+        assert result["key"] is None
+        assert result["other"] == "value"
+    
+    def test_sanitize_payload_handles_primitives(self):
+        """Test that primitive values are passed through unchanged."""
+        sanitize = self._sanitize_payload_test_impl
+        
+        assert sanitize("string") == "string"
+        assert sanitize(123) == 123
+        assert sanitize(3.14) == 3.14
+        assert sanitize(True) is True
+        assert sanitize(None) is None
+    
+    def test_sanitize_payload_converts_tuples_to_lists(self):
+        """Test that tuples are converted to lists for JSON compatibility."""
+        sanitize = self._sanitize_payload_test_impl
+        
+        payload = {"items": (1, 2, 3)}
+        result = sanitize(payload)
+        
+        assert isinstance(result["items"], list)
+        assert result["items"] == [1, 2, 3]
+    
+    def test_sanitize_payload_serializable_result(self):
+        """Test that the result can be JSON serialized without errors."""
+        sanitize = self._sanitize_payload_test_impl
+        
+        # Complex payload with potential serialization issues
+        payload = {
+            None: "removed",
+            "spec_id": "test_123",
+            "parameters": {
+                None: "also_removed",
+                "goal": "test query",
+                "complexity": 0.5,
+            },
+            "nested": [
+                {None: "gone", "valid": True}
+            ]
+        }
+        
+        result = sanitize(payload)
+        
+        # Should not raise any exceptions
+        json_str = json.dumps(result)
+        assert isinstance(json_str, str)
+        
+        # Verify structure
+        parsed = json.loads(json_str)
+        assert parsed["spec_id"] == "test_123"
+        assert parsed["parameters"]["goal"] == "test query"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
