@@ -5173,16 +5173,38 @@ async def chat(request: ChatRequest):
     logger.info("[VULCAN] Starting parallel execution of cognitive steps 2-5")
     _parallel_start = time.perf_counter()
 
+    # FIX: Wrap each task with individual timing to identify bottlenecks
+    async def _timed_task(name: str, coro):
+        """Wrapper to time each parallel task and log if slow (>2s)."""
+        _start = time.perf_counter()
+        try:
+            result = await coro
+            elapsed = time.perf_counter() - _start
+            # Log at WARNING level if task takes > 2 seconds (potential bottleneck)
+            if elapsed > 2.0:
+                logger.warning(f"[TIMING] {name} took {elapsed:.2f}s (SLOW - potential bottleneck)")
+            else:
+                logger.debug(f"[TIMING] {name} completed in {elapsed:.2f}s")
+            return result
+        except Exception as e:
+            elapsed = time.perf_counter() - _start
+            logger.debug(f"[TIMING] {name} failed after {elapsed:.2f}s: {e}")
+            raise
+
     parallel_results = await asyncio.gather(
-        _memory_search_task_process(),
-        _reasoning_task_process(),
-        _world_model_task_process(),
-        _meta_reasoning_task_process(),
+        _timed_task("memory_search", _memory_search_task_process()),
+        _timed_task("reasoning", _reasoning_task_process()),
+        _timed_task("world_model", _world_model_task_process()),
+        _timed_task("meta_reasoning", _meta_reasoning_task_process()),
         return_exceptions=True
     )
 
     _parallel_elapsed = time.perf_counter() - _parallel_start
-    logger.info(f"[TIMING] PARALLEL Steps 2-5 completed in {_parallel_elapsed:.2f}s (previously sequential: 20-30s)")
+    # FIX: Log at WARNING level if parallel execution takes > 5 seconds
+    if _parallel_elapsed > 5.0:
+        logger.warning(f"[TIMING] PARALLEL Steps 2-5 completed in {_parallel_elapsed:.2f}s (SLOW - investigate individual task timings above)")
+    else:
+        logger.info(f"[TIMING] PARALLEL Steps 2-5 completed in {_parallel_elapsed:.2f}s (previously sequential: 20-30s)")
 
     # Aggregate results from parallel execution
     # Result 0: Memory search
@@ -6349,17 +6371,39 @@ async def unified_chat(request: UnifiedChatRequest):
         logger.info("[VULCAN/v1/chat] Starting parallel execution of cognitive steps 2-6")
         _parallel_start = time.perf_counter()
 
+        # FIX: Wrap each task with individual timing to identify bottlenecks
+        async def _timed_task(name: str, coro):
+            """Wrapper to time each parallel task and log if slow (>2s)."""
+            _start = time.perf_counter()
+            try:
+                result = await coro
+                elapsed = time.perf_counter() - _start
+                # Log at WARNING level if task takes > 2 seconds (potential bottleneck)
+                if elapsed > 2.0:
+                    logger.warning(f"[TIMING] {name} took {elapsed:.2f}s (SLOW - potential bottleneck)")
+                else:
+                    logger.debug(f"[TIMING] {name} completed in {elapsed:.2f}s")
+                return result
+            except Exception as e:
+                elapsed = time.perf_counter() - _start
+                logger.debug(f"[TIMING] {name} failed after {elapsed:.2f}s: {e}")
+                raise
+
         parallel_results = await asyncio.gather(
-            _memory_search_task(),
-            _reasoning_task(),
-            _planning_task(),
-            _world_model_task(),
-            _semantic_bridge_task(),
+            _timed_task("memory_search", _memory_search_task()),
+            _timed_task("reasoning", _reasoning_task()),
+            _timed_task("planning", _planning_task()),
+            _timed_task("world_model", _world_model_task()),
+            _timed_task("semantic_bridge", _semantic_bridge_task()),
             return_exceptions=True
         )
 
         _parallel_elapsed = time.perf_counter() - _parallel_start
-        logger.info(f"[TIMING] PARALLEL Steps 2-6 completed in {_parallel_elapsed:.2f}s (previously sequential: 20-30s)")
+        # FIX: Log at WARNING level if parallel execution takes > 5 seconds
+        if _parallel_elapsed > 5.0:
+            logger.warning(f"[TIMING] PARALLEL Steps 2-6 completed in {_parallel_elapsed:.2f}s (SLOW - investigate individual task timings above)")
+        else:
+            logger.info(f"[TIMING] PARALLEL Steps 2-6 completed in {_parallel_elapsed:.2f}s (previously sequential: 20-30s)")
 
         # Aggregate results from parallel execution
         # Result 0: Memory search
