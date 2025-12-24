@@ -2584,6 +2584,21 @@ async def lifespan(app: FastAPI):
         f"Starting VULCAN-AGI worker {worker_id} in {settings.deployment_mode} mode"
     )
 
+    # PERFORMANCE FIX: Increase default ThreadPoolExecutor size to prevent
+    # thread pool exhaustion when parallel cognitive tasks all use run_in_executor(None, ...)
+    # The default pool size is min(32, os.cpu_count() + 4) which may be too small
+    # when multiple parallel tasks (memory, reasoning, planning, world_model) all compete.
+    # This was causing intermittent 25-30 second delays when threads were exhausted.
+    try:
+        import concurrent.futures
+        loop = asyncio.get_event_loop()
+        # Use 32 workers to handle parallel cognitive tasks without exhaustion
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=32, thread_name_prefix="vulcan_")
+        loop.set_default_executor(executor)
+        logger.info("[PERFORMANCE] Set default ThreadPoolExecutor to 32 workers to prevent thread pool exhaustion")
+    except Exception as e:
+        logger.warning(f"Failed to set default executor: {e}")
+
     try:
         # Load configuration profile
         profile_name = settings.deployment_mode
@@ -5635,6 +5650,7 @@ async def unified_chat(request: UnifiedChatRequest):
         # Define async task functions for parallel execution
         async def _memory_search_task():
             """STEP 2: Memory Search (Long-term + Associative Memory)"""
+            _task_start = time.perf_counter()
             _mem_context = []
             _systems = []
             if not request.enable_memory:
@@ -5644,13 +5660,17 @@ async def unified_chat(request: UnifiedChatRequest):
             if hasattr(deps, "ltm") and deps.ltm:
                 try:
                     if hasattr(deps, "multimodal") and deps.multimodal:
+                        _op_start = time.perf_counter()
                         query_result = await loop.run_in_executor(
                             None, deps.multimodal.process_input, user_message
                         )
+                        logger.debug(f"[TIMING] multimodal.process_input took {time.perf_counter() - _op_start:.2f}s")
                         if hasattr(query_result, "embedding"):
+                            _op_start = time.perf_counter()
                             results = await loop.run_in_executor(
                                 None, deps.ltm.search, query_result.embedding, 5
                             )
+                            logger.debug(f"[TIMING] ltm.search took {time.perf_counter() - _op_start:.2f}s")
                             if results:
                                 _mem_context.extend(
                                     [{"source": "ltm", "data": r} for r in results[:3]]
@@ -5663,9 +5683,11 @@ async def unified_chat(request: UnifiedChatRequest):
             if hasattr(deps, "am") and deps.am:
                 try:
                     if hasattr(deps.am, "retrieve"):
+                        _op_start = time.perf_counter()
                         am_results = await loop.run_in_executor(
                             None, deps.am.retrieve, user_message, 3
                         )
+                        logger.debug(f"[TIMING] am.retrieve took {time.perf_counter() - _op_start:.2f}s")
                         if am_results:
                             _mem_context.extend(
                                 [{"source": "am", "data": r} for r in am_results]
@@ -5674,10 +5696,12 @@ async def unified_chat(request: UnifiedChatRequest):
                 except Exception as e:
                     logger.debug(f"AM search skipped: {e}")
 
+            logger.debug(f"[TIMING] _memory_search_task completed in {time.perf_counter() - _task_start:.2f}s")
             return _mem_context, _systems
 
         async def _reasoning_task():
             """STEP 3: Reasoning Engine Selection and Execution"""
+            _task_start = time.perf_counter()
             _reasoning = {}
             _systems = []
             _meta = {}
@@ -5688,17 +5712,20 @@ async def unified_chat(request: UnifiedChatRequest):
             reasoning_subtasks = []
 
             async def _symbolic_reasoning():
+                _op_start = time.perf_counter()
                 if hasattr(deps, "symbolic") and deps.symbolic:
                     try:
                         result = await loop.run_in_executor(
                             None, deps.symbolic.reason, user_message
                         )
+                        logger.debug(f"[TIMING] symbolic.reason took {time.perf_counter() - _op_start:.2f}s")
                         return ("symbolic", result, "symbolic_reasoning")
                     except Exception as e:
                         logger.debug(f"Symbolic reasoning skipped: {e}")
                 return None
 
             async def _probabilistic_reasoning():
+                _op_start = time.perf_counter()
                 if hasattr(deps, "probabilistic") and deps.probabilistic:
                     try:
                         if hasattr(deps, "multimodal") and deps.multimodal:
@@ -5729,30 +5756,35 @@ async def unified_chat(request: UnifiedChatRequest):
                                         "prediction": str(prob_result),
                                         "uncertainty": 0.0,
                                     }
+                                logger.debug(f"[TIMING] probabilistic reasoning took {time.perf_counter() - _op_start:.2f}s")
                                 return ("probabilistic", result, "probabilistic_reasoning")
                     except Exception as e:
                         logger.debug(f"Probabilistic reasoning skipped: {e}")
                 return None
 
             async def _causal_reasoning():
+                _op_start = time.perf_counter()
                 if request.enable_causal and hasattr(deps, "causal") and deps.causal:
                     try:
                         if hasattr(deps.causal, "analyze"):
                             result = await loop.run_in_executor(
                                 None, deps.causal.analyze, user_message
                             )
+                            logger.debug(f"[TIMING] causal.analyze took {time.perf_counter() - _op_start:.2f}s")
                             return ("causal", result, "causal_reasoning", True)
                     except Exception as e:
                         logger.debug(f"Causal reasoning skipped: {e}")
                 return None
 
             async def _analogical_reasoning():
+                _op_start = time.perf_counter()
                 if hasattr(deps, "analogical") and deps.analogical:
                     try:
                         if hasattr(deps.analogical, "find_analogies"):
                             result = await loop.run_in_executor(
                                 None, deps.analogical.find_analogies, user_message
                             )
+                            logger.debug(f"[TIMING] analogical.find_analogies took {time.perf_counter() - _op_start:.2f}s")
                             return ("analogical", result, "analogical_reasoning")
                     except Exception as e:
                         logger.debug(f"Analogical reasoning skipped: {e}")
@@ -5780,10 +5812,12 @@ async def unified_chat(request: UnifiedChatRequest):
                     if len(result) > 3 and result[3]:
                         _meta["causal_analysis"] = True
 
+            logger.debug(f"[TIMING] _reasoning_task completed in {time.perf_counter() - _task_start:.2f}s")
             return _reasoning, _systems, _meta
 
         async def _planning_task():
             """STEP 4: Planning System (for complex queries)"""
+            _task_start = time.perf_counter()
             _plan = None
             _systems = []
             _meta = {}
@@ -5808,21 +5842,25 @@ async def unified_chat(request: UnifiedChatRequest):
 
             if needs_planning:
                 try:
+                    _op_start = time.perf_counter()
                     _plan = await loop.run_in_executor(
                         None,
                         deps.goal_system.generate_plan,
                         {"high_level_goal": user_message},
                         context,
                     )
+                    logger.debug(f"[TIMING] goal_system.generate_plan took {time.perf_counter() - _op_start:.2f}s")
                     _systems.append("planning_system")
                     _meta["planning_engaged"] = True
                 except Exception as e:
                     logger.debug(f"Planning skipped: {e}")
 
+            logger.debug(f"[TIMING] _planning_task completed in {time.perf_counter() - _task_start:.2f}s")
             return _plan, _systems, _meta
 
         async def _world_model_task():
             """STEP 5: World Model Consultation"""
+            _task_start = time.perf_counter()
             _insight = None
             _systems = []
             if not (hasattr(deps, "world_model") and deps.world_model):
@@ -5830,13 +5868,16 @@ async def unified_chat(request: UnifiedChatRequest):
 
             try:
                 if hasattr(deps.world_model, "predict"):
+                    _op_start = time.perf_counter()
                     _insight = await loop.run_in_executor(
                         None, deps.world_model.predict, user_message, {}
                     )
+                    logger.debug(f"[TIMING] world_model.predict took {time.perf_counter() - _op_start:.2f}s")
                     _systems.append("world_model")
             except Exception as e:
                 logger.debug(f"World model skipped: {e}")
 
+            logger.debug(f"[TIMING] _world_model_task completed in {time.perf_counter() - _task_start:.2f}s")
             return _insight, _systems
 
         async def _semantic_bridge_task():
