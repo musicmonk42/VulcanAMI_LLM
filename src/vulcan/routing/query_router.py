@@ -185,12 +185,17 @@ COLLABORATION_TRIGGERS: Tuple[str, ...] = (
 # ============================================================
 # These thresholds determine when Graphix Arena is activated for
 # tournament-style multi-agent competition and graph evolution tasks
+#
+# FIX: Lowered thresholds to ensure arena activates for complex queries.
+# Arena provides valuable multi-agent collaboration, tournament evaluation,
+# and graph evolution capabilities that benefit complex/creative tasks.
 
-ARENA_UNCERTAINTY_THRESHOLD: float = 0.4  # High uncertainty triggers arena
-ARENA_HIGH_COMPLEXITY_THRESHOLD: float = 0.6  # Very high complexity + uncertainty
-ARENA_COLLABORATION_COMPLEXITY_THRESHOLD: float = 0.4  # For collaborative scenarios (3+ agents)
-ARENA_CREATIVE_COMPLEXITY_THRESHOLD: float = 0.35  # For creative tasks needing multiple perspectives
-ARENA_REASONING_COMPLEXITY_THRESHOLD: float = 0.35  # For multi-aspect reasoning tasks
+ARENA_UNCERTAINTY_THRESHOLD: float = 0.35  # High uncertainty triggers arena (lowered from 0.4)
+ARENA_HIGH_COMPLEXITY_THRESHOLD: float = 0.5  # Very high complexity + uncertainty (lowered from 0.6)
+ARENA_COLLABORATION_COMPLEXITY_THRESHOLD: float = 0.35  # For collaborative scenarios (lowered from 0.4)
+ARENA_CREATIVE_COMPLEXITY_THRESHOLD: float = 0.3  # For creative tasks (lowered from 0.35)
+ARENA_REASONING_COMPLEXITY_THRESHOLD: float = 0.3  # For multi-aspect reasoning (lowered from 0.35)
+ARENA_EXECUTION_COMPLEXITY_THRESHOLD: float = 0.45  # For complex execution tasks (NEW)
 
 # ============================================================
 # CONSTANTS - Security Patterns
@@ -1146,6 +1151,28 @@ class QueryAnalyzer:
             if any(kw in query_lower for kw in multi_aspect_keywords):
                 arena_participation = True
                 tournament_candidates = max(tournament_candidates, 5)
+        
+        # 9. FIX: Execution tasks with high complexity and collaboration (Arena improves quality)
+        # Complex execution tasks benefit from Arena's multi-agent evaluation and tournament selection
+        if query_type == QueryType.EXECUTION and complexity_score > ARENA_EXECUTION_COMPLEXITY_THRESHOLD:
+            arena_participation = True
+            tournament_candidates = max(tournament_candidates, 5)
+            logger.debug(f"[Arena] Execution task triggered arena (complexity={complexity_score:.2f})")
+        
+        # 10. FIX: Any query with collaboration AND moderate complexity should use Arena
+        # Arena's collaborative environment is ideal for multi-agent deliberation
+        if collaboration_needed and complexity_score > 0.3:
+            arena_participation = True
+            tournament_candidates = max(tournament_candidates, len(collaboration_agents) if collaboration_agents else 3)
+            logger.debug(f"[Arena] Collaboration with complexity triggered arena (collab_agents={len(collaboration_agents or [])})")
+        
+        # 11. FIX: Detect creative indicators even without explicit creative keywords
+        # Count creative indicators and trigger arena if detected
+        creative_count = sum(1 for ind in CREATIVE_INDICATORS if ind in query_lower)
+        if creative_count >= 2 and complexity_score > 0.3:
+            arena_participation = True
+            tournament_candidates = max(tournament_candidates, 5)
+            logger.debug(f"[Arena] Creative indicators ({creative_count}) triggered arena")
         
         return arena_participation, tournament_candidates
     
