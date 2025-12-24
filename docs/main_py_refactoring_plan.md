@@ -220,7 +220,7 @@ src/vulcan/
 │
 ├── cli/                         # NEW: CLI layer
 │   ├── __init__.py              # main() function
-│   └── server.py                # run_production_server, find_available_port
+│   └── server.py                # run_production_server (imports find_available_port from utils_main)
 │
 ├── utils_main/                  # NEW: Utilities (named to avoid collision)
 │   ├── __init__.py
