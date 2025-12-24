@@ -6074,7 +6074,8 @@ async def unified_chat(request: UnifiedChatRequest):
                     # Check if Arena result has a direct response we can use
                     if isinstance(arena_output, dict) and arena_output.get("output"):
                         # Arena provided a complete response
-                        timing_breakdown["total_ms"] = (time.time() - start_time) * 1000
+                        arena_latency_ms = int((time.time() - start_time) * 1000)
+                        timing_breakdown["total_ms"] = arena_latency_ms
                         return {
                             "response": arena_output.get("output", "Arena processing complete"),
                             "arena_execution": {
