@@ -659,7 +659,14 @@ class AgentPoolManager:
         rotated out of the deque. Called during provenance recording.
         
         Note: This should be called while holding a lock to prevent race conditions.
+        
+        PERFORMANCE FIX: Only cleanup if lookup is significantly larger than deque
+        to avoid O(n) iteration on every insert under high load.
         """
+        # Skip cleanup if lookup size is within acceptable bounds
+        if len(self._provenance_lookup) <= self._provenance_maxlen + 10:
+            return
+        
         # Get current job_ids in the deque
         current_job_ids = set()
         for record in self._provenance_records:
@@ -757,9 +764,18 @@ class AgentPoolManager:
         
         This method saves statistics and provenance counts to Redis so they
         can be restored after container restarts.
+        
+        PERFORMANCE FIX: Throttle to max once per second to avoid excessive
+        Redis round-trips under high throughput.
         """
         if self.redis_client is None:
             return
+        
+        # Throttle Redis persistence to max once per second
+        now = time.time()
+        if now - getattr(self, '_last_redis_persist', 0) < 1.0:
+            return
+        self._last_redis_persist = now
         
         try:
             # Persist statistics
@@ -1006,6 +1022,11 @@ class AgentPoolManager:
                             logger.debug(f"Error closing process handle: {e}")
 
                     del self.agent_processes[agent_id]
+
+                # PERFORMANCE FIX: Clean up specialized_agents tracking
+                for spec_list in self.specialized_agents.values():
+                    if agent_id in spec_list:
+                        spec_list.remove(agent_id)
 
                 # Update statistics
                 with self.stats_lock:
@@ -1725,13 +1746,15 @@ class AgentPoolManager:
                                 agents_to_retire.append(agent_id)
 
                         # Update resource usage for local agents
+                        # PERFORMANCE FIX: Use non-blocking CPU measurement (interval=None)
+                        # to avoid 100ms blocking per agent which causes slowdown with many agents
                         if PSUTIL_AVAILABLE and agent_id in self.agent_processes:
                             process = self.agent_processes[agent_id]
                             if process.is_alive():
                                 try:
                                     p = psutil.Process(process.pid)
                                     metadata.resource_usage = {
-                                        "cpu_percent": p.cpu_percent(interval=0.1),
+                                        "cpu_percent": p.cpu_percent(interval=None),
                                         "memory_mb": p.memory_info().rss / 1024 / 1024,
                                         "num_threads": p.num_threads(),
                                     }
@@ -1813,15 +1836,15 @@ class AgentPoolManager:
         self.last_status_check = current_time
 
         with self.lock:
+            # PERFORMANCE FIX: Combine into single loop to avoid double iteration
             state_counts = defaultdict(int)
+            capability_counts = defaultdict(int)
+            health_scores = []
             for metadata in self.agents.values():
                 state_counts[metadata.state.value] += 1
-
-            capability_counts = defaultdict(int)
-            for metadata in self.agents.values():
                 capability_counts[metadata.capability.value] += 1
+                health_scores.append(metadata.get_health_score())
 
-            health_scores = [m.get_health_score() for m in self.agents.values()]
             avg_health = (
                 sum(health_scores) / len(health_scores) if health_scores else 0.0
             )
@@ -1861,12 +1884,11 @@ class AgentPoolManager:
     def _cached_status(self) -> Dict[str, Any]:
         """Return cached status to avoid frequent checks."""
         with self.lock:
+            # PERFORMANCE FIX: Combine into single loop to avoid double iteration
             state_counts = defaultdict(int)
-            for metadata in self.agents.values():
-                state_counts[metadata.state.value] += 1
-
             capability_counts = defaultdict(int)
             for metadata in self.agents.values():
+                state_counts[metadata.state.value] += 1
                 capability_counts[metadata.capability.value] += 1
 
             return {
