@@ -2588,8 +2588,9 @@ def _sanitize_payload(data: Any) -> Any:
     """
     if isinstance(data, dict):
         # Filter out None keys and recursively sanitize values
+        # Note: str(k) handles non-string keys (e.g., integers) for JSON compatibility
         return {
-            str(k) if k is not None else "__none_key__": _sanitize_payload(v)
+            str(k): _sanitize_payload(v)
             for k, v in data.items()
             if k is not None  # Remove entries with None keys entirely
         }

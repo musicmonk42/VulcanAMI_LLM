@@ -957,10 +957,12 @@ class TestArenaSanitization:
         This mirrors the implementation in vulcan/main.py.
         """
         if isinstance(data, dict):
+            # Filter out None keys and recursively sanitize values
+            # Note: str(k) handles non-string keys (e.g., integers) for JSON compatibility
             return {
-                str(k) if k is not None else "__none_key__": TestArenaSanitization._sanitize_payload_test_impl(v)
+                str(k): TestArenaSanitization._sanitize_payload_test_impl(v)
                 for k, v in data.items()
-                if k is not None
+                if k is not None  # Remove entries with None keys entirely
             }
         elif isinstance(data, list):
             return [TestArenaSanitization._sanitize_payload_test_impl(item) for item in data]
