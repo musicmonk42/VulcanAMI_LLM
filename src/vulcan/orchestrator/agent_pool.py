@@ -2285,13 +2285,13 @@ class AgentPoolManager:
             self._pending_executions.clear()
         
         # SINGLETON FIX: Remove this instance from the class registry
-        instance_id = getattr(self, '_instance_id', None)
-        if instance_id:
-            with AgentPoolManager._instance_lock:
-                if instance_id in AgentPoolManager._instances:
-                    del AgentPoolManager._instances[instance_id]
-                if AgentPoolManager._default_instance is self:
-                    AgentPoolManager._default_instance = None
+        # Acquire instance_id under the class lock to ensure thread safety
+        with AgentPoolManager._instance_lock:
+            instance_id = getattr(self, '_instance_id', None)
+            if instance_id and instance_id in AgentPoolManager._instances:
+                del AgentPoolManager._instances[instance_id]
+            if AgentPoolManager._default_instance is self:
+                AgentPoolManager._default_instance = None
 
         logger.info("Agent pool shutdown complete")
 

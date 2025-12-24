@@ -5818,13 +5818,16 @@ def _truncate_history(
         history: List of message dictionaries with 'role' and 'content' keys
         max_messages: Maximum number of messages to retain
         max_tokens: Maximum estimated tokens in history
-        max_message_length: Maximum characters per message
+        max_message_length: Maximum characters per message (minimum: 50)
         
     Returns:
         Truncated history list
     """
     if not history:
         return []
+    
+    # Ensure max_message_length is reasonable to avoid negative half values
+    max_message_length = max(50, max_message_length)
     
     # Step 1: Apply sliding window - keep only most recent messages
     if len(history) > max_messages:
@@ -5840,7 +5843,8 @@ def _truncate_history(
         content = truncated_msg.get("content", "")
         if len(content) > max_message_length:
             # Keep the first and last parts, add ellipsis in middle
-            half = max_message_length // 2 - 10
+            # Ensure half is at least 10 characters to have meaningful content
+            half = max(10, max_message_length // 2 - 15)
             truncated_msg["content"] = (
                 content[:half] + "\n... [truncated] ...\n" + content[-half:]
             )
@@ -5850,14 +5854,15 @@ def _truncate_history(
         truncated_history.append(truncated_msg)
     
     # Step 3: Estimate token count and drop oldest messages if over limit
-    # Rough estimate: 1 token ≈ 4 characters
+    # Conservative estimate: 1 token ≈ 3-4 characters for English text
+    # Using 3 for more conservative estimation (may slightly over-truncate)
     total_chars = sum(len(msg.get("content", "")) for msg in truncated_history)
-    estimated_tokens = total_chars // 4
+    estimated_tokens = total_chars // 3  # More conservative than //4
     
     while estimated_tokens > max_tokens and len(truncated_history) > 1:
         removed = truncated_history.pop(0)
         removed_chars = len(removed.get("content", ""))
-        estimated_tokens -= removed_chars // 4
+        estimated_tokens -= removed_chars // 3
         logger.debug(
             f"Context truncation: Dropped oldest message ({removed_chars} chars), "
             f"estimated tokens now: {estimated_tokens}"
@@ -6867,6 +6872,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
 
         # Calculate latency
         latency_ms = int((time.time() - start_time) * 1000)
+        
+        # JOB-TO-RESPONSE GAP FIX: Add total time to timing breakdown
+        timing_breakdown["total_ms"] = latency_ms
 
         # Update reasoning type based on what was used
         if len([s for s in systems_used if "reasoning" in s]) > 1:
