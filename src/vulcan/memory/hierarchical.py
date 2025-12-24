@@ -7,6 +7,7 @@ import json
 import logging
 import threading
 import time
+import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -1613,12 +1614,9 @@ class PersistentHierarchicalMemory:
         self.semantic = SemanticMemory()
         self.procedural = ProceduralMemory()
 
-        # Persistent storage backend
+        # Persistent storage backend (S3Store aliased as PackfileStore)
         self.persistent_store = PackfileStore(
-            s3_bucket=config.memory_bucket,
-            cloudfront_url=config.cdn_url,
-            compression="zstd",
-            encryption="AES256",
+            bucket=config.memory_bucket,
         )
 
         # LSM tree for efficient compaction
@@ -1713,7 +1711,8 @@ class PersistentHierarchicalMemory:
         else:
             # Compact and upload to persistent storage
             packfile = self.lsm_compactor.compact([memory_item])
-            self.persistent_store.upload(packfile, pack_id="pack-001")
+            pack_id = str(uuid.uuid4())
+            self.persistent_store.put_object(key=f"packs/{pack_id}.pack", data=packfile)
 
     def retrieve(self, query, k=10):
         """
