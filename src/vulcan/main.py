@@ -2475,9 +2475,9 @@ class Settings(BaseSettings):
     arena_base_url: str = Field(
         default="http://localhost:8080/arena", env="ARENA_BASE_URL"
     )
-    # API key for Arena authentication
-    arena_api_key: str = Field(
-        default="default-secret-key-for-dev", env="GRAPHIX_API_KEY"
+    # API key for Arena authentication - must be set via env var in production
+    arena_api_key: Optional[str] = Field(
+        default=None, env="GRAPHIX_API_KEY"
     )
     # Timeout for Arena API calls (seconds)
     arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
