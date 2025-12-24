@@ -2773,37 +2773,38 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     t0 = time.perf_counter()
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=timeout)
-            ) as resp:
-                elapsed = time.perf_counter() - t0
+        # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
+        session = await get_http_session()
+        async with session.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=timeout)
+        ) as resp:
+            elapsed = time.perf_counter() - t0
+            
+            if resp.status == 200:
+                result = await resp.json()
+                logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
                 
-                if resp.status == 200:
-                    result = await resp.json()
-                    logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
-                    
-                    return {
-                        "status": "success",
-                        "agent_id": agent_id,
-                        "execution_time": elapsed,
-                        "result": result,
-                        "arena_url": url,
-                    }
-                else:
-                    error_text = await resp.text()
-                    logger.error(f"[ARENA] {agent_id} failed: {resp.status} - {error_text}")
-                    
-                    return {
-                        "status": "error",
-                        "agent_id": agent_id,
-                        "execution_time": elapsed,
-                        "error": error_text,
-                        "status_code": resp.status,
-                    }
+                return {
+                    "status": "success",
+                    "agent_id": agent_id,
+                    "execution_time": elapsed,
+                    "result": result,
+                    "arena_url": url,
+                }
+            else:
+                error_text = await resp.text()
+                logger.error(f"[ARENA] {agent_id} failed: {resp.status} - {error_text}")
+                
+                return {
+                    "status": "error",
+                    "agent_id": agent_id,
+                    "execution_time": elapsed,
+                    "error": error_text,
+                    "status_code": resp.status,
+                }
                     
     except asyncio.TimeoutError:
         elapsed = time.perf_counter() - t0
@@ -2882,25 +2883,93 @@ async def _submit_arena_feedback(
     }
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
-                if resp.status == 200:
-                    result = await resp.json()
-                    logger.info(f"[ARENA] Feedback submitted for {proposal_id}: score={score}")
-                    return {"status": "success", "result": result}
-                else:
-                    error_text = await resp.text()
-                    logger.error(f"[ARENA] Feedback submission failed: {resp.status}")
-                    return {"status": "error", "error": error_text}
+        # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
+        session = await get_http_session()
+        async with session.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=30)
+        ) as resp:
+            if resp.status == 200:
+                result = await resp.json()
+                logger.info(f"[ARENA] Feedback submitted for {proposal_id}: score={score}")
+                return {"status": "success", "result": result}
+            else:
+                error_text = await resp.text()
+                logger.error(f"[ARENA] Feedback submission failed: {resp.status}")
+                return {"status": "error", "error": error_text}
                     
     except Exception as e:
         logger.error(f"[ARENA] Feedback submission error: {e}")
         return {"status": "error", "error": str(e)}
+
+
+# ============================================================
+# HTTP CONNECTION POOL FIX - Global session for connection reuse
+# ============================================================
+
+# HTTP CONNECTION POOL FIX: Constants for connection pool configuration
+# These can be overridden via environment variables for different deployment scenarios
+HTTP_POOL_LIMIT = int(os.environ.get("VULCAN_HTTP_POOL_LIMIT", "100"))
+HTTP_POOL_LIMIT_PER_HOST = int(os.environ.get("VULCAN_HTTP_POOL_LIMIT_PER_HOST", "30"))
+HTTP_DNS_CACHE_TTL = int(os.environ.get("VULCAN_HTTP_DNS_CACHE_TTL", "300"))
+HTTP_TOTAL_TIMEOUT = float(os.environ.get("VULCAN_HTTP_TOTAL_TIMEOUT", "60.0"))
+HTTP_CONNECT_TIMEOUT = float(os.environ.get("VULCAN_HTTP_CONNECT_TIMEOUT", "10.0"))
+HTTP_READ_TIMEOUT = float(os.environ.get("VULCAN_HTTP_READ_TIMEOUT", "30.0"))
+
+# HTTP CONNECTION POOL FIX: Global aiohttp session for connection reuse
+# Creating a new ClientSession per request causes overhead and connection exhaustion
+# The session is initialized in lifespan context and used by all HTTP operations
+_http_session: Optional[Any] = None  # Type as Any to handle aiohttp not being installed
+
+
+async def get_http_session():
+    """
+    Get the global HTTP session for connection pooling.
+    
+    HTTP CONNECTION POOL FIX: This ensures HTTP connections are reused
+    rather than creating new connections for each request, which was
+    causing latency and potential connection exhaustion.
+    
+    Returns:
+        aiohttp.ClientSession with connection pooling
+    """
+    global _http_session
+    if not AIOHTTP_AVAILABLE or aiohttp is None:
+        raise RuntimeError("aiohttp not available - cannot create HTTP session")
+    
+    if _http_session is None or _http_session.closed:
+        # Create session with configurable connection pool limits
+        connector = aiohttp.TCPConnector(
+            limit=HTTP_POOL_LIMIT,
+            limit_per_host=HTTP_POOL_LIMIT_PER_HOST,
+            ttl_dns_cache=HTTP_DNS_CACHE_TTL,
+            enable_cleanup_closed=True,
+        )
+        timeout = aiohttp.ClientTimeout(
+            total=HTTP_TOTAL_TIMEOUT,
+            connect=HTTP_CONNECT_TIMEOUT,
+            sock_read=HTTP_READ_TIMEOUT,
+        )
+        _http_session = aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+        )
+        logger.info(
+            f"HTTP connection pool initialized (limit={HTTP_POOL_LIMIT}, "
+            f"per_host={HTTP_POOL_LIMIT_PER_HOST})"
+        )
+    return _http_session
+
+
+async def close_http_session():
+    """Close the global HTTP session gracefully."""
+    global _http_session
+    if _http_session is not None and not _http_session.closed:
+        await _http_session.close()
+        _http_session = None
+        logger.info("HTTP connection pool closed")
 
 
 # ============================================================
@@ -3442,6 +3511,11 @@ async def lifespan(app: FastAPI):
         raise
 
     startup_complete = True
+    
+    # HTTP CONNECTION POOL FIX: Initialize global HTTP session
+    if AIOHTTP_AVAILABLE:
+        await get_http_session()
+        logger.info("✓ Global HTTP connection pool initialized")
 
     try:
         yield
@@ -3449,6 +3523,13 @@ async def lifespan(app: FastAPI):
         logger.info(f"VULCAN-AGI worker {worker_id} received cancellation signal")
     finally:
         # SHUTDOWN LOGIC
+        
+        # HTTP CONNECTION POOL FIX: Close HTTP session first
+        try:
+            await close_http_session()
+        except Exception as e:
+            logger.warning(f"Error closing HTTP session: {e}")
+        
         if startup_complete and hasattr(app.state, "deployment"):
             deployment = app.state.deployment
 
@@ -5720,6 +5801,99 @@ class UnifiedChatRequest(BaseModel):
     enable_causal: bool = True
 
 
+# CONTEXT ACCUMULATION FIX: Constants for context window management
+# These limits prevent unbounded context growth causing response lag
+MAX_HISTORY_MESSAGES = 20  # Maximum number of history messages to retain
+MAX_HISTORY_TOKENS = 4096  # Maximum total tokens in history (rough estimate)
+MAX_MESSAGE_LENGTH = 2000  # Maximum characters per message
+MIN_MESSAGE_LENGTH = 50  # Minimum enforced max_message_length to avoid edge cases
+MIN_TRUNCATION_HALF = 10  # Minimum characters to keep on each side when truncating
+ELLIPSIS_OVERHEAD = 15  # Overhead for ellipsis marker "... [truncated] ..."
+CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
+
+# JOB-TO-RESPONSE GAP FIX: Timing thresholds for debugging
+SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
+SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
+
+
+def _truncate_history(
+    history: List[Dict[str, str]],
+    max_messages: int = MAX_HISTORY_MESSAGES,
+    max_tokens: int = MAX_HISTORY_TOKENS,
+    max_message_length: int = MAX_MESSAGE_LENGTH,
+) -> List[Dict[str, str]]:
+    """
+    Truncate conversation history to prevent context accumulation.
+    
+    CONTEXT ACCUMULATION FIX: This implements a sliding window approach to
+    prevent the conversation history from growing unbounded, which was causing
+    response times to degrade from 5s → 4s → 37s → 51s → 86s.
+    
+    Strategy:
+    1. Limit total number of messages (sliding window)
+    2. Truncate individual messages that are too long
+    3. Estimate token count and drop older messages if over limit
+    
+    Args:
+        history: List of message dictionaries with 'role' and 'content' keys
+        max_messages: Maximum number of messages to retain
+        max_tokens: Maximum estimated tokens in history
+        max_message_length: Maximum characters per message (minimum: 50)
+        
+    Returns:
+        Truncated history list
+    """
+    if not history:
+        return []
+    
+    # Ensure max_message_length is sufficient for meaningful truncation
+    # Minimum 50 chars allows for readable content on each side of the ellipsis
+    max_message_length = max(MIN_MESSAGE_LENGTH, max_message_length)
+    
+    # Step 1: Apply sliding window - keep only most recent messages
+    if len(history) > max_messages:
+        logger.debug(
+            f"Context truncation: Sliding window {len(history)} → {max_messages} messages"
+        )
+        history = history[-max_messages:]
+    
+    # Step 2: Truncate individual messages that are too long
+    truncated_history = []
+    ellipsis_marker = "\n... [truncated] ...\n"
+    for msg in history:
+        truncated_msg = dict(msg)  # Copy to avoid modifying original
+        content = truncated_msg.get("content", "")
+        if len(content) > max_message_length:
+            # Keep the first and last parts, add ellipsis in middle
+            # Ensure half is at least MIN_TRUNCATION_HALF characters to have meaningful content
+            half = max(MIN_TRUNCATION_HALF, (max_message_length - len(ellipsis_marker)) // 2)
+            
+            # Ensure truncated content is actually shorter than original
+            truncated_content = content[:half] + ellipsis_marker + content[-half:]
+            if len(truncated_content) < len(content):
+                truncated_msg["content"] = truncated_content
+                logger.debug(
+                    f"Context truncation: Message truncated from {len(content)} to {len(truncated_msg['content'])} chars"
+                )
+        truncated_history.append(truncated_msg)
+    
+    # Step 3: Estimate token count and drop oldest messages if over limit
+    # Use CHARS_PER_TOKEN_ESTIMATE for conservative token estimation
+    total_chars = sum(len(msg.get("content", "")) for msg in truncated_history)
+    estimated_tokens = total_chars // CHARS_PER_TOKEN_ESTIMATE
+    
+    while estimated_tokens > max_tokens and len(truncated_history) > 1:
+        removed = truncated_history.pop(0)
+        removed_chars = len(removed.get("content", ""))
+        estimated_tokens -= removed_chars // CHARS_PER_TOKEN_ESTIMATE
+        logger.debug(
+            f"Context truncation: Dropped oldest message ({removed_chars} chars), "
+            f"estimated tokens now: {estimated_tokens}"
+        )
+    
+    return truncated_history
+
+
 @app.post("/v1/chat")
 async def unified_chat(request: UnifiedChatRequest):
     """
@@ -5737,6 +5911,27 @@ async def unified_chat(request: UnifiedChatRequest):
     Returns a natural language response with metadata about which systems were used.
     """
     start_time = time.time()
+    
+    # JOB-TO-RESPONSE GAP FIX: Add detailed timing instrumentation
+    # This helps diagnose where the 50+ second gap is occurring
+    timing_breakdown = {
+        "request_received": start_time,
+        "phases": {},  # Will track each phase's duration
+    }
+    
+    def _record_phase(phase_name: str, phase_start: float) -> float:
+        """Record phase duration and return current time for next phase."""
+        now = time.time()
+        duration_ms = (now - phase_start) * 1000
+        timing_breakdown["phases"][phase_name] = {
+            "duration_ms": duration_ms,
+            "end_time": now,
+        }
+        if duration_ms > SLOW_PHASE_THRESHOLD_MS:
+            logger.warning(
+                f"[VULCAN/v1/chat] SLOW PHASE: {phase_name} took {duration_ms:.1f}ms"
+            )
+        return now
 
     if not hasattr(app.state, "deployment"):
         raise HTTPException(status_code=503, detail="System not initialized")
@@ -5753,10 +5948,23 @@ async def unified_chat(request: UnifiedChatRequest):
         "planning_engaged": False,
         "causal_analysis": False,
     }
+    
+    phase_start = start_time
 
     try:
         user_message = request.message
-        context = {"user_query": user_message, "history": request.history}
+        
+        # CONTEXT ACCUMULATION FIX: Apply sliding window truncation to history
+        # This prevents the multi-turn context from growing unbounded
+        truncated_history = _truncate_history(request.history)
+        original_history_len = len(request.history)
+        if original_history_len != len(truncated_history):
+            logger.info(
+                f"[VULCAN/v1/chat] Context truncated: {original_history_len} → {len(truncated_history)} messages"
+            )
+        
+        context = {"user_query": user_message, "history": truncated_history}
+        phase_start = _record_phase("context_preparation", phase_start)
 
         # ================================================================
         # STEP 0: QUERY ROUTING LAYER - Analyze and route query
@@ -5827,6 +6035,8 @@ async def unified_chat(request: UnifiedChatRequest):
             logger.debug(f"[VULCAN/v1/chat] Routing layer not available: {e}")
         except Exception as e:
             logger.warning(f"[VULCAN/v1/chat] Query routing failed: {e}", exc_info=True)
+        
+        phase_start = _record_phase("query_routing", phase_start)
 
         # ================================================================
         # ARENA EXECUTION PATH - Execute via Graphix Arena when enabled
@@ -5850,6 +6060,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     query=user_message,
                     routing_plan=routing_plan,
                 )
+                phase_start = _record_phase("arena_execution", phase_start)
                 
                 if arena_result.get("status") == "success":
                     logger.info(
@@ -5863,6 +6074,8 @@ async def unified_chat(request: UnifiedChatRequest):
                     # Check if Arena result has a direct response we can use
                     if isinstance(arena_output, dict) and arena_output.get("output"):
                         # Arena provided a complete response
+                        arena_latency_ms = int((time.time() - start_time) * 1000)
+                        timing_breakdown["total_ms"] = arena_latency_ms
                         return {
                             "response": arena_output.get("output", "Arena processing complete"),
                             "arena_execution": {
@@ -6683,6 +6896,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
 
         # Calculate latency
         latency_ms = int((time.time() - start_time) * 1000)
+        
+        # JOB-TO-RESPONSE GAP FIX: Add total time to timing breakdown
+        timing_breakdown["total_ms"] = latency_ms
 
         # Update reasoning type based on what was used
         if len([s for s in systems_used if "reasoning" in s]) > 1:
@@ -6737,6 +6953,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # NEW: Include routing and agent pool stats
             "routing": routing_stats if routing_stats else None,
             "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
+            # JOB-TO-RESPONSE GAP FIX: Include timing breakdown for debugging slow requests
+            "timing_breakdown": timing_breakdown if latency_ms > SLOW_REQUEST_THRESHOLD_MS else None,
         }
 
     except Exception as e:
