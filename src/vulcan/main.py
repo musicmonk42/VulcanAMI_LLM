@@ -2659,17 +2659,23 @@ def _deep_sanitize_for_json(data: Any, _depth: int = 0) -> Any:
     
     # Handle Enum types (more precise than checking for 'value' attribute)
     if isinstance(data, EnumBase):
-        return data.value
+        try:
+            # Recursively sanitize enum value in case it's a complex type
+            return _deep_sanitize_for_json(data.value, _depth + 1)
+        except Exception:
+            return str(data)  # Fallback to string representation
     
     # Handle datetime types (more precise than checking for 'isoformat' attribute)
     if isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
         return data.isoformat()
     
-    if hasattr(data, '__dict__'):  # Custom objects
+    # Custom objects: try to convert via __dict__
+    if hasattr(data, '__dict__'):
         try:
             return _deep_sanitize_for_json(data.__dict__, _depth + 1)
-        except Exception:
-            pass
+        except (TypeError, ValueError, RecursionError) as e:
+            # Log at debug level since this is an expected fallback path
+            pass  # Fall through to string conversion
     
     # Last resort: convert to string
     try:
@@ -2831,7 +2837,12 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
         payload_json = json.dumps(payload)
     except (TypeError, ValueError) as json_err:
         logger.error(f"[ARENA] JSON serialization failed: {json_err}")
-        logger.error(f"[ARENA] Payload keys: {list(payload.keys()) if isinstance(payload, dict) else type(payload)}")
+        # Defensive logging - handle case where payload might not have keys() method
+        try:
+            payload_info = list(payload.keys()) if isinstance(payload, dict) else type(payload).__name__
+        except Exception:
+            payload_info = "unknown"
+        logger.error(f"[ARENA] Payload info: {payload_info}")
         # Attempt deep sanitization as fallback
         payload = _deep_sanitize_for_json(payload)
         try:
@@ -2866,7 +2877,11 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     try:
         # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
         session = await get_http_session()
-        # Use data= with pre-serialized JSON instead of json= for full control
+        # SERIALIZATION FIX: Use data= with pre-serialized JSON instead of json=
+        # This gives us full control over serialization, allowing us to catch and
+        # handle errors early (above) rather than letting aiohttp fail internally.
+        # The json= parameter would call json.dumps() internally, bypassing our
+        # error handling and making debugging more difficult.
         async with session.post(
             url,
             data=payload_json,
@@ -2993,6 +3008,7 @@ async def _submit_arena_feedback(
     try:
         # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
         session = await get_http_session()
+        # SERIALIZATION FIX: Use data= with pre-serialized JSON for consistent error handling
         async with session.post(
             url,
             data=payload_json,
