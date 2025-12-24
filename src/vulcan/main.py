@@ -2855,10 +2855,10 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     if not api_key:
         logger.warning("[ARENA] API key not configured - Arena request may fail authentication")
     
-    headers = {
-        "X-API-Key": api_key or "",
-        "Content-Type": "application/json",
-    }
+    # Build headers, only include X-API-Key if configured
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["X-API-Key"] = api_key
     
     logger.info(f"[ARENA] Executing via {agent_id}: {url}")
     t0 = time.perf_counter()
@@ -2985,10 +2985,10 @@ async def _submit_arena_feedback(
     if not api_key:
         logger.warning("[ARENA] API key not configured - feedback submission may fail authentication")
     
-    headers = {
-        "X-API-Key": api_key or "",
-        "Content-Type": "application/json",
-    }
+    # Build headers, only include X-API-Key if configured
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["X-API-Key"] = api_key
     
     try:
         # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
