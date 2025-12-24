@@ -9,6 +9,7 @@
 # PERFORMANCE: Added response time tracking and adaptive scaling
 # PERFORMANCE: Added simple_mode support for reduced overhead
 # MEMORY LEAK FIX: Replaced unbounded provenance_records with rolling deque(maxlen=50)
+# THREAD POOL FIX: submit_job() now non-blocking to prevent thread pool starvation
 # ============================================================
 
 import asyncio
@@ -436,6 +437,7 @@ class AgentPoolManager:
     - Thread-safe operations throughout
     - FIXED: Proper timeouts to prevent hanging
     - FIXED: Windows multiprocessing compatibility (uses standalone worker function)
+    - THREAD POOL FIX: submit_job() is now non-blocking to prevent thread pool starvation
     """
 
     def __init__(
@@ -563,6 +565,15 @@ class AgentPoolManager:
             "max_queue_depth": self.config.get("max_queue_depth", 100),
         }
 
+        # ========== THREAD POOL FIX: Non-blocking job execution ==========
+        # Pending executions queue - jobs wait here instead of blocking submit_job()
+        self._pending_executions: Dict[str, Dict[str, Any]] = {}
+        self._pending_executions_lock = threading.Lock()
+        
+        # Dedicated executor thread for processing pending jobs
+        self._executor_thread: Optional[threading.Thread] = None
+        self._start_executor()
+
         # Start monitoring
         self._start_monitor()
 
@@ -579,6 +590,72 @@ class AgentPoolManager:
             f"queue_type={task_queue_type}, "
             f"cachetools_available={CACHETOOLS_AVAILABLE}"
         )
+
+    # ========== THREAD POOL FIX: Background Job Executor ==========
+    
+    def _start_executor(self):
+        """Start background executor thread for processing pending jobs."""
+        if self._executor_thread is None or not self._executor_thread.is_alive():
+            self._executor_thread = threading.Thread(
+                target=self._process_pending_executions,
+                daemon=True,
+                name="AgentPoolExecutor"
+            )
+            self._executor_thread.start()
+            logger.info("Agent pool executor thread started")
+    
+    def _process_pending_executions(self):
+        """
+        Background thread that processes pending job executions.
+        
+        THREAD POOL FIX: This runs in a dedicated thread, processing jobs
+        that were queued by submit_job(). This prevents submit_job() from
+        blocking the caller's thread pool.
+        """
+        logger.info("Job executor thread started")
+        
+        while not self._shutdown_event.is_set():
+            try:
+                # Check for pending jobs every 10ms
+                if self._shutdown_event.wait(timeout=0.01):
+                    break
+                
+                # Get pending jobs to process
+                jobs_to_process = []
+                with self._pending_executions_lock:
+                    # Process up to 10 jobs per cycle to prevent starvation
+                    job_ids = list(self._pending_executions.keys())[:10]
+                    for job_id in job_ids:
+                        exec_data = self._pending_executions.pop(job_id, None)
+                        if exec_data:
+                            jobs_to_process.append((job_id, exec_data))
+                
+                # Execute jobs outside the lock
+                for job_id, exec_data in jobs_to_process:
+                    try:
+                        self._execute_job_sync(
+                            job_id=job_id,
+                            agent_id=exec_data["agent_id"],
+                            graph=exec_data["graph"],
+                            parameters=exec_data["parameters"],
+                            metadata=exec_data["metadata"],
+                        )
+                    except Exception as e:
+                        logger.error(f"Executor failed to process job {job_id}: {e}")
+                        # Ensure agent returns to IDLE state on failure
+                        try:
+                            self._handle_task_failure(
+                                exec_data["agent_id"], 
+                                job_id, 
+                                e
+                            )
+                        except Exception as cleanup_err:
+                            logger.error(f"Cleanup after job {job_id} failure also failed: {cleanup_err}")
+                
+            except Exception as e:
+                logger.error(f"Executor thread error: {e}", exc_info=True)
+        
+        logger.info("Job executor thread stopped")
 
     # ========== PROVENANCE RECORDS PROPERTY AND METHODS (MEMORY LEAK FIX) ==========
     
@@ -1135,7 +1212,13 @@ class AgentPoolManager:
     ) -> str:
         """
         Submit a job to the agent pool
-        FIXED: Uses reasonable timeout defaults and proper error handling
+        
+        THREAD POOL FIX: This method is now NON-BLOCKING. Instead of executing
+        the job synchronously (which blocked the caller's thread), jobs are
+        queued for execution by a dedicated background thread.
+        
+        This prevents thread pool starvation when multiple requests submit
+        jobs concurrently via run_in_executor().
 
         Args:
             graph: Computation graph
@@ -1222,13 +1305,18 @@ class AgentPoolManager:
 
                 return job_id
 
-        # FIXED: Execute task outside the lock to avoid blocking other submissions
-        # Note: This is safe because:
-        # 1. The agent is in WORKING state, so other threads won't assign work to it
-        # 2. The metadata object belongs to this agent and won't be deleted while working
-        # 3. provenance is task-specific and only modified by the owning task
+        # THREAD POOL FIX: Queue for background execution instead of blocking
+        # This is the key change - we don't call _execute_job_sync() here anymore
         if agent_id:
-            self._execute_job_sync(job_id, agent_id, graph, parameters, metadata)
+            with self._pending_executions_lock:
+                self._pending_executions[job_id] = {
+                    "agent_id": agent_id,
+                    "graph": graph,
+                    "parameters": parameters,
+                    "metadata": metadata,
+                    "queued_at": time.time(),
+                }
+            logger.debug(f"Job {job_id} queued for background execution")
 
         return job_id
 
@@ -1246,7 +1334,7 @@ class AgentPoolManager:
         FIXED: This method executes tasks synchronously instead of relying on
         stub worker processes that don't actually process tasks.
 
-        Called OUTSIDE the lock to avoid blocking other submissions.
+        Called by the background executor thread (NOT from submit_job directly).
 
         Thread safety notes:
         - The agent is in WORKING state, so other threads won't assign new work to it
@@ -1643,6 +1731,10 @@ class AgentPoolManager:
                     metadata.transition_state(
                         AgentState.IDLE, f"Task {task_id} cancelled"
                     )
+            
+            # Also remove from pending executions if queued
+            with self._pending_executions_lock:
+                self._pending_executions.pop(task_id, None)
 
     def _archive_old_provenance(self):
         """Archive old provenance records to disk.
@@ -1780,6 +1872,12 @@ class AgentPoolManager:
                 if monitor_iterations % STATS_RESET_INTERVAL == 0:
                     logger.info(f"Performing periodic statistics reset (iteration {monitor_iterations})")
                     self.reset_statistics(preserve_totals=True)
+                
+                # THREAD POOL FIX: Log pending executions queue size for monitoring
+                with self._pending_executions_lock:
+                    pending_count = len(self._pending_executions)
+                if pending_count > 0:
+                    logger.debug(f"Pending executions queue size: {pending_count}")
 
             except Exception as e:
                 logger.error(f"Monitor error: {e}", exc_info=True)
@@ -1865,12 +1963,17 @@ class AgentPoolManager:
 
             with self.stats_lock:
                 stats = dict(self.stats)
+            
+            # THREAD POOL FIX: Include pending executions count
+            with self._pending_executions_lock:
+                pending_executions = len(self._pending_executions)
 
             status = {
                 "total_agents": len(self.agents),
                 "state_distribution": dict(state_counts),
                 "capability_distribution": dict(capability_counts),
                 "pending_tasks": len(self.task_assignments),
+                "pending_executions": pending_executions,
                 "average_health_score": avg_health,
                 "queue_status": queue_status,
                 "statistics": stats,
@@ -1947,6 +2050,10 @@ class AgentPoolManager:
         base_stats["priority_queue"] = self.priority_queue.get_stats()
         base_stats["perf_thresholds"] = self.perf_thresholds
         
+        # THREAD POOL FIX: Include pending executions count
+        with self._pending_executions_lock:
+            base_stats["pending_executions"] = len(self._pending_executions)
+        
         return base_stats
 
     def reset_statistics(self, preserve_totals: bool = True) -> None:
@@ -2002,6 +2109,10 @@ class AgentPoolManager:
             }
             pending_tasks = len(self.task_assignments)
         
+        # THREAD POOL FIX: Include pending executions
+        with self._pending_executions_lock:
+            pending_executions = len(self._pending_executions)
+        
         utilization_pct = (
             agent_utilization["working"] / agent_utilization["total"] * 100
             if agent_utilization["total"] > 0 else 0.0
@@ -2013,6 +2124,7 @@ class AgentPoolManager:
             "agent_utilization": agent_utilization,
             "utilization_percent": utilization_pct,
             "pending_tasks": pending_tasks,
+            "pending_executions": pending_executions,
             "thresholds": self.perf_thresholds,
             "trend": self.response_time_tracker.get_recent_trend(),
         }
@@ -2030,6 +2142,11 @@ class AgentPoolManager:
                 self.auto_scaler.shutdown()
             except Exception as e:
                 logger.error(f"Error shutting down auto-scaler: {e}")
+
+        # THREAD POOL FIX: Wait for executor thread to finish
+        if self._executor_thread and self._executor_thread.is_alive():
+            logger.info("Waiting for executor thread to finish...")
+            self._executor_thread.join(timeout=5)
 
         # Stop accepting new jobs and retire all agents
         with self.lock:
@@ -2072,6 +2189,10 @@ class AgentPoolManager:
             self.agent_processes.clear()
             self.task_assignments.clear()
             self.task_assignment_times.clear()
+        
+        # Clear pending executions
+        with self._pending_executions_lock:
+            self._pending_executions.clear()
 
         logger.info("Agent pool shutdown complete")
 
@@ -2101,137 +2222,139 @@ class AutoScaler:
         """
         self.pool = pool_manager
         self._shutdown_event = threading.Event()
+
+        # Start scaling thread
         self.scaling_thread = threading.Thread(
             target=self._scaling_loop, daemon=True, name="AutoScaler"
         )
         self.scaling_thread.start()
-        logger.info("Auto-scaler started")
+
+        logger.info("Auto-scaler initialized")
 
     def _scaling_loop(self):
         """
-        Auto-scaling control loop
-
-        FIXED: Converted hardcoded time.sleep(30) to interruptible self._shutdown_event.wait(timeout=30).
+        Scaling loop that monitors load and adjusts pool size
+        FIXED: Uses interruptible wait instead of time.sleep
         """
-        # FIXED: Use interruptible wait
-        while not self._shutdown_event.is_set():
-            try:
-                # If shutdown is signaled, break immediately
-                if self._shutdown_event.wait(timeout=30):
-                    break
+        logger.info("Auto-scaler loop started")
+        
+        # PERFORMANCE: Use simple_mode check interval for less frequent scaling
+        check_interval = SIMPLE_MODE_CHECK_INTERVAL if SIMPLE_MODE else 30
 
+        while not self._shutdown_event.is_set():
+            # FIXED: Use interruptible wait
+            if self._shutdown_event.wait(timeout=check_interval):
+                break
+
+            try:
                 self._evaluate_and_scale()
             except Exception as e:
-                logger.error(f"Auto-scaling error: {e}", exc_info=True)
+                logger.error(f"Auto-scaler error: {e}", exc_info=True)
 
-        logger.info("Auto-scaler stopped")
+        logger.info("Auto-scaler loop stopped")
 
     def _evaluate_and_scale(self):
-        """Evaluate load and scale accordingly with proper locking.
+        """Evaluate current load and scale accordingly with enhanced metrics"""
+        status = self.pool.get_pool_status()
+
+        total_agents = status["total_agents"]
+        idle_agents = status.get("state_distribution", {}).get("idle", 0)
+        working_agents = status.get("state_distribution", {}).get(
+            "working", 0
+        )
+        # FIXED: Use .get() with default to avoid KeyError during shutdown
+        pending_tasks = status.get("pending_tasks", 0)
+
+        # Calculate utilization
+        if total_agents > 0:
+            utilization = working_agents / total_agents
+        else:
+            utilization = 0.0
         
-        Enhanced to include response time based scaling decisions.
-        """
-        with self.pool.lock:
-            status = self.pool.get_pool_status()
+        # Get response time metrics for adaptive scaling
+        response_stats = self.pool.response_time_tracker.get_stats()
+        p95_ms = response_stats.get("p95_ms", 0.0)
+        p99_ms = response_stats.get("p99_ms", 0.0)
+        trend = self.pool.response_time_tracker.get_recent_trend()
+        
+        # Get priority queue depth
+        queue_depth = self.pool.priority_queue.size()
+        
+        # Performance thresholds
+        p95_target = self.pool.perf_thresholds["p95_target_ms"]
+        p99_target = self.pool.perf_thresholds["p99_target_ms"]
+        max_queue = self.pool.perf_thresholds["max_queue_depth"]
 
-            total_agents = status["total_agents"]
-            idle_agents = status["state_distribution"].get(AgentState.IDLE.value, 0)
-            working_agents = status["state_distribution"].get(
-                AgentState.WORKING.value, 0
+        logger.debug(
+            f"Auto-scaler evaluation: "
+            f"utilization={utilization:.2f}, "
+            f"total={total_agents}, "
+            f"idle={idle_agents}, "
+            f"working={working_agents}, "
+            f"pending={pending_tasks}, "
+            f"p95={p95_ms:.1f}ms, p99={p99_ms:.1f}ms, "
+            f"queue_depth={queue_depth}, trend={trend:.1f}"
+        )
+        
+        # Determine scaling action
+        scale_up_reasons = []
+        scale_down_ok = True
+        
+        # Scale up conditions:
+        # 1. High utilization (>80%)
+        if utilization > 0.8:
+            scale_up_reasons.append("high_utilization")
+        
+        # 2. Pending tasks exceed idle agents
+        if pending_tasks > idle_agents:
+            scale_up_reasons.append("pending_tasks")
+        
+        # 3. Response times exceeding SLA targets
+        if p95_ms > p95_target:
+            scale_up_reasons.append("p95_exceeded")
+            scale_down_ok = False
+        
+        if p99_ms > p99_target:
+            scale_up_reasons.append("p99_exceeded")
+            scale_down_ok = False
+        
+        # 4. Queue depth too high
+        if queue_depth > max_queue:
+            scale_up_reasons.append("queue_depth")
+        
+        # 5. Degrading performance trend
+        if trend > 50:  # 50ms degradation trend
+            scale_up_reasons.append("degrading_trend")
+            scale_down_ok = False
+
+        # Scale up if any reason applies
+        if scale_up_reasons:
+            agents_to_spawn = min(
+                max(1, pending_tasks - idle_agents, len(scale_up_reasons)),
+                self.pool.max_agents - total_agents,
             )
-            # FIXED: Use .get() with default to avoid KeyError during shutdown
-            pending_tasks = status.get("pending_tasks", 0)
 
-            # Calculate utilization
-            if total_agents > 0:
-                utilization = working_agents / total_agents
-            else:
-                utilization = 0.0
-            
-            # Get response time metrics for adaptive scaling
-            response_stats = self.pool.response_time_tracker.get_stats()
-            p95_ms = response_stats.get("p95_ms", 0.0)
-            p99_ms = response_stats.get("p99_ms", 0.0)
-            trend = self.pool.response_time_tracker.get_recent_trend()
-            
-            # Get priority queue depth
-            queue_depth = self.pool.priority_queue.size()
-            
-            # Performance thresholds
-            p95_target = self.pool.perf_thresholds["p95_target_ms"]
-            p99_target = self.pool.perf_thresholds["p99_target_ms"]
-            max_queue = self.pool.perf_thresholds["max_queue_depth"]
+            if agents_to_spawn > 0:
+                logger.info(f"Scaling up by {agents_to_spawn} agents, reasons: {scale_up_reasons}")
+                for _ in range(agents_to_spawn):
+                    self.pool.spawn_agent()
 
-            logger.debug(
-                f"Auto-scaler evaluation: "
-                f"utilization={utilization:.2f}, "
-                f"total={total_agents}, "
-                f"idle={idle_agents}, "
-                f"working={working_agents}, "
-                f"pending={pending_tasks}, "
-                f"p95={p95_ms:.1f}ms, p99={p99_ms:.1f}ms, "
-                f"queue_depth={queue_depth}, trend={trend:.1f}"
+        # Scale down only if low utilization AND performance is good
+        elif scale_down_ok and utilization < 0.2 and total_agents > self.pool.min_agents:
+            agents_to_retire = min(
+                idle_agents // 2, total_agents - self.pool.min_agents
             )
-            
-            # Determine scaling action
-            scale_up_reasons = []
-            scale_down_ok = True
-            
-            # Scale up conditions:
-            # 1. High utilization (>80%)
-            if utilization > 0.8:
-                scale_up_reasons.append("high_utilization")
-            
-            # 2. Pending tasks exceed idle agents
-            if pending_tasks > idle_agents:
-                scale_up_reasons.append("pending_tasks")
-            
-            # 3. Response times exceeding SLA targets
-            if p95_ms > p95_target:
-                scale_up_reasons.append("p95_exceeded")
-                scale_down_ok = False
-            
-            if p99_ms > p99_target:
-                scale_up_reasons.append("p99_exceeded")
-                scale_down_ok = False
-            
-            # 4. Queue depth too high
-            if queue_depth > max_queue:
-                scale_up_reasons.append("queue_depth")
-            
-            # 5. Degrading performance trend
-            if trend > 50:  # 50ms degradation trend
-                scale_up_reasons.append("degrading_trend")
-                scale_down_ok = False
 
-            # Scale up if any reason applies
-            if scale_up_reasons:
-                agents_to_spawn = min(
-                    max(1, pending_tasks - idle_agents, len(scale_up_reasons)),
-                    self.pool.max_agents - total_agents,
-                )
+            if agents_to_retire > 0:
+                idle_agent_ids = [
+                    agent_id
+                    for agent_id, metadata in self.pool.agents.items()
+                    if metadata.state == AgentState.IDLE
+                ][:agents_to_retire]
 
-                if agents_to_spawn > 0:
-                    logger.info(f"Scaling up by {agents_to_spawn} agents, reasons: {scale_up_reasons}")
-                    for _ in range(agents_to_spawn):
-                        self.pool.spawn_agent()
-
-            # Scale down only if low utilization AND performance is good
-            elif scale_down_ok and utilization < 0.2 and total_agents > self.pool.min_agents:
-                agents_to_retire = min(
-                    idle_agents // 2, total_agents - self.pool.min_agents
-                )
-
-                if agents_to_retire > 0:
-                    idle_agent_ids = [
-                        agent_id
-                        for agent_id, metadata in self.pool.agents.items()
-                        if metadata.state == AgentState.IDLE
-                    ][:agents_to_retire]
-
-                    logger.info(f"Scaling down by {agents_to_retire} agents (performance OK)")
-                    for agent_id in idle_agent_ids:
-                        self.pool.retire_agent(agent_id)
+                logger.info(f"Scaling down by {agents_to_retire} agents (performance OK)")
+                for agent_id in idle_agent_ids:
+                    self.pool.retire_agent(agent_id)
 
     def shutdown(self):
         """Shutdown auto-scaler"""
