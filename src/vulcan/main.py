@@ -6688,7 +6688,7 @@ async def flush_memory():
     
     This endpoint provides two modes of operation:
     1. New mode: Uses async flush_history() method with rolling deque
-    2. Legacy mode: Clears provenance_records list directly (fallback)
+    2. Legacy mode: Clears internal _provenance_records deque directly (fallback)
     """
     if not hasattr(app.state, "deployment"):
         return {"status": "error", "message": "System not initialized"}
@@ -6704,24 +6704,22 @@ async def flush_memory():
         return {"status": "error", "message": "Agent pool not found"}
     
     try:
-        # New mode: Use async flush_history if available
+        # New mode: Use async flush_history if available (preferred)
         if hasattr(agent_pool, "flush_history"):
             await agent_pool.flush_history()
             logger.info("Memory flushed via async flush_history()")
             return {"status": "success", "message": "Memory flushed. Rolling window reset."}
         
-        # Legacy fallback: Clear provenance_records directly
-        if hasattr(agent_pool, "provenance_records"):
-            if isinstance(agent_pool.provenance_records, list):
-                agent_pool.provenance_records.clear()
-                logger.info("Memory flushed via legacy provenance_records.clear()")
-            elif hasattr(agent_pool, "_provenance_records"):
-                # Direct access to internal deque
-                agent_pool._provenance_records.clear()
-                if hasattr(agent_pool, "_provenance_lookup"):
-                    agent_pool._provenance_lookup.clear()
-                logger.info("Memory flushed via internal _provenance_records.clear()")
-            return {"status": "success", "message": "Memory list cleared (Legacy mode)."}
+        # Legacy fallback: Clear internal deque and lookup directly
+        # Note: provenance_records property returns a new list each time,
+        # so we need to clear the internal _provenance_records deque instead
+        if hasattr(agent_pool, "_provenance_records"):
+            # Direct access to internal deque
+            agent_pool._provenance_records.clear()
+            if hasattr(agent_pool, "_provenance_lookup"):
+                agent_pool._provenance_lookup.clear()
+            logger.info("Memory flushed via internal _provenance_records.clear()")
+            return {"status": "success", "message": "Memory cleared (Legacy mode)."}
         
         return {"status": "error", "message": "No supported memory structure found"}
         

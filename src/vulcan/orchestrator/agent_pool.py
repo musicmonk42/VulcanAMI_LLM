@@ -475,8 +475,9 @@ class AgentPoolManager:
         max_provenance = self.config.get("max_provenance_records", SIMPLE_MODE_MAX_PROVENANCE)
         # Use 50 as default if not specified, as recommended for fixing memory leak
         self._provenance_maxlen = max(max_provenance, 50) if max_provenance else 50
-        self._provenance_records: deque = deque(maxlen=self._provenance_maxlen)
+        self._provenance_records: deque[Any] = deque(maxlen=self._provenance_maxlen)
         self._provenance_lock = asyncio.Lock()  # Async lock for thread-safe provenance access
+        self._sync_provenance_lock = threading.Lock()  # Sync lock for non-async methods
         # Lookup dictionary for O(1) job_id access (auto-cleaned when deque rotates)
         self._provenance_lookup: Dict[str, Any] = {}
 
@@ -582,6 +583,26 @@ class AgentPoolManager:
         """
         return list(self._provenance_records)
     
+    def _extract_job_id(self, record: Any) -> Optional[str]:
+        """
+        Extract job_id from a provenance record.
+        Handles both object attributes and dictionary keys.
+        
+        Args:
+            record: Provenance record (object or dict)
+            
+        Returns:
+            Job ID string if found, None otherwise.
+        """
+        # Try attribute access first (for provenance objects)
+        job_id = getattr(record, 'job_id', None)
+        if job_id:
+            return job_id
+        # Try dictionary access
+        if isinstance(record, dict):
+            return record.get('job_id')
+        return None
+    
     async def _record_provenance(self, record: Dict[str, Any]) -> None:
         """
         Thread-safe write that auto-prunes old history.
@@ -592,7 +613,7 @@ class AgentPoolManager:
         async with self._provenance_lock:
             self._provenance_records.append(record)
             # Update lookup dictionary for O(1) access by job_id
-            job_id = getattr(record, 'job_id', None) or record.get('job_id') if isinstance(record, dict) else None
+            job_id = self._extract_job_id(record)
             if job_id:
                 self._provenance_lookup[job_id] = record
                 # Clean up lookup for items that have been rotated out of the deque
@@ -612,11 +633,13 @@ class AgentPoolManager:
         """
         Clean up the lookup dictionary to remove entries that have been
         rotated out of the deque. Called during provenance recording.
+        
+        Note: This should be called while holding a lock to prevent race conditions.
         """
         # Get current job_ids in the deque
         current_job_ids = set()
         for record in self._provenance_records:
-            job_id = getattr(record, 'job_id', None) or (record.get('job_id') if isinstance(record, dict) else None)
+            job_id = self._extract_job_id(record)
             if job_id:
                 current_job_ids.add(job_id)
         
@@ -641,15 +664,17 @@ class AgentPoolManager:
         """
         Store provenance record with job_id-based access.
         This is a synchronous helper for code that can't use async.
+        Thread-safe using synchronous lock.
         
         Args:
             job_id: Job identifier
             record: Provenance record to store
         """
-        self._provenance_records.append(record)
-        self._provenance_lookup[job_id] = record
-        # Clean up old entries
-        self._cleanup_provenance_lookup()
+        with self._sync_provenance_lock:
+            self._provenance_records.append(record)
+            self._provenance_lookup[job_id] = record
+            # Clean up old entries
+            self._cleanup_provenance_lookup()
 
     def _hydrate_state_from_redis(self) -> None:
         """
