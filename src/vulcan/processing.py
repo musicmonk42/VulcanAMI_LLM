@@ -74,11 +74,6 @@ except ImportError:
 # --- Custom LLM Dependency ---
 # NOTE: In a real system, this would be imported from src.llm_core.graphix_transformer
 
-# PERFORMANCE FIX: Thread-safe singleton holder for GraphixTransformer
-# This prevents re-loading BERT models on every request
-_graphix_transformer_instance: Optional["GraphixTransformer"] = None
-_graphix_transformer_lock = threading.Lock()
-
 
 class GraphixTransformer:
     """
@@ -88,10 +83,19 @@ class GraphixTransformer:
     PERFORMANCE: Set SKIP_BERT_EMBEDDINGS=true to skip BERT loading
     and use lightweight embeddings instead. Saves 3.5s+ per request.
     
-    PERFORMANCE FIX: This class now implements a singleton pattern via
+    PERFORMANCE FIX: This class implements a singleton pattern via
     get_instance() to prevent loading BERT models multiple times per request.
     Use get_instance() instead of direct instantiation for model reuse.
+    
+    Note: The singleton ignores config/embedding_dim parameters after first
+    instantiation. This is intentional since the BERT model configuration
+    should be consistent across all usages.
     """
+
+    # PERFORMANCE FIX: Class-level singleton storage for better encapsulation
+    # This prevents re-loading BERT models on every request
+    _instance: Optional["GraphixTransformer"] = None
+    _lock = threading.Lock()
 
     @classmethod
     def get_instance(cls, config=None, embedding_dim=EMBEDDING_DIM) -> "GraphixTransformer":
@@ -109,17 +113,30 @@ class GraphixTransformer:
             
         Returns:
             The singleton GraphixTransformer instance
+            
+        Note:
+            Parameters are only used on first instantiation. Subsequent calls
+            return the cached instance regardless of parameter values.
         """
-        global _graphix_transformer_instance
-        
-        if _graphix_transformer_instance is None:
-            with _graphix_transformer_lock:
+        if cls._instance is None:
+            with cls._lock:
                 # Double-checked locking for thread safety
-                if _graphix_transformer_instance is None:
+                if cls._instance is None:
                     logger.info("Creating singleton GraphixTransformer instance")
-                    _graphix_transformer_instance = cls(config=config, embedding_dim=embedding_dim)
+                    cls._instance = cls(config=config, embedding_dim=embedding_dim)
         
-        return _graphix_transformer_instance
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """
+        Reset the singleton instance.
+        
+        Useful for testing or when configuration changes are needed.
+        After calling this, get_instance() will create a new instance.
+        """
+        with cls._lock:
+            cls._instance = None
 
     def __init__(self, config=None, embedding_dim=EMBEDDING_DIM):
         self.embedding_dim = embedding_dim
