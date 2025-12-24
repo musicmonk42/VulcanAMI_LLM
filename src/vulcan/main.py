@@ -2909,6 +2909,15 @@ async def _submit_arena_feedback(
 # HTTP CONNECTION POOL FIX - Global session for connection reuse
 # ============================================================
 
+# HTTP CONNECTION POOL FIX: Constants for connection pool configuration
+# These can be overridden via environment variables for different deployment scenarios
+HTTP_POOL_LIMIT = int(os.environ.get("VULCAN_HTTP_POOL_LIMIT", "100"))
+HTTP_POOL_LIMIT_PER_HOST = int(os.environ.get("VULCAN_HTTP_POOL_LIMIT_PER_HOST", "30"))
+HTTP_DNS_CACHE_TTL = int(os.environ.get("VULCAN_HTTP_DNS_CACHE_TTL", "300"))
+HTTP_TOTAL_TIMEOUT = float(os.environ.get("VULCAN_HTTP_TOTAL_TIMEOUT", "60.0"))
+HTTP_CONNECT_TIMEOUT = float(os.environ.get("VULCAN_HTTP_CONNECT_TIMEOUT", "10.0"))
+HTTP_READ_TIMEOUT = float(os.environ.get("VULCAN_HTTP_READ_TIMEOUT", "30.0"))
+
 # HTTP CONNECTION POOL FIX: Global aiohttp session for connection reuse
 # Creating a new ClientSession per request causes overhead and connection exhaustion
 # The session is initialized in lifespan context and used by all HTTP operations
@@ -2931,23 +2940,26 @@ async def get_http_session():
         raise RuntimeError("aiohttp not available - cannot create HTTP session")
     
     if _http_session is None or _http_session.closed:
-        # Create session with connection pool limits
+        # Create session with configurable connection pool limits
         connector = aiohttp.TCPConnector(
-            limit=100,  # Total connection pool limit
-            limit_per_host=30,  # Per-host connection limit
-            ttl_dns_cache=300,  # DNS cache TTL in seconds
+            limit=HTTP_POOL_LIMIT,
+            limit_per_host=HTTP_POOL_LIMIT_PER_HOST,
+            ttl_dns_cache=HTTP_DNS_CACHE_TTL,
             enable_cleanup_closed=True,
         )
         timeout = aiohttp.ClientTimeout(
-            total=60.0,  # Total request timeout
-            connect=10.0,  # Connection timeout
-            sock_read=30.0,  # Socket read timeout
+            total=HTTP_TOTAL_TIMEOUT,
+            connect=HTTP_CONNECT_TIMEOUT,
+            sock_read=HTTP_READ_TIMEOUT,
         )
         _http_session = aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
         )
-        logger.info("HTTP connection pool initialized (limit=100, per_host=30)")
+        logger.info(
+            f"HTTP connection pool initialized (limit={HTTP_POOL_LIMIT}, "
+            f"per_host={HTTP_POOL_LIMIT_PER_HOST})"
+        )
     return _http_session
 
 
@@ -5794,6 +5806,14 @@ class UnifiedChatRequest(BaseModel):
 MAX_HISTORY_MESSAGES = 20  # Maximum number of history messages to retain
 MAX_HISTORY_TOKENS = 4096  # Maximum total tokens in history (rough estimate)
 MAX_MESSAGE_LENGTH = 2000  # Maximum characters per message
+MIN_MESSAGE_LENGTH = 50  # Minimum enforced max_message_length to avoid edge cases
+MIN_TRUNCATION_HALF = 10  # Minimum characters to keep on each side when truncating
+ELLIPSIS_OVERHEAD = 15  # Overhead for ellipsis marker "... [truncated] ..."
+CHARS_PER_TOKEN_ESTIMATE = 3  # Conservative estimate for token calculation
+
+# JOB-TO-RESPONSE GAP FIX: Timing thresholds for debugging
+SLOW_PHASE_THRESHOLD_MS = 1000  # Log warning if phase takes longer than this
+SLOW_REQUEST_THRESHOLD_MS = 5000  # Include timing breakdown for requests slower than this
 
 
 def _truncate_history(
@@ -5827,7 +5847,7 @@ def _truncate_history(
         return []
     
     # Ensure max_message_length is reasonable to avoid negative half values
-    max_message_length = max(50, max_message_length)
+    max_message_length = max(MIN_MESSAGE_LENGTH, max_message_length)
     
     # Step 1: Apply sliding window - keep only most recent messages
     if len(history) > max_messages:
@@ -5843,8 +5863,8 @@ def _truncate_history(
         content = truncated_msg.get("content", "")
         if len(content) > max_message_length:
             # Keep the first and last parts, add ellipsis in middle
-            # Ensure half is at least 10 characters to have meaningful content
-            half = max(10, max_message_length // 2 - 15)
+            # Ensure half is at least MIN_TRUNCATION_HALF characters to have meaningful content
+            half = max(MIN_TRUNCATION_HALF, max_message_length // 2 - ELLIPSIS_OVERHEAD)
             truncated_msg["content"] = (
                 content[:half] + "\n... [truncated] ...\n" + content[-half:]
             )
@@ -5854,15 +5874,14 @@ def _truncate_history(
         truncated_history.append(truncated_msg)
     
     # Step 3: Estimate token count and drop oldest messages if over limit
-    # Conservative estimate: 1 token ≈ 3-4 characters for English text
-    # Using 3 for more conservative estimation (may slightly over-truncate)
+    # Use CHARS_PER_TOKEN_ESTIMATE for conservative token estimation
     total_chars = sum(len(msg.get("content", "")) for msg in truncated_history)
-    estimated_tokens = total_chars // 3  # More conservative than //4
+    estimated_tokens = total_chars // CHARS_PER_TOKEN_ESTIMATE
     
     while estimated_tokens > max_tokens and len(truncated_history) > 1:
         removed = truncated_history.pop(0)
         removed_chars = len(removed.get("content", ""))
-        estimated_tokens -= removed_chars // 3
+        estimated_tokens -= removed_chars // CHARS_PER_TOKEN_ESTIMATE
         logger.debug(
             f"Context truncation: Dropped oldest message ({removed_chars} chars), "
             f"estimated tokens now: {estimated_tokens}"
@@ -5904,7 +5923,7 @@ async def unified_chat(request: UnifiedChatRequest):
             "duration_ms": duration_ms,
             "end_time": now,
         }
-        if duration_ms > 1000:  # Log phases taking > 1 second
+        if duration_ms > SLOW_PHASE_THRESHOLD_MS:
             logger.warning(
                 f"[VULCAN/v1/chat] SLOW PHASE: {phase_name} took {duration_ms:.1f}ms"
             )
@@ -6929,8 +6948,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # NEW: Include routing and agent pool stats
             "routing": routing_stats if routing_stats else None,
             "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
-            # JOB-TO-RESPONSE GAP FIX: Include timing breakdown for debugging
-            "timing_breakdown": timing_breakdown if latency_ms > 5000 else None,  # Only include for slow requests
+            # JOB-TO-RESPONSE GAP FIX: Include timing breakdown for debugging slow requests
+            "timing_breakdown": timing_breakdown if latency_ms > SLOW_REQUEST_THRESHOLD_MS else None,
         }
 
     except Exception as e:
