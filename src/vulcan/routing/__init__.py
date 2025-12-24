@@ -161,6 +161,8 @@ try:
         SeverityLevel,
         AuditEntry,
         log_to_governance,
+        log_to_governance_async,
+        log_to_governance_fire_and_forget,
         get_governance_logger,
     )
 
@@ -173,6 +175,8 @@ except ImportError as e:
     SeverityLevel = None
     AuditEntry = None
     log_to_governance = None
+    log_to_governance_async = None
+    log_to_governance_fire_and_forget = None
     get_governance_logger = None
 
 # Experiment Trigger
@@ -365,6 +369,8 @@ __all__ = [
     "SeverityLevel",
     "AuditEntry",
     "log_to_governance",
+    "log_to_governance_async",
+    "log_to_governance_fire_and_forget",
     "get_governance_logger",
     # Experiments
     "ExperimentTrigger",
