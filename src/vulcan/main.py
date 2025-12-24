@@ -4240,9 +4240,9 @@ async def chat(request: ChatRequest):
                 # This prevents the 29s delay caused by sequential blocking submission
                 task_coroutines = [
                     submit_single_task(
-                        agent_task, 
-                        collective.agent_pool, 
-                        capability_map, 
+                        agent_task,
+                        collective.agent_pool,
+                        capability_map,
                         agent_pool_timeout,
                         request.max_tokens
                     )
