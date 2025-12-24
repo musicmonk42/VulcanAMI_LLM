@@ -2773,37 +2773,38 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     t0 = time.perf_counter()
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=timeout)
-            ) as resp:
-                elapsed = time.perf_counter() - t0
+        # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
+        session = await get_http_session()
+        async with session.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=timeout)
+        ) as resp:
+            elapsed = time.perf_counter() - t0
+            
+            if resp.status == 200:
+                result = await resp.json()
+                logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
                 
-                if resp.status == 200:
-                    result = await resp.json()
-                    logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
-                    
-                    return {
-                        "status": "success",
-                        "agent_id": agent_id,
-                        "execution_time": elapsed,
-                        "result": result,
-                        "arena_url": url,
-                    }
-                else:
-                    error_text = await resp.text()
-                    logger.error(f"[ARENA] {agent_id} failed: {resp.status} - {error_text}")
-                    
-                    return {
-                        "status": "error",
-                        "agent_id": agent_id,
-                        "execution_time": elapsed,
-                        "error": error_text,
-                        "status_code": resp.status,
-                    }
+                return {
+                    "status": "success",
+                    "agent_id": agent_id,
+                    "execution_time": elapsed,
+                    "result": result,
+                    "arena_url": url,
+                }
+            else:
+                error_text = await resp.text()
+                logger.error(f"[ARENA] {agent_id} failed: {resp.status} - {error_text}")
+                
+                return {
+                    "status": "error",
+                    "agent_id": agent_id,
+                    "execution_time": elapsed,
+                    "error": error_text,
+                    "status_code": resp.status,
+                }
                     
     except asyncio.TimeoutError:
         elapsed = time.perf_counter() - t0
@@ -2882,25 +2883,81 @@ async def _submit_arena_feedback(
     }
     
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=30)
-            ) as resp:
-                if resp.status == 200:
-                    result = await resp.json()
-                    logger.info(f"[ARENA] Feedback submitted for {proposal_id}: score={score}")
-                    return {"status": "success", "result": result}
-                else:
-                    error_text = await resp.text()
-                    logger.error(f"[ARENA] Feedback submission failed: {resp.status}")
-                    return {"status": "error", "error": error_text}
+        # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
+        session = await get_http_session()
+        async with session.post(
+            url,
+            json=payload,
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=30)
+        ) as resp:
+            if resp.status == 200:
+                result = await resp.json()
+                logger.info(f"[ARENA] Feedback submitted for {proposal_id}: score={score}")
+                return {"status": "success", "result": result}
+            else:
+                error_text = await resp.text()
+                logger.error(f"[ARENA] Feedback submission failed: {resp.status}")
+                return {"status": "error", "error": error_text}
                     
     except Exception as e:
         logger.error(f"[ARENA] Feedback submission error: {e}")
         return {"status": "error", "error": str(e)}
+
+
+# ============================================================
+# HTTP CONNECTION POOL FIX - Global session for connection reuse
+# ============================================================
+
+# HTTP CONNECTION POOL FIX: Global aiohttp session for connection reuse
+# Creating a new ClientSession per request causes overhead and connection exhaustion
+# The session is initialized in lifespan context and used by all HTTP operations
+_http_session: Optional[Any] = None  # Type as Any to handle aiohttp not being installed
+
+
+async def get_http_session():
+    """
+    Get the global HTTP session for connection pooling.
+    
+    HTTP CONNECTION POOL FIX: This ensures HTTP connections are reused
+    rather than creating new connections for each request, which was
+    causing latency and potential connection exhaustion.
+    
+    Returns:
+        aiohttp.ClientSession with connection pooling
+    """
+    global _http_session
+    if not AIOHTTP_AVAILABLE or aiohttp is None:
+        raise RuntimeError("aiohttp not available - cannot create HTTP session")
+    
+    if _http_session is None or _http_session.closed:
+        # Create session with connection pool limits
+        connector = aiohttp.TCPConnector(
+            limit=100,  # Total connection pool limit
+            limit_per_host=30,  # Per-host connection limit
+            ttl_dns_cache=300,  # DNS cache TTL in seconds
+            enable_cleanup_closed=True,
+        )
+        timeout = aiohttp.ClientTimeout(
+            total=60.0,  # Total request timeout
+            connect=10.0,  # Connection timeout
+            sock_read=30.0,  # Socket read timeout
+        )
+        _http_session = aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+        )
+        logger.info("HTTP connection pool initialized (limit=100, per_host=30)")
+    return _http_session
+
+
+async def close_http_session():
+    """Close the global HTTP session gracefully."""
+    global _http_session
+    if _http_session is not None and not _http_session.closed:
+        await _http_session.close()
+        _http_session = None
+        logger.info("HTTP connection pool closed")
 
 
 # ============================================================
@@ -3442,6 +3499,11 @@ async def lifespan(app: FastAPI):
         raise
 
     startup_complete = True
+    
+    # HTTP CONNECTION POOL FIX: Initialize global HTTP session
+    if AIOHTTP_AVAILABLE:
+        await get_http_session()
+        logger.info("✓ Global HTTP connection pool initialized")
 
     try:
         yield
@@ -3449,6 +3511,13 @@ async def lifespan(app: FastAPI):
         logger.info(f"VULCAN-AGI worker {worker_id} received cancellation signal")
     finally:
         # SHUTDOWN LOGIC
+        
+        # HTTP CONNECTION POOL FIX: Close HTTP session first
+        try:
+            await close_http_session()
+        except Exception as e:
+            logger.warning(f"Error closing HTTP session: {e}")
+        
         if startup_complete and hasattr(app.state, "deployment"):
             deployment = app.state.deployment
 
