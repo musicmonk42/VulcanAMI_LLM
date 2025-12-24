@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import pickle
+import threading
 import time
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -384,12 +385,53 @@ class AnalogicalMapping:
 
 
 class SemanticEnricher:
-    """Enriches entities and relations with semantic information"""
+    """Enriches entities and relations with semantic information
+    
+    PERFORMANCE FIX: Uses singleton pattern for embedding model to prevent
+    reloading the SentenceTransformer model on every instantiation.
+    Loading the model takes 3-5+ seconds, which was causing 25-30 second
+    delays when multiple requests tried to load models simultaneously.
+    """
+
+    # PERFORMANCE FIX: Class-level singleton for embedding model
+    # This prevents reloading the model on every SemanticEnricher instantiation
+    _shared_embedding_model = None
+    _shared_model_lock = threading.Lock()  # Initialize at class definition time for thread safety
+    _model_load_attempted = False
+
+    @classmethod
+    def _get_shared_model(cls):
+        """Get or create the shared embedding model (singleton pattern)
+        
+        Thread-safe implementation using double-checked locking.
+        The model is loaded only once and shared across all instances.
+        """
+        if cls._shared_embedding_model is None and not cls._model_load_attempted:
+            with cls._shared_model_lock:
+                # Double-checked locking
+                if cls._shared_embedding_model is None and not cls._model_load_attempted:
+                    cls._model_load_attempted = True
+                    if SENTENCE_TRANSFORMERS_AVAILABLE:
+                        try:
+                            logger.info("[TIMING] Loading SentenceTransformer model (singleton, will load ONCE)...")
+                            import time
+                            start = time.perf_counter()
+                            cls._shared_embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+                            elapsed = time.perf_counter() - start
+                            logger.info(f"[TIMING] SentenceTransformer model loaded in {elapsed:.2f}s (singleton)")
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to load sentence transformer: {e}, using TF-IDF fallback"
+                            )
+        
+        return cls._shared_embedding_model
 
     def __init__(self):
         self.embedding_cache = {}
         self.entity_cache = {}
-        self.embedding_model = None
+        
+        # PERFORMANCE FIX: Use shared singleton model instead of loading per-instance
+        self.embedding_model = SemanticEnricher._get_shared_model()
 
         # Initialize TF-IDF vectorizer for fallback
         self._tfidf_vectorizer = None
@@ -397,17 +439,8 @@ class SemanticEnricher:
         self._corpus_hash = set()
         self._tfidf_fitted = False  # FIX #2: Track if vectorizer is fitted
 
-        # Initialize embedding model lazily
-        if SENTENCE_TRANSFORMERS_AVAILABLE:
-            try:
-                self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-                logger.info("Loaded sentence transformer model for semantic embeddings")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to load sentence transformer: {e}, using TF-IDF fallback"
-                )
-                self._init_tfidf_vectorizer()
-        else:
+        # Initialize TF-IDF if embedding model not available
+        if self.embedding_model is None:
             logger.info("Using TF-IDF fallback for semantic embeddings")
             self._init_tfidf_vectorizer()
 

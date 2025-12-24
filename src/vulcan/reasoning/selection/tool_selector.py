@@ -264,19 +264,41 @@ class MultiTierFeatureExtractor:
     Extracts features at different levels of complexity and cost.
     This replaces the random data stub implementation.
 
+    PERFORMANCE FIX: Uses singleton pattern for embedding model to prevent
+    reloading the SentenceTransformer model on every instantiation.
     """
+
+    # PERFORMANCE FIX: Class-level singleton for embedding model
+    _shared_embedding_model = None
+    _shared_model_lock = threading.Lock()  # Initialize at class definition time for thread safety
+    _model_load_attempted = False
+
+    @classmethod
+    def _get_shared_model(cls):
+        """Get or create the shared embedding model (singleton pattern)"""
+        if cls._shared_embedding_model is None and not cls._model_load_attempted:
+            with cls._shared_model_lock:
+                # Double-checked locking
+                if cls._shared_embedding_model is None and not cls._model_load_attempted:
+                    cls._model_load_attempted = True
+                    if TRANSFORMERS_AVAILABLE:
+                        try:
+                            logger.info("[TIMING] Loading SentenceTransformer for tool selector (singleton)...")
+                            import time
+                            start = time.perf_counter()
+                            cls._shared_embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+                            elapsed = time.perf_counter() - start
+                            logger.info(f"[TIMING] SentenceTransformer loaded in {elapsed:.2f}s (tool selector singleton)")
+                        except Exception as e:
+                            logger.error(f"Failed to load SentenceTransformer model: {e}")
+        
+        return cls._shared_embedding_model
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         config = config or {}
         self.dim = config.get("feature_dim", 128)
-        self.semantic_model = None
-        if TRANSFORMERS_AVAILABLE:
-            try:
-                # Use a small, fast model for efficiency
-                self.semantic_model = SentenceTransformer("all-MiniLM-L6-v2")
-            except Exception as e:
-                logger.error(f"Failed to load SentenceTransformer model: {e}")
-                self.semantic_model = None
+        # PERFORMANCE FIX: Use shared singleton model instead of loading per-instance
+        self.semantic_model = MultiTierFeatureExtractor._get_shared_model()
 
     def extract_tier1(self, problem: Any) -> np.ndarray:
         """Fast, low-cost surface features."""

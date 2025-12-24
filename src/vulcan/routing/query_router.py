@@ -181,6 +181,18 @@ COLLABORATION_TRIGGERS: Tuple[str, ...] = (
 )
 
 # ============================================================
+# CONSTANTS - Arena Routing Thresholds
+# ============================================================
+# These thresholds determine when Graphix Arena is activated for
+# tournament-style multi-agent competition and graph evolution tasks
+
+ARENA_UNCERTAINTY_THRESHOLD: float = 0.4  # High uncertainty triggers arena
+ARENA_HIGH_COMPLEXITY_THRESHOLD: float = 0.6  # Very high complexity + uncertainty
+ARENA_COLLABORATION_COMPLEXITY_THRESHOLD: float = 0.4  # For collaborative scenarios (3+ agents)
+ARENA_CREATIVE_COMPLEXITY_THRESHOLD: float = 0.35  # For creative tasks needing multiple perspectives
+ARENA_REASONING_COMPLEXITY_THRESHOLD: float = 0.35  # For multi-aspect reasoning tasks
+
+# ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
 
@@ -685,9 +697,12 @@ class QueryAnalyzer:
             query_lower, query_type, complexity_score
         )
         
-        # Determine arena participation
+        # Determine arena participation (pass collaboration info for better routing)
         arena_participation, tournament_candidates = self._determine_arena_participation(
-            query_lower, uncertainty_score, complexity_score
+            query_lower, uncertainty_score, complexity_score,
+            query_type=query_type,
+            collaboration_needed=collaboration_needed,
+            collaboration_agents=collaboration_agents
         )
         
         # Create processing plan
@@ -1035,37 +1050,102 @@ class QueryAnalyzer:
         self,
         query_lower: str,
         uncertainty_score: float,
-        complexity_score: float
+        complexity_score: float,
+        query_type: QueryType = None,
+        collaboration_needed: bool = False,
+        collaboration_agents: List[str] = None
     ) -> Tuple[bool, int]:
         """
         Determine if arena tournament should be triggered.
+        
+        Graphix Arena is a distributed environment for AI agent collaboration,
+        tournament-style competition, and graph evolution. It should be activated
+        for complex multi-agent scenarios requiring multiple perspectives.
         
         Args:
             query_lower: Lowercased query string
             uncertainty_score: Calculated uncertainty score
             complexity_score: Calculated complexity score
+            query_type: The classified query type
+            collaboration_needed: Whether multi-agent collaboration is required
+            collaboration_agents: List of agents involved in collaboration
             
         Returns:
             Tuple of (arena_participation, tournament_candidates_count)
         """
         arena_participation = False
         tournament_candidates = 0
+        collaboration_agents = collaboration_agents or []
         
-        # High uncertainty triggers tournament
-        if uncertainty_score > 0.4:
+        # ================================================================
+        # ARENA ACTIVATION CONDITIONS
+        # Arena provides multi-agent tournaments, graph evolution, and
+        # competitive evaluation - activate for scenarios that benefit from this
+        # ================================================================
+        
+        # 1. High uncertainty triggers tournament (original condition)
+        if uncertainty_score > ARENA_UNCERTAINTY_THRESHOLD:
             arena_participation = True
             tournament_candidates = 5
         
-        # Very high complexity + uncertainty triggers larger tournament
-        if complexity_score > 0.6 and uncertainty_score > 0.3:
+        # 2. Very high complexity + uncertainty triggers larger tournament
+        if complexity_score > ARENA_HIGH_COMPLEXITY_THRESHOLD and uncertainty_score > 0.3:
             arena_participation = True
             tournament_candidates = 10
         
-        # Explicit exploration requests
+        # 3. Explicit exploration/alternative requests
         exploration_keywords = ("explore", "alternatives", "options", "possibilities", "different ways")
         if any(kw in query_lower for kw in exploration_keywords):
             arena_participation = True
             tournament_candidates = max(tournament_candidates, 5)
+        
+        # 3b. Comparison requests (benefit from competitive evaluation)
+        comparison_keywords = ("compare", "contrast", "versus", "vs.", "vs,", " vs ", "evaluate against", "which is better")
+        if any(kw in query_lower for kw in comparison_keywords):
+            arena_participation = True
+            tournament_candidates = max(tournament_candidates, 5)
+        
+        # 4. Graph evolution/generation tasks (Arena's core capability)
+        graph_keywords = (
+            "graph", "evolve", "evolution", "mutate", "mutation",
+            "generate graph", "ir graph", "graphix", "visualize graph",
+            "3d matrix", "transform graph"
+        )
+        if any(kw in query_lower for kw in graph_keywords):
+            arena_participation = True
+            tournament_candidates = max(tournament_candidates, 5)
+        
+        # 5. Tournament/competition scenarios
+        tournament_keywords = (
+            "tournament", "compete", "competition", "battle",
+            "best solution", "compare solutions", "evaluate approaches",
+            "multiple candidates", "rank"
+        )
+        if any(kw in query_lower for kw in tournament_keywords):
+            arena_participation = True
+            tournament_candidates = max(tournament_candidates, 8)
+        
+        # 6. Complex collaborative reasoning (3+ agents = benefit from Arena)
+        if collaboration_needed and len(collaboration_agents) >= 3:
+            # Only if complexity is high enough to warrant Arena overhead
+            if complexity_score > ARENA_COLLABORATION_COMPLEXITY_THRESHOLD:
+                arena_participation = True
+                tournament_candidates = max(tournament_candidates, len(collaboration_agents) + 2)
+        
+        # 7. Creative tasks with moderate complexity (multiple perspectives beneficial)
+        creative_keywords = ("creative", "design", "innovative", "novel", "artistic", "imaginative")
+        is_creative = any(kw in query_lower for kw in creative_keywords)
+        if is_creative and complexity_score > ARENA_CREATIVE_COMPLEXITY_THRESHOLD:
+            arena_participation = True
+            tournament_candidates = max(tournament_candidates, 5)
+        
+        # 8. Reasoning/perception tasks with multiple aspects (benefits from competitive evaluation)
+        if query_type in (QueryType.REASONING, QueryType.PERCEPTION) and complexity_score > ARENA_REASONING_COMPLEXITY_THRESHOLD:
+            # Multi-faceted reasoning benefits from Arena's tournament approach
+            multi_aspect_keywords = ("multiple", "various", "different angles", "perspectives", "aspects")
+            if any(kw in query_lower for kw in multi_aspect_keywords):
+                arena_participation = True
+                tournament_candidates = max(tournament_candidates, 5)
         
         return arena_participation, tournament_candidates
     
