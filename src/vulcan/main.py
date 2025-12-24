@@ -41,6 +41,8 @@ import argparse
 import re
 import sys
 import functools
+import datetime
+from enum import Enum as EnumBase
 from pathlib import Path
 
 # HTTP client for Arena API calls
@@ -2564,6 +2566,9 @@ def initialize_component(name, func):
 # 3. Language evolution - Successful patterns stored in Registry
 # ============================================================
 
+# Maximum recursion depth for deep sanitization (prevents stack overflow on circular refs)
+_DEEP_SANITIZE_MAX_DEPTH = 50
+
 
 def _sanitize_payload(data: Any) -> Any:
     """
@@ -2629,8 +2634,7 @@ def _deep_sanitize_for_json(data: Any, _depth: int = 0) -> Any:
     Returns:
         JSON-serializable data
     """
-    MAX_DEPTH = 50
-    if _depth > MAX_DEPTH:
+    if _depth > _DEEP_SANITIZE_MAX_DEPTH:
         return "__max_depth_exceeded__"
     
     if data is None:
@@ -2653,11 +2657,12 @@ def _deep_sanitize_for_json(data: Any, _depth: int = 0) -> Any:
     if isinstance(data, (list, tuple)):
         return [_deep_sanitize_for_json(item, _depth + 1) for item in data]
     
-    # Handle common special types
-    if hasattr(data, 'value'):  # Enum
+    # Handle Enum types (more precise than checking for 'value' attribute)
+    if isinstance(data, EnumBase):
         return data.value
     
-    if hasattr(data, 'isoformat'):  # datetime
+    # Handle datetime types (more precise than checking for 'isoformat' attribute)
+    if isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
         return data.isoformat()
     
     if hasattr(data, '__dict__'):  # Custom objects
@@ -2838,7 +2843,7 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
                 "status": "error",
                 "agent_id": agent_id,
                 "execution_time": 0,
-                "error": f"JSON serialization failed: {json_err}",
+                "error": f"JSON serialization failed (original: {json_err}, after deep sanitize: {retry_err})",
             }
     
     # Construct Arena API URL
@@ -2970,7 +2975,7 @@ async def _submit_arena_feedback(
             payload_json = json.dumps(payload)
         except Exception as retry_err:
             logger.error(f"[ARENA] Feedback deep sanitization also failed: {retry_err}")
-            return {"status": "error", "error": f"JSON serialization failed: {json_err}"}
+            return {"status": "error", "error": f"JSON serialization failed (original: {json_err}, after deep sanitize: {retry_err})"}
     
     headers = {
         "X-API-Key": api_key if api_key else "",
