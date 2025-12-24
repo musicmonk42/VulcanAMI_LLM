@@ -2565,6 +2565,52 @@ def initialize_component(name, func):
 # ============================================================
 
 
+def _sanitize_payload(data: Any) -> Any:
+    """
+    Sanitize payload for JSON serialization by handling None keys and values.
+    
+    JSON does not support None as dictionary keys. This function:
+    - Removes dictionary entries with None keys (which would cause serialization failure)
+    - Recursively processes nested dicts and lists
+    - Converts non-serializable values to strings
+    
+    Args:
+        data: The data to sanitize (dict, list, or any value)
+        
+    Returns:
+        Sanitized data safe for JSON serialization
+        
+    Example:
+        >>> _sanitize_payload({None: "value", "key": "value"})
+        {'key': 'value'}
+        >>> _sanitize_payload({"nested": {None: "bad", "ok": 1}})
+        {'nested': {'ok': 1}}
+    """
+    if isinstance(data, dict):
+        # Filter out None keys and recursively sanitize values
+        return {
+            str(k) if k is not None else "__none_key__": _sanitize_payload(v)
+            for k, v in data.items()
+            if k is not None  # Remove entries with None keys entirely
+        }
+    elif isinstance(data, list):
+        # Recursively sanitize list elements
+        return [_sanitize_payload(item) for item in data]
+    elif isinstance(data, tuple):
+        # Convert tuples to lists for JSON compatibility
+        return [_sanitize_payload(item) for item in data]
+    elif data is None:
+        return None  # None values are fine, just not None keys
+    elif isinstance(data, (str, int, float, bool)):
+        return data
+    else:
+        # For any other type, try to convert to string
+        try:
+            return str(data)
+        except Exception:
+            return "__unserializable__"
+
+
 def _select_arena_agent(routing_plan) -> str:
     """
     Map query type to appropriate Arena agent.
@@ -2708,6 +2754,10 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     # Build payload for Arena
     payload = _build_arena_payload(query, routing_plan, agent_id)
     
+    # CRITICAL FIX: Sanitize payload to remove None keys that cause serialization failures
+    # Error "Cannot serialize non-str key None" occurs when dict has None as key
+    payload = _sanitize_payload(payload)
+    
     # Construct Arena API URL
     # When running via full_platform.py, Arena is mounted at /arena
     # The API endpoint is /api/run/{agent_id}
@@ -2821,6 +2871,9 @@ async def _submit_arena_feedback(
         "score": score,
         "rationale": rationale,
     }
+    
+    # Sanitize payload to ensure JSON serialization compatibility
+    payload = _sanitize_payload(payload)
     
     headers = {
         "X-API-Key": api_key,
