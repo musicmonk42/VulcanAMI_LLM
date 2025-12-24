@@ -5180,7 +5180,7 @@ async def chat(request: ChatRequest):
         try:
             result = await coro
             elapsed = time.perf_counter() - _start
-            # Log at INFO level if task takes > 2 seconds (potential bottleneck)
+            # Log at WARNING level if task takes > 2 seconds (potential bottleneck)
             if elapsed > 2.0:
                 logger.warning(f"[TIMING] {name} took {elapsed:.2f}s (SLOW - potential bottleneck)")
             else:
@@ -6378,7 +6378,7 @@ async def unified_chat(request: UnifiedChatRequest):
             try:
                 result = await coro
                 elapsed = time.perf_counter() - _start
-                # Log at INFO level if task takes > 2 seconds (potential bottleneck)
+                # Log at WARNING level if task takes > 2 seconds (potential bottleneck)
                 if elapsed > 2.0:
                     logger.warning(f"[TIMING] {name} took {elapsed:.2f}s (SLOW - potential bottleneck)")
                 else:
