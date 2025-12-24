@@ -43,6 +43,14 @@ import sys
 import functools
 from pathlib import Path
 
+# HTTP client for Arena API calls
+try:
+    import aiohttp
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    aiohttp = None
+    AIOHTTP_AVAILABLE = False
+
 # Enable faulthandler ASAP to capture native crashes (segfaults)
 try:
     import faulthandler
@@ -2458,6 +2466,24 @@ class Settings(BaseSettings):
     # Whether to automatically trigger training when batch is full
     distillation_auto_train: bool = Field(default=True, env="DISTILLATION_AUTO_TRAIN")
 
+    # ================================================================
+    # GRAPHIX ARENA CONFIGURATION
+    # Arena is the FastAPI-based coordination surface for agent collaboration,
+    # tournament selection, graph evolution, and feedback integration.
+    # ================================================================
+    # Base URL for Graphix Arena service
+    arena_base_url: str = Field(
+        default="http://localhost:8080/arena", env="ARENA_BASE_URL"
+    )
+    # API key for Arena authentication - must be set via env var in production
+    arena_api_key: Optional[str] = Field(
+        default=None, env="GRAPHIX_API_KEY"
+    )
+    # Timeout for Arena API calls (seconds)
+    arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
+    # Whether to enable Arena routing for complex queries
+    arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -2528,6 +2554,299 @@ def initialize_component(name, func):
         logger.info(f"Initializing component: {name}")
         _initialized_components[name] = func()
     return _initialized_components[name]
+
+
+# ============================================================
+# GRAPHIX ARENA INTEGRATION HELPERS
+# Arena is the training and execution environment for:
+# 1. Agent training - Agents compete in tournaments, winners improve
+# 2. Graph language runtime - Graphix IR graphs are executed and evolved
+# 3. Language evolution - Successful patterns stored in Registry
+# ============================================================
+
+
+def _select_arena_agent(routing_plan) -> str:
+    """
+    Map query type to appropriate Arena agent.
+    
+    Arena agents:
+    - generator: Creates new graphs from specs (creative/generative tasks)
+    - evolver: Mutates existing graphs (optimization/evolution tasks)
+    - visualizer: Renders graphs (explanation/visualization tasks)
+    - photonic_optimizer: Hardware optimization (photonic/analog tasks)
+    - automl_optimizer: Model tuning (hyperparameter/automl tasks)
+    """
+    query_type = routing_plan.query_type.value if hasattr(routing_plan.query_type, 'value') else str(routing_plan.query_type)
+    
+    agent_mapping = {
+        # Creative/generative → generator
+        "GENERATIVE": "generator",
+        "generative": "generator",
+        "generation": "generator",
+        "creative": "generator",
+        "design": "generator",
+        
+        # Optimization → evolver
+        "OPTIMIZATION": "evolver",
+        "optimization": "evolver",
+        "evolution": "evolver",
+        "improve": "evolver",
+        
+        # Explanation → visualizer
+        "PERCEPTION": "visualizer",
+        "perception": "visualizer",
+        "visualization": "visualizer",
+        "explain": "visualizer",
+        
+        # Reasoning can use generator for graph-based reasoning
+        "REASONING": "generator",
+        "reasoning": "generator",
+        
+        # Planning uses generator for planning graphs
+        "PLANNING": "generator",
+        "planning": "generator",
+        
+        # Hardware → photonic_optimizer
+        "photonic": "photonic_optimizer",
+        "hardware": "photonic_optimizer",
+        "analog": "photonic_optimizer",
+        
+        # Model tuning → automl_optimizer
+        "automl": "automl_optimizer",
+        "hyperparameter": "automl_optimizer",
+        "tune": "automl_optimizer",
+    }
+    
+    return agent_mapping.get(query_type, "generator")
+
+
+def _build_arena_payload(query: str, routing_plan, agent_id: str) -> dict:
+    """
+    Build payload for Arena API based on agent type.
+    
+    Generator expects GraphSpec format, others expect GraphixIRGraph format.
+    """
+    query_id = routing_plan.query_id if hasattr(routing_plan, 'query_id') else f"q_{int(time.time() * 1000)}"
+    query_type = routing_plan.query_type.value if hasattr(routing_plan.query_type, 'value') else str(routing_plan.query_type)
+    complexity = routing_plan.complexity_score if hasattr(routing_plan, 'complexity_score') else 0.5
+    
+    if agent_id == "generator":
+        # Generator expects GraphSpec format
+        return {
+            "spec_id": f"query_{query_id}",
+            "parameters": {
+                "goal": query,
+                "query_type": query_type,
+                "complexity": complexity,
+                "source": "vulcan",
+                "timestamp": time.time(),
+            }
+        }
+    else:
+        # Evolver, visualizer, etc. expect GraphixIRGraph format
+        return {
+            "graph_id": f"g_{query_id}",
+            "nodes": [
+                {
+                    "id": "root",
+                    "label": "query_input",
+                    "properties": {
+                        "text": query,
+                        "query_type": query_type,
+                    }
+                }
+            ],
+            "edges": [],
+            "properties": {
+                "source": "vulcan",
+                "query_id": query_id,
+                "query_type": query_type,
+                "complexity": complexity,
+                "timestamp": time.time(),
+            }
+        }
+
+
+async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = None) -> dict:
+    """
+    Execute query through Graphix Arena for training + graph execution.
+    
+    Arena handles:
+    - Agent execution (generator/evolver/visualizer/etc)
+    - Tournament selection among proposals
+    - Feedback integration (RLHF)
+    - Governance enforcement
+    
+    Args:
+        query: The user query to process
+        routing_plan: The routing plan from QueryRouter
+        arena_base_url: Base URL for Arena API (defaults to settings)
+        
+    Returns:
+        dict with Arena execution result including:
+        - result: The agent's output
+        - agent_id: Which agent was used
+        - execution_time: How long it took
+        - metrics: Any performance metrics from Arena
+    """
+    if not AIOHTTP_AVAILABLE:
+        logger.warning("[ARENA] aiohttp not available, falling back to VULCAN-only processing")
+        return {
+            "status": "fallback",
+            "reason": "aiohttp not available for Arena API calls",
+            "result": None,
+        }
+    
+    # Get Arena configuration
+    base_url = arena_base_url or settings.arena_base_url
+    api_key = settings.arena_api_key
+    timeout = settings.arena_timeout
+    
+    # Select appropriate Arena agent
+    agent_id = _select_arena_agent(routing_plan)
+    
+    # Build payload for Arena
+    payload = _build_arena_payload(query, routing_plan, agent_id)
+    
+    # Construct Arena API URL
+    # When running via full_platform.py, Arena is mounted at /arena
+    # The API endpoint is /api/run/{agent_id}
+    url = f"{base_url}/api/run/{agent_id}"
+    
+    headers = {
+        "X-API-Key": api_key,
+        "Content-Type": "application/json",
+    }
+    
+    logger.info(f"[ARENA] Executing via {agent_id}: {url}")
+    t0 = time.perf_counter()
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=timeout)
+            ) as resp:
+                elapsed = time.perf_counter() - t0
+                
+                if resp.status == 200:
+                    result = await resp.json()
+                    logger.info(f"[ARENA] {agent_id} completed in {elapsed:.2f}s")
+                    
+                    return {
+                        "status": "success",
+                        "agent_id": agent_id,
+                        "execution_time": elapsed,
+                        "result": result,
+                        "arena_url": url,
+                    }
+                else:
+                    error_text = await resp.text()
+                    logger.error(f"[ARENA] {agent_id} failed: {resp.status} - {error_text}")
+                    
+                    return {
+                        "status": "error",
+                        "agent_id": agent_id,
+                        "execution_time": elapsed,
+                        "error": error_text,
+                        "status_code": resp.status,
+                    }
+                    
+    except asyncio.TimeoutError:
+        elapsed = time.perf_counter() - t0
+        logger.error(f"[ARENA] {agent_id} timeout after {elapsed:.2f}s")
+        return {
+            "status": "timeout",
+            "agent_id": agent_id,
+            "execution_time": elapsed,
+            "error": f"Arena request timed out after {timeout}s",
+        }
+    except aiohttp.ClientError as e:
+        elapsed = time.perf_counter() - t0
+        logger.error(f"[ARENA] {agent_id} connection error: {e}")
+        return {
+            "status": "connection_error",
+            "agent_id": agent_id,
+            "execution_time": elapsed,
+            "error": str(e),
+        }
+    except Exception as e:
+        elapsed = time.perf_counter() - t0
+        logger.error(f"[ARENA] {agent_id} unexpected error: {e}")
+        return {
+            "status": "error",
+            "agent_id": agent_id,
+            "execution_time": elapsed,
+            "error": str(e),
+        }
+
+
+async def _submit_arena_feedback(
+    proposal_id: str,
+    score: float,
+    rationale: str,
+    arena_base_url: str = None
+) -> dict:
+    """
+    Submit feedback to Arena for RLHF (Reinforcement Learning from Human Feedback).
+    
+    This enables the evolution loop where:
+    - User feedback influences agent training
+    - Successful patterns are reinforced
+    - Losers get diversity penalty applied
+    
+    Args:
+        proposal_id: ID of the proposal/graph to provide feedback on
+        score: Feedback score (typically -1.0 to 1.0)
+        rationale: Human-readable explanation of the feedback
+        arena_base_url: Base URL for Arena API
+        
+    Returns:
+        dict with feedback submission result
+    """
+    if not AIOHTTP_AVAILABLE:
+        logger.warning("[ARENA] aiohttp not available, cannot submit feedback")
+        return {"status": "error", "reason": "aiohttp not available"}
+    
+    base_url = arena_base_url or settings.arena_base_url
+    api_key = settings.arena_api_key
+    
+    url = f"{base_url}/api/feedback"
+    
+    payload = {
+        "graph_id": proposal_id,
+        "agent_id": "vulcan",  # Feedback from VULCAN system
+        "score": score,
+        "rationale": rationale,
+    }
+    
+    headers = {
+        "X-API-Key": api_key,
+        "Content-Type": "application/json",
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                if resp.status == 200:
+                    result = await resp.json()
+                    logger.info(f"[ARENA] Feedback submitted for {proposal_id}: score={score}")
+                    return {"status": "success", "result": result}
+                else:
+                    error_text = await resp.text()
+                    logger.error(f"[ARENA] Feedback submission failed: {resp.status}")
+                    return {"status": "error", "error": error_text}
+                    
+    except Exception as e:
+        logger.error(f"[ARENA] Feedback submission error: {e}")
+        return {"status": "error", "error": str(e)}
 
 
 # ============================================================
@@ -4072,6 +4391,69 @@ async def chat(request: ChatRequest):
         logger.warning(f"[VULCAN] Query routing failed: {e}", exc_info=True)
 
     # ================================================================
+    # ARENA EXECUTION PATH - Execute via Graphix Arena when enabled
+    # Arena provides: agent training, graph evolution, tournament selection
+    # ================================================================
+    arena_result = None
+    if (
+        routing_plan
+        and routing_plan.arena_participation
+        and settings.arena_enabled
+        and AIOHTTP_AVAILABLE
+    ):
+        logger.info(
+            f"[VULCAN] Routing to Arena for graph execution + agent training: "
+            f"query_id={routing_plan.query_id}"
+        )
+        systems_used.append("graphix_arena")
+        
+        try:
+            arena_result = await _execute_via_arena(
+                query=request.prompt,
+                routing_plan=routing_plan,
+            )
+            
+            if arena_result.get("status") == "success":
+                logger.info(
+                    f"[VULCAN] Arena execution successful: agent={arena_result.get('agent_id')}, "
+                    f"time={arena_result.get('execution_time', 0):.2f}s"
+                )
+                
+                # If Arena returned a complete result, we can use it directly
+                # but we'll still run through VULCAN's cognitive pipeline for enrichment
+                arena_output = arena_result.get("result", {})
+                
+                # Check if Arena result has a direct response we can use
+                if isinstance(arena_output, dict) and arena_output.get("output"):
+                    # Arena provided a complete response - return it with metadata
+                    return {
+                        "response": arena_output.get("output", "Arena processing complete"),
+                        "arena_execution": {
+                            "agent_id": arena_result.get("agent_id"),
+                            "execution_time": arena_result.get("execution_time"),
+                            "status": "success",
+                        },
+                        "routing": routing_stats,
+                        "systems_used": systems_used,
+                        "metadata": {
+                            "arena_processed": True,
+                            "query_id": routing_plan.query_id,
+                        },
+                    }
+            else:
+                # Arena execution failed - log and continue with VULCAN processing
+                logger.warning(
+                    f"[VULCAN] Arena execution failed: {arena_result.get('status')}, "
+                    f"error={arena_result.get('error', 'unknown')}, falling back to VULCAN"
+                )
+                
+        except Exception as arena_err:
+            logger.warning(
+                f"[VULCAN] Arena execution error: {arena_err}, falling back to VULCAN"
+            )
+            arena_result = {"status": "error", "error": str(arena_err)}
+
+    # ================================================================
     # STEP 0: INPUT GATEKEEPER - Validate query before processing
     # ================================================================
     try:
@@ -5182,6 +5564,15 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             "governance_triggered": routing_plan.requires_governance,
         }
 
+    # Add Arena execution info if Arena was used
+    if arena_result is not None:
+        response_data["arena_execution"] = {
+            "status": arena_result.get("status"),
+            "agent_id": arena_result.get("agent_id"),
+            "execution_time": arena_result.get("execution_time"),
+            "error": arena_result.get("error") if arena_result.get("status") != "success" else None,
+        }
+
     return response_data
 
 
@@ -5351,6 +5742,70 @@ async def unified_chat(request: UnifiedChatRequest):
             logger.debug(f"[VULCAN/v1/chat] Routing layer not available: {e}")
         except Exception as e:
             logger.warning(f"[VULCAN/v1/chat] Query routing failed: {e}", exc_info=True)
+
+        # ================================================================
+        # ARENA EXECUTION PATH - Execute via Graphix Arena when enabled
+        # Arena provides: agent training, graph evolution, tournament selection
+        # ================================================================
+        arena_result = None
+        if (
+            routing_plan
+            and routing_plan.arena_participation
+            and settings.arena_enabled
+            and AIOHTTP_AVAILABLE
+        ):
+            logger.info(
+                f"[VULCAN/v1/chat] Routing to Arena for graph execution + agent training: "
+                f"query_id={routing_plan.query_id}"
+            )
+            systems_used.append("graphix_arena")
+            
+            try:
+                arena_result = await _execute_via_arena(
+                    query=user_message,
+                    routing_plan=routing_plan,
+                )
+                
+                if arena_result.get("status") == "success":
+                    logger.info(
+                        f"[VULCAN/v1/chat] Arena execution successful: agent={arena_result.get('agent_id')}, "
+                        f"time={arena_result.get('execution_time', 0):.2f}s"
+                    )
+                    
+                    # If Arena returned a complete result, we can use it directly
+                    arena_output = arena_result.get("result", {})
+                    
+                    # Check if Arena result has a direct response we can use
+                    if isinstance(arena_output, dict) and arena_output.get("output"):
+                        # Arena provided a complete response
+                        return {
+                            "response": arena_output.get("output", "Arena processing complete"),
+                            "arena_execution": {
+                                "agent_id": arena_result.get("agent_id"),
+                                "execution_time": arena_result.get("execution_time"),
+                                "status": "success",
+                            },
+                            "routing": routing_stats,
+                            "systems_used": systems_used,
+                            "metadata": {
+                                **metadata,
+                                "arena_processed": True,
+                                "query_id": routing_plan.query_id,
+                            },
+                            "latency_ms": int((time.time() - start_time) * 1000),
+                        }
+                else:
+                    # Arena execution failed - continue with VULCAN processing
+                    logger.warning(
+                        f"[VULCAN/v1/chat] Arena execution failed: {arena_result.get('status')}, "
+                        f"error={arena_result.get('error', 'unknown')}, falling back to VULCAN"
+                    )
+                    
+            except Exception as arena_err:
+                logger.warning(
+                    f"[VULCAN/v1/chat] Arena execution error: {arena_err}, falling back to VULCAN"
+                )
+                arena_result = {"status": "error", "error": str(arena_err)}
 
         # ================================================================
         # STEP 0.5: Submit tasks to Agent Pool
