@@ -4148,13 +4148,17 @@ async def chat(request: ChatRequest):
             # ============================================================
             # USE ROUTING PLAN'S AGENT TASKS (if available)
             # This is the critical connection to the routing layer!
+            # PERFORMANCE FIX: Submit tasks in PARALLEL using asyncio.gather()
+            # instead of sequential blocking submission to avoid 29s delay
             # ============================================================
             if routing_plan and routing_plan.agent_tasks:
                 logger.info(
                     f"[VULCAN] Using routing plan tasks: {len(routing_plan.agent_tasks)} tasks from plan {routing_plan.query_id}"
                 )
 
-                for agent_task in routing_plan.agent_tasks:
+                # PERFORMANCE FIX: Define async helper function for parallel task submission
+                async def submit_single_task(agent_task, pool, capability_map, timeout, max_tokens):
+                    """Submit a single task to agent pool asynchronously."""
                     capability = capability_map.get(
                         agent_task.capability, AgentCapability.REASONING
                     )
@@ -4178,7 +4182,7 @@ async def chat(request: ChatRequest):
                             {
                                 "id": "output",
                                 "type": "generation",
-                                "params": {"max_tokens": request.max_tokens},
+                                "params": {"max_tokens": max_tokens},
                             },
                         ],
                         "edges": [
@@ -4187,66 +4191,101 @@ async def chat(request: ChatRequest):
                         ],
                     }
 
-                    # Submit to agent pool
                     logger.info(
                         f"[VULCAN] Submitting routing task to agent pool: "
                         f"task_id={agent_task.task_id}, capability={agent_task.capability}, priority={agent_task.priority}"
                     )
 
                     try:
-                        submitted_job_id = collective.agent_pool.submit_job(
-                            graph=task_graph,
-                            parameters={
-                                "prompt": agent_task.prompt,
-                                "task_type": agent_task.task_type,
-                                "source": agent_task.parameters.get("source", "user"),
-                                "is_primary": agent_task.parameters.get(
-                                    "is_primary", True
-                                ),
-                                **agent_task.parameters,
-                            },
-                            priority=agent_task.priority,
-                            capability_required=capability,
-                            timeout_seconds=agent_task.timeout_seconds
-                            or agent_pool_timeout,
+                        # Run blocking submit_job in executor to avoid blocking event loop
+                        inner_loop = asyncio.get_running_loop()
+                        submitted_job_id = await inner_loop.run_in_executor(
+                            None,
+                            lambda: pool.submit_job(
+                                graph=task_graph,
+                                parameters={
+                                    "prompt": agent_task.prompt,
+                                    "task_type": agent_task.task_type,
+                                    "source": agent_task.parameters.get("source", "user"),
+                                    "is_primary": agent_task.parameters.get(
+                                        "is_primary", True
+                                    ),
+                                    **agent_task.parameters,
+                                },
+                                priority=agent_task.priority,
+                                capability_required=capability,
+                                timeout_seconds=agent_task.timeout_seconds or timeout,
+                            )
                         )
 
                         if submitted_job_id:
-                            submitted_jobs.append(submitted_job_id)
-                            systems_used.append(f"agent_pool_{agent_task.capability}")
                             logger.info(
                                 f"[VULCAN] Task submitted successfully: {submitted_job_id}"
                             )
-
-                            # Log task submission to governance (reuse import from STEP -1)
-                            if routing_plan.requires_audit:
-                                try:
-                                    # PERFORMANCE FIX: Use fire-and-forget for governance logging
-                                    # The function is imported at the top of this try block
-                                    if GOVERNANCE_AVAILABLE:
-                                        log_to_governance_fire_and_forget(
-                                            action_type="agent_task_submitted",
-                                            details={
-                                                "task_id": agent_task.task_id,
-                                                "job_id": submitted_job_id,
-                                                "capability": agent_task.capability,
-                                                "task_type": agent_task.task_type,
-                                            },
-                                            severity="info",
-                                            query_id=routing_plan.query_id,
-                                        )
-                                except NameError:
-                                    # Function not imported (import error earlier in block)
-                                    pass
-                                except Exception as gov_err:
-                                    logger.debug(
-                                        f"[VULCAN] Governance logging skipped: {gov_err}"
-                                    )
+                            return {
+                                "job_id": submitted_job_id,
+                                "capability": agent_task.capability,
+                                "task_id": agent_task.task_id,
+                                "task_type": agent_task.task_type,
+                            }
+                        return None
 
                     except Exception as task_err:
                         logger.warning(
                             f"[VULCAN] Failed to submit task {agent_task.task_id}: {task_err}"
                         )
+                        return None
+
+                # PERFORMANCE FIX: Submit ALL tasks in parallel using asyncio.gather()
+                # This prevents the 29s delay caused by sequential blocking submission
+                task_coroutines = [
+                    submit_single_task(
+                        agent_task,
+                        collective.agent_pool,
+                        capability_map,
+                        agent_pool_timeout,
+                        request.max_tokens
+                    )
+                    for agent_task in routing_plan.agent_tasks
+                ]
+
+                # Wait for all tasks to complete in parallel
+                task_results = await asyncio.gather(*task_coroutines, return_exceptions=True)
+
+                # Process results and update tracking
+                for result in task_results:
+                    if isinstance(result, Exception):
+                        logger.warning(f"[VULCAN] Task submission exception: {result}")
+                        continue
+                    if result and result.get("job_id"):
+                        submitted_jobs.append(result["job_id"])
+                        systems_used.append(f"agent_pool_{result['capability']}")
+
+                        # Log task submission to governance (fire-and-forget)
+                        if routing_plan.requires_audit:
+                            try:
+                                if GOVERNANCE_AVAILABLE:
+                                    log_to_governance_fire_and_forget(
+                                        action_type="agent_task_submitted",
+                                        details={
+                                            "task_id": result["task_id"],
+                                            "job_id": result["job_id"],
+                                            "capability": result["capability"],
+                                            "task_type": result["task_type"],
+                                        },
+                                        severity="info",
+                                        query_id=routing_plan.query_id,
+                                    )
+                            except NameError:
+                                pass
+                            except Exception as gov_err:
+                                logger.debug(
+                                    f"[VULCAN] Governance logging skipped: {gov_err}"
+                                )
+
+                logger.info(
+                    f"[VULCAN] Parallel task submission complete: {len(submitted_jobs)} tasks submitted"
+                )
 
                 # Update stats after all submissions
                 _update_agent_pool_stats()
@@ -5234,8 +5273,10 @@ async def unified_chat(request: UnifiedChatRequest):
                         f"[VULCAN/v1/chat] Submitting {len(routing_plan.agent_tasks)} tasks to agent pool"
                     )
 
-                    for agent_task in routing_plan.agent_tasks:
-                        capability = capability_map.get(
+                    # PERFORMANCE FIX: Define async helper function for parallel task submission
+                    async def submit_single_task_v1(agent_task, agent_pool, cap_map, max_tok):
+                        """Submit a single task to agent pool asynchronously."""
+                        capability = cap_map.get(
                             agent_task.capability, AgentCapability.REASONING
                         )
 
@@ -5257,7 +5298,7 @@ async def unified_chat(request: UnifiedChatRequest):
                                 {
                                     "id": "output",
                                     "type": "generation",
-                                    "params": {"max_tokens": request.max_tokens},
+                                    "params": {"max_tokens": max_tok},
                                 },
                             ],
                             "edges": [
@@ -5267,30 +5308,65 @@ async def unified_chat(request: UnifiedChatRequest):
                         }
 
                         try:
-                            submitted_job_id = pool.submit_job(
-                                graph=task_graph,
-                                parameters={
-                                    "prompt": agent_task.prompt,
-                                    "task_type": agent_task.task_type,
-                                },
-                                priority=agent_task.priority,
-                                capability_required=capability,
-                                timeout_seconds=agent_task.timeout_seconds or 15.0,
+                            # Run blocking submit_job in executor to avoid blocking event loop
+                            inner_loop = asyncio.get_running_loop()
+                            submitted_job_id = await inner_loop.run_in_executor(
+                                None,
+                                lambda: agent_pool.submit_job(
+                                    graph=task_graph,
+                                    parameters={
+                                        "prompt": agent_task.prompt,
+                                        "task_type": agent_task.task_type,
+                                    },
+                                    priority=agent_task.priority,
+                                    capability_required=capability,
+                                    timeout_seconds=agent_task.timeout_seconds or 15.0,
+                                )
                             )
 
                             if submitted_job_id:
-                                submitted_jobs.append(submitted_job_id)
-                                systems_used.append(
-                                    f"agent_pool_{agent_task.capability}"
-                                )
                                 logger.info(
                                     f"[VULCAN/v1/chat] ✓ Task submitted: {submitted_job_id} to {agent_task.capability}"
                                 )
+                                return {
+                                    "job_id": submitted_job_id,
+                                    "capability": agent_task.capability,
+                                }
+                            return None
 
                         except Exception as task_err:
                             logger.warning(
                                 f"[VULCAN/v1/chat] Failed to submit task: {task_err}"
                             )
+                            return None
+
+                    # PERFORMANCE FIX: Submit ALL tasks in parallel using asyncio.gather()
+                    # This prevents the 29s delay caused by sequential blocking submission
+                    task_coroutines = [
+                        submit_single_task_v1(
+                            agent_task,
+                            pool,
+                            capability_map,
+                            request.max_tokens
+                        )
+                        for agent_task in routing_plan.agent_tasks
+                    ]
+
+                    # Wait for all tasks to complete in parallel
+                    task_results = await asyncio.gather(*task_coroutines, return_exceptions=True)
+
+                    # Process results and update tracking
+                    for result in task_results:
+                        if isinstance(result, Exception):
+                            logger.warning(f"[VULCAN/v1/chat] Task submission exception: {result}")
+                            continue
+                        if result and result.get("job_id"):
+                            submitted_jobs.append(result["job_id"])
+                            systems_used.append(f"agent_pool_{result['capability']}")
+
+                    logger.info(
+                        f"[VULCAN/v1/chat] Parallel task submission complete: {len(submitted_jobs)} tasks submitted"
+                    )
 
                     # Update stats
                     agent_pool_stats["jobs_submitted_this_request"] = len(
