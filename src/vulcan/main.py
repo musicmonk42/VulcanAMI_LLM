@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from prometheus_client import Counter, Gauge, Histogram, generate_latest
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, status
 import uvicorn
 import numpy as np
 import msgpack
@@ -6678,6 +6678,56 @@ async def submit_agent_job(request: Request):
     except Exception as e:
         logger.error(f"Failed to submit job: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/vulcan/admin/flush_memory", status_code=status.HTTP_200_OK)
+async def flush_memory():
+    """
+    Emergency Endpoint: Clears the AgentPool provenance history.
+    Use this if latency spikes to reset the context window.
+    
+    This endpoint provides two modes of operation:
+    1. New mode: Uses async flush_history() method with rolling deque
+    2. Legacy mode: Clears provenance_records list directly (fallback)
+    """
+    if not hasattr(app.state, "deployment"):
+        return {"status": "error", "message": "System not initialized"}
+    
+    deployment = app.state.deployment
+    
+    # Try to access agent pool
+    agent_pool = None
+    if hasattr(deployment, "collective") and hasattr(deployment.collective, "agent_pool"):
+        agent_pool = deployment.collective.agent_pool
+    
+    if agent_pool is None:
+        return {"status": "error", "message": "Agent pool not found"}
+    
+    try:
+        # New mode: Use async flush_history if available
+        if hasattr(agent_pool, "flush_history"):
+            await agent_pool.flush_history()
+            logger.info("Memory flushed via async flush_history()")
+            return {"status": "success", "message": "Memory flushed. Rolling window reset."}
+        
+        # Legacy fallback: Clear provenance_records directly
+        if hasattr(agent_pool, "provenance_records"):
+            if isinstance(agent_pool.provenance_records, list):
+                agent_pool.provenance_records.clear()
+                logger.info("Memory flushed via legacy provenance_records.clear()")
+            elif hasattr(agent_pool, "_provenance_records"):
+                # Direct access to internal deque
+                agent_pool._provenance_records.clear()
+                if hasattr(agent_pool, "_provenance_lookup"):
+                    agent_pool._provenance_lookup.clear()
+                logger.info("Memory flushed via internal _provenance_records.clear()")
+            return {"status": "success", "message": "Memory list cleared (Legacy mode)."}
+        
+        return {"status": "error", "message": "No supported memory structure found"}
+        
+    except Exception as e:
+        logger.error(f"Failed to flush memory: {e}")
+        return {"status": "error", "message": f"Failed to flush memory: {str(e)}"}
 
 
 # ============================================================

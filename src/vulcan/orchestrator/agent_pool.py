@@ -8,8 +8,10 @@
 # FIXED: Converted long time.sleep calls to interruptible self._shutdown_event.wait().
 # PERFORMANCE: Added response time tracking and adaptive scaling
 # PERFORMANCE: Added simple_mode support for reduced overhead
+# MEMORY LEAK FIX: Replaced unbounded provenance_records with rolling deque(maxlen=50)
 # ============================================================
 
+import asyncio
 import heapq
 import json
 import logging
@@ -468,14 +470,15 @@ class AgentPoolManager:
         self.agents: Dict[str, AgentMetadata] = {}
         self.agent_processes: Dict[str, multiprocessing.Process] = {}
 
-        # PERFORMANCE: Use bounded provenance records from simple_mode configuration
-        # This prevents memory leaks from unbounded provenance growth
+        # MEMORY LEAK FIX: Rolling Window provenance records using deque
+        # The deque automatically keeps only the last N items, preventing memory leaks
         max_provenance = self.config.get("max_provenance_records", SIMPLE_MODE_MAX_PROVENANCE)
-        self.provenance_records = TTLCache(maxsize=max_provenance, ttl=provenance_ttl)
-        if not CACHETOOLS_AVAILABLE:
-            # Manual TTL tracking when using fallback
-            self.provenance_creation_times: Dict[str, float] = {}
-            self.provenance_ttl = provenance_ttl
+        # Use 50 as default if not specified, as recommended for fixing memory leak
+        self._provenance_maxlen = max(max_provenance, 50) if max_provenance else 50
+        self._provenance_records: deque = deque(maxlen=self._provenance_maxlen)
+        self._provenance_lock = asyncio.Lock()  # Async lock for thread-safe provenance access
+        # Lookup dictionary for O(1) job_id access (auto-cleaned when deque rotates)
+        self._provenance_lookup: Dict[str, Any] = {}
 
         # Task assignment tracking
         self.task_assignments: Dict[str, str] = {}  # task_id -> agent_id
@@ -565,6 +568,88 @@ class AgentPoolManager:
             f"queue_type={task_queue_type}, "
             f"cachetools_available={CACHETOOLS_AVAILABLE}"
         )
+
+    # ========== PROVENANCE RECORDS PROPERTY AND METHODS (MEMORY LEAK FIX) ==========
+    
+    @property
+    def provenance_records(self) -> List[Dict[str, Any]]:
+        """
+        Exposes the deque as a list for backward compatibility 
+        with SemanticBridge and other components.
+        
+        Returns:
+            List of provenance records from the rolling window deque.
+        """
+        return list(self._provenance_records)
+    
+    async def _record_provenance(self, record: Dict[str, Any]) -> None:
+        """
+        Thread-safe write that auto-prunes old history.
+        
+        Args:
+            record: Provenance record to store. Must have a 'job_id' key.
+        """
+        async with self._provenance_lock:
+            self._provenance_records.append(record)
+            # Update lookup dictionary for O(1) access by job_id
+            job_id = getattr(record, 'job_id', None) or record.get('job_id') if isinstance(record, dict) else None
+            if job_id:
+                self._provenance_lookup[job_id] = record
+                # Clean up lookup for items that have been rotated out of the deque
+                self._cleanup_provenance_lookup()
+    
+    async def flush_history(self) -> None:
+        """
+        Manually clears history to reset context without restart.
+        Use this if latency spikes to reset the context window.
+        """
+        async with self._provenance_lock:
+            self._provenance_records.clear()
+            self._provenance_lookup.clear()
+            logger.info("Provenance history flushed (rolling window reset)")
+    
+    def _cleanup_provenance_lookup(self) -> None:
+        """
+        Clean up the lookup dictionary to remove entries that have been
+        rotated out of the deque. Called during provenance recording.
+        """
+        # Get current job_ids in the deque
+        current_job_ids = set()
+        for record in self._provenance_records:
+            job_id = getattr(record, 'job_id', None) or (record.get('job_id') if isinstance(record, dict) else None)
+            if job_id:
+                current_job_ids.add(job_id)
+        
+        # Remove entries from lookup that are no longer in the deque
+        keys_to_remove = [k for k in self._provenance_lookup if k not in current_job_ids]
+        for key in keys_to_remove:
+            del self._provenance_lookup[key]
+    
+    def _get_provenance_by_job_id(self, job_id: str) -> Optional[Any]:
+        """
+        Get provenance record by job_id using the lookup dictionary.
+        
+        Args:
+            job_id: Job identifier
+            
+        Returns:
+            Provenance record if found, None otherwise.
+        """
+        return self._provenance_lookup.get(job_id)
+    
+    def _set_provenance_by_job_id(self, job_id: str, record: Any) -> None:
+        """
+        Store provenance record with job_id-based access.
+        This is a synchronous helper for code that can't use async.
+        
+        Args:
+            job_id: Job identifier
+            record: Provenance record to store
+        """
+        self._provenance_records.append(record)
+        self._provenance_lookup[job_id] = record
+        # Clean up old entries
+        self._cleanup_provenance_lookup()
 
     def _hydrate_state_from_redis(self) -> None:
         """
@@ -1019,9 +1104,7 @@ class AgentPoolManager:
             )
 
             # Store provenance
-            self.provenance_records[job_id] = provenance
-            if not CACHETOOLS_AVAILABLE:
-                self.provenance_creation_times[job_id] = time.time()
+            self._set_provenance_by_job_id(job_id, provenance)
 
             # Update statistics
             with self.stats_lock:
@@ -1113,7 +1196,7 @@ class AgentPoolManager:
         try:
             # Get provenance for the task (thread-safe access)
             with self.lock:
-                provenance = self.provenance_records.get(job_id)
+                provenance = self._get_provenance_by_job_id(job_id)
                 if provenance:
                     # Start execution while holding lock to prevent concurrent modification
                     provenance.start_execution()
@@ -1281,7 +1364,7 @@ class AgentPoolManager:
         with self.lock:
             for task_id, assigned_agent in self.task_assignments.items():
                 if assigned_agent == agent_id:
-                    provenance = self.provenance_records.get(task_id)
+                    provenance = self._get_provenance_by_job_id(task_id)
                     if provenance:
                         provenance.start_execution()
 
@@ -1444,8 +1527,8 @@ class AgentPoolManager:
         """
         with self.lock:
             # Update provenance
-            if task_id in self.provenance_records:
-                provenance = self.provenance_records[task_id]
+            provenance = self._get_provenance_by_job_id(task_id)
+            if provenance:
                 if not provenance.is_complete():
                     provenance.complete("failed", error=str(error))
 
@@ -1469,8 +1552,8 @@ class AgentPoolManager:
         """
         with self.lock:
             # Update provenance
-            if task_id in self.provenance_records:
-                provenance = self.provenance_records[task_id]
+            provenance = self._get_provenance_by_job_id(task_id)
+            if provenance:
                 if not provenance.is_complete():
                     provenance.complete("cancelled")
 
@@ -1492,60 +1575,41 @@ class AgentPoolManager:
                     )
 
     def _archive_old_provenance(self):
-        """Archive old provenance records to disk"""
+        """Archive old provenance records to disk.
+        
+        NOTE: With the rolling deque implementation, the deque automatically 
+        maintains a bounded size (maxlen=50 by default). Archiving is now 
+        optional and mainly for audit/compliance purposes.
+        """
         with self._archive_lock:
             try:
-                # Manual cleanup for non-TTLCache
-                if not CACHETOOLS_AVAILABLE:
-                    current_time = time.time()
-                    expired_jobs = [
-                        job_id
-                        for job_id, create_time in self.provenance_creation_times.items()
-                        if current_time - create_time > self.provenance_ttl
-                    ]
-
-                    if expired_jobs:
-                        for job_id in expired_jobs:
-                            if job_id in self.provenance_records:
-                                del self.provenance_records[job_id]
-                            del self.provenance_creation_times[job_id]
-
-                        logger.debug(
-                            f"Cleaned up {len(expired_jobs)} expired provenance records"
-                        )
-
-                # Archive if too many records
-                if len(self.provenance_records) > 9000:
+                # With rolling deque, we no longer need manual cleanup
+                # The deque auto-prunes to maxlen when items are added
+                
+                # Archive current records for audit purposes if there are any
+                current_records = list(self._provenance_records)
+                if len(current_records) > 0:
                     timestamp = int(time.time())
                     archive_file = self.archive_dir / f"provenance_{timestamp}.jsonl"
 
-                    # Archive oldest 1000 records
-                    records_to_archive = list(self.provenance_records.items())[:1000]
-
+                    # Archive all current records
+                    archived_count = 0
                     with open(archive_file, "w", encoding="utf-8") as f:
-                        for job_id, prov in records_to_archive:
+                        for prov in current_records:
                             try:
-                                f.write(json.dumps(prov.to_dict(), default=str) + "\n")
+                                if hasattr(prov, 'to_dict'):
+                                    f.write(json.dumps(prov.to_dict(), default=str) + "\n")
+                                elif isinstance(prov, dict):
+                                    f.write(json.dumps(prov, default=str) + "\n")
+                                archived_count += 1
                             except Exception as e:
-                                logger.error(
-                                    f"Failed to serialize provenance {job_id}: {e}"
-                                )
+                                logger.error(f"Failed to serialize provenance: {e}")
 
-                    # Remove archived records from cache
-                    with self.lock:
-                        for job_id, _ in records_to_archive:
-                            if job_id in self.provenance_records:
-                                del self.provenance_records[job_id]
-                            if (
-                                not CACHETOOLS_AVAILABLE
-                                and job_id in self.provenance_creation_times
-                            ):
-                                del self.provenance_creation_times[job_id]
-
-                    self._last_archive_time = time.time()
-                    logger.info(
-                        f"Archived {len(records_to_archive)} provenance records to {archive_file}"
-                    )
+                    if archived_count > 0:
+                        self._last_archive_time = time.time()
+                        logger.info(
+                            f"Archived {archived_count} provenance records to {archive_file}"
+                        )
 
             except Exception as e:
                 logger.error(f"Failed to archive provenance: {e}", exc_info=True)
@@ -1589,9 +1653,9 @@ class AgentPoolManager:
                         )
                         self._cancel_task(task_id)
 
-                    # Check provenance archiving
-                    if len(self.provenance_records) > 9000:
-                        self._archive_old_provenance()
+                    # Note: With rolling deque (maxlen=50), provenance is auto-bounded
+                    # Archiving is now optional and can be triggered periodically if needed
+                    # The deque automatically drops old records when new ones are added
 
                     # Monitor each agent
                     agents_to_recover = []
@@ -1791,10 +1855,10 @@ class AgentPoolManager:
             Job provenance dictionary or None if not found
         """
         with self.lock:
-            if job_id not in self.provenance_records:
+            provenance = self._get_provenance_by_job_id(job_id)
+            if provenance is None:
                 return None
 
-            provenance = self.provenance_records[job_id]
             return provenance.get_summary()
 
     def get_statistics(self) -> Dict[str, Any]:
