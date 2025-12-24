@@ -9,8 +9,8 @@
 # META-LEARNING: Populates llm_meta_state.json for experiment triggers
 # MEMORY SYSTEMS: Updates success/risk/utility/cost memories
 #
-# PERFORMANCE FIX: Memory updates are now buffered and flushed periodically
-# instead of writing to disk on every request, preventing progressive slowdown.
+# PERFORMANCE FIX: All disk I/O now runs in a background ThreadPoolExecutor
+# to prevent blocking the asyncio event loop and causing request delays.
 # ============================================================
 
 """
@@ -42,6 +42,11 @@ Thread Safety:
     All public methods are thread-safe. The TelemetryRecorder uses
     buffered writes with automatic flushing to minimize I/O overhead.
 
+Performance Fix:
+    All disk I/O operations now run in a background ThreadPoolExecutor
+    to prevent blocking the asyncio event loop. This eliminates the
+    progressive slowdown issue that occurred when the JSON file grew large.
+
 Usage:
     from vulcan.routing import record_telemetry, record_ai_interaction
 
@@ -63,6 +68,7 @@ import json
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -86,6 +92,9 @@ AI_INTERACTION_BUFFER_SIZE = 100
 # PERFORMANCE FIX: Memory update buffer size
 # Memory updates are now buffered instead of written on every request
 MEMORY_UPDATE_BUFFER_SIZE = 50
+
+# PERFORMANCE FIX: Thread pool for non-blocking I/O
+IO_THREAD_POOL_SIZE = 2
 
 # Thresholds for experiment triggers
 USER_INTERACTION_EXPERIMENT_THRESHOLD = 100
@@ -277,6 +286,9 @@ class TelemetryRecorder:
     meta-learning data collection. Uses buffered writes with automatic flushing
     to minimize I/O overhead.
 
+    PERFORMANCE FIX: All disk I/O operations now run in a background
+    ThreadPoolExecutor to prevent blocking the asyncio event loop.
+
     Thread-safe implementation suitable for production use.
 
     Usage:
@@ -309,6 +321,7 @@ class TelemetryRecorder:
         memory_update_buffer_size: int = MEMORY_UPDATE_BUFFER_SIZE,
         flush_interval: float = TELEMETRY_FLUSH_INTERVAL,
         auto_flush: bool = True,
+        io_thread_pool_size: int = IO_THREAD_POOL_SIZE,
     ):
         """
         Initialize the telemetry recorder.
@@ -320,6 +333,7 @@ class TelemetryRecorder:
             memory_update_buffer_size: Number of memory updates to buffer before flush
             flush_interval: Seconds between automatic flushes
             auto_flush: Whether to automatically flush on interval
+            io_thread_pool_size: Number of threads for background I/O operations
         """
         self._meta_state_path = meta_state_path or DEFAULT_META_STATE_PATH
         self._buffer_size = buffer_size
@@ -338,6 +352,14 @@ class TelemetryRecorder:
 
         # Thread safety
         self._lock = threading.RLock()
+        
+        # PERFORMANCE FIX: Thread pool for non-blocking I/O
+        # All disk operations run here instead of blocking the main thread
+        self._io_executor = ThreadPoolExecutor(
+            max_workers=io_thread_pool_size,
+            thread_name_prefix="TelemetryIO"
+        )
+        self._flush_in_progress = threading.Event()
 
         # Counters
         self._total_entries = 0
@@ -365,6 +387,9 @@ class TelemetryRecorder:
             # PERFORMANCE FIX: Memory update stats
             "memory_updates_queued": 0,
             "memory_updates_flushed": 0,
+            # I/O stats
+            "async_flushes_started": 0,
+            "async_flushes_completed": 0,
         }
 
         # Auto-flush configuration
@@ -378,7 +403,7 @@ class TelemetryRecorder:
         # Register shutdown handler
         atexit.register(self._atexit_handler)
 
-        logger.debug(f"TelemetryRecorder initialized, path: {self._meta_state_path}")
+        logger.debug(f"TelemetryRecorder initialized with non-blocking I/O, path: {self._meta_state_path}")
 
     def _atexit_handler(self) -> None:
         """Handle graceful shutdown on process exit."""
@@ -398,7 +423,8 @@ class TelemetryRecorder:
         """Background loop for automatic flushing."""
         while not self._shutdown_event.wait(timeout=self._flush_interval):
             try:
-                self.flush()
+                # PERFORMANCE FIX: Use non-blocking flush
+                self.flush_async()
             except Exception as e:
                 logger.error(f"[TelemetryRecorder] Auto-flush error: {e}")
 
@@ -423,6 +449,9 @@ class TelemetryRecorder:
     ) -> None:
         """
         Record interaction telemetry for meta-learning (dual-mode).
+
+        This method is non-blocking - it only appends to an in-memory buffer.
+        Actual disk I/O happens asynchronously in a background thread.
 
         Args:
             query: The query text
@@ -491,9 +520,9 @@ class TelemetryRecorder:
             if error_occurred:
                 self._stats["errors"] += 1
 
-            # Flush if buffer is full
+            # PERFORMANCE FIX: Trigger async flush if buffer is full
             if len(self._buffer) >= self._buffer_size:
-                self._flush_buffer_locked()
+                self._schedule_flush_locked()
 
         logger.debug(f"[TelemetryRecorder] Recorded {source} entry {entry.query_id}")
 
@@ -510,6 +539,8 @@ class TelemetryRecorder:
     ) -> None:
         """
         Record an AI-to-AI interaction for meta-learning.
+
+        This method is non-blocking - it only appends to an in-memory buffer.
 
         Args:
             interaction_type: "agent_communication", "tournament", "debate", "vote"
@@ -550,9 +581,9 @@ class TelemetryRecorder:
             elif interaction_type == "vote":
                 self._stats["votes"] += 1
 
-            # Flush AI interactions if buffer is full
+            # PERFORMANCE FIX: Trigger async flush if buffer is full
             if len(self._ai_interaction_buffer) >= self._ai_buffer_size:
-                self._flush_ai_interactions_locked()
+                self._schedule_flush_locked()
 
         logger.debug(
             f"[TelemetryRecorder] Recorded AI interaction: {sender} -> {receiver} ({interaction_type})"
@@ -607,6 +638,8 @@ class TelemetryRecorder:
         Instead of writing to disk on every request (which caused progressive
         slowdown), memory updates are now buffered and flushed periodically.
         
+        This method is non-blocking.
+        
         Args:
             source: Interaction source (user/agent/arena)
             query_type: Type of query
@@ -629,112 +662,122 @@ class TelemetryRecorder:
             self._memory_update_buffer.append(entry)
             self._stats["memory_updates_queued"] += 1
             
-            # Flush if buffer is full
+            # Trigger async flush if buffer is full
             if len(self._memory_update_buffer) >= self._memory_update_buffer_size:
-                self._flush_memory_updates_locked()
+                self._schedule_memory_flush_locked()
 
-    def flush(self) -> None:
-        """Flush all buffered telemetry to storage."""
-        with self._lock:
-            self._flush_buffer_locked()
-            self._flush_ai_interactions_locked()
-        
-        # PERFORMANCE FIX: Also flush memory updates
-        with self._memory_update_lock:
-            self._flush_memory_updates_locked()
-
-    def _flush_buffer_locked(self) -> None:
-        """Flush telemetry buffer while holding lock."""
-        if not self._buffer:
-            return
-
-        entries_to_write = list(self._buffer)
-        self._buffer.clear()
-
-        try:
-            self._write_to_meta_state(entries_to_write)
-            logger.info(
-                f"[TelemetryRecorder] Flushed {len(entries_to_write)} telemetry entries"
-            )
-        except Exception as e:
-            logger.error(f"[TelemetryRecorder] Flush failed: {e}", exc_info=True)
-            # Re-add entries to buffer on failure (partial recovery)
-            if len(self._buffer) + len(entries_to_write) <= self._buffer_size * 2:
-                self._buffer.extend(entries_to_write)
-
-    def _flush_ai_interactions_locked(self) -> None:
-        """Flush AI interaction buffer while holding lock."""
-        if not self._ai_interaction_buffer:
-            return
-
-        entries_to_write = list(self._ai_interaction_buffer)
-        self._ai_interaction_buffer.clear()
-
-        try:
-            self._write_ai_interactions_to_meta_state(entries_to_write)
-            logger.info(
-                f"[TelemetryRecorder] Flushed {len(entries_to_write)} AI interactions"
-            )
-        except Exception as e:
-            logger.error(
-                f"[TelemetryRecorder] AI interaction flush failed: {e}", exc_info=True
-            )
-            # Re-add entries to buffer on failure
-            if (
-                len(self._ai_interaction_buffer) + len(entries_to_write)
-                <= self._ai_buffer_size * 2
-            ):
-                self._ai_interaction_buffer.extend(entries_to_write)
-
-    def _flush_memory_updates_locked(self) -> None:
+    def _schedule_flush_locked(self) -> None:
         """
-        PERFORMANCE FIX: Flush memory update buffer while holding lock.
+        Schedule a non-blocking flush (must hold self._lock).
         
-        This batches all memory updates and writes them in a single disk I/O
-        operation, instead of the previous behavior of writing on every request.
+        PERFORMANCE FIX: This submits the flush to a background thread pool
+        instead of blocking the current thread.
         """
-        if not self._memory_update_buffer:
-            return
+        if not self._flush_in_progress.is_set():
+            self._flush_in_progress.set()
+            self._stats["async_flushes_started"] += 1
+            self._io_executor.submit(self._do_flush_in_background)
 
-        updates_to_write = list(self._memory_update_buffer)
-        self._memory_update_buffer.clear()
+    def _schedule_memory_flush_locked(self) -> None:
+        """
+        Schedule a non-blocking memory flush (must hold self._memory_update_lock).
+        """
+        if not self._flush_in_progress.is_set():
+            self._flush_in_progress.set()
+            self._stats["async_flushes_started"] += 1
+            self._io_executor.submit(self._do_flush_in_background)
 
+    def flush_async(self) -> None:
+        """
+        PERFORMANCE FIX: Trigger a non-blocking flush.
+        
+        The actual I/O happens in a background thread, so this method
+        returns immediately without blocking the caller.
+        """
+        if not self._flush_in_progress.is_set():
+            self._flush_in_progress.set()
+            self._stats["async_flushes_started"] += 1
+            self._io_executor.submit(self._do_flush_in_background)
+
+    def _do_flush_in_background(self) -> None:
+        """
+        PERFORMANCE FIX: Perform the actual flush in a background thread.
+        
+        This runs in the ThreadPoolExecutor, NOT the main event loop.
+        The main thread is never blocked by disk I/O.
+        """
         try:
-            self._write_memory_updates_to_meta_state(updates_to_write)
-            self._stats["memory_updates_flushed"] += len(updates_to_write)
-            logger.debug(
-                f"[TelemetryRecorder] Flushed {len(updates_to_write)} memory updates"
-            )
+            # Grab data from buffers quickly while holding locks
+            telemetry_entries = []
+            ai_entries = []
+            memory_updates = []
+            
+            with self._lock:
+                if self._buffer:
+                    telemetry_entries = list(self._buffer)
+                    self._buffer.clear()
+                if self._ai_interaction_buffer:
+                    ai_entries = list(self._ai_interaction_buffer)
+                    self._ai_interaction_buffer.clear()
+            
+            with self._memory_update_lock:
+                if self._memory_update_buffer:
+                    memory_updates = list(self._memory_update_buffer)
+                    self._memory_update_buffer.clear()
+            
+            # Now do the slow disk I/O WITHOUT holding any locks
+            # This doesn't block the main thread
+            if telemetry_entries or ai_entries or memory_updates:
+                self._write_all_to_meta_state(telemetry_entries, ai_entries, memory_updates)
+                
+                total_entries = len(telemetry_entries)
+                total_ai = len(ai_entries)
+                total_memory = len(memory_updates)
+                
+                logger.info(
+                    f"[TelemetryRecorder] Flushed {total_entries} telemetry entries, "
+                    f"{total_ai} AI interactions, {total_memory} memory updates (background)"
+                )
+                
+                with self._lock:
+                    self._stats["async_flushes_completed"] += 1
+                    self._stats["memory_updates_flushed"] += total_memory
+                    
         except Exception as e:
-            logger.error(
-                f"[TelemetryRecorder] Memory update flush failed: {e}", exc_info=True
-            )
-            # Re-add entries to buffer on failure (with limit to prevent unbounded growth)
-            if (
-                len(self._memory_update_buffer) + len(updates_to_write)
-                <= self._memory_update_buffer_size * 2
-            ):
-                self._memory_update_buffer.extend(updates_to_write)
+            logger.error(f"[TelemetryRecorder] Background flush failed: {e}", exc_info=True)
+        finally:
+            self._flush_in_progress.clear()
 
-    def _write_memory_updates_to_meta_state(
-        self, updates: List[MemoryUpdateEntry]
+    def _write_all_to_meta_state(
+        self,
+        telemetry_entries: List[TelemetryEntry],
+        ai_entries: List[AIInteractionEntry],
+        memory_updates: List[MemoryUpdateEntry],
     ) -> None:
         """
-        PERFORMANCE FIX: Write batched memory updates to llm_meta_state.json.
+        PERFORMANCE FIX: Write all buffered data to llm_meta_state.json in a single operation.
         
-        This consolidates multiple memory updates into a single disk write,
-        dramatically reducing I/O overhead compared to the previous per-request writes.
+        This runs in a background thread and does NOT block the event loop.
+        All data is written atomically to prevent corruption.
         
         Args:
-            updates: List of MemoryUpdateEntry objects to write
+            telemetry_entries: List of TelemetryEntry objects to write
+            ai_entries: List of AIInteractionEntry objects to write
+            memory_updates: List of MemoryUpdateEntry objects to write
         """
-        if not updates:
-            return
-            
+        # Ensure parent directory exists
         self._meta_state_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # Load existing state or create new
         state = self._load_or_create_state()
         
+        # Ensure structure exists
+        if "objects" not in state:
+            state["objects"] = {}
+        if "telemetry" not in state["objects"]:
+            state["objects"]["telemetry"] = []
+        if "ai_interactions" not in state["objects"]:
+            state["objects"]["ai_interactions"] = []
         if "memory" not in state:
             state["memory"] = {
                 "success_memory": {},
@@ -742,146 +785,125 @@ class TelemetryRecorder:
                 "utility_memory": {},
                 "cost_memory": {},
             }
-        
-        # Process all buffered updates
-        for update in updates:
-            if update.source == "user":
-                # Update utility_memory with user interaction data
-                if update.query_type not in state["memory"]["utility_memory"]:
-                    state["memory"]["utility_memory"][update.query_type] = {
-                        "count": 0,
-                        "last_updated": update.timestamp,
-                        "patterns": [],
-                    }
-                
-                mem = state["memory"]["utility_memory"][update.query_type]
-                mem["count"] += 1
-                mem["last_updated"] = update.timestamp
-                
-                # Store pattern if response quality is known
-                if update.quality_score is not None:
-                    mem["patterns"].append({
-                        "timestamp": update.timestamp,
-                        "quality": update.quality_score
-                    })
-                    # Keep only recent patterns
-                    mem["patterns"] = mem["patterns"][-MAX_MEMORY_PATTERNS:]
-            
-            elif update.source in ("agent", "arena"):
-                # Update success_memory with AI performance data
-                interaction_type = update.interaction_type or "general"
-                if interaction_type not in state["memory"]["success_memory"]:
-                    state["memory"]["success_memory"][interaction_type] = {
-                        "count": 0,
-                        "successes": 0,
-                        "last_updated": update.timestamp,
-                    }
-                
-                mem = state["memory"]["success_memory"][interaction_type]
-                mem["count"] += 1
-                mem["last_updated"] = update.timestamp
-                
-                if not update.error_occurred:
-                    mem["successes"] += 1
-                
-                # Update risk_memory if errors occurred
-                if update.error_occurred:
-                    error_type = update.error_type or "unknown"
-                    if error_type not in state["memory"]["risk_memory"]:
-                        state["memory"]["risk_memory"][error_type] = {
-                            "count": 0,
-                            "last_occurred": update.timestamp,
-                        }
-                    state["memory"]["risk_memory"][error_type]["count"] += 1
-                    state["memory"]["risk_memory"][error_type]["last_occurred"] = update.timestamp
-        
-        # Update state timestamp
         if "state" not in state:
             state["state"] = {}
+        
+        # Add telemetry entries
+        for entry in telemetry_entries:
+            telemetry_record = entry.to_dict()
+            telemetry_record["step"] = len(state["objects"]["telemetry"])
+            state["objects"]["telemetry"].append(telemetry_record)
+        
+        # Enforce maximum telemetry entries limit
+        if len(state["objects"]["telemetry"]) > MAX_TELEMETRY_ENTRIES:
+            state["objects"]["telemetry"] = state["objects"]["telemetry"][
+                -MAX_TELEMETRY_ENTRIES:
+            ]
+        
+        # Add AI interaction entries
+        for entry in ai_entries:
+            ai_record = entry.to_dict()
+            ai_record["step"] = len(state["objects"]["ai_interactions"])
+            state["objects"]["ai_interactions"].append(ai_record)
+        
+        # Enforce maximum AI interaction entries limit
+        if len(state["objects"]["ai_interactions"]) > MAX_AI_INTERACTION_ENTRIES:
+            state["objects"]["ai_interactions"] = state["objects"]["ai_interactions"][
+                -MAX_AI_INTERACTION_ENTRIES:
+            ]
+        
+        # Process memory updates
+        for update in memory_updates:
+            self._apply_memory_update(state, update)
+        
+        # Update state counters
+        state["state"]["telemetry_entries"] = len(state["objects"]["telemetry"])
+        state["state"]["ai_interaction_entries"] = len(
+            state["objects"]["ai_interactions"]
+        )
+        state["state"]["last_telemetry_update"] = time.time()
+        state["state"]["last_ai_interaction_update"] = time.time()
         state["state"]["last_memory_update"] = time.time()
         
         # Write back atomically
         self._write_state_atomic(state)
 
-    def _write_to_meta_state(self, entries: List[TelemetryEntry]) -> None:
+    def _apply_memory_update(self, state: Dict[str, Any], update: MemoryUpdateEntry) -> None:
         """
-        Write telemetry entries to llm_meta_state.json.
-
+        Apply a single memory update to the state dict.
+        
+        User interactions -> utility_memory (learn from real-world problems)
+        AI interactions -> success_memory, risk_memory (learn from AI performance)
+        
         Args:
-            entries: List of TelemetryEntry objects to write
+            state: The state dictionary to update
+            update: The memory update entry to apply
         """
-        # Ensure parent directory exists
-        self._meta_state_path.parent.mkdir(parents=True, exist_ok=True)
+        if update.source == "user":
+            # Update utility_memory with user interaction data
+            if update.query_type not in state["memory"]["utility_memory"]:
+                state["memory"]["utility_memory"][update.query_type] = {
+                    "count": 0,
+                    "last_updated": update.timestamp,
+                    "patterns": [],
+                }
+            
+            mem = state["memory"]["utility_memory"][update.query_type]
+            mem["count"] += 1
+            mem["last_updated"] = update.timestamp
+            
+            # Store pattern if response quality is known
+            if update.quality_score is not None:
+                mem["patterns"].append({
+                    "timestamp": update.timestamp,
+                    "quality": update.quality_score
+                })
+                # Keep only recent patterns
+                mem["patterns"] = mem["patterns"][-MAX_MEMORY_PATTERNS:]
+        
+        elif update.source in ("agent", "arena"):
+            # Update success_memory with AI performance data
+            interaction_type = update.interaction_type or "general"
+            if interaction_type not in state["memory"]["success_memory"]:
+                state["memory"]["success_memory"][interaction_type] = {
+                    "count": 0,
+                    "successes": 0,
+                    "last_updated": update.timestamp,
+                }
+            
+            mem = state["memory"]["success_memory"][interaction_type]
+            mem["count"] += 1
+            mem["last_updated"] = update.timestamp
+            
+            if not update.error_occurred:
+                mem["successes"] += 1
+            
+            # Update risk_memory if errors occurred
+            if update.error_occurred:
+                error_type = update.error_type or "unknown"
+                if error_type not in state["memory"]["risk_memory"]:
+                    state["memory"]["risk_memory"][error_type] = {
+                        "count": 0,
+                        "last_occurred": update.timestamp,
+                    }
+                state["memory"]["risk_memory"][error_type]["count"] += 1
+                state["memory"]["risk_memory"][error_type]["last_occurred"] = update.timestamp
 
-        # Load existing state or create new
-        state = self._load_or_create_state()
-
-        # Ensure objects.telemetry exists
-        if "objects" not in state:
-            state["objects"] = {}
-        if "telemetry" not in state["objects"]:
-            state["objects"]["telemetry"] = []
-
-        # Add new entries
-        for entry in entries:
-            telemetry_record = entry.to_dict()
-            telemetry_record["step"] = len(state["objects"]["telemetry"])
-            state["objects"]["telemetry"].append(telemetry_record)
-
-        # Enforce maximum entries limit
-        if len(state["objects"]["telemetry"]) > MAX_TELEMETRY_ENTRIES:
-            state["objects"]["telemetry"] = state["objects"]["telemetry"][
-                -MAX_TELEMETRY_ENTRIES:
-            ]
-
-        # Update state counters
-        if "state" not in state:
-            state["state"] = {}
-        state["state"]["telemetry_entries"] = len(state["objects"]["telemetry"])
-        state["state"]["last_telemetry_update"] = time.time()
-
-        # Write back atomically
-        self._write_state_atomic(state)
-
-    def _write_ai_interactions_to_meta_state(
-        self, entries: List[AIInteractionEntry]
-    ) -> None:
+    def flush(self) -> None:
         """
-        Write AI interaction entries to llm_meta_state.json.
-
-        Args:
-            entries: List of AIInteractionEntry objects to write
+        Flush all buffered telemetry to storage.
+        
+        This is a synchronous method that waits for the flush to complete.
+        Use flush_async() for non-blocking behavior.
         """
-        self._meta_state_path.parent.mkdir(parents=True, exist_ok=True)
-
-        state = self._load_or_create_state()
-
-        if "objects" not in state:
-            state["objects"] = {}
-        if "ai_interactions" not in state["objects"]:
-            state["objects"]["ai_interactions"] = []
-
-        # Add new entries
-        for entry in entries:
-            ai_record = entry.to_dict()
-            ai_record["step"] = len(state["objects"]["ai_interactions"])
-            state["objects"]["ai_interactions"].append(ai_record)
-
-        # Enforce maximum entries limit
-        if len(state["objects"]["ai_interactions"]) > MAX_AI_INTERACTION_ENTRIES:
-            state["objects"]["ai_interactions"] = state["objects"]["ai_interactions"][
-                -MAX_AI_INTERACTION_ENTRIES:
-            ]
-
-        # Update counters
-        if "state" not in state:
-            state["state"] = {}
-        state["state"]["ai_interaction_entries"] = len(
-            state["objects"]["ai_interactions"]
-        )
-        state["state"]["last_ai_interaction_update"] = time.time()
-
-        self._write_state_atomic(state)
+        # Trigger async flush
+        self.flush_async()
+        
+        # Wait for flush to complete (with timeout)
+        timeout = 30  # seconds
+        start = time.time()
+        while self._flush_in_progress.is_set() and (time.time() - start) < timeout:
+            time.sleep(0.1)
 
     def _load_or_create_state(self) -> Dict[str, Any]:
         """Load existing state or create new default state."""
@@ -964,6 +986,8 @@ class TelemetryRecorder:
         with self._memory_update_lock:
             stats["memory_update_buffer_size"] = len(self._memory_update_buffer)
 
+        stats["flush_in_progress"] = self._flush_in_progress.is_set()
+
         return stats
 
     def get_telemetry_count(self) -> int:
@@ -984,11 +1008,14 @@ class TelemetryRecorder:
         if self._flush_thread and self._flush_thread.is_alive():
             self._flush_thread.join(timeout=5.0)
 
-        # Final flush
+        # Final synchronous flush
         try:
             self.flush()
         except Exception as e:
             logger.error(f"[TelemetryRecorder] Error during shutdown flush: {e}")
+
+        # Shutdown thread pool
+        self._io_executor.shutdown(wait=True, cancel_futures=False)
 
         logger.debug("[TelemetryRecorder] Shutdown complete")
 
@@ -1030,7 +1057,7 @@ def record_telemetry(
     """
     Record interaction telemetry for meta-learning system.
 
-    Convenience function using global recorder.
+    Convenience function using global recorder. Non-blocking.
 
     Args:
         query: The query text
@@ -1050,6 +1077,8 @@ def record_interaction(
 ) -> None:
     """
     Record ALL interactions for meta-learning (dual-mode).
+
+    This is completely non-blocking - all disk I/O happens in background threads.
 
     User interactions:
         - Query patterns
@@ -1114,6 +1143,8 @@ def record_ai_interaction(
     """
     Record an AI-to-AI interaction.
 
+    This is non-blocking - all disk I/O happens in background threads.
+
     This records:
         - Agent-to-agent communication
         - Tournament participation
@@ -1149,14 +1180,15 @@ def _update_memory_systems(
     source: str, query: str, response: str, metadata: Dict[str, Any]
 ) -> None:
     """
-    DEPRECATED: Update VULCAN memory systems based on interaction source.
-    
-    This function is kept for backwards compatibility but now uses the
-    buffered queue_memory_update() method instead of direct disk writes.
-    
+    Update VULCAN memory systems based on interaction source.
+
+    DEPRECATED: This function is kept for backwards compatibility but now uses
+    the buffered queue_memory_update() method instead of direct disk writes.
+
     PERFORMANCE FIX: Memory updates are now buffered and flushed periodically
-    instead of writing to disk on every request. This prevents the progressive
-    slowdown that was occurring when the JSON file grew large.
+    in a background thread, instead of writing to disk on every request.
+    This prevents the progressive slowdown that was occurring when the JSON
+    file grew large.
 
     User interactions -> utility_memory (learn from real-world problems)
     AI interactions -> success_memory, risk_memory (learn from AI performance)
