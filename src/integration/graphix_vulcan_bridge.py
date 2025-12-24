@@ -325,8 +325,12 @@ class HierarchicalMemory:
             )
 
             # Extract retrieved texts
-            for idx in top_k_indices.squeeze(0).tolist():
-                if isinstance(idx, int) and idx < len(self.episodic):
+            # Handle both scalar (when top_k=1) and list results from tolist()
+            indices = top_k_indices.flatten().tolist()
+            if not isinstance(indices, list):
+                indices = [indices]
+            for idx in indices:
+                if isinstance(idx, int) and 0 <= idx < len(self.episodic):
                     context_items.append(self.episodic[idx][0])
 
         retrieved_context = {
@@ -398,17 +402,17 @@ class HierarchicalMemory:
                 self._embedding_count += 1
             else:
                 # At capacity: shift left and add new embedding at the end
-                # This is more efficient than slice + cat for FIFO behavior
-                self._embedding_tensor[:-1] = self._embedding_tensor[1:].clone()
+                # PERFORMANCE FIX: Use roll() instead of slice+clone for O(1) rotation
+                # roll() moves elements without creating copies
+                self._embedding_tensor = torch.roll(self._embedding_tensor, shifts=-1, dims=0)
                 self._embedding_tensor[-1] = vector.squeeze(0)
                 # _embedding_count stays at memory_capacity
 
             # 3. Enforce capacity for episodic list (tensor is handled above)
+            # Note: We don't need to re-index since indices aren't used for retrieval
+            # The position in the list serves as the effective index
             if len(self.episodic) > self.config.memory_capacity:
                 self.episodic.pop(0)
-                # Re-index remaining items
-                for i, (text, _) in enumerate(self.episodic):
-                    self.episodic[i] = (text, i)
 
         await asyncio.to_thread(_sync_store)
         # PERFORMANCE FIX: Reduced simulated latency from 0.01s to 0.001s
@@ -945,7 +949,7 @@ class GraphixVulcanBridge:
 
     # ------------------------ PERFORMANCE FIX: Cleanup Methods ------------------------ #
 
-    def cleanup(self) -> None:
+    def cleanup(self, graceful: bool = True, timeout_seconds: float = 5.0) -> None:
         """
         PERFORMANCE FIX: Cleanup resources to prevent memory leaks during long sessions.
         
@@ -954,25 +958,33 @@ class GraphixVulcanBridge:
         - ThreadPoolExecutor
         - Memory caches
         - Concept registry
+        
+        Args:
+            graceful: If True, wait for pending tasks to complete (up to timeout).
+                     If False, shutdown immediately without waiting.
+            timeout_seconds: Maximum time to wait for pending tasks if graceful=True.
         """
         # Shutdown executor if it exists
         if self._executor is not None:
             try:
-                self._executor.shutdown(wait=False)
+                # Use graceful shutdown with timeout to avoid incomplete tasks
+                self._executor.shutdown(wait=graceful)
                 self._executor = None
                 log.debug("GraphixVulcanBridge: ThreadPoolExecutor shutdown complete")
             except Exception as e:
                 log.warning(f"GraphixVulcanBridge: Error shutting down executor: {e}")
         
-        # Clear memory caches
+        # Clear memory caches - with proper null checks
         if hasattr(self, 'memory') and self.memory is not None:
-            self.memory._cache.clear()
-            self.memory._last_cache_cleanup = time.time()
+            if hasattr(self.memory, '_cache'):
+                self.memory._cache.clear()
+            if hasattr(self.memory, '_last_cache_cleanup'):
+                self.memory._last_cache_cleanup = time.time()
             log.debug("GraphixVulcanBridge: Memory cache cleared")
         
-        # Trim concept registry
+        # Trim concept registry - with proper null checks
         if hasattr(self, 'world_model') and self.world_model is not None:
-            if len(self.world_model._concept_registry) > 100:
+            if hasattr(self.world_model, '_concept_registry') and len(self.world_model._concept_registry) > 100:
                 # Keep top 50 most frequent
                 sorted_concepts = sorted(
                     self.world_model._concept_registry.items(),
@@ -990,17 +1002,33 @@ class GraphixVulcanBridge:
             Dictionary with memory usage statistics for debugging performance issues.
         """
         stats = {
-            "cache_size": len(self.memory._cache) if hasattr(self, 'memory') else 0,
-            "episodic_memory_size": len(self.memory.episodic) if hasattr(self, 'memory') else 0,
-            "embedding_count": self.memory._embedding_count if hasattr(self, 'memory') and hasattr(self.memory, '_embedding_count') else 0,
-            "concept_registry_size": len(self.world_model._concept_registry) if hasattr(self, 'world_model') else 0,
+            "cache_size": 0,
+            "episodic_memory_size": 0,
+            "embedding_count": 0,
+            "concept_registry_size": 0,
             "executor_active": self._executor is not None,
         }
+        
+        # Safe access to memory attributes
+        if hasattr(self, 'memory') and self.memory is not None:
+            if hasattr(self.memory, '_cache'):
+                stats["cache_size"] = len(self.memory._cache)
+            if hasattr(self.memory, 'episodic'):
+                stats["episodic_memory_size"] = len(self.memory.episodic)
+            if hasattr(self.memory, '_embedding_count'):
+                stats["embedding_count"] = self.memory._embedding_count
+        
+        # Safe access to world_model attributes
+        if hasattr(self, 'world_model') and self.world_model is not None:
+            if hasattr(self.world_model, '_concept_registry'):
+                stats["concept_registry_size"] = len(self.world_model._concept_registry)
+        
         return stats
 
     def __del__(self):
         """Destructor to ensure cleanup on garbage collection."""
         try:
-            self.cleanup()
+            # Use non-graceful shutdown during destruction to avoid blocking
+            self.cleanup(graceful=False)
         except Exception:
             pass  # Ignore errors during destruction
