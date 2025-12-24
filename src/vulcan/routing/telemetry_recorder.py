@@ -8,6 +8,9 @@
 # PRODUCTION-READY: Thread-safe, buffered writes, auto-flush
 # META-LEARNING: Populates llm_meta_state.json for experiment triggers
 # MEMORY SYSTEMS: Updates success/risk/utility/cost memories
+#
+# PERFORMANCE FIX: Memory updates are now buffered and flushed periodically
+# instead of writing to disk on every request, preventing progressive slowdown.
 # ============================================================
 
 """
@@ -79,6 +82,10 @@ DEFAULT_META_STATE_PATH = Path("data/llm_meta_state.json")
 TELEMETRY_BUFFER_SIZE = 100
 TELEMETRY_FLUSH_INTERVAL = 60  # seconds
 AI_INTERACTION_BUFFER_SIZE = 100
+
+# PERFORMANCE FIX: Memory update buffer size
+# Memory updates are now buffered instead of written on every request
+MEMORY_UPDATE_BUFFER_SIZE = 50
 
 # Thresholds for experiment triggers
 USER_INTERACTION_EXPERIMENT_THRESHOLD = 100
@@ -230,6 +237,33 @@ class AIInteractionEntry:
         }
 
 
+@dataclass
+class MemoryUpdateEntry:
+    """
+    PERFORMANCE FIX: Buffered memory update entry.
+    
+    Instead of writing to disk on every request, memory updates are
+    buffered and flushed periodically with other telemetry data.
+    
+    Attributes:
+        timestamp: Update timestamp
+        source: Interaction source (user/agent/arena)
+        query_type: Type of query
+        quality_score: Response quality score if available
+        error_occurred: Whether an error occurred
+        error_type: Type of error if any
+        interaction_type: Type of AI interaction if applicable
+    """
+    
+    timestamp: float
+    source: str
+    query_type: str
+    quality_score: Optional[float] = None
+    error_occurred: bool = False
+    error_type: Optional[str] = None
+    interaction_type: Optional[str] = None
+
+
 # ============================================================
 # TELEMETRY RECORDER CLASS
 # ============================================================
@@ -272,6 +306,7 @@ class TelemetryRecorder:
         meta_state_path: Optional[Path] = None,
         buffer_size: int = TELEMETRY_BUFFER_SIZE,
         ai_buffer_size: int = AI_INTERACTION_BUFFER_SIZE,
+        memory_update_buffer_size: int = MEMORY_UPDATE_BUFFER_SIZE,
         flush_interval: float = TELEMETRY_FLUSH_INTERVAL,
         auto_flush: bool = True,
     ):
@@ -282,17 +317,24 @@ class TelemetryRecorder:
             meta_state_path: Path to llm_meta_state.json
             buffer_size: Number of telemetry entries to buffer before flush
             ai_buffer_size: Number of AI interaction entries to buffer
+            memory_update_buffer_size: Number of memory updates to buffer before flush
             flush_interval: Seconds between automatic flushes
             auto_flush: Whether to automatically flush on interval
         """
         self._meta_state_path = meta_state_path or DEFAULT_META_STATE_PATH
         self._buffer_size = buffer_size
         self._ai_buffer_size = ai_buffer_size
+        self._memory_update_buffer_size = memory_update_buffer_size
         self._flush_interval = flush_interval
 
         # Buffers for batched writes
         self._buffer: List[TelemetryEntry] = []
         self._ai_interaction_buffer: List[AIInteractionEntry] = []
+        
+        # PERFORMANCE FIX: Buffer for memory updates
+        # Memory updates are now buffered instead of written on every request
+        self._memory_update_buffer: List[MemoryUpdateEntry] = []
+        self._memory_update_lock = threading.RLock()
 
         # Thread safety
         self._lock = threading.RLock()
@@ -320,6 +362,9 @@ class TelemetryRecorder:
             "tournaments": 0,
             "debates": 0,
             "votes": 0,
+            # PERFORMANCE FIX: Memory update stats
+            "memory_updates_queued": 0,
+            "memory_updates_flushed": 0,
         }
 
         # Auto-flush configuration
@@ -547,11 +592,56 @@ class TelemetryRecorder:
 
         logger.info(f"[TelemetryRecorder] Recorded feedback for {query_id}: {feedback}")
 
+    def queue_memory_update(
+        self,
+        source: str,
+        query_type: str,
+        quality_score: Optional[float] = None,
+        error_occurred: bool = False,
+        error_type: Optional[str] = None,
+        interaction_type: Optional[str] = None,
+    ) -> None:
+        """
+        PERFORMANCE FIX: Queue a memory update for batch processing.
+        
+        Instead of writing to disk on every request (which caused progressive
+        slowdown), memory updates are now buffered and flushed periodically.
+        
+        Args:
+            source: Interaction source (user/agent/arena)
+            query_type: Type of query
+            quality_score: Response quality score if available
+            error_occurred: Whether an error occurred
+            error_type: Type of error if any
+            interaction_type: Type of AI interaction if applicable
+        """
+        entry = MemoryUpdateEntry(
+            timestamp=time.time(),
+            source=source,
+            query_type=query_type,
+            quality_score=quality_score,
+            error_occurred=error_occurred,
+            error_type=error_type,
+            interaction_type=interaction_type,
+        )
+        
+        with self._memory_update_lock:
+            self._memory_update_buffer.append(entry)
+            self._stats["memory_updates_queued"] += 1
+            
+            # Flush if buffer is full
+            if len(self._memory_update_buffer) >= self._memory_update_buffer_size:
+                self._flush_memory_updates_locked()
+
     def flush(self) -> None:
         """Flush all buffered telemetry to storage."""
         with self._lock:
             self._flush_buffer_locked()
             self._flush_ai_interactions_locked()
+        
+        # PERFORMANCE FIX: Also flush memory updates
+        with self._memory_update_lock:
+            self._flush_memory_updates_locked()
 
     def _flush_buffer_locked(self) -> None:
         """Flush telemetry buffer while holding lock."""
@@ -595,6 +685,123 @@ class TelemetryRecorder:
                 <= self._ai_buffer_size * 2
             ):
                 self._ai_interaction_buffer.extend(entries_to_write)
+
+    def _flush_memory_updates_locked(self) -> None:
+        """
+        PERFORMANCE FIX: Flush memory update buffer while holding lock.
+        
+        This batches all memory updates and writes them in a single disk I/O
+        operation, instead of the previous behavior of writing on every request.
+        """
+        if not self._memory_update_buffer:
+            return
+
+        updates_to_write = list(self._memory_update_buffer)
+        self._memory_update_buffer.clear()
+
+        try:
+            self._write_memory_updates_to_meta_state(updates_to_write)
+            self._stats["memory_updates_flushed"] += len(updates_to_write)
+            logger.debug(
+                f"[TelemetryRecorder] Flushed {len(updates_to_write)} memory updates"
+            )
+        except Exception as e:
+            logger.error(
+                f"[TelemetryRecorder] Memory update flush failed: {e}", exc_info=True
+            )
+            # Re-add entries to buffer on failure (with limit to prevent unbounded growth)
+            if (
+                len(self._memory_update_buffer) + len(updates_to_write)
+                <= self._memory_update_buffer_size * 2
+            ):
+                self._memory_update_buffer.extend(updates_to_write)
+
+    def _write_memory_updates_to_meta_state(
+        self, updates: List[MemoryUpdateEntry]
+    ) -> None:
+        """
+        PERFORMANCE FIX: Write batched memory updates to llm_meta_state.json.
+        
+        This consolidates multiple memory updates into a single disk write,
+        dramatically reducing I/O overhead compared to the previous per-request writes.
+        
+        Args:
+            updates: List of MemoryUpdateEntry objects to write
+        """
+        if not updates:
+            return
+            
+        self._meta_state_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        state = self._load_or_create_state()
+        
+        if "memory" not in state:
+            state["memory"] = {
+                "success_memory": {},
+                "risk_memory": {},
+                "utility_memory": {},
+                "cost_memory": {},
+            }
+        
+        # Process all buffered updates
+        for update in updates:
+            if update.source == "user":
+                # Update utility_memory with user interaction data
+                if update.query_type not in state["memory"]["utility_memory"]:
+                    state["memory"]["utility_memory"][update.query_type] = {
+                        "count": 0,
+                        "last_updated": update.timestamp,
+                        "patterns": [],
+                    }
+                
+                mem = state["memory"]["utility_memory"][update.query_type]
+                mem["count"] += 1
+                mem["last_updated"] = update.timestamp
+                
+                # Store pattern if response quality is known
+                if update.quality_score is not None:
+                    mem["patterns"].append({
+                        "timestamp": update.timestamp,
+                        "quality": update.quality_score
+                    })
+                    # Keep only recent patterns
+                    mem["patterns"] = mem["patterns"][-MAX_MEMORY_PATTERNS:]
+            
+            elif update.source in ("agent", "arena"):
+                # Update success_memory with AI performance data
+                interaction_type = update.interaction_type or "general"
+                if interaction_type not in state["memory"]["success_memory"]:
+                    state["memory"]["success_memory"][interaction_type] = {
+                        "count": 0,
+                        "successes": 0,
+                        "last_updated": update.timestamp,
+                    }
+                
+                mem = state["memory"]["success_memory"][interaction_type]
+                mem["count"] += 1
+                mem["last_updated"] = update.timestamp
+                
+                if not update.error_occurred:
+                    mem["successes"] += 1
+                
+                # Update risk_memory if errors occurred
+                if update.error_occurred:
+                    error_type = update.error_type or "unknown"
+                    if error_type not in state["memory"]["risk_memory"]:
+                        state["memory"]["risk_memory"][error_type] = {
+                            "count": 0,
+                            "last_occurred": update.timestamp,
+                        }
+                    state["memory"]["risk_memory"][error_type]["count"] += 1
+                    state["memory"]["risk_memory"][error_type]["last_occurred"] = update.timestamp
+        
+        # Update state timestamp
+        if "state" not in state:
+            state["state"] = {}
+        state["state"]["last_memory_update"] = time.time()
+        
+        # Write back atomically
+        self._write_state_atomic(state)
 
     def _write_to_meta_state(self, entries: List[TelemetryEntry]) -> None:
         """
@@ -715,6 +922,7 @@ class TelemetryRecorder:
                 "ai_interaction_entries": 0,
                 "last_telemetry_update": time.time(),
                 "last_ai_interaction_update": time.time(),
+                "last_memory_update": time.time(),
             },
             "memory": {
                 "success_memory": {},
@@ -752,7 +960,11 @@ class TelemetryRecorder:
             else:
                 stats["avg_latency_ms"] = 0.0
 
-            return stats
+        # PERFORMANCE FIX: Include memory update buffer stats
+        with self._memory_update_lock:
+            stats["memory_update_buffer_size"] = len(self._memory_update_buffer)
+
+        return stats
 
     def get_telemetry_count(self) -> int:
         """Get total telemetry entries (including those flushed to disk)."""
@@ -877,8 +1089,16 @@ def record_interaction(
 
     recorder.record(query, response, metadata, **record_kwargs)
 
-    # Update memory systems based on source
-    _update_memory_systems(source, query, response, metadata)
+    # PERFORMANCE FIX: Queue memory update instead of writing to disk immediately
+    # This prevents progressive slowdown by batching disk writes
+    recorder.queue_memory_update(
+        source=source,
+        query_type=metadata.get("query_type", "general"),
+        quality_score=metadata.get("response_quality_score"),
+        error_occurred=metadata.get("error_occurred", False),
+        error_type=metadata.get("error_type"),
+        interaction_type=metadata.get("interaction_type"),
+    )
 
 
 def record_ai_interaction(
@@ -929,7 +1149,14 @@ def _update_memory_systems(
     source: str, query: str, response: str, metadata: Dict[str, Any]
 ) -> None:
     """
-    Update VULCAN memory systems based on interaction source.
+    DEPRECATED: Update VULCAN memory systems based on interaction source.
+    
+    This function is kept for backwards compatibility but now uses the
+    buffered queue_memory_update() method instead of direct disk writes.
+    
+    PERFORMANCE FIX: Memory updates are now buffered and flushed periodically
+    instead of writing to disk on every request. This prevents the progressive
+    slowdown that was occurring when the JSON file grew large.
 
     User interactions -> utility_memory (learn from real-world problems)
     AI interactions -> success_memory, risk_memory (learn from AI performance)
@@ -940,72 +1167,14 @@ def _update_memory_systems(
         response: The response
         metadata: Interaction metadata
     """
+    # PERFORMANCE FIX: Use buffered updates instead of direct disk I/O
     recorder = get_telemetry_recorder()
-
-    try:
-        state = recorder._load_or_create_state()
-
-        if "memory" not in state:
-            state["memory"] = {
-                "success_memory": {},
-                "risk_memory": {},
-                "utility_memory": {},
-                "cost_memory": {},
-            }
-
-        query_type = metadata.get("query_type", "general")
-        timestamp = time.time()
-
-        if source == "user":
-            # Update utility_memory with user interaction data
-            if query_type not in state["memory"]["utility_memory"]:
-                state["memory"]["utility_memory"][query_type] = {
-                    "count": 0,
-                    "last_updated": timestamp,
-                    "patterns": [],
-                }
-
-            mem = state["memory"]["utility_memory"][query_type]
-            mem["count"] += 1
-            mem["last_updated"] = timestamp
-
-            # Store pattern if response quality is known
-            quality = metadata.get("response_quality_score")
-            if quality is not None:
-                mem["patterns"].append({"timestamp": timestamp, "quality": quality})
-                # Keep only recent patterns
-                mem["patterns"] = mem["patterns"][-MAX_MEMORY_PATTERNS:]
-
-        elif source in ("agent", "arena"):
-            # Update success_memory with AI performance data
-            interaction_type = metadata.get("interaction_type", "general")
-            if interaction_type not in state["memory"]["success_memory"]:
-                state["memory"]["success_memory"][interaction_type] = {
-                    "count": 0,
-                    "successes": 0,
-                    "last_updated": timestamp,
-                }
-
-            mem = state["memory"]["success_memory"][interaction_type]
-            mem["count"] += 1
-            mem["last_updated"] = timestamp
-
-            if not metadata.get("error_occurred", False):
-                mem["successes"] += 1
-
-            # Update risk_memory if errors occurred
-            if metadata.get("error_occurred"):
-                error_type = metadata.get("error_type", "unknown")
-                if error_type not in state["memory"]["risk_memory"]:
-                    state["memory"]["risk_memory"][error_type] = {
-                        "count": 0,
-                        "last_occurred": timestamp,
-                    }
-                state["memory"]["risk_memory"][error_type]["count"] += 1
-                state["memory"]["risk_memory"][error_type]["last_occurred"] = timestamp
-
-        # Write back atomically
-        recorder._write_state_atomic(state)
-
-    except Exception as e:
-        logger.debug(f"[TelemetryRecorder] Memory update failed: {e}")
+    
+    recorder.queue_memory_update(
+        source=source,
+        query_type=metadata.get("query_type", "general"),
+        quality_score=metadata.get("response_quality_score"),
+        error_occurred=metadata.get("error_occurred", False),
+        error_type=metadata.get("error_type"),
+        interaction_type=metadata.get("interaction_type"),
+    )
