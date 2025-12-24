@@ -5720,6 +5720,83 @@ class UnifiedChatRequest(BaseModel):
     enable_causal: bool = True
 
 
+# CONTEXT ACCUMULATION FIX: Constants for context window management
+# These limits prevent unbounded context growth causing response lag
+MAX_HISTORY_MESSAGES = 20  # Maximum number of history messages to retain
+MAX_HISTORY_TOKENS = 4096  # Maximum total tokens in history (rough estimate)
+MAX_MESSAGE_LENGTH = 2000  # Maximum characters per message
+
+
+def _truncate_history(
+    history: List[Dict[str, str]],
+    max_messages: int = MAX_HISTORY_MESSAGES,
+    max_tokens: int = MAX_HISTORY_TOKENS,
+    max_message_length: int = MAX_MESSAGE_LENGTH,
+) -> List[Dict[str, str]]:
+    """
+    Truncate conversation history to prevent context accumulation.
+    
+    CONTEXT ACCUMULATION FIX: This implements a sliding window approach to
+    prevent the conversation history from growing unbounded, which was causing
+    response times to degrade from 5s → 4s → 37s → 51s → 86s.
+    
+    Strategy:
+    1. Limit total number of messages (sliding window)
+    2. Truncate individual messages that are too long
+    3. Estimate token count and drop older messages if over limit
+    
+    Args:
+        history: List of message dictionaries with 'role' and 'content' keys
+        max_messages: Maximum number of messages to retain
+        max_tokens: Maximum estimated tokens in history
+        max_message_length: Maximum characters per message
+        
+    Returns:
+        Truncated history list
+    """
+    if not history:
+        return []
+    
+    # Step 1: Apply sliding window - keep only most recent messages
+    if len(history) > max_messages:
+        logger.debug(
+            f"Context truncation: Sliding window {len(history)} → {max_messages} messages"
+        )
+        history = history[-max_messages:]
+    
+    # Step 2: Truncate individual messages that are too long
+    truncated_history = []
+    for msg in history:
+        truncated_msg = dict(msg)  # Copy to avoid modifying original
+        content = truncated_msg.get("content", "")
+        if len(content) > max_message_length:
+            # Keep the first and last parts, add ellipsis in middle
+            half = max_message_length // 2 - 10
+            truncated_msg["content"] = (
+                content[:half] + "\n... [truncated] ...\n" + content[-half:]
+            )
+            logger.debug(
+                f"Context truncation: Message truncated from {len(content)} to {len(truncated_msg['content'])} chars"
+            )
+        truncated_history.append(truncated_msg)
+    
+    # Step 3: Estimate token count and drop oldest messages if over limit
+    # Rough estimate: 1 token ≈ 4 characters
+    total_chars = sum(len(msg.get("content", "")) for msg in truncated_history)
+    estimated_tokens = total_chars // 4
+    
+    while estimated_tokens > max_tokens and len(truncated_history) > 1:
+        removed = truncated_history.pop(0)
+        removed_chars = len(removed.get("content", ""))
+        estimated_tokens -= removed_chars // 4
+        logger.debug(
+            f"Context truncation: Dropped oldest message ({removed_chars} chars), "
+            f"estimated tokens now: {estimated_tokens}"
+        )
+    
+    return truncated_history
+
+
 @app.post("/v1/chat")
 async def unified_chat(request: UnifiedChatRequest):
     """
@@ -5737,6 +5814,27 @@ async def unified_chat(request: UnifiedChatRequest):
     Returns a natural language response with metadata about which systems were used.
     """
     start_time = time.time()
+    
+    # JOB-TO-RESPONSE GAP FIX: Add detailed timing instrumentation
+    # This helps diagnose where the 50+ second gap is occurring
+    timing_breakdown = {
+        "request_received": start_time,
+        "phases": {},  # Will track each phase's duration
+    }
+    
+    def _record_phase(phase_name: str, phase_start: float) -> float:
+        """Record phase duration and return current time for next phase."""
+        now = time.time()
+        duration_ms = (now - phase_start) * 1000
+        timing_breakdown["phases"][phase_name] = {
+            "duration_ms": duration_ms,
+            "end_time": now,
+        }
+        if duration_ms > 1000:  # Log phases taking > 1 second
+            logger.warning(
+                f"[VULCAN/v1/chat] SLOW PHASE: {phase_name} took {duration_ms:.1f}ms"
+            )
+        return now
 
     if not hasattr(app.state, "deployment"):
         raise HTTPException(status_code=503, detail="System not initialized")
@@ -5753,10 +5851,23 @@ async def unified_chat(request: UnifiedChatRequest):
         "planning_engaged": False,
         "causal_analysis": False,
     }
+    
+    phase_start = start_time
 
     try:
         user_message = request.message
-        context = {"user_query": user_message, "history": request.history}
+        
+        # CONTEXT ACCUMULATION FIX: Apply sliding window truncation to history
+        # This prevents the multi-turn context from growing unbounded
+        truncated_history = _truncate_history(request.history)
+        original_history_len = len(request.history)
+        if original_history_len != len(truncated_history):
+            logger.info(
+                f"[VULCAN/v1/chat] Context truncated: {original_history_len} → {len(truncated_history)} messages"
+            )
+        
+        context = {"user_query": user_message, "history": truncated_history}
+        phase_start = _record_phase("context_preparation", phase_start)
 
         # ================================================================
         # STEP 0: QUERY ROUTING LAYER - Analyze and route query
@@ -5827,6 +5938,8 @@ async def unified_chat(request: UnifiedChatRequest):
             logger.debug(f"[VULCAN/v1/chat] Routing layer not available: {e}")
         except Exception as e:
             logger.warning(f"[VULCAN/v1/chat] Query routing failed: {e}", exc_info=True)
+        
+        phase_start = _record_phase("query_routing", phase_start)
 
         # ================================================================
         # ARENA EXECUTION PATH - Execute via Graphix Arena when enabled
@@ -5850,6 +5963,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     query=user_message,
                     routing_plan=routing_plan,
                 )
+                phase_start = _record_phase("arena_execution", phase_start)
                 
                 if arena_result.get("status") == "success":
                     logger.info(
@@ -5863,6 +5977,7 @@ async def unified_chat(request: UnifiedChatRequest):
                     # Check if Arena result has a direct response we can use
                     if isinstance(arena_output, dict) and arena_output.get("output"):
                         # Arena provided a complete response
+                        timing_breakdown["total_ms"] = (time.time() - start_time) * 1000
                         return {
                             "response": arena_output.get("output", "Arena processing complete"),
                             "arena_execution": {
@@ -6737,6 +6852,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             # NEW: Include routing and agent pool stats
             "routing": routing_stats if routing_stats else None,
             "agent_pool_stats": agent_pool_stats if agent_pool_stats else None,
+            # JOB-TO-RESPONSE GAP FIX: Include timing breakdown for debugging
+            "timing_breakdown": timing_breakdown if latency_ms > 5000 else None,  # Only include for slow requests
         }
 
     except Exception as e:

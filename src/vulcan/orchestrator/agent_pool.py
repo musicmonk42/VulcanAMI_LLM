@@ -438,7 +438,97 @@ class AgentPoolManager:
     - FIXED: Proper timeouts to prevent hanging
     - FIXED: Windows multiprocessing compatibility (uses standalone worker function)
     - THREAD POOL FIX: submit_job() is now non-blocking to prevent thread pool starvation
+    - SINGLETON FIX: Thread-safe singleton pattern to prevent duplicate pools
     """
+    
+    # SINGLETON FIX: Class-level instance tracking to prevent duplicate pools
+    _instances: Dict[str, "AgentPoolManager"] = {}
+    _instance_lock = threading.Lock()
+    _default_instance: Optional["AgentPoolManager"] = None
+    
+    @classmethod
+    def get_instance(
+        cls,
+        instance_id: str = "default",
+        max_agents: int = None,
+        min_agents: int = None,
+        task_queue_type: str = "custom",
+        **kwargs
+    ) -> "AgentPoolManager":
+        """
+        Get or create a singleton instance of AgentPoolManager.
+        
+        SINGLETON FIX: This method ensures only one pool exists per instance_id,
+        preventing the "zombie pool" issue where multiple pools run simultaneously.
+        
+        Args:
+            instance_id: Unique identifier for this pool instance (default: "default")
+            max_agents: Maximum number of agents in pool
+            min_agents: Minimum number of agents to maintain
+            task_queue_type: Type of task queue
+            **kwargs: Additional arguments passed to __init__
+            
+        Returns:
+            AgentPoolManager singleton instance
+        """
+        with cls._instance_lock:
+            if instance_id not in cls._instances:
+                logger.info(f"Creating new AgentPoolManager instance: {instance_id}")
+                instance = cls(
+                    max_agents=max_agents,
+                    min_agents=min_agents,
+                    task_queue_type=task_queue_type,
+                    **kwargs
+                )
+                instance._instance_id = instance_id
+                cls._instances[instance_id] = instance
+                
+                # Track default instance for convenience
+                if instance_id == "default":
+                    cls._default_instance = instance
+            else:
+                logger.debug(f"Returning existing AgentPoolManager instance: {instance_id}")
+            
+            return cls._instances[instance_id]
+    
+    @classmethod
+    def get_default(cls) -> Optional["AgentPoolManager"]:
+        """
+        Get the default AgentPoolManager instance if it exists.
+        
+        Returns:
+            Default AgentPoolManager instance or None
+        """
+        return cls._default_instance
+    
+    @classmethod
+    def get_all_instances(cls) -> Dict[str, "AgentPoolManager"]:
+        """
+        Get all active AgentPoolManager instances.
+        
+        Returns:
+            Dictionary of instance_id to AgentPoolManager
+        """
+        with cls._instance_lock:
+            return dict(cls._instances)
+    
+    @classmethod
+    def shutdown_all(cls) -> None:
+        """
+        Shutdown all AgentPoolManager instances.
+        
+        SINGLETON FIX: This ensures clean shutdown of all pools to prevent
+        zombie pools from persisting across restarts.
+        """
+        with cls._instance_lock:
+            for instance_id, instance in list(cls._instances.items()):
+                logger.info(f"Shutting down AgentPoolManager instance: {instance_id}")
+                try:
+                    instance.shutdown()
+                except Exception as e:
+                    logger.error(f"Error shutting down pool {instance_id}: {e}")
+            cls._instances.clear()
+            cls._default_instance = None
 
     def __init__(
         self,
@@ -2193,6 +2283,15 @@ class AgentPoolManager:
         # Clear pending executions
         with self._pending_executions_lock:
             self._pending_executions.clear()
+        
+        # SINGLETON FIX: Remove this instance from the class registry
+        instance_id = getattr(self, '_instance_id', None)
+        if instance_id:
+            with AgentPoolManager._instance_lock:
+                if instance_id in AgentPoolManager._instances:
+                    del AgentPoolManager._instances[instance_id]
+                if AgentPoolManager._default_instance is self:
+                    AgentPoolManager._default_instance = None
 
         logger.info("Agent pool shutdown complete")
 
