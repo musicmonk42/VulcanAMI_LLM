@@ -414,7 +414,7 @@ class MultiModalReasoningEngine:
     _shared_vision_transform = None
     _shared_audio_processor = None
     _shared_audio_model = None
-    _shared_model_lock = None
+    _shared_model_lock = threading.Lock()  # Initialize at class definition time for thread safety
     _text_model_load_attempted = False
     _vision_model_load_attempted = False
     _audio_model_load_attempted = False
@@ -522,12 +522,6 @@ class MultiModalReasoningEngine:
         across all instances, preventing the 3-5+ second model load time from
         causing intermittent 25-30 second delays when multiple requests arrive.
         """
-        import threading
-        
-        # Lazy initialization of lock
-        if MultiModalReasoningEngine._shared_model_lock is None:
-            MultiModalReasoningEngine._shared_model_lock = threading.Lock()
-        
         if (MultiModalReasoningEngine._shared_text_model is None and 
             not MultiModalReasoningEngine._text_model_load_attempted):
             with MultiModalReasoningEngine._shared_model_lock:
@@ -537,8 +531,7 @@ class MultiModalReasoningEngine:
                     MultiModalReasoningEngine._text_model_load_attempted = True
                     
                     logger.info(f"[TIMING] Loading text model ({TEXT_MODEL_NAME}) - singleton, will load ONCE...")
-                    import time as _time
-                    start = _time.perf_counter()
+                    start = time.perf_counter()
                     
                     try:
                         model_kwargs = {}
@@ -565,10 +558,10 @@ class MultiModalReasoningEngine:
 
                         MultiModalReasoningEngine._shared_text_model.eval()
                         
-                        elapsed = _time.perf_counter() - start
+                        elapsed = time.perf_counter() - start
                         logger.info(f"[TIMING] Text model loaded in {elapsed:.2f}s (singleton)")
                     except Exception as e:
-                        elapsed = _time.perf_counter() - start
+                        elapsed = time.perf_counter() - start
                         logger.error(f"Failed to load text model after {elapsed:.2f}s: {e}")
 
     def register_modality_reasoner(self, modality: ModalityType, reasoner: Any):

@@ -16,6 +16,7 @@ import hashlib
 import json
 import logging
 import pickle
+import threading
 import time
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
@@ -395,7 +396,7 @@ class SemanticEnricher:
     # PERFORMANCE FIX: Class-level singleton for embedding model
     # This prevents reloading the model on every SemanticEnricher instantiation
     _shared_embedding_model = None
-    _shared_model_lock = None  # Will be initialized lazily
+    _shared_model_lock = threading.Lock()  # Initialize at class definition time for thread safety
     _model_load_attempted = False
 
     @classmethod
@@ -405,12 +406,6 @@ class SemanticEnricher:
         Thread-safe implementation using double-checked locking.
         The model is loaded only once and shared across all instances.
         """
-        import threading
-        
-        # Lazy initialization of lock
-        if cls._shared_model_lock is None:
-            cls._shared_model_lock = threading.Lock()
-        
         if cls._shared_embedding_model is None and not cls._model_load_attempted:
             with cls._shared_model_lock:
                 # Double-checked locking

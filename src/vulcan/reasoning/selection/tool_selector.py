@@ -270,18 +270,12 @@ class MultiTierFeatureExtractor:
 
     # PERFORMANCE FIX: Class-level singleton for embedding model
     _shared_embedding_model = None
-    _shared_model_lock = None  # Will be initialized lazily
+    _shared_model_lock = threading.Lock()  # Initialize at class definition time for thread safety
     _model_load_attempted = False
 
     @classmethod
     def _get_shared_model(cls):
         """Get or create the shared embedding model (singleton pattern)"""
-        import threading
-        
-        # Lazy initialization of lock
-        if cls._shared_model_lock is None:
-            cls._shared_model_lock = threading.Lock()
-        
         if cls._shared_embedding_model is None and not cls._model_load_attempted:
             with cls._shared_model_lock:
                 # Double-checked locking
