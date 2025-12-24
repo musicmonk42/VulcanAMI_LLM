@@ -2851,8 +2851,12 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     # The API endpoint is /api/run/{agent_id}
     url = f"{base_url}/api/run/{agent_id}"
     
+    # Warn if API key is not configured (Arena may reject the request)
+    if not api_key:
+        logger.warning("[ARENA] API key not configured - Arena request may fail authentication")
+    
     headers = {
-        "X-API-Key": api_key if api_key else "",
+        "X-API-Key": api_key or "",
         "Content-Type": "application/json",
     }
     
@@ -2977,8 +2981,12 @@ async def _submit_arena_feedback(
             logger.error(f"[ARENA] Feedback deep sanitization also failed: {retry_err}")
             return {"status": "error", "error": f"JSON serialization failed (original: {json_err}, after deep sanitize: {retry_err})"}
     
+    # Warn if API key is not configured (Arena may reject the request)
+    if not api_key:
+        logger.warning("[ARENA] API key not configured - feedback submission may fail authentication")
+    
     headers = {
-        "X-API-Key": api_key if api_key else "",
+        "X-API-Key": api_key or "",
         "Content-Type": "application/json",
     }
     
