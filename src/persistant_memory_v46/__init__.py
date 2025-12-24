@@ -15,9 +15,12 @@ Version: 46
 import logging
 from .graph_rag import GraphNode, GraphRAG, RetrievalResult
 from .lsm import BloomFilter, MerkleLSM, MerkleLSMDAG, Packfile
-from .store import PackfileStore
-from .unlearning import GradientSurgeryUnlearner, UnlearningEngine
+from .store import S3Store as PackfileStore
+from .unlearning import GradientSurgeryUnlearner
 from .zk import GrothProof, MerkleTree, ZKCircuit, ZKProver
+
+# Alias for backward compatibility
+UnlearningEngine = GradientSurgeryUnlearner
 
 __version__ = "46.0.0"
 __author__ = "Vulcan LLM"
@@ -65,11 +68,10 @@ def create_memory_system(
     Returns:
         Dictionary containing all initialized components
     """
-    # Initialize storage
+    # Initialize storage (S3Store aliased as PackfileStore)
     store = PackfileStore(
-        s3_bucket=s3_bucket,
-        compression=compression,
-        encryption=encryption,
+        bucket=s3_bucket,
+        region=kwargs.get("region", "us-east-1"),
         **{k: v for k, v in kwargs.items() if k.startswith("storage_")},
     )
 
@@ -89,12 +91,9 @@ def create_memory_system(
         **{k: v for k, v in kwargs.items() if k.startswith("rag_")},
     )
 
-    # Initialize Unlearning Engine
+    # Initialize Unlearning Engine (GradientSurgeryUnlearner aliased as UnlearningEngine)
     unlearning = UnlearningEngine(
         merkle_graph=lsm.dag,
-        method=kwargs.get("unlearning_method", "gradient_surgery"),
-        enable_verification=kwargs.get("enable_verification", True),
-        **{k: v for k, v in kwargs.items() if k.startswith("unlearning_")},
     )
 
     # Initialize ZK Prover

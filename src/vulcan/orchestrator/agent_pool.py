@@ -48,6 +48,11 @@ from .agent_lifecycle import (
 )
 from .task_queues import TaskQueueInterface, create_task_queue
 
+# Import memory systems for provenance tracking
+from src.vulcan.memory.specialized import WorkingMemory
+from src.vulcan.memory.hierarchical import HierarchicalMemory
+from src.vulcan.memory.base import MemoryConfig
+
 # ============================================================
 # CONSTANTS
 # ============================================================
@@ -470,8 +475,13 @@ class AgentPoolManager:
         self.agents: Dict[str, AgentMetadata] = {}
         self.agent_processes: Dict[str, multiprocessing.Process] = {}
 
-        # MEMORY LEAK FIX: Rolling Window provenance records using deque
-        # The deque automatically keeps only the last N items, preventing memory leaks
+        # MEMORY LEAK FIX: Use specialized memory systems instead of unbounded list
+        # Create memory config for provenance tracking
+        memory_config = MemoryConfig(max_working_memory=50)
+        self.working_memory = WorkingMemory(memory_config)
+        self.long_term_memory = HierarchicalMemory(memory_config)
+        
+        # Keep legacy provenance tracking for backward compatibility
         max_provenance = self.config.get("max_provenance_records", SIMPLE_MODE_MAX_PROVENANCE)
         # Use 50 as default if not specified, as recommended for fixing memory leak
         self._provenance_maxlen = max(max_provenance, 50) if max_provenance else 50
@@ -575,13 +585,13 @@ class AgentPoolManager:
     @property
     def provenance_records(self) -> List[Dict[str, Any]]:
         """
-        Exposes the deque as a list for backward compatibility 
+        Exposes the working memory buffer as a list for backward compatibility 
         with SemanticBridge and other components.
         
         Returns:
-            List of provenance records from the rolling window deque.
+            List of provenance records from the working memory buffer.
         """
-        return list(self._provenance_records)
+        return list(self.working_memory.buffer)
     
     def _extract_job_id(self, record: Any) -> Optional[str]:
         """
@@ -606,6 +616,7 @@ class AgentPoolManager:
     async def _record_provenance(self, record: Dict[str, Any]) -> None:
         """
         Thread-safe write that auto-prunes old history.
+        Stores records in both working_memory and long_term_memory.
         
         Args:
             record: Provenance record to store. Must have a 'job_id' key.
@@ -618,6 +629,19 @@ class AgentPoolManager:
                 self._provenance_lookup[job_id] = record
                 # Clean up lookup for items that have been rotated out of the deque
                 self._cleanup_provenance_lookup()
+            
+            # Store in working_memory for short-term access
+            self.working_memory.store(record, relevance=0.8)
+            
+            # Store in long_term_memory asynchronously for persistence
+            try:
+                self.long_term_memory.store(
+                    content=record,
+                    importance=0.7,
+                    metadata={"type": "provenance", "job_id": job_id}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to store provenance in long-term memory: {e}")
     
     async def flush_history(self) -> None:
         """

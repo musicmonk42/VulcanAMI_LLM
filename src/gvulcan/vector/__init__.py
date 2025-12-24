@@ -20,7 +20,7 @@ from .milvus_bootstrap import (
     load_collection,
     validate_config,
 )
-from .milvus_client import MilvusClient
+from .milvus_client import MilvusIndex
 from .quantization import (
     dequantize_fp16,
     dequantize_int8,
@@ -37,7 +37,7 @@ __all__ = [
     "load_collection",
     "validate_config",
     # Client
-    "MilvusClient",
+    "MilvusIndex",
     # Quantization
     "quantize_fp16",
     "dequantize_fp16",
