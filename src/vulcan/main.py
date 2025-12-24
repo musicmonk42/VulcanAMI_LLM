@@ -5846,7 +5846,8 @@ def _truncate_history(
     if not history:
         return []
     
-    # Ensure max_message_length is reasonable to avoid negative half values
+    # Ensure max_message_length is sufficient for meaningful truncation
+    # Minimum 50 chars allows for readable content on each side of the ellipsis
     max_message_length = max(MIN_MESSAGE_LENGTH, max_message_length)
     
     # Step 1: Apply sliding window - keep only most recent messages
@@ -5858,19 +5859,22 @@ def _truncate_history(
     
     # Step 2: Truncate individual messages that are too long
     truncated_history = []
+    ellipsis_marker = "\n... [truncated] ...\n"
     for msg in history:
         truncated_msg = dict(msg)  # Copy to avoid modifying original
         content = truncated_msg.get("content", "")
         if len(content) > max_message_length:
             # Keep the first and last parts, add ellipsis in middle
             # Ensure half is at least MIN_TRUNCATION_HALF characters to have meaningful content
-            half = max(MIN_TRUNCATION_HALF, max_message_length // 2 - ELLIPSIS_OVERHEAD)
-            truncated_msg["content"] = (
-                content[:half] + "\n... [truncated] ...\n" + content[-half:]
-            )
-            logger.debug(
-                f"Context truncation: Message truncated from {len(content)} to {len(truncated_msg['content'])} chars"
-            )
+            half = max(MIN_TRUNCATION_HALF, (max_message_length - len(ellipsis_marker)) // 2)
+            
+            # Ensure truncated content is actually shorter than original
+            truncated_content = content[:half] + ellipsis_marker + content[-half:]
+            if len(truncated_content) < len(content):
+                truncated_msg["content"] = truncated_content
+                logger.debug(
+                    f"Context truncation: Message truncated from {len(content)} to {len(truncated_msg['content'])} chars"
+                )
         truncated_history.append(truncated_msg)
     
     # Step 3: Estimate token count and drop oldest messages if over limit
