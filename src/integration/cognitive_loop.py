@@ -442,6 +442,9 @@ class SamplingTableCache:
         # Use statistical moments across full array for better coverage
         if HAS_NUMPY:
             arr = np.array(logits, dtype=np.float32)
+            # PERFORMANCE FIX: Handle NaN/Inf values to prevent numerical instability
+            # This addresses RuntimeWarning: invalid value encountered in subtract
+            arr = np.nan_to_num(arr, nan=0.0, posinf=1e6, neginf=-1e6)
             # Compute moments across full array
             mean_val = float(np.mean(arr))
             std_val = float(np.std(arr))

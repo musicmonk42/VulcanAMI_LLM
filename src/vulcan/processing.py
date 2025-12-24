@@ -73,6 +73,13 @@ except ImportError:
 
 # --- Custom LLM Dependency ---
 # NOTE: In a real system, this would be imported from src.llm_core.graphix_transformer
+
+# PERFORMANCE FIX: Thread-safe singleton holder for GraphixTransformer
+# This prevents re-loading BERT models on every request
+_graphix_transformer_instance: Optional["GraphixTransformer"] = None
+_graphix_transformer_lock = threading.Lock()
+
+
 class GraphixTransformer:
     """
     Core LLM component with real BERT embeddings.
@@ -80,7 +87,39 @@ class GraphixTransformer:
     
     PERFORMANCE: Set SKIP_BERT_EMBEDDINGS=true to skip BERT loading
     and use lightweight embeddings instead. Saves 3.5s+ per request.
+    
+    PERFORMANCE FIX: This class now implements a singleton pattern via
+    get_instance() to prevent loading BERT models multiple times per request.
+    Use get_instance() instead of direct instantiation for model reuse.
     """
+
+    @classmethod
+    def get_instance(cls, config=None, embedding_dim=EMBEDDING_DIM) -> "GraphixTransformer":
+        """
+        Get the singleton instance of GraphixTransformer.
+        
+        PERFORMANCE FIX: This ensures the BERT model is only loaded once,
+        preventing the 3-5 second model load on every request.
+        
+        Thread-safe implementation using double-checked locking.
+        
+        Args:
+            config: Optional configuration (only used on first instantiation)
+            embedding_dim: Embedding dimension (only used on first instantiation)
+            
+        Returns:
+            The singleton GraphixTransformer instance
+        """
+        global _graphix_transformer_instance
+        
+        if _graphix_transformer_instance is None:
+            with _graphix_transformer_lock:
+                # Double-checked locking for thread safety
+                if _graphix_transformer_instance is None:
+                    logger.info("Creating singleton GraphixTransformer instance")
+                    _graphix_transformer_instance = cls(config=config, embedding_dim=embedding_dim)
+        
+        return _graphix_transformer_instance
 
     def __init__(self, config=None, embedding_dim=EMBEDDING_DIM):
         self.embedding_dim = embedding_dim
@@ -786,8 +825,9 @@ class DynamicModelManager:
         """Load a specific model."""
         # MODIFIED: Replaced SentenceTransformer with GraphixTransformer/GraphixTextEncoder
         if modality == "text":
-            # Instantiate the LLM core component (simulated here)
-            llm_core = GraphixTransformer()
+            # PERFORMANCE FIX: Use singleton instance to prevent BERT model reload
+            # This prevents the 3-5 second model load on every request
+            llm_core = GraphixTransformer.get_instance()
             # Wrap the LLM's embedding method in a consistent encoder interface
             model = GraphixTextEncoder(llm_core, device=device)
 
