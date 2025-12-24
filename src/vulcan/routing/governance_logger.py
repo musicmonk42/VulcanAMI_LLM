@@ -48,12 +48,14 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import atexit
 import json
 import logging
 import sqlite3
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
@@ -86,6 +88,23 @@ DEFAULT_LOG_QUERY_LIMIT = 100
 
 # Request truncation limit
 MAX_REQUEST_LENGTH = 2000
+
+# PERFORMANCE FIX: Thread pool for async I/O operations
+# This allows governance logging to run without blocking the asyncio event loop
+_GOVERNANCE_IO_EXECUTOR: Optional[ThreadPoolExecutor] = None
+_GOVERNANCE_EXECUTOR_LOCK = threading.Lock()
+
+
+def _get_governance_executor() -> ThreadPoolExecutor:
+    """Get or create the thread pool for async governance I/O operations."""
+    global _GOVERNANCE_IO_EXECUTOR
+    if _GOVERNANCE_IO_EXECUTOR is None:
+        with _GOVERNANCE_EXECUTOR_LOCK:
+            if _GOVERNANCE_IO_EXECUTOR is None:
+                _GOVERNANCE_IO_EXECUTOR = ThreadPoolExecutor(
+                    max_workers=2, thread_name_prefix="governance_io"
+                )
+    return _GOVERNANCE_IO_EXECUTOR
 
 
 # ============================================================
@@ -1052,4 +1071,77 @@ def log_to_governance(
         query_id=query_id,
         session_id=session_id,
         severity=severity_enum,
+    )
+
+
+async def log_to_governance_async(
+    action_type: str,
+    details: Dict[str, Any],
+    actor: str = "vulcan_system",
+    query_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    severity: str = "info",
+) -> int:
+    """
+    Async version of log_to_governance that doesn't block the event loop.
+
+    PERFORMANCE FIX: This function uses asyncio.to_thread to run the
+    synchronous SQLite operation in a thread pool, preventing the
+    governance logging from blocking the async request handler.
+
+    Args:
+        action_type: Type of action (string or ActionType enum)
+        details: Action details
+        actor: Actor identifier
+        query_id: Query ID
+        session_id: Session ID
+        severity: Severity level string
+
+    Returns:
+        ID of the log entry
+    """
+    return await asyncio.to_thread(
+        log_to_governance,
+        action_type,
+        details,
+        actor,
+        query_id,
+        session_id,
+        severity,
+    )
+
+
+def log_to_governance_fire_and_forget(
+    action_type: str,
+    details: Dict[str, Any],
+    actor: str = "vulcan_system",
+    query_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    severity: str = "info",
+) -> None:
+    """
+    Fire-and-forget version of log_to_governance for non-critical logging.
+
+    PERFORMANCE FIX: This function submits the logging operation to a
+    thread pool and returns immediately without waiting for completion.
+    Use this when you don't need to wait for the log entry ID and want
+    maximum performance.
+
+    Args:
+        action_type: Type of action (string or ActionType enum)
+        details: Action details
+        actor: Actor identifier
+        query_id: Query ID
+        session_id: Session ID
+        severity: Severity level string
+    """
+    executor = _get_governance_executor()
+    executor.submit(
+        log_to_governance,
+        action_type,
+        details,
+        actor,
+        query_id,
+        session_id,
+        severity,
     )

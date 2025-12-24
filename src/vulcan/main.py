@@ -318,6 +318,55 @@ except ImportError:
 
 
 # ============================================================
+# PERFORMANCE INSTRUMENTATION - Timing decorators for bottleneck detection
+# ============================================================
+import functools
+
+# Threshold in milliseconds for logging slow operations
+SLOW_OPERATION_THRESHOLD_MS = 100
+
+
+def timed_async(func):
+    """
+    Decorator to time async functions and log slow operations.
+    
+    PERFORMANCE FIX: This helps identify future bottlenecks by logging
+    any async function that takes longer than SLOW_OPERATION_THRESHOLD_MS.
+    """
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = await func(*args, **kwargs)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if elapsed_ms > SLOW_OPERATION_THRESHOLD_MS:
+            logger.warning(
+                f"[SLOW] {func.__module__}.{func.__name__} took {elapsed_ms:.1f}ms"
+            )
+        return result
+    return wrapper
+
+
+def timed_sync(func):
+    """
+    Decorator to time sync functions and log slow operations.
+    
+    PERFORMANCE FIX: This helps identify future bottlenecks by logging
+    any sync function that takes longer than SLOW_OPERATION_THRESHOLD_MS.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if elapsed_ms > SLOW_OPERATION_THRESHOLD_MS:
+            logger.warning(
+                f"[SLOW] {func.__module__}.{func.__name__} took {elapsed_ms:.1f}ms"
+            )
+        return result
+    return wrapper
+
+
+# ============================================================
 # MOCKED/PLACEHOLDER LLM IMPLEMENTATION
 # This replaces the need for the external 'graphix_vulcan_llm' package
 # ============================================================
@@ -3924,6 +3973,7 @@ async def chat(request: ChatRequest):
         from vulcan.routing import (
             route_query_async,
             log_to_governance,
+            log_to_governance_fire_and_forget,
             record_telemetry,
             get_governance_logger,
             get_query_analyzer,
@@ -3959,9 +4009,10 @@ async def chat(request: ChatRequest):
                 f"collab={routing_plan.collaboration_needed}, arena={routing_plan.arena_participation}"
             )
 
-            # Log to governance IMMEDIATELY if required
+            # PERFORMANCE FIX: Use fire-and-forget for governance logging
+            # This prevents blocking the request while waiting for SQLite I/O
             if GOVERNANCE_AVAILABLE and routing_plan.requires_audit:
-                log_to_governance(
+                log_to_governance_fire_and_forget(
                     action_type="query_processed",
                     details={
                         "query_id": routing_plan.query_id,
@@ -4154,13 +4205,13 @@ async def chat(request: ChatRequest):
                             # Log task submission to governance (reuse import from STEP -1)
                             if routing_plan.requires_audit:
                                 try:
-                                    # Use already-imported log_to_governance from STEP -1
+                                    # PERFORMANCE FIX: Use fire-and-forget for governance logging
                                     if (
-                                        "log_to_governance" in dir()
+                                        "log_to_governance_fire_and_forget" in dir()
                                         and "GOVERNANCE_AVAILABLE" in dir()
                                         and GOVERNANCE_AVAILABLE
                                     ):
-                                        log_to_governance(
+                                        log_to_governance_fire_and_forget(
                                             action_type="agent_task_submitted",
                                             details={
                                                 "task_id": agent_task.task_id,
@@ -4867,7 +4918,8 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                 or (routing_plan and routing_plan.requires_audit)
             )
             if should_log:
-                log_to_governance(
+                # PERFORMANCE FIX: Use fire-and-forget for non-critical governance logging
+                log_to_governance_fire_and_forget(
                     action_type="response_generated",
                     details={
                         "query_id": query_id,
@@ -5069,6 +5121,7 @@ async def unified_chat(request: UnifiedChatRequest):
             from vulcan.routing import (
                 route_query_async,
                 log_to_governance,
+                log_to_governance_fire_and_forget,
                 record_telemetry,
                 get_governance_logger,
                 get_query_analyzer,
@@ -5101,9 +5154,10 @@ async def unified_chat(request: UnifiedChatRequest):
                     f"type={routing_plan.query_type.value}, tasks={len(routing_plan.agent_tasks)}"
                 )
 
-                # Log to governance IMMEDIATELY if required
+                # PERFORMANCE FIX: Use fire-and-forget for governance logging
+                # This prevents blocking the request while waiting for SQLite I/O
                 if GOVERNANCE_AVAILABLE and routing_plan.requires_audit:
-                    log_to_governance(
+                    log_to_governance_fire_and_forget(
                         action_type="query_processed",
                         details={
                             "query_id": routing_plan.query_id,
