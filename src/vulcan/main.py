@@ -366,6 +366,22 @@ def timed_sync(func):
     return wrapper
 
 
+async def run_tasks_in_parallel(*coroutines):
+    """
+    Run multiple coroutines in parallel using asyncio.gather.
+    
+    PERFORMANCE FIX: This allows multiple CPU-bound or I/O-bound operations
+    to run concurrently instead of sequentially, reducing total latency.
+    
+    Args:
+        *coroutines: Variable number of coroutines to run in parallel
+        
+    Returns:
+        List of results from each coroutine (in order)
+    """
+    return await asyncio.gather(*coroutines, return_exceptions=True)
+
+
 # ============================================================
 # MOCKED/PLACEHOLDER LLM IMPLEMENTATION
 # This replaces the need for the external 'graphix_vulcan_llm' package
