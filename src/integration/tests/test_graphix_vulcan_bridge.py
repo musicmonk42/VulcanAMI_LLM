@@ -229,7 +229,7 @@ class TestPerformanceFixes:
     @pytest.mark.asyncio
     async def test_cache_ttl_expiration(self):
         """Verify that cache entries expire and are cleaned up."""
-        import time
+        import asyncio
         
         config = BridgeConfig(cache_ttl_seconds=0.1)  # Very short TTL
         memory = HierarchicalMemory(config)
@@ -242,8 +242,8 @@ class TestPerformanceFixes:
         _, cache_hit = await memory.aretrieve_context("test_query", top_k=2)
         assert cache_hit is False
         
-        # Wait for TTL to expire
-        time.sleep(0.15)
+        # Wait for TTL to expire using asyncio.sleep for async-safe timing
+        await asyncio.sleep(0.15)
         
         # Trigger another retrieval which should clean up expired entries
         _, cache_hit = await memory.aretrieve_context("test_query", top_k=2)
@@ -275,15 +275,18 @@ class TestPerformanceFixes:
     
     def test_bridge_cleanup(self):
         """Verify that bridge cleanup method works correctly."""
+        import time
+        
         bridge = GraphixVulcanBridge()
         
         # Get initial stats
         stats_before = bridge.get_memory_stats()
         assert isinstance(stats_before, dict)
         
-        # Add some data
+        # Add some data with current timestamps (not expired)
+        current_time = time.time()
         bridge.world_model._concept_registry = {f"concept_{i}": i for i in range(500)}
-        bridge.memory._cache = {f"query_{i}": ({}, 0.0) for i in range(20)}
+        bridge.memory._cache = {f"query_{i}": ({}, current_time) for i in range(20)}
         
         # Run cleanup
         bridge.cleanup(graceful=True)
@@ -291,9 +294,9 @@ class TestPerformanceFixes:
         # Get stats after cleanup
         stats_after = bridge.get_memory_stats()
         
-        # Concept registry should be trimmed
+        # Concept registry should be trimmed (cleanup keeps top 50)
         assert stats_after["concept_registry_size"] <= 100
-        # Cache should be cleared
+        # Cache should be cleared (cleanup clears all cache entries)
         assert stats_after["cache_size"] == 0
     
     @pytest.mark.asyncio
