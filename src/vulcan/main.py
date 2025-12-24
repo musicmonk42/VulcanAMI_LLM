@@ -40,6 +40,7 @@ import asyncio
 import argparse
 import re
 import sys
+import functools
 from pathlib import Path
 
 # Enable faulthandler ASAP to capture native crashes (segfaults)
@@ -320,7 +321,6 @@ except ImportError:
 # ============================================================
 # PERFORMANCE INSTRUMENTATION - Timing decorators for bottleneck detection
 # ============================================================
-import functools
 
 # Threshold in milliseconds for logging slow operations
 SLOW_OPERATION_THRESHOLD_MS = 100
@@ -4222,11 +4222,8 @@ async def chat(request: ChatRequest):
                             if routing_plan.requires_audit:
                                 try:
                                     # PERFORMANCE FIX: Use fire-and-forget for governance logging
-                                    if (
-                                        "log_to_governance_fire_and_forget" in dir()
-                                        and "GOVERNANCE_AVAILABLE" in dir()
-                                        and GOVERNANCE_AVAILABLE
-                                    ):
+                                    # The function is imported at the top of this try block
+                                    if GOVERNANCE_AVAILABLE:
                                         log_to_governance_fire_and_forget(
                                             action_type="agent_task_submitted",
                                             details={
@@ -4238,6 +4235,9 @@ async def chat(request: ChatRequest):
                                             severity="info",
                                             query_id=routing_plan.query_id,
                                         )
+                                except NameError:
+                                    # Function not imported (import error earlier in block)
+                                    pass
                                 except Exception as gov_err:
                                     logger.debug(
                                         f"[VULCAN] Governance logging skipped: {gov_err}"

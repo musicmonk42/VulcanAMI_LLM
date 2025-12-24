@@ -52,6 +52,7 @@ import asyncio
 import atexit
 import json
 import logging
+import os
 import sqlite3
 import threading
 import time
@@ -91,8 +92,12 @@ MAX_REQUEST_LENGTH = 2000
 
 # PERFORMANCE FIX: Thread pool for async I/O operations
 # This allows governance logging to run without blocking the asyncio event loop
+# Configurable via environment variable GOVERNANCE_IO_WORKERS (default: min(4, cpu_count+1))
 _GOVERNANCE_IO_EXECUTOR: Optional[ThreadPoolExecutor] = None
 _GOVERNANCE_EXECUTOR_LOCK = threading.Lock()
+
+# Calculate default worker count based on CPU count
+_DEFAULT_GOVERNANCE_WORKERS = min(4, (os.cpu_count() or 1) + 1)
 
 
 def _get_governance_executor() -> ThreadPoolExecutor:
@@ -101,10 +106,27 @@ def _get_governance_executor() -> ThreadPoolExecutor:
     if _GOVERNANCE_IO_EXECUTOR is None:
         with _GOVERNANCE_EXECUTOR_LOCK:
             if _GOVERNANCE_IO_EXECUTOR is None:
-                _GOVERNANCE_IO_EXECUTOR = ThreadPoolExecutor(
-                    max_workers=2, thread_name_prefix="governance_io"
+                max_workers = int(
+                    os.getenv("GOVERNANCE_IO_WORKERS", str(_DEFAULT_GOVERNANCE_WORKERS))
                 )
+                _GOVERNANCE_IO_EXECUTOR = ThreadPoolExecutor(
+                    max_workers=max_workers, thread_name_prefix="governance_io"
+                )
+                # Register cleanup on application exit
+                atexit.register(_cleanup_governance_executor)
     return _GOVERNANCE_IO_EXECUTOR
+
+
+def _cleanup_governance_executor():
+    """Cleanup the governance I/O executor on application shutdown."""
+    global _GOVERNANCE_IO_EXECUTOR
+    if _GOVERNANCE_IO_EXECUTOR is not None:
+        try:
+            _GOVERNANCE_IO_EXECUTOR.shutdown(wait=False)
+            logger.debug("Governance I/O executor shut down")
+        except Exception as e:
+            logger.warning(f"Error shutting down governance executor: {e}")
+        _GOVERNANCE_IO_EXECUTOR = None
 
 
 # ============================================================
