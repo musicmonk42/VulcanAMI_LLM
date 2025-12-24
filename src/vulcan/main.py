@@ -4393,128 +4393,16 @@ async def chat(request: ChatRequest):
         logger.warning(f"[VULCAN] Agent pool routing failed: {e}", exc_info=True)
 
     # ================================================================
-    # STEP 2: Query Vulcan's Long-Term Memory
+    # TIMING: Initialize timing instrumentation for bottleneck diagnosis
     # ================================================================
-    if deps.ltm:
-        try:
-            # Use multimodal processor to get embedding for memory search
-            if deps.multimodal:
-                perception = await loop.run_in_executor(
-                    None, deps.multimodal.process_input, processed_prompt
-                )
-                if hasattr(perception, "embedding"):
-                    embedding = perception.embedding
-                    memory_results = await loop.run_in_executor(
-                        None, deps.ltm.search, embedding, 5
-                    )
-                    if memory_results:
-                        memory_context = memory_results
-                        systems_used.append("long_term_memory")
-                        logger.info(
-                            f"[VULCAN] Retrieved {len(memory_context)} relevant memories"
-                        )
-        except Exception as e:
-            logger.debug(f"[VULCAN] Memory retrieval failed: {e}")
-
-    # Also check episodic memory
-    if deps.am and not memory_context:
-        try:
-            if hasattr(deps.am, "get_recent_episodes"):
-                recent = await loop.run_in_executor(
-                    None, deps.am.get_recent_episodes, 3
-                )
-                if recent:
-                    memory_context = recent
-                    systems_used.append("episodic_memory")
-                    logger.info(f"[VULCAN] Retrieved {len(recent)} recent episodes")
-        except Exception as e:
-            logger.debug(f"[VULCAN] Episodic memory failed: {e}")
+    _timing_start = time.perf_counter()
 
     # ================================================================
-    # STEP 3: Apply Vulcan's Reasoning Systems (ALL of them)
+    # PARALLEL EXECUTION: Steps 2-5 run concurrently for performance
+    # Previously these ran sequentially causing 20-30s bottleneck
     # ================================================================
 
-    # 3a. Symbolic Reasoning
-    if deps.symbolic:
-        try:
-            if hasattr(deps.symbolic, "reason"):
-                symbolic_result = await loop.run_in_executor(
-                    None, deps.symbolic.reason, processed_prompt
-                )
-            elif hasattr(deps.symbolic, "query"):
-                symbolic_result = await loop.run_in_executor(
-                    None, deps.symbolic.query, processed_prompt
-                )
-            else:
-                symbolic_result = None
-
-            if symbolic_result:
-                reasoning_insights["symbolic"] = str(symbolic_result)[:200]
-                systems_used.append("symbolic_reasoning")
-                logger.info("[VULCAN] Applied symbolic reasoning")
-        except Exception as e:
-            logger.debug(f"[VULCAN] Symbolic reasoning failed: {e}")
-
-    # 3b. Probabilistic Reasoning
-    if deps.probabilistic and deps.multimodal:
-        try:
-            perception = await loop.run_in_executor(
-                None, deps.multimodal.process_input, processed_prompt
-            )
-            if hasattr(perception, "embedding"):
-                if hasattr(deps.probabilistic, "predict_with_uncertainty"):
-                    prob_result = await loop.run_in_executor(
-                        None,
-                        deps.probabilistic.predict_with_uncertainty,
-                        perception.embedding,
-                    )
-                    if prob_result:
-                        prediction, uncertainty = prob_result
-                        reasoning_insights["probabilistic"] = {
-                            "confidence": round(1.0 - uncertainty, 3),
-                            "prediction": str(prediction)[:100],
-                        }
-                        systems_used.append("probabilistic_reasoning")
-                        logger.info(
-                            f"[VULCAN] Applied probabilistic reasoning (confidence: {1.0-uncertainty:.2f})"
-                        )
-        except Exception as e:
-            logger.debug(f"[VULCAN] Probabilistic reasoning failed: {e}")
-
-    # 3c. Causal Reasoning
-    if deps.causal:
-        try:
-            if hasattr(deps.causal, "estimate_causal_effect"):
-                causal_result = await loop.run_in_executor(
-                    None,
-                    deps.causal.estimate_causal_effect,
-                    "query",
-                    processed_prompt[:50],
-                )
-                if causal_result:
-                    reasoning_insights["causal"] = str(causal_result)[:200]
-                    systems_used.append("causal_reasoning")
-                    logger.info("[VULCAN] Applied causal reasoning")
-        except Exception as e:
-            logger.debug(f"[VULCAN] Causal reasoning failed: {e}")
-
-    # 3d. Analogical Reasoning
-    if deps.abstract:
-        try:
-            if hasattr(deps.abstract, "find_analogies"):
-                analogy_result = await loop.run_in_executor(
-                    None, deps.abstract.find_analogies, processed_prompt
-                )
-                if analogy_result:
-                    reasoning_insights["analogical"] = str(analogy_result)[:200]
-                    systems_used.append("analogical_reasoning")
-                    logger.info("[VULCAN] Applied analogical reasoning")
-        except Exception as e:
-            logger.debug(f"[VULCAN] Analogical reasoning failed: {e}")
-
-    # ================================================================
-    # STEP 4: WORLD MODEL INTEGRATION (Full Activation)
-    # ================================================================
+    # Pre-compute query analysis flags (needed by world model task)
     query_lower = processed_prompt.lower()
     is_predictive_query = any(
         kw in query_lower
@@ -4537,24 +4425,172 @@ async def chat(request: ChatRequest):
         for kw in ["why", "cause", "effect", "because", "leads to", "results in"]
     )
 
-    if deps.world_model:
+    # Define async task functions for parallel execution
+    async def _memory_search_task_process():
+        """STEP 2: Query Vulcan's Long-Term Memory"""
+        _mem_context = []
+        _systems = []
+
+        if deps.ltm:
+            try:
+                if deps.multimodal:
+                    perception = await loop.run_in_executor(
+                        None, deps.multimodal.process_input, processed_prompt
+                    )
+                    if hasattr(perception, "embedding"):
+                        embedding = perception.embedding
+                        memory_results = await loop.run_in_executor(
+                            None, deps.ltm.search, embedding, 5
+                        )
+                        if memory_results:
+                            _mem_context = memory_results
+                            _systems.append("long_term_memory")
+                            logger.info(
+                                f"[VULCAN] Retrieved {len(_mem_context)} relevant memories"
+                            )
+            except Exception as e:
+                logger.debug(f"[VULCAN] Memory retrieval failed: {e}")
+
+        # Also check episodic memory if LTM didn't return results
+        if deps.am and not _mem_context:
+            try:
+                if hasattr(deps.am, "get_recent_episodes"):
+                    recent = await loop.run_in_executor(
+                        None, deps.am.get_recent_episodes, 3
+                    )
+                    if recent:
+                        _mem_context = recent
+                        _systems.append("episodic_memory")
+                        logger.info(f"[VULCAN] Retrieved {len(recent)} recent episodes")
+            except Exception as e:
+                logger.debug(f"[VULCAN] Episodic memory failed: {e}")
+
+        return _mem_context, _systems
+
+    async def _reasoning_task_process():
+        """STEP 3: Apply Vulcan's Reasoning Systems (ALL of them in parallel)"""
+        _reasoning = {}
+        _systems = []
+
+        # Create subtasks for each reasoning type
+        async def _symbolic():
+            if deps.symbolic:
+                try:
+                    if hasattr(deps.symbolic, "reason"):
+                        result = await loop.run_in_executor(
+                            None, deps.symbolic.reason, processed_prompt
+                        )
+                    elif hasattr(deps.symbolic, "query"):
+                        result = await loop.run_in_executor(
+                            None, deps.symbolic.query, processed_prompt
+                        )
+                    else:
+                        result = None
+                    if result:
+                        return ("symbolic", str(result)[:200], "symbolic_reasoning")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Symbolic reasoning failed: {e}")
+            return None
+
+        async def _probabilistic():
+            if deps.probabilistic and deps.multimodal:
+                try:
+                    perception = await loop.run_in_executor(
+                        None, deps.multimodal.process_input, processed_prompt
+                    )
+                    if hasattr(perception, "embedding"):
+                        if hasattr(deps.probabilistic, "predict_with_uncertainty"):
+                            prob_result = await loop.run_in_executor(
+                                None,
+                                deps.probabilistic.predict_with_uncertainty,
+                                perception.embedding,
+                            )
+                            if prob_result:
+                                prediction, uncertainty = prob_result
+                                result = {
+                                    "confidence": round(1.0 - uncertainty, 3),
+                                    "prediction": str(prediction)[:100],
+                                }
+                                logger.info(
+                                    f"[VULCAN] Applied probabilistic reasoning (confidence: {1.0-uncertainty:.2f})"
+                                )
+                                return ("probabilistic", result, "probabilistic_reasoning")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Probabilistic reasoning failed: {e}")
+            return None
+
+        async def _causal():
+            if deps.causal:
+                try:
+                    if hasattr(deps.causal, "estimate_causal_effect"):
+                        result = await loop.run_in_executor(
+                            None,
+                            deps.causal.estimate_causal_effect,
+                            "query",
+                            processed_prompt[:50],
+                        )
+                        if result:
+                            logger.info("[VULCAN] Applied causal reasoning")
+                            return ("causal", str(result)[:200], "causal_reasoning")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Causal reasoning failed: {e}")
+            return None
+
+        async def _analogical():
+            if deps.abstract:
+                try:
+                    if hasattr(deps.abstract, "find_analogies"):
+                        result = await loop.run_in_executor(
+                            None, deps.abstract.find_analogies, processed_prompt
+                        )
+                        if result:
+                            logger.info("[VULCAN] Applied analogical reasoning")
+                            return ("analogical", str(result)[:200], "analogical_reasoning")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Analogical reasoning failed: {e}")
+            return None
+
+        # Run all reasoning subtasks in parallel
+        results = await asyncio.gather(
+            _symbolic(), _probabilistic(), _causal(), _analogical(),
+            return_exceptions=True
+        )
+
+        for r in results:
+            if isinstance(r, Exception):
+                logger.debug(f"Reasoning subtask exception: {r}")
+            elif r is not None:
+                _reasoning[r[0]] = r[1]
+                _systems.append(r[2])
+
+        return _reasoning, _systems
+
+    async def _world_model_task_process():
+        """STEP 4: WORLD MODEL INTEGRATION (Full Activation - parallelized internally)"""
+        _insights = {}
+        _systems = []
+
+        if not deps.world_model:
+            return _insights, _systems
+
         try:
-            # 4a. Get current world state
-            if hasattr(deps.world_model, "get_current_state"):
-                world_state = await loop.run_in_executor(
-                    None, deps.world_model.get_current_state
-                )
-                if world_state:
-                    world_model_insights["current_state"] = str(world_state)[:150]
-                    systems_used.append("world_model_state")
-
-            # 4b. PREDICTION ENGINE for predictive queries
-            if is_predictive_query:
-                if hasattr(deps.world_model, "predict_with_calibrated_uncertainty"):
+            # Define sub-tasks for world model components
+            async def _get_state():
+                if hasattr(deps.world_model, "get_current_state"):
                     try:
-                        # Create model context
-                        from vulcan.world_model.world_model_core import ModelContext
+                        state = await loop.run_in_executor(
+                            None, deps.world_model.get_current_state
+                        )
+                        if state:
+                            return ("current_state", str(state)[:150], "world_model_state")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN] World state failed: {e}")
+                return None
 
+            async def _prediction():
+                if is_predictive_query and hasattr(deps.world_model, "predict_with_calibrated_uncertainty"):
+                    try:
+                        from vulcan.world_model.world_model_core import ModelContext
                         context = ModelContext(
                             domain="user_query",
                             targets=[processed_prompt[:50]],
@@ -4567,154 +4603,222 @@ async def chat(request: ChatRequest):
                             context,
                         )
                         if prediction:
-                            world_model_insights["prediction"] = str(prediction)[:200]
-                            systems_used.append("prediction_engine")
                             logger.info("[VULCAN] Prediction engine activated")
+                            return ("prediction", str(prediction)[:200], "prediction_engine")
                     except Exception as e:
                         logger.debug(f"[VULCAN] Prediction failed: {e}")
+                return None
 
-            # 4c. CAUSAL GRAPH for causal queries
-            if is_causal_query and hasattr(deps.world_model, "causal_dag"):
-                try:
-                    causal_dag = deps.world_model.causal_dag
-                    if causal_dag and hasattr(causal_dag, "query_causes"):
-                        causes = await loop.run_in_executor(
-                            None, causal_dag.query_causes, processed_prompt[:30]
-                        )
-                        if causes:
-                            world_model_insights["causal_graph"] = str(causes)[:150]
-                            systems_used.append("causal_graph")
-                            logger.info("[VULCAN] Causal graph reasoning activated")
-                except Exception as e:
-                    logger.debug(f"[VULCAN] Causal graph query failed: {e}")
+            async def _causal_graph():
+                if is_causal_query and hasattr(deps.world_model, "causal_dag"):
+                    try:
+                        causal_dag = deps.world_model.causal_dag
+                        if causal_dag and hasattr(causal_dag, "query_causes"):
+                            causes = await loop.run_in_executor(
+                                None, causal_dag.query_causes, processed_prompt[:30]
+                            )
+                            if causes:
+                                logger.info("[VULCAN] Causal graph reasoning activated")
+                                return ("causal_graph", str(causes)[:150], "causal_graph")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN] Causal graph query failed: {e}")
+                return None
 
-            # 4d. COUNTERFACTUAL REASONING
-            if is_counterfactual:
-                if hasattr(deps.world_model, "motivational_introspection"):
+            async def _counterfactual():
+                if is_counterfactual and hasattr(deps.world_model, "motivational_introspection"):
                     mi = deps.world_model.motivational_introspection
                     if mi and hasattr(mi, "counterfactual_reasoner"):
                         try:
                             cf_reasoner = mi.counterfactual_reasoner
-                            if cf_reasoner and hasattr(
-                                cf_reasoner, "reason_counterfactual"
-                            ):
-                                cf_result = await loop.run_in_executor(
-                                    None,
-                                    cf_reasoner.reason_counterfactual,
-                                    processed_prompt,
+                            if cf_reasoner and hasattr(cf_reasoner, "reason_counterfactual"):
+                                result = await loop.run_in_executor(
+                                    None, cf_reasoner.reason_counterfactual, processed_prompt
                                 )
-                                if cf_result:
-                                    world_model_insights["counterfactual"] = str(
-                                        cf_result
-                                    )[:150]
-                                    systems_used.append("counterfactual_reasoning")
-                                    logger.info(
-                                        "[VULCAN] Counterfactual reasoning activated"
-                                    )
+                                if result:
+                                    logger.info("[VULCAN] Counterfactual reasoning activated")
+                                    return ("counterfactual", str(result)[:150], "counterfactual_reasoning")
                         except Exception as e:
-                            logger.debug(
-                                f"[VULCAN] Counterfactual reasoning failed: {e}"
+                            logger.debug(f"[VULCAN] Counterfactual reasoning failed: {e}")
+                return None
+
+            async def _invariants():
+                if hasattr(deps.world_model, "invariant_registry"):
+                    try:
+                        inv_registry = deps.world_model.invariant_registry
+                        if inv_registry and hasattr(inv_registry, "get_active_invariants"):
+                            invariants = await loop.run_in_executor(
+                                None, inv_registry.get_active_invariants
                             )
+                            if invariants:
+                                return ("invariants_active", len(invariants), "invariant_detector")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN] Invariant detection failed: {e}")
+                return None
 
-            # 4e. INVARIANT DETECTOR for pattern detection
-            if hasattr(deps.world_model, "invariant_registry"):
-                try:
-                    inv_registry = deps.world_model.invariant_registry
-                    if inv_registry and hasattr(inv_registry, "get_active_invariants"):
-                        invariants = await loop.run_in_executor(
-                            None, inv_registry.get_active_invariants
-                        )
-                        if invariants:
-                            world_model_insights["invariants_active"] = len(invariants)
-                            systems_used.append("invariant_detector")
-                except Exception as e:
-                    logger.debug(f"[VULCAN] Invariant detection failed: {e}")
+            async def _dynamics():
+                if hasattr(deps.world_model, "dynamics_model"):
+                    try:
+                        dyn_model = deps.world_model.dynamics_model
+                        if dyn_model and hasattr(dyn_model, "predict_dynamics"):
+                            result = await loop.run_in_executor(
+                                None, dyn_model.predict_dynamics, {"query": processed_prompt[:50]}
+                            )
+                            if result:
+                                logger.info("[VULCAN] Dynamics model activated")
+                                return ("dynamics", str(result)[:100], "dynamics_model")
+                    except Exception as e:
+                        logger.debug(f"[VULCAN] Dynamics model failed: {e}")
+                return None
 
-            # 4f. DYNAMICS MODEL
-            if hasattr(deps.world_model, "dynamics_model"):
-                try:
-                    dyn_model = deps.world_model.dynamics_model
-                    if dyn_model and hasattr(dyn_model, "predict_dynamics"):
-                        dyn_result = await loop.run_in_executor(
-                            None,
-                            dyn_model.predict_dynamics,
-                            {"query": processed_prompt[:50]},
-                        )
-                        if dyn_result:
-                            world_model_insights["dynamics"] = str(dyn_result)[:100]
-                            systems_used.append("dynamics_model")
-                            logger.info("[VULCAN] Dynamics model activated")
-                except Exception as e:
-                    logger.debug(f"[VULCAN] Dynamics model failed: {e}")
+            # Run all world model subtasks in parallel
+            results = await asyncio.gather(
+                _get_state(), _prediction(), _causal_graph(),
+                _counterfactual(), _invariants(), _dynamics(),
+                return_exceptions=True
+            )
 
-            # Update world model with this observation
+            for r in results:
+                if isinstance(r, Exception):
+                    logger.debug(f"World model subtask exception: {r}")
+                elif r is not None:
+                    _insights[r[0]] = r[1]
+                    _systems.append(r[2])
+
+            # Update world model with observation (fire and forget, don't wait)
             if deps.multimodal and hasattr(deps.world_model, "update_state"):
-                perception = await loop.run_in_executor(
-                    None, deps.multimodal.process_input, processed_prompt
-                )
-                if hasattr(perception, "embedding"):
-                    await loop.run_in_executor(
-                        None,
-                        deps.world_model.update_state,
-                        perception.embedding,
-                        {"type": "user_query"},
-                        0.0,
+                try:
+                    perception = await loop.run_in_executor(
+                        None, deps.multimodal.process_input, processed_prompt
                     )
+                    if hasattr(perception, "embedding"):
+                        await loop.run_in_executor(
+                            None,
+                            deps.world_model.update_state,
+                            perception.embedding,
+                            {"type": "user_query"},
+                            0.0,
+                        )
+                except Exception as e:
+                    logger.debug(f"[VULCAN] World model update failed: {e}")
 
         except Exception as e:
             logger.debug(f"[VULCAN] World model interaction failed: {e}")
 
-    # ================================================================
-    # STEP 5: META-REASONING LAYER
-    # ================================================================
-    try:
-        # 5a. Goal Conflict Detection
-        if deps.goal_conflict_detector:
-            try:
-                if hasattr(deps.goal_conflict_detector, "detect_conflicts"):
-                    conflicts = await loop.run_in_executor(
-                        None,
-                        deps.goal_conflict_detector.detect_conflicts,
-                        processed_prompt,
-                    )
-                    if conflicts:
-                        meta_reasoning_insights["goal_conflicts"] = str(conflicts)[:100]
-                        systems_used.append("goal_conflict_detector")
-                        logger.info("[VULCAN] Goal conflict detection activated")
-            except Exception as e:
-                logger.debug(f"[VULCAN] Goal conflict detection failed: {e}")
+        return _insights, _systems
 
-        # 5b. Objective Negotiation
-        if deps.objective_negotiator:
-            try:
-                if hasattr(deps.objective_negotiator, "negotiate"):
-                    negotiation = await loop.run_in_executor(
-                        None,
-                        deps.objective_negotiator.negotiate,
-                        {"query": processed_prompt},
-                    )
-                    if negotiation:
-                        meta_reasoning_insights["negotiation"] = str(negotiation)[:100]
-                        systems_used.append("objective_negotiator")
-            except Exception as e:
-                logger.debug(f"[VULCAN] Objective negotiation failed: {e}")
+    async def _meta_reasoning_task_process():
+        """STEP 5: META-REASONING LAYER (parallelized internally)"""
+        _meta = {}
+        _systems = []
 
-        # 5c. Self-Improvement Drive Status
-        if deps.self_improvement_drive:
-            try:
-                if hasattr(deps.self_improvement_drive, "get_status"):
-                    si_status = await loop.run_in_executor(
-                        None, deps.self_improvement_drive.get_status
-                    )
-                    if si_status:
-                        meta_reasoning_insights["self_improvement_active"] = (
-                            si_status.get("running", False)
+        async def _goal_conflicts():
+            if deps.goal_conflict_detector:
+                try:
+                    if hasattr(deps.goal_conflict_detector, "detect_conflicts"):
+                        conflicts = await loop.run_in_executor(
+                            None,
+                            deps.goal_conflict_detector.detect_conflicts,
+                            processed_prompt,
                         )
-                        systems_used.append("self_improvement_drive")
-            except Exception as e:
-                logger.debug(f"[VULCAN] Self-improvement status failed: {e}")
-    except Exception as e:
-        logger.debug(f"[VULCAN] Meta-reasoning layer failed: {e}")
+                        if conflicts:
+                            logger.info("[VULCAN] Goal conflict detection activated")
+                            return ("goal_conflicts", str(conflicts)[:100], "goal_conflict_detector")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Goal conflict detection failed: {e}")
+            return None
+
+        async def _negotiation():
+            if deps.objective_negotiator:
+                try:
+                    if hasattr(deps.objective_negotiator, "negotiate"):
+                        negotiation = await loop.run_in_executor(
+                            None,
+                            deps.objective_negotiator.negotiate,
+                            {"query": processed_prompt},
+                        )
+                        if negotiation:
+                            return ("negotiation", str(negotiation)[:100], "objective_negotiator")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Objective negotiation failed: {e}")
+            return None
+
+        async def _self_improvement():
+            if deps.self_improvement_drive:
+                try:
+                    if hasattr(deps.self_improvement_drive, "get_status"):
+                        si_status = await loop.run_in_executor(
+                            None, deps.self_improvement_drive.get_status
+                        )
+                        if si_status:
+                            return ("self_improvement_active", si_status.get("running", False), "self_improvement_drive")
+                except Exception as e:
+                    logger.debug(f"[VULCAN] Self-improvement status failed: {e}")
+            return None
+
+        try:
+            results = await asyncio.gather(
+                _goal_conflicts(), _negotiation(), _self_improvement(),
+                return_exceptions=True
+            )
+
+            for r in results:
+                if isinstance(r, Exception):
+                    logger.debug(f"Meta-reasoning subtask exception: {r}")
+                elif r is not None:
+                    _meta[r[0]] = r[1]
+                    _systems.append(r[2])
+        except Exception as e:
+            logger.debug(f"[VULCAN] Meta-reasoning layer failed: {e}")
+
+        return _meta, _systems
+
+    # Execute all major steps in parallel using asyncio.gather
+    logger.info("[VULCAN] Starting parallel execution of cognitive steps 2-5")
+    _parallel_start = time.perf_counter()
+
+    parallel_results = await asyncio.gather(
+        _memory_search_task_process(),
+        _reasoning_task_process(),
+        _world_model_task_process(),
+        _meta_reasoning_task_process(),
+        return_exceptions=True
+    )
+
+    _parallel_elapsed = time.perf_counter() - _parallel_start
+    logger.info(f"[TIMING] PARALLEL Steps 2-5 completed in {_parallel_elapsed:.2f}s (previously sequential: 20-30s)")
+
+    # Aggregate results from parallel execution
+    # Result 0: Memory search
+    if not isinstance(parallel_results[0], Exception):
+        mem_result, mem_systems = parallel_results[0]
+        memory_context = mem_result
+        systems_used.extend(mem_systems)
+    else:
+        logger.debug(f"Memory search task failed: {parallel_results[0]}")
+
+    # Result 1: Reasoning
+    if not isinstance(parallel_results[1], Exception):
+        reasoning_result, reasoning_systems = parallel_results[1]
+        reasoning_insights = reasoning_result
+        systems_used.extend(reasoning_systems)
+    else:
+        logger.debug(f"Reasoning task failed: {parallel_results[1]}")
+
+    # Result 2: World model
+    if not isinstance(parallel_results[2], Exception):
+        world_result, world_systems = parallel_results[2]
+        world_model_insights = world_result
+        systems_used.extend(world_systems)
+    else:
+        logger.debug(f"World model task failed: {parallel_results[2]}")
+
+    # Result 3: Meta-reasoning
+    if not isinstance(parallel_results[3], Exception):
+        meta_result, meta_systems = parallel_results[3]
+        meta_reasoning_insights = meta_result
+        systems_used.extend(meta_systems)
+    else:
+        logger.debug(f"Meta-reasoning task failed: {parallel_results[3]}")
 
     # ================================================================
     # STEP 6: Build Context from ALL Vulcan's Cognitive Systems
@@ -5472,6 +5576,11 @@ async def unified_chat(request: UnifiedChatRequest):
             )
 
         # ================================================================
+        # TIMING: Initialize timing instrumentation for bottleneck diagnosis
+        # ================================================================
+        _timing_start = time.perf_counter()
+
+        # ================================================================
         # STEP 1: Safety Validation (CSIU Framework)
         # ================================================================
         safety_result = {"safe": True, "reason": "No safety constraints violated"}
@@ -5498,6 +5607,10 @@ async def unified_chat(request: UnifiedChatRequest):
         else:
             metadata["safety_status"] = "disabled"
 
+        # TIMING: Log safety validation duration
+        logger.info(f"[TIMING] STEP 1 Safety validation took {time.perf_counter() - _timing_start:.2f}s")
+        _timing_start = time.perf_counter()
+
         # If unsafe, return early with explanation
         if not safety_result["safe"]:
             return {
@@ -5508,25 +5621,41 @@ async def unified_chat(request: UnifiedChatRequest):
             }
 
         # ================================================================
-        # STEP 2: Memory Search (Long-term + Associative Memory)
+        # PARALLEL EXECUTION: Steps 2-6 run concurrently for performance
+        # Previously these ran sequentially causing 20-30s bottleneck
         # ================================================================
+        loop = asyncio.get_running_loop()
+
+        # Initialize result containers
         memory_context = []
-        if request.enable_memory:
+        reasoning_results = {}
+        plan_result = None
+        world_model_insight = None
+
+        # Define async task functions for parallel execution
+        async def _memory_search_task():
+            """STEP 2: Memory Search (Long-term + Associative Memory)"""
+            _mem_context = []
+            _systems = []
+            if not request.enable_memory:
+                return _mem_context, _systems
+
             # Search long-term memory
             if hasattr(deps, "ltm") and deps.ltm:
                 try:
-                    # First, get embedding for the query
                     if hasattr(deps, "multimodal") and deps.multimodal:
-                        loop = asyncio.get_running_loop()
                         query_result = await loop.run_in_executor(
                             None, deps.multimodal.process_input, user_message
                         )
                         if hasattr(query_result, "embedding"):
-                            results = deps.ltm.search(query_result.embedding, k=5)
-                            memory_context.extend(
-                                [{"source": "ltm", "data": r} for r in results[:3]]
+                            results = await loop.run_in_executor(
+                                None, deps.ltm.search, query_result.embedding, 5
                             )
-                            systems_used.append("long_term_memory")
+                            if results:
+                                _mem_context.extend(
+                                    [{"source": "ltm", "data": r} for r in results[:3]]
+                                )
+                                _systems.append("long_term_memory")
                 except Exception as e:
                     logger.debug(f"LTM search skipped: {e}")
 
@@ -5534,109 +5663,137 @@ async def unified_chat(request: UnifiedChatRequest):
             if hasattr(deps, "am") and deps.am:
                 try:
                     if hasattr(deps.am, "retrieve"):
-                        am_results = deps.am.retrieve(user_message, k=3)
-                        memory_context.extend(
-                            [{"source": "am", "data": r} for r in am_results]
+                        am_results = await loop.run_in_executor(
+                            None, deps.am.retrieve, user_message, 3
                         )
-                        systems_used.append("associative_memory")
+                        if am_results:
+                            _mem_context.extend(
+                                [{"source": "am", "data": r} for r in am_results]
+                            )
+                            _systems.append("associative_memory")
                 except Exception as e:
                     logger.debug(f"AM search skipped: {e}")
 
-            metadata["memory_results"] = len(memory_context)
+            return _mem_context, _systems
 
-        # ================================================================
-        # STEP 3: Reasoning Engine Selection and Execution
-        # ================================================================
-        reasoning_results = {}
+        async def _reasoning_task():
+            """STEP 3: Reasoning Engine Selection and Execution"""
+            _reasoning = {}
+            _systems = []
+            _meta = {}
+            if not request.enable_reasoning:
+                return _reasoning, _systems, _meta
 
-        if request.enable_reasoning:
-            # Symbolic Reasoning
-            if hasattr(deps, "symbolic") and deps.symbolic:
-                try:
-                    loop = asyncio.get_running_loop()
-                    symbolic_result = await loop.run_in_executor(
-                        None, deps.symbolic.reason, user_message
-                    )
-                    reasoning_results["symbolic"] = symbolic_result
-                    systems_used.append("symbolic_reasoning")
-                except Exception as e:
-                    logger.debug(f"Symbolic reasoning skipped: {e}")
+            # Create subtasks for each reasoning type to run in parallel
+            reasoning_subtasks = []
 
-            # Probabilistic Reasoning
-            if hasattr(deps, "probabilistic") and deps.probabilistic:
-                try:
-                    loop = asyncio.get_running_loop()
-                    # Get embedding for probabilistic reasoning
-                    if hasattr(deps, "multimodal") and deps.multimodal:
-                        query_result = await loop.run_in_executor(
-                            None, deps.multimodal.process_input, user_message
+            async def _symbolic_reasoning():
+                if hasattr(deps, "symbolic") and deps.symbolic:
+                    try:
+                        result = await loop.run_in_executor(
+                            None, deps.symbolic.reason, user_message
                         )
-                        if hasattr(query_result, "embedding"):
-                            prob_result = await loop.run_in_executor(
-                                None,
-                                deps.probabilistic.predict_with_uncertainty,
-                                query_result.embedding,
+                        return ("symbolic", result, "symbolic_reasoning")
+                    except Exception as e:
+                        logger.debug(f"Symbolic reasoning skipped: {e}")
+                return None
+
+            async def _probabilistic_reasoning():
+                if hasattr(deps, "probabilistic") and deps.probabilistic:
+                    try:
+                        if hasattr(deps, "multimodal") and deps.multimodal:
+                            query_result = await loop.run_in_executor(
+                                None, deps.multimodal.process_input, user_message
                             )
-                            # Normalize result to consistent dict format
-                            if isinstance(prob_result, dict):
-                                reasoning_results["probabilistic"] = {
-                                    "prediction": str(
-                                        prob_result.get(
-                                            "mean", prob_result.get("prediction", "")
-                                        )
-                                    ),
-                                    "uncertainty": float(
-                                        prob_result.get(
-                                            "uncertainty", prob_result.get("std", 0.0)
-                                        )
-                                    ),
-                                }
-                            else:
-                                reasoning_results["probabilistic"] = {
-                                    "prediction": str(prob_result),
-                                    "uncertainty": 0.0,
-                                }
-                            systems_used.append("probabilistic_reasoning")
-                except Exception as e:
-                    logger.debug(f"Probabilistic reasoning skipped: {e}")
+                            if hasattr(query_result, "embedding"):
+                                prob_result = await loop.run_in_executor(
+                                    None,
+                                    deps.probabilistic.predict_with_uncertainty,
+                                    query_result.embedding,
+                                )
+                                if isinstance(prob_result, dict):
+                                    result = {
+                                        "prediction": str(
+                                            prob_result.get(
+                                                "mean", prob_result.get("prediction", "")
+                                            )
+                                        ),
+                                        "uncertainty": float(
+                                            prob_result.get(
+                                                "uncertainty", prob_result.get("std", 0.0)
+                                            )
+                                        ),
+                                    }
+                                else:
+                                    result = {
+                                        "prediction": str(prob_result),
+                                        "uncertainty": 0.0,
+                                    }
+                                return ("probabilistic", result, "probabilistic_reasoning")
+                    except Exception as e:
+                        logger.debug(f"Probabilistic reasoning skipped: {e}")
+                return None
 
-            # Causal Reasoning
-            if request.enable_causal and hasattr(deps, "causal") and deps.causal:
-                try:
-                    loop = asyncio.get_running_loop()
-                    if hasattr(deps.causal, "analyze"):
-                        causal_result = await loop.run_in_executor(
-                            None, deps.causal.analyze, user_message
-                        )
-                        reasoning_results["causal"] = causal_result
-                        systems_used.append("causal_reasoning")
-                        metadata["causal_analysis"] = True
-                except Exception as e:
-                    logger.debug(f"Causal reasoning skipped: {e}")
+            async def _causal_reasoning():
+                if request.enable_causal and hasattr(deps, "causal") and deps.causal:
+                    try:
+                        if hasattr(deps.causal, "analyze"):
+                            result = await loop.run_in_executor(
+                                None, deps.causal.analyze, user_message
+                            )
+                            return ("causal", result, "causal_reasoning", True)
+                    except Exception as e:
+                        logger.debug(f"Causal reasoning skipped: {e}")
+                return None
 
-            # Analogical Reasoning
-            if hasattr(deps, "analogical") and deps.analogical:
-                try:
-                    loop = asyncio.get_running_loop()
-                    if hasattr(deps.analogical, "find_analogies"):
-                        analog_result = await loop.run_in_executor(
-                            None, deps.analogical.find_analogies, user_message
-                        )
-                        reasoning_results["analogical"] = analog_result
-                        systems_used.append("analogical_reasoning")
-                except Exception as e:
-                    logger.debug(f"Analogical reasoning skipped: {e}")
+            async def _analogical_reasoning():
+                if hasattr(deps, "analogical") and deps.analogical:
+                    try:
+                        if hasattr(deps.analogical, "find_analogies"):
+                            result = await loop.run_in_executor(
+                                None, deps.analogical.find_analogies, user_message
+                            )
+                            return ("analogical", result, "analogical_reasoning")
+                    except Exception as e:
+                        logger.debug(f"Analogical reasoning skipped: {e}")
+                return None
 
-        # ================================================================
-        # STEP 4: Planning System (for complex queries)
-        # ================================================================
-        plan_result = None
-        if (
-            request.enable_planning
-            and hasattr(deps, "goal_system")
-            and deps.goal_system
-        ):
-            # Check if query seems to require planning (contains action words)
+            # Run all reasoning subtasks in parallel
+            reasoning_results_raw = await asyncio.gather(
+                _symbolic_reasoning(),
+                _probabilistic_reasoning(),
+                _causal_reasoning(),
+                _analogical_reasoning(),
+                return_exceptions=True
+            )
+
+            # Process results
+            for result in reasoning_results_raw:
+                if isinstance(result, Exception):
+                    logger.debug(f"Reasoning subtask exception: {result}")
+                    continue
+                if result is not None:
+                    key, value, system = result[0], result[1], result[2]
+                    _reasoning[key] = value
+                    _systems.append(system)
+                    # Check for causal analysis flag
+                    if len(result) > 3 and result[3]:
+                        _meta["causal_analysis"] = True
+
+            return _reasoning, _systems, _meta
+
+        async def _planning_task():
+            """STEP 4: Planning System (for complex queries)"""
+            _plan = None
+            _systems = []
+            _meta = {}
+            if not (
+                request.enable_planning
+                and hasattr(deps, "goal_system")
+                and deps.goal_system
+            ):
+                return _plan, _systems, _meta
+
             planning_keywords = [
                 "how to",
                 "plan",
@@ -5651,41 +5808,102 @@ async def unified_chat(request: UnifiedChatRequest):
 
             if needs_planning:
                 try:
-                    loop = asyncio.get_running_loop()
-                    plan_result = await loop.run_in_executor(
+                    _plan = await loop.run_in_executor(
                         None,
                         deps.goal_system.generate_plan,
                         {"high_level_goal": user_message},
                         context,
                     )
-                    systems_used.append("planning_system")
-                    metadata["planning_engaged"] = True
+                    _systems.append("planning_system")
+                    _meta["planning_engaged"] = True
                 except Exception as e:
                     logger.debug(f"Planning skipped: {e}")
 
-        # ================================================================
-        # STEP 5: World Model Consultation
-        # ================================================================
-        world_model_insight = None
-        if hasattr(deps, "world_model") and deps.world_model:
+            return _plan, _systems, _meta
+
+        async def _world_model_task():
+            """STEP 5: World Model Consultation"""
+            _insight = None
+            _systems = []
+            if not (hasattr(deps, "world_model") and deps.world_model):
+                return _insight, _systems
+
             try:
-                loop = asyncio.get_running_loop()
                 if hasattr(deps.world_model, "predict"):
-                    world_model_insight = await loop.run_in_executor(
+                    _insight = await loop.run_in_executor(
                         None, deps.world_model.predict, user_message, {}
                     )
-                    systems_used.append("world_model")
+                    _systems.append("world_model")
             except Exception as e:
                 logger.debug(f"World model skipped: {e}")
 
-        # ================================================================
-        # STEP 6: Semantic Bridge (cross-domain knowledge)
-        # ================================================================
-        if hasattr(deps, "semantic_bridge") and deps.semantic_bridge:
-            try:
-                systems_used.append("semantic_bridge")
-            except Exception as e:
-                logger.debug(f"Semantic bridge skipped: {e}")
+            return _insight, _systems
+
+        async def _semantic_bridge_task():
+            """STEP 6: Semantic Bridge (cross-domain knowledge)"""
+            _systems = []
+            if hasattr(deps, "semantic_bridge") and deps.semantic_bridge:
+                try:
+                    _systems.append("semantic_bridge")
+                except Exception as e:
+                    logger.debug(f"Semantic bridge skipped: {e}")
+            return _systems
+
+        # Execute all steps in parallel using asyncio.gather
+        logger.info("[VULCAN/v1/chat] Starting parallel execution of cognitive steps 2-6")
+        _parallel_start = time.perf_counter()
+
+        parallel_results = await asyncio.gather(
+            _memory_search_task(),
+            _reasoning_task(),
+            _planning_task(),
+            _world_model_task(),
+            _semantic_bridge_task(),
+            return_exceptions=True
+        )
+
+        _parallel_elapsed = time.perf_counter() - _parallel_start
+        logger.info(f"[TIMING] PARALLEL Steps 2-6 completed in {_parallel_elapsed:.2f}s (previously sequential: 20-30s)")
+
+        # Aggregate results from parallel execution
+        # Result 0: Memory search
+        if not isinstance(parallel_results[0], Exception):
+            mem_result, mem_systems = parallel_results[0]
+            memory_context = mem_result
+            systems_used.extend(mem_systems)
+            metadata["memory_results"] = len(memory_context)
+        else:
+            logger.debug(f"Memory search task failed: {parallel_results[0]}")
+
+        # Result 1: Reasoning
+        if not isinstance(parallel_results[1], Exception):
+            reasoning_results, reasoning_systems, reasoning_meta = parallel_results[1]
+            systems_used.extend(reasoning_systems)
+            metadata.update(reasoning_meta)
+        else:
+            logger.debug(f"Reasoning task failed: {parallel_results[1]}")
+
+        # Result 2: Planning
+        if not isinstance(parallel_results[2], Exception):
+            plan_result, planning_systems, planning_meta = parallel_results[2]
+            systems_used.extend(planning_systems)
+            metadata.update(planning_meta)
+        else:
+            logger.debug(f"Planning task failed: {parallel_results[2]}")
+
+        # Result 3: World model
+        if not isinstance(parallel_results[3], Exception):
+            world_model_insight, world_model_systems = parallel_results[3]
+            systems_used.extend(world_model_systems)
+        else:
+            logger.debug(f"World model task failed: {parallel_results[3]}")
+
+        # Result 4: Semantic bridge
+        if not isinstance(parallel_results[4], Exception):
+            semantic_systems = parallel_results[4]
+            systems_used.extend(semantic_systems)
+        else:
+            logger.debug(f"Semantic bridge task failed: {parallel_results[4]}")
 
         # ================================================================
         # STEP 7: Generate Response using LLM with full context
@@ -5712,6 +5930,10 @@ async def unified_chat(request: UnifiedChatRequest):
                 )
             except Exception:
                 llm_context["plan"] = str(plan_result)
+
+        # TIMING: Log context building duration
+        _context_start = time.perf_counter()
+        logger.info(f"[TIMING] STEP 7a Context building took {time.perf_counter() - _context_start:.2f}s")
 
         # Generate response
         response_text = ""
@@ -5822,9 +6044,14 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                 "\n(Note: Full LLM response generation is currently unavailable)"
             )
 
+        # TIMING: Log LLM generation duration
+        _llm_end = time.perf_counter()
+        logger.info(f"[TIMING] STEP 7b LLM generation took {_llm_end - _context_start:.2f}s")
+
         # ================================================================
         # STEP 8: Final Safety Check on Response
         # ================================================================
+        _safety_start = time.perf_counter()
         if request.enable_safety and hasattr(deps, "safety") and deps.safety:
             try:
                 loop = asyncio.get_running_loop()
@@ -5839,6 +6066,9 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                         metadata["safety_status"] = "output_filtered"
             except Exception as e:
                 logger.debug(f"Output safety check skipped: {e}")
+
+        # TIMING: Log final safety check duration
+        logger.info(f"[TIMING] STEP 8 Final safety check took {time.perf_counter() - _safety_start:.2f}s")
 
         # Calculate latency
         latency_ms = int((time.time() - start_time) * 1000)
