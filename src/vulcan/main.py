@@ -41,6 +41,8 @@ import argparse
 import re
 import sys
 import functools
+import datetime
+from enum import Enum as EnumBase
 from pathlib import Path
 
 # HTTP client for Arena API calls
@@ -2564,6 +2566,9 @@ def initialize_component(name, func):
 # 3. Language evolution - Successful patterns stored in Registry
 # ============================================================
 
+# Maximum recursion depth for deep sanitization (prevents stack overflow on circular refs)
+_DEEP_SANITIZE_MAX_DEPTH = 50
+
 
 def _sanitize_payload(data: Any) -> Any:
     """
@@ -2610,6 +2615,73 @@ def _sanitize_payload(data: Any) -> Any:
             return str(data)
         except Exception:
             return "__unserializable__"
+
+
+def _deep_sanitize_for_json(data: Any, _depth: int = 0) -> Any:
+    """
+    Deep sanitization for JSON serialization - more aggressive than _sanitize_payload.
+    
+    This is a fallback when standard sanitization fails. It:
+    - Removes ALL non-string keys (not just None)
+    - Converts any objects to their string representations
+    - Handles circular references by tracking depth
+    - Handles special types like datetime, enum, etc.
+    
+    Args:
+        data: The data to sanitize
+        _depth: Current recursion depth (to prevent infinite recursion)
+        
+    Returns:
+        JSON-serializable data
+    """
+    if _depth > _DEEP_SANITIZE_MAX_DEPTH:
+        return "__max_depth_exceeded__"
+    
+    if data is None:
+        return None
+    
+    if isinstance(data, (str, int, float, bool)):
+        return data
+    
+    if isinstance(data, dict):
+        result = {}
+        for k, v in data.items():
+            # Skip None keys entirely
+            if k is None:
+                continue
+            # Convert non-string keys to strings
+            str_key = str(k) if not isinstance(k, str) else k
+            result[str_key] = _deep_sanitize_for_json(v, _depth + 1)
+        return result
+    
+    if isinstance(data, (list, tuple)):
+        return [_deep_sanitize_for_json(item, _depth + 1) for item in data]
+    
+    # Handle Enum types (more precise than checking for 'value' attribute)
+    if isinstance(data, EnumBase):
+        try:
+            # Recursively sanitize enum value in case it's a complex type
+            return _deep_sanitize_for_json(data.value, _depth + 1)
+        except Exception:
+            return str(data)  # Fallback to string representation
+    
+    # Handle datetime types (more precise than checking for 'isoformat' attribute)
+    if isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
+        return data.isoformat()
+    
+    # Custom objects: try to convert via __dict__
+    if hasattr(data, '__dict__'):
+        try:
+            return _deep_sanitize_for_json(data.__dict__, _depth + 1)
+        except (TypeError, ValueError, RecursionError) as e:
+            # Log at debug level since this is an expected fallback path
+            pass  # Fall through to string conversion
+    
+    # Last resort: convert to string
+    try:
+        return str(data)
+    except Exception:
+        return "__unserializable__"
 
 
 def _select_arena_agent(routing_plan) -> str:
@@ -2759,15 +2831,45 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     # Error "Cannot serialize non-str key None" occurs when dict has None as key
     payload = _sanitize_payload(payload)
     
+    # CRITICAL FIX: Pre-serialize to JSON to catch serialization errors early
+    # This provides better error diagnostics than letting aiohttp fail silently
+    try:
+        payload_json = json.dumps(payload)
+    except (TypeError, ValueError) as json_err:
+        logger.error(f"[ARENA] JSON serialization failed: {json_err}")
+        # Defensive logging - handle case where payload might not have keys() method
+        try:
+            payload_info = list(payload.keys()) if isinstance(payload, dict) else type(payload).__name__
+        except Exception:
+            payload_info = "unknown"
+        logger.error(f"[ARENA] Payload info: {payload_info}")
+        # Attempt deep sanitization as fallback
+        payload = _deep_sanitize_for_json(payload)
+        try:
+            payload_json = json.dumps(payload)
+            logger.info("[ARENA] Deep sanitization succeeded, retrying serialization")
+        except Exception as retry_err:
+            logger.error(f"[ARENA] Deep sanitization also failed: {retry_err}")
+            return {
+                "status": "error",
+                "agent_id": agent_id,
+                "execution_time": 0,
+                "error": f"JSON serialization failed (original: {json_err}, after deep sanitize: {retry_err})",
+            }
+    
     # Construct Arena API URL
     # When running via full_platform.py, Arena is mounted at /arena
     # The API endpoint is /api/run/{agent_id}
     url = f"{base_url}/api/run/{agent_id}"
     
-    headers = {
-        "X-API-Key": api_key,
-        "Content-Type": "application/json",
-    }
+    # Warn if API key is not configured (Arena may reject the request)
+    if not api_key:
+        logger.warning("[ARENA] API key not configured - Arena request may fail authentication")
+    
+    # Build headers, only include X-API-Key if configured
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["X-API-Key"] = api_key
     
     logger.info(f"[ARENA] Executing via {agent_id}: {url}")
     t0 = time.perf_counter()
@@ -2775,9 +2877,14 @@ async def _execute_via_arena(query: str, routing_plan, arena_base_url: str = Non
     try:
         # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
         session = await get_http_session()
+        # SERIALIZATION FIX: Use data= with pre-serialized JSON instead of json=
+        # This gives us full control over serialization, allowing us to catch and
+        # handle errors early (above) rather than letting aiohttp fail internally.
+        # The json= parameter would call json.dumps() internally, bypassing our
+        # error handling and making debugging more difficult.
         async with session.post(
             url,
-            json=payload,
+            data=payload_json,
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=timeout)
         ) as resp:
@@ -2877,17 +2984,34 @@ async def _submit_arena_feedback(
     # Sanitize payload to ensure JSON serialization compatibility
     payload = _sanitize_payload(payload)
     
-    headers = {
-        "X-API-Key": api_key,
-        "Content-Type": "application/json",
-    }
+    # Pre-serialize to JSON to catch serialization errors early
+    try:
+        payload_json = json.dumps(payload)
+    except (TypeError, ValueError) as json_err:
+        logger.error(f"[ARENA] Feedback JSON serialization failed: {json_err}")
+        payload = _deep_sanitize_for_json(payload)
+        try:
+            payload_json = json.dumps(payload)
+        except Exception as retry_err:
+            logger.error(f"[ARENA] Feedback deep sanitization also failed: {retry_err}")
+            return {"status": "error", "error": f"JSON serialization failed (original: {json_err}, after deep sanitize: {retry_err})"}
+    
+    # Warn if API key is not configured (Arena may reject the request)
+    if not api_key:
+        logger.warning("[ARENA] API key not configured - feedback submission may fail authentication")
+    
+    # Build headers, only include X-API-Key if configured
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["X-API-Key"] = api_key
     
     try:
         # HTTP CONNECTION POOL FIX: Use global session instead of creating new one
         session = await get_http_session()
+        # SERIALIZATION FIX: Use data= with pre-serialized JSON for consistent error handling
         async with session.post(
             url,
-            json=payload,
+            data=payload_json,
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=30)
         ) as resp:
