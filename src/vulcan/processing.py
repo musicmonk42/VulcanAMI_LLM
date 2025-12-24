@@ -5,6 +5,7 @@
 # FULLY DEBUGGED VERSION - All critical issues resolved
 # FIXED: Import paths corrected for src.vulcan package structure
 # FIXED: All 13 test failures resolved - inference tensors, dimension mismatch, attention fusion, log rotation, caching
+# PERFORMANCE FIX: GraphixTransformer singleton pattern to prevent BERT reloading
 # ============================================================
 
 from __future__ import annotations
@@ -80,7 +81,61 @@ class GraphixTransformer:
     
     PERFORMANCE: Set SKIP_BERT_EMBEDDINGS=true to skip BERT loading
     and use lightweight embeddings instead. Saves 3.5s+ per request.
+    
+    PERFORMANCE FIX: This class implements a singleton pattern via
+    get_instance() to prevent loading BERT models multiple times.
+    ALWAYS use get_instance() instead of direct instantiation.
+    
+    Note: The singleton ignores config/embedding_dim parameters after first
+    instantiation. This is intentional since the BERT model configuration
+    should be consistent across all usages.
     """
+    
+    # PERFORMANCE FIX: Class-level singleton storage
+    # This prevents re-loading BERT models on every request
+    _instance: Optional["GraphixTransformer"] = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls, config=None, embedding_dim=EMBEDDING_DIM) -> "GraphixTransformer":
+        """
+        Get the singleton instance of GraphixTransformer.
+        
+        PERFORMANCE FIX: This ensures the BERT model is only loaded once,
+        preventing the 3-5 second model load on every request.
+        
+        Thread-safe implementation using double-checked locking.
+        
+        Args:
+            config: Optional configuration (only used on first instantiation)
+            embedding_dim: Embedding dimension (only used on first instantiation)
+            
+        Returns:
+            The singleton GraphixTransformer instance
+            
+        Note:
+            Parameters are only used on first instantiation. Subsequent calls
+            return the cached instance regardless of parameter values.
+        """
+        if cls._instance is None:
+            with cls._lock:
+                # Double-checked locking for thread safety
+                if cls._instance is None:
+                    logger.info("Creating singleton GraphixTransformer instance (BERT will load once)")
+                    cls._instance = cls(config=config, embedding_dim=embedding_dim)
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """
+        Reset the singleton instance.
+        
+        Useful for testing or when configuration changes are needed.
+        After calling this, get_instance() will create a new instance.
+        """
+        with cls._lock:
+            cls._instance = None
+            logger.info("GraphixTransformer singleton instance reset")
 
     def __init__(self, config=None, embedding_dim=EMBEDDING_DIM):
         self.embedding_dim = embedding_dim
@@ -102,6 +157,7 @@ class GraphixTransformer:
 
         # Load real BERT model and tokenizer
         try:
+            logger.info("Loading BERT model (this should only happen ONCE at startup)...")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 "bert-base-uncased", revision=revision
             )  # nosec B615 - revision parameter present
@@ -116,7 +172,7 @@ class GraphixTransformer:
             bert_dim = 768  # BERT base hidden size
             self.projection = torch.randn(bert_dim, 384) * 0.01
 
-            logger.info("Loaded real BERT model for embeddings")
+            logger.info("✓ BERT model loaded successfully (singleton instance)")
         except Exception as e:
             logger.error(f"Failed to load BERT model: {e}, using fallback")
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -694,14 +750,12 @@ class DynamicModelManager:
                     # Force garbage collection
                     gc.collect()
 
-                    # Clear CUDA cache multiple times for thorough cleanup
+                    # Clear CUDA cache completely
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                        torch.cuda.synchronize()  # Wait for GPU operations
-                        time.sleep(0.1)  # Brief pause
-                        torch.cuda.empty_cache()  # Second pass
+                        torch.cuda.synchronize()
 
-                        # Log memory status after cleanup
+                        # Log memory state
                         for i in range(torch.cuda.device_count()):
                             mem_free = torch.cuda.mem_get_info(i)[0] / 1024**3
                             logger.info(
@@ -709,18 +763,18 @@ class DynamicModelManager:
                             )
 
             elif reason == "cpu_memory":
-                # Unload least recently used models
-                keys_to_keep = [
-                    key
-                    for key in self._models.keys()
-                    if isinstance(self._models[key], GraphixTextEncoder)
+                # PERFORMANCE FIX: Never evict text models - they use BERT which takes 3.5s+ to reload
+                # Only evict vision/audio models under memory pressure
+                essential_keys = [
+                    key for key in self._models.keys()
+                    if key.startswith("text_") or isinstance(self._models[key], GraphixTextEncoder)
                 ]
+                
+                non_essential = [key for key in self._models.keys() if key not in essential_keys]
 
-                if len(self._models) > len(keys_to_keep) + 2:
-                    # Keep only essential and 2 most recent non-essential models
-                    keys_to_remove = [
-                        key for key in self._models.keys() if key not in keys_to_keep
-                    ][2:]
+                if len(non_essential) > 2:
+                    # Keep only 2 most recent non-essential models
+                    keys_to_remove = non_essential[:-2]
                     for key in keys_to_remove:
                         if key in self._models:
                             del self._models[key]
@@ -728,12 +782,29 @@ class DynamicModelManager:
                             del self._processors[key]
                         if key in self._tokenizers:
                             del self._tokenizers[key]
-                        logger.info(f"Unloaded model {key} due to memory pressure")
+                        logger.info(f"Unloaded model {key} due to memory pressure (kept text models)")
 
                     # FIXED: Force garbage collection
                     gc.collect()
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
+
+    def preload_essential_models(self):
+        """
+        Preload essential models at startup to avoid loading during requests.
+        
+        PERFORMANCE FIX: Call this during application initialization to ensure
+        the BERT model is loaded before any requests come in.
+        """
+        logger.info("Preloading essential models...")
+        
+        # Preload text model (BERT-based) - this is the expensive one
+        self.get_model("text", ProcessingQuality.BALANCED)
+        logger.info("✓ Text model (BERT) preloaded")
+        
+        # Optionally preload vision if commonly used
+        # self.get_model("vision", ProcessingQuality.BALANCED)
+        # logger.info("✓ Vision model preloaded")
 
     def get_model(
         self,
@@ -784,17 +855,13 @@ class DynamicModelManager:
         self, modality: str, model_name: str, device: str
     ) -> Tuple[Any, Any]:
         """Load a specific model."""
-        # MODIFIED: Replaced SentenceTransformer with GraphixTransformer/GraphixTextEncoder
+        # PERFORMANCE FIX: Use singleton GraphixTransformer to prevent BERT reload
         if modality == "text":
-            # Instantiate the LLM core component (simulated here)
-            llm_core = GraphixTransformer()
+            # Use the singleton instance - this ensures BERT is only loaded once
+            llm_core = GraphixTransformer.get_instance()
             # Wrap the LLM's embedding method in a consistent encoder interface
             model = GraphixTextEncoder(llm_core, device=device)
-
-            # Since the LLM is initialized, we can conceptually move it if needed
-            # For the mock, we skip moving GraphixTransformer, but the wrapper
-            # reports the correct device.
-
+            logger.info(f"Loaded text model: {model_name} on {device}")
             return model, None
 
         elif modality in ["vision", "audio"]:
