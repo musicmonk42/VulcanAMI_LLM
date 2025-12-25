@@ -186,6 +186,9 @@ class NSOAligner:
     # Internal Arena agents (generator, visualizer) were being quarantined at Risk: 0.20 which is too aggressive
     # Raised from implicit 0.0 to 0.5 for internal agents to reduce false positives
     INTERNAL_SOURCE_QUARANTINE_THRESHOLD = 0.5  # Risk score above which internal sources get quarantined
+    # FIX #5: General quarantine threshold - previously 0.0 (implicit), causing quarantine at Risk: 0.20
+    # Raised to 0.4 to allow valid creative outputs through while still catching genuinely risky content
+    DEFAULT_QUARANTINE_THRESHOLD = 0.4  # Risk score above which proposals get quarantined
 
     def __init__(
         self,
@@ -2033,6 +2036,7 @@ class NSOAligner:
             self.logger.warning(f"ML screen failure. Taxonomy: {taxonomy}")
             # PERFORMANCE FIX: For internal sources, only quarantine if confidence exceeds threshold
             # This prevents false quarantines of internal Arena agents at low confidence scores (e.g., 0.20)
+            # FIX #5: Also apply DEFAULT_QUARANTINE_THRESHOLD for non-internal sources
             if self.enable_quarantine:
                 confidence = taxonomy["confidence"]
                 should_quarantine = True
@@ -2043,6 +2047,13 @@ class NSOAligner:
                         f"skipping quarantine (threshold: {self.INTERNAL_SOURCE_QUARANTINE_THRESHOLD:.2f})"
                     )
                     audit_metadata["quarantine_skipped_reason"] = "internal_source_low_confidence"
+                    should_quarantine = False
+                elif not is_internal_source and confidence < self.DEFAULT_QUARANTINE_THRESHOLD:
+                    self.logger.info(
+                        f"[ML Screen] Low confidence ({confidence:.2f}) - "
+                        f"skipping quarantine (threshold: {self.DEFAULT_QUARANTINE_THRESHOLD:.2f})"
+                    )
+                    audit_metadata["quarantine_skipped_reason"] = "low_confidence"
                     should_quarantine = False
                 
                 if should_quarantine:

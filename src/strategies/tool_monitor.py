@@ -341,23 +341,75 @@ class ToolMonitor:
             "consecutive_failures": config.get("consecutive_failures_threshold", 5),
         }
 
+        # EMA-based cost model calibration
+        # Start with reasonable defaults based on typical tool execution times
+        self._predictions: Dict[str, float] = {
+            "generator": 5000,    # Start at 5s, not 220ms!
+            "evolver": 3000,
+            "optimizer": 2000,
+            "agent_pool": 500,
+        }
+        self._sample_counts: Dict[str, int] = defaultdict(int)
+        self._alpha = config.get("ema_alpha", 0.3)  # EMA decay factor
+        self._max_prediction_ms = 300000  # Cap predictions at 5 minutes
+
         # Statistics
         self.start_time = time.time()
 
         logger.info("Tool Monitor initialized")
+
+    def get_prediction(self, tool_name: str) -> float:
+        """
+        Get calibrated prediction for a tool's execution time.
+
+        Args:
+            tool_name: Name of the tool
+
+        Returns:
+            Predicted execution time in milliseconds
+        """
+        return self._predictions.get(tool_name, 5000)  # Default 5s if unknown
 
     def record_execution(
         self,
         tool_name: str,
         success: bool,
         latency_ms: float,
-        energy_mj: float,
-        confidence: float,
+        energy_mj: float = 0.0,
+        confidence: float = 1.0,
         metadata: Optional[Dict[str, Any]] = None,
-    ):
-        """Record tool execution"""
+    ) -> Dict[str, Any]:
+        """
+        Record tool execution and update EMA predictions.
+        
+        Returns prediction calibration metrics.
+        """
 
         timestamp = time.time()
+
+        # EMA-based cost model calibration
+        old_prediction = self._predictions.get(tool_name, 5000)
+        self._sample_counts[tool_name] += 1
+
+        # EMA update: new = alpha * actual + (1 - alpha) * old
+        new_prediction = self._alpha * latency_ms + (1 - self._alpha) * old_prediction
+        self._predictions[tool_name] = min(new_prediction, self._max_prediction_ms)
+
+        error_percent = abs(latency_ms - old_prediction) / old_prediction * 100 if old_prediction > 0 else 0
+
+        if error_percent > 100:
+            logger.warning(
+                f"[CostModel] {tool_name}: predicted={old_prediction:.0f}ms, "
+                f"actual={latency_ms:.0f}ms, error={error_percent:.0f}%, "
+                f"new_prediction={new_prediction:.0f}ms"
+            )
+
+        calibration_result = {
+            "predicted_ms": old_prediction,
+            "actual_ms": latency_ms,
+            "error_percent": error_percent,
+            "new_prediction": new_prediction,
+        }
 
         # Update tool metrics
         metrics = self.tool_metrics[tool_name]
@@ -437,6 +489,8 @@ class ToolMonitor:
 
         # Check thresholds
         self._check_thresholds(tool_name, metrics)
+
+        return calibration_result
 
     def _calculate_health_score(self, metrics: ToolMetrics) -> float:
         """Calculate health score for tool"""

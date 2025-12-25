@@ -298,6 +298,26 @@ except ImportError:
         ToolMonitor = None
         STRATEGY_AVAILABLE = False
 
+# HardwareDispatcher for optimal hardware backend routing
+try:
+    from hardware_dispatcher import HardwareDispatcher, HardwareBackend
+
+    HARDWARE_DISPATCH_AVAILABLE = True
+except ImportError:
+    HARDWARE_DISPATCH_AVAILABLE = False
+    HardwareDispatcher = None
+    HardwareBackend = None
+
+# HardwareEmulator availability check - used internally by HardwareDispatcher
+# for fallback when real photonic/GPU hardware is unavailable
+try:
+    from hardware_emulator import HardwareEmulator
+
+    HARDWARE_EMULATOR_AVAILABLE = True
+except ImportError:
+    HARDWARE_EMULATOR_AVAILABLE = False
+    HardwareEmulator = None
+
 # Prometheus metrics
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
@@ -344,6 +364,52 @@ MAX_GRAPH_ID_LENGTH = 256
 MAX_NODES = 10000  # FIX: Added max node count for validation
 MAX_REBERT_THRESHOLD = 0.5
 MIN_REBERT_THRESHOLD = 0.0
+
+# Magic markers for subprocess JSON output
+OUTPUT_START_MARKER = "###ARENA_OUTPUT_START###"
+OUTPUT_END_MARKER = "###ARENA_OUTPUT_END###"
+
+
+def extract_json_from_output(stdout: str) -> dict:
+    """
+    Extract JSON from subprocess output, handling mixed log/data.
+    
+    Uses magic markers for reliable parsing, with fallbacks for
+    legacy output formats.
+    
+    Args:
+        stdout: Raw stdout from subprocess
+        
+    Returns:
+        Parsed JSON dictionary
+        
+    Raises:
+        json.JSONDecodeError: If JSON cannot be extracted
+    """
+    # Try marker-based extraction first
+    if OUTPUT_START_MARKER in stdout and OUTPUT_END_MARKER in stdout:
+        start_idx = stdout.index(OUTPUT_START_MARKER) + len(OUTPUT_START_MARKER)
+        end_idx = stdout.index(OUTPUT_END_MARKER)
+        json_str = stdout[start_idx:end_idx].strip()
+        return json.loads(json_str)
+    
+    # Fallback: find JSON object boundaries
+    try:
+        first_brace = stdout.index('{')
+        last_brace = stdout.rindex('}') + 1
+        return json.loads(stdout[first_brace:last_brace])
+    except (ValueError, json.JSONDecodeError):
+        pass
+    
+    # Last resort - wrap with descriptive error on failure
+    try:
+        return json.loads(stdout.strip())
+    except json.JSONDecodeError as e:
+        raise json.JSONDecodeError(
+            f"All JSON extraction methods failed. Original error: {e.msg}",
+            e.doc,
+            e.pos
+        ) from e
 
 
 # App Initialization
@@ -780,6 +846,39 @@ class GraphixArena:
         else:
             logger.warning(f"⚠ StrategyOrchestrator unavailable")
 
+        # Initialize hardware dispatcher for optimal backend routing
+        self.hardware_dispatcher = None
+        if HARDWARE_DISPATCH_AVAILABLE:
+            try:
+                self.hardware_dispatcher = HardwareDispatcher(
+                    use_mock=False,  # Use real hardware detection
+                    enable_metrics=True,
+                    enable_health_checks=True,
+                )
+
+                # Log detected hardware
+                available_hw = self.hardware_dispatcher.list_available_hardware()
+                hw_names = [hw['backend'] for hw in available_hw]
+                logger.info(f"[GraphixArena] ✓ HardwareDispatcher initialized")
+                logger.info(f"[GraphixArena] Available backends: {hw_names}")
+
+                # Check for photonic
+                if any('lightmatter' in str(hw).lower() or 'aim' in str(hw).lower()
+                       for hw in hw_names):
+                    logger.info("[GraphixArena] 🚀 PHOTONIC hardware detected!")
+                elif any('gpu' in str(hw).lower() or 'nvidia' in str(hw).lower()
+                         for hw in hw_names):
+                    logger.info("[GraphixArena] GPU detected, will use for acceleration")
+                else:
+                    logger.info("[GraphixArena] CPU/Emulator mode - no accelerators found")
+
+            except Exception as e:
+                logger.warning(f"[GraphixArena] HardwareDispatcher init failed: {e}")
+                self.hardware_dispatcher = None
+        else:
+            self.hardware_dispatcher = None
+            logger.info("[GraphixArena] HardwareDispatcher not available")
+
         # Bounded feedback log
         self.feedback_log: deque = deque(maxlen=MAX_FEEDBACK_LOG_SIZE)
 
@@ -903,6 +1002,189 @@ class GraphixArena:
         audit_payload["bias_assessment"] = audit_payload.get("bias_assessment", {"checked": True, "source": "arena_internal"})
         return audit_payload
 
+    def _dispatch_compute(self, op: str, *args, **kwargs) -> Any:
+        """
+        Route computation through hardware dispatcher.
+        
+        Falls back to numpy if dispatcher unavailable.
+        
+        Args:
+            op: Operation name (e.g., 'photonic_mvm', 'matmul', 'mvm')
+            *args: Operation arguments (typically matrix and vector)
+            **kwargs: Additional parameters including 'params' dict
+            
+        Returns:
+            Computation result (numpy array or error dict)
+        """
+        # Use dispatcher if available
+        if self.hardware_dispatcher:
+            try:
+                result = self.hardware_dispatcher.dispatch(op, *args, **kwargs)
+
+                # Check for error response
+                if isinstance(result, dict) and 'error_code' in result:
+                    logger.warning(f"[Dispatcher] {op} failed: {result.get('message')}")
+                    # Fall through to numpy fallback
+                else:
+                    return result
+
+            except Exception as e:
+                logger.warning(f"[Dispatcher] {op} exception: {e}, falling back to numpy")
+
+        # Fallback to numpy
+        if not NUMPY_AVAILABLE:
+            return {"error": "NumPy not available for fallback"}
+
+        if op == 'photonic_mvm' and len(args) >= 2:
+            return np.dot(args[0], args[1])
+        elif op == 'matmul' and len(args) >= 2:
+            return np.matmul(args[0], args[1])
+        elif op == 'mvm' and len(args) >= 2:
+            return np.dot(args[0], args[1])
+        else:
+            raise ValueError(f"Unknown operation: {op}")
+
+    def _gather_inputs(self, node: dict, results: dict) -> list:
+        """
+        Gather inputs for a node from previous results or node data.
+        
+        Args:
+            node: Node definition with input specifications
+            results: Dictionary of previous node results
+            
+        Returns:
+            List of input values for the node operation
+        """
+        inputs = []
+        
+        # Check for explicit inputs in node
+        if 'inputs' in node:
+            for inp in node['inputs']:
+                if isinstance(inp, str) and inp in results:
+                    inputs.append(results[inp])
+                else:
+                    inputs.append(inp)
+        
+        # Check for matrix/vector data in node
+        if 'matrix' in node:
+            inputs.append(np.array(node['matrix']) if NUMPY_AVAILABLE else node['matrix'])
+        if 'vector' in node:
+            inputs.append(np.array(node['vector']) if NUMPY_AVAILABLE else node['vector'])
+        
+        # Default: create identity/random data if no inputs specified
+        if not inputs and NUMPY_AVAILABLE:
+            size = node.get('size', 4)
+            inputs = [np.eye(size), np.ones(size)]
+        
+        return inputs
+
+    def _execute_cpu_op(self, op_type: str, inputs: list, params: dict) -> Any:
+        """
+        Execute a non-matrix operation on CPU.
+        
+        Args:
+            op_type: Type of operation
+            inputs: Input values
+            params: Operation parameters
+            
+        Returns:
+            Operation result
+        """
+        if not NUMPY_AVAILABLE:
+            return {"error": "NumPy not available"}
+        
+        if op_type == 'add':
+            return np.add(*inputs[:2]) if len(inputs) >= 2 else inputs[0]
+        elif op_type == 'relu':
+            return np.maximum(0, inputs[0]) if inputs else np.array([])
+        elif op_type == 'softmax':
+            if inputs:
+                exp_x = np.exp(inputs[0] - np.max(inputs[0]))
+                return exp_x / exp_x.sum()
+            return np.array([])
+        elif op_type == 'identity':
+            return inputs[0] if inputs else np.array([])
+        else:
+            # Default: return first input or empty
+            return inputs[0] if inputs else np.array([])
+
+    async def execute_graph(self, graph: dict) -> dict:
+        """
+        Execute graph using optimal hardware backend.
+        
+        Routes matrix operations through the hardware dispatcher for optimal
+        performance on available accelerators (photonic, GPU, emulator, CPU).
+        
+        Args:
+            graph: Graph definition with nodes and edges
+            
+        Returns:
+            Dictionary with execution results and metadata
+        """
+        # FIX: Validate graph structure before processing
+        # This prevents "Missing 'nodes' field" errors from data integrity issues
+        if not isinstance(graph, dict):
+            logger.warning("[Arena] Invalid graph: expected dict, got %s. Using empty graph.", type(graph).__name__)
+            graph = {"nodes": [], "edges": []}
+        
+        if "nodes" not in graph:
+            logger.warning("[Arena] Invalid base graph: Missing 'nodes' field. Using empty nodes list.")
+            graph["nodes"] = []
+        
+        if not isinstance(graph.get("nodes"), list):
+            logger.warning("[Arena] Invalid 'nodes' field: expected list. Using empty nodes list.")
+            graph["nodes"] = []
+            
+        nodes = graph.get('nodes', [])
+        # Note: edges reserved for future topological ordering/dependency resolution
+        _ = graph.get('edges', [])
+
+        # Log execution plan
+        if self.hardware_dispatcher:
+            backend_info = self.hardware_dispatcher.get_metrics_summary()
+            logger.info(f"[Arena] Executing graph with {len(nodes)} nodes via dispatcher")
+        else:
+            logger.info(f"[Arena] Executing graph with {len(nodes)} nodes (CPU fallback)")
+
+        results = {}
+
+        for node in nodes:
+            node_id = node.get('id')
+            op_type = node.get('op', 'mvm')
+
+            # Get inputs from previous results or node data
+            inputs = self._gather_inputs(node, results)
+
+            # Route through dispatcher
+            if op_type in ('mvm', 'matmul', 'photonic_mvm', 'photonic_fused'):
+                # Build params for photonic ops
+                params = node.get('params', {})
+                if not params and op_type.startswith('photonic'):
+                    # Provide default photonic params
+                    params = {
+                        'noise_std': 0.01,
+                        'multiplexing': 'wavelength',
+                        'compression': 'ITU-F.748-quantized',
+                        'bandwidth_ghz': 100,
+                        'latency_ps': 50,
+                    }
+                
+                # Use original op_type if it's already a photonic operation,
+                # otherwise prefix with 'photonic_' for dispatcher routing
+                dispatch_op = op_type if op_type.startswith('photonic') else f'photonic_{op_type}'
+                result = self._dispatch_compute(
+                    dispatch_op,
+                    *inputs,
+                    params=params
+                )
+            else:
+                # Non-matrix ops run on CPU
+                result = self._execute_cpu_op(op_type, inputs, node.get('params', {}))
+
+            results[node_id] = result
+
+        return {'results': results, 'success': True}
+
     def send_slack_alert(self, message: str):
         """Send Slack alert."""
         if not self.slack_client or not self.slack_channel:
@@ -980,6 +1262,7 @@ class GraphixArena:
         # for the parent process to parse. Without this, logging.basicConfig() in
         # llm_client.py outputs to stdout by default, causing JSON parse failures
         # (e.g., "Extra data: line 1 column 5") and 40-second timeouts.
+        # FIX Issue 4: Use magic markers to wrap JSON output for reliable parsing.
         script_to_execute = (
             f"import sys, logging; "
             f"logging.basicConfig(stream=sys.stderr, level=logging.INFO, "
@@ -987,7 +1270,11 @@ class GraphixArena:
             f"import json; from llm_client import GraphixLLMClient; "
             f"client=GraphixLLMClient('{agent_id}'); "
             f'messages = [{{"role": "user", "content": {repr(content_payload)}}}]; '
-            f"print(json.dumps(client.chat(messages)))"
+            f"result = client.chat(messages); "
+            f"print('###ARENA_OUTPUT_START###'); "
+            f"print(json.dumps(result)); "
+            f"print('###ARENA_OUTPUT_END###'); "
+            f"sys.stdout.flush()"
         )
 
         cmd = [sys.executable, "-c", script_to_execute]
@@ -1028,7 +1315,15 @@ class GraphixArena:
                 )
                 raise ValueError(f"Agent {agent_id} failed: {error_output}")
 
-            return json.loads(stdout.decode())
+            # Parse with marker-aware extractor
+            stdout_str = stdout.decode()
+            try:
+                return extract_json_from_output(stdout_str)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Arena output: {e}")
+                logger.debug(f"stdout: {stdout_str[:500]}")
+                logger.debug(f"stderr: {stderr.decode()[:500]}")
+                raise
 
         except asyncio.TimeoutError:
             logger.error(f"Agent {agent_id} execution timeout")
@@ -1847,6 +2142,58 @@ async def arena_health():
             "status": "error",
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat(),
+        }
+
+
+@app.get("/api/hardware/status", summary="Hardware dispatcher status", tags=["hardware"])
+async def get_hardware_status():
+    """
+    Get hardware dispatcher status and metrics.
+    
+    Returns detailed information about available hardware backends,
+    performance metrics, and health status for the HardwareDispatcher
+    used for optimal computation routing (photonic → GPU → emulator → CPU).
+    """
+    if _ARENA_INSTANCE is None:
+        return {"error": "Arena not initialized", "mode": "unavailable"}
+
+    arena = _ARENA_INSTANCE
+    if not hasattr(arena, 'hardware_dispatcher') or not arena.hardware_dispatcher:
+        return {"error": "HardwareDispatcher not available", "mode": "cpu_only"}
+
+    dispatcher = arena.hardware_dispatcher
+
+    try:
+        # Get available backends
+        available_backends = dispatcher.list_available_hardware()
+
+        # Get metrics summary
+        metrics_summary = dispatcher.get_metrics_summary()
+
+        # Get health status for each backend
+        health_status = {}
+        for backend, capabilities in dispatcher.hardware_registry.items():
+            health_status[backend.value] = {
+                "status": capabilities.health_status,
+                "last_check": (
+                    capabilities.last_health_check.isoformat()
+                    if capabilities.last_health_check
+                    else None
+                ),
+                "available": capabilities.available,
+            }
+
+        return {
+            "available_backends": available_backends,
+            "metrics_summary": metrics_summary,
+            "health_status": health_status,
+            "mode": "dispatcher_active",
+        }
+    except Exception as e:
+        logger.error(f"Failed to get hardware dispatcher status: {e}")
+        return {
+            "error": str(e),
+            "mode": "error",
         }
 
 

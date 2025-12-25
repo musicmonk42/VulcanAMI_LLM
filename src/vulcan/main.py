@@ -327,9 +327,9 @@ class Settings(BaseSettings):
         default=None, env="GRAPHIX_API_KEY"
     )
     # Timeout for Arena API calls (seconds)
-    # PERFORMANCE FIX: Arena completes in 55-64s based on production logs
-    # Set to 90s to allow completion while optimization is in progress
-    arena_timeout: float = Field(default=90.0, env="ARENA_TIMEOUT")
+    # FIX #6: Arena completes in 55-64s based on production logs, but under high CPU load
+    # can take longer. Increased from 90s to 120s to prevent valid but slow generations from timeout
+    arena_timeout: float = Field(default=120.0, env="ARENA_TIMEOUT")
     # Whether to enable Arena routing for complex queries
     arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
 
@@ -979,6 +979,15 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"[VULCAN] Error stopping SelfOptimizer: {e}")
         
+        # Shutdown HardwareDispatcher if present in Arena
+        if hasattr(app.state, 'arena') and hasattr(app.state.arena, 'hardware_dispatcher'):
+            if app.state.arena.hardware_dispatcher:
+                try:
+                    app.state.arena.hardware_dispatcher.shutdown()
+                    logger.info("[VULCAN] ✓ HardwareDispatcher shutdown complete")
+                except Exception as e:
+                    logger.warning(f"[VULCAN] Error shutting down HardwareDispatcher: {e}")
+
         if startup_complete and hasattr(app.state, "deployment"):
             deployment = app.state.deployment
 
