@@ -177,6 +177,11 @@ class NSOAligner:
     rollback capability, and comprehensive audit trails.
     """
 
+    # FIX: Named constants for source-based risk adjustments (configurable)
+    INTERNAL_SOURCE_CONFIDENCE_MULTIPLIER = 0.5  # Reduce confidence by 50% for internal sources
+    INTERNAL_SOURCE_ML_TOXICITY_THRESHOLD = 0.75  # Higher ML threshold for internal sources
+    DEFAULT_ML_TOXICITY_THRESHOLD = 0.6  # Default ML threshold for user sources
+
     def __init__(
         self,
         claude_client: Optional[Any] = None,
@@ -2476,7 +2481,14 @@ class NSOAligner:
         )
         
         # For context-dependent keywords, require negative context words
-        negative_context_words = ["should", "must", "need to", "want to", "going to", "will", "real", "actually"]
+        # These indicate intent/direction rather than fictional/creative use
+        # Note: Phrases with spaces use simple substring matching; single words
+        # are also matched as substrings, which is intentional for catching
+        # variations like "needs to", "wanting to", etc.
+        negative_context_words = [
+            "should", "must", "need to", "want to", "going to", 
+            "will", "real", "actually", "seriously"
+        ]
         has_negative_context = any(w in text_lower for w in negative_context_words)
         
         context_keyword_match = False
@@ -2503,7 +2515,11 @@ class NSOAligner:
                 ml_confidence = 0.0
                 
                 # FIX: Apply higher threshold for internal sources to reduce false positives
-                toxicity_threshold = 0.75 if is_internal_source else 0.6
+                toxicity_threshold = (
+                    self.INTERNAL_SOURCE_ML_TOXICITY_THRESHOLD 
+                    if is_internal_source 
+                    else self.DEFAULT_ML_TOXICITY_THRESHOLD
+                )
                 
                 for result in results:
                     # Check for various toxic labels model might output
@@ -2526,11 +2542,12 @@ class NSOAligner:
                     ml_toxicity or rule_based_toxicity
                 )  # Combine results
                 
-                # FIX: Apply source-based confidence reduction
+                # FIX: Apply source-based confidence reduction using named constant
                 base_confidence = max(
                     ml_confidence, (0.5 if rule_based_toxicity else 0.0)
                 )
-                taxonomy["confidence"] = base_confidence * 0.5 if is_internal_source else base_confidence
+                confidence_multiplier = self.INTERNAL_SOURCE_CONFIDENCE_MULTIPLIER if is_internal_source else 1.0
+                taxonomy["confidence"] = base_confidence * confidence_multiplier
                 
                 if taxonomy["toxicity"]:
                     taxonomy["bias"] = (
@@ -2545,14 +2562,16 @@ class NSOAligner:
                 )
                 taxonomy["toxicity"] = rule_based_toxicity
                 base_confidence = 0.5 if rule_based_toxicity else 0.0
-                taxonomy["confidence"] = base_confidence * 0.5 if is_internal_source else base_confidence
+                confidence_multiplier = self.INTERNAL_SOURCE_CONFIDENCE_MULTIPLIER if is_internal_source else 1.0
+                taxonomy["confidence"] = base_confidence * confidence_multiplier
                 if rule_based_toxicity:
                     taxonomy["bias"] = "toxicity_rule_detected"
         else:
             # Fallback if no ML model
             taxonomy["toxicity"] = rule_based_toxicity
             base_confidence = 0.5 if rule_based_toxicity else 0.0
-            taxonomy["confidence"] = base_confidence * 0.5 if is_internal_source else base_confidence
+            confidence_multiplier = self.INTERNAL_SOURCE_CONFIDENCE_MULTIPLIER if is_internal_source else 1.0
+            taxonomy["confidence"] = base_confidence * confidence_multiplier
             if rule_based_toxicity:
                 taxonomy["bias"] = "toxicity_rule_detected"
 
