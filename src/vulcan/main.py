@@ -4088,6 +4088,9 @@ async def unified_chat(request: UnifiedChatRequest):
         # ================================================================
         # STEP 7: Generate Response using LLM with full context
         # ================================================================
+        # TIMING: Start measuring context building
+        _context_start = time.perf_counter()
+        
         # Build comprehensive context for LLM
         llm_context = {
             "user_message": user_message,
@@ -4111,8 +4114,7 @@ async def unified_chat(request: UnifiedChatRequest):
             except Exception:
                 llm_context["plan"] = str(plan_result)
 
-        # TIMING: Log context building duration
-        _context_start = time.perf_counter()
+        # FIX: Log context building duration AFTER the context is built
         logger.info(f"[TIMING] STEP 7a Context building took {time.perf_counter() - _context_start:.2f}s")
 
         # Generate response
