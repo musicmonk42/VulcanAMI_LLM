@@ -931,9 +931,24 @@ class GraphixArena:
 
         cmd = [sys.executable, "-c", script_to_execute]
 
+        # FIX Issue 1: Pass PYTHONPATH environment to subprocess
+        # Without this, subprocesses cannot find llm_client and other project modules,
+        # causing ModuleNotFoundError and 30-40s timeout per query as it falls back
+        # to slower Agent Pool.
+        project_root = Path(__file__).resolve().parent.parent
+        src_dir = Path(__file__).resolve().parent
+        env = os.environ.copy()
+        existing_pythonpath = env.get("PYTHONPATH", "")
+        # Prepend project root and src directory to PYTHONPATH
+        env["PYTHONPATH"] = f"{project_root}{os.pathsep}{src_dir}{os.pathsep}{existing_pythonpath}"
+
         try:
             proc = await asyncio.create_subprocess_exec(
-                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,  # FIX: Pass environment with correct PYTHONPATH
+                cwd=str(project_root),  # FIX: Set working directory to project root
             )
 
             # Add timeout
