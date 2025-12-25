@@ -52,7 +52,43 @@ MODULES = {
         'expected_methods': ['optimize', 'search', 'evaluate', 'optimize_graph', 'generate_kernel'],
         'request_flow_file': 'src/full_platform.py',
         'integration_note': 'Stored in app.state but not accessed; for kernel optimization, not typical request flow'
-    }
+    },
+    # Strategy Module Components
+    'StrategyOrchestrator': {
+        'file': 'src/strategies/strategy_orchestrator.py',
+        'class': 'StrategyOrchestrator',
+        'expected_methods': ['analyze', 'record_execution', 'get_statistics', 'get_health_status', 'get_drift_status'],
+        'request_flow_file': 'src/vulcan/routing/query_router.py',
+        'integration_note': 'Main entry point for strategies module - wires cost model, drift monitor, VOI gate, etc.'
+    },
+    'StochasticCostModel': {
+        'file': 'src/strategies/cost_model.py',
+        'class': 'StochasticCostModel',
+        'expected_methods': ['predict_cost', 'update', 'get_statistics', 'save_model', 'load_model'],
+        'request_flow_file': 'src/strategies/strategy_orchestrator.py',
+        'integration_note': 'Uncertainty-aware cost prediction; used via StrategyOrchestrator'
+    },
+    'DistributionMonitor': {
+        'file': 'src/strategies/distribution_monitor.py',
+        'class': 'DistributionMonitor',
+        'expected_methods': ['detect_shift', 'update', 'get_drift_summary', 'get_statistics'],
+        'request_flow_file': 'src/strategies/strategy_orchestrator.py',
+        'integration_note': 'Drift detection (KS, Wasserstein, MMD); used via StrategyOrchestrator'
+    },
+    'ToolMonitor': {
+        'file': 'src/strategies/tool_monitor.py',
+        'class': 'ToolMonitor',
+        'expected_methods': ['record_execution', 'get_health_status', 'get_statistics', 'export_metrics'],
+        'request_flow_file': 'src/strategies/strategy_orchestrator.py',
+        'integration_note': 'Tool health, latency tracking; used via StrategyOrchestrator'
+    },
+    'ValueOfInformationGate': {
+        'file': 'src/strategies/value_of_information.py',
+        'class': 'ValueOfInformationGate',
+        'expected_methods': ['should_gather_more', 'evaluate', 'get_statistics'],
+        'request_flow_file': 'src/strategies/strategy_orchestrator.py',
+        'integration_note': 'Decides when to gather more info vs proceed; used via StrategyOrchestrator'
+    },
 }
 
 
