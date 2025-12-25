@@ -365,6 +365,10 @@ MAX_NODES = 10000  # FIX: Added max node count for validation
 MAX_REBERT_THRESHOLD = 0.5
 MIN_REBERT_THRESHOLD = 0.0
 
+# GDPR Compliance Constants
+GDPR_RETENTION_POLICY = "session_only"
+GDPR_COMPLIANCE_STANDARD = "gdpr_minimization"
+
 # Magic markers for subprocess JSON output
 OUTPUT_START_MARKER = "###ARENA_OUTPUT_START###"
 OUTPUT_END_MARKER = "###ARENA_OUTPUT_END###"
@@ -1016,18 +1020,21 @@ class GraphixArena:
             Response dict with GDPR metadata injected
         """
         if not isinstance(response, dict):
+            logger.debug(
+                f"[GDPR] Skipping metadata injection for non-dict response type: {type(response).__name__}"
+            )
             return response
         
         # Add metadata section if not present
         if "metadata" not in response:
             response["metadata"] = {}
         
-        # Inject GDPR compliance fields
+        # Inject GDPR compliance fields using constants
         response["metadata"]["retention_policy"] = response["metadata"].get(
-            "retention_policy", "session_only"
+            "retention_policy", GDPR_RETENTION_POLICY
         )
         response["metadata"]["compliance_standard"] = response["metadata"].get(
-            "compliance_standard", "gdpr_minimization"
+            "compliance_standard", GDPR_COMPLIANCE_STANDARD
         )
         
         return response
