@@ -2238,7 +2238,16 @@ class NSOAligner:
         return "unknown"  # Default to unknown on failure or unclear response
 
     def _check_privacy_and_residency(self, proposal: Dict[str, Any]) -> Tuple[str, str]:
-        """Enhanced privacy and residency checks."""
+        """Enhanced privacy and residency checks.
+        
+        FIX: Reduced false positives by requiring contextual indicators for PII detection.
+        Previously, patterns like phone numbers and credit cards would match many normal
+        technical identifiers (version numbers, IDs, timestamps). Now we require either:
+        1. A high-confidence pattern (like SSN format) OR
+        2. A contextual indicator keyword near the match
+        
+        This fixes the Arena security audit being too aggressive (400 BiasDetected).
+        """
         # Extract text content more robustly
         if isinstance(proposal, dict):
             text_content = proposal.get(
@@ -2250,17 +2259,15 @@ class NSOAligner:
         if not isinstance(text_content, str):
             text_content = json.dumps(text_content)  # Fallback for complex types
 
-        text_content.lower()
+        text_lower = text_content.lower()
 
-        # Enhanced PII detection
-        pii_patterns = [
-            (r"\b\d{3}-\d{2}-\d{4}\b", "SSN"),
-            (r"\b(?:\d[ -]*?){13,16}\b", "Credit Card"),
-            (
-                r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
-                "Email",
-            ),  # Improved email regex
-            (r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", "Phone"),  # Improved phone regex
+        # FIX: Context-aware PII detection to reduce false positives
+        # Patterns now include context indicators that must be present nearby
+        # to avoid flagging normal technical data like version numbers, IDs, etc.
+        
+        # High-confidence patterns (always flag, no context needed)
+        high_confidence_patterns = [
+            (r"\b\d{3}-\d{2}-\d{4}\b", "SSN"),  # SSN format is specific enough
             (
                 r"\b(?:DOB|date.?of.?birth)[:\s]*\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
                 "Date of Birth",
@@ -2268,21 +2275,68 @@ class NSOAligner:
             (
                 r"\b(?:passport|license).?(?:number|#|no\.?)[:\s]*[A-Z0-9-]+\b",
                 "ID Number",
-            ),  # Allow hyphens
+            ),
             (
                 r"\b\d+\s+[NESWnesw]+\s+[A-Za-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Lane|Ln)\b",
                 "Street Address",
-            ),  # Basic address pattern
+            ),
+        ]
+        
+        # Context-dependent patterns (require nearby context keywords to flag)
+        # These patterns can match normal data, so we require context
+        context_patterns = [
+            # Credit Card - requires context keywords to flag
+            # Pattern checks common card prefixes (Visa 4xxx, MC 51-55xx, Discover 6011/65xx)
+            # Note: This only validates format/prefix, not Luhn checksum (intentional for
+            # reduced false positives - actual card validation should happen elsewhere)
+            (
+                r"\b(?:4\d{3}|5[1-5]\d{2}|6(?:011|5\d{2}))[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b",
+                "Credit Card",
+                ["credit", "card", "visa", "mastercard", "amex", "payment", "cvv", "expir"],
+            ),
+            # Phone - requires context keywords
+            (
+                r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",
+                "Phone",
+                ["phone", "call", "mobile", "cell", "tel", "fax", "contact"],
+            ),
+            # Email - only flag if looks like real email AND has context
+            (
+                r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+                "Email",
+                ["email", "mail", "contact", "address", "send", "reach"],
+            ),
         ]
 
         privacy_status = "safe"
-        for pattern, pii_type in pii_patterns:
-            if re.search(
-                pattern, text_content
-            ):  # Search original case for regex if needed
+        
+        # Check high-confidence patterns (no context needed)
+        for pattern, pii_type in high_confidence_patterns:
+            if re.search(pattern, text_content, re.IGNORECASE):
                 self.logger.warning(f"PII detected: {pii_type}")
                 privacy_status = "risky"
-                break  # Found one, mark as risky
+                break
+        
+        # Check context-dependent patterns (require nearby keywords)
+        if privacy_status == "safe":
+            for pattern, pii_type, context_keywords in context_patterns:
+                match = re.search(pattern, text_content, re.IGNORECASE)
+                if match:
+                    # Check if any context keyword is present as a whole word
+                    # Use word boundaries to avoid false positives like "recall" matching "call"
+                    has_context = any(
+                        re.search(rf'\b{re.escape(kw)}\b', text_lower)
+                        for kw in context_keywords
+                    )
+                    if has_context:
+                        self.logger.warning(f"PII detected: {pii_type}")
+                        privacy_status = "risky"
+                        break
+                    else:
+                        # Log at debug level - pattern matched but no context
+                        self.logger.debug(
+                            f"PII pattern matched ({pii_type}) but no context keywords found - ignoring"
+                        )
 
         # Data residency check
         residency_status = "safe"
@@ -2462,14 +2516,14 @@ class NSOAligner:
             taxonomy["privacy"] = True
             taxonomy["confidence"] = max(taxonomy["confidence"], 0.7)
 
-        pii_patterns = [
-            r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
-            r"\b(?:\d[ -]*?){13,16}\b",  # Credit Card
-            r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",  # Email
-            r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b",  # Phone
+        # FIX: Use only high-confidence PII patterns to reduce false positives
+        # Context-dependent patterns (phone, credit card, email) removed unless
+        # privacy keywords are already detected above
+        high_confidence_pii_patterns = [
+            r"\b\d{3}-\d{2}-\d{4}\b",  # SSN - specific format, always flag
         ]
         if not taxonomy["privacy"]:  # Only run regex if keyword didn't trigger
-            for pattern in pii_patterns:
+            for pattern in high_confidence_pii_patterns:
                 if re.search(pattern, text_content):
                     taxonomy["privacy"] = True
                     taxonomy["confidence"] = max(taxonomy["confidence"], 0.8)

@@ -1058,6 +1058,10 @@ def record_telemetry(
     Record interaction telemetry for meta-learning system.
 
     Convenience function using global recorder. Non-blocking.
+    
+    FIX: Now also queues memory updates so conversation context and learning
+    data is stored. Previously only telemetry entries were stored, resulting
+    in "0 memory updates" on every flush.
 
     Args:
         query: The query text
@@ -1067,6 +1071,18 @@ def record_telemetry(
     """
     recorder = get_telemetry_recorder()
     recorder.record(query, response, metadata, **kwargs)
+    
+    # FIX: Queue memory update so the system learns from interactions
+    # This was missing, causing "0 memory updates" in flush logs
+    source = kwargs.get("source", "user")
+    recorder.queue_memory_update(
+        source=source,
+        query_type=metadata.get("query_type", "general"),
+        quality_score=metadata.get("response_quality_score"),
+        error_occurred=kwargs.get("error_occurred", False),
+        error_type=kwargs.get("error_type"),
+        interaction_type=kwargs.get("interaction_type"),
+    )
 
 
 def record_interaction(
