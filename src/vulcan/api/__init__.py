@@ -38,26 +38,39 @@ _imports_successful = True
 
 try:
     from vulcan.api.models import (
+        # Enums
+        HealthStatus,
+        ErrorType,
+        # Request models
         StepRequest,
+        ChatRequest,
+        # Response models
         StepResponse,
         ChatMessage,
-        ChatRequest,
         ChatResponse,
         StatusResponse,
         ConfigResponse,
         ImprovementApproval,
+        HealthResponse,
+        MetricsResponse,
+        ErrorResponse,
     )
 except ImportError as e:
     logger.warning(f"API models not available: {e}")
     _imports_successful = False
+    HealthStatus = None
+    ErrorType = None
     StepRequest = None
+    ChatRequest = None
     StepResponse = None
     ChatMessage = None
-    ChatRequest = None
     ChatResponse = None
     StatusResponse = None
     ConfigResponse = None
     ImprovementApproval = None
+    HealthResponse = None
+    MetricsResponse = None
+    ErrorResponse = None
 
 try:
     from vulcan.api.rate_limiting import (
@@ -87,15 +100,22 @@ __all__ = [
     # Version info
     "__version__",
     "__author__",
-    # Models
+    # Enums
+    "HealthStatus",
+    "ErrorType",
+    # Request models
     "StepRequest",
+    "ChatRequest",
+    # Response models
     "StepResponse",
     "ChatMessage",
-    "ChatRequest",
     "ChatResponse",
     "StatusResponse",
     "ConfigResponse",
     "ImprovementApproval",
+    "HealthResponse",
+    "MetricsResponse",
+    "ErrorResponse",
     # Rate limiting
     "rate_limit_storage",
     "rate_limit_lock",
@@ -126,8 +146,10 @@ def get_module_info() -> Dict[str, Any]:
         },
         "models_available": [
             name for name in [
+                "HealthStatus", "ErrorType",
                 "StepRequest", "StepResponse", "ChatMessage", "ChatRequest",
-                "ChatResponse", "StatusResponse", "ConfigResponse", "ImprovementApproval"
+                "ChatResponse", "StatusResponse", "ConfigResponse", "ImprovementApproval",
+                "HealthResponse", "MetricsResponse", "ErrorResponse"
             ] if globals().get(name) is not None
         ],
     }
