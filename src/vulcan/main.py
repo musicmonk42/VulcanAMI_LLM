@@ -113,16 +113,11 @@ except ImportError:
 
 # SelfOptimizer for autonomous performance tuning
 try:
-    from evolve import SelfOptimizer
+    from src.evolve.self_optimizer import SelfOptimizer
     SELF_OPTIMIZER_AVAILABLE = True
 except ImportError:
-    try:
-        from src.evolve import SelfOptimizer
-        SELF_OPTIMIZER_AVAILABLE = True
-    except ImportError:
-        SelfOptimizer = None
-        SELF_OPTIMIZER_AVAILABLE = False
-        logging.debug("SelfOptimizer not available")
+    SelfOptimizer = None
+    SELF_OPTIMIZER_AVAILABLE = False
 
 # ============================================================
 # MODULAR IMPORTS - From refactored vulcan.* subpackages
@@ -947,7 +942,7 @@ async def lifespan(app: FastAPI):
         logger.info("✓ Global HTTP connection pool initialized")
 
     # Initialize SelfOptimizer for autonomous performance tuning
-    if SELF_OPTIMIZER_AVAILABLE and SelfOptimizer:
+    if SELF_OPTIMIZER_AVAILABLE:
         try:
             app.state.self_optimizer = SelfOptimizer(
                 target_latency_ms=100,
