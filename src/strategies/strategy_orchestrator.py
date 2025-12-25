@@ -115,7 +115,8 @@ class StrategyOrchestrator:
         
         if FEATURE_EXTRACTOR_AVAILABLE and MultiTierFeatureExtractor:
             try:
-                self.feature_extractor = MultiTierFeatureExtractor(config.get('features', {}))
+                # MultiTierFeatureExtractor takes no arguments
+                self.feature_extractor = MultiTierFeatureExtractor()
                 logger.info("[StrategyOrchestrator] MultiTierFeatureExtractor initialized")
             except Exception as e:
                 logger.warning(f"[StrategyOrchestrator] Failed to init MultiTierFeatureExtractor: {e}")
@@ -224,25 +225,30 @@ class StrategyOrchestrator:
                     remaining_budget={'time_ms': context.get('budget_ms', 1000)}
                 )
                 
-                voi_result = self.voi_gate.should_gather_more(decision_state)
+                # FIX: Pass extracted uncertainty and confidence values instead of DecisionState
+                # The should_gather_more method expects numeric values, not a DecisionState object
+                # It returns a boolean: True if more info should be gathered
+                # Use getattr with defaults to handle missing attributes gracefully
+                uncertainty_val = getattr(decision_state, 'uncertainty', self.DEFAULT_INITIAL_UNCERTAINTY)
+                confidence_val = getattr(decision_state, 'current_confidence', self.DEFAULT_INITIAL_CONFIDENCE)
                 
-                if voi_result and voi_result.recommendation != VOIAction.PROCEED:
-                    voi_decision = voi_result.recommendation.value
+                should_gather = self.voi_gate.should_gather_more(
+                    uncertainty=uncertainty_val if uncertainty_val is not None else self.DEFAULT_INITIAL_UNCERTAINTY,
+                    confidence=confidence_val if confidence_val is not None else self.DEFAULT_INITIAL_CONFIDENCE,
+                    query_id=context.get('query_id')
+                )
+                
+                if should_gather:
+                    voi_decision = 'gather_more'
                     self.total_voi_gathers += 1
                     
-                    # Extract higher-tier features based on VOI recommendation
+                    # Extract higher-tier features since VOI recommends gathering more
                     if self.feature_extractor:
                         try:
                             extract_start = time.time()
-                            if voi_result.recommendation == VOIAction.GATHER_MORE:
-                                features = self.feature_extractor.extract_tier2(query)
-                                tier_used = 2
-                            elif voi_result.recommendation == VOIAction.FULL_ANALYSIS:
-                                features = self.feature_extractor.extract_tier3(query)
-                                tier_used = 3
-                            else:
-                                features = self.feature_extractor.extract_tier2(query)
-                                tier_used = 2
+                            # Default to tier 2 for "gather_more" decision
+                            features = self.feature_extractor.extract_tier2(query)
+                            tier_used = 2
                             
                             extraction_time_ms = (time.time() - extract_start) * 1000
                             logger.info(
