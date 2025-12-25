@@ -159,7 +159,11 @@ class StrategyOrchestrator:
         
         logger.info(f"[StrategyOrchestrator] Initialized with {len(components)}/5 components: {components}")
     
-    async def analyze(
+    # Default values for decision making (can be configured)
+    DEFAULT_INITIAL_UNCERTAINTY = 0.5
+    DEFAULT_INITIAL_CONFIDENCE = 0.5
+    
+    def analyze(
         self,
         query: Any,
         context: Optional[Dict[str, Any]] = None
@@ -168,6 +172,7 @@ class StrategyOrchestrator:
         Analyze a query and recommend the best tool.
         
         This is the main entry point for tool selection.
+        Note: This is a synchronous method for simpler integration.
         """
         start_time = time.time()
         context = context or {}
@@ -176,17 +181,18 @@ class StrategyOrchestrator:
         drift_detected = False
         drift_summary = {}
         voi_decision = 'proceed'
+        extraction_time_ms = 0.0
         
         # Step 1: Extract features (start with Tier 1)
-        if self.feature_extractor and FeatureTier:
+        if self.feature_extractor:
             try:
-                tier = FeatureTier.TIER1_SYNTACTIC
-                features_result = self.feature_extractor.extract(query, tier)
-                features = features_result.features
-                tier_used = tier.value
+                extract_start = time.time()
+                features = self.feature_extractor.extract_tier1(query)
+                extraction_time_ms = (time.time() - extract_start) * 1000
+                tier_used = 1
                 logger.info(
                     f"[Strategy] Extracted {len(features) if features is not None else 0} "
-                    f"Tier-1 features in {features_result.extraction_time_ms:.1f}ms"
+                    f"Tier-1 features in {extraction_time_ms:.1f}ms"
                 )
             except Exception as e:
                 logger.warning(f"[Strategy] Feature extraction failed: {e}")
@@ -212,8 +218,8 @@ class StrategyOrchestrator:
             try:
                 decision_state = DecisionState(
                     features=features,
-                    uncertainty=0.5,
-                    current_confidence=0.5,
+                    uncertainty=self.DEFAULT_INITIAL_UNCERTAINTY,
+                    current_confidence=self.DEFAULT_INITIAL_CONFIDENCE,
                     gathered_information=[],
                     remaining_budget={'time_ms': context.get('budget_ms', 1000)}
                 )
@@ -225,21 +231,26 @@ class StrategyOrchestrator:
                     self.total_voi_gathers += 1
                     
                     # Extract higher-tier features based on VOI recommendation
-                    if self.feature_extractor and FeatureTier:
-                        if voi_result.recommendation == VOIAction.GATHER_MORE:
-                            tier = FeatureTier.TIER2_STRUCTURAL
-                        elif voi_result.recommendation == VOIAction.FULL_ANALYSIS:
-                            tier = FeatureTier.TIER3_SEMANTIC
-                        else:
-                            tier = FeatureTier.TIER2_STRUCTURAL
-                        
-                        features_result = self.feature_extractor.extract(query, tier)
-                        features = features_result.features
-                        tier_used = tier.value
-                        logger.info(
-                            f"[Strategy] VOI: Upgraded to Tier-{tier.value} features "
-                            f"({features_result.extraction_time_ms:.1f}ms)"
-                        )
+                    if self.feature_extractor:
+                        try:
+                            extract_start = time.time()
+                            if voi_result.recommendation == VOIAction.GATHER_MORE:
+                                features = self.feature_extractor.extract_tier2(query)
+                                tier_used = 2
+                            elif voi_result.recommendation == VOIAction.FULL_ANALYSIS:
+                                features = self.feature_extractor.extract_tier3(query)
+                                tier_used = 3
+                            else:
+                                features = self.feature_extractor.extract_tier2(query)
+                                tier_used = 2
+                            
+                            extraction_time_ms = (time.time() - extract_start) * 1000
+                            logger.info(
+                                f"[Strategy] VOI: Upgraded to Tier-{tier_used} features "
+                                f"({extraction_time_ms:.1f}ms)"
+                            )
+                        except Exception as e:
+                            logger.warning(f"[Strategy] Higher-tier extraction failed: {e}")
             except Exception as e:
                 logger.warning(f"[Strategy] VOI analysis failed: {e}")
         
