@@ -392,13 +392,37 @@ class TestPrivacyChecks:
     """Test privacy and residency checks."""
 
     def test_check_privacy_pii_detection(self, nso_aligner):
-        """Test PII detection in privacy check."""
-        proposal = {"text": "Email: user@example.com, Phone: 123-456-7890"}
+        """Test PII detection in privacy check with context keywords."""
+        # FIX: Updated to use context keywords as PII detection is now context-aware
+        proposal = {"text": "Contact email: user@example.com, call phone: 123-456-7890"}
 
         privacy_status, residency_status = nso_aligner._check_privacy_and_residency(
             proposal
         )
 
+        assert privacy_status == "risky"
+
+    def test_check_privacy_pii_false_positive_prevention(self, nso_aligner):
+        """Test that PII-like patterns without context don't trigger false positives."""
+        # This tests the FIX for Arena security audit being too aggressive
+        proposal = {"text": "Version 123-456-7890 released, ID: 4111111111111111"}
+
+        privacy_status, residency_status = nso_aligner._check_privacy_and_residency(
+            proposal
+        )
+
+        # Should NOT be risky because there's no context like "phone" or "credit card"
+        assert privacy_status == "safe"
+
+    def test_check_privacy_ssn_always_detected(self, nso_aligner):
+        """Test that SSN format is always detected (high confidence)."""
+        proposal = {"text": "Number is 123-45-6789"}
+
+        privacy_status, residency_status = nso_aligner._check_privacy_and_residency(
+            proposal
+        )
+
+        # SSN format is specific enough - always flag
         assert privacy_status == "risky"
 
     def test_check_data_residency_gdpr(self, nso_aligner):
