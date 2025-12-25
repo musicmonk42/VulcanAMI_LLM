@@ -10116,77 +10116,67 @@ except ImportError:
     API_MODULE_AVAILABLE = False
 
 
-def get_platform_integration_status() -> Dict[str, Any]:
+# Module registry for platform integration - maps module name to (available_flag, info_getter)
+_MODULE_REGISTRY = {
+    "utils_main": (UTILS_MODULE_AVAILABLE, get_utils_module_info if UTILS_MODULE_AVAILABLE else None),
+    "llm": (LLM_MODULE_AVAILABLE, get_llm_module_info if LLM_MODULE_AVAILABLE else None),
+    "distillation": (DISTILLATION_MODULE_AVAILABLE, get_distillation_module_info if DISTILLATION_MODULE_AVAILABLE else None),
+    "arena": (ARENA_MODULE_AVAILABLE, get_arena_module_info if ARENA_MODULE_AVAILABLE else None),
+    "metrics": (METRICS_MODULE_AVAILABLE, get_metrics_module_info if METRICS_MODULE_AVAILABLE else None),
+    "api": (API_MODULE_AVAILABLE, get_api_module_info if API_MODULE_AVAILABLE else None),
+}
+
+
+def get_platform_integration_status(include_details: bool = True) -> Dict[str, Any]:
     """
     Get the status of all extracted modules for platform integration.
     
     This function provides a comprehensive view of which modules are available
     and fully integrated with the platform.
     
+    Args:
+        include_details: Whether to include detailed module info (default True).
+                        Set to False for faster status checks.
+    
     Returns:
         Dictionary with module availability and status information
     """
-    status = {
-        "utils_main": UTILS_MODULE_AVAILABLE,
-        "llm": LLM_MODULE_AVAILABLE,
-        "distillation": DISTILLATION_MODULE_AVAILABLE,
-        "arena": ARENA_MODULE_AVAILABLE,
-        "metrics": METRICS_MODULE_AVAILABLE,
-        "api": API_MODULE_AVAILABLE,
-    }
+    status = {name: available for name, (available, _) in _MODULE_REGISTRY.items()}
     
-    # Get detailed info from each module if available
-    detailed_info = {}
-    if UTILS_MODULE_AVAILABLE:
-        try:
-            detailed_info["utils_main"] = get_utils_module_info()
-        except Exception:
-            detailed_info["utils_main"] = {"error": "Failed to get module info"}
-    
-    if LLM_MODULE_AVAILABLE:
-        try:
-            detailed_info["llm"] = get_llm_module_info()
-        except Exception:
-            detailed_info["llm"] = {"error": "Failed to get module info"}
-    
-    if DISTILLATION_MODULE_AVAILABLE:
-        try:
-            detailed_info["distillation"] = get_distillation_module_info()
-        except Exception:
-            detailed_info["distillation"] = {"error": "Failed to get module info"}
-    
-    if ARENA_MODULE_AVAILABLE:
-        try:
-            detailed_info["arena"] = get_arena_module_info()
-        except Exception:
-            detailed_info["arena"] = {"error": "Failed to get module info"}
-    
-    if METRICS_MODULE_AVAILABLE:
-        try:
-            detailed_info["metrics"] = get_metrics_module_info()
-        except Exception:
-            detailed_info["metrics"] = {"error": "Failed to get module info"}
-    
-    if API_MODULE_AVAILABLE:
-        try:
-            detailed_info["api"] = get_api_module_info()
-        except Exception:
-            detailed_info["api"] = {"error": "Failed to get module info"}
-    
-    return {
+    result = {
         "modules_available": status,
         "all_modules_available": all(status.values()),
-        "module_details": detailed_info,
     }
+    
+    # Get detailed info from each module if requested
+    if include_details:
+        detailed_info = {}
+        for module_name, (available, info_getter) in _MODULE_REGISTRY.items():
+            if available and info_getter:
+                try:
+                    detailed_info[module_name] = info_getter()
+                except Exception as e:
+                    detailed_info[module_name] = {
+                        "error": f"Failed to get {module_name} module info: {type(e).__name__}: {e}"
+                    }
+        result["module_details"] = detailed_info
+    
+    return result
 
 
-# Log platform integration status at startup
-_integration_status = get_platform_integration_status()
-if _integration_status["all_modules_available"]:
-    logger.info("✓ All extracted modules are available for platform integration")
-else:
-    unavailable = [k for k, v in _integration_status["modules_available"].items() if not v]
-    logger.warning(f"Some extracted modules unavailable: {unavailable}")
+def _log_platform_integration_status():
+    """Log platform integration status (called lazily to avoid slowing imports)."""
+    status = get_platform_integration_status(include_details=False)
+    if status["all_modules_available"]:
+        logger.info("✓ All extracted modules are available for platform integration")
+    else:
+        unavailable = [k for k, v in status["modules_available"].items() if not v]
+        logger.warning(f"Some extracted modules unavailable: {unavailable}")
+
+
+# Defer status logging to avoid slowing down imports
+# Status will be logged when main() is called or when explicitly requested
+_platform_status_logged = False
 
 
 if __name__ == "__main__":
