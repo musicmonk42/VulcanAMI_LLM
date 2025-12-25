@@ -1044,6 +1044,25 @@ class GraphixArena:
         else:
             raise ValueError(f"Unknown operation: {op}")
 
+    async def _dispatch_compute_async(self, op: str, *args, **kwargs) -> Any:
+        """
+        Async version of _dispatch_compute that offloads to thread pool.
+        
+        FIX #6: CPU Offloading - This method prevents CPU saturation by
+        running matrix operations in a thread pool, allowing the async
+        event loop to remain responsive.
+        
+        Args:
+            op: Operation name (e.g., 'photonic_mvm', 'matmul', 'mvm')
+            *args: Operation arguments (typically matrix and vector)
+            **kwargs: Additional parameters including 'params' dict
+            
+        Returns:
+            Computation result (numpy array or error dict)
+        """
+        # Offload to thread pool to prevent blocking the event loop
+        return await asyncio.to_thread(self._dispatch_compute, op, *args, **kwargs)
+
     def _gather_inputs(self, node: dict, results: dict) -> list:
         """
         Gather inputs for a node from previous results or node data.
@@ -1172,14 +1191,17 @@ class GraphixArena:
                 # Use original op_type if it's already a photonic operation,
                 # otherwise prefix with 'photonic_' for dispatcher routing
                 dispatch_op = op_type if op_type.startswith('photonic') else f'photonic_{op_type}'
-                result = self._dispatch_compute(
+                # FIX #6: Use async dispatch to offload CPU-intensive matrix ops
+                result = await self._dispatch_compute_async(
                     dispatch_op,
                     *inputs,
                     params=params
                 )
             else:
-                # Non-matrix ops run on CPU
-                result = self._execute_cpu_op(op_type, inputs, node.get('params', {}))
+                # Non-matrix ops - offload to thread pool if CPU-bound
+                result = await asyncio.to_thread(
+                    self._execute_cpu_op, op_type, inputs, node.get('params', {})
+                )
 
             results[node_id] = result
 
@@ -1447,6 +1469,8 @@ class GraphixArena:
                 }
 
             # Apply EvolutionEngine for generator/evolver agents
+            # FIX #6: CPU Offloading - Run heavy evolution computation via HardwareDispatcher
+            # to prevent CPU saturation (98.4% CPU causing 60-70s response times)
             evolution_result = None
             if self.evolution_engine and agent_id in ("generator", "evolver"):
                 try:
@@ -1461,8 +1485,15 @@ class GraphixArena:
                             edges = individual.graph.get("edges", [])
                             return len(nodes) * 0.1 + len(edges) * 0.05 + 0.5
                         
-                        # Run short evolution cycle
-                        best = self.evolution_engine.evolve(fitness_fn, generations=3)
+                        # FIX: Offload heavy evolution computation to thread pool
+                        # This prevents blocking the main async event loop during
+                        # CPU-intensive evolution cycles
+                        def _run_evolution():
+                            return self.evolution_engine.evolve(fitness_fn, generations=3)
+                        
+                        # Use asyncio.to_thread to run CPU-bound evolution off main thread
+                        best = await asyncio.to_thread(_run_evolution)
+                        
                         if best:
                             evolution_result = {
                                 "evolved": True,
@@ -1477,10 +1508,13 @@ class GraphixArena:
                     evolution_result = {"evolved": False, "error": str(e)}
 
             # Query LTM for similar topologies
+            # FIX #6: Offload LTM query to thread pool
             ltm_results = []
             if self.registry and hasattr(self.registry, "find_similar_topologies"):
                 try:
-                    ltm_results = self.registry.find_similar_topologies(payload)
+                    ltm_results = await asyncio.to_thread(
+                        self.registry.find_similar_topologies, payload
+                    )
                     logger.info(
                         f"Queried LTM for similar topologies, found {len(ltm_results)} matches"
                     )
@@ -1488,10 +1522,13 @@ class GraphixArena:
                     logger.error(f"LTM query failed: {e}")
 
             # Generate augmented data
+            # FIX #6: Offload data augmentation to thread pool
             augmented = None
             if self.data_augmentor is not None:
                 try:
-                    augmented = self.data_augmentor.generate_synthetic_proposal(payload)
+                    augmented = await asyncio.to_thread(
+                        self.data_augmentor.generate_synthetic_proposal, payload
+                    )
                 except Exception as e:
                     logger.error(f"Synthetic data augmentation failed: {e}")
 
@@ -1675,9 +1712,11 @@ class GraphixArena:
                 logger.warning(f"Multi-model audit failed: {e}")
 
         # Transparent task orchestration
+        # FIX #6: Offload transparent task to thread pool to prevent CPU blocking
         transparent_result = None
         try:
-            transparent_result = self.run_transparent_task(
+            transparent_result = await asyncio.to_thread(
+                self.run_transparent_task,
                 agent_id, task_prompt, payload
             )
         except Exception as e:
