@@ -694,14 +694,17 @@ class TestAPIModels:
         except ImportError:
             pytest.skip("api models not available")
 
+        # StepResponse has action as Optional[str], reasoning, state, and metrics
         response = StepResponse(
-            action={"type": "explore"},
-            success=True,
-            uncertainty=0.3,
+            action="explore",
+            reasoning="Test reasoning",
+            state={"key": "value"},
+            metrics={"latency": 0.5},
         )
-        assert response.action["type"] == "explore"
-        assert response.success is True
-        assert response.uncertainty == 0.3
+        assert response.action == "explore"
+        assert response.reasoning == "Test reasoning"
+        assert response.state == {"key": "value"}
+        assert response.metrics == {"latency": 0.5}
 
     def test_health_status_enum(self):
         """Test HealthStatus enum."""
@@ -710,9 +713,10 @@ class TestAPIModels:
         except ImportError:
             pytest.skip("api models not available")
 
-        assert HealthStatus.HEALTHY.value == "healthy"
-        assert HealthStatus.UNHEALTHY.value == "unhealthy"
+        # HealthStatus uses OK, DEGRADED, DOWN
+        assert HealthStatus.OK.value == "ok"
         assert HealthStatus.DEGRADED.value == "degraded"
+        assert HealthStatus.DOWN.value == "down"
 
     def test_error_type_enum(self):
         """Test ErrorType enum."""
@@ -721,9 +725,10 @@ class TestAPIModels:
         except ImportError:
             pytest.skip("api models not available")
 
-        assert ErrorType.VALIDATION.value == "validation"
+        # ErrorType uses VALIDATION_ERROR, TIMEOUT, INTERNAL_ERROR, etc.
+        assert ErrorType.VALIDATION_ERROR.value == "validation_error"
         assert ErrorType.TIMEOUT.value == "timeout"
-        assert ErrorType.INTERNAL.value == "internal"
+        assert ErrorType.INTERNAL_ERROR.value == "internal_error"
 
 
 class TestRateLimiting:
@@ -904,10 +909,12 @@ class TestCrossModuleIntegration:
         except ImportError:
             pytest.skip("Required modules not available")
 
+        # StepResponse has action as Optional[str], not dict
         response = StepResponse(
-            action={"type": "explore", "data": (1, 2, 3)},
-            success=True,
-            uncertainty=0.3,
+            action="explore",
+            reasoning="Test reasoning",
+            state={"key": "value", "nested": {"a": 1}},
+            metrics={"latency": 0.5},
         )
         
         # Convert to dict and sanitize
