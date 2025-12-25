@@ -391,10 +391,14 @@ class NSOAligner:
         """Lazy-load torch optimizer on first access."""
         if self._opt is None:
             if _ensure_torch_loaded() and _torch is not None and _torch_optim is not None:
-                # Ensure weights are initialized as tensor first
-                if self._weights is None:
-                    self._weights = _torch.tensor([0.33, 0.33, 0.34], requires_grad=True)
-                self._opt = _torch_optim.Adam([self._weights], lr=0.01)
+                # Access weights property to ensure it's initialized as a tensor
+                # This avoids duplicating tensor creation logic
+                weights = self.weights
+                if hasattr(weights, 'requires_grad'):
+                    self._opt = _torch_optim.Adam([self._weights], lr=0.01)
+                else:
+                    # weights is a list (fallback), can't create optimizer
+                    self._opt = None
             else:
                 self._opt = None
         return self._opt
@@ -487,8 +491,16 @@ class NSOAligner:
                         _once_logged["accelerate_missing"] = True
                     self.adversarial_detector = None
                     self.tokenizer = None
+                elif not _ensure_torch_loaded() or _torch is None:
+                    # Torch not available - skip model loading
+                    self.logger.info(
+                        f"torch not available; skipping model load for {model_id}. "
+                        "Falling back to rule-based adversarial detection."
+                    )
+                    self.adversarial_detector = None
+                    self.tokenizer = None
                 else:
-                    # accelerate is available - try to load the model
+                    # accelerate and torch are available - try to load the model
                     try:
                         token = os.getenv("HF_TOKEN")  # optional
                         self.tokenizer = AutoTokenizer.from_pretrained(  # nosec B615 - revision parameter present
@@ -500,7 +512,7 @@ class NSOAligner:
                             revision=model_revision,
                             trust_remote_code=False,
                             low_cpu_mem_usage=True,
-                            torch_dtype=_torch.float32 if _torch else None,
+                            torch_dtype=_torch.float32,
                             device_map={"": "cpu"},  # Force CPU
                         )
                         try:
@@ -583,7 +595,7 @@ class NSOAligner:
                     self.logger.error(f"Error closing SecurityAuditEngine: {e}")
 
             # Save RL weights
-            if hasattr(self, "_weights") and self._weights is not None and self.log_dir:
+            if self._weights is not None and self.log_dir:
                 weights_path = self.log_dir / "rl_weights.pt"
                 try:
                     if _ensure_torch_loaded() and _torch is not None:
@@ -2321,6 +2333,10 @@ class NSOAligner:
         if not _ensure_torch_loaded() or _torch is None or _torch_nn_utils is None:
             return
         
+        # Check if weights is a torch tensor (not a fallback list)
+        if not hasattr(self.weights, 'requires_grad'):
+            return  # weights is a list fallback, skip RL update
+        
         individual_rewards = []
         for label in labels:
             if label == ground_truth:
@@ -2354,7 +2370,7 @@ class NSOAligner:
         l2_reg = 0.001 * _torch.sum(self.weights**2)
         loss = loss + l2_reg
 
-        # Gradient descent
+        # Gradient descent - only if optimizer is available
         if self.opt is not None:
             self.opt.zero_grad()
             loss.backward()
@@ -2363,29 +2379,29 @@ class NSOAligner:
             )  # Prevent exploding gradients
             self.opt.step()
 
-        # Enforce non-negative weights (though softmax handles probabilities)
-        # A small positive minimum might be better than zero
-        with _torch.no_grad():
-            self.weights.clamp_(
-                min=0.01
-            )  # Ensure weights don't go exactly to zero or negative
+            # Enforce non-negative weights (though softmax handles probabilities)
+            # A small positive minimum might be better than zero
+            with _torch.no_grad():
+                self.weights.clamp_(
+                    min=0.01
+                )  # Ensure weights don't go exactly to zero or negative
 
-        # Track convergence
-        self.weight_history.append(self.weights.detach().clone())
+            # Track convergence
+            self.weight_history.append(self.weights.detach().clone())
 
-        if len(self.weight_history) >= 10:
-            # Check if weights have stabilized
-            recent_weights = _torch.stack(list(self.weight_history)[-10:])
-            variance = recent_weights.var(dim=0).mean().item()
+            if len(self.weight_history) >= 10:
+                # Check if weights have stabilized
+                recent_weights = _torch.stack(list(self.weight_history)[-10:])
+                variance = recent_weights.var(dim=0).mean().item()
 
-            if variance < self.convergence_threshold:
-                self.logger.debug(
-                    f"Weights converged (variance={variance:.6f})"
-                )  # Changed to debug
+                if variance < self.convergence_threshold:
+                    self.logger.debug(
+                        f"Weights converged (variance={variance:.6f})"
+                    )  # Changed to debug
 
-        self.logger.debug(
-            f"RL Update: weights={self.weights.data.tolist()}, loss={loss.item():.4f}"
-        )
+            self.logger.debug(
+                f"RL Update: weights={self.weights.data.tolist()}, loss={loss.item():.4f}"
+            )
 
     def _validate_ethical_label(self, label: str) -> bool:
         """Validates ethical label against canonical enum."""
