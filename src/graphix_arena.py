@@ -851,37 +851,13 @@ class GraphixArena:
             logger.warning(f"⚠ StrategyOrchestrator unavailable")
 
         # Initialize hardware dispatcher for optimal backend routing
+        # PRIORITY 0 FIX: Force-kill HardwareDispatcher to prevent resource starvation
+        # The AnalogPhotonicEmulator was causing 4000% CPU usage even when disabled in config.
+        # Ignoring config and hardcoding disabled state to prevent CPU starvation.
+        print("🛑 HARDWARE DISPATCHER FORCEFULLY DISABLED IN CODE")
         self.hardware_dispatcher = None
-        if HARDWARE_DISPATCH_AVAILABLE:
-            try:
-                self.hardware_dispatcher = HardwareDispatcher(
-                    use_mock=False,  # Use real hardware detection
-                    enable_metrics=True,
-                    enable_health_checks=True,
-                )
-
-                # Log detected hardware
-                available_hw = self.hardware_dispatcher.list_available_hardware()
-                hw_names = [hw['backend'] for hw in available_hw]
-                logger.info(f"[GraphixArena] ✓ HardwareDispatcher initialized")
-                logger.info(f"[GraphixArena] Available backends: {hw_names}")
-
-                # Check for photonic
-                if any('lightmatter' in str(hw).lower() or 'aim' in str(hw).lower()
-                       for hw in hw_names):
-                    logger.info("[GraphixArena] 🚀 PHOTONIC hardware detected!")
-                elif any('gpu' in str(hw).lower() or 'nvidia' in str(hw).lower()
-                         for hw in hw_names):
-                    logger.info("[GraphixArena] GPU detected, will use for acceleration")
-                else:
-                    logger.info("[GraphixArena] CPU/Emulator mode - no accelerators found")
-
-            except Exception as e:
-                logger.warning(f"[GraphixArena] HardwareDispatcher init failed: {e}")
-                self.hardware_dispatcher = None
-        else:
-            self.hardware_dispatcher = None
-            logger.info("[GraphixArena] HardwareDispatcher not available")
+        self.use_hardware = False
+        logger.warning("[GraphixArena] 🛑 HARDWARE DISPATCHER FORCEFULLY DISABLED IN CODE - Ignoring configuration")
 
         # Bounded feedback log
         self.feedback_log: deque = deque(maxlen=MAX_FEEDBACK_LOG_SIZE)
