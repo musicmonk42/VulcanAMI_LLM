@@ -60,7 +60,11 @@ _torch_initialized = False
 
 
 def _ensure_torch_loaded():
-    """Lazy-load torch on first use to avoid startup CPU overhead."""
+    """Lazy-load torch on first use to avoid startup CPU overhead.
+    
+    Returns:
+        bool: True if torch was successfully loaded, False otherwise.
+    """
     global _torch, _torch_optim, _torch_nn_utils, _torch_initialized
     if _torch_initialized:
         return _torch is not None
@@ -394,10 +398,11 @@ class NSOAligner:
                 # Access weights property to ensure it's initialized as a tensor
                 # This avoids duplicating tensor creation logic
                 weights = self.weights
-                if hasattr(weights, 'requires_grad'):
+                if hasattr(weights, 'requires_grad') and weights.requires_grad:
+                    # Use self._weights since we know it's the tensor from the property access
                     self._opt = _torch_optim.Adam([self._weights], lr=0.01)
                 else:
-                    # weights is a list (fallback), can't create optimizer
+                    # weights is a list (fallback) or tensor without grad, can't create optimizer
                     self._opt = None
             else:
                 self._opt = None
@@ -2333,9 +2338,10 @@ class NSOAligner:
         if not _ensure_torch_loaded() or _torch is None or _torch_nn_utils is None:
             return
         
-        # Check if weights is a torch tensor (not a fallback list)
-        if not hasattr(self.weights, 'requires_grad'):
-            return  # weights is a list fallback, skip RL update
+        # Verify weights is a torch tensor with gradients enabled (not a fallback list)
+        weights = self.weights
+        if not (hasattr(weights, 'requires_grad') and weights.requires_grad):
+            return  # weights is either a list fallback or tensor without grad, skip RL update
         
         individual_rewards = []
         for label in labels:
@@ -2347,7 +2353,7 @@ class NSOAligner:
                 individual_rewards.append(-1.0)  # Incorrect label
 
         # Pad or truncate rewards to match the full weight tensor length
-        num_weights = len(self.weights)
+        num_weights = len(weights)
         if len(individual_rewards) < num_weights:
             individual_rewards.extend([0.0] * (num_weights - len(individual_rewards)))
         elif len(individual_rewards) > num_weights:
