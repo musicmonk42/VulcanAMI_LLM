@@ -120,6 +120,15 @@ from typing import (
 
 import numpy as np
 
+# Try to import psutil for CPU monitoring - used to skip tests during high load
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    psutil = None
+    HAS_PSUTIL = False
+    # Don't warn at import time - we'll log if needed when we try to check
+
 # Type checking imports to avoid circular dependencies
 if TYPE_CHECKING:
     from src.adversarial_tester import AdversarialTester, AttackType
@@ -146,6 +155,12 @@ DEFAULT_PERIODIC_TEST_INTERVAL: int = 3600  # 1 hour
 DEFAULT_TENSOR_SIZE: int = 512
 MIN_PERIODIC_INTERVAL: int = 60  # Minimum 60 seconds between tests
 MAX_QUERY_LENGTH_FOR_LOGGING: int = 200  # Truncate queries in logs for privacy
+
+# FIX Issue 4: CPU threshold for skipping adversarial tests during high load
+# If CPU usage exceeds this threshold, skip the periodic adversarial test to avoid
+# competing with production traffic and causing performance degradation
+DEFAULT_CPU_THRESHOLD: float = 70.0  # Skip tests if CPU > 70%
+DEFAULT_MEMORY_THRESHOLD: float = 85.0  # Skip tests if memory > 85%
 
 # Character feature extraction ratio - use half the tensor for character features
 # to leave room for other features (length, word count, hash-based noise)
@@ -540,6 +555,53 @@ def get_adversarial_tester() -> Optional["AdversarialTester"]:
 # ============================================================
 
 
+def _check_system_load(
+    cpu_threshold: float = DEFAULT_CPU_THRESHOLD,
+    memory_threshold: float = DEFAULT_MEMORY_THRESHOLD,
+) -> Tuple[bool, str]:
+    """
+    FIX Issue 4: Check if system is under acceptable load for adversarial testing.
+
+    This prevents adversarial tests from running during high CPU/memory usage,
+    which was causing background CPU starvation during production traffic.
+
+    Args:
+        cpu_threshold: Maximum CPU percentage before skipping (default: 70%)
+        memory_threshold: Maximum memory percentage before skipping (default: 85%)
+
+    Returns:
+        Tuple of (is_acceptable, reason) where:
+        - is_acceptable: True if system load is acceptable for testing
+        - reason: Human-readable explanation if not acceptable
+    """
+    if not HAS_PSUTIL:
+        # If psutil isn't available, allow tests to run but log warning
+        logger.warning(
+            "psutil not available - cannot check system load before adversarial tests. "
+            "Install psutil for CPU/memory monitoring: pip install psutil"
+        )
+        return True, "psutil not available - cannot check system load"
+
+    try:
+        # Check CPU usage - use small interval (0.1s) for more accurate measurement
+        # This provides a balance between accuracy and blocking time
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        if cpu_percent > cpu_threshold:
+            return False, f"CPU usage at {cpu_percent:.1f}% (threshold: {cpu_threshold:.0f}%)"
+
+        # Check memory usage
+        memory = psutil.virtual_memory()
+        if memory.percent > memory_threshold:
+            return False, f"Memory usage at {memory.percent:.1f}% (threshold: {memory_threshold:.0f}%)"
+
+        return True, f"System load acceptable (CPU: {cpu_percent:.1f}%, Memory: {memory.percent:.1f}%)"
+
+    except Exception as e:
+        logger.warning(f"Error checking system load: {e}")
+        # On error, allow tests to run
+        return True, f"Error checking load: {e}"
+
+
 def start_periodic_testing(
     tester: Optional["AdversarialTester"] = None,
     interval_seconds: int = DEFAULT_PERIODIC_TEST_INTERVAL,
@@ -640,6 +702,14 @@ def start_periodic_testing(
 
             if not _PERIODIC_RUNNING:
                 break
+
+            # FIX Issue 4: Check system load before running tests
+            # Skip adversarial tests during high CPU/memory usage to avoid
+            # competing with production traffic
+            load_acceptable, load_reason = _check_system_load()
+            if not load_acceptable:
+                logger.info(f"⏸️ Skipping adversarial test - {load_reason}")
+                continue
 
             start_time = time.time()
             try:

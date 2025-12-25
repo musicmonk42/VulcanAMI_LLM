@@ -183,6 +183,20 @@ class SelfImprovementDrive:
     - Reporting (services/reporting_service.py)
     """
 
+    # FIX Issue 5: Blacklisted objectives that should never be auto-selected
+    # These are demo/test tasks that create noise and waste cycles on every startup
+    BLACKLISTED_OBJECTIVES = {
+        "fix_circular_imports",  # Demo task, creates dummy module_a.py/module_b.py files
+        "module_a_refactor",
+        "module_b_refactor",
+    }
+
+    # Files that should never be auto-modified by self-improvement
+    PROTECTED_FILES = {
+        "src/module_a.py",
+        "src/module_b.py",
+    }
+
     # --- START REPLACEMENT ---
     def __init__(
         self,
@@ -207,6 +221,9 @@ class SelfImprovementDrive:
         self.alert_callback = alert_callback
         self.approval_checker = approval_checker
         self._lock = threading.RLock()
+        
+        # FIX Issue 5: Track if blacklisted objectives have been logged (only log once)
+        self._blacklist_logged = False
 
         # --- START ADDITION ---
         self.world_model = world_model
@@ -1595,8 +1612,20 @@ class SelfImprovementDrive:
         available_objectives = [
             obj
             for obj in self.objectives
-            if not obj.completed and obj.cooldown_until <= current_time
+            if not obj.completed 
+            and obj.cooldown_until <= current_time
+            # FIX Issue 5: Skip blacklisted objectives to avoid dummy circular import fixes
+            and obj.type not in self.BLACKLISTED_OBJECTIVES
         ]
+
+        # FIX Issue 5: Log skipped blacklisted objectives (only once per session)
+        blacklisted_found = [
+            obj.type for obj in self.objectives 
+            if obj.type in self.BLACKLISTED_OBJECTIVES and not obj.completed
+        ]
+        if blacklisted_found and not self._blacklist_logged:
+            logger.debug(f"Skipping blacklisted objectives: {blacklisted_found}")
+            self._blacklist_logged = True
 
         if not available_objectives:
             # Check if any are just on cooldown
