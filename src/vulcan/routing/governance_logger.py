@@ -110,7 +110,7 @@ _DEFAULT_GOVERNANCE_WORKERS = min(4, (os.cpu_count() or 1) + 1)
 # - Background thread flush (prevents per-query blocking)
 # - Rotating log files (prevents single file growing indefinitely)
 
-DEFAULT_BUFFER_MAXLEN = 100  # Maximum entries in buffer before oldest are dropped
+DEFAULT_BUFFER_MAXLEN = 500  # Maximum entries in buffer before oldest are dropped
 DEFAULT_FLUSH_INTERVAL = 5.0  # Flush buffer to disk every N seconds
 DEFAULT_LOG_PATH = Path("governance_logs")  # Default directory for JSONL log files
 

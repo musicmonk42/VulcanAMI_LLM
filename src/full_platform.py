@@ -678,6 +678,40 @@ def setup_python_path():
     print(f"Debug: Python path configured: {sys.path[:3]}...")
 
 
+def _build_subprocess_env(extra_env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    """
+    Build environment for subprocess with proper PYTHONPATH.
+    
+    PERFORMANCE FIX: This ensures subprocesses can find llm_client and other
+    project modules, preventing ModuleNotFoundError and 30-40s timeout per query.
+    
+    Args:
+        extra_env: Optional additional environment variables to include
+        
+    Returns:
+        Environment dictionary with PYTHONPATH set correctly
+    """
+    # Get project root and src directory
+    src_dir = Path(__file__).resolve().parent
+    project_root = src_dir.parent
+    
+    # Start with copy of current environment
+    env = os.environ.copy()
+    
+    # Build PYTHONPATH: /app:/app/src (or equivalent for local paths)
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    new_pythonpath = f"{project_root}{os.pathsep}{src_dir}"
+    if existing_pythonpath:
+        new_pythonpath = f"{new_pythonpath}{os.pathsep}{existing_pythonpath}"
+    env["PYTHONPATH"] = new_pythonpath
+    
+    # Add any extra environment variables
+    if extra_env:
+        env.update(extra_env)
+    
+    return env
+
+
 setup_python_path()
 
 # =============================================================================
@@ -1671,15 +1705,12 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting API Server on port {settings.api_server_port}..."
                 )
-                # Build environment for API server
-                # - Use GRAPHIX_API_PORT to avoid conflict with main app's PORT
-                # - Pass GRAPHIX_JWT_SECRET if available, otherwise enable ephemeral secret
-                # - Share JWT_SECRET_KEY from main platform if GRAPHIX_JWT_SECRET not set
-                api_server_env = {
-                    **os.environ,
+                # PERFORMANCE FIX: Use _build_subprocess_env to ensure PYTHONPATH is set
+                # This prevents ModuleNotFoundError for llm_client and other modules
+                api_server_env = _build_subprocess_env({
                     "GRAPHIX_API_PORT": str(settings.api_server_port),
                     "GRAPHIX_API_HOST": "0.0.0.0",
-                }
+                })
                 # Remove PORT to prevent api_server from using main app's port
                 api_server_env.pop("PORT", None)
                 
@@ -1731,12 +1762,11 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting Registry gRPC Server on port {settings.registry_grpc_port}..."
                 )
-                # Build environment for Registry gRPC server
-                registry_env = {
-                    **os.environ,
+                # PERFORMANCE FIX: Use _build_subprocess_env to ensure PYTHONPATH is set
+                registry_env = _build_subprocess_env({
                     "REGISTRY_PORT": str(settings.registry_grpc_port),
                     "REGISTRY_DB_PATH": os.environ.get("REGISTRY_DB_PATH", "registry.db"),
-                }
+                })
                 # Remove PORT to prevent conflict with main app
                 registry_env.pop("PORT", None)
                 
@@ -1780,11 +1810,10 @@ async def lifespan(app: FastAPI):
                 logger.info(
                     f"Starting Listener Service on port {settings.listener_port}..."
                 )
-                # Build environment for Listener service
-                listener_env = {
-                    **os.environ,
+                # PERFORMANCE FIX: Use _build_subprocess_env to ensure PYTHONPATH is set
+                listener_env = _build_subprocess_env({
                     "LISTENER_DB_PATH": os.environ.get("LISTENER_DB_PATH", "listener_registry.db"),
-                }
+                })
                 # Remove PORT to prevent conflict with main app
                 listener_env.pop("PORT", None)
                 
