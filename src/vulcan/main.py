@@ -979,6 +979,15 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"[VULCAN] Error stopping SelfOptimizer: {e}")
         
+        # Shutdown HardwareDispatcher if present in Arena
+        if hasattr(app.state, 'arena') and hasattr(app.state.arena, 'hardware_dispatcher'):
+            if app.state.arena.hardware_dispatcher:
+                try:
+                    app.state.arena.hardware_dispatcher.shutdown()
+                    logger.info("[VULCAN] ✓ HardwareDispatcher shutdown complete")
+                except Exception as e:
+                    logger.warning(f"[VULCAN] Error shutting down HardwareDispatcher: {e}")
+
         if startup_complete and hasattr(app.state, "deployment"):
             deployment = app.state.deployment
 
@@ -5802,6 +5811,58 @@ async def get_hardware_status():
     except Exception as e:
         logger.error(f"Failed to get hardware status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/hardware/status")
+async def get_hardware_dispatcher_status(request: Request):
+    """
+    Get hardware dispatcher status and metrics.
+    
+    Returns detailed information about available hardware backends,
+    performance metrics, and health status for the HardwareDispatcher
+    used by GraphixArena for optimal computation routing.
+    """
+    if not hasattr(request.app.state, 'arena'):
+        return {"error": "Arena not initialized", "mode": "unavailable"}
+
+    arena = request.app.state.arena
+    if not hasattr(arena, 'hardware_dispatcher') or not arena.hardware_dispatcher:
+        return {"error": "HardwareDispatcher not available", "mode": "cpu_only"}
+
+    dispatcher = arena.hardware_dispatcher
+
+    try:
+        # Get available backends
+        available_backends = dispatcher.list_available_hardware()
+        
+        # Get metrics summary
+        metrics_summary = dispatcher.get_metrics_summary()
+        
+        # Get health status for each backend
+        health_status = {}
+        for backend, capabilities in dispatcher.hardware_registry.items():
+            health_status[backend.value] = {
+                "status": capabilities.health_status,
+                "last_check": (
+                    capabilities.last_health_check.isoformat()
+                    if capabilities.last_health_check
+                    else None
+                ),
+                "available": capabilities.available,
+            }
+
+        return {
+            "available_backends": available_backends,
+            "metrics_summary": metrics_summary,
+            "health_status": health_status,
+            "mode": "dispatcher_active",
+        }
+    except Exception as e:
+        logger.error(f"Failed to get hardware dispatcher status: {e}")
+        return {
+            "error": str(e),
+            "mode": "error",
+        }
 
 
 # ============================================================
