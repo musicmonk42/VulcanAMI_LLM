@@ -243,7 +243,9 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     
     # PERFORMANCE FIX: Fast-path skip for low-complexity queries
     # Queries with complexity < threshold skip Arena entirely for faster response
-    complexity = getattr(routing_plan, 'complexity_score', 0.5)
+    # Default to 0.0 if complexity_score is not available to skip Arena by default
+    # rather than unexpectedly calling Arena when complexity is unknown
+    complexity = getattr(routing_plan, 'complexity_score', 0.0)
     if complexity < complexity_threshold:
         logger.info(f"[ARENA] Fast-path skip: complexity {complexity:.2f} < threshold {complexity_threshold:.2f}")
         return {

@@ -93,6 +93,31 @@ class GraphValidator:
         return graph
 
     @staticmethod
+    def ensure_valid_graph(graph: Any, validator: "GraphValidator") -> Dict[str, Any]:
+        """
+        Normalize and validate a graph, returning a valid structure.
+        
+        This helper reduces code duplication in augmentation methods.
+        
+        Args:
+            graph: Input graph (may be invalid)
+            validator: GraphValidator instance
+            
+        Returns:
+            Valid graph dictionary
+        """
+        # First normalize the graph
+        graph = validator.normalize_graph(graph)
+        
+        # Validate the normalized input
+        valid, error = validator.validate_graph(graph)
+        if not valid:
+            logger.warning(f"Graph validation failed after normalization: {error}. Using empty graph.")
+            return {"nodes": [], "edges": []}
+        
+        return graph
+
+    @staticmethod
     def validate_graph(graph: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         """
         Validate graph structure.
@@ -476,17 +501,8 @@ class DataAugmentor:
         Raises:
             ValueError: If complexity out of range
         """
-        # PERFORMANCE FIX: Normalize invalid graphs instead of crashing
-        # This prevents "Invalid base graph: Missing 'nodes' field" errors
-        # by creating a valid empty structure that can be augmented
-        base_graph = self.validator.normalize_graph(base_graph)
-        
-        # Validate the normalized input
-        valid, error = self.validator.validate_graph(base_graph)
-        if not valid:
-            # This shouldn't happen after normalization, but log warning if it does
-            logger.warning(f"Graph validation failed after normalization: {error}. Using empty graph.")
-            base_graph = {"nodes": [], "edges": []}
+        # PERFORMANCE FIX: Use helper to normalize and validate graph
+        base_graph = self.validator.ensure_valid_graph(base_graph, self.validator)
 
         if not (1 <= complexity <= MAX_COMPLEXITY):
             raise ValueError(f"Complexity must be 1-{MAX_COMPLEXITY}, got {complexity}")
@@ -626,14 +642,8 @@ class DataAugmentor:
         Returns:
             Counterfactual proposal
         """
-        # PERFORMANCE FIX: Normalize invalid graphs instead of crashing
-        base_graph = self.validator.normalize_graph(base_graph)
-        
-        # Validate the normalized input
-        valid, error = self.validator.validate_graph(base_graph)
-        if not valid:
-            logger.warning(f"Graph validation failed after normalization: {error}. Using empty graph.")
-            base_graph = {"nodes": [], "edges": []}
+        # PERFORMANCE FIX: Use helper to normalize and validate graph
+        base_graph = self.validator.ensure_valid_graph(base_graph, self.validator)
 
         proposal = copy.deepcopy(base_graph)
         nodes = proposal.get("nodes", [])
@@ -732,14 +742,8 @@ class DataAugmentor:
         Raises:
             ValueError: If graph is empty after normalization (can't create adversarial from nothing)
         """
-        # PERFORMANCE FIX: Normalize invalid graphs instead of crashing
-        base_graph = self.validator.normalize_graph(base_graph)
-        
-        # Validate the normalized input
-        valid, error = self.validator.validate_graph(base_graph)
-        if not valid:
-            logger.warning(f"Graph validation failed after normalization: {error}. Using empty graph.")
-            base_graph = {"nodes": [], "edges": []}
+        # PERFORMANCE FIX: Use helper to normalize and validate graph
+        base_graph = self.validator.ensure_valid_graph(base_graph, self.validator)
 
         proposal = copy.deepcopy(base_graph)
         nodes = proposal.get("nodes", [])
@@ -894,14 +898,8 @@ class DataAugmentor:
         Raises:
             ValueError: If n invalid
         """
-        # PERFORMANCE FIX: Normalize invalid graphs instead of crashing
-        base_graph = self.validator.normalize_graph(base_graph)
-        
-        # Validate the normalized input
-        valid, error = self.validator.validate_graph(base_graph)
-        if not valid:
-            logger.warning(f"Graph validation failed after normalization: {error}. Using empty graph.")
-            base_graph = {"nodes": [], "edges": []}
+        # PERFORMANCE FIX: Use helper to normalize and validate graph
+        base_graph = self.validator.ensure_valid_graph(base_graph, self.validator)
 
         if not (1 <= n <= MAX_BATCH_SIZE):
             raise ValueError(f"Batch size must be 1-{MAX_BATCH_SIZE}, got {n}")

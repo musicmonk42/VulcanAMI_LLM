@@ -699,8 +699,9 @@ def _build_subprocess_env(extra_env: Optional[Dict[str, str]] = None) -> Dict[st
     env = os.environ.copy()
     
     # Build PYTHONPATH: /app:/app/src (or equivalent for local paths)
+    # Use str() for cross-platform compatibility (Windows vs Unix)
     existing_pythonpath = env.get("PYTHONPATH", "")
-    new_pythonpath = f"{project_root}{os.pathsep}{src_dir}"
+    new_pythonpath = f"{str(project_root)}{os.pathsep}{str(src_dir)}"
     if existing_pythonpath:
         new_pythonpath = f"{new_pythonpath}{os.pathsep}{existing_pythonpath}"
     env["PYTHONPATH"] = new_pythonpath

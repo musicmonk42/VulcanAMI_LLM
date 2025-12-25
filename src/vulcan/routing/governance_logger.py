@@ -261,8 +261,8 @@ class BufferedGovernanceLogger:
 
     Args:
         log_path: Directory for log files (default: "governance_logs")
-        buffer_maxlen: Maximum buffer size before oldest entries are dropped (default: 100)
-        flush_interval: Seconds between background flushes (default: 5.0)
+        buffer_maxlen: Maximum buffer size before oldest entries are dropped (default: DEFAULT_BUFFER_MAXLEN=500)
+        flush_interval: Seconds between background flushes (default: DEFAULT_FLUSH_INTERVAL=5.0)
     """
 
     def __init__(
@@ -276,8 +276,8 @@ class BufferedGovernanceLogger:
 
         Args:
             log_path: Directory for rotating log files
-            buffer_maxlen: Maximum entries in buffer (default: 100)
-            flush_interval: Seconds between background flushes (default: 5.0)
+            buffer_maxlen: Maximum entries in buffer (default: DEFAULT_BUFFER_MAXLEN=500)
+            flush_interval: Seconds between background flushes (default: DEFAULT_FLUSH_INTERVAL=5.0)
         """
         self.log_path = Path(log_path)
         self._buffer: Deque[Dict[str, Any]] = deque(maxlen=buffer_maxlen)
