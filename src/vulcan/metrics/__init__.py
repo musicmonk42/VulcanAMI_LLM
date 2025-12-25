@@ -273,6 +273,6 @@ _get_or_create_metric = get_or_create_metric
 
 # Log module initialization
 if PROMETHEUS_AVAILABLE:
-    logger.info(f"VULCAN-AGI Metrics module v{__version__} loaded with Prometheus support")
+    logger.info(f"VULCAN-AGI Metrics module v{__version__} loaded (Prometheus enabled)")
 else:
-    logger.info(f"VULCAN-AGI Metrics module v{__version__} loaded (using mock metrics - prometheus_client not installed)")
+    logger.info(f"VULCAN-AGI Metrics module v{__version__} loaded (mock metrics)")

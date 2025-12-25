@@ -63,7 +63,8 @@ class DistillationStorageBackend:
         self.logger = logging.getLogger("DistillationStorage")
         
         # Thread safety lock for concurrent access
-        self._lock = threading.RLock()
+        # Using threading.Lock for efficiency since we don't need reentrant behavior
+        self._lock = threading.Lock()
         
         # Ensure storage directory exists
         self.storage_path.mkdir(parents=True, exist_ok=True)

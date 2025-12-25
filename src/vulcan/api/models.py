@@ -13,7 +13,8 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from enum import Enum
 
 # Module metadata
 __version__ = "1.0.0"
@@ -145,27 +146,45 @@ class ImprovementApproval(BaseModel):
     status: str = "pending"
 
 
+class HealthStatus(str, Enum):
+    """Enumeration of possible health statuses."""
+    OK = "ok"
+    DEGRADED = "degraded"
+    DOWN = "down"
+
+
+class ErrorType(str, Enum):
+    """Enumeration of common error types."""
+    VALIDATION_ERROR = "validation_error"
+    AUTHENTICATION_ERROR = "authentication_error"
+    AUTHORIZATION_ERROR = "authorization_error"
+    NOT_FOUND = "not_found"
+    TIMEOUT = "timeout"
+    INTERNAL_ERROR = "internal_error"
+    SERVICE_UNAVAILABLE = "service_unavailable"
+
+
 class HealthResponse(BaseModel):
     """Response model for health check endpoints."""
-    status: str
-    healthy: bool
-    components: Optional[Dict[str, Any]] = None
-    version: Optional[str] = None
-    uptime_seconds: Optional[float] = None
+    status: HealthStatus = Field(default=HealthStatus.OK, description="Current health status")
+    healthy: bool = Field(default=True, description="Overall health indicator")
+    components: Optional[Dict[str, Any]] = Field(default=None, description="Component health details")
+    version: Optional[str] = Field(default=None, description="Application version")
+    uptime_seconds: Optional[float] = Field(default=None, description="Uptime in seconds")
 
 
 class MetricsResponse(BaseModel):
     """Response model for metrics endpoints."""
-    prometheus_data: Optional[str] = None
-    internal_metrics: Optional[Dict[str, Any]] = None
+    prometheus_data: Optional[str] = Field(default=None, description="Prometheus-format metrics")
+    internal_metrics: Optional[Dict[str, Any]] = Field(default=None, description="Internal metrics data")
 
 
 class ErrorResponse(BaseModel):
     """Standard error response model."""
-    error: str
-    detail: Optional[str] = None
-    error_type: Optional[str] = None
-    timestamp: Optional[float] = None
+    error: str = Field(..., description="Error message")
+    detail: Optional[str] = Field(default=None, description="Detailed error description")
+    error_type: Optional[ErrorType] = Field(default=None, description="Type of error")
+    timestamp: Optional[float] = Field(default=None, description="Error timestamp")
 
 
 # ============================================================
@@ -173,6 +192,9 @@ class ErrorResponse(BaseModel):
 # ============================================================
 
 __all__ = [
+    # Enums
+    "HealthStatus",
+    "ErrorType",
     # Request models
     "StepRequest",
     "PlanRequest",
