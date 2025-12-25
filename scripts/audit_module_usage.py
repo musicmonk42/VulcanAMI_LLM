@@ -21,27 +21,37 @@ MODULES = {
     'TournamentManager': {
         'file': 'src/tournament_manager.py',
         'class': 'TournamentManager',
-        'expected_methods': ['run_tournament', 'run_adaptive_tournament', 'select_winner', 'evaluate_proposals']
+        'expected_methods': ['run_tournament', 'run_adaptive_tournament', 'select_winner', 'evaluate_proposals'],
+        'request_flow_file': 'src/graphix_arena.py',
+        'integration_note': 'Used in Arena /tournament endpoint, should appear in logs as "[trace] Tournament complete:"'
     },
     'EvolutionEngine': {
         'file': 'src/evolution_engine.py',
         'class': 'EvolutionEngine',
-        'expected_methods': ['evolve', 'mutate', 'crossover', 'run_generation', 'run_evolution']
+        'expected_methods': ['evolve', 'mutate', 'crossover', 'run_generation', 'run_evolution'],
+        'request_flow_file': 'src/graphix_arena.py',
+        'integration_note': 'Integrated into run_shadow_task for generator/evolver agents, logs "[EvolutionEngine] Starting evolution"'
     },
     'ConsensusEngine': {
         'file': 'src/consensus_engine.py',
         'class': 'ConsensusEngine',
-        'expected_methods': ['reach_consensus', 'vote', 'aggregate', 'evaluate_proposal']
+        'expected_methods': ['reach_consensus', 'vote', 'aggregate', 'evaluate_proposal'],
+        'request_flow_file': 'src/memory/governed_unlearning.py',
+        'integration_note': 'Used in governed unlearning/training paths, not typical request flow'
     },
     'GovernanceLoop': {
         'file': 'src/governance_loop.py',
         'class': 'GovernanceLoop',
-        'expected_methods': ['enforce_policies', 'check_compliance', 'add_policy', 'start', 'stop']
+        'expected_methods': ['enforce_policies', 'check_compliance', 'add_policy', 'start', 'stop'],
+        'request_flow_file': 'src/unified_runtime/runtime_extensions.py',
+        'integration_note': 'Policy enforcement system; vulcan.routing.governance_logger is separate audit logger'
     },
     'Superoptimizer': {
         'file': 'src/superoptimizer.py',
         'class': 'Superoptimizer',
-        'expected_methods': ['optimize', 'search', 'evaluate', 'optimize_graph']
+        'expected_methods': ['optimize', 'search', 'evaluate', 'optimize_graph', 'generate_kernel'],
+        'request_flow_file': 'src/full_platform.py',
+        'integration_note': 'Stored in app.state but not accessed; for kernel optimization, not typical request flow'
     }
 }
 
@@ -97,6 +107,48 @@ def find_all_calls(src_dir: str, class_name: str, method_names: list) -> dict:
     return results
 
 
+def check_request_flow_integration(class_name: str, request_flow_file: str) -> dict:
+    """Check if a module is integrated into the request flow file."""
+    result = {
+        'integrated': False,
+        'location': None,
+        'usage_type': None
+    }
+    
+    try:
+        file_path = Path(request_flow_file)
+        if not file_path.exists():
+            return result
+            
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+        
+        # Check for various integration patterns
+        patterns = [
+            (rf'self\.{class_name.lower()}', 'instance_attribute'),
+            (rf'self\.\w*{class_name.lower()}\w*', 'instance_attribute'),
+            (rf'app\.state\.{class_name.lower()}', 'app_state'),
+            (rf'{class_name}\(', 'direct_instantiation'),
+        ]
+        
+        for pattern, usage_type in patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                result['integrated'] = True
+                result['usage_type'] = usage_type
+                # Find line number
+                lines = content.split('\n')
+                for i, line in enumerate(lines, 1):
+                    if re.search(pattern, line, re.IGNORECASE):
+                        result['location'] = i
+                        break
+                break
+                
+    except Exception as e:
+        print(f"Warning: Could not check {request_flow_file}: {e}")
+        
+    return result
+
+
 def audit_module(name: str, config: dict) -> dict:
     """Audit a single module's usage."""
     print(f"\n{'='*60}")
@@ -104,6 +156,7 @@ def audit_module(name: str, config: dict) -> dict:
     print(f"{'='*60}")
 
     results = find_all_calls('src', config['class'], config['expected_methods'])
+    request_flow = check_request_flow_integration(config['class'], config.get('request_flow_file', ''))
 
     print(f"\n📦 Imports ({len(results['imports'])}):")
     for file, line, code in results['imports'][:5]:
@@ -138,6 +191,17 @@ def audit_module(name: str, config: dict) -> dict:
         else:
             print(f"   .{method}() - ❌ NEVER CALLED")
 
+    # Check request flow integration
+    print(f"\n🔄 Request Flow Integration:")
+    if request_flow['integrated']:
+        print(f"   ✅ Integrated in {config.get('request_flow_file', 'N/A')}")
+        print(f"      Usage: {request_flow['usage_type']} at line {request_flow['location']}")
+    else:
+        print(f"   ⚠️  Not found in {config.get('request_flow_file', 'N/A')}")
+    
+    print(f"\n📝 Integration Note:")
+    print(f"   {config.get('integration_note', 'N/A')}")
+
     # Determine status
     has_storage = len(results['stored_assignments']) > 0
     has_calls = total_calls > 0
@@ -159,7 +223,9 @@ def audit_module(name: str, config: dict) -> dict:
         'instantiations': len(results['instantiations']),
         'stored': len(results['stored_assignments']),
         'method_calls': total_calls,
-        'status': status
+        'request_flow_integrated': request_flow['integrated'],
+        'status': status,
+        'integration_note': config.get('integration_note', '')
     }
 
 
@@ -185,16 +251,13 @@ def main():
 
     # Recommendations
     print("\n" + "=" * 60)
-    print("RECOMMENDATIONS")
+    print("REQUEST FLOW INTEGRATION STATUS")
     print("=" * 60)
-
-    unused_modules = [r for r in summary if 'NEVER CALLED' in r['status'] or 'NOT INTEGRATED' in r['status']]
-    if unused_modules:
-        print("\nModules that need wiring into request flow:")
-        for r in unused_modules:
-            print(f"  - {r['name']}: {r['status']}")
-    else:
-        print("\n✅ All modules appear to be integrated!")
+    
+    for r in summary:
+        status_icon = "✅" if r['request_flow_integrated'] else "⚠️"
+        print(f"\n{status_icon} {r['name']}:")
+        print(f"   {r['integration_note']}")
 
     return summary
 
