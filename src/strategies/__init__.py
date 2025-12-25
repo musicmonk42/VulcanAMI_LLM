@@ -59,8 +59,15 @@ from .value_of_information import (
     ValueOfInformationGate,
     VOIAction,
 )
+from .strategy_orchestrator import (
+    StrategyOrchestrator,
+    StrategyDecision,
+)
 
 __all__ = [
+    # Strategy Orchestrator (main entry point)
+    "StrategyOrchestrator",
+    "StrategyDecision",
     # Cost Model
     "StochasticCostModel",
     "CostPredictor",

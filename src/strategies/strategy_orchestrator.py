@@ -1,0 +1,523 @@
+"""
+Strategy Orchestrator - Wires all strategy components together
+
+This is the main entry point for the strategies module, providing intelligent
+tool selection through:
+- Multi-tier feature extraction with VOI-gated progression
+- Distribution drift detection and alerting
+- Stochastic cost prediction with uncertainty quantification
+- Tool health monitoring and degradation handling
+"""
+
+import logging
+import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+# Try importing strategy components with fallbacks
+try:
+    from .cost_model import StochasticCostModel, CostObservation, CostComponent
+    COST_MODEL_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"StochasticCostModel not available: {e}")
+    COST_MODEL_AVAILABLE = False
+    StochasticCostModel = None
+    CostObservation = None
+    CostComponent = None
+
+try:
+    from .distribution_monitor import DistributionMonitor, DriftSeverity
+    DISTRIBUTION_MONITOR_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"DistributionMonitor not available: {e}")
+    DISTRIBUTION_MONITOR_AVAILABLE = False
+    DistributionMonitor = None
+    DriftSeverity = None
+
+try:
+    from .feature_extraction import MultiTierFeatureExtractor, FeatureTier, ExtractionResult
+    FEATURE_EXTRACTOR_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"MultiTierFeatureExtractor not available: {e}")
+    FEATURE_EXTRACTOR_AVAILABLE = False
+    MultiTierFeatureExtractor = None
+    FeatureTier = None
+    ExtractionResult = None
+
+try:
+    from .tool_monitor import ToolMonitor, HealthStatus
+    TOOL_MONITOR_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"ToolMonitor not available: {e}")
+    TOOL_MONITOR_AVAILABLE = False
+    ToolMonitor = None
+    HealthStatus = None
+
+try:
+    from .value_of_information import ValueOfInformationGate, DecisionState, VOIAction
+    VOI_GATE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"ValueOfInformationGate not available: {e}")
+    VOI_GATE_AVAILABLE = False
+    ValueOfInformationGate = None
+    DecisionState = None
+    VOIAction = None
+
+
+@dataclass
+class StrategyDecision:
+    """Result of strategy analysis"""
+    recommended_tool: str
+    confidence: float
+    estimated_cost_ms: float
+    drift_detected: bool
+    drift_severity: Optional[str] = None
+    feature_tier_used: int = 1
+    voi_decision: str = "proceed"
+    health_status: str = "healthy"
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+class StrategyOrchestrator:
+    """
+    Orchestrates all strategy components for intelligent tool selection.
+    
+    This is the main entry point for the strategies module.
+    """
+    
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        config = config or {}
+        
+        # Initialize all strategy components with fallbacks
+        self.cost_model = None
+        self.distribution_monitor = None
+        self.feature_extractor = None
+        self.tool_monitor = None
+        self.voi_gate = None
+        
+        if COST_MODEL_AVAILABLE and StochasticCostModel:
+            try:
+                self.cost_model = StochasticCostModel(config.get('cost_model', {}))
+                logger.info("[StrategyOrchestrator] StochasticCostModel initialized")
+            except Exception as e:
+                logger.warning(f"[StrategyOrchestrator] Failed to init StochasticCostModel: {e}")
+        
+        if DISTRIBUTION_MONITOR_AVAILABLE and DistributionMonitor:
+            try:
+                self.distribution_monitor = DistributionMonitor(config.get('drift', {}))
+                logger.info("[StrategyOrchestrator] DistributionMonitor initialized")
+            except Exception as e:
+                logger.warning(f"[StrategyOrchestrator] Failed to init DistributionMonitor: {e}")
+        
+        if FEATURE_EXTRACTOR_AVAILABLE and MultiTierFeatureExtractor:
+            try:
+                self.feature_extractor = MultiTierFeatureExtractor(config.get('features', {}))
+                logger.info("[StrategyOrchestrator] MultiTierFeatureExtractor initialized")
+            except Exception as e:
+                logger.warning(f"[StrategyOrchestrator] Failed to init MultiTierFeatureExtractor: {e}")
+        
+        if TOOL_MONITOR_AVAILABLE and ToolMonitor:
+            try:
+                self.tool_monitor = ToolMonitor(config.get('monitoring', {}))
+                logger.info("[StrategyOrchestrator] ToolMonitor initialized")
+            except Exception as e:
+                logger.warning(f"[StrategyOrchestrator] Failed to init ToolMonitor: {e}")
+        
+        if VOI_GATE_AVAILABLE and ValueOfInformationGate:
+            try:
+                self.voi_gate = ValueOfInformationGate(config.get('voi', {}))
+                logger.info("[StrategyOrchestrator] ValueOfInformationGate initialized")
+            except Exception as e:
+                logger.warning(f"[StrategyOrchestrator] Failed to init ValueOfInformationGate: {e}")
+        
+        # Available tools
+        self.available_tools = config.get('tools', [
+            'symbolic', 'probabilistic', 'causal', 'neural', 'hybrid'
+        ])
+        
+        # Statistics
+        self.total_decisions = 0
+        self.total_drift_detections = 0
+        self.total_voi_gathers = 0
+        
+        # Component availability summary
+        components = []
+        if self.cost_model:
+            components.append("cost_model")
+        if self.distribution_monitor:
+            components.append("drift_monitor")
+        if self.feature_extractor:
+            components.append("feature_extractor")
+        if self.tool_monitor:
+            components.append("tool_monitor")
+        if self.voi_gate:
+            components.append("voi_gate")
+        
+        logger.info(f"[StrategyOrchestrator] Initialized with {len(components)}/5 components: {components}")
+    
+    # Default values for decision making (can be configured)
+    DEFAULT_INITIAL_UNCERTAINTY = 0.5
+    DEFAULT_INITIAL_CONFIDENCE = 0.5
+    
+    def analyze(
+        self,
+        query: Any,
+        context: Optional[Dict[str, Any]] = None
+    ) -> StrategyDecision:
+        """
+        Analyze a query and recommend the best tool.
+        
+        This is the main entry point for tool selection.
+        Note: This is a synchronous method for simpler integration.
+        """
+        start_time = time.time()
+        context = context or {}
+        features = None
+        tier_used = 1
+        drift_detected = False
+        drift_summary = {}
+        voi_decision = 'proceed'
+        extraction_time_ms = 0.0
+        
+        # Step 1: Extract features (start with Tier 1)
+        if self.feature_extractor:
+            try:
+                extract_start = time.time()
+                features = self.feature_extractor.extract_tier1(query)
+                extraction_time_ms = (time.time() - extract_start) * 1000
+                tier_used = 1
+                logger.info(
+                    f"[Strategy] Extracted {len(features) if features is not None else 0} "
+                    f"Tier-1 features in {extraction_time_ms:.1f}ms"
+                )
+            except Exception as e:
+                logger.warning(f"[Strategy] Feature extraction failed: {e}")
+                features = np.zeros(15)  # Fallback
+        else:
+            # Create dummy features if extractor not available
+            features = np.zeros(15)
+        
+        # Step 2: Check for distribution drift
+        if self.distribution_monitor and features is not None:
+            try:
+                drift_detected = self.distribution_monitor.detect_shift(features.reshape(1, -1))
+                drift_summary = self.distribution_monitor.get_drift_summary()
+                
+                if drift_detected:
+                    self.total_drift_detections += 1
+                    logger.warning(f"[Strategy] Distribution drift detected! Summary: {drift_summary}")
+            except Exception as e:
+                logger.warning(f"[Strategy] Drift detection failed: {e}")
+        
+        # Step 3: VOI decision - should we gather more features?
+        if self.voi_gate and DecisionState and VOIAction and features is not None:
+            try:
+                decision_state = DecisionState(
+                    features=features,
+                    uncertainty=self.DEFAULT_INITIAL_UNCERTAINTY,
+                    current_confidence=self.DEFAULT_INITIAL_CONFIDENCE,
+                    gathered_information=[],
+                    remaining_budget={'time_ms': context.get('budget_ms', 1000)}
+                )
+                
+                voi_result = self.voi_gate.should_gather_more(decision_state)
+                
+                if voi_result and voi_result.recommendation != VOIAction.PROCEED:
+                    voi_decision = voi_result.recommendation.value
+                    self.total_voi_gathers += 1
+                    
+                    # Extract higher-tier features based on VOI recommendation
+                    if self.feature_extractor:
+                        try:
+                            extract_start = time.time()
+                            if voi_result.recommendation == VOIAction.GATHER_MORE:
+                                features = self.feature_extractor.extract_tier2(query)
+                                tier_used = 2
+                            elif voi_result.recommendation == VOIAction.FULL_ANALYSIS:
+                                features = self.feature_extractor.extract_tier3(query)
+                                tier_used = 3
+                            else:
+                                features = self.feature_extractor.extract_tier2(query)
+                                tier_used = 2
+                            
+                            extraction_time_ms = (time.time() - extract_start) * 1000
+                            logger.info(
+                                f"[Strategy] VOI: Upgraded to Tier-{tier_used} features "
+                                f"({extraction_time_ms:.1f}ms)"
+                            )
+                        except Exception as e:
+                            logger.warning(f"[Strategy] Higher-tier extraction failed: {e}")
+            except Exception as e:
+                logger.warning(f"[Strategy] VOI analysis failed: {e}")
+        
+        # Step 4: Predict costs for each tool
+        tool_costs = {}
+        tool_predictions = {}
+        
+        if self.cost_model and CostComponent and features is not None:
+            try:
+                for tool in self.available_tools:
+                    cost_pred = self.cost_model.predict_cost(tool, features)
+                    tool_costs[tool] = cost_pred
+                    tool_predictions[tool] = cost_pred.get(
+                        CostComponent.TIME_MS.value, {}
+                    ).get('mean', float('inf'))
+            except Exception as e:
+                logger.warning(f"[Strategy] Cost prediction failed: {e}")
+                # Fallback to default predictions
+                for tool in self.available_tools:
+                    tool_predictions[tool] = 1000.0  # 1 second default
+        else:
+            # Fallback predictions
+            for tool in self.available_tools:
+                tool_predictions[tool] = 1000.0
+        
+        # Step 5: Get tool health status
+        health_status = "healthy"
+        if self.tool_monitor and HealthStatus:
+            try:
+                health_status = self.tool_monitor.get_health_status().value
+            except Exception as e:
+                logger.warning(f"[Strategy] Health check failed: {e}")
+        
+        # Step 6: Select best tool (lowest cost + health consideration)
+        best_tool = self.available_tools[0] if self.available_tools else "symbolic"
+        best_score = float('inf')
+        
+        for tool, cost in tool_predictions.items():
+            # Get tool health score
+            tool_health_score = 1.0
+            if self.tool_monitor:
+                try:
+                    tool_metrics = self.tool_monitor.tool_metrics.get(tool)
+                    if tool_metrics:
+                        tool_health_score = tool_metrics.health_score
+                except Exception:
+                    pass
+            
+            # Penalize unhealthy tools
+            adjusted_cost = cost / max(0.1, tool_health_score)
+            
+            if adjusted_cost < best_score:
+                best_score = adjusted_cost
+                best_tool = tool
+        
+        # Calculate confidence based on cost variance
+        confidence = 0.5
+        if best_tool in tool_costs and CostComponent:
+            try:
+                cost_info = tool_costs[best_tool].get(CostComponent.TIME_MS.value, {})
+                mean_cost = cost_info.get('mean', 100)
+                std_cost = cost_info.get('std', 10)
+                # Confidence inversely related to coefficient of variation
+                cv = std_cost / max(1, mean_cost)
+                confidence = max(0.1, min(0.99, 1 - cv))
+            except Exception:
+                pass
+        
+        # Update statistics
+        self.total_decisions += 1
+        
+        # Record for monitoring
+        if self.distribution_monitor and features is not None:
+            try:
+                self.distribution_monitor.update(features.reshape(1, -1))
+            except Exception as e:
+                logger.debug(f"[Strategy] Distribution update failed: {e}")
+        
+        elapsed_ms = (time.time() - start_time) * 1000
+        
+        logger.info(
+            f"[Strategy] Decision: tool={best_tool}, confidence={confidence:.2f}, "
+            f"drift={drift_detected}, tier={tier_used}, elapsed={elapsed_ms:.1f}ms"
+        )
+        
+        return StrategyDecision(
+            recommended_tool=best_tool,
+            confidence=confidence,
+            estimated_cost_ms=tool_predictions.get(best_tool, 0),
+            drift_detected=drift_detected,
+            drift_severity=drift_summary.get('max_severity') if drift_detected else None,
+            feature_tier_used=tier_used,
+            voi_decision=voi_decision,
+            health_status=health_status,
+            metadata={
+                'all_costs': {t: tool_predictions.get(t, 0) for t in self.available_tools},
+                'analysis_time_ms': elapsed_ms,
+                'drift_summary': drift_summary if drift_detected else None,
+            }
+        )
+    
+    def record_execution(
+        self,
+        tool_name: str,
+        success: bool,
+        latency_ms: float,
+        features: Optional[np.ndarray] = None,
+        confidence: float = 1.0,
+        energy_mj: float = 0.0
+    ):
+        """
+        Record tool execution for model updates.
+        Call this after a tool completes execution.
+        """
+        # Update tool monitor
+        if self.tool_monitor:
+            try:
+                self.tool_monitor.record_execution(
+                    tool_name=tool_name,
+                    success=success,
+                    latency_ms=latency_ms,
+                    confidence=confidence,
+                    energy_mj=energy_mj
+                )
+            except Exception as e:
+                logger.debug(f"[Strategy] Tool monitor update failed: {e}")
+        
+        # Update cost model with observation
+        if self.cost_model and CostObservation and CostComponent and features is not None:
+            try:
+                observation = CostObservation(
+                    tool_name=tool_name,
+                    component=CostComponent.TIME_MS,
+                    value=latency_ms,
+                    features=features,
+                    complexity=0.5,
+                    cold_start=False,
+                    health_score=1.0 if success else 0.5
+                )
+                self.cost_model.update(observation)
+            except Exception as e:
+                logger.debug(f"[Strategy] Cost model update failed: {e}")
+        
+        logger.debug(
+            f"[Strategy] Recorded execution: {tool_name} success={success} latency={latency_ms:.1f}ms"
+        )
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive strategy statistics"""
+        stats = {
+            'orchestrator': {
+                'total_decisions': self.total_decisions,
+                'total_drift_detections': self.total_drift_detections,
+                'total_voi_gathers': self.total_voi_gathers,
+                'drift_rate': self.total_drift_detections / max(1, self.total_decisions),
+                'voi_gather_rate': self.total_voi_gathers / max(1, self.total_decisions),
+            },
+            'components_available': {
+                'cost_model': self.cost_model is not None,
+                'distribution_monitor': self.distribution_monitor is not None,
+                'feature_extractor': self.feature_extractor is not None,
+                'tool_monitor': self.tool_monitor is not None,
+                'voi_gate': self.voi_gate is not None,
+            }
+        }
+        
+        if self.cost_model:
+            try:
+                stats['cost_model'] = self.cost_model.get_statistics()
+            except Exception:
+                pass
+        
+        if self.distribution_monitor:
+            try:
+                stats['distribution_monitor'] = self.distribution_monitor.get_statistics()
+            except Exception:
+                pass
+        
+        if self.tool_monitor:
+            try:
+                stats['tool_monitor'] = self.tool_monitor.get_statistics()
+            except Exception:
+                pass
+        
+        if self.voi_gate:
+            try:
+                stats['voi_gate'] = self.voi_gate.get_statistics()
+            except Exception:
+                pass
+        
+        return stats
+    
+    def get_health_status(self) -> Dict[str, Any]:
+        """Get tool health status"""
+        result = {
+            'overall_status': 'healthy',
+            'tools': {}
+        }
+        
+        if self.tool_monitor:
+            try:
+                result['overall_status'] = self.tool_monitor.get_health_status().value
+                for name, metrics in self.tool_monitor.tool_metrics.items():
+                    result['tools'][name] = metrics.to_dict() if hasattr(metrics, 'to_dict') else str(metrics)
+            except Exception as e:
+                logger.debug(f"[Strategy] Get health status failed: {e}")
+        
+        return result
+    
+    def get_drift_status(self) -> Dict[str, Any]:
+        """Get distribution drift status"""
+        if self.distribution_monitor:
+            try:
+                return self.distribution_monitor.get_drift_summary()
+            except Exception as e:
+                logger.debug(f"[Strategy] Get drift status failed: {e}")
+        return {'status': 'monitoring_unavailable'}
+    
+    def save_state(self, path: str):
+        """Save all strategy component states"""
+        import os
+        os.makedirs(path, exist_ok=True)
+        
+        if self.cost_model:
+            try:
+                self.cost_model.save_model(f"{path}/cost_model")
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to save cost model: {e}")
+        
+        if self.distribution_monitor:
+            try:
+                self.distribution_monitor.save_state(f"{path}/distribution")
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to save distribution state: {e}")
+        
+        if self.voi_gate:
+            try:
+                self.voi_gate.save_state(f"{path}/voi")
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to save VOI state: {e}")
+        
+        if self.tool_monitor:
+            try:
+                self.tool_monitor.export_metrics(f"{path}/tool_metrics.json")
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to save tool metrics: {e}")
+        
+        logger.info(f"[StrategyOrchestrator] State saved to {path}")
+    
+    def load_state(self, path: str):
+        """Load all strategy component states"""
+        if self.cost_model:
+            try:
+                self.cost_model.load_model(f"{path}/cost_model")
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to load cost model: {e}")
+        
+        if self.distribution_monitor:
+            try:
+                self.distribution_monitor.load_state(f"{path}/distribution")
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to load distribution state: {e}")
+        
+        if self.voi_gate:
+            try:
+                self.voi_gate.load_state(f"{path}/voi")
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to load VOI state: {e}")
+        
+        logger.info(f"[StrategyOrchestrator] State loaded from {path}")

@@ -22,6 +22,7 @@ import json
 import asyncio
 import os
 import sys
+import time
 from pathlib import Path
 
 # Get the directory of the current script (src/)
@@ -272,6 +273,30 @@ try:
 except ImportError:
     TournamentManager = None
     TOURNAMENT_AVAILABLE = False
+
+# EvolutionEngine
+try:
+    from evolution_engine import EvolutionEngine
+
+    EVOLUTION_AVAILABLE = True
+except ImportError:
+    EvolutionEngine = None
+    EVOLUTION_AVAILABLE = False
+
+# StrategyOrchestrator for cost-aware execution planning
+try:
+    from strategies import StrategyOrchestrator, StochasticCostModel, ToolMonitor
+
+    STRATEGY_AVAILABLE = True
+except ImportError:
+    try:
+        from src.strategies import StrategyOrchestrator, StochasticCostModel, ToolMonitor
+        STRATEGY_AVAILABLE = True
+    except ImportError:
+        StrategyOrchestrator = None
+        StochasticCostModel = None
+        ToolMonitor = None
+        STRATEGY_AVAILABLE = False
 
 # Prometheus metrics
 try:
@@ -727,6 +752,34 @@ class GraphixArena:
         else:
             logger.warning(f"⚠ TournamentManager unavailable")
 
+        # EvolutionEngine for generator/evolver tasks
+        self.evolution_engine = (
+            EvolutionEngine(
+                population_size=20,
+                max_generations=5,
+                cache_size=100,
+                diversity_threshold=0.15
+            ) if EVOLUTION_AVAILABLE and EvolutionEngine else None
+        )
+        if self.evolution_engine:
+            logger.info(f"✓ EvolutionEngine initialized in Arena (pop_size=20, max_gens=5)")
+        else:
+            logger.warning(f"⚠ EvolutionEngine unavailable")
+
+        # StrategyOrchestrator for cost-aware execution planning
+        self.strategy_orchestrator = None
+        if STRATEGY_AVAILABLE and StrategyOrchestrator:
+            try:
+                self.strategy_orchestrator = StrategyOrchestrator({
+                    'tools': ['generator', 'evolver', 'visualizer']
+                })
+                logger.info(f"✓ StrategyOrchestrator initialized in Arena (cost prediction, drift detection)")
+            except Exception as e:
+                logger.warning(f"⚠ StrategyOrchestrator failed to initialize: {e}")
+                self.strategy_orchestrator = None
+        else:
+            logger.warning(f"⚠ StrategyOrchestrator unavailable")
+
         # Bounded feedback log
         self.feedback_log: deque = deque(maxlen=MAX_FEEDBACK_LOG_SIZE)
 
@@ -1098,6 +1151,36 @@ class GraphixArena:
                     "hallucination_rate": hallucination_rate,
                 }
 
+            # Apply EvolutionEngine for generator/evolver agents
+            evolution_result = None
+            if self.evolution_engine and agent_id in ("generator", "evolver"):
+                try:
+                    # Check if result contains graph data that can be evolved
+                    if isinstance(result, dict) and ("graph" in result or "nodes" in result):
+                        logger.info(f"[EvolutionEngine] Starting evolution for {agent_id} output")
+                        
+                        # Define fitness function based on result quality
+                        def fitness_fn(individual):
+                            # Basic fitness based on structure quality
+                            nodes = individual.graph.get("nodes", [])
+                            edges = individual.graph.get("edges", [])
+                            return len(nodes) * 0.1 + len(edges) * 0.05 + 0.5
+                        
+                        # Run short evolution cycle
+                        best = self.evolution_engine.evolve(fitness_fn, generations=3)
+                        if best:
+                            evolution_result = {
+                                "evolved": True,
+                                "best_fitness": best.fitness if hasattr(best, "fitness") else None,
+                                "generations_run": 3,
+                            }
+                            logger.info(
+                                f"[EvolutionEngine] Evolution complete: best_fitness={evolution_result.get('best_fitness', 'N/A')}"
+                            )
+                except Exception as e:
+                    logger.warning(f"[EvolutionEngine] Evolution failed: {e}")
+                    evolution_result = {"evolved": False, "error": str(e)}
+
             # Query LTM for similar topologies
             ltm_results = []
             if self.registry and hasattr(self.registry, "find_similar_topologies"):
@@ -1123,6 +1206,7 @@ class GraphixArena:
                 "hallucination_rate": hallucination_rate,
                 "similar_topologies": ltm_results,
                 "augmented": augmented,
+                "evolution": evolution_result,
             }
 
         except Exception as e:
@@ -1333,6 +1417,27 @@ class GraphixArena:
 
         # Execute task
         try:
+            # Predict execution cost using StrategyOrchestrator if available
+            predicted_cost_ms = None
+            strategy_features = None
+            if self.strategy_orchestrator:
+                try:
+                    # Use task prompt as query for cost prediction (synchronous call)
+                    strategy_decision = self.strategy_orchestrator.analyze(
+                        task_prompt[:500] if task_prompt else "",
+                        context={'budget_ms': 120000, 'agent_id': agent_id}
+                    )
+                    predicted_cost_ms = strategy_decision.estimated_cost_ms
+                    logger.info(
+                        f"[Arena] Agent {agent_id}: predicted cost={predicted_cost_ms:.0f}ms, "
+                        f"confidence={strategy_decision.confidence:.2f}, "
+                        f"drift={strategy_decision.drift_detected}"
+                    )
+                except Exception as e:
+                    logger.debug(f"[Arena] Cost prediction failed: {e}")
+            
+            execution_start = time.time()
+            
             # Apply tool selection rule if matched, otherwise use default logic
             if execution_handler == "run_shadow_task":
                 result = await self.run_shadow_task(agent_id, task_prompt, payload)
@@ -1346,6 +1451,28 @@ class GraphixArena:
                 else:
                     agent_result = await self._run_agent(agent_id, task_prompt, payload)
                     result = {"status": "success", "result": agent_result}
+
+            # Calculate actual execution time and record for learning
+            actual_latency_ms = (time.time() - execution_start) * 1000
+            success = result.get("status") != "error"
+            
+            # Record execution in StrategyOrchestrator for cost model learning
+            if self.strategy_orchestrator:
+                try:
+                    self.strategy_orchestrator.record_execution(
+                        tool_name=agent_id,
+                        success=success,
+                        latency_ms=actual_latency_ms,
+                        confidence=1.0 if success else 0.5
+                    )
+                    if predicted_cost_ms:
+                        prediction_error = abs(actual_latency_ms - predicted_cost_ms) / max(1, predicted_cost_ms)
+                        logger.info(
+                            f"[Arena] Agent {agent_id}: actual={actual_latency_ms:.0f}ms, "
+                            f"predicted={predicted_cost_ms:.0f}ms, error={prediction_error:.1%}"
+                        )
+                except Exception as e:
+                    logger.debug(f"[Arena] Execution recording failed: {e}")
 
             # Log completion
             self.audit.log_event(

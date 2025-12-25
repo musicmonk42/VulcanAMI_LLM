@@ -193,6 +193,19 @@ except ImportError:
         ADVERSARIAL_CHECK_AVAILABLE = False
         logger.debug("Adversarial check not available for query routing")
 
+# Try to import StrategyOrchestrator for intelligent tool selection
+try:
+    from strategies import StrategyOrchestrator
+    STRATEGY_ORCHESTRATOR_AVAILABLE = True
+except ImportError:
+    try:
+        from src.strategies import StrategyOrchestrator
+        STRATEGY_ORCHESTRATOR_AVAILABLE = True
+    except ImportError:
+        StrategyOrchestrator = None
+        STRATEGY_ORCHESTRATOR_AVAILABLE = False
+        logger.debug("StrategyOrchestrator not available for query routing")
+
 # ============================================================
 # CONSTANTS - Query Classification Keywords
 # ============================================================
@@ -700,6 +713,16 @@ class QueryAnalyzer:
         if self._enable_adversarial_check:
             logger.info("Adversarial check integrated with QueryAnalyzer")
         
+        # Strategy Orchestrator integration for intelligent tool selection
+        self._strategy_orchestrator = None
+        if STRATEGY_ORCHESTRATOR_AVAILABLE and StrategyOrchestrator:
+            try:
+                self._strategy_orchestrator = StrategyOrchestrator()
+                logger.info("[QueryRouter] StrategyOrchestrator wired in for intelligent tool selection")
+            except Exception as e:
+                logger.warning(f"Failed to initialize StrategyOrchestrator: {e}")
+                self._strategy_orchestrator = None
+        
         logger.debug("QueryAnalyzer initialized with compiled patterns and bounded caches")
     
     def clear_caches(self) -> Dict[str, Any]:
@@ -742,6 +765,34 @@ class QueryAnalyzer:
     def is_adversarial_check_enabled(self) -> bool:
         """Check if adversarial checking is enabled and available."""
         return self._enable_adversarial_check
+    
+    @property
+    def is_strategy_enabled(self) -> bool:
+        """Check if StrategyOrchestrator is enabled and available."""
+        return self._strategy_orchestrator is not None
+    
+    @property
+    def strategy(self):
+        """Get the StrategyOrchestrator instance (for advanced usage)."""
+        return self._strategy_orchestrator
+    
+    def get_strategy_statistics(self) -> Dict[str, Any]:
+        """Get statistics from the StrategyOrchestrator if available."""
+        if self._strategy_orchestrator:
+            return self._strategy_orchestrator.get_statistics()
+        return {"status": "strategy_orchestrator_not_available"}
+    
+    def get_drift_status(self) -> Dict[str, Any]:
+        """Get distribution drift status from StrategyOrchestrator if available."""
+        if self._strategy_orchestrator:
+            return self._strategy_orchestrator.get_drift_status()
+        return {"status": "drift_monitoring_not_available"}
+    
+    def get_tool_health(self) -> Dict[str, Any]:
+        """Get tool health status from StrategyOrchestrator if available."""
+        if self._strategy_orchestrator:
+            return self._strategy_orchestrator.get_health_status()
+        return {"status": "tool_monitoring_not_available"}
     
     def analyze(self, query: str, session_id: Optional[str] = None) -> QueryPlan:
         """

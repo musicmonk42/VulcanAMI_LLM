@@ -111,6 +111,14 @@ except ImportError:
     Redis = None
     REDIS_AVAILABLE = False
 
+# SelfOptimizer for autonomous performance tuning
+try:
+    from src.evolve.self_optimizer import SelfOptimizer
+    SELF_OPTIMIZER_AVAILABLE = True
+except ImportError:
+    SelfOptimizer = None
+    SELF_OPTIMIZER_AVAILABLE = False
+
 # ============================================================
 # MODULAR IMPORTS - From refactored vulcan.* subpackages
 # ============================================================
@@ -319,7 +327,9 @@ class Settings(BaseSettings):
         default=None, env="GRAPHIX_API_KEY"
     )
     # Timeout for Arena API calls (seconds)
-    arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
+    # PERFORMANCE FIX: Arena completes in 55-64s based on production logs
+    # Set to 90s to allow completion while optimization is in progress
+    arena_timeout: float = Field(default=90.0, env="ARENA_TIMEOUT")
     # Whether to enable Arena routing for complex queries
     arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
 
@@ -931,6 +941,23 @@ async def lifespan(app: FastAPI):
         await get_http_session()
         logger.info("✓ Global HTTP connection pool initialized")
 
+    # Initialize SelfOptimizer for autonomous performance tuning
+    if SELF_OPTIMIZER_AVAILABLE:
+        try:
+            app.state.self_optimizer = SelfOptimizer(
+                target_latency_ms=100,
+                target_memory_mb=2000,
+                optimization_interval_s=60,
+                enable_auto_tune=True
+            )
+            app.state.self_optimizer.start()
+            logger.info("[VULCAN] ✓ SelfOptimizer started (target_latency=100ms, interval=60s)")
+        except Exception as e:
+            logger.warning(f"[VULCAN] Failed to initialize SelfOptimizer: {e}")
+            app.state.self_optimizer = None
+    else:
+        app.state.self_optimizer = None
+
     try:
         yield
     except asyncio.CancelledError:
@@ -943,6 +970,14 @@ async def lifespan(app: FastAPI):
             await close_http_session()
         except Exception as e:
             logger.warning(f"Error closing HTTP session: {e}")
+        
+        # Stop SelfOptimizer if running
+        if hasattr(app.state, "self_optimizer") and app.state.self_optimizer:
+            try:
+                app.state.self_optimizer.stop()
+                logger.info("[VULCAN] ✓ SelfOptimizer stopped")
+            except Exception as e:
+                logger.warning(f"[VULCAN] Error stopping SelfOptimizer: {e}")
         
         if startup_complete and hasattr(app.state, "deployment"):
             deployment = app.state.deployment

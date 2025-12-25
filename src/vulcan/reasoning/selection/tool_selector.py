@@ -15,12 +15,13 @@ import logging
 import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 import time
-from collections import defaultdict, deque
+from collections import defaultdict, deque, OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+import hashlib
 
 import numpy as np
 
@@ -266,12 +267,25 @@ class MultiTierFeatureExtractor:
 
     PERFORMANCE FIX: Uses singleton pattern for embedding model to prevent
     reloading the SentenceTransformer model on every instantiation.
+    
+    PERFORMANCE FIX (2): Uses LRU cache for embedding results to prevent
+    recomputing embeddings for repeated queries. Based on production logs,
+    embedding batch times varied from 0.15s to 16.63s due to CPU contention.
+    Caching reduces this variance by returning cached results instantly.
     """
 
     # PERFORMANCE FIX: Class-level singleton for embedding model
     _shared_embedding_model = None
     _shared_model_lock = threading.Lock()  # Initialize at class definition time for thread safety
     _model_load_attempted = False
+    
+    # PERFORMANCE FIX: Class-level LRU cache for embedding results
+    # Prevents recomputing embeddings for the same text (0.15s-16s per call)
+    _embedding_cache: OrderedDict = OrderedDict()
+    _embedding_cache_lock = threading.Lock()
+    _embedding_cache_maxsize = 2000  # Maximum cached embeddings
+    _embedding_cache_hits = 0
+    _embedding_cache_misses = 0
 
     @classmethod
     def _get_shared_model(cls):
@@ -293,6 +307,51 @@ class MultiTierFeatureExtractor:
                             logger.error(f"Failed to load SentenceTransformer model: {e}")
         
         return cls._shared_embedding_model
+    
+    @classmethod
+    def _get_cached_embedding(cls, text: str) -> Optional[np.ndarray]:
+        """Get embedding from cache if available (LRU eviction)."""
+        # Use SHA-256 with 32 chars (128-bit space) to reduce collision risk in high-throughput
+        cache_key = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
+        
+        with cls._embedding_cache_lock:
+            if cache_key in cls._embedding_cache:
+                # Move to end (most recently used)
+                cls._embedding_cache.move_to_end(cache_key)
+                cls._embedding_cache_hits += 1
+                # Return copy to prevent mutation (embeddings are small ~384-512 floats)
+                return cls._embedding_cache[cache_key].copy()
+            cls._embedding_cache_misses += 1
+            return None
+    
+    @classmethod
+    def _cache_embedding(cls, text: str, embedding: np.ndarray) -> None:
+        """Cache embedding with batch LRU eviction for efficiency."""
+        cache_key = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
+        
+        with cls._embedding_cache_lock:
+            # Batch eviction: remove 10% when at capacity to reduce lock contention
+            if len(cls._embedding_cache) >= cls._embedding_cache_maxsize:
+                evict_count = max(1, cls._embedding_cache_maxsize // 10)  # Remove 10% (min 1)
+                for _ in range(evict_count):
+                    if cls._embedding_cache:
+                        cls._embedding_cache.popitem(last=False)
+            
+            cls._embedding_cache[cache_key] = embedding.copy()  # Store copy
+    
+    @classmethod
+    def get_cache_stats(cls) -> Dict[str, Any]:
+        """Get embedding cache statistics for monitoring."""
+        with cls._embedding_cache_lock:
+            total = cls._embedding_cache_hits + cls._embedding_cache_misses
+            hit_rate = cls._embedding_cache_hits / total if total > 0 else 0.0
+            return {
+                "size": len(cls._embedding_cache),
+                "maxsize": cls._embedding_cache_maxsize,
+                "hits": cls._embedding_cache_hits,
+                "misses": cls._embedding_cache_misses,
+                "hit_rate": hit_rate,
+            }
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         config = config or {}
@@ -329,7 +388,11 @@ class MultiTierFeatureExtractor:
         return projected / (norm + 1e-10)
 
     def extract_tier3(self, problem: Any) -> np.ndarray:
-        """Deep semantic features using a transformer model."""
+        """Deep semantic features using a transformer model.
+        
+        PERFORMANCE FIX: Uses LRU cache to avoid recomputing embeddings for
+        repeated queries. Cache reduces 0.15s-16.63s embedding time to instant.
+        """
         if not self.semantic_model:
             logger.warning(
                 "Semantic model not available, falling back to Tier 1 features."
@@ -337,9 +400,27 @@ class MultiTierFeatureExtractor:
             return self.extract_tier1(problem)
 
         problem_str = str(problem)
+        
+        # PERFORMANCE FIX: Check cache first
+        cached_embedding = MultiTierFeatureExtractor._get_cached_embedding(problem_str)
+        if cached_embedding is not None:
+            # Resize cached embedding if necessary
+            if cached_embedding.shape[0] != self.dim:
+                if cached_embedding.shape[0] > self.dim:
+                    cached_embedding = cached_embedding[: self.dim]
+                else:
+                    padded = np.zeros(self.dim)
+                    padded[: cached_embedding.shape[0]] = cached_embedding
+                    cached_embedding = padded
+            return cached_embedding
+        
         try:
-            # Get sentence embedding
+            # Get sentence embedding (expensive - 0.15s to 16s under load)
             embedding = self.semantic_model.encode(problem_str, show_progress_bar=False)
+            
+            # Cache the raw embedding before resizing
+            MultiTierFeatureExtractor._cache_embedding(problem_str, embedding)
+            
             # Resize to the required dimension if necessary
             if embedding.shape[0] != self.dim:
                 if embedding.shape[0] > self.dim:
