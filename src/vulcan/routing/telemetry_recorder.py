@@ -72,10 +72,39 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, TYPE_CHECKING
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# SOPHISTICATED MEMORY SYSTEM INTEGRATION
+# ============================================================
+# Import the advanced persistent memory system from persistant_memory_v46
+# This provides GraphRAG, MerkleLSM, S3 packfile storage, and ZK proofs
+# for production-grade memory management instead of just JSON files.
+
+GRAPH_RAG_AVAILABLE = False
+PERSISTENT_MEMORY_AVAILABLE = False
+
+try:
+    from persistant_memory_v46 import GraphRAG, create_memory_system, get_system_info
+    GRAPH_RAG_AVAILABLE = True
+    logger.info("GraphRAG from persistant_memory_v46 available for advanced memory storage")
+except ImportError:
+    logger.debug("persistant_memory_v46 not available, using JSON-based memory storage")
+
+try:
+    from vulcan.memory.hierarchical import HierarchicalMemory
+    PERSISTENT_MEMORY_AVAILABLE = True
+    logger.info("HierarchicalMemory available for persistent memory storage")
+except ImportError:
+    try:
+        from src.vulcan.memory.hierarchical import HierarchicalMemory
+        PERSISTENT_MEMORY_AVAILABLE = True
+        logger.info("HierarchicalMemory available for persistent memory storage (src prefix)")
+    except ImportError:
+        logger.debug("HierarchicalMemory not available, using JSON-based memory storage")
 
 # ============================================================
 # CONSTANTS
@@ -104,6 +133,11 @@ AI_INTERACTION_EXPERIMENT_THRESHOLD = 50
 MAX_MEMORY_PATTERNS = 100
 MAX_TELEMETRY_ENTRIES = 10000
 MAX_AI_INTERACTION_ENTRIES = 10000
+
+# GraphRAG storage limits
+GRAPHRAG_QUERY_TRUNCATE_LENGTH = 2000  # Max chars for query text in GraphRAG
+GRAPHRAG_RESPONSE_TRUNCATE_LENGTH = 2000  # Max chars for response text in GraphRAG
+GRAPHRAG_RESULT_TRUNCATE_LENGTH = 500  # Max chars for AI result JSON in GraphRAG
 
 
 # ============================================================
@@ -322,6 +356,8 @@ class TelemetryRecorder:
         flush_interval: float = TELEMETRY_FLUSH_INTERVAL,
         auto_flush: bool = True,
         io_thread_pool_size: int = IO_THREAD_POOL_SIZE,
+        use_graph_rag: bool = True,
+        graph_rag_config: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the telemetry recorder.
@@ -334,6 +370,8 @@ class TelemetryRecorder:
             flush_interval: Seconds between automatic flushes
             auto_flush: Whether to automatically flush on interval
             io_thread_pool_size: Number of threads for background I/O operations
+            use_graph_rag: Whether to use the sophisticated GraphRAG memory system
+            graph_rag_config: Optional configuration for GraphRAG
         """
         self._meta_state_path = meta_state_path or DEFAULT_META_STATE_PATH
         self._buffer_size = buffer_size
@@ -360,6 +398,35 @@ class TelemetryRecorder:
             thread_name_prefix="TelemetryIO"
         )
         self._flush_in_progress = threading.Event()
+
+        # ============================================================
+        # SOPHISTICATED MEMORY SYSTEM INTEGRATION
+        # ============================================================
+        # Initialize GraphRAG for advanced memory storage if available
+        self._graph_rag: Optional[Any] = None
+        self._use_graph_rag = use_graph_rag and GRAPH_RAG_AVAILABLE
+        
+        if self._use_graph_rag:
+            try:
+                rag_config = graph_rag_config or {}
+                self._graph_rag = GraphRAG(
+                    embedding_dim=rag_config.get("embedding_dim", 384),
+                    cache_capacity=rag_config.get("cache_capacity", 1000),
+                    **{k: v for k, v in rag_config.items() if k not in ["embedding_dim", "cache_capacity"]}
+                )
+                logger.info(
+                    "[TelemetryRecorder] GraphRAG memory system initialized - "
+                    "using advanced persistent memory with graph-based retrieval"
+                )
+            except Exception as e:
+                logger.warning(f"[TelemetryRecorder] Failed to initialize GraphRAG: {e}, falling back to JSON")
+                self._graph_rag = None
+                self._use_graph_rag = False
+        else:
+            logger.info(
+                "[TelemetryRecorder] Using JSON-based memory storage "
+                f"(GraphRAG available: {GRAPH_RAG_AVAILABLE}, enabled: {use_graph_rag})"
+            )
 
         # Counters
         self._total_entries = 0
@@ -390,6 +457,9 @@ class TelemetryRecorder:
             # I/O stats
             "async_flushes_started": 0,
             "async_flushes_completed": 0,
+            # GraphRAG stats
+            "graph_rag_enabled": self._use_graph_rag,
+            "graph_rag_documents_added": 0,
         }
 
         # Auto-flush configuration
@@ -473,6 +543,14 @@ class TelemetryRecorder:
         """
         import uuid
 
+        # Include query/response in metadata for GraphRAG storage
+        # This enables semantic search over past interactions
+        enhanced_metadata = dict(metadata)
+        if self._use_graph_rag:
+            # Store truncated query/response for GraphRAG indexing
+            enhanced_metadata["query"] = query[:GRAPHRAG_QUERY_TRUNCATE_LENGTH] if query else ""
+            enhanced_metadata["response"] = response[:GRAPHRAG_RESPONSE_TRUNCATE_LENGTH] if response else ""
+
         entry = TelemetryEntry(
             timestamp=time.time(),
             query_id=query_id or f"q_{uuid.uuid4().hex[:12]}",
@@ -491,7 +569,7 @@ class TelemetryRecorder:
             collaboration_session_id=collaboration_session_id,
             agents_involved=agents_involved or [],
             interaction_type=interaction_type,
-            metadata=metadata,
+            metadata=enhanced_metadata,
         )
 
         with self._lock:
@@ -525,6 +603,19 @@ class TelemetryRecorder:
                 self._schedule_flush_locked()
 
         logger.debug(f"[TelemetryRecorder] Recorded {source} entry {entry.query_id}")
+        
+        # FIX Issue #1: Queue memory update so conversation context is stored
+        # Previously, only convenience functions (record_telemetry, record_interaction)
+        # queued memory updates. Now record() does too, ensuring all interactions
+        # contribute to learning data regardless of how they're recorded.
+        self.queue_memory_update(
+            source=source,
+            query_type=metadata.get("query_type", "general"),
+            quality_score=metadata.get("response_quality_score"),
+            error_occurred=error_occurred,
+            error_type=error_type,
+            interaction_type=interaction_type,
+        )
 
     def record_ai_interaction(
         self,
@@ -827,6 +918,174 @@ class TelemetryRecorder:
         
         # Write back atomically
         self._write_state_atomic(state)
+        
+        # ============================================================
+        # SOPHISTICATED MEMORY SYSTEM INTEGRATION
+        # ============================================================
+        # Also store telemetry entries in GraphRAG for advanced retrieval
+        if self._use_graph_rag and self._graph_rag is not None:
+            self._store_to_graph_rag(telemetry_entries, ai_entries, memory_updates)
+
+    def _store_to_graph_rag(
+        self,
+        telemetry_entries: List[TelemetryEntry],
+        ai_entries: List[AIInteractionEntry],
+        memory_updates: List[MemoryUpdateEntry],
+    ) -> None:
+        """
+        Store telemetry data to the sophisticated GraphRAG memory system.
+        
+        This enables:
+        - Semantic search over telemetry history
+        - Graph-based relationship discovery between interactions
+        - Hybrid retrieval (vector + BM25) for finding similar past interactions
+        - Cross-encoder reranking for high-quality retrieval
+        
+        Args:
+            telemetry_entries: List of TelemetryEntry objects
+            ai_entries: List of AIInteractionEntry objects
+            memory_updates: List of MemoryUpdateEntry objects
+        """
+        if not self._graph_rag:
+            return
+            
+        try:
+            # Store telemetry entries as documents
+            for entry in telemetry_entries:
+                doc_id = f"telemetry_{entry.query_id}_{int(entry.timestamp * 1000)}"
+                # Get query/response from metadata if available (they're not stored in entry directly)
+                query_text = entry.metadata.get("query", f"Query (length: {entry.query_length})")
+                response_text = entry.metadata.get("response", f"Response (length: {entry.response_length})")
+                content = f"Query: {query_text}\nResponse: {response_text}"
+                metadata = {
+                    "type": "telemetry",
+                    "source": entry.source,
+                    "query_type": entry.metadata.get("query_type", "unknown"),
+                    "timestamp": entry.timestamp,
+                    "session_id": entry.session_id,
+                    "latency_ms": entry.latency_ms,
+                    "governance_triggered": entry.governance_triggered,
+                    "experiment_triggered": entry.experiment_triggered,
+                }
+                
+                self._graph_rag.add_document(
+                    doc_id=doc_id,
+                    content=content,
+                    metadata=metadata,
+                    auto_chunk=True,
+                )
+                self._stats["graph_rag_documents_added"] += 1
+            
+            # Store AI interactions as documents
+            for entry in ai_entries:
+                doc_id = f"ai_{entry.interaction_id}_{int(entry.timestamp * 1000)}"
+                content = f"AI Interaction: {entry.interaction_type}\nFrom: {entry.sender}\nTo: {entry.receiver}\nQuery: {entry.query}"
+                if entry.result:
+                    content += f"\nResult: {json.dumps(entry.result)[:GRAPHRAG_RESULT_TRUNCATE_LENGTH]}"
+                    
+                metadata = {
+                    "type": "ai_interaction",
+                    "interaction_type": entry.interaction_type,
+                    "sender": entry.sender,
+                    "receiver": entry.receiver,
+                    "timestamp": entry.timestamp,
+                    "session_id": entry.session_id,
+                    "message_type": entry.message_type,
+                }
+                
+                self._graph_rag.add_document(
+                    doc_id=doc_id,
+                    content=content,
+                    metadata=metadata,
+                    auto_chunk=False,  # AI interactions are typically shorter
+                )
+                self._stats["graph_rag_documents_added"] += 1
+                
+            logger.debug(
+                f"[TelemetryRecorder] Stored {len(telemetry_entries)} telemetry + "
+                f"{len(ai_entries)} AI entries to GraphRAG"
+            )
+            
+        except Exception as e:
+            logger.warning(f"[TelemetryRecorder] Failed to store to GraphRAG: {e}")
+
+    def retrieve_similar_interactions(
+        self,
+        query: str,
+        k: int = 10,
+        interaction_type: Optional[str] = None,
+        use_rerank: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve similar past interactions using the sophisticated GraphRAG system.
+        
+        This method leverages the advanced persistent memory capabilities:
+        - Semantic vector search for similarity matching
+        - BM25 keyword search for exact matches
+        - Graph-based expansion for related context
+        - Cross-encoder reranking for quality results
+        
+        Args:
+            query: The query to search for similar interactions
+            k: Number of results to return
+            interaction_type: Optional filter for interaction type ("telemetry" or "ai_interaction")
+            use_rerank: Whether to use cross-encoder reranking
+            
+        Returns:
+            List of similar interactions with scores and metadata
+        """
+        if not self._use_graph_rag or not self._graph_rag:
+            logger.debug("[TelemetryRecorder] GraphRAG not available for retrieval")
+            return []
+            
+        try:
+            # Build filters
+            filters = {}
+            if interaction_type:
+                filters["type"] = interaction_type
+                
+            # Retrieve from GraphRAG
+            results = self._graph_rag.retrieve(
+                query=query,
+                k=k,
+                use_rerank=use_rerank,
+                use_hybrid=True,
+                filters=filters if filters else None,
+            )
+            
+            # Convert to dict format
+            return [
+                {
+                    "node_id": r.node_id,
+                    "content": r.content,
+                    "score": r.score,
+                    "metadata": r.metadata,
+                    "source": r.source,
+                }
+                for r in results
+            ]
+            
+        except Exception as e:
+            logger.warning(f"[TelemetryRecorder] GraphRAG retrieval failed: {e}")
+            return []
+
+    def get_graph_rag_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics from the GraphRAG memory system.
+        
+        Returns:
+            Dictionary with GraphRAG statistics or empty dict if not available
+        """
+        if not self._use_graph_rag or not self._graph_rag:
+            return {"enabled": False, "reason": "GraphRAG not initialized"}
+            
+        try:
+            return {
+                "enabled": True,
+                **self._graph_rag.get_statistics(),
+            }
+        except Exception as e:
+            return {"enabled": True, "error": str(e)}
 
     def _apply_memory_update(self, state: Dict[str, Any], update: MemoryUpdateEntry) -> None:
         """
@@ -987,6 +1246,10 @@ class TelemetryRecorder:
             stats["memory_update_buffer_size"] = len(self._memory_update_buffer)
 
         stats["flush_in_progress"] = self._flush_in_progress.is_set()
+        
+        # Include GraphRAG statistics if available
+        if self._use_graph_rag:
+            stats["graph_rag"] = self.get_graph_rag_stats()
 
         return stats
 
@@ -1059,9 +1322,8 @@ def record_telemetry(
 
     Convenience function using global recorder. Non-blocking.
     
-    FIX: Now also queues memory updates so conversation context and learning
-    data is stored. Previously only telemetry entries were stored, resulting
-    in "0 memory updates" on every flush.
+    Memory updates are automatically queued by the record() method, so
+    conversation context and learning data is stored.
 
     Args:
         query: The query text
@@ -1070,19 +1332,8 @@ def record_telemetry(
         **kwargs: Additional arguments passed to TelemetryRecorder.record()
     """
     recorder = get_telemetry_recorder()
+    # record() now automatically queues memory updates (FIX Issue #1)
     recorder.record(query, response, metadata, **kwargs)
-    
-    # FIX: Queue memory update so the system learns from interactions
-    # This was missing, causing "0 memory updates" in flush logs
-    source = kwargs.get("source", "user")
-    recorder.queue_memory_update(
-        source=source,
-        query_type=metadata.get("query_type", "general"),
-        quality_score=metadata.get("response_quality_score"),
-        error_occurred=kwargs.get("error_occurred", False),
-        error_type=kwargs.get("error_type"),
-        interaction_type=kwargs.get("interaction_type"),
-    )
 
 
 def record_interaction(
@@ -1095,6 +1346,7 @@ def record_interaction(
     Record ALL interactions for meta-learning (dual-mode).
 
     This is completely non-blocking - all disk I/O happens in background threads.
+    Memory updates are automatically queued by the record() method.
 
     User interactions:
         - Query patterns
@@ -1132,18 +1384,8 @@ def record_interaction(
         "interaction_type": metadata.get("interaction_type"),
     }
 
+    # record() now automatically queues memory updates (FIX Issue #1)
     recorder.record(query, response, metadata, **record_kwargs)
-
-    # PERFORMANCE FIX: Queue memory update instead of writing to disk immediately
-    # This prevents progressive slowdown by batching disk writes
-    recorder.queue_memory_update(
-        source=source,
-        query_type=metadata.get("query_type", "general"),
-        quality_score=metadata.get("response_quality_score"),
-        error_occurred=metadata.get("error_occurred", False),
-        error_type=metadata.get("error_type"),
-        interaction_type=metadata.get("interaction_type"),
-    )
 
 
 def record_ai_interaction(
