@@ -308,7 +308,8 @@ except ImportError:
     HardwareDispatcher = None
     HardwareBackend = None
 
-# HardwareEmulator for fallback compute
+# HardwareEmulator availability check - used internally by HardwareDispatcher
+# for fallback when real photonic/GPU hardware is unavailable
 try:
     from hardware_emulator import HardwareEmulator
 
@@ -1075,7 +1076,8 @@ class GraphixArena:
             Dictionary with execution results and metadata
         """
         nodes = graph.get('nodes', [])
-        edges = graph.get('edges', [])
+        # Note: edges reserved for future topological ordering/dependency resolution
+        _ = graph.get('edges', [])
 
         # Log execution plan
         if self.hardware_dispatcher:
@@ -1107,6 +1109,8 @@ class GraphixArena:
                         'latency_ps': 50,
                     }
                 
+                # Use original op_type if it's already a photonic operation,
+                # otherwise prefix with 'photonic_' for dispatcher routing
                 dispatch_op = op_type if op_type.startswith('photonic') else f'photonic_{op_type}'
                 result = self._dispatch_compute(
                     dispatch_op,
