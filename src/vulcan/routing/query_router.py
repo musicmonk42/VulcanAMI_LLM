@@ -1004,7 +1004,8 @@ class QueryAnalyzer:
         
         try:
             # FIX: Check cache first to avoid expensive re-computation
-            cache_key = _compute_query_hash(query)
+            # Include source in cache key since same query may have different results for different sources
+            cache_key = _compute_query_hash(f"{query}:{plan.source}")
             cached_result = self._safety_cache.get(cache_key)
             
             if cached_result is not None:
@@ -1027,7 +1028,8 @@ class QueryAnalyzer:
             
             # No cache hit - run expensive validation
             # Priority 1: Pre-query validation
-            pre_check = self._safety_validator.validate_query(query)
+            # FIX: Pass source to reduce false positives for arena/agent sources
+            pre_check = self._safety_validator.validate_query(query, source=plan.source)
             plan.safety_validated = True
             plan.safety_passed = pre_check.safe
             

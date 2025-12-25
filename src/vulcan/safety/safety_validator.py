@@ -1561,7 +1561,7 @@ class EnhancedSafetyValidator(SafetyValidator):
                 logger.error(f"World model validation failed: {e}")
         return token
 
-    def validate_query(self, query: str) -> SafetyReport:
+    def validate_query(self, query: str, source: str = "user") -> SafetyReport:
         """
         Pre-check validation for incoming queries before LLM processing.
 
@@ -1571,9 +1571,14 @@ class EnhancedSafetyValidator(SafetyValidator):
         - Requests for operational attack guides (phishing, social engineering, exploits)
         - Privacy violations
         - Ethical violations
+        
+        FIX: Added source parameter to reduce false positives for internal calls.
+        Arena, agent, and internal sources get reduced sensitivity.
 
         Args:
             query: The user query to validate
+            source: Query source ("user", "arena", "agent", "internal"). 
+                    Internal sources have reduced sensitivity to avoid false positives.
 
         Returns:
             SafetyReport with safe=True if query is acceptable, safe=False with reasons otherwise
@@ -1591,7 +1596,8 @@ class EnhancedSafetyValidator(SafetyValidator):
         confidence = 1.0
 
         # Use existing LLM validators for pre-check
-        context = {"query": query, "phase": "pre_check"}
+        # FIX: Include source in context so validators can reduce false positives for internal calls
+        context = {"query": query, "phase": "pre_check", "source": source}
 
         for validator in self.llm_validators:
             try:
