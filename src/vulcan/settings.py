@@ -161,8 +161,10 @@ class Settings(BaseSettings):
         default="http://localhost:8080/arena", env="ARENA_BASE_URL"
     )
     # API key for Arena authentication - must be set via env var in production
+    # Default matches Arena server's default (graphix_arena.py line 346) to enable
+    # internal service-to-service calls when GRAPHIX_API_KEY is not explicitly set
     arena_api_key: Optional[str] = Field(
-        default=None, env="GRAPHIX_API_KEY"
+        default="default-secret-key-for-dev", env="GRAPHIX_API_KEY"
     )
     # Timeout for Arena API calls (seconds)
     arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
