@@ -2285,8 +2285,10 @@ class NSOAligner:
         # Context-dependent patterns (require nearby context keywords to flag)
         # These patterns can match normal data, so we require context
         context_patterns = [
-            # Credit Card - requires context keywords OR Luhn-valid format
-            # Pattern is more strict: 4 groups of 4 digits (common card format)
+            # Credit Card - requires context keywords to flag
+            # Pattern checks common card prefixes (Visa 4xxx, MC 51-55xx, Discover 6011/65xx)
+            # Note: This only validates format/prefix, not Luhn checksum (intentional for
+            # reduced false positives - actual card validation should happen elsewhere)
             (
                 r"\b(?:4\d{3}|5[1-5]\d{2}|6(?:011|5\d{2}))[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b",
                 "Credit Card",
