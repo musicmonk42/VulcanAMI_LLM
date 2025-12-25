@@ -221,6 +221,9 @@ class SelfImprovementDrive:
         self.alert_callback = alert_callback
         self.approval_checker = approval_checker
         self._lock = threading.RLock()
+        
+        # FIX Issue 5: Track if blacklisted objectives have been logged (only log once)
+        self._blacklist_logged = False
 
         # --- START ADDITION ---
         self.world_model = world_model
@@ -1620,7 +1623,7 @@ class SelfImprovementDrive:
             obj.type for obj in self.objectives 
             if obj.type in self.BLACKLISTED_OBJECTIVES and not obj.completed
         ]
-        if blacklisted_found and not hasattr(self, '_blacklist_logged'):
+        if blacklisted_found and not self._blacklist_logged:
             logger.debug(f"Skipping blacklisted objectives: {blacklisted_found}")
             self._blacklist_logged = True
 

@@ -579,8 +579,9 @@ def _check_system_load(
         return True, "psutil not available - cannot check system load"
 
     try:
-        # Check CPU usage (averaged over 1 second)
-        cpu_percent = psutil.cpu_percent(interval=1)
+        # Check CPU usage - use interval=None for instantaneous reading (non-blocking)
+        # This avoids 1-second delays in the periodic testing loop
+        cpu_percent = psutil.cpu_percent(interval=None)
         if cpu_percent > cpu_threshold:
             return False, f"CPU usage at {cpu_percent:.1f}% (threshold: {cpu_threshold:.0f}%)"
 
