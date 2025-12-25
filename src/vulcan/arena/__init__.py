@@ -87,17 +87,60 @@ __all__ = [
     "HTTP_POOL_LIMIT_PER_HOST",
     # Module utilities
     "get_module_info",
+    "validate_arena_module",
 ]
 
 
 def get_module_info() -> Dict[str, Any]:
-    """Get information about the arena module."""
+    """
+    Get information about the arena module.
+    
+    Returns:
+        Dictionary containing:
+        - version: Module version
+        - author: Module author
+        - imports_successful: Whether all imports succeeded
+        - aiohttp_available: Whether aiohttp is available for HTTP calls
+        - components: Status of each component
+    """
     return {
         "version": __version__,
         "author": __author__,
         "imports_successful": _imports_successful,
         "aiohttp_available": AIOHTTP_AVAILABLE if AIOHTTP_AVAILABLE is not None else False,
+        "components": {
+            "execute_via_arena": execute_via_arena is not None,
+            "submit_arena_feedback": submit_arena_feedback is not None,
+            "get_http_session": get_http_session is not None,
+            "close_http_session": close_http_session is not None,
+        },
     }
+
+
+def validate_arena_module() -> bool:
+    """
+    Validate that the arena module is properly loaded and functional.
+    
+    Returns:
+        True if module is functional, False otherwise
+    """
+    try:
+        info = get_module_info()
+        
+        # Core functions must be available
+        core_available = all(info["components"].values())
+        
+        if core_available:
+            logger.info("Arena module validated successfully")
+        else:
+            missing = [k for k, v in info["components"].items() if not v]
+            logger.warning(f"Some arena components unavailable: {missing}")
+        
+        return core_available
+        
+    except Exception as e:
+        logger.error(f"Arena module validation failed: {e}")
+        return False
 
 
 # Log module initialization

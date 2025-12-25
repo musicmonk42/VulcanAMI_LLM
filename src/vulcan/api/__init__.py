@@ -103,11 +103,64 @@ __all__ = [
     "cleanup_rate_limits",
     "start_rate_limit_cleanup",
     "check_rate_limit",
+    # Module utilities
+    "get_module_info",
+    "validate_api_module",
 ]
+
+
+def get_module_info() -> Dict[str, Any]:
+    """
+    Get information about the API module.
+    
+    Returns:
+        Dictionary containing module information and component availability
+    """
+    return {
+        "version": __version__,
+        "author": __author__,
+        "imports_successful": _imports_successful,
+        "components": {
+            "models": StepRequest is not None,
+            "rate_limiting": check_rate_limit is not None,
+        },
+        "models_available": [
+            name for name in [
+                "StepRequest", "StepResponse", "ChatMessage", "ChatRequest",
+                "ChatResponse", "StatusResponse", "ConfigResponse", "ImprovementApproval"
+            ] if globals().get(name) is not None
+        ],
+    }
+
+
+def validate_api_module() -> bool:
+    """
+    Validate that the API module is properly loaded and functional.
+    
+    Returns:
+        True if module is functional, False otherwise
+    """
+    try:
+        info = get_module_info()
+        
+        # Core components must be available
+        all_available = all(info["components"].values())
+        
+        if all_available:
+            logger.info("API module validated successfully")
+        else:
+            missing = [k for k, v in info["components"].items() if not v]
+            logger.warning(f"Some API components unavailable: {missing}")
+        
+        return all_available
+        
+    except Exception as e:
+        logger.error(f"API module validation failed: {e}")
+        return False
 
 
 # Log module initialization
 if _imports_successful:
-    logger.debug(f"API module v{__version__} loaded successfully")
+    logger.info(f"VULCAN-AGI API module v{__version__} loaded successfully")
 else:
-    logger.debug(f"API module v{__version__} loaded with some components unavailable")
+    logger.warning(f"VULCAN-AGI API module v{__version__} loaded with some components unavailable")

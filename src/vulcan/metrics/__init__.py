@@ -187,6 +187,7 @@ __all__ = [
     # Helper
     "get_or_create_metric",
     "MockMetric",
+    "MockTimer",
     # Standard metrics
     "step_counter",
     "step_duration",
@@ -205,7 +206,66 @@ __all__ = [
     "Histogram",
     "REGISTRY",
     "generate_latest",
+    # Module utilities
+    "get_module_info",
+    "validate_metrics_module",
 ]
+
+
+def get_module_info() -> Dict[str, Any]:
+    """
+    Get information about the metrics module.
+    
+    Returns:
+        Dictionary containing:
+        - version: Module version
+        - author: Module author
+        - prometheus_available: Whether prometheus_client is installed
+        - metrics_registered: List of registered metric names
+    """
+    metrics_registered = [
+        "vulcan_steps_total",
+        "vulcan_step_duration_seconds",
+        "vulcan_active_requests",
+        "vulcan_errors_total",
+        "vulcan_auth_failures_total",
+        "vulcan_improvement_attempts_total",
+        "vulcan_improvement_successes_total",
+        "vulcan_improvement_failures_total",
+        "vulcan_improvement_cost_usd_total",
+        "vulcan_improvement_approvals_pending",
+    ]
+    
+    return {
+        "version": __version__,
+        "author": __author__,
+        "prometheus_available": PROMETHEUS_AVAILABLE,
+        "metrics_registered": metrics_registered if PROMETHEUS_AVAILABLE else [],
+        "using_mocks": not PROMETHEUS_AVAILABLE,
+    }
+
+
+def validate_metrics_module() -> bool:
+    """
+    Validate that the metrics module is properly loaded and functional.
+    
+    Returns:
+        True if module is functional (even with mocks), False on error
+    """
+    try:
+        info = get_module_info()
+        
+        # Module is functional even without Prometheus (uses mocks)
+        if info["prometheus_available"]:
+            logger.info("Metrics module validated with Prometheus support")
+        else:
+            logger.info("Metrics module validated (using mock metrics)")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Metrics module validation failed: {e}")
+        return False
 
 
 # Backward compatibility alias
@@ -213,6 +273,6 @@ _get_or_create_metric = get_or_create_metric
 
 # Log module initialization
 if PROMETHEUS_AVAILABLE:
-    logger.debug(f"Metrics module v{__version__} loaded with Prometheus support")
+    logger.info(f"VULCAN-AGI Metrics module v{__version__} loaded with Prometheus support")
 else:
-    logger.debug(f"Metrics module v{__version__} loaded (Prometheus not available)")
+    logger.info(f"VULCAN-AGI Metrics module v{__version__} loaded (using mock metrics - prometheus_client not installed)")

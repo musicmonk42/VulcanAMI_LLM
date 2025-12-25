@@ -145,6 +145,29 @@ class ImprovementApproval(BaseModel):
     status: str = "pending"
 
 
+class HealthResponse(BaseModel):
+    """Response model for health check endpoints."""
+    status: str
+    healthy: bool
+    components: Optional[Dict[str, Any]] = None
+    version: Optional[str] = None
+    uptime_seconds: Optional[float] = None
+
+
+class MetricsResponse(BaseModel):
+    """Response model for metrics endpoints."""
+    prometheus_data: Optional[str] = None
+    internal_metrics: Optional[Dict[str, Any]] = None
+
+
+class ErrorResponse(BaseModel):
+    """Standard error response model."""
+    error: str
+    detail: Optional[str] = None
+    error_type: Optional[str] = None
+    timestamp: Optional[float] = None
+
+
 # ============================================================
 # MODULE EXPORTS
 # ============================================================
@@ -166,4 +189,11 @@ __all__ = [
     "StatusResponse",
     "ConfigResponse",
     "ImprovementApproval",
+    "HealthResponse",
+    "MetricsResponse",
+    "ErrorResponse",
 ]
+
+
+# Module initialization logging
+logger.debug(f"API models module v{__version__} loaded with {len(__all__)} models")

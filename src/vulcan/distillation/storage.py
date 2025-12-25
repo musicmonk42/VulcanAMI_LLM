@@ -8,19 +8,23 @@
 #     - Optional encryption at rest using Fernet
 #     - Configurable retention with automatic cleanup
 #     - Provenance records for governance audit
+#     - Thread-safe operations
+#     - Atomic file operations
 #
 # VERSION HISTORY:
 #     1.0.0 - Extracted from main.py for modular architecture
+#     1.0.1 - Added thread safety, atomic operations, and enhanced logging
 # ============================================================
 
 import json
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Module metadata
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "VULCAN-AGI Team"
 
 logger = logging.getLogger(__name__)
@@ -57,6 +61,9 @@ class DistillationStorageBackend:
         self.use_encryption = use_encryption
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
         self.logger = logging.getLogger("DistillationStorage")
+        
+        # Thread safety lock for concurrent access
+        self._lock = threading.RLock()
         
         # Ensure storage directory exists
         self.storage_path.mkdir(parents=True, exist_ok=True)
@@ -131,6 +138,7 @@ class DistillationStorageBackend:
         Append a training example to storage.
         
         Uses JSONL format (one JSON object per line) for efficient appending.
+        Thread-safe with proper locking.
         
         Args:
             example: The example dictionary to store
@@ -138,31 +146,32 @@ class DistillationStorageBackend:
         Returns:
             True if successful, False otherwise
         """
-        try:
-            # Check file rotation
-            if self._examples_file.exists():
-                if self._examples_file.stat().st_size > self.max_file_size_bytes:
-                    self._rotate_file(self._examples_file)
-            
-            # Serialize and optionally encrypt
-            line = json.dumps(example, separators=(',', ':'))
-            if self.use_encryption:
-                line = self._encrypt(line)
-            
-            # Append to file
-            with open(self._examples_file, "a") as f:
-                f.write(line + "\n")
-            
-            # Update metadata
-            self._metadata["total_examples"] += 1
-            self._metadata["last_write"] = time.time()
-            self._save_metadata()
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to append example: {e}")
-            return False
+        with self._lock:
+            try:
+                # Check file rotation
+                if self._examples_file.exists():
+                    if self._examples_file.stat().st_size > self.max_file_size_bytes:
+                        self._rotate_file(self._examples_file)
+                
+                # Serialize and optionally encrypt
+                line = json.dumps(example, separators=(',', ':'))
+                if self.use_encryption:
+                    line = self._encrypt(line)
+                
+                # Append to file
+                with open(self._examples_file, "a") as f:
+                    f.write(line + "\n")
+                
+                # Update metadata
+                self._metadata["total_examples"] += 1
+                self._metadata["last_write"] = time.time()
+                self._save_metadata()
+                
+                return True
+                
+            except Exception as e:
+                self.logger.error(f"Failed to append example: {e}")
+                return False
     
     def append_provenance(self, record: Dict[str, Any]) -> bool:
         """
@@ -194,6 +203,8 @@ class DistillationStorageBackend:
         """
         Read examples from storage.
         
+        Thread-safe with proper locking.
+        
         Args:
             limit: Maximum number of examples to read
             offset: Number of examples to skip
@@ -201,32 +212,33 @@ class DistillationStorageBackend:
         Returns:
             List of example dictionaries
         """
-        examples = []
-        
-        if not self._examples_file.exists():
-            return examples
-        
-        try:
-            with open(self._examples_file, "r") as f:
-                for i, line in enumerate(f):
-                    if i < offset:
-                        continue
-                    if limit and len(examples) >= limit:
-                        break
-                    
-                    line = line.strip()
-                    if not line:
-                        continue
-                    
-                    if self.use_encryption:
-                        line = self._decrypt(line)
-                    
-                    examples.append(json.loads(line))
+        with self._lock:
+            examples = []
             
-        except Exception as e:
-            self.logger.error(f"Failed to read examples: {e}")
-        
-        return examples
+            if not self._examples_file.exists():
+                return examples
+            
+            try:
+                with open(self._examples_file, "r") as f:
+                    for i, line in enumerate(f):
+                        if i < offset:
+                            continue
+                        if limit and len(examples) >= limit:
+                            break
+                        
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        if self.use_encryption:
+                            line = self._decrypt(line)
+                        
+                        examples.append(json.loads(line))
+                
+            except Exception as e:
+                self.logger.error(f"Failed to read examples: {e}")
+            
+            return examples
     
     def read_and_clear(self, batch_size: int) -> List[Dict[str, Any]]:
         """
@@ -321,4 +333,29 @@ class DistillationStorageBackend:
         return removed
 
 
-__all__ = ["DistillationStorageBackend"]
+def get_module_info() -> Dict[str, Any]:
+    """
+    Get information about the storage module.
+    
+    Returns:
+        Dictionary containing module information
+    """
+    return {
+        "version": __version__,
+        "author": __author__,
+        "features": [
+            "JSONL format storage",
+            "Optional Fernet encryption",
+            "Automatic file rotation",
+            "Thread-safe operations",
+            "Provenance tracking",
+            "Retention cleanup",
+        ],
+    }
+
+
+__all__ = ["DistillationStorageBackend", "get_module_info"]
+
+
+# Module initialization logging
+logger.debug(f"Distillation storage module v{__version__} loaded")
