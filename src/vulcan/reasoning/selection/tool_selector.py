@@ -311,27 +311,31 @@ class MultiTierFeatureExtractor:
     @classmethod
     def _get_cached_embedding(cls, text: str) -> Optional[np.ndarray]:
         """Get embedding from cache if available (LRU eviction)."""
-        # Compute cache key from text hash (faster than storing full text)
-        cache_key = hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()[:16]
+        # Use SHA-256 with 32 chars (128-bit space) to reduce collision risk in high-throughput
+        cache_key = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
         
         with cls._embedding_cache_lock:
             if cache_key in cls._embedding_cache:
                 # Move to end (most recently used)
                 cls._embedding_cache.move_to_end(cache_key)
                 cls._embedding_cache_hits += 1
-                return cls._embedding_cache[cache_key].copy()  # Return copy to prevent mutation
+                # Return copy to prevent mutation (embeddings are small ~384-512 floats)
+                return cls._embedding_cache[cache_key].copy()
             cls._embedding_cache_misses += 1
             return None
     
     @classmethod
     def _cache_embedding(cls, text: str, embedding: np.ndarray) -> None:
-        """Cache embedding with LRU eviction."""
-        cache_key = hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()[:16]
+        """Cache embedding with batch LRU eviction for efficiency."""
+        cache_key = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
         
         with cls._embedding_cache_lock:
-            # Evict oldest entries if at capacity
-            while len(cls._embedding_cache) >= cls._embedding_cache_maxsize:
-                cls._embedding_cache.popitem(last=False)
+            # Batch eviction: remove 10% when at capacity to reduce lock contention
+            if len(cls._embedding_cache) >= cls._embedding_cache_maxsize:
+                evict_count = max(1, cls._embedding_cache_maxsize // 10)  # Remove 10% (min 1)
+                for _ in range(evict_count):
+                    if cls._embedding_cache:
+                        cls._embedding_cache.popitem(last=False)
             
             cls._embedding_cache[cache_key] = embedding.copy()  # Store copy
     
