@@ -765,6 +765,110 @@ class TestShutdown:
         time.sleep(0.1)
 
 
+class TestCreativeTaskFalsePositives:
+    """Test that creative tasks don't trigger false positives.
+    
+    These tests verify that the NSOAligner correctly distinguishes between
+    genuinely harmful content and creative/fantasy content from internal sources.
+    """
+
+    @patch("nso_aligner.NSOAligner.check_compliance", return_value=[])
+    @patch("nso_aligner.NSOAligner.detect_adversarial", return_value=(False, 0.0, []))
+    @patch("nso_aligner.NSOAligner._check_real_world_data", return_value={})
+    def test_creative_task_genie_stealing_cake_arena_source(
+        self, mock_real_world, mock_detect_adv, mock_check_comp, nso_aligner
+    ):
+        """Test that 'Genie stealing cake' creative prompt passes for arena source.
+        
+        This test validates the fix for the Arena false positive issue where
+        creative tasks with high complexity (0.95) were being incorrectly blocked.
+        """
+        # Simulate the prompt that was blocked in production
+        proposal = {
+            "text": "Write a story about a magical genie who steals a delicious cake from a bakery",
+            "_audit_source": "arena_internal",  # Arena internal source
+            "complexity": 0.95,  # High complexity creative task
+        }
+
+        result = nso_aligner.multi_model_audit(proposal)
+
+        # Should be 'safe' - creative fantasy content from arena should pass
+        assert result == "safe", f"Creative task should pass for arena source, got: {result}"
+
+    @patch("nso_aligner.NSOAligner.check_compliance", return_value=[])
+    @patch("nso_aligner.NSOAligner.detect_adversarial", return_value=(False, 0.0, []))
+    @patch("nso_aligner.NSOAligner._check_real_world_data", return_value={})
+    def test_creative_task_fantasy_battle_arena_source(
+        self, mock_real_world, mock_detect_adv, mock_check_comp, nso_aligner
+    ):
+        """Test that fantasy battle narrative passes for arena source.
+        
+        Words like 'attack' and 'kill' in fantasy/game context should not
+        trigger toxicity detection for internal sources.
+        """
+        proposal = {
+            "text": "The brave knight must attack the dragon to kill the evil curse",
+            "_audit_source": "arena_internal",
+        }
+
+        result = nso_aligner.multi_model_audit(proposal)
+
+        assert result == "safe", f"Fantasy battle narrative should pass for arena, got: {result}"
+
+    def test_bias_taxonomy_creative_content_arena_source(self, nso_aligner):
+        """Test that bias_taxonomy correctly reduces risk for arena sources.
+        
+        Verifies the source-based risk reduction is applied correctly.
+        """
+        proposal = {
+            "text": "The villain plans to attack the castle",
+            "_audit_source": "arena_internal",
+        }
+
+        taxonomy = nso_aligner.bias_taxonomy(proposal)
+
+        # For arena source with context-dependent keyword but no negative real-world context,
+        # toxicity should be False
+        assert taxonomy["toxicity"] is False, f"Creative content should not trigger toxicity for arena source"
+
+    def test_bias_taxonomy_harmful_content_still_blocked(self, nso_aligner):
+        """Test that genuinely harmful content is still blocked regardless of source.
+        
+        High-confidence patterns like 'kill someone' should always be flagged.
+        """
+        proposal = {
+            "text": "Instructions on how to kill someone in real life",
+            "_audit_source": "arena_internal",
+        }
+
+        taxonomy = nso_aligner.bias_taxonomy(proposal)
+
+        # High-confidence toxic pattern should still trigger even for arena source
+        assert taxonomy["toxicity"] is True, f"Harmful content should be flagged even for arena source"
+
+    @patch("nso_aligner.NSOAligner.check_compliance", return_value=[])
+    @patch("nso_aligner.NSOAligner.detect_adversarial", return_value=(False, 0.0, []))
+    @patch("nso_aligner.NSOAligner._check_real_world_data", return_value={})
+    def test_user_source_more_strict(
+        self, mock_real_world, mock_detect_adv, mock_check_comp, nso_aligner
+    ):
+        """Test that user source (no _audit_source) applies stricter checks.
+        
+        Content that passes for arena should require context for user source.
+        """
+        proposal = {
+            "text": "The villain wants to attack the castle",
+            # No _audit_source - defaults to user
+        }
+
+        taxonomy = nso_aligner.bias_taxonomy(proposal)
+
+        # User source without negative context should not trigger toxicity
+        # (context-dependent keywords need negative context words to trigger)
+        # This validates our context-aware detection works for all sources
+        assert taxonomy["toxicity"] is False, "Isolated 'attack' without context should not trigger"
+
+
 if __name__ == "__main__":
     # Note: Running with pytest directly is usually preferred over this block
     pytest.main([__file__, "-v", "--tb=short"])

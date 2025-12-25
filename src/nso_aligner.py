@@ -2430,22 +2430,69 @@ class NSOAligner:
             "confidence": 0.0,
         }
 
-        # --- Toxicity Check (Rules + ML) ---
-        toxicity_keywords = [
+        # FIX: Check for source context to reduce false positives for internal/arena operations
+        # Arena and internal sources get reduced sensitivity for creative content
+        audit_source = proposal.get("_audit_source", "user") if isinstance(proposal, dict) else "user"
+        is_internal_source = audit_source in ("arena_internal", "arena", "agent", "internal", "system")
+        
+        # FIX: Context-aware toxicity detection to reduce false positives
+        # For creative tasks (stories, games, roleplay), isolated keywords like "kill" or "attack"
+        # should not trigger toxicity unless accompanied by real-world harmful context
+        
+        # High-confidence toxicity patterns that should always be flagged
+        high_confidence_toxic_patterns = [
+            r"\b(kill|murder|harm)\s+(people|someone|person|them|him|her)\b",
+            r"\b(hate|attack)\s+(group|race|religion|gender)\b",
+            r"\bgo\s+kill\s+yourself\b",
+            r"\b(discriminate|slur)\s+against\b",
+        ]
+        
+        # Lower-confidence keywords that need negative context to trigger
+        context_dependent_keywords = [
             "hate",
-            "violence",
+            "violence", 
             "kill",
             "attack",
             "toxic",
+        ]
+        
+        # Always-flag keywords (direct insults/slurs)
+        direct_toxic_keywords = [
             "slur",
             "discriminate",
             "idiot",
-            "stupid",
+            "stupid", 
             "moron",
-        ]  # Expanded
-        rule_based_toxicity = any(
-            f" {k} " in f" {text_lower} " for k in toxicity_keywords
-        )  # Check whole words
+        ]
+        
+        # Check high-confidence patterns first
+        high_confidence_match = any(
+            re.search(pat, text_lower) for pat in high_confidence_toxic_patterns
+        )
+        
+        # Check direct toxic keywords (always flag)
+        direct_toxic_match = any(
+            f" {k} " in f" {text_lower} " for k in direct_toxic_keywords
+        )
+        
+        # For context-dependent keywords, require negative context words
+        negative_context_words = ["should", "must", "need to", "want to", "going to", "will", "real", "actually"]
+        has_negative_context = any(w in text_lower for w in negative_context_words)
+        
+        context_keyword_match = False
+        if has_negative_context:
+            context_keyword_match = any(
+                f" {k} " in f" {text_lower} " for k in context_dependent_keywords
+            )
+        
+        # Combine rule-based results
+        rule_based_toxicity = high_confidence_match or direct_toxic_match or context_keyword_match
+        
+        # FIX: Apply source-based risk reduction for internal/arena sources
+        # Creative content from internal sources (like "Genie stealing cake") should pass
+        if is_internal_source and not high_confidence_match:
+            # For internal sources, only flag on high-confidence patterns or direct insults
+            rule_based_toxicity = high_confidence_match or direct_toxic_match
 
         if TRANSFORMERS_AVAILABLE and self.bias_classifier:
             try:
@@ -2454,6 +2501,10 @@ class NSOAligner:
                 )  # Ensure truncation
                 ml_toxicity = False
                 ml_confidence = 0.0
+                
+                # FIX: Apply higher threshold for internal sources to reduce false positives
+                toxicity_threshold = 0.75 if is_internal_source else 0.6
+                
                 for result in results:
                     # Check for various toxic labels model might output
                     if (
@@ -2466,17 +2517,21 @@ class NSOAligner:
                             "insult",
                             "identity_hate",
                         ]
-                        and result["score"] > 0.6
-                    ):  # Adjusted threshold
+                        and result["score"] > toxicity_threshold
+                    ):
                         ml_toxicity = True
                         ml_confidence = max(ml_confidence, result["score"])
                         break
                 taxonomy["toxicity"] = (
                     ml_toxicity or rule_based_toxicity
                 )  # Combine results
-                taxonomy["confidence"] = max(
+                
+                # FIX: Apply source-based confidence reduction
+                base_confidence = max(
                     ml_confidence, (0.5 if rule_based_toxicity else 0.0)
                 )
+                taxonomy["confidence"] = base_confidence * 0.5 if is_internal_source else base_confidence
+                
                 if taxonomy["toxicity"]:
                     taxonomy["bias"] = (
                         "toxicity_ml_detected"
@@ -2489,13 +2544,15 @@ class NSOAligner:
                     f"Bias classifier failed: {e}. Falling back to rules."
                 )
                 taxonomy["toxicity"] = rule_based_toxicity
-                taxonomy["confidence"] = 0.5 if rule_based_toxicity else 0.0
+                base_confidence = 0.5 if rule_based_toxicity else 0.0
+                taxonomy["confidence"] = base_confidence * 0.5 if is_internal_source else base_confidence
                 if rule_based_toxicity:
                     taxonomy["bias"] = "toxicity_rule_detected"
         else:
             # Fallback if no ML model
             taxonomy["toxicity"] = rule_based_toxicity
-            taxonomy["confidence"] = 0.5 if rule_based_toxicity else 0.0
+            base_confidence = 0.5 if rule_based_toxicity else 0.0
+            taxonomy["confidence"] = base_confidence * 0.5 if is_internal_source else base_confidence
             if rule_based_toxicity:
                 taxonomy["bias"] = "toxicity_rule_detected"
 
