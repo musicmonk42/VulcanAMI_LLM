@@ -10044,5 +10044,150 @@ def main():
         # --- END MODIFIED BLOCK ---
 
 
+# ============================================================
+# MODULE RE-EXPORTS FOR PLATFORM INTEGRATION
+# ============================================================
+# These imports make the extracted modules available alongside
+# the original implementations in main.py for backward compatibility.
+# External consumers can import directly from the submodules or
+# continue using vulcan.main as before.
+# ============================================================
+
+try:
+    # Utils module exports
+    from vulcan.utils_main import (
+        get_module_info as get_utils_module_info,
+        validate_utils,
+    )
+    UTILS_MODULE_AVAILABLE = True
+except ImportError:
+    UTILS_MODULE_AVAILABLE = False
+
+try:
+    # LLM module exports
+    from vulcan.llm import (
+        get_module_info as get_llm_module_info,
+        validate_llm_module,
+    )
+    LLM_MODULE_AVAILABLE = True
+except ImportError:
+    LLM_MODULE_AVAILABLE = False
+
+try:
+    # Distillation module exports
+    from vulcan.distillation import (
+        get_module_info as get_distillation_module_info,
+        validate_distillation_module,
+        get_knowledge_distiller,
+        initialize_knowledge_distiller,
+    )
+    DISTILLATION_MODULE_AVAILABLE = True
+except ImportError:
+    DISTILLATION_MODULE_AVAILABLE = False
+
+try:
+    # Arena module exports
+    from vulcan.arena import (
+        get_module_info as get_arena_module_info,
+        validate_arena_module,
+    )
+    ARENA_MODULE_AVAILABLE = True
+except ImportError:
+    ARENA_MODULE_AVAILABLE = False
+
+try:
+    # Metrics module exports
+    from vulcan.metrics import (
+        get_module_info as get_metrics_module_info,
+        validate_metrics_module,
+    )
+    METRICS_MODULE_AVAILABLE = True
+except ImportError:
+    METRICS_MODULE_AVAILABLE = False
+
+try:
+    # API module exports
+    from vulcan.api import (
+        get_module_info as get_api_module_info,
+        validate_api_module,
+    )
+    API_MODULE_AVAILABLE = True
+except ImportError:
+    API_MODULE_AVAILABLE = False
+
+
+def get_platform_integration_status() -> Dict[str, Any]:
+    """
+    Get the status of all extracted modules for platform integration.
+    
+    This function provides a comprehensive view of which modules are available
+    and fully integrated with the platform.
+    
+    Returns:
+        Dictionary with module availability and status information
+    """
+    status = {
+        "utils_main": UTILS_MODULE_AVAILABLE,
+        "llm": LLM_MODULE_AVAILABLE,
+        "distillation": DISTILLATION_MODULE_AVAILABLE,
+        "arena": ARENA_MODULE_AVAILABLE,
+        "metrics": METRICS_MODULE_AVAILABLE,
+        "api": API_MODULE_AVAILABLE,
+    }
+    
+    # Get detailed info from each module if available
+    detailed_info = {}
+    if UTILS_MODULE_AVAILABLE:
+        try:
+            detailed_info["utils_main"] = get_utils_module_info()
+        except Exception:
+            detailed_info["utils_main"] = {"error": "Failed to get module info"}
+    
+    if LLM_MODULE_AVAILABLE:
+        try:
+            detailed_info["llm"] = get_llm_module_info()
+        except Exception:
+            detailed_info["llm"] = {"error": "Failed to get module info"}
+    
+    if DISTILLATION_MODULE_AVAILABLE:
+        try:
+            detailed_info["distillation"] = get_distillation_module_info()
+        except Exception:
+            detailed_info["distillation"] = {"error": "Failed to get module info"}
+    
+    if ARENA_MODULE_AVAILABLE:
+        try:
+            detailed_info["arena"] = get_arena_module_info()
+        except Exception:
+            detailed_info["arena"] = {"error": "Failed to get module info"}
+    
+    if METRICS_MODULE_AVAILABLE:
+        try:
+            detailed_info["metrics"] = get_metrics_module_info()
+        except Exception:
+            detailed_info["metrics"] = {"error": "Failed to get module info"}
+    
+    if API_MODULE_AVAILABLE:
+        try:
+            detailed_info["api"] = get_api_module_info()
+        except Exception:
+            detailed_info["api"] = {"error": "Failed to get module info"}
+    
+    return {
+        "modules_available": status,
+        "all_modules_available": all(status.values()),
+        "module_details": detailed_info,
+    }
+
+
+# Log platform integration status at startup
+_integration_status = get_platform_integration_status()
+if _integration_status["all_modules_available"]:
+    logger.info("✓ All extracted modules are available for platform integration")
+else:
+    unavailable = [k for k, v in _integration_status["modules_available"].items() if not v]
+    logger.warning(f"Some extracted modules unavailable: {unavailable}")
+
+
 if __name__ == "__main__":
     main()
