@@ -134,6 +134,11 @@ MAX_MEMORY_PATTERNS = 100
 MAX_TELEMETRY_ENTRIES = 10000
 MAX_AI_INTERACTION_ENTRIES = 10000
 
+# GraphRAG storage limits
+GRAPHRAG_QUERY_TRUNCATE_LENGTH = 2000  # Max chars for query text in GraphRAG
+GRAPHRAG_RESPONSE_TRUNCATE_LENGTH = 2000  # Max chars for response text in GraphRAG
+GRAPHRAG_RESULT_TRUNCATE_LENGTH = 500  # Max chars for AI result JSON in GraphRAG
+
 
 # ============================================================
 # ENUMS
@@ -543,8 +548,8 @@ class TelemetryRecorder:
         enhanced_metadata = dict(metadata)
         if self._use_graph_rag:
             # Store truncated query/response for GraphRAG indexing
-            enhanced_metadata["query"] = query[:2000] if query else ""
-            enhanced_metadata["response"] = response[:2000] if response else ""
+            enhanced_metadata["query"] = query[:GRAPHRAG_QUERY_TRUNCATE_LENGTH] if query else ""
+            enhanced_metadata["response"] = response[:GRAPHRAG_RESPONSE_TRUNCATE_LENGTH] if response else ""
 
         entry = TelemetryEntry(
             timestamp=time.time(),
@@ -976,7 +981,7 @@ class TelemetryRecorder:
                 doc_id = f"ai_{entry.interaction_id}_{int(entry.timestamp * 1000)}"
                 content = f"AI Interaction: {entry.interaction_type}\nFrom: {entry.sender}\nTo: {entry.receiver}\nQuery: {entry.query}"
                 if entry.result:
-                    content += f"\nResult: {json.dumps(entry.result)[:500]}"
+                    content += f"\nResult: {json.dumps(entry.result)[:GRAPHRAG_RESULT_TRUNCATE_LENGTH]}"
                     
                 metadata = {
                     "type": "ai_interaction",
