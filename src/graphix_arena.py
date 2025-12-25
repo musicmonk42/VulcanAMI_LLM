@@ -363,7 +363,8 @@ async def get_api_key(request: Request, api_key: str = Security(api_key_header))
     
     # Skip auth for localhost/internal requests
     # This is safe because Arena and VULCAN run in the same container
-    localhost_addresses = ("127.0.0.1", "::1", "localhost")
+    # Note: request.client.host returns IP addresses, not hostnames
+    localhost_addresses = ("127.0.0.1", "::1")
     if client_host in localhost_addresses:
         logger.debug(f"[AUTH] Skipping API key validation for internal request from {client_host}")
         return "internal-localhost-bypass"

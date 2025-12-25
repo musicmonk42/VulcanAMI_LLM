@@ -1039,7 +1039,8 @@ class QueryAnalyzer:
                 logger.warning(f"[Safety] Query blocked: {plan.safety_reasons[0] if plan.safety_reasons else 'Unknown reason'}")
             
             # Priority 3: Risk classification
-            risk_level_str = "SAFE"
+            # Initialize to None - will be set by risk classification or error handling
+            risk_level_str = None
             try:
                 risk_level = self._safety_validator.classify_query_risk(query)
                 if hasattr(risk_level, 'name'):
@@ -1061,9 +1062,10 @@ class QueryAnalyzer:
                 risk_level_str = "UNKNOWN"
             
             # FIX: Cache the result for future queries
+            # Use "SAFE" as default if risk_level_str is still None (shouldn't happen normally)
             self._safety_cache.set(cache_key, {
                 "safe": plan.safety_passed,
-                "risk_level": risk_level_str,
+                "risk_level": risk_level_str or "SAFE",
                 "reasons": reasons_to_cache,
             })
                 
