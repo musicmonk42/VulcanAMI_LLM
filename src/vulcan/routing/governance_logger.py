@@ -56,12 +56,13 @@ import os
 import sqlite3
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Deque, Dict, Generator, List, Optional
 
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
@@ -98,6 +99,20 @@ _GOVERNANCE_EXECUTOR_LOCK = threading.Lock()
 
 # Calculate default worker count based on CPU count
 _DEFAULT_GOVERNANCE_WORKERS = min(4, (os.cpu_count() or 1) + 1)
+
+# ============================================================
+# BUFFERED LOGGING CONFIGURATION
+# ============================================================
+# PERFORMANCE FIX: Non-blocking governance logging with buffered I/O
+# This addresses the root cause of synchronous governance logging blocking
+# on growing file I/O by using:
+# - Bounded buffer (prevents memory leak)
+# - Background thread flush (prevents per-query blocking)
+# - Rotating log files (prevents single file growing indefinitely)
+
+DEFAULT_BUFFER_MAXLEN = 500  # Maximum entries in buffer before oldest are dropped
+DEFAULT_FLUSH_INTERVAL = 5.0  # Flush buffer to disk every N seconds
+DEFAULT_LOG_PATH = Path("governance_logs")  # Default directory for JSONL log files
 
 
 def _get_governance_executor() -> ThreadPoolExecutor:
@@ -206,6 +221,259 @@ class AuditEntry:
             "details": self.details,
             "timestamp": self.timestamp,
         }
+
+
+# ============================================================
+# BUFFERED GOVERNANCE LOGGER CLASS
+# ============================================================
+
+
+class BufferedGovernanceLogger:
+    """
+    Non-blocking governance logger with buffered writes.
+
+    PERFORMANCE FIX: This class addresses the root cause of synchronous
+    governance logging blocking on growing file I/O. Instead of writing
+    to disk on every log call (which causes increasing latency as files grow),
+    this logger:
+
+    1. Appends entries to a bounded in-memory buffer (deque with maxlen)
+    2. Background thread flushes buffer to disk every N seconds
+    3. Writes to rotating hourly JSONL files (not growing single files)
+
+    This changes logging from O(file_size) to O(1) for each query, fixing
+    the performance degradation pattern (11s -> 18s -> 33s -> 63s).
+
+    Thread Safety:
+        All public methods are thread-safe. Uses threading.Lock for buffer
+        access and daemon thread for background flushing.
+
+    Usage:
+        from vulcan.routing.governance_logger import BufferedGovernanceLogger
+
+        logger = BufferedGovernanceLogger()
+
+        # Non-blocking log - just appends to buffer
+        logger.log("q_123", {"route": "reasoning", "complexity": 0.7})
+
+        # Buffer will be flushed to disk by background thread every 5s
+        # On shutdown, remaining entries are flushed via atexit handler
+
+    Args:
+        log_path: Directory for log files (default: "governance_logs")
+        buffer_maxlen: Maximum buffer size before oldest entries are dropped (default: DEFAULT_BUFFER_MAXLEN=500)
+        flush_interval: Seconds between background flushes (default: DEFAULT_FLUSH_INTERVAL=5.0)
+    """
+
+    def __init__(
+        self,
+        log_path: str = "governance_logs",
+        buffer_maxlen: int = DEFAULT_BUFFER_MAXLEN,
+        flush_interval: float = DEFAULT_FLUSH_INTERVAL,
+    ):
+        """
+        Initialize the buffered governance logger.
+
+        Args:
+            log_path: Directory for rotating log files
+            buffer_maxlen: Maximum entries in buffer (default: DEFAULT_BUFFER_MAXLEN=500)
+            flush_interval: Seconds between background flushes (default: DEFAULT_FLUSH_INTERVAL=5.0)
+        """
+        self.log_path = Path(log_path)
+        self._buffer: Deque[Dict[str, Any]] = deque(maxlen=buffer_maxlen)
+        self._lock = threading.Lock()
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gov_flush")
+        self._flush_interval = flush_interval
+        self._shutdown = False
+        self._stats = {
+            "entries_logged": 0,
+            "entries_flushed": 0,
+            "entries_dropped": 0,  # Due to buffer overflow
+            "flush_count": 0,
+            "errors": 0,
+        }
+
+        # Ensure log directory exists
+        self.log_path.mkdir(parents=True, exist_ok=True)
+
+        # Start background flush thread
+        self._start_background_flush()
+
+        # Register cleanup on application exit
+        atexit.register(self._atexit_handler)
+
+        logger.debug(
+            f"BufferedGovernanceLogger initialized: log_path={self.log_path}, "
+            f"buffer_maxlen={buffer_maxlen}, flush_interval={flush_interval}s"
+        )
+
+    def log(self, query_id: str, routing_result: Dict[str, Any]) -> None:
+        """
+        Non-blocking log - just append to buffer.
+
+        This method returns immediately after appending to the in-memory
+        buffer. Actual disk I/O happens in the background flush thread.
+
+        Args:
+            query_id: Unique identifier for the query
+            routing_result: Routing decision data to log
+        """
+        entry = {
+            "query_id": query_id,
+            "timestamp": time.time(),
+            "result": routing_result,
+        }
+
+        with self._lock:
+            # Check if buffer is full (will drop oldest)
+            was_full = len(self._buffer) == self._buffer.maxlen
+            self._buffer.append(entry)
+
+            self._stats["entries_logged"] += 1
+            if was_full:
+                self._stats["entries_dropped"] += 1
+
+        # DON'T write to disk here - return immediately
+        logger.debug(f"[BufferedGovernanceLogger] Buffered entry for query_id={query_id}")
+
+    def _start_background_flush(self) -> None:
+        """Start the background thread that flushes buffer to disk."""
+
+        def _flush_loop() -> None:
+            """Flush buffer to disk at regular intervals."""
+            while not self._shutdown:
+                time.sleep(self._flush_interval)
+                if not self._shutdown:  # Check again after sleep
+                    self._flush_to_disk()
+
+        thread = threading.Thread(target=_flush_loop, daemon=True, name="gov_flush_loop")
+        thread.start()
+        logger.debug("Background flush thread started")
+
+    def _flush_to_disk(self) -> None:
+        """Batch write buffer contents to rotating log file."""
+        with self._lock:
+            if not self._buffer:
+                return
+            entries = list(self._buffer)
+            self._buffer.clear()
+
+        if not entries:
+            return
+
+        try:
+            # Write to hourly rotating log file (not growing single file)
+            hour_timestamp = int(time.time() // 3600)
+            log_file = self.log_path / f"gov_{hour_timestamp}.jsonl"
+
+            with open(log_file, "a", encoding="utf-8") as f:
+                for entry in entries:
+                    f.write(json.dumps(entry) + "\n")
+
+            with self._lock:
+                self._stats["entries_flushed"] += len(entries)
+                self._stats["flush_count"] += 1
+
+            logger.debug(
+                f"[BufferedGovernanceLogger] Flushed {len(entries)} entries to {log_file}"
+            )
+
+        except Exception as e:
+            logger.error(f"[BufferedGovernanceLogger] Flush failed: {e}", exc_info=True)
+            with self._lock:
+                self._stats["errors"] += 1
+            # Re-add entries to buffer on failure (if space permits)
+            # We don't want to lose data, but also can't block indefinitely
+            with self._lock:
+                for entry in reversed(entries):
+                    if len(self._buffer) < self._buffer.maxlen:
+                        self._buffer.appendleft(entry)
+
+    def _atexit_handler(self) -> None:
+        """Flush remaining buffer on application shutdown."""
+        # Check if we're in pytest cleanup mode
+        if os.environ.get("PYTEST_CLEANUP_DONE") == "1":
+            return
+
+        self._shutdown = True
+        try:
+            # Final flush
+            self._flush_to_disk()
+            # Shutdown executor
+            self._executor.shutdown(wait=False)
+            logger.debug("BufferedGovernanceLogger shutdown complete")
+        except Exception as e:
+            logger.warning(f"Error during BufferedGovernanceLogger shutdown: {e}")
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get logging statistics."""
+        with self._lock:
+            stats = dict(self._stats)
+            stats["buffer_size"] = len(self._buffer)
+            stats["buffer_maxlen"] = self._buffer.maxlen
+        return stats
+
+    def flush_now(self) -> None:
+        """
+        Force an immediate flush of the buffer.
+
+        Useful for testing or when you need to ensure logs are persisted.
+        """
+        self._flush_to_disk()
+
+
+# ============================================================
+# BUFFERED LOGGER SINGLETON
+# ============================================================
+
+_buffered_logger: Optional[BufferedGovernanceLogger] = None
+_buffered_logger_lock = threading.Lock()
+
+
+def get_buffered_governance_logger(
+    log_path: str = "governance_logs",
+    buffer_maxlen: int = DEFAULT_BUFFER_MAXLEN,
+    flush_interval: float = DEFAULT_FLUSH_INTERVAL,
+) -> BufferedGovernanceLogger:
+    """
+    Get or create the global buffered governance logger (thread-safe singleton).
+
+    Args:
+        log_path: Directory for log files
+        buffer_maxlen: Maximum buffer size
+        flush_interval: Seconds between flushes
+
+    Returns:
+        BufferedGovernanceLogger instance
+    """
+    global _buffered_logger
+
+    if _buffered_logger is None:
+        with _buffered_logger_lock:
+            if _buffered_logger is None:
+                _buffered_logger = BufferedGovernanceLogger(
+                    log_path=log_path,
+                    buffer_maxlen=buffer_maxlen,
+                    flush_interval=flush_interval,
+                )
+                logger.debug("Global BufferedGovernanceLogger instance created")
+
+    return _buffered_logger
+
+
+def log_routing_result(query_id: str, routing_result: Dict[str, Any]) -> None:
+    """
+    Non-blocking convenience function to log a routing result.
+
+    This is the recommended way to log governance data from the query router.
+    It uses the buffered logger which returns immediately without disk I/O.
+
+    Args:
+        query_id: Unique identifier for the query
+        routing_result: Routing decision data to log
+    """
+    buffered_logger = get_buffered_governance_logger()
+    buffered_logger.log(query_id, routing_result)
 
 
 # ============================================================

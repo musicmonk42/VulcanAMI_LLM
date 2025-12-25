@@ -230,14 +230,30 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     # Get Arena configuration
     base_url = arena_base_url
     api_key = None
-    timeout = 60.0
+    timeout = 30.0  # PERFORMANCE FIX: Reduced from 60s to 30s
+    complexity_threshold = 0.3  # PERFORMANCE FIX: Default fast-path threshold
     
     if settings is not None:
         base_url = base_url or settings.arena_base_url
         api_key = settings.arena_api_key
         timeout = settings.arena_timeout
+        complexity_threshold = getattr(settings, 'arena_complexity_threshold', 0.3)
     else:
         base_url = base_url or "http://localhost:8080/arena"
+    
+    # PERFORMANCE FIX: Fast-path skip for low-complexity queries
+    # Queries with complexity < threshold skip Arena entirely for faster response
+    # Default to 0.0 if complexity_score is not available to skip Arena by default
+    # rather than unexpectedly calling Arena when complexity is unknown
+    complexity = getattr(routing_plan, 'complexity_score', 0.0)
+    if complexity < complexity_threshold:
+        logger.info(f"[ARENA] Fast-path skip: complexity {complexity:.2f} < threshold {complexity_threshold:.2f}")
+        return {
+            "status": "skipped",
+            "reason": f"Query complexity ({complexity:.2f}) below threshold ({complexity_threshold:.2f})",
+            "result": None,
+            "execution_time": 0,
+        }
     
     # Select appropriate Arena agent
     agent_id = select_arena_agent(routing_plan)

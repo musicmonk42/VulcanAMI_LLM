@@ -166,10 +166,15 @@ class Settings(BaseSettings):
     arena_api_key: Optional[str] = Field(
         default="default-secret-key-for-dev", env="GRAPHIX_API_KEY"
     )
-    # Timeout for Arena API calls (seconds)
-    arena_timeout: float = Field(default=60.0, env="ARENA_TIMEOUT")
+    # PERFORMANCE FIX: Reduced timeout from 60s to 30s to prevent long waits on Arena failures
+    # Original 60s timeout caused fallback delays that hurt overall response time
+    arena_timeout: float = Field(default=30.0, env="ARENA_TIMEOUT")
     # Whether to enable Arena routing for complex queries
     arena_enabled: bool = Field(default=True, env="ARENA_ENABLED")
+    # PERFORMANCE FIX: Complexity threshold for Arena fast-path skip
+    # Queries with complexity < this value skip Arena entirely for faster response
+    # This prevents unnecessary Arena overhead for simple queries
+    arena_complexity_threshold: float = Field(default=0.3, env="ARENA_COMPLEXITY_THRESHOLD")
 
     class Config:
         env_file = ".env"
