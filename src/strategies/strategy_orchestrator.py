@@ -228,9 +228,13 @@ class StrategyOrchestrator:
                 # FIX: Pass extracted uncertainty and confidence values instead of DecisionState
                 # The should_gather_more method expects numeric values, not a DecisionState object
                 # It returns a boolean: True if more info should be gathered
+                # Use getattr with defaults to handle missing attributes gracefully
+                uncertainty_val = getattr(decision_state, 'uncertainty', self.DEFAULT_INITIAL_UNCERTAINTY)
+                confidence_val = getattr(decision_state, 'current_confidence', self.DEFAULT_INITIAL_CONFIDENCE)
+                
                 should_gather = self.voi_gate.should_gather_more(
-                    uncertainty=decision_state.uncertainty,
-                    confidence=decision_state.current_confidence,
+                    uncertainty=uncertainty_val if uncertainty_val is not None else self.DEFAULT_INITIAL_UNCERTAINTY,
+                    confidence=confidence_val if confidence_val is not None else self.DEFAULT_INITIAL_CONFIDENCE,
                     query_id=context.get('query_id')
                 )
                 

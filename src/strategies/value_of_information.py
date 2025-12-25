@@ -13,13 +13,48 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
 from .security_fixes import safe_pickle_load
 
 logger = logging.getLogger(__name__)
+
+
+def extract_numeric_value(value: Any, default: float = 0.5) -> float:
+    """
+    Safely extract a numeric value from various input types.
+    
+    This utility handles conversion from DecisionState objects, numeric types,
+    and other objects that have numeric attributes (uncertainty, value, score, confidence).
+    
+    Args:
+        value: The value to extract from (can be float, int, DecisionState, or similar)
+        default: Default value to return if extraction fails
+        
+    Returns:
+        Extracted float value
+    """
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    # Handle DecisionState or similar objects
+    if hasattr(value, 'uncertainty'):
+        return float(value.uncertainty)
+    if hasattr(value, 'value'):
+        return float(value.value)
+    if hasattr(value, 'score'):
+        return float(value.score)
+    if hasattr(value, 'confidence'):
+        return float(value.confidence)
+    if hasattr(value, '__float__'):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            pass
+    return default
 
 
 class InformationSource(Enum):
@@ -437,7 +472,7 @@ class ValueOfInformationGate:
 
     def should_gather_more(
         self,
-        uncertainty,  # Can be float OR DecisionState object for backward compatibility
+        uncertainty: Union[float, Any],  # Can be float OR DecisionState object
         confidence: Optional[float] = None,
         query_id: Optional[str] = None,
         **kwargs
@@ -459,31 +494,9 @@ class ValueOfInformationGate:
         Returns:
             True if more information should be gathered, False to proceed
         """
-        # === Helper to extract numeric values safely ===
-        def extract_numeric(value, default=0.5):
-            if value is None:
-                return default
-            if isinstance(value, (int, float)):
-                return float(value)
-            # Handle DecisionState or similar objects
-            if hasattr(value, 'uncertainty'):
-                return float(value.uncertainty)
-            if hasattr(value, 'value'):
-                return float(value.value)
-            if hasattr(value, 'score'):
-                return float(value.score)
-            if hasattr(value, 'confidence'):
-                return float(value.confidence)
-            if hasattr(value, '__float__'):
-                try:
-                    return float(value)
-                except (TypeError, ValueError):
-                    pass
-            return default
-
-        # Extract numeric values (THE KEY FIX)
-        uncertainty_value = extract_numeric(uncertainty, default=0.5)
-        confidence_value = extract_numeric(confidence, default=0.9) if confidence is not None else 0.9
+        # Extract numeric values using module-level utility
+        uncertainty_value = extract_numeric_value(uncertainty, default=0.5)
+        confidence_value = extract_numeric_value(confidence, default=0.9) if confidence is not None else 0.9
 
         # Check max gather rounds first (before incrementing)
         if query_id:
