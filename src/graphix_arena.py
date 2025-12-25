@@ -348,8 +348,28 @@ API_KEY_NAME = "X-API-KEY"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 
-async def get_api_key(api_key: str = Security(api_key_header)):
-    """Dependency to validate the API key from the request header."""
+async def get_api_key(request: Request, api_key: str = Security(api_key_header)):
+    """
+    Dependency to validate the API key from the request header.
+    
+    Skip authentication for internal requests from localhost (127.0.0.1 or ::1).
+    This allows same-container internal calls (e.g., VULCAN calling Arena)
+    without requiring API key configuration.
+    """
+    # Get client IP from request
+    client_host = None
+    if request.client:
+        client_host = request.client.host
+    
+    # Skip auth for localhost/internal requests
+    # This is safe because Arena and VULCAN run in the same container
+    # Note: request.client.host returns IP addresses, not hostnames
+    localhost_addresses = ("127.0.0.1", "::1")
+    if client_host in localhost_addresses:
+        logger.debug(f"[AUTH] Skipping API key validation for internal request from {client_host}")
+        return "internal-localhost-bypass"
+    
+    # External requests require valid API key
     if api_key == API_KEY:
         return api_key
     else:
