@@ -8,6 +8,16 @@
 # ============================================================================
 
 # ====================================================================
+# PRIORITY 2 FIX: RESTRICT CPU THREADS - MUST BE FIRST
+# Prevents PyTorch from eating 40 cores and causing resource starvation
+# These environment variables MUST be set before any torch/numpy imports
+# ====================================================================
+import os
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["TORCH_NUM_THREADS"] = "4"
+
+# ====================================================================
 # PATH + SAFETY SETUP - MUST BE FIRST
 # ====================================================================
 from vulcan.orchestrator import ProductionDeployment
@@ -2891,6 +2901,38 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             )
         systems_used.append("vulcan_reasoning_synthesis")
         logger.info("[VULCAN] Response synthesized from reasoning systems")
+        
+        # ================================================================
+        # PRIORITY 1 FIX: FALLBACK GUARD - NSOAligner safety validation
+        # When Arena times out and we fall back to agent_pool processing,
+        # validate the fallback response before returning to user
+        # ================================================================
+        safety = None
+        try:
+            from src.nso_aligner import NSOAligner
+            safety = NSOAligner()
+            # multi_model_audit returns "safe", "risky", or "unsafe"
+            safety_result = safety.multi_model_audit(
+                {"text": response_text, "_audit_source": "fallback_guard"},
+                rationale="Fallback Guard validation"
+            )
+            if safety_result != "safe":
+                response_text = "I cannot answer this request due to safety guidelines (Fallback Guard)."
+                logger.warning(f"[VULCAN] Fallback response blocked by NSOAligner safety validation: {safety_result}")
+                systems_used.append("fallback_guard_blocked")
+            else:
+                systems_used.append("fallback_guard_passed")
+        except ImportError:
+            logger.debug("[VULCAN] NSOAligner not available for fallback guard")
+        except Exception as fallback_safety_err:
+            logger.warning(f"[VULCAN] Fallback guard NSOAligner validation failed: {fallback_safety_err}")
+        finally:
+            # Clean up resources if safety was successfully initialized
+            if safety is not None:
+                try:
+                    safety.shutdown()
+                except Exception:
+                    pass  # Ignore shutdown errors
 
     if not response_text:
         response_text = "I apologize, but I'm currently unable to process your request. Please try again."
