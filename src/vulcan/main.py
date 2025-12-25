@@ -384,19 +384,11 @@ if REDIS_AVAILABLE:
 else:
     logger.warning("Redis library not available. Using in-process state.")
 
-# HTTP Connection Pool Configuration
-HTTP_DNS_CACHE_TTL = int(os.environ.get("VULCAN_HTTP_DNS_CACHE_TTL", "300"))
-HTTP_TOTAL_TIMEOUT = float(os.environ.get("VULCAN_HTTP_TOTAL_TIMEOUT", "60.0"))
-HTTP_CONNECT_TIMEOUT = float(os.environ.get("VULCAN_HTTP_CONNECT_TIMEOUT", "10.0"))
-HTTP_READ_TIMEOUT = float(os.environ.get("VULCAN_HTTP_READ_TIMEOUT", "30.0"))
-
-# HTTP CONNECTION POOL FIX: Global aiohttp session for connection reuse
-# The session is initialized in lifespan context and used by all HTTP operations
-_http_session: Optional[Any] = None  # Type as Any to handle aiohttp not being installed
-
 # ============================================================
 # LIFESPAN MANAGER
 # ============================================================
+# Note: HTTP session management is now handled by vulcan.arena.http_session
+# (get_http_session, close_http_session)
 
 
 @asynccontextmanager
