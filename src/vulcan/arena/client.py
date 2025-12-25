@@ -230,7 +230,7 @@ async def execute_via_arena(query: str, routing_plan, arena_base_url: str = None
     # Get Arena configuration
     base_url = arena_base_url
     api_key = None
-    timeout = 90.0  # PERFORMANCE FIX: Increased from 30s to 90s - Arena completes in 55-64s
+    timeout = 120.0  # FIX #6: Increased from 90s to 120s to account for high CPU load
     complexity_threshold = 0.3  # PERFORMANCE FIX: Default fast-path threshold
     
     if settings is not None:

@@ -365,6 +365,45 @@ MAX_NODES = 10000  # FIX: Added max node count for validation
 MAX_REBERT_THRESHOLD = 0.5
 MIN_REBERT_THRESHOLD = 0.0
 
+# Magic markers for subprocess JSON output
+OUTPUT_START_MARKER = "###ARENA_OUTPUT_START###"
+OUTPUT_END_MARKER = "###ARENA_OUTPUT_END###"
+
+
+def extract_json_from_output(stdout: str) -> dict:
+    """
+    Extract JSON from subprocess output, handling mixed log/data.
+    
+    Uses magic markers for reliable parsing, with fallbacks for
+    legacy output formats.
+    
+    Args:
+        stdout: Raw stdout from subprocess
+        
+    Returns:
+        Parsed JSON dictionary
+        
+    Raises:
+        json.JSONDecodeError: If JSON cannot be extracted
+    """
+    # Try marker-based extraction first
+    if OUTPUT_START_MARKER in stdout and OUTPUT_END_MARKER in stdout:
+        start_idx = stdout.index(OUTPUT_START_MARKER) + len(OUTPUT_START_MARKER)
+        end_idx = stdout.index(OUTPUT_END_MARKER)
+        json_str = stdout[start_idx:end_idx].strip()
+        return json.loads(json_str)
+    
+    # Fallback: find JSON object boundaries
+    try:
+        first_brace = stdout.index('{')
+        last_brace = stdout.rindex('}') + 1
+        return json.loads(stdout[first_brace:last_brace])
+    except (ValueError, json.JSONDecodeError):
+        pass
+    
+    # Last resort
+    return json.loads(stdout.strip())
+
 
 # App Initialization
 app = FastAPI(
@@ -1075,6 +1114,20 @@ class GraphixArena:
         Returns:
             Dictionary with execution results and metadata
         """
+        # FIX: Validate graph structure before processing
+        # This prevents "Missing 'nodes' field" errors from data integrity issues
+        if not isinstance(graph, dict):
+            logger.warning("[Arena] Invalid graph: expected dict, got %s. Using empty graph.", type(graph).__name__)
+            graph = {"nodes": [], "edges": []}
+        
+        if "nodes" not in graph:
+            logger.warning("[Arena] Invalid base graph: Missing 'nodes' field. Using empty nodes list.")
+            graph["nodes"] = []
+        
+        if not isinstance(graph.get("nodes"), list):
+            logger.warning("[Arena] Invalid 'nodes' field: expected list. Using empty nodes list.")
+            graph["nodes"] = []
+            
         nodes = graph.get('nodes', [])
         # Note: edges reserved for future topological ordering/dependency resolution
         _ = graph.get('edges', [])
@@ -1202,6 +1255,7 @@ class GraphixArena:
         # for the parent process to parse. Without this, logging.basicConfig() in
         # llm_client.py outputs to stdout by default, causing JSON parse failures
         # (e.g., "Extra data: line 1 column 5") and 40-second timeouts.
+        # FIX Issue 4: Use magic markers to wrap JSON output for reliable parsing.
         script_to_execute = (
             f"import sys, logging; "
             f"logging.basicConfig(stream=sys.stderr, level=logging.INFO, "
@@ -1209,7 +1263,11 @@ class GraphixArena:
             f"import json; from llm_client import GraphixLLMClient; "
             f"client=GraphixLLMClient('{agent_id}'); "
             f'messages = [{{"role": "user", "content": {repr(content_payload)}}}]; '
-            f"print(json.dumps(client.chat(messages)))"
+            f"result = client.chat(messages); "
+            f"print('###ARENA_OUTPUT_START###'); "
+            f"print(json.dumps(result)); "
+            f"print('###ARENA_OUTPUT_END###'); "
+            f"sys.stdout.flush()"
         )
 
         cmd = [sys.executable, "-c", script_to_execute]
@@ -1250,7 +1308,15 @@ class GraphixArena:
                 )
                 raise ValueError(f"Agent {agent_id} failed: {error_output}")
 
-            return json.loads(stdout.decode())
+            # Parse with marker-aware extractor
+            stdout_str = stdout.decode()
+            try:
+                return extract_json_from_output(stdout_str)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Arena output: {e}")
+                logger.debug(f"stdout: {stdout_str[:500]}")
+                logger.debug(f"stderr: {stderr.decode()[:500]}")
+                raise
 
         except asyncio.TimeoutError:
             logger.error(f"Agent {agent_id} execution timeout")
