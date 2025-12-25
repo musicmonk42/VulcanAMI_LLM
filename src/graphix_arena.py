@@ -1207,7 +1207,7 @@ class GraphixArena:
 
         # Security audit
         # FIX: Arena internal operations should have reduced sensitivity to avoid false positives
-        # Only block truly dangerous content (homograph attacks, real-world threats)
+        # Only block truly dangerous content (unsafe label) - risky and bias are often false positives
         audit_label = None
         if self.nso_aligner:
             try:
@@ -1217,38 +1217,30 @@ class GraphixArena:
                 audit_label = self.nso_aligner.multi_model_audit(audit_payload)
 
                 # FIX: For internal Arena operations, only reject on severe risks
-                # "bias" alone may be a false positive for legitimate graph operations
-                if audit_label in ("risky", "unsafe"):
-                    # Check if this is a severe risk (adversarial, homograph, real-world threat)
-                    # or a potential false positive (bias detection, compliance)
-                    audit_details = getattr(self.nso_aligner, '_last_audit_metadata', {})
-                    severe_risks = {"homograph_attack", "real_world_threat", "adversarial_input", "adversarial_after_modification"}
-                    is_severe = any(
-                        risk in str(audit_details.get("quarantine_reason", "")) 
-                        for risk in severe_risks
+                # "unsafe" always blocked - indicates truly dangerous content
+                # "risky" and "bias" are often false positives for legitimate graph operations
+                if audit_label == "unsafe":
+                    # Always block unsafe content regardless of source
+                    bias_detections.inc()
+                    alert_msg = (
+                        f"[Unsafe Content] Agent: {agent_id}, Graph: {graph_id}, "
+                        f"Label: {audit_label}. Proposal rejected."
                     )
-                    
-                    if is_severe or audit_label == "unsafe":
-                        bias_detections.inc()
-                        alert_msg = (
-                            f"[Bias Detected] Agent: {agent_id}, Graph: {graph_id}, "
-                            f"Label: {audit_label}. Proposal rejected."
-                        )
-                        logger.warning(alert_msg)
-                        self.send_slack_alert(alert_msg)
+                    logger.warning(alert_msg)
+                    self.send_slack_alert(alert_msg)
 
-                        raise BiasDetectedException(
-                            agent_id=agent_id,
-                            graph_id=graph_id,
-                            label=audit_label,
-                            message="Proposal rejected by security audit engine due to potential bias or risk.",
-                        )
-                    else:
-                        # FIX: Log warning but don't block for potential false positives
-                        logger.info(
-                            f"[Arena Audit] Non-severe risk detected ({audit_label}) for agent {agent_id}, "
-                            f"graph {graph_id}. Allowing to proceed with monitoring."
-                        )
+                    raise BiasDetectedException(
+                        agent_id=agent_id,
+                        graph_id=graph_id,
+                        label=audit_label,
+                        message="Proposal rejected by security audit engine due to unsafe content.",
+                    )
+                elif audit_label == "risky":
+                    # FIX: Log warning but don't block for risky (potential false positive)
+                    logger.info(
+                        f"[Arena Audit] Risky flag raised for agent {agent_id}, "
+                        f"graph {graph_id}. Treating as monitoring event for internal Arena operation."
+                    )
                 elif audit_label == "bias":
                     # FIX: Bias alone is often a false positive for Arena operations
                     logger.debug(

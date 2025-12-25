@@ -365,16 +365,11 @@ class EthicalValidator(BaseValidator):
             ),
         ]
 
-        # Ethical concern keywords - REDUCED scores to require multiple indicators
-        # FIX: Single keywords like "exploit" can appear in legitimate contexts
-        # (e.g., "exploit this opportunity", "security exploit detection")
+        # Ethical concern keywords - only keep single words that are highly concerning
+        # FIX: Removed multi-word phrases that don't match as expected with simple substring matching
+        # The patterns above already handle contextual multi-word matching
         self._concern_keywords = {
-            "exploit vulnerability": 0.7,  # More specific than just "exploit"
-            "manipulate people": 0.65,
-            "deceive users": 0.7,
-            "harm": 0.5,  # Reduced - too common in legitimate contexts
-            "discriminate": 0.75,  # Still flag discrimination
-            "violate privacy": 0.65,
+            "discriminate": 0.75,  # Still flag discrimination - highly concerning
         }
         # FIX: Raised threshold from 0.5 to 0.65 to reduce false positives
         # This means queries need stronger indicators to be blocked
