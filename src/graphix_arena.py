@@ -922,7 +922,15 @@ class GraphixArena:
         logger.info(f"Executing task for agent '{agent_id}' via standard subprocess...")
 
         content_payload = f"{task}: {json.dumps(data)}"
+        # FIX Issue 2 (Dirty JSON): Configure logging to stderr BEFORE importing modules.
+        # This prevents logs from contaminating stdout, which must contain only clean JSON
+        # for the parent process to parse. Without this, logging.basicConfig() in
+        # llm_client.py outputs to stdout by default, causing JSON parse failures
+        # (e.g., "Extra data: line 1 column 5") and 40-second timeouts.
         script_to_execute = (
+            f"import sys, logging; "
+            f"logging.basicConfig(stream=sys.stderr, level=logging.INFO, "
+            f"format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'); "
             f"import json; from llm_client import GraphixLLMClient; "
             f"client=GraphixLLMClient('{agent_id}'); "
             f'messages = [{{"role": "user", "content": {repr(content_payload)}}}]; '

@@ -147,13 +147,14 @@ class _MetricsRegistry:
                 else:
                     raise
         elif not PROMETHEUS_AVAILABLE and not _MetricsRegistry._initialized:
-            # Set to None if Prometheus not available
-            _MetricsRegistry._drift_value_gauge = None
-            _MetricsRegistry._drift_events = None
-            _MetricsRegistry._drift_checks = None
-            _MetricsRegistry._drift_latency = None
-            _MetricsRegistry._realignment_operations = None
-            _MetricsRegistry._validation_errors = None
+            # FIX: Use _NoOpMetric instances instead of None when Prometheus is not available
+            # This prevents AttributeError when using @drift_latency.time() decorator
+            _MetricsRegistry._drift_value_gauge = _NoOpMetric()
+            _MetricsRegistry._drift_events = _NoOpMetric()
+            _MetricsRegistry._drift_checks = _NoOpMetric()
+            _MetricsRegistry._drift_latency = _NoOpMetric()
+            _MetricsRegistry._realignment_operations = _NoOpMetric()
+            _MetricsRegistry._validation_errors = _NoOpMetric()
             _MetricsRegistry._initialized = True
 
     @property
