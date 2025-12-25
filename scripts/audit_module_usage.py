@@ -89,6 +89,14 @@ MODULES = {
         'request_flow_file': 'src/strategies/strategy_orchestrator.py',
         'integration_note': 'Decides when to gather more info vs proceed; used via StrategyOrchestrator'
     },
+    # SelfOptimizer
+    'SelfOptimizer': {
+        'file': 'src/evolve/self_optimizer.py',
+        'class': 'SelfOptimizer',
+        'expected_methods': ['start', 'stop', 'collect_metrics', 'optimize', 'get_recommendations'],
+        'request_flow_file': 'src/vulcan/main.py',
+        'integration_note': 'Autonomous performance tuning; started in lifespan, stopped on shutdown'
+    },
 }
 
 

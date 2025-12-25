@@ -111,6 +111,19 @@ except ImportError:
     Redis = None
     REDIS_AVAILABLE = False
 
+# SelfOptimizer for autonomous performance tuning
+try:
+    from evolve import SelfOptimizer
+    SELF_OPTIMIZER_AVAILABLE = True
+except ImportError:
+    try:
+        from src.evolve import SelfOptimizer
+        SELF_OPTIMIZER_AVAILABLE = True
+    except ImportError:
+        SelfOptimizer = None
+        SELF_OPTIMIZER_AVAILABLE = False
+        logging.debug("SelfOptimizer not available")
+
 # ============================================================
 # MODULAR IMPORTS - From refactored vulcan.* subpackages
 # ============================================================
@@ -933,6 +946,23 @@ async def lifespan(app: FastAPI):
         await get_http_session()
         logger.info("✓ Global HTTP connection pool initialized")
 
+    # Initialize SelfOptimizer for autonomous performance tuning
+    if SELF_OPTIMIZER_AVAILABLE and SelfOptimizer:
+        try:
+            app.state.self_optimizer = SelfOptimizer(
+                target_latency_ms=100,
+                target_memory_mb=2000,
+                optimization_interval_s=60,
+                enable_auto_tune=True
+            )
+            app.state.self_optimizer.start()
+            logger.info("[VULCAN] ✓ SelfOptimizer started (target_latency=100ms, interval=60s)")
+        except Exception as e:
+            logger.warning(f"[VULCAN] Failed to initialize SelfOptimizer: {e}")
+            app.state.self_optimizer = None
+    else:
+        app.state.self_optimizer = None
+
     try:
         yield
     except asyncio.CancelledError:
@@ -945,6 +975,14 @@ async def lifespan(app: FastAPI):
             await close_http_session()
         except Exception as e:
             logger.warning(f"Error closing HTTP session: {e}")
+        
+        # Stop SelfOptimizer if running
+        if hasattr(app.state, "self_optimizer") and app.state.self_optimizer:
+            try:
+                app.state.self_optimizer.stop()
+                logger.info("[VULCAN] ✓ SelfOptimizer stopped")
+            except Exception as e:
+                logger.warning(f"[VULCAN] Error stopping SelfOptimizer: {e}")
         
         if startup_complete and hasattr(app.state, "deployment"):
             deployment = app.state.deployment
