@@ -200,8 +200,7 @@ class TestSanitizeModule:
 
         assert is_json_serializable({"key": "value"})
         assert is_json_serializable([1, 2, 3])
-        # Note: Python's json.dumps actually accepts None keys (converts to "null")
-        # The real issue is with non-string keys in general
+        # Lambda functions cannot be serialized
         assert not is_json_serializable(lambda x: x)
 
     def test_safe_json_dumps(self):
@@ -773,8 +772,8 @@ class TestPlatformIntegration:
         try:
             from vulcan.main import get_platform_integration_status
             status = get_platform_integration_status()
-            assert "modules" in status
-            assert "all_loaded" in status
+            assert "modules_available" in status
+            assert "all_modules_available" in status
         except ImportError:
             pytest.skip("main.py integration not available")
 
