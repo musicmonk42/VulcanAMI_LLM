@@ -2907,6 +2907,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         # When Arena times out and we fall back to agent_pool processing,
         # validate the fallback response before returning to user
         # ================================================================
+        safety = None
         try:
             from src.nso_aligner import NSOAligner
             safety = NSOAligner()
@@ -2921,11 +2922,17 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                 systems_used.append("fallback_guard_blocked")
             else:
                 systems_used.append("fallback_guard_passed")
-            safety.shutdown()  # Clean up resources
         except ImportError:
             logger.debug("[VULCAN] NSOAligner not available for fallback guard")
         except Exception as fallback_safety_err:
             logger.warning(f"[VULCAN] Fallback guard NSOAligner validation failed: {fallback_safety_err}")
+        finally:
+            # Clean up resources if safety was successfully initialized
+            if safety is not None:
+                try:
+                    safety.shutdown()
+                except Exception:
+                    pass  # Ignore shutdown errors
 
     if not response_text:
         response_text = "I apologize, but I'm currently unable to process your request. Please try again."

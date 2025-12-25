@@ -854,7 +854,7 @@ class GraphixArena:
         # PRIORITY 0 FIX: Force-kill HardwareDispatcher to prevent resource starvation
         # The AnalogPhotonicEmulator was causing 4000% CPU usage even when disabled in config.
         # Ignoring config and hardcoding disabled state to prevent CPU starvation.
-        print("🛑 HARDWARE DISPATCHER FORCEFULLY DISABLED IN CODE")
+        logger.warning("🛑 HARDWARE DISPATCHER FORCEFULLY DISABLED IN CODE")
         self.hardware_dispatcher = None
         self.use_hardware = False
         logger.warning("[GraphixArena] 🛑 HARDWARE DISPATCHER FORCEFULLY DISABLED IN CODE - Ignoring configuration")
