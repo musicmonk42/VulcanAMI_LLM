@@ -23,6 +23,11 @@
       "enable_avx2": true
     }
   },
+  "hardware": {
+    "enable_dispatcher": true,
+    "emulation_mode": false,
+    "default_backend": "cpu"
+  },
   "execution": {
     "max_parallel": 20,
     "max_threads_per_task": 4,

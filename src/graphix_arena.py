@@ -1002,6 +1002,36 @@ class GraphixArena:
         audit_payload["bias_assessment"] = audit_payload.get("bias_assessment", {"checked": True, "source": "arena_internal"})
         return audit_payload
 
+    def _add_gdpr_metadata(self, response: Dict) -> Dict:
+        """
+        Add GDPR compliance metadata to response payloads.
+        
+        This ensures every generated JSON payload includes the required
+        retention_policy and compliance_standard fields for GDPR minimization.
+        
+        Args:
+            response: Original response dictionary
+            
+        Returns:
+            Response dict with GDPR metadata injected
+        """
+        if not isinstance(response, dict):
+            return response
+        
+        # Add metadata section if not present
+        if "metadata" not in response:
+            response["metadata"] = {}
+        
+        # Inject GDPR compliance fields
+        response["metadata"]["retention_policy"] = response["metadata"].get(
+            "retention_policy", "session_only"
+        )
+        response["metadata"]["compliance_standard"] = response["metadata"].get(
+            "compliance_standard", "gdpr_minimization"
+        )
+        
+        return response
+
     def _dispatch_compute(self, op: str, *args, **kwargs) -> Any:
         """
         Route computation through hardware dispatcher.
@@ -1205,7 +1235,7 @@ class GraphixArena:
 
             results[node_id] = result
 
-        return {'results': results, 'success': True}
+        return self._add_gdpr_metadata({'results': results, 'success': True})
 
     def send_slack_alert(self, message: str):
         """Send Slack alert."""
@@ -1462,11 +1492,11 @@ class GraphixArena:
                     },
                 )
 
-                return {
+                return self._add_gdpr_metadata({
                     "status": "rollback",
                     "reason": f"Hallucination rate {hallucination_rate:.2%} exceeded threshold",
                     "hallucination_rate": hallucination_rate,
-                }
+                })
 
             # Apply EvolutionEngine for generator/evolver agents
             # FIX #6: CPU Offloading - Run heavy evolution computation via HardwareDispatcher
@@ -1532,18 +1562,18 @@ class GraphixArena:
                 except Exception as e:
                     logger.error(f"Synthetic data augmentation failed: {e}")
 
-            return {
+            return self._add_gdpr_metadata({
                 "status": "success",
                 "result": result,
                 "hallucination_rate": hallucination_rate,
                 "similar_topologies": ltm_results,
                 "augmented": augmented,
                 "evolution": evolution_result,
-            }
+            })
 
         except Exception as e:
             logger.error(f"Shadow task failed: {e}")
-            return {"status": "error", "reason": str(e)}
+            return self._add_gdpr_metadata({"status": "error", "reason": str(e)})
 
     async def rollback_failed_task(self, payload: Dict, reason: str = "") -> Dict:
         """
@@ -1944,7 +1974,7 @@ class GraphixArena:
             except Exception as e:
                 logger.debug(f"Tournament telemetry recording failed: {e}")
 
-            return {"winners": winner_indices, "meta": meta}
+            return self._add_gdpr_metadata({"winners": winner_indices, "meta": meta})
 
         except ValueError as e:
             logger.error(f"Tournament validation failed: {e}")
@@ -1992,7 +2022,7 @@ class GraphixArena:
                     feedback, reason="Negative feedback/consensus failure"
                 )
 
-            return {"status": "ok", "message": "Feedback recorded"}
+            return self._add_gdpr_metadata({"status": "ok", "message": "Feedback recorded"})
 
         except HTTPException:
             raise
