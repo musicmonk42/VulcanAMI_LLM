@@ -12,11 +12,11 @@
     "step_counter": 1200,
     "total_experiments_run": 5,
     "successful_experiments": 2,
-    "telemetry_entries": 1201,
+    "telemetry_entries": 1202,
     "ai_interaction_entries": 0,
-    "last_telemetry_update": 1766638228.1235733,
-    "last_ai_interaction_update": 1766638228.1235738,
-    "last_memory_update": 1766638228.123574
+    "last_telemetry_update": 1766638308.51404,
+    "last_ai_interaction_update": 1766638308.5140405,
+    "last_memory_update": 1766638308.5140405
   },
   "memory": {
     "success_memory": {
@@ -50,7 +50,12 @@
       "warmup_schedule_adjust": [
         0.017009894895917105,
         0.05116017279384052
-      ]
+      ],
+      "test": {
+        "count": 1,
+        "last_updated": 1766638308.5088305,
+        "patterns": []
+      }
     },
     "cost_memory": {
       "lr_adjustment": [
@@ -14492,6 +14497,33 @@
           "query_type": "test"
         },
         "step": 1200
+      },
+      {
+        "timestamp": 1766638308.5088048,
+        "query_id": "q_2b4ed10b4aed",
+        "session_id": null,
+        "source": "user",
+        "query_type": "test",
+        "query_length": 10,
+        "response_length": 13,
+        "latency_ms": 0.0,
+        "agent_tasks": {
+          "submitted": 0,
+          "completed": 0
+        },
+        "governance_triggered": false,
+        "experiment_triggered": false,
+        "user_feedback": null,
+        "response_quality_score": null,
+        "error_occurred": false,
+        "error_type": null,
+        "collaboration_session_id": null,
+        "agents_involved": [],
+        "interaction_type": null,
+        "meta": {
+          "query_type": "test"
+        },
+        "step": 1201
       }
     ],
     "issues": [

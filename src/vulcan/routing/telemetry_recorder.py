@@ -525,6 +525,19 @@ class TelemetryRecorder:
                 self._schedule_flush_locked()
 
         logger.debug(f"[TelemetryRecorder] Recorded {source} entry {entry.query_id}")
+        
+        # FIX Issue #1: Queue memory update so conversation context is stored
+        # Previously, only convenience functions (record_telemetry, record_interaction)
+        # queued memory updates. Now record() does too, ensuring all interactions
+        # contribute to learning data regardless of how they're recorded.
+        self.queue_memory_update(
+            source=source,
+            query_type=metadata.get("query_type", "general"),
+            quality_score=metadata.get("response_quality_score"),
+            error_occurred=error_occurred,
+            error_type=error_type,
+            interaction_type=interaction_type,
+        )
 
     def record_ai_interaction(
         self,
@@ -1059,9 +1072,8 @@ def record_telemetry(
 
     Convenience function using global recorder. Non-blocking.
     
-    FIX: Now also queues memory updates so conversation context and learning
-    data is stored. Previously only telemetry entries were stored, resulting
-    in "0 memory updates" on every flush.
+    Memory updates are automatically queued by the record() method, so
+    conversation context and learning data is stored.
 
     Args:
         query: The query text
@@ -1070,19 +1082,8 @@ def record_telemetry(
         **kwargs: Additional arguments passed to TelemetryRecorder.record()
     """
     recorder = get_telemetry_recorder()
+    # record() now automatically queues memory updates (FIX Issue #1)
     recorder.record(query, response, metadata, **kwargs)
-    
-    # FIX: Queue memory update so the system learns from interactions
-    # This was missing, causing "0 memory updates" in flush logs
-    source = kwargs.get("source", "user")
-    recorder.queue_memory_update(
-        source=source,
-        query_type=metadata.get("query_type", "general"),
-        quality_score=metadata.get("response_quality_score"),
-        error_occurred=kwargs.get("error_occurred", False),
-        error_type=kwargs.get("error_type"),
-        interaction_type=kwargs.get("interaction_type"),
-    )
 
 
 def record_interaction(
@@ -1095,6 +1096,7 @@ def record_interaction(
     Record ALL interactions for meta-learning (dual-mode).
 
     This is completely non-blocking - all disk I/O happens in background threads.
+    Memory updates are automatically queued by the record() method.
 
     User interactions:
         - Query patterns
@@ -1132,18 +1134,8 @@ def record_interaction(
         "interaction_type": metadata.get("interaction_type"),
     }
 
+    # record() now automatically queues memory updates (FIX Issue #1)
     recorder.record(query, response, metadata, **record_kwargs)
-
-    # PERFORMANCE FIX: Queue memory update instead of writing to disk immediately
-    # This prevents progressive slowdown by batching disk writes
-    recorder.queue_memory_update(
-        source=source,
-        query_type=metadata.get("query_type", "general"),
-        quality_score=metadata.get("response_quality_score"),
-        error_occurred=metadata.get("error_occurred", False),
-        error_type=metadata.get("error_type"),
-        interaction_type=metadata.get("interaction_type"),
-    )
 
 
 def record_ai_interaction(
