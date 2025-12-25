@@ -425,6 +425,18 @@ class TestPrivacyChecks:
         # SSN format is specific enough - always flag
         assert privacy_status == "risky"
 
+    def test_check_privacy_word_boundary_matching(self, nso_aligner):
+        """Test that context keywords use word boundaries to prevent false positives."""
+        # "recall" contains "call" but shouldn't trigger phone context
+        proposal = {"text": "recall 555-123-4567 from callable function"}
+
+        privacy_status, residency_status = nso_aligner._check_privacy_and_residency(
+            proposal
+        )
+
+        # Should NOT be risky - "recall" and "callable" don't match "call" as whole word
+        assert privacy_status == "safe"
+
     def test_check_data_residency_gdpr(self, nso_aligner):
         """Test GDPR data residency check."""
         proposal = {"data_residency": "EU", "processing_location": "US"}

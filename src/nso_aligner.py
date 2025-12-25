@@ -2322,8 +2322,12 @@ class NSOAligner:
             for pattern, pii_type, context_keywords in context_patterns:
                 match = re.search(pattern, text_content, re.IGNORECASE)
                 if match:
-                    # Check if any context keyword is present in text
-                    has_context = any(kw in text_lower for kw in context_keywords)
+                    # Check if any context keyword is present as a whole word
+                    # Use word boundaries to avoid false positives like "recall" matching "call"
+                    has_context = any(
+                        re.search(rf'\b{re.escape(kw)}\b', text_lower)
+                        for kw in context_keywords
+                    )
                     if has_context:
                         self.logger.warning(f"PII detected: {pii_type}")
                         privacy_status = "risky"
