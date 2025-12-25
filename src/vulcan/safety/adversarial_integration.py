@@ -575,13 +575,17 @@ def _check_system_load(
         - reason: Human-readable explanation if not acceptable
     """
     if not HAS_PSUTIL:
-        # If psutil isn't available, allow tests to run
+        # If psutil isn't available, allow tests to run but log warning
+        logger.warning(
+            "psutil not available - cannot check system load before adversarial tests. "
+            "Install psutil for CPU/memory monitoring: pip install psutil"
+        )
         return True, "psutil not available - cannot check system load"
 
     try:
-        # Check CPU usage - use interval=None for instantaneous reading (non-blocking)
-        # This avoids 1-second delays in the periodic testing loop
-        cpu_percent = psutil.cpu_percent(interval=None)
+        # Check CPU usage - use small interval (0.1s) for more accurate measurement
+        # This provides a balance between accuracy and blocking time
+        cpu_percent = psutil.cpu_percent(interval=0.1)
         if cpu_percent > cpu_threshold:
             return False, f"CPU usage at {cpu_percent:.1f}% (threshold: {cpu_threshold:.0f}%)"
 
