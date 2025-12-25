@@ -401,8 +401,15 @@ def extract_json_from_output(stdout: str) -> dict:
     except (ValueError, json.JSONDecodeError):
         pass
     
-    # Last resort
-    return json.loads(stdout.strip())
+    # Last resort - wrap with descriptive error on failure
+    try:
+        return json.loads(stdout.strip())
+    except json.JSONDecodeError as e:
+        raise json.JSONDecodeError(
+            f"All JSON extraction methods failed. Original error: {e.msg}",
+            e.doc,
+            e.pos
+        ) from e
 
 
 # App Initialization

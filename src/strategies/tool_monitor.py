@@ -351,6 +351,7 @@ class ToolMonitor:
         }
         self._sample_counts: Dict[str, int] = defaultdict(int)
         self._alpha = config.get("ema_alpha", 0.3)  # EMA decay factor
+        self._max_prediction_ms = 300000  # Cap predictions at 5 minutes
 
         # Statistics
         self.start_time = time.time()
@@ -392,7 +393,7 @@ class ToolMonitor:
 
         # EMA update: new = alpha * actual + (1 - alpha) * old
         new_prediction = self._alpha * latency_ms + (1 - self._alpha) * old_prediction
-        self._predictions[tool_name] = min(new_prediction, 300000)  # Cap at 5 min
+        self._predictions[tool_name] = min(new_prediction, self._max_prediction_ms)
 
         error_percent = abs(latency_ms - old_prediction) / old_prediction * 100 if old_prediction > 0 else 0
 

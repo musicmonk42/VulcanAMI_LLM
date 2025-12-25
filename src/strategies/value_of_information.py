@@ -456,24 +456,28 @@ class ValueOfInformationGate:
         Returns:
             True if more information should be gathered, False to proceed
         """
-        # Track gather rounds per query to prevent infinite loops
+        # Check max gather rounds first (before incrementing)
         if query_id:
             rounds = self._gather_counts.get(query_id, 0)
             if rounds >= self.max_gather_rounds:
                 logger.info(f"[VOI] Max gather rounds ({self.max_gather_rounds}) reached")
                 return False
-            self._gather_counts[query_id] = rounds + 1
 
-        # Decision logic
+        # Decision logic - check conditions first
+        should_gather = False
+        
         if uncertainty > self.uncertainty_threshold:
             logger.debug(f"[VOI] High uncertainty ({uncertainty:.2f}), should gather more")
-            return True
-
-        if confidence is not None and confidence < self.min_confidence:
+            should_gather = True
+        elif confidence is not None and confidence < self.min_confidence:
             logger.debug(f"[VOI] Low confidence ({confidence:.2f}), should gather more")
-            return True
+            should_gather = True
 
-        return False
+        # Only increment gather count if we're actually gathering
+        if should_gather and query_id:
+            self._gather_counts[query_id] = self._gather_counts.get(query_id, 0) + 1
+
+        return should_gather
 
     def reset_gather_count(self, query_id: str) -> None:
         """Reset gather count when query completes."""
