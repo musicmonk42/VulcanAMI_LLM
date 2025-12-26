@@ -3223,8 +3223,13 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         )
         
         if OUTCOME_QUEUE_AVAILABLE:
+            # Get local variables for safe access
+            local_vars = locals()
+            
             # Determine outcome status based on response quality
-            if response_text and len(response_text) > MIN_MEANINGFUL_RESPONSE_LENGTH:
+            # MIN_MEANINGFUL_RESPONSE_LENGTH is defined at the start of this function
+            min_response_len = local_vars.get('MIN_MEANINGFUL_RESPONSE_LENGTH', 10)
+            if response_text and len(response_text) > min_response_len:
                 if gatekeeper_results.get("hallucination_warning"):
                     outcome_status = OutcomeStatus.PARTIAL
                 else:
@@ -3234,21 +3239,28 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             else:
                 outcome_status = OutcomeStatus.PARTIAL
             
+            # Safely extract variables that may or may not be defined
+            _query_type = local_vars.get('query_type', 'general')
+            _complexity_score = local_vars.get('complexity_score', 0.0)
+            _uncertainty_score = local_vars.get('uncertainty_score', 0.0)
+            _timing_start = local_vars.get('_timing_start', time.perf_counter())
+            _quality_score = local_vars.get('quality_score', 0.0)
+            
             # Build query outcome for curiosity engine
             query_outcome = QueryOutcome(
                 query_id=query_id if query_id else f"unknown_{int(time.time()*1000)}",
                 query_text=processed_prompt[:500] if processed_prompt else "",
-                query_type=query_type if 'query_type' in dir() else "general",
-                complexity=complexity_score if 'complexity_score' in dir() else 0.0,
-                uncertainty=uncertainty_score if 'uncertainty_score' in dir() else 0.0,
+                query_type=_query_type,
+                complexity=_complexity_score,
+                uncertainty=_uncertainty_score,
                 routing_time_ms=routing_stats.get("routing_time_ms", 0.0) if routing_stats else 0.0,
                 tasks_generated=len(routing_plan.agent_tasks) if routing_plan and routing_plan.agent_tasks else 0,
                 was_creative=routing_plan.is_creative if routing_plan and hasattr(routing_plan, 'is_creative') else False,
                 agents_used=[],  # Would need to track from agent pool
                 capabilities_used=[s.replace("agent_pool_", "") for s in systems_used if s.startswith("agent_pool_")],
-                execution_time_ms=(time.perf_counter() - _timing_start) * 1000 if '_timing_start' in dir() else 0.0,
+                execution_time_ms=(time.perf_counter() - _timing_start) * 1000,
                 status=outcome_status,
-                confidence=quality_score if 'quality_score' in dir() else 0.0,
+                confidence=_quality_score,
                 error_type=None,
             )
             
