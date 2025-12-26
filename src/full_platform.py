@@ -1506,6 +1506,26 @@ async def lifespan(app: FastAPI):
                             curiosity_engine = getattr(
                                 vulcan_deployment.collective.deps, "curiosity", None
                             )
+                            
+                            # FIX: Dependency Injection - Wake the Brain
+                            # Try finding it in the global scope if the object attribute fails
+                            if curiosity_engine is None:
+                                # Try to import and check for a global instance
+                                try:
+                                    import src.vulcan.curiosity_engine.curiosity_engine_core as engine_module
+                                    
+                                    if hasattr(vulcan_deployment, 'curiosity_engine'):
+                                        curiosity_engine = vulcan_deployment.curiosity_engine
+                                        logger.info("✓ Found curiosity_engine on vulcan_deployment object")
+                                    else:
+                                        # FALLBACK: Create a new instance if the global one is missing
+                                        logger.warning("⚠️ Engine missing on object. Creating standalone instance for Driver.")
+                                        curiosity_engine = engine_module.CuriosityEngine()
+                                        logger.info("✓ Standalone CuriosityEngine instance created for Driver")
+                                except ImportError as ie:
+                                    logger.warning(f"Could not import curiosity_engine_core: {ie}")
+                                except Exception as eng_err:
+                                    logger.warning(f"Could not create standalone CuriosityEngine: {eng_err}")
 
                             # Configure driver with production settings
                             driver_config = CuriosityDriverConfig(
@@ -1527,10 +1547,10 @@ async def lifespan(app: FastAPI):
                             )
 
                             # EMERGENCY STABILIZATION: Force start the driver
-                            # If curiosity_engine is None, create a minimal stub that allows startup
+                            # If curiosity_engine is still None after fallback, skip driver creation
                             if curiosity_engine is None:
                                 logger.warning(
-                                    "Curiosity engine not available in deps - "
+                                    "Curiosity engine not available in deps and fallback failed - "
                                     "force-starting with degraded mode"
                                 )
                                 # Skip driver creation if no engine available to avoid runtime errors
