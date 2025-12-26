@@ -1488,7 +1488,12 @@ class CuriosityEngine:
                 return []
 
     def generate_targeted_experiments(self, gap: KnowledgeGap) -> List[Experiment]:
-        """Generate experiments targeted at specific gap - REFACTORED"""
+        """Generate experiments targeted at specific gap - REFACTORED
+        
+        BUG FIX: Added support for outcome bridge gap types (slow_routing,
+        complex_query_handling, high_error_rate, routing_variance) which
+        were previously falling through to empty experiment list.
+        """
 
         try:
             # EXAMINE: Check available budget
@@ -1515,8 +1520,35 @@ class CuriosityEngine:
                 experiments = self.iterative_designer.generate_iterative_experiments(
                     gap, max_iterations=3
                 )
+            # BUG FIX: Handle outcome bridge gap types that were returning empty lists
+            elif gap.type in ("slow_routing", "routing_variance"):
+                # Routing issues are treated as decomposition problems
+                # (optimizing the query routing pipeline)
+                experiments = (
+                    self.experiment_generator.generate_decomposition_experiment(
+                        gap, complexity=0.4
+                    )
+                )
+            elif gap.type == "complex_query_handling":
+                # Complex query handling is treated as a decomposition problem
+                # (breaking down complex queries into manageable parts)
+                experiments = (
+                    self.experiment_generator.generate_decomposition_experiment(
+                        gap, complexity=0.6
+                    )
+                )
+            elif gap.type == "high_error_rate":
+                # High error rates suggest causal analysis is needed
+                # (understanding why queries are failing)
+                experiments = self.experiment_generator.generate_causal_experiment(gap)
             else:
-                experiments = []
+                # BUG FIX: Instead of returning empty list, generate generic experiments
+                # This ensures gaps are never silently ignored
+                logger.warning(
+                    f"[CuriosityEngine] Unhandled gap type '{gap.type}', "
+                    f"generating generic experiment"
+                )
+                experiments = self.experiment_generator.generate_for_gap(gap)
 
             # Filter by budget
             affordable_experiments = []
@@ -1594,7 +1626,8 @@ class CuriosityEngine:
     def run_learning_cycle(self, max_experiments: int = 10) -> Dict[str, Any]:
         """Run one cycle of curiosity-driven learning - REFACTORED
         
-        BUG #3 FIX: Added diagnostic logging to explain why no gaps are found.
+        BUG FIX: Added diagnostic logging to explain why no gaps are found
+        and why experiments might not be generated.
         """
 
         with self.lock:
@@ -1607,7 +1640,7 @@ class CuriosityEngine:
                 # Identify gaps
                 gaps = self.identify_gaps_with_cycle_detection()
                 
-                # BUG #3 FIX: Log diagnostic info if no gaps found
+                # BUG FIX: Log diagnostic info if no gaps found
                 if len(gaps) == 0:
                     ingestion_stats = self.get_ingestion_stats()
                     logger.debug(
@@ -1617,13 +1650,26 @@ class CuriosityEngine:
                         f"Strategy: {strategy}. "
                         f"Hint: Call ingest_query_result() from query pipeline to feed data."
                     )
+                else:
+                    # BUG FIX: Log gap types found for debugging
+                    gap_types = [g.type for g in gaps]
+                    logger.info(
+                        f"[CuriosityEngine] Found {len(gaps)} gaps: {gap_types}"
+                    )
 
                 # SELECT: Prioritize gaps
                 priorities = self.prioritize_gaps(gaps[:max_experiments])
+                
+                # BUG FIX: Log if priorities were created
+                logger.debug(
+                    f"[CuriosityEngine] Created {len(priorities)} priorities "
+                    f"for learning queue"
+                )
 
                 # APPLY: Run experiments
                 results = []
                 experiments_run = 0
+                gaps_with_no_experiments = 0
 
                 while experiments_run < max_experiments:
                     try:
@@ -1634,6 +1680,15 @@ class CuriosityEngine:
 
                     # Generate experiments for gap
                     experiments = self.generate_targeted_experiments(priority.gap)
+                    
+                    # BUG FIX: Log when no experiments are generated for a gap
+                    if not experiments:
+                        gaps_with_no_experiments += 1
+                        logger.warning(
+                            f"[CuriosityEngine] No experiments generated for gap "
+                            f"type='{priority.gap.type}', id='{priority.gap.id}'"
+                        )
+                        continue
 
                     for exp in experiments[:2]:  # Limit per gap
                         if experiments_run >= max_experiments:
@@ -1643,6 +1698,13 @@ class CuriosityEngine:
                         result = self.run_experiment_sandboxed(exp)
                         results.append(result)
                         experiments_run += 1
+
+                # BUG FIX: Log summary of gaps that generated no experiments
+                if gaps_with_no_experiments > 0:
+                    logger.warning(
+                        f"[CuriosityEngine] {gaps_with_no_experiments} gaps "
+                        f"generated no experiments"
+                    )
 
                 # Update from results
                 self.update_from_experiment_results(results)

@@ -10,9 +10,11 @@ Features:
 - Functional WorldModelCore (enhanced state/intervention logic).
 - Robust async error handling with retry (_safe_call_async).
 - Comprehensive Audit and Observability hooks with KL divergence tracking.
+- PERFORMANCE FIX: Resource cleanup to prevent progressive degradation.
 """
 
 import asyncio
+import gc
 import inspect
 import logging
 import math
@@ -30,12 +32,15 @@ log = logging.getLogger(__name__)
 
 # --- Configuration Constants (Defaults) ---
 _ASYNC_TIMEOUT = 2.0
+_FAST_OP_TIMEOUT = 0.5  # PERFORMANCE FIX: Faster timeout for simple operations
 _EMBEDDING_DIM = 256
 _MEMORY_CAPACITY = 100
 _KL_GUARD_THRESHOLD = 0.05
 _MAX_RETRIES = 3
+_FAST_OP_MAX_RETRIES = 1  # PERFORMANCE FIX: Fewer retries for fast operations
 _VOCAB_SIZE = 5000
 _CACHE_TTL_SECONDS = 60.0
+_RESOURCE_CLEANUP_INTERVAL = 10  # PERFORMANCE FIX: Cleanup resources every N operations
 DEVICE = torch.device("cpu")  # Use CPU for thread-based embedding
 
 
@@ -43,26 +48,32 @@ DEVICE = torch.device("cpu")  # Use CPU for thread-based embedding
 @dataclass
 class BridgeConfig:
     async_timeout: float = _ASYNC_TIMEOUT
+    fast_op_timeout: float = _FAST_OP_TIMEOUT  # PERFORMANCE FIX: Faster timeout for simple operations
     embedding_dim: int = _EMBEDDING_DIM
     memory_capacity: int = _MEMORY_CAPACITY
     kl_guard_threshold: float = _KL_GUARD_THRESHOLD
     max_retries: int = _MAX_RETRIES
+    fast_op_max_retries: int = _FAST_OP_MAX_RETRIES  # PERFORMANCE FIX: Fewer retries for fast ops
     vocab_size: int = _VOCAB_SIZE
     cache_ttl_seconds: float = _CACHE_TTL_SECONDS
     consensus_timeout_seconds: float = 2.0  # Added consensus timeout configuration
+    resource_cleanup_interval: int = _RESOURCE_CLEANUP_INTERVAL  # PERFORMANCE FIX: Cleanup frequency
 
     def __post_init__(self):
         """Validate configuration parameters."""
         # Define validation rules: (field_name, allow_zero, allow_negative)
         validations = [
             ("async_timeout", False, False),
+            ("fast_op_timeout", False, False),
             ("embedding_dim", False, False),
             ("memory_capacity", False, False),
             ("kl_guard_threshold", True, False),  # Can be zero
             ("max_retries", True, False),  # Can be zero (no retries)
+            ("fast_op_max_retries", True, False),  # Can be zero (no retries)
             ("vocab_size", False, False),
             ("cache_ttl_seconds", False, False),
             ("consensus_timeout_seconds", False, False),
+            ("resource_cleanup_interval", False, False),
         ]
 
         for field_name, allow_zero, allow_negative in validations:
@@ -527,6 +538,9 @@ class GraphixVulcanBridge:
 
         self._last_context: Optional[BridgeContext] = None
 
+        # PERFORMANCE FIX: Operation counter for periodic resource cleanup
+        self._operation_count: int = 0
+
         # Link WorldModelCore back to this bridge for logging purposes
         WorldModelCore._get_bridge = lambda: self
 
@@ -628,6 +642,37 @@ class GraphixVulcanBridge:
 
         return default
 
+    async def _safe_call_async_fast(
+        self,
+        fn: Optional[Union[Callable, Any]],
+        args: Any,
+        default: Any,
+    ) -> Any:
+        """
+        PERFORMANCE FIX: Faster async call helper for known-fast operations.
+        
+        Uses shorter timeout and fewer retries to prevent cascading delays
+        for operations like intervene_before_emit that should complete quickly.
+        
+        This addresses the 29-second gap issue where simple operations were
+        timing out and triggering multiple retries with exponential backoff.
+        
+        Args:
+            fn: Function to call (async or sync)
+            args: Arguments to pass to the function
+            default: Default value to return on timeout/error
+            
+        Returns:
+            Function result or default value
+        """
+        return await self._safe_call_async(
+            fn,
+            args,
+            default,
+            timeout=self.config.fast_op_timeout,
+            max_retries=self.config.fast_op_max_retries,
+        )
+
     # ------------------------ Phase: EXAMINE (ASYNC) ------------------------ #
 
     async def before_execution(self, graph_or_tokens: Any) -> Dict[str, Any]:
@@ -691,6 +736,9 @@ class GraphixVulcanBridge:
     # ------------------------ Phase: REMEMBER (ASYNC) ------------------------ #
 
     async def after_execution(self, result: Any) -> None:
+        # PERFORMANCE FIX: Track operations and trigger periodic cleanup
+        self._operation_count += 1
+        
         # 1. Store to hierarchical memory
         if isinstance(result, dict):
             prompt = result.get("prompt")
@@ -754,6 +802,14 @@ class GraphixVulcanBridge:
             "bridge.after_execution",
             {"status": self.world_model._state["status"], "kl_div_sim": kl_div},
         )
+        
+        # PERFORMANCE FIX: Periodic resource cleanup to prevent progressive degradation
+        # This addresses the issue where embedding batches go from 0.6s to 12s over time
+        if self._operation_count % self.config.resource_cleanup_interval == 0:
+            self.cleanup_resources()
+            log.debug(
+                f"GraphixVulcanBridge: Periodic cleanup after {self._operation_count} operations"
+            )
 
     # ------------------------ Reasoning/Safety helpers (ASYNC) ------------------------ #
 
@@ -784,11 +840,13 @@ class GraphixVulcanBridge:
                 default=token,
             )
 
-        ok = await self._safe_call_async(
+        # PERFORMANCE FIX: Use faster async call for validate_generation (known fast operation)
+        ok = await self._safe_call_async_fast(
             self.world_model.validate_generation, (token, context), default=True
         )
         if not ok:
-            token = await self._safe_call_async(
+            # PERFORMANCE FIX: Use faster async call for suggest_correction (known fast operation)
+            token = await self._safe_call_async_fast(
                 self.world_model.suggest_correction, (token, context), default=token
             )
             await self._obs(
@@ -796,7 +854,9 @@ class GraphixVulcanBridge:
                 {"original": str(original), "reason": "WorldModel"},
             )
 
-        intervention = await self._safe_call_async(
+        # PERFORMANCE FIX: Use faster async call for intervene_before_emit (known fast operation)
+        # This addresses the 29-second gap issue where this simple operation was timing out
+        intervention = await self._safe_call_async_fast(
             self.world_model.intervene_before_emit,
             (token, context, hidden_state),
             default=None,
@@ -958,6 +1018,8 @@ class GraphixVulcanBridge:
         - ThreadPoolExecutor
         - Memory caches
         - Concept registry
+        - Python garbage collection
+        - PyTorch CUDA cache (if applicable)
         
         Args:
             graceful: If True, wait for pending tasks to complete (up to timeout).
@@ -993,6 +1055,50 @@ class GraphixVulcanBridge:
                 )[:50]
                 self.world_model._concept_registry = dict(sorted_concepts)
                 log.debug("GraphixVulcanBridge: Concept registry trimmed")
+        
+        # PERFORMANCE FIX: Run garbage collection to reclaim memory
+        gc.collect()
+        
+        # PERFORMANCE FIX: Clear PyTorch CUDA cache if using GPU
+        if torch.cuda.is_available():
+            try:
+                torch.cuda.empty_cache()
+                log.debug("GraphixVulcanBridge: CUDA cache cleared")
+            except Exception as e:
+                log.debug(f"GraphixVulcanBridge: CUDA cache clear failed (non-critical): {e}")
+
+    def cleanup_resources(self) -> Dict[str, Any]:
+        """
+        PERFORMANCE FIX: Lightweight resource cleanup for periodic maintenance.
+        
+        This method is designed to be called periodically during operation to
+        prevent progressive degradation. It's lighter than full cleanup().
+        
+        Returns:
+            Dictionary with cleanup statistics
+        """
+        stats_before = self.get_memory_stats()
+        
+        # Run garbage collection on generations 0 and 1 for effective cleanup
+        # without the overhead of a full collection
+        gc.collect(1)
+        
+        # Clear expired cache entries in memory
+        if hasattr(self, 'memory') and self.memory is not None:
+            if hasattr(self.memory, '_cleanup_expired_cache'):
+                self.memory._cleanup_expired_cache()
+        
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        stats_after = self.get_memory_stats()
+        
+        return {
+            "stats_before": stats_before,
+            "stats_after": stats_after,
+            "gc_collected": True,
+        }
 
     def get_memory_stats(self) -> Dict[str, Any]:
         """
@@ -1007,6 +1113,7 @@ class GraphixVulcanBridge:
             "embedding_count": 0,
             "concept_registry_size": 0,
             "executor_active": self._executor is not None,
+            "operation_count": getattr(self, '_operation_count', 0),
         }
         
         # Safe access to memory attributes
