@@ -583,21 +583,71 @@ class DynamicBudget:
 
 
 class ResourceSampler:
-    """Samples system resources - SEPARATED CONCERN"""
+    """
+    Samples system resources - SEPARATED CONCERN
+    
+    PERFORMANCE OPTIMIZATION: Uses non-blocking psutil.cpu_percent(interval=None)
+    and caches results to prevent blocking the main thread. The cache ensures
+    we don't poll the OS more than once per second.
+    """
 
-    def __init__(self, enable_gpu: bool = False):
+    def __init__(self, enable_gpu: bool = False, cache_ttl: float = 1.0):
         self.enable_gpu = enable_gpu
         self.gpu_available = False
         self.gputil = None
+        
+        # Caching to throttle resource checks
+        self._cache_ttl = cache_ttl
+        self._cpu_cache = None
+        self._cpu_cache_time = 0
+        self._snapshot_cache = None
+        self._snapshot_cache_time = 0
+        self._lock = threading.RLock()
 
         if enable_gpu:
             self._setup_gpu_monitoring()
+        
+        # Prime the CPU percentage calculation (first call returns 0)
+        # This is non-blocking since interval=None
+        try:
+            psutil.cpu_percent(interval=None)
+        except Exception:
+            pass
+
+    def _get_cached_cpu_percent(self) -> float:
+        """Get CPU percent with caching to avoid blocking calls."""
+        current_time = time.time()
+        
+        with self._lock:
+            # Return cached value if still valid
+            if (self._cpu_cache is not None
+                    and current_time - self._cpu_cache_time < self._cache_ttl):
+                return self._cpu_cache
+            
+            try:
+                # Use interval=None for non-blocking call
+                # This returns the CPU usage since the last call
+                cpu_percent = psutil.cpu_percent(interval=None) / 100.0
+                self._cpu_cache = cpu_percent
+                self._cpu_cache_time = current_time
+                return cpu_percent
+            except Exception as e:
+                logger.debug("Error getting CPU percent: %s", e)
+                return self._cpu_cache if self._cpu_cache is not None else 0.5
 
     def sample(self) -> ResourceSnapshot:
-        """Sample current resources"""
+        """Sample current resources with caching to reduce OS polling."""
+        current_time = time.time()
+        
+        # Return cached snapshot if still valid
+        with self._lock:
+            if (self._snapshot_cache is not None
+                    and current_time - self._snapshot_cache_time < self._cache_ttl):
+                return self._snapshot_cache
+        
         try:
-            # CPU usage
-            cpu_percent = psutil.cpu_percent(interval=0.1) / 100.0
+            # CPU usage - non-blocking with caching
+            cpu_percent = self._get_cached_cpu_percent()
 
             # Memory usage
             memory_info = psutil.virtual_memory()
@@ -632,7 +682,7 @@ class ResourceSampler:
             gpu_percent = 0.0
             gpu_memory = 0.0
 
-        return ResourceSnapshot(
+        snapshot = ResourceSnapshot(
             timestamp=time.time(),
             cpu_percent=cpu_percent,
             memory_percent=memory_percent,
@@ -642,6 +692,13 @@ class ResourceSampler:
             gpu_percent=gpu_percent,
             gpu_memory=gpu_memory,
         )
+        
+        # Cache the snapshot
+        with self._lock:
+            self._snapshot_cache = snapshot
+            self._snapshot_cache_time = current_time
+        
+        return snapshot
 
     def _setup_gpu_monitoring(self):
         """Setup GPU monitoring if available"""
