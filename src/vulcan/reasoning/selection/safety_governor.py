@@ -430,11 +430,26 @@ class SafetyGovernor:
         self.cache_lock = threading.RLock()
 
     def _initialize_default_contracts(self):
-        """Initialize default tool contracts"""
+        """Initialize default tool contracts
+        
+        FIX for Issue #4: The previous contracts had overly strict required_inputs
+        that were checking for literal keywords in the problem text (e.g., 'rules',
+        'logic', 'graph', 'data'). This caused 4 of 5 reasoning strategies to fail
+        with "Missing required inputs" errors on every query.
+        
+        The fix removes required_inputs as hard requirements since:
+        1. Users don't need to literally include "rules" or "logic" in their query
+        2. The tool selector already determines which tools are appropriate
+        3. Blocking tools based on missing keywords prevents legitimate reasoning
+        
+        Forbidden inputs are kept as safety measures against problematic content.
+        """
 
+        # FIX: Remove overly strict required_inputs - these keywords don't need to
+        # literally appear in the user's query text for the tool to work properly
         self.contracts["symbolic"] = ToolContract(
             tool_name="symbolic",
-            required_inputs={"logic", "rules"},
+            required_inputs=set(),  # FIX: Was {"logic", "rules"} - too strict
             forbidden_inputs={"undefined", "infinite"},
             max_execution_time_ms=5000,
             max_energy_mj=500,
@@ -458,9 +473,10 @@ class SafetyGovernor:
             output_validators=[lambda x: hasattr(x, "probability") or True],
         )
 
+        # FIX: Remove overly strict required_inputs
         self.contracts["causal"] = ToolContract(
             tool_name="causal",
-            required_inputs={"graph", "data"},
+            required_inputs=set(),  # FIX: Was {"graph", "data"} - too strict
             forbidden_inputs={"cyclic"},
             max_execution_time_ms=10000,
             max_energy_mj=1000,
@@ -471,22 +487,24 @@ class SafetyGovernor:
             output_validators=[lambda x: not self._has_cycles(x)],
         )
 
+        # FIX: Remove overly strict required_inputs
         self.contracts["analogical"] = ToolContract(
             tool_name="analogical",
-            required_inputs={"source", "target"},
+            required_inputs=set(),  # FIX: Was {"source", "target"} - too strict
             forbidden_inputs=set(),
             max_execution_time_ms=2000,
             max_energy_mj=200,
             min_confidence=0.4,
-            required_safety_level=SafetyLevel.LOW,
+            required_safety_level=SafetyLevel.MEDIUM,  # FIX: Changed from LOW to MEDIUM to work with default MEDIUM context
             allowed_operations={"map", "transfer", "adapt"},
             forbidden_operations=set(),
             output_validators=[lambda x: x is not None],
         )
 
+        # FIX: Remove overly strict required_inputs
         self.contracts["multimodal"] = ToolContract(
             tool_name="multimodal",
-            required_inputs={"modalities"},
+            required_inputs=set(),  # FIX: Was {"modalities"} - too strict
             forbidden_inputs={"corrupted"},
             max_execution_time_ms=15000,
             max_energy_mj=1500,
