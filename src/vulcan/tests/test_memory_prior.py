@@ -192,7 +192,8 @@ class TestMemoryIndex:
         # Results should be (entry, similarity) tuples
         for entry, similarity in results:
             assert isinstance(entry, MemoryEntry)
-            assert 0 <= similarity <= 1
+            # Use small tolerance for floating point precision
+            assert -1e-6 <= similarity <= 1 + 1e-6
 
     def test_search_euclidean(self):
         """Test Euclidean distance search"""

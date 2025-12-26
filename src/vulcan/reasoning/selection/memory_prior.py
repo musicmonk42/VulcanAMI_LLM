@@ -21,6 +21,20 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Import semantic tool matcher for query-based tool selection
+try:
+    from .semantic_tool_matcher import SemanticToolMatcher
+    SEMANTIC_MATCHER_AVAILABLE = True
+except ImportError:
+    SEMANTIC_MATCHER_AVAILABLE = False
+    SemanticToolMatcher = None
+    logger.warning("SemanticToolMatcher not available")
+
+
+# Configuration constants for semantic tool matching
+MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST = 10  # Minimum query text length to apply semantic boost
+MULTIMODAL_CONTENT_BOOST = 0.4  # Strong boost for explicit multimodal content
+
 
 class SimilarityMetric(Enum):
     """Similarity metrics for memory retrieval"""
@@ -281,6 +295,15 @@ class BayesianMemoryPrior:
         # CRITICAL FIX: Use RLock for better thread safety
         self.lock = threading.RLock()
 
+        # Initialize semantic tool matcher for query-based selection
+        self.semantic_matcher = None
+        if SEMANTIC_MATCHER_AVAILABLE:
+            try:
+                self.semantic_matcher = SemanticToolMatcher()
+                logger.info("[BayesianMemoryPrior] Semantic tool matcher initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize semantic matcher: {e}")
+
         # Load historical data if available
         self._load_from_memory_system()
 
@@ -401,6 +424,55 @@ class BayesianMemoryPrior:
             except Exception as e:
                 logger.error(f"Prior computation failed: {e}")
                 prior = self._uniform_prior(available_tools)
+
+        # Apply semantic boost based on query content
+        if self.semantic_matcher is not None and context:
+            query_text = None
+            if isinstance(context, dict):
+                query_text = context.get('query') or context.get('problem') or context.get('text')
+                if query_text is None and 'problem' in context:
+                    problem = context['problem']
+                    if isinstance(problem, str):
+                        query_text = problem
+                    elif isinstance(problem, dict):
+                        query_text = problem.get('text') or problem.get('query') or str(problem)
+            elif isinstance(context, str):
+                query_text = context
+            
+            if query_text and isinstance(query_text, str) and len(query_text) > MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST:
+                try:
+                    prior.tool_probs = self.semantic_matcher.boost_prior(
+                        prior.tool_probs,
+                        query_text,
+                        available_tools
+                    )
+                    if prior.tool_probs:
+                        prior.most_likely_tool = max(
+                            prior.tool_probs.items(),
+                            key=lambda x: x[1]
+                        )[0]
+                    prior.metadata['semantic_boost_applied'] = True
+                except Exception as e:
+                    logger.warning(f"Semantic boost failed: {e}")
+
+        # Additional boost for multimodal when multimodal content is detected
+        if context and context.get('is_multimodal') and 'multimodal' in available_tools:
+            try:
+                original_multimodal_prob = prior.tool_probs.get('multimodal', 0)
+                prior.tool_probs['multimodal'] = original_multimodal_prob + MULTIMODAL_CONTENT_BOOST
+                
+                # Renormalize
+                total = sum(prior.tool_probs.values())
+                if total > 0:
+                    prior.tool_probs = {k: v / total for k, v in prior.tool_probs.items()}
+                
+                # Update most likely tool
+                prior.most_likely_tool = max(prior.tool_probs.items(), key=lambda x: x[1])[0]
+                prior.metadata['multimodal_content_boost_applied'] = True
+                
+                logger.info(f"[MultimodalBoost] multimodal: {original_multimodal_prob:.3f} -> {prior.tool_probs['multimodal']:.3f}")
+            except Exception as e:
+                logger.warning(f"Multimodal boost failed: {e}")
 
         # CRITICAL FIX: Evict old cache entries before adding new one
         if len(self.prior_cache) >= self.max_cache_size:

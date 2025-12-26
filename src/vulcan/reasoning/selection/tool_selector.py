@@ -16,7 +16,7 @@ import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 import time
 from collections import defaultdict, deque, OrderedDict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -147,7 +147,7 @@ class StochasticCostModel:
             "probabilistic": {"time": 800, "energy": 80},
             "causal": {"time": 3000, "energy": 300},
             "analogical": {"time": 600, "energy": 60},
-            "multimodal": {"time": 5000, "energy": 500},
+            "multimodal": {"time": 8000, "energy": 800},  # Increased from 5000 to allow more processing time
         }
 
     def predict_cost(self, tool_name: str, features: np.ndarray) -> Dict[str, Any]:
@@ -266,6 +266,10 @@ class StochasticCostModel:
 CLEANUP_CACHE_CAPACITY_THRESHOLD = 0.9  # Trigger cleanup at 90% cache capacity
 CLEANUP_MISS_INTERVAL = 100  # Trigger cleanup every N cache misses
 
+# Multimodal tool configuration
+MULTIMODAL_TIME_BUDGET_MULTIPLIER = 1.5  # Allow multimodal more time headroom
+
+
 class MultiTierFeatureExtractor:
     """
     Extracts features at different levels of complexity and cost.
@@ -289,9 +293,12 @@ class MultiTierFeatureExtractor:
     # Prevents recomputing embeddings for the same text (0.15s-16s per call)
     _embedding_cache: OrderedDict = OrderedDict()
     _embedding_cache_lock = threading.Lock()
-    _embedding_cache_maxsize = 2000  # Maximum cached embeddings
+    _embedding_cache_maxsize = 5000  # Increased from 2000 for better hit rate
     _embedding_cache_hits = 0
     _embedding_cache_misses = 0
+    
+    # PERFORMANCE FIX: Dedicated executor for embedding operations with timeout
+    _embedding_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="embedding")
 
     @classmethod
     def _get_shared_model(cls):
@@ -542,14 +549,47 @@ class MultiTierFeatureExtractor:
             return (text_embedding + modal_hint) / 2.0
         return self.extract_tier3(problem)
 
+    def extract_tier3_with_timeout(self, problem: Any, timeout: float = 5.0) -> np.ndarray:
+        """Extract semantic features with timeout protection.
+        
+        This prevents indefinite blocking when embedding operations take too long
+        (observed 12-24s under CPU contention).
+        
+        Args:
+            problem: Problem to extract features from
+            timeout: Maximum time in seconds to wait for embedding
+            
+        Returns:
+            Feature vector (falls back to tier1 on timeout)
+        """
+        try:
+            future = MultiTierFeatureExtractor._embedding_executor.submit(
+                self.extract_tier3, problem
+            )
+            return future.result(timeout=timeout)
+        except FuturesTimeoutError:
+            logger.warning(f"[Embedding] Timeout after {timeout}s, falling back to tier1 features")
+            return self.extract_tier1(problem)
+        except Exception as e:
+            logger.error(f"[Embedding] Failed: {e}, falling back to tier1")
+            return self.extract_tier1(problem)
+
     def extract_adaptive(self, problem: Any, time_budget: float) -> np.ndarray:
-        """Adaptively choose feature tier based on time budget."""
+        """Adaptively choose feature tier based on time budget.
+        
+        PERFORMANCE FIX: Uses timeout wrapper to prevent embedding operations
+        from blocking indefinitely under CPU contention.
+        """
         if time_budget < 100 and not isinstance(
             problem, dict
         ):  # Fast path for simple problems
             return self.extract_tier1(problem)
-        else:  # Default to deep features if budget allows
-            return self.extract_tier3(problem)
+        elif time_budget < 1000:
+            # Medium budget - use timeout protection
+            return self.extract_tier3_with_timeout(problem, timeout=2.0)
+        else:
+            # Higher budget - allow more time but still protect
+            return self.extract_tier3_with_timeout(problem, timeout=5.0)
 
 
 # ==============================================================================
@@ -1100,7 +1140,7 @@ class ToolSelector:
             "safety_enabled": True,
             "learning_enabled": True,
             "warm_pool_enabled": True,
-            "default_timeout_ms": 5000,
+            "default_timeout_ms": 10000,  # Increased to allow multimodal processing
             "default_energy_budget_mj": 1000,
             "min_confidence": 0.5,
             "enable_calibration": True,
@@ -1295,8 +1335,22 @@ class ToolSelector:
                 request.features = features
 
             # Step 6: Compute prior probabilities
+            # Include query text in context for semantic tool matching
+            prior_context = request.context.copy() if request.context else {}
+            if 'query' not in prior_context and request.problem is not None:
+                if isinstance(request.problem, str):
+                    prior_context['query'] = request.problem
+                elif isinstance(request.problem, dict):
+                    prior_context['query'] = (
+                        request.problem.get('text') or 
+                        request.problem.get('query') or 
+                        str(request.problem)
+                    )
+                else:
+                    prior_context['query'] = str(request.problem)
+            
             prior_dist = self.memory_prior.compute_prior(
-                features, safe_candidates, request.context
+                features, safe_candidates, prior_context
             )
 
             # Step 7: Generate candidate tools with utilities
@@ -1406,6 +1460,21 @@ class ToolSelector:
                     time_budget * 0.02,  # Use 2% of budget for extraction
                 )
 
+            # Check if problem contains multimodal indicators
+            is_multimodal = False
+            if isinstance(request.problem, dict):
+                multimodal_keys = ['image', 'images', 'audio', 'video', 'file', 'document', 'attachment']
+                is_multimodal = any(key in request.problem for key in multimodal_keys)
+            elif isinstance(request.problem, str):
+                multimodal_indicators = ['image', 'picture', 'photo', 'uploaded', 'attached', 'file', 'document', 'diagram', 'chart', 'screenshot']
+                problem_lower = request.problem.lower()
+                is_multimodal = any(indicator in problem_lower for indicator in multimodal_indicators)
+            
+            if is_multimodal:
+                request.context = request.context or {}
+                request.context['is_multimodal'] = True
+                logger.info("[ToolSelector] Multimodal content detected in request")
+
             # Cache features
             self.cache.cache_features(request.problem, features)
 
@@ -1498,10 +1567,16 @@ class ToolSelector:
                 # Predict costs
                 cost_dist = self.cost_model.predict_cost(tool_name, features)
 
-                # Check hard constraints
-                if cost_dist["time"]["mean"] > request.constraints.get(
-                    "time_budget_ms", float("inf")
-                ):
+                # Check hard constraints - be more lenient for multimodal
+                time_budget = request.constraints.get("time_budget_ms", float("inf"))
+                predicted_time = cost_dist["time"]["mean"]
+                
+                # Allow multimodal more time headroom since it handles complex inputs
+                if tool_name == "multimodal":
+                    time_budget = time_budget * MULTIMODAL_TIME_BUDGET_MULTIPLIER
+                
+                if predicted_time > time_budget:
+                    logger.debug(f"Tool {tool_name} filtered: predicted_time={predicted_time:.0f}ms > budget={time_budget:.0f}ms")
                     continue
                 if cost_dist["energy"]["mean"] > request.constraints.get(
                     "energy_budget_mj", float("inf")
