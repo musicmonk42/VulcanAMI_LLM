@@ -201,6 +201,32 @@ except ImportError as e:
     CostCalibrator = None
     CostEstimator = None
 
+# Curiosity driver components (process-isolated active driver)
+try:
+    from .curiosity_driver import (
+        CuriosityDriver,
+        CuriosityDriverConfig,
+        CycleOutcome,
+        CycleResult,
+        CycleStatisticsTracker,
+        DriverState,
+        ProcessPoolManager,
+        create_curiosity_driver,
+    )
+
+    CURIOSITY_DRIVER_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Curiosity driver not available: {e}")
+    CURIOSITY_DRIVER_AVAILABLE = False
+    CuriosityDriver = None
+    CuriosityDriverConfig = None
+    CycleOutcome = None
+    CycleResult = None
+    CycleStatisticsTracker = None
+    DriverState = None
+    ProcessPoolManager = None
+    create_curiosity_driver = None
+
 __all__ = [
     # Core Engine
     "CuriosityEngine",
@@ -273,12 +299,22 @@ __all__ = [
     "ResourceAdvisor",
     "CostCalibrator",
     "CostEstimator",
+    # Curiosity Driver (Active Heartbeat)
+    "CuriosityDriver",
+    "CuriosityDriverConfig",
+    "CycleOutcome",
+    "CycleResult",
+    "CycleStatisticsTracker",
+    "DriverState",
+    "ProcessPoolManager",
+    "create_curiosity_driver",
     # Availability Flags
     "CURIOSITY_ENGINE_AVAILABLE",
     "GAP_ANALYZER_AVAILABLE",
     "EXPERIMENT_GENERATOR_AVAILABLE",
     "DEPENDENCY_GRAPH_AVAILABLE",
     "EXPLORATION_BUDGET_AVAILABLE",
+    "CURIOSITY_DRIVER_AVAILABLE",
 ]
 
 # Version info

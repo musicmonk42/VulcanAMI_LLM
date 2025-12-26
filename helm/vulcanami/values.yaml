@@ -288,3 +288,18 @@ monitoring:
   serviceMonitor:
     enabled: true
     interval: 30s
+
+# CuriosityDriver Configuration (Active Learning Heartbeat)
+# Controls the autonomous curiosity-driven learning system
+curiosityDriver:
+  enabled: true
+  # Interval between heartbeat cycles (seconds)
+  heartbeatInterval: 60.0
+  # Minimum exploration budget required to run a learning cycle
+  minBudgetThreshold: 10.0
+  # Maximum experiments to run per learning cycle
+  maxExperimentsPerCycle: 5
+  # Sleep duration when budget is low (seconds)
+  lowBudgetSleep: 120.0
+  # Timeout for each learning cycle (seconds)
+  cycleTimeout: 300.0
