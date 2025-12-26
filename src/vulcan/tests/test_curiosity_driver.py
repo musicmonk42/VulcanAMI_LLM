@@ -10,6 +10,8 @@ Tests cover:
 - Heartbeat loop behavior
 - Graceful shutdown
 - Error handling
+- Statistics tracking
+- State management
 """
 
 import asyncio
@@ -20,6 +22,11 @@ import pytest
 from vulcan.curiosity_engine.curiosity_driver import (
     CuriosityDriver,
     CuriosityDriverConfig,
+    CycleOutcome,
+    CycleResult,
+    CycleStatisticsTracker,
+    DriverState,
+    ProcessPoolManager,
     _run_cycle_wrapper,
     create_curiosity_driver,
 )
@@ -468,6 +475,210 @@ class TestCuriosityDriverIntegration:
             await asyncio.sleep(0.1)
 
         # Both should have completed without error
+
+
+# =============================================================================
+# Test Separated Concern Classes
+# =============================================================================
+
+
+class TestCycleStatisticsTracker:
+    """Tests for CycleStatisticsTracker class"""
+
+    def test_record_cycle(self):
+        """Test recording a cycle result"""
+        tracker = CycleStatisticsTracker()
+
+        result = CycleResult(
+            cycle_id=1,
+            outcome=CycleOutcome.SUCCESS,
+            experiments_run=5,
+            successful_experiments=4,
+            success_rate=0.8,
+            execution_time=10.0,
+        )
+
+        tracker.record_cycle(result)
+
+        assert tracker.total_experiments == 5
+        assert tracker.total_successes == 4
+        assert tracker.outcome_counts[CycleOutcome.SUCCESS] == 1
+
+    def test_get_statistics(self):
+        """Test getting comprehensive statistics"""
+        tracker = CycleStatisticsTracker()
+
+        for i in range(5):
+            result = CycleResult(
+                cycle_id=i,
+                outcome=CycleOutcome.SUCCESS,
+                experiments_run=3,
+                successful_experiments=2,
+                success_rate=0.67,
+                execution_time=5.0,
+            )
+            tracker.record_cycle(result)
+
+        stats = tracker.get_statistics()
+
+        assert stats["total_cycles"] == 5
+        assert stats["total_experiments"] == 15
+        assert stats["total_successes"] == 10
+
+    def test_reset(self):
+        """Test resetting statistics"""
+        tracker = CycleStatisticsTracker()
+
+        result = CycleResult(
+            cycle_id=1,
+            outcome=CycleOutcome.SUCCESS,
+            experiments_run=5,
+            successful_experiments=4,
+            success_rate=0.8,
+            execution_time=10.0,
+        )
+        tracker.record_cycle(result)
+
+        tracker.reset()
+
+        assert tracker.total_experiments == 0
+        assert tracker.total_successes == 0
+        assert len(tracker.cycle_history) == 0
+
+
+class TestProcessPoolManager:
+    """Tests for ProcessPoolManager class"""
+
+    def test_initialize_and_shutdown(self):
+        """Test process pool initialization and shutdown"""
+        manager = ProcessPoolManager(max_workers=1)
+
+        assert not manager.is_available()
+
+        # Initialize
+        result = manager.initialize()
+        assert result is True
+        assert manager.is_available()
+
+        # Shutdown
+        result = manager.shutdown()
+        assert result is True
+        assert not manager.is_available()
+
+    def test_double_initialize(self):
+        """Test double initialization is handled"""
+        manager = ProcessPoolManager(max_workers=1)
+
+        manager.initialize()
+        result = manager.initialize()  # Should return True without error
+
+        assert result is True
+
+        manager.shutdown()
+
+    def test_active_task_tracking(self):
+        """Test active task counter"""
+        manager = ProcessPoolManager()
+
+        assert manager.get_active_task_count() == 0
+
+        manager.increment_active_tasks()
+        assert manager.get_active_task_count() == 1
+
+        manager.decrement_active_tasks()
+        assert manager.get_active_task_count() == 0
+
+        # Ensure decrement doesn't go below 0
+        manager.decrement_active_tasks()
+        assert manager.get_active_task_count() == 0
+
+
+class TestCycleResult:
+    """Tests for CycleResult dataclass"""
+
+    def test_to_dict(self):
+        """Test conversion to dictionary"""
+        result = CycleResult(
+            cycle_id=1,
+            outcome=CycleOutcome.SUCCESS,
+            experiments_run=5,
+            successful_experiments=4,
+            success_rate=0.8,
+            execution_time=10.0,
+            subprocess_pid=12345,
+            strategy_used="balanced",
+        )
+
+        d = result.to_dict()
+
+        assert d["cycle_id"] == 1
+        assert d["outcome"] == "success"
+        assert d["experiments_run"] == 5
+        assert d["subprocess_pid"] == 12345
+
+
+class TestDriverState:
+    """Tests for DriverState enum"""
+
+    def test_states_exist(self):
+        """Test all expected states exist"""
+        assert DriverState.STOPPED is not None
+        assert DriverState.STARTING is not None
+        assert DriverState.RUNNING is not None
+        assert DriverState.STOPPING is not None
+        assert DriverState.ERROR is not None
+
+    def test_state_values(self):
+        """Test state string values"""
+        assert DriverState.STOPPED.value == "stopped"
+        assert DriverState.RUNNING.value == "running"
+
+
+class TestCuriosityDriverState:
+    """Tests for driver state management"""
+
+    @pytest.mark.asyncio
+    async def test_state_transitions(self, curiosity_engine, driver_config):
+        """Test state transitions during lifecycle"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+
+        # Initial state
+        assert driver.state == DriverState.STOPPED
+
+        # After start
+        await driver.start()
+        assert driver.state == DriverState.RUNNING
+
+        # After stop
+        await driver.stop()
+        assert driver.state == DriverState.STOPPED
+
+    def test_state_property(self, curiosity_driver):
+        """Test state property access"""
+        state = curiosity_driver.state
+        assert isinstance(state, DriverState)
+
+
+class TestCuriosityDriverExtendedStats:
+    """Tests for extended statistics functionality"""
+
+    @pytest.mark.asyncio
+    async def test_get_recent_history(self, curiosity_engine, driver_config):
+        """Test getting recent cycle history"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+
+        history = driver.get_recent_history()
+        assert isinstance(history, list)
+
+    @pytest.mark.asyncio
+    async def test_reset_statistics(self, curiosity_engine, driver_config):
+        """Test resetting statistics"""
+        driver = CuriosityDriver(curiosity_engine, driver_config)
+
+        driver.reset_statistics()
+
+        assert driver._cycle_count == 0
+        assert driver._consecutive_failures == 0
 
 
 # =============================================================================

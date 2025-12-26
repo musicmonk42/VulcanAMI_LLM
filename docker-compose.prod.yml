@@ -255,6 +255,12 @@ services:
       # Ray Configuration (Architectural Fix #3)
       - RAY_ENABLED=${RAY_ENABLED:-false}
       - RAY_ADDRESS=${RAY_ADDRESS:-auto}
+      # CuriosityDriver Configuration (Active Learning Heartbeat)
+      - CURIOSITY_HEARTBEAT_INTERVAL=${CURIOSITY_HEARTBEAT_INTERVAL:-60.0}
+      - CURIOSITY_MIN_BUDGET=${CURIOSITY_MIN_BUDGET:-10.0}
+      - CURIOSITY_MAX_EXPERIMENTS=${CURIOSITY_MAX_EXPERIMENTS:-5}
+      - CURIOSITY_LOW_BUDGET_SLEEP=${CURIOSITY_LOW_BUDGET_SLEEP:-120.0}
+      - CURIOSITY_CYCLE_TIMEOUT=${CURIOSITY_CYCLE_TIMEOUT:-300.0}
       # Vulcan Memory System (v46) Configuration
       - MILVUS_HOST=milvus
       - MILVUS_PORT=19530

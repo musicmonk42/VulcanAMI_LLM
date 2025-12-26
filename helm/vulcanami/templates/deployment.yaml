@@ -191,6 +191,21 @@ spec:
           value: {{ .Values.ray.objectStoreMemory | quote }}
         {{- end }}
         {{- end }}
+        {{- /* CuriosityDriver Configuration (Active Learning Heartbeat) */}}
+        {{- if .Values.curiosityDriver }}
+        {{- if .Values.curiosityDriver.enabled }}
+        - name: CURIOSITY_HEARTBEAT_INTERVAL
+          value: {{ .Values.curiosityDriver.heartbeatInterval | quote }}
+        - name: CURIOSITY_MIN_BUDGET
+          value: {{ .Values.curiosityDriver.minBudgetThreshold | quote }}
+        - name: CURIOSITY_MAX_EXPERIMENTS
+          value: {{ .Values.curiosityDriver.maxExperimentsPerCycle | quote }}
+        - name: CURIOSITY_LOW_BUDGET_SLEEP
+          value: {{ .Values.curiosityDriver.lowBudgetSleep | quote }}
+        - name: CURIOSITY_CYCLE_TIMEOUT
+          value: {{ .Values.curiosityDriver.cycleTimeout | quote }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials
         {{- if .Values.secrets.awsAccessKeyId }}

@@ -206,6 +206,11 @@ try:
     from .curiosity_driver import (
         CuriosityDriver,
         CuriosityDriverConfig,
+        CycleOutcome,
+        CycleResult,
+        CycleStatisticsTracker,
+        DriverState,
+        ProcessPoolManager,
         create_curiosity_driver,
     )
 
@@ -215,6 +220,11 @@ except ImportError as e:
     CURIOSITY_DRIVER_AVAILABLE = False
     CuriosityDriver = None
     CuriosityDriverConfig = None
+    CycleOutcome = None
+    CycleResult = None
+    CycleStatisticsTracker = None
+    DriverState = None
+    ProcessPoolManager = None
     create_curiosity_driver = None
 
 __all__ = [
@@ -292,6 +302,11 @@ __all__ = [
     # Curiosity Driver (Active Heartbeat)
     "CuriosityDriver",
     "CuriosityDriverConfig",
+    "CycleOutcome",
+    "CycleResult",
+    "CycleStatisticsTracker",
+    "DriverState",
+    "ProcessPoolManager",
     "create_curiosity_driver",
     # Availability Flags
     "CURIOSITY_ENGINE_AVAILABLE",
