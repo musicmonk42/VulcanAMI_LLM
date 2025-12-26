@@ -12,7 +12,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from queue import Empty, PriorityQueue
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
 
@@ -1276,7 +1276,7 @@ class CuriosityEngine:
         # Callback to SelfImprovementDrive for gap-driven priority boosting
         # When set, detected gaps will be sent to SelfImprovementDrive to
         # boost relevant improvement objectives (e.g., slow_routing -> optimize_performance)
-        self._on_gaps_detected_callback: Optional[callable] = None
+        self._on_gaps_detected_callback: Optional[Callable[[List[Dict[str, Any]]], Any]] = None
 
         # Thread safety
         self.lock = threading.RLock()
@@ -1413,7 +1413,9 @@ class CuriosityEngine:
     
     # ========== SelfImprovementDrive Connection ==========
     
-    def set_on_gaps_detected_callback(self, callback: callable) -> None:
+    def set_on_gaps_detected_callback(
+        self, callback: Callable[[List[Dict[str, Any]]], Any]
+    ) -> None:
         """
         Set callback to be called when gaps are detected.
         

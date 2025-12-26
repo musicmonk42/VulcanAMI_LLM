@@ -15,6 +15,7 @@ import logging
 import pickle  # SECURITY: Internal data only, never deserialize untrusted data
 import threading
 import time
+import uuid
 from collections import defaultdict, deque, OrderedDict
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
@@ -140,6 +141,13 @@ except ImportError:
         record_query_outcome = None
         OUTCOME_BRIDGE_AVAILABLE = False
         logger.debug("Outcome bridge not available - implicit feedback disabled")
+
+
+# ==============================================================================
+# Constants for Implicit Feedback Recording
+# ==============================================================================
+SUCCESS_CONFIDENCE_THRESHOLD = 0.5  # Minimum confidence for success
+MAX_SUCCESS_TIME_MS = 10000  # Maximum execution time (ms) for success
 
 
 # ==============================================================================
@@ -1931,22 +1939,24 @@ class ToolSelector:
         
         try:
             # Generate a unique query ID for this outcome
-            import uuid
             query_id = f"tool_sel_{uuid.uuid4().hex[:12]}"
             
             # Determine success status based on confidence and latency
             # Success criteria:
-            # - High confidence (> 0.5) indicates good tool selection
-            # - Reasonable latency (< 10s) indicates efficient execution
-            is_success = result.confidence > 0.5 and result.execution_time_ms < 10000
+            # - High confidence (> SUCCESS_CONFIDENCE_THRESHOLD) indicates good tool selection
+            # - Reasonable latency (< MAX_SUCCESS_TIME_MS) indicates efficient execution
+            is_success = (
+                result.confidence > SUCCESS_CONFIDENCE_THRESHOLD 
+                and result.execution_time_ms < MAX_SUCCESS_TIME_MS
+            )
             status = "success" if is_success else "error"
             
             # Determine error type if not successful
             error_type = None
             if not is_success:
-                if result.confidence <= 0.5:
+                if result.confidence <= SUCCESS_CONFIDENCE_THRESHOLD:
                     error_type = "low_confidence"
-                elif result.execution_time_ms >= 10000:
+                elif result.execution_time_ms >= MAX_SUCCESS_TIME_MS:
                     error_type = "slow_execution"
             
             # Estimate complexity from the strategy used
