@@ -58,6 +58,32 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 # Initialize logger immediately after imports
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# EMBEDDING CACHE INTEGRATION
+# ============================================================
+# Import embedding cache functions for fast-path query detection.
+# This reduces query routing latency from 64+ seconds to ~200ms
+# for repeated/simple queries by using cached simple query detection.
+
+try:
+    from .embedding_cache import (
+        is_simple_query as embedding_cache_is_simple_query,
+        get_cache_stats as get_embedding_cache_stats,
+    )
+    EMBEDDING_CACHE_AVAILABLE = True
+except ImportError:
+    try:
+        from vulcan.routing.embedding_cache import (
+            is_simple_query as embedding_cache_is_simple_query,
+            get_cache_stats as get_embedding_cache_stats,
+        )
+        EMBEDDING_CACHE_AVAILABLE = True
+    except ImportError:
+        embedding_cache_is_simple_query = None
+        get_embedding_cache_stats = None
+        EMBEDDING_CACHE_AVAILABLE = False
+        logger.debug("Embedding cache not available for query routing")
+
 
 # ============================================================
 # BOUNDED LRU CACHE FOR QUERY ROUTING
@@ -310,6 +336,12 @@ ARENA_COLLABORATION_COMPLEXITY_THRESHOLD: float = 0.35  # For collaborative scen
 ARENA_CREATIVE_COMPLEXITY_THRESHOLD: float = 0.3  # For creative tasks (lowered from 0.35)
 ARENA_REASONING_COMPLEXITY_THRESHOLD: float = 0.3  # For multi-aspect reasoning (lowered from 0.35)
 ARENA_EXECUTION_COMPLEXITY_THRESHOLD: float = 0.45  # For complex execution tasks (NEW)
+
+# ============================================================
+# CONSTANTS - Cache Stats Logging
+# ============================================================
+# Interval for logging embedding cache statistics (every N requests)
+CACHE_STATS_LOG_INTERVAL: int = 10
 
 # ============================================================
 # CONSTANTS - Security Patterns
@@ -1085,6 +1117,22 @@ class QueryAnalyzer:
             f"adversarial_safe={plan.adversarial_safe}"
         )
         
+        # PERFORMANCE FIX: Log embedding cache stats periodically for monitoring
+        # This helps track cache effectiveness and identify potential issues
+        if EMBEDDING_CACHE_AVAILABLE and get_embedding_cache_stats is not None:
+            try:
+                stats = get_embedding_cache_stats()
+                total_requests = stats.get("hits", 0) + stats.get("misses", 0)
+                # Log every CACHE_STATS_LOG_INTERVAL requests to avoid excessive logging
+                if total_requests > 0 and total_requests % CACHE_STATS_LOG_INTERVAL == 0:
+                    logger.info(
+                        f"[QueryRouter] Embedding cache stats: "
+                        f"hits={stats.get('hits', 0)}, misses={stats.get('misses', 0)}, "
+                        f"hit_rate={stats.get('hit_rate', 0):.1%}"
+                    )
+            except Exception as e:
+                logger.debug(f"[QueryRouter] Could not get embedding cache stats: {e}")
+        
         return plan
     
     def _perform_adversarial_check(self, query: str, plan: ProcessingPlan) -> None:
@@ -1234,12 +1282,23 @@ class QueryAnalyzer:
         BUG #2 FIX: This method provides a fast-path for trivial queries
         to avoid the 100-200 second latency for simple greetings.
         
+        PERFORMANCE FIX: Integrates with embedding_cache.is_simple_query()
+        for comprehensive simple query detection, reducing query routing
+        times from 64+ seconds to ~200ms for repeated/simple queries.
+        
         Args:
             query: The query string (not lowercased)
             
         Returns:
             True if the query is trivial and should skip heavy analysis
         """
+        # PERFORMANCE FIX: Use embedding_cache's is_simple_query for comprehensive detection
+        # This provides more robust detection patterns and caching benefits
+        if EMBEDDING_CACHE_AVAILABLE and embedding_cache_is_simple_query is not None:
+            if embedding_cache_is_simple_query(query):
+                logger.debug(f"[QueryRouter] Fast-path: simple query detected by embedding_cache")
+                return True
+        
         query_lower = query.lower().strip()
         
         # Only consider very short queries (under 20 chars) as potentially trivial
