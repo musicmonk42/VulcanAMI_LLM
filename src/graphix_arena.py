@@ -349,6 +349,17 @@ except ImportError:
     def dispatch_feedback_protocol(request, context):
         return {"status": "error", "message": "Feedback protocol dispatcher not found."}
 
+# Ray for distributed execution (Architectural Fix #3)
+# Ray Actors handle workloads better than standard subprocess, preventing
+# "Zombie Process" saturation and improving memory/CPU resource management
+try:
+    import ray
+
+    RAY_AVAILABLE = True
+except ImportError:
+    RAY_AVAILABLE = False
+    ray = None  # type: ignore
+
 
 # Configure logging
 logging.basicConfig(
@@ -372,6 +383,110 @@ GDPR_COMPLIANCE_STANDARD = "gdpr_minimization"
 # Magic markers for subprocess JSON output
 OUTPUT_START_MARKER = "###ARENA_OUTPUT_START###"
 OUTPUT_END_MARKER = "###ARENA_OUTPUT_END###"
+
+
+# ============================================================
+# RAY ARENA WORKER (Architectural Fix #3)
+# ============================================================
+# Ray Actors manage memory and CPU resources better than Python's
+# default multiprocessing, preventing "Zombie Process" saturation.
+# ============================================================
+
+def _create_ray_arena_worker_class():
+    """
+    Create the ArenaWorker Ray Actor class dynamically.
+    
+    This is done in a function to avoid issues when Ray is not available.
+    The @ray.remote decorator requires Ray to be imported.
+    """
+    if not RAY_AVAILABLE or ray is None:
+        return None
+    
+    @ray.remote
+    class ArenaWorker:
+        """
+        Ray Actor for executing Arena agent tasks.
+        
+        This actor encapsulates the LLM client and handles task execution
+        in a distributed manner, allowing Ray to manage resources efficiently.
+        """
+        
+        def __init__(self, agent_id: str):
+            """
+            Initialize the Arena worker with an agent ID.
+            
+            Args:
+                agent_id: The identifier for this agent worker
+            """
+            self.agent_id = agent_id
+            self.llm_client = None
+            self._initialized = False
+            
+        def _ensure_initialized(self):
+            """Lazy initialization of LLM client."""
+            if self._initialized:
+                return
+                
+            # Import inside the actor to avoid serialization issues
+            try:
+                from llm_client import GraphixLLMClient
+                self.llm_client = GraphixLLMClient(agent_id=self.agent_id)
+                self._initialized = True
+            except ImportError:
+                self.llm_client = None
+                self._initialized = True
+            except Exception as e:
+                logging.getLogger("ArenaWorker").error(
+                    f"Failed to initialize LLM client for {self.agent_id}: {e}"
+                )
+                self.llm_client = None
+                self._initialized = True
+        
+        def generate(self, prompt: str) -> Dict[str, Any]:
+            """
+            Generate a response for the given prompt.
+            
+            Args:
+                prompt: The task prompt to process
+                
+            Returns:
+                Dictionary containing the result or error
+            """
+            self._ensure_initialized()
+            
+            if self.llm_client is None:
+                return {
+                    "status": "error",
+                    "error": "LLM client not available",
+                    "agent_id": self.agent_id
+                }
+            
+            try:
+                messages = [{"role": "user", "content": prompt}]
+                result = self.llm_client.chat(messages)
+                return result
+            except Exception as e:
+                return {
+                    "status": "error",
+                    "error": str(e),
+                    "agent_id": self.agent_id
+                }
+        
+        def health_check(self) -> Dict[str, Any]:
+            """Check worker health status."""
+            self._ensure_initialized()
+            return {
+                "agent_id": self.agent_id,
+                "initialized": self._initialized,
+                "llm_available": self.llm_client is not None,
+                "status": "healthy" if self._initialized else "initializing"
+            }
+    
+    return ArenaWorker
+
+
+# Create the ArenaWorker class if Ray is available
+ArenaWorker = _create_ray_arena_worker_class()
 
 
 def extract_json_from_output(stdout: str) -> dict:
@@ -850,6 +965,42 @@ class GraphixArena:
         else:
             logger.warning(f"⚠ StrategyOrchestrator unavailable")
 
+        # ============================================================
+        # RAY WORKERS (Architectural Fix #3)
+        # ============================================================
+        # Initialize Ray workers for distributed agent task execution.
+        # Ray manages memory/CPU better than subprocess, preventing zombie processes.
+        self.ray_workers: Dict[str, Any] = {}
+        self.use_ray = False
+        
+        if RAY_AVAILABLE and ray is not None and ArenaWorker is not None:
+            try:
+                if ray.is_initialized():
+                    self.use_ray = True
+                    # Pre-create workers for each agent
+                    for agent_id in self.agents.keys():
+                        try:
+                            self.ray_workers[agent_id] = ArenaWorker.remote(agent_id)
+                            logger.debug(f"Created Ray worker for agent: {agent_id}")
+                        except Exception as e:
+                            logger.warning(f"Failed to create Ray worker for {agent_id}: {e}")
+                    
+                    if self.ray_workers:
+                        logger.info(
+                            f"✓ Ray workers initialized for {len(self.ray_workers)} agents "
+                            f"(distributed execution enabled)"
+                        )
+                    else:
+                        logger.warning("⚠ No Ray workers created, falling back to subprocess")
+                        self.use_ray = False
+                else:
+                    logger.info("Ray available but not initialized, using subprocess execution")
+            except Exception as e:
+                logger.warning(f"⚠ Ray worker initialization failed: {e}, using subprocess")
+                self.use_ray = False
+        else:
+            logger.debug("Ray not available, using standard subprocess execution")
+
         # Initialize hardware dispatcher for optimal backend routing
         # PRIORITY 0 FIX: Force-kill HardwareDispatcher to prevent resource starvation
         # The AnalogPhotonicEmulator was causing 4000% CPU usage even when disabled in config.
@@ -1288,7 +1439,48 @@ class GraphixArena:
                     logger.error(f"Distributed sharded LLM inference failed: {e}")
                     raise ValueError(f"LLM distributed inference failed: {e}")
 
-        # Standard subprocess execution
+        # ============================================================
+        # RAY ACTOR EXECUTION (Architectural Fix #3)
+        # ============================================================
+        # Use Ray actors when available - they manage memory/CPU better than
+        # subprocess, preventing "Zombie Process" saturation.
+        if self.use_ray and agent_id in self.ray_workers:
+            logger.info(f"Executing task for agent '{agent_id}' via Ray actor...")
+            content_payload = f"{task}: {json.dumps(data)}"
+            
+            try:
+                worker = self.ray_workers[agent_id]
+                # Use asyncio.wait_for with ray.get for timeout control
+                future = worker.generate.remote(content_payload)
+                result = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, ray.get, future
+                    ),
+                    timeout=60  # 60 second timeout for Ray execution
+                )
+                
+                if isinstance(result, dict) and result.get("status") == "error":
+                    logger.warning(
+                        f"Ray worker error for {agent_id}: {result.get('error')}, "
+                        "falling back to subprocess"
+                    )
+                    # Fall through to subprocess execution
+                else:
+                    logger.debug(f"Ray execution successful for {agent_id}")
+                    return result
+                    
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"Ray execution timeout for {agent_id}, falling back to subprocess"
+                )
+                # Fall through to subprocess execution
+            except Exception as e:
+                logger.warning(
+                    f"Ray execution failed for {agent_id}: {e}, falling back to subprocess"
+                )
+                # Fall through to subprocess execution
+
+        # Standard subprocess execution (fallback)
         logger.info(f"Executing task for agent '{agent_id}' via standard subprocess...")
 
         content_payload = f"{task}: {json.dumps(data)}"

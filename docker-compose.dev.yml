@@ -336,6 +336,15 @@ services:
       - ENABLE_SELF_IMPROVEMENT=${ENABLE_SELF_IMPROVEMENT:-0}
       - INTRINSIC_DRIVES_ENABLED=${INTRINSIC_DRIVES_ENABLED:-False}
       - INTRINSIC_DRIVES_APPROVAL_REQUIRED=${INTRINSIC_DRIVES_APPROVAL_REQUIRED:-True}
+      # Distillation Configuration (Architectural Fix #6)
+      - DISTILLATION_ENABLED=${DISTILLATION_ENABLED:-true}
+      - DISTILLATION_MODE=${DISTILLATION_MODE:-active}
+      - DISTILLATION_CONFIDENCE_THRESHOLD=${DISTILLATION_CONFIDENCE_THRESHOLD:-0.85}
+      - DISTILLATION_ESCALATION_THRESHOLD=${DISTILLATION_ESCALATION_THRESHOLD:-0.40}
+      - DISTILLATION_HYBRID_ROUTING=${DISTILLATION_HYBRID_ROUTING:-true}
+      # Ray Configuration (Architectural Fix #3)
+      - RAY_ENABLED=${RAY_ENABLED:-false}
+      - RAY_ADDRESS=${RAY_ADDRESS:-auto}
     ports:
       # NOTE: Port 8000 conflicts with api-gateway service if both run simultaneously.
       # Use profiles to avoid conflict:

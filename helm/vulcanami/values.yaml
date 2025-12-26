@@ -145,6 +145,29 @@ llm:
     maxCostPerSession: 2.0
     maxCostPerDay: 10.0
 
+# Distillation Configuration (Architectural Fix #6)
+# Enables "Master and Apprentice" pattern for CPU optimization
+# Student model handles easy queries, Teacher handles complex ones
+distillation:
+  enabled: true
+  mode: "active"  # "active" (routing enabled) or "passive" (capture only)
+  confidenceThreshold: 0.85  # If Student is 85%+ sure, use fast path
+  escalationThreshold: 0.40  # If Student is <40% sure, escalate to Teacher
+  hybridRouting: true  # Enable Student/Teacher hybrid routing
+  fastPathLatencyTargetMs: 50
+  teacherTimeoutSeconds: 60
+  studentTimeoutSeconds: 5
+  captureForTraining: true  # Capture responses for knowledge distillation
+
+# Ray Configuration (Architectural Fix #3)
+# Ray Actors manage memory/CPU better than subprocess
+ray:
+  enabled: false  # Set to true to enable Ray workers
+  address: "auto"  # Ray cluster address or "auto" for local
+  numCpus: 4
+  numGpus: 0
+  objectStoreMemory: 2000000000  # 2GB
+
 # Database configuration
 postgres:
   enabled: true

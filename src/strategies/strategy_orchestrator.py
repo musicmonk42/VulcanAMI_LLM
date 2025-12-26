@@ -475,6 +475,31 @@ class StrategyOrchestrator:
                 logger.debug(f"[Strategy] Get drift status failed: {e}")
         return {'status': 'monitoring_unavailable'}
     
+    def reset_cost_predictions(self, tool_name: Optional[str] = None):
+        """
+        Reset the learned cost predictions to allow re-learning.
+        
+        This is the "Cost Hallucination" fix - when the tool_monitor has learned
+        incorrect latency estimates (e.g., 259ms when reality is 54,000ms), calling
+        this method will clear the learned predictions and allow the router to
+        re-evaluate tools as "Unknown" and re-learn the "new normal".
+        
+        Args:
+            tool_name: If provided, reset only predictions for this tool.
+                      If None, reset all tool predictions to defaults.
+        """
+        if self.tool_monitor:
+            try:
+                self.tool_monitor.reset_cost_predictions(tool_name)
+                logger.info(
+                    f"[StrategyOrchestrator] Cost predictions reset "
+                    f"({'all tools' if tool_name is None else tool_name})"
+                )
+            except Exception as e:
+                logger.warning(f"[Strategy] Failed to reset cost predictions: {e}")
+        else:
+            logger.warning("[Strategy] ToolMonitor not available for cost prediction reset")
+    
     def save_state(self, path: str):
         """Save all strategy component states"""
         import os

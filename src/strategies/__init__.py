@@ -63,11 +63,28 @@ from .strategy_orchestrator import (
     StrategyOrchestrator,
     StrategyDecision,
 )
+from .student_router import (
+    StudentRouter,
+    QueryTypeClassifier,
+    QueryComplexity,
+    RoutingDecision,
+    RoutingResult,
+    StudentPrediction,
+    RouterStatistics,
+)
 
 __all__ = [
     # Strategy Orchestrator (main entry point)
     "StrategyOrchestrator",
     "StrategyDecision",
+    # Student Router (Distillation-based Hybrid Routing)
+    "StudentRouter",
+    "QueryTypeClassifier",
+    "QueryComplexity",
+    "RoutingDecision",
+    "RoutingResult",
+    "StudentPrediction",
+    "RouterStatistics",
     # Cost Model
     "StochasticCostModel",
     "CostPredictor",
@@ -123,4 +140,4 @@ __all__ = [
 ]
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "1.1.0"  # Updated for StudentRouter addition
