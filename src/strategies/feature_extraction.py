@@ -28,11 +28,13 @@ logger = logging.getLogger(__name__)
 # LAZY LOADING: Heavy libraries are loaded on first use to reduce startup latency
 # =============================================================================
 
-# Lazy-loaded module references
-_nltk = None
-_nltk_initialized = False
-_nx = None
-_TfidfVectorizer = None
+# Lazy-loaded module references with initialization flags
+# Using _UNINITIALIZED sentinel to distinguish between "not loaded" and "failed to load"
+_UNINITIALIZED = object()
+
+_nltk = _UNINITIALIZED
+_nx = _UNINITIALIZED
+_TfidfVectorizer = _UNINITIALIZED
 
 
 def _get_nltk():
@@ -42,12 +44,10 @@ def _get_nltk():
     Returns:
         The nltk module if available, None otherwise.
     """
-    global _nltk, _nltk_initialized
+    global _nltk
     
-    if _nltk_initialized:
+    if _nltk is not _UNINITIALIZED:
         return _nltk
-    
-    _nltk_initialized = True
     
     try:
         import nltk as nltk_module
@@ -92,7 +92,7 @@ def _get_networkx():
     """
     global _nx
     
-    if _nx is not None:
+    if _nx is not _UNINITIALIZED:
         return _nx
     
     try:
@@ -115,7 +115,7 @@ def _get_tfidf_vectorizer():
     """
     global _TfidfVectorizer
     
-    if _TfidfVectorizer is not None:
+    if _TfidfVectorizer is not _UNINITIALIZED:
         return _TfidfVectorizer
     
     try:
@@ -129,15 +129,9 @@ def _get_tfidf_vectorizer():
     return _TfidfVectorizer
 
 
-# Helper property for backward compatibility
 def _has_nltk():
     """Check if NLTK is available (triggers lazy load)."""
     return _get_nltk() is not None
-
-
-# For backward compatibility with existing code that checks HAS_NLTK
-# This is now a function call that triggers lazy loading
-HAS_NLTK = property(lambda self: _has_nltk())
 
 
 def _nltk_word_tokenize(text):
