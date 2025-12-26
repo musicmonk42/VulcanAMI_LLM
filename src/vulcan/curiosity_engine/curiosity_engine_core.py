@@ -1182,11 +1182,102 @@ class CuriosityEngine:
 
         # Strategy selection mode
         self.exploration_mode = "adaptive"  # "adaptive", "sequential", "parallel"
+        
+        # BUG #3 FIX: Track if any data has been ingested
+        self._queries_ingested = 0
+        self._failures_ingested = 0
 
         # Thread safety
         self.lock = threading.RLock()
 
         logger.info("CuriosityEngine initialized (refactored)")
+
+    # ========== BUG #3 FIX: Query data ingestion methods ==========
+    
+    def ingest_query_result(
+        self, 
+        query: str, 
+        result: Dict[str, Any], 
+        success: bool,
+        domain: str = "unknown",
+        query_type: str = "general"
+    ) -> None:
+        """
+        Feed query outcomes to the learning system.
+        
+        BUG #3 FIX: This method connects the curiosity engine to actual query data.
+        Call this from the query processing pipeline to feed outcomes to the engine.
+        
+        Args:
+            query: The original query text
+            result: The result dictionary from query processing
+            success: Whether the query was successful
+            domain: The domain/topic of the query
+            query_type: The type of query (reasoning, perception, etc.)
+        """
+        with self.lock:
+            self._queries_ingested += 1
+            
+            if not success:
+                self._failures_ingested += 1
+                
+                # Record as a failure for gap analysis
+                failure_data = {
+                    "query": query[:200],  # Truncate for storage
+                    "domain": domain,
+                    "query_type": query_type,
+                    "error": result.get("error", "Unknown error"),
+                    "complexity": result.get("complexity", 0.5),
+                    "pattern": query_type,
+                }
+                
+                # Determine failure type based on query_type
+                if query_type in ("decomposition", "planning"):
+                    self.gap_analyzer.record_failure("decomposition", failure_data)
+                elif query_type in ("reasoning", "causal"):
+                    self.gap_analyzer.record_failure("prediction", failure_data)
+                elif query_type in ("transfer", "learning"):
+                    self.gap_analyzer.record_failure("transfer", failure_data)
+                else:
+                    # Default to decomposition for general failures
+                    self.gap_analyzer.record_failure("decomposition", failure_data)
+                
+                logger.debug(
+                    f"[CuriosityEngine] Ingested failure: domain={domain}, type={query_type}"
+                )
+            else:
+                # Record successful patterns for exploration
+                patterns = set()
+                if query_type:
+                    patterns.add(query_type)
+                if domain:
+                    patterns.add(domain)
+                
+                if patterns:
+                    self.exploration_frontier.add_explored_region(domain, patterns)
+                    
+            # Log ingestion stats periodically
+            if self._queries_ingested % 100 == 0:
+                logger.info(
+                    f"[CuriosityEngine] Ingested {self._queries_ingested} queries "
+                    f"({self._failures_ingested} failures)"
+                )
+    
+    def get_ingestion_stats(self) -> Dict[str, Any]:
+        """Get statistics about data ingestion for monitoring.
+        
+        BUG #3 FIX: Returns stats to help diagnose why no gaps are found.
+        """
+        with self.lock:
+            return {
+                "queries_ingested": self._queries_ingested,
+                "failures_ingested": self._failures_ingested,
+                "gap_analyzer_stats": self.gap_analyzer.get_statistics(),
+                "failure_rate": (
+                    self._failures_ingested / self._queries_ingested 
+                    if self._queries_ingested > 0 else 0.0
+                ),
+            }
 
     def select_exploration_strategy(
         self, context: Optional[Dict[str, Any]] = None
@@ -1450,7 +1541,10 @@ class CuriosityEngine:
             logger.error("Error updating from results: %s", e)
 
     def run_learning_cycle(self, max_experiments: int = 10) -> Dict[str, Any]:
-        """Run one cycle of curiosity-driven learning - REFACTORED"""
+        """Run one cycle of curiosity-driven learning - REFACTORED
+        
+        BUG #3 FIX: Added diagnostic logging to explain why no gaps are found.
+        """
 
         with self.lock:
             try:
@@ -1461,6 +1555,17 @@ class CuriosityEngine:
 
                 # Identify gaps
                 gaps = self.identify_gaps_with_cycle_detection()
+                
+                # BUG #3 FIX: Log diagnostic info if no gaps found
+                if len(gaps) == 0:
+                    ingestion_stats = self.get_ingestion_stats()
+                    logger.debug(
+                        f"[CuriosityEngine] No gaps found. "
+                        f"Ingestion stats: queries={ingestion_stats['queries_ingested']}, "
+                        f"failures={ingestion_stats['failures_ingested']}. "
+                        f"Strategy: {strategy}. "
+                        f"Hint: Call ingest_query_result() from query pipeline to feed data."
+                    )
 
                 # SELECT: Prioritize gaps
                 priorities = self.prioritize_gaps(gaps[:max_experiments])
