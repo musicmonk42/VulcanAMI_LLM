@@ -1362,24 +1362,34 @@ class CuriosityEngine:
                     prediction_gaps = self.gap_analyzer.analyze_prediction_errors()
                     transfer_gaps = self.gap_analyzer.analyze_transfer_failures()
                     latent_gaps = self.gap_analyzer.detect_latent_gaps()
+                    # FIX: Include outcome bridge gaps for cross-process data
+                    outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
 
                     gaps.extend(decomposition_gaps)
                     gaps.extend(prediction_gaps)
                     gaps.extend(transfer_gaps)
                     gaps.extend(latent_gaps)
+                    gaps.extend(outcome_gaps)
                 elif strategy == "gap_driven":
                     decomposition_gaps = (
                         self.gap_analyzer.analyze_decomposition_failures()
                     )
+                    # FIX: Include outcome bridge gaps for cross-process data
+                    outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
                     gaps.extend(decomposition_gaps[:5])
+                    gaps.extend(outcome_gaps[:3])
                 else:  # balanced
                     decomposition_gaps = (
                         self.gap_analyzer.analyze_decomposition_failures()
                     )
                     prediction_gaps = self.gap_analyzer.analyze_prediction_errors()
+                    # FIX: Include outcome bridge gaps for cross-process data
+                    # This enables the subprocess to read query outcomes from the main process
+                    outcome_gaps = self.gap_analyzer.analyze_from_outcome_bridge(minutes=60)
 
                     gaps.extend(decomposition_gaps[:3])
                     gaps.extend(prediction_gaps[:3])
+                    gaps.extend(outcome_gaps[:3])
             elif strategy == "minimal":
                 all_gaps = self.gap_analyzer.get_all_gaps()
                 gaps = all_gaps[:3]
