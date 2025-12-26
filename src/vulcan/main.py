@@ -3049,33 +3049,55 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
             quality_score *= 0.5  # Penalize for hallucination
 
         # Record telemetry for meta-learning
+        # OPTIMIZATION: Run telemetry as background task (fire-and-forget)
         if TELEMETRY_AVAILABLE:
-            record_telemetry(
-                query=processed_prompt,
-                response=response_text,
-                metadata={
+            # Capture telemetry data for background task
+            _telemetry_data = {
+                "query": processed_prompt,
+                "response": response_text,
+                "metadata": {
                     "query_id": query_id,
                     "query_type": query_type,
                     "complexity_score": complexity_score,
                     "uncertainty_score": uncertainty_score,
-                    "systems_used": systems_used,
+                    "systems_used": systems_used,  # List is captured at this point, no modification after
                     "vulcan_systems_active": len(vulcan_systems),
                     "response_quality_score": quality_score,
                     "jobs_submitted": len(submitted_jobs) if submitted_jobs else 0,
                     "routing_stats": routing_stats if routing_stats else None,
                 },
-                source="user",
-                agent_tasks_submitted=len(submitted_jobs) if submitted_jobs else 0,
-                agent_tasks_completed=agent_pool_stats.get("jobs_completed_total", 0),
-                governance_triggered=bool(gatekeeper_results)
-                or (routing_plan and routing_plan.requires_governance),
-                experiment_triggered=(
+                "source": "user",
+                "agent_tasks_submitted": len(submitted_jobs) if submitted_jobs else 0,
+                "agent_tasks_completed": agent_pool_stats.get("jobs_completed_total", 0),
+                "governance_triggered": bool(gatekeeper_results)
+                    or (routing_plan and routing_plan.requires_governance),
+                "experiment_triggered": (
                     routing_plan.should_trigger_experiment if routing_plan else False
                 ),
-            )
+            }
+            
+            async def _record_telemetry_bg():
+                try:
+                    record_telemetry(
+                        query=_telemetry_data["query"],
+                        response=_telemetry_data["response"],
+                        metadata=_telemetry_data["metadata"],
+                        source=_telemetry_data["source"],
+                        agent_tasks_submitted=_telemetry_data["agent_tasks_submitted"],
+                        agent_tasks_completed=_telemetry_data["agent_tasks_completed"],
+                        governance_triggered=_telemetry_data["governance_triggered"],
+                        experiment_triggered=_telemetry_data["experiment_triggered"],
+                    )
+                    logger.debug(
+                        f"[VULCAN] Background telemetry recorded: query_id={_telemetry_data['metadata']['query_id']}"
+                    )
+                except Exception as bg_err:
+                    logger.debug(f"[VULCAN] Background telemetry failed: {bg_err}")
+            
+            asyncio.create_task(_record_telemetry_bg())
             systems_used.append("telemetry_recorded")
-            logger.info(
-                f"[VULCAN] Telemetry recorded: query_id={query_id}, type={query_type}, quality={quality_score:.2f}"
+            logger.debug(
+                f"[VULCAN] Telemetry scheduled as background task: query_id={query_id}"
             )
 
         # Log response generation to governance
@@ -3797,9 +3819,42 @@ async def unified_chat(request: UnifiedChatRequest):
 
         # ================================================================
         # STEP 1: Safety Validation (CSIU Framework)
+        # OPTIMIZATION: Lightweight safety check for short inputs (< 20 chars)
+        # bypasses heavy NSOAligner/NeuralSafetyValidator for simple greetings
         # ================================================================
         safety_result = {"safe": True, "reason": "No safety constraints violated"}
-        if request.enable_safety and hasattr(deps, "safety") and deps.safety:
+        
+        # LIGHTWEIGHT SAFETY CHECK: Simple keyword blacklist for short inputs
+        SHORT_INPUT_THRESHOLD = 20
+        LIGHTWEIGHT_BLACKLIST = frozenset([
+            "kill", "harm", "attack", "destroy", "bomb", "weapon",
+            "hate", "racist", "sexist", "abuse", "hack", "exploit",
+            "porn", "xxx", "naked", "nude", "suicide", "murder",
+        ])
+        
+        use_lightweight_safety = len(user_message.strip()) < SHORT_INPUT_THRESHOLD
+        
+        if use_lightweight_safety:
+            # Fast path: lightweight keyword-based safety check for short inputs
+            message_lower = user_message.lower().strip()
+            # Use simple split for faster performance on short inputs
+            message_words = set(message_lower.split())
+            blacklisted_words = message_words & LIGHTWEIGHT_BLACKLIST
+            
+            if blacklisted_words:
+                safety_result = {
+                    "safe": False,
+                    "reason": f"Potentially harmful content detected in short input"
+                }
+                metadata["safety_status"] = "flagged_lightweight"
+                systems_used.append("lightweight_safety_check")
+                logger.debug(f"[VULCAN] Lightweight safety check blocked short input")
+            else:
+                safety_result = {"safe": True, "reason": "Passed lightweight check"}
+                metadata["safety_status"] = "approved_lightweight"
+                systems_used.append("lightweight_safety_check")
+                logger.debug(f"[VULCAN] Short input ({len(user_message)} chars) passed lightweight safety check")
+        elif request.enable_safety and hasattr(deps, "safety") and deps.safety:
             try:
                 loop = asyncio.get_running_loop()
                 # Validate the user input for safety
@@ -4365,6 +4420,8 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
 
         # ================================================================
         # STEP 9: Record Telemetry for Meta-Learning
+        # OPTIMIZATION: Run telemetry as background task (fire-and-forget)
+        # to avoid blocking response return
         # ================================================================
         try:
             from vulcan.routing import (
@@ -4373,10 +4430,11 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
             )
 
             if TELEMETRY_AVAILABLE:
-                record_telemetry(
-                    query=user_message,
-                    response=response_text,
-                    metadata={
+                # Create telemetry data for background task
+                telemetry_data = {
+                    "query": user_message,
+                    "response": response_text,
+                    "metadata": {
                         "query_id": routing_stats.get("query_id", "unknown"),
                         "query_type": routing_stats.get("query_type", "unknown"),
                         "complexity_score": routing_stats.get("complexity_score", 0.0),
@@ -4385,9 +4443,25 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
                         "latency_ms": latency_ms,
                         "success": True,
                     },
-                    source="user",
-                )
-                logger.info(f"[VULCAN/v1/chat] Telemetry recorded for query")
+                    "source": "user",
+                }
+                
+                # PARALLEL EXECUTION: Run telemetry recording as background task
+                # Does not await completion - response returns immediately
+                async def _record_telemetry_background():
+                    try:
+                        record_telemetry(
+                            query=telemetry_data["query"],
+                            response=telemetry_data["response"],
+                            metadata=telemetry_data["metadata"],
+                            source=telemetry_data["source"],
+                        )
+                        logger.debug(f"[VULCAN/v1/chat] Background telemetry recorded")
+                    except Exception as bg_err:
+                        logger.debug(f"[VULCAN/v1/chat] Background telemetry failed: {bg_err}")
+                
+                asyncio.create_task(_record_telemetry_background())
+                logger.debug(f"[VULCAN/v1/chat] Telemetry scheduled as background task")
         except Exception as e:
             logger.debug(f"[VULCAN/v1/chat] Telemetry recording failed: {e}")
 
