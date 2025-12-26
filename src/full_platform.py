@@ -22,6 +22,26 @@
 # main worker process, not in the reloader watcher process. See is_main_process()
 # and the file lock mechanism for ghost process prevention.
 
+# =============================================================================
+# CRITICAL PERFORMANCE FIX: Limit PyTorch/NumPy Thread Count
+# =============================================================================
+# Set these environment variables BEFORE any imports to limit threading overhead.
+# Without this, embedding operations can take 10x longer due to excessive parallelism.
+import os
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ["NUMEXPR_NUM_THREADS"] = "4"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+try:
+    import torch
+    torch.set_num_threads(4)
+    torch.set_num_interop_threads(2)
+except ImportError:
+    pass  # torch not available, skip thread configuration
+# =============================================================================
+
 # Now proceed with all imports
 import argparse
 import asyncio
@@ -29,7 +49,6 @@ import hmac
 import importlib
 import json  # For Arena API endpoints
 import logging
-import os
 import subprocess  # For background process management
 import sys
 from collections import deque
@@ -1321,6 +1340,38 @@ async def lifespan(app: FastAPI):
                 vulcan_module.app.state.worker_id = worker_id
 
                 # ================================================================
+                # UNIFIED LEARNING SYSTEM INITIALIZATION
+                # ================================================================
+                unified_learning = None
+                try:
+                    from vulcan.learning import UnifiedLearningSystem, LearningConfig
+                    
+                    logger.info("Initializing UnifiedLearningSystem...")
+                    learning_config = LearningConfig(
+                        learning_rate=0.001,
+                        ewc_lambda=100.0,
+                        meta_lr=0.001,
+                        rlhf_enabled=False,  # Start with RLHF disabled until stable
+                        checkpoint_frequency=1000,
+                    )
+                    unified_learning = UnifiedLearningSystem(
+                        config=learning_config,
+                        embedding_dim=384,
+                        enable_world_model=False,  # Disable for now - adds overhead
+                        enable_curriculum=True,
+                        enable_metacognition=True,
+                    )
+                    logger.info("✓ UnifiedLearningSystem initialized")
+                    
+                    # Store reference for other components
+                    vulcan_deployment.learning_system = unified_learning
+                    vulcan_module.app.state.learning_system = unified_learning
+                except ImportError as e:
+                    logger.warning(f"UnifiedLearningSystem not available: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to initialize UnifiedLearningSystem: {e}")
+
+                # ================================================================
                 # ACTIVATE ALL VULCAN SUBSYSTEMS (from main.py lifespan logic)
                 # ================================================================
                 def _activate_subsystem(
@@ -1507,25 +1558,20 @@ async def lifespan(app: FastAPI):
                                 vulcan_deployment.collective.deps, "curiosity", None
                             )
                             
-                            # FIX: Dependency Injection - Wake the Brain
-                            # Try finding it in the global scope if the object attribute fails
+                            # FIX: Prevent duplicate CuriosityEngine - Use deployment's engine first
+                            # This prevents creating a second CuriosityEngine instance (50% less CPU)
                             if curiosity_engine is None:
-                                # Try to import and check for a global instance
-                                try:
-                                    import src.vulcan.curiosity_engine.curiosity_engine_core as engine_module
-                                    
-                                    if hasattr(vulcan_deployment, 'curiosity_engine'):
-                                        curiosity_engine = vulcan_deployment.curiosity_engine
-                                        logger.info("✓ Found curiosity_engine on vulcan_deployment object")
-                                    else:
-                                        # FALLBACK: Create a new instance if the global one is missing
-                                        logger.warning("⚠️ Engine missing on object. Creating standalone instance for Driver.")
-                                        curiosity_engine = engine_module.CuriosityEngine()
-                                        logger.info("✓ Standalone CuriosityEngine instance created for Driver")
-                                except ImportError as ie:
-                                    logger.warning(f"Could not import curiosity_engine_core: {ie}")
-                                except Exception as eng_err:
-                                    logger.warning(f"Could not create standalone CuriosityEngine: {eng_err}")
+                                # Check deployment object directly first (preferred)
+                                if hasattr(vulcan_deployment, 'curiosity_engine') and vulcan_deployment.curiosity_engine:
+                                    curiosity_engine = vulcan_deployment.curiosity_engine
+                                    logger.info("✓ Found curiosity_engine on vulcan_deployment object")
+                                else:
+                                    # Do NOT create standalone instance - this causes duplicate CPU usage
+                                    # Instead, log and skip
+                                    logger.warning(
+                                        "⚠️ CuriosityEngine not found on deployment. "
+                                        "Driver will not start to avoid duplicate engine creation."
+                                    )
 
                             # Configure driver with production settings
                             driver_config = CuriosityDriverConfig(
@@ -2246,6 +2292,34 @@ async def lifespan(app: FastAPI):
             logger.info("  ✅ Query Routing Layer (Dual-Mode Learning)")
             logger.info("    → User Interaction Mode: utility_memory")
             logger.info("    → AI Interaction Mode: success/risk_memory")
+            
+            # ================================================================
+            # WIRE UP LEARNING SYSTEM TO ROUTING AND TOOL SELECTION
+            # ================================================================
+            if unified_learning is not None:
+                try:
+                    from vulcan.routing.query_router import get_query_analyzer
+                    
+                    # Connect to QueryRouter
+                    query_analyzer = get_query_analyzer()
+                    if hasattr(query_analyzer, 'set_learning_system'):
+                        query_analyzer.set_learning_system(unified_learning)
+                        logger.info("✓ Learning system connected to QueryRouter")
+                    
+                    # Connect to ToolSelector (if available on deployment)
+                    if hasattr(vulcan_deployment, 'tool_selector') and vulcan_deployment.tool_selector:
+                        vulcan_deployment.tool_selector.learning_system = unified_learning
+                        logger.info("✓ Learning system connected to ToolSelector")
+                    
+                    # Register shutdown hook
+                    import atexit
+                    atexit.register(unified_learning.shutdown)
+                    logger.info("✓ Learning system shutdown hook registered")
+                    
+                except ImportError as e:
+                    logger.debug(f"Could not wire learning to routing: {e}")
+                except Exception as e:
+                    logger.warning(f"Learning system wiring incomplete: {e}")
 
         except ImportError as e:
             components_status["Query Routing Layer"] = False

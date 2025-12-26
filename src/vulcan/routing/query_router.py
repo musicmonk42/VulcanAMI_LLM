@@ -770,6 +770,9 @@ class QueryAnalyzer:
                 logger.warning(f"Failed to initialize StrategyOrchestrator: {e}")
                 self._strategy_orchestrator = None
         
+        # Learning system integration (set externally for adaptive routing)
+        self.learning_system: Optional['UnifiedLearningSystem'] = None
+        
         logger.debug("QueryAnalyzer initialized with compiled patterns and bounded caches")
     
     def clear_caches(self) -> Dict[str, Any]:
@@ -840,6 +843,18 @@ class QueryAnalyzer:
         if self._strategy_orchestrator:
             return self._strategy_orchestrator.get_health_status()
         return {"status": "tool_monitoring_not_available"}
+    
+    def set_learning_system(self, learning_system: 'UnifiedLearningSystem'):
+        """Connect learning system for adaptive routing
+        
+        This allows the query router to record routing outcomes for the learning
+        system, enabling adaptive improvements to routing decisions over time.
+        
+        Args:
+            learning_system: The UnifiedLearningSystem instance to connect
+        """
+        self.learning_system = learning_system
+        logger.info("[QueryRouter] Learning system connected for adaptive routing")
     
     def analyze(self, query: str, session_id: Optional[str] = None) -> QueryPlan:
         """
@@ -1132,6 +1147,17 @@ class QueryAnalyzer:
                     )
             except Exception as e:
                 logger.debug(f"[QueryRouter] Could not get embedding cache stats: {e}")
+        
+        # Record outcome for learning (adaptive routing)
+        if self.learning_system and hasattr(self.learning_system, 'continual_learner'):
+            try:
+                self.learning_system.continual_learner.record_experience(
+                    state={'query_type': plan.query_type.value, 'complexity': plan.complexity_score},
+                    action={'tools': [t.task_type for t in plan.agent_tasks] if plan.agent_tasks else []},
+                    reward=1.0 if plan.safety_passed else 0.0,
+                )
+            except Exception:
+                pass  # Don't let learning failures affect routing
         
         return plan
     

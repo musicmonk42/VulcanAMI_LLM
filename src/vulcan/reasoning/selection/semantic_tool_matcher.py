@@ -272,6 +272,9 @@ class SemanticToolMatcher:
         self.min_similarity_threshold = config.get("min_similarity_threshold", 0.15)
         self.boost_factor = config.get("boost_factor", 0.5)  # How much to boost prior
         
+        # Learning system integration (set externally for meta-learning boost)
+        self.learning_system: Optional[Any] = None
+        
         # Get or create shared embedding model
         self.embedding_model = self._get_shared_model()
         
@@ -413,7 +416,7 @@ class SemanticToolMatcher:
         matches = self.match_query(query, available_tools)
         
         # Compute boost for each tool
-        boosted_probs = {}
+        boosted = {}
         total_boost = 0.0
         
         for tool_name in available_tools:
@@ -425,7 +428,7 @@ class SemanticToolMatcher:
                 # Only boost if there's meaningful similarity
                 if match.combined_score >= self.min_similarity_threshold:
                     boost = match.combined_score * self.boost_factor
-                    boosted_probs[tool_name] = original_prob + boost
+                    boosted[tool_name] = original_prob + boost
                     total_boost += boost
                     
                     logger.debug(
@@ -436,16 +439,36 @@ class SemanticToolMatcher:
                         f"keywords={match.keyword_matches[:3]}"
                     )
                 else:
-                    boosted_probs[tool_name] = original_prob
+                    boosted[tool_name] = original_prob
             else:
-                boosted_probs[tool_name] = original_prob
+                boosted[tool_name] = original_prob
+        
+        # Meta-learning boost: Use learned task patterns if available
+        if hasattr(self, 'learning_system') and self.learning_system:
+            try:
+                if self.learning_system.continual_learner:
+                    # Get task embedding for this query
+                    task_id = self.learning_system.continual_learner.task_detector.detect_task(
+                        {'text': query, 'type': 'tool_selection'}
+                    )
+                    
+                    # If we've seen similar tasks, boost based on historical performance
+                    if task_id in self.learning_system.continual_learner.task_info:
+                        task_info = self.learning_system.continual_learner.task_info[task_id]
+                        if task_info.metadata and 'best_tools' in task_info.metadata:
+                            for tool in task_info.metadata['best_tools']:
+                                if tool in boosted:
+                                    boosted[tool] *= 1.2  # 20% boost for historically good tools
+                            logger.debug(f"[MetaBoost] Applied historical boost for task {task_id}")
+            except Exception as e:
+                logger.debug(f"[MetaBoost] Skipped: {e}")
         
         # Normalize to sum to 1.0
-        total = sum(boosted_probs.values())
+        total = sum(boosted.values())
         if total > 0:
-            boosted_probs = {k: v / total for k, v in boosted_probs.items()}
+            boosted = {k: v / total for k, v in boosted.items()}
         
-        return boosted_probs
+        return boosted
     
     def get_best_match(
         self,
