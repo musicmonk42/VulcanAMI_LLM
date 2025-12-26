@@ -70,6 +70,7 @@ from .student_router import (
     RoutingDecision,
     RoutingResult,
     StudentPrediction,
+    RouterStatistics,
 )
 
 __all__ = [
@@ -83,6 +84,7 @@ __all__ = [
     "RoutingDecision",
     "RoutingResult",
     "StudentPrediction",
+    "RouterStatistics",
     # Cost Model
     "StochasticCostModel",
     "CostPredictor",
