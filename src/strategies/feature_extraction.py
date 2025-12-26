@@ -3,10 +3,11 @@ Multi-Tier Feature Extraction for Tool Selection System
 
 Implements hierarchical feature extraction with increasing complexity and cost,
 from simple syntactic features to deep semantic and multimodal analysis.
+
+PERFORMANCE OPTIMIZATION: Heavy libraries (sklearn, nltk, networkx) are lazy-loaded
+to reduce startup CPU spike and memory usage. They are only imported when first needed.
 """
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-import networkx as nx
 import hashlib
 import json
 import logging
@@ -23,45 +24,153 @@ import numpy as np
 # Initialize logger at module level
 logger = logging.getLogger(__name__)
 
-try:
-    import nltk
+# =============================================================================
+# LAZY LOADING: Heavy libraries are loaded on first use to reduce startup latency
+# =============================================================================
 
-    HAS_NLTK = True
-    # Download NLTK data if needed
-    try:
-        nltk.data.find("tokenizers/punkt_tab")
-    except LookupError:
-        try:
-            nltk.download("punkt_tab", quiet=True)
-        except Exception as e:
-            logger.debug(f"Failed to download punkt_tab: {e}")
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        try:
-            nltk.download("punkt", quiet=True)
-        except Exception as e:
-            logger.debug(f"Failed to download punkt: {e}")
-    try:
-        nltk.data.find("taggers/averaged_perceptron_tagger")
-    except LookupError:
-        try:
-            nltk.download("averaged_perceptron_tagger", quiet=True)
-        except Exception as e:
-            logger.debug(f"Failed to download averaged_perceptron_tagger: {e}")
-    try:
-        nltk.data.find("taggers/averaged_perceptron_tagger_eng")
-    except LookupError:
-        try:
-            nltk.download("averaged_perceptron_tagger_eng", quiet=True)
-        except Exception as e:
-            logger.debug(f"Failed to download averaged_perceptron_tagger_eng: {e}")
-except ImportError:
-    HAS_NLTK = False
-    nltk = None
+# Lazy-loaded module references
+_nltk = None
+_nltk_initialized = False
+_nx = None
+_TfidfVectorizer = None
 
 
-logger = logging.getLogger(__name__)
+def _get_nltk():
+    """
+    Lazy-load NLTK and download required data on first use.
+    
+    Returns:
+        The nltk module if available, None otherwise.
+    """
+    global _nltk, _nltk_initialized
+    
+    if _nltk_initialized:
+        return _nltk
+    
+    _nltk_initialized = True
+    
+    try:
+        import nltk as nltk_module
+        _nltk = nltk_module
+        
+        # Download NLTK data if needed (only on first use)
+        _ensure_nltk_data(_nltk)
+        
+        logger.debug("NLTK lazy-loaded successfully")
+    except ImportError:
+        _nltk = None
+        logger.debug("NLTK not available")
+    
+    return _nltk
+
+
+def _ensure_nltk_data(nltk_module):
+    """Ensure required NLTK data is downloaded."""
+    data_packages = [
+        ("tokenizers/punkt_tab", "punkt_tab"),
+        ("tokenizers/punkt", "punkt"),
+        ("taggers/averaged_perceptron_tagger", "averaged_perceptron_tagger"),
+        ("taggers/averaged_perceptron_tagger_eng", "averaged_perceptron_tagger_eng"),
+    ]
+    
+    for data_path, package_name in data_packages:
+        try:
+            nltk_module.data.find(data_path)
+        except LookupError:
+            try:
+                nltk_module.download(package_name, quiet=True)
+            except Exception as e:
+                logger.debug(f"Failed to download {package_name}: {e}")
+
+
+def _get_networkx():
+    """
+    Lazy-load NetworkX on first use.
+    
+    Returns:
+        The networkx module if available, None otherwise.
+    """
+    global _nx
+    
+    if _nx is not None:
+        return _nx
+    
+    try:
+        import networkx as nx_module
+        _nx = nx_module
+        logger.debug("NetworkX lazy-loaded successfully")
+    except ImportError:
+        _nx = None
+        logger.warning("NetworkX not available - graph features will be disabled")
+    
+    return _nx
+
+
+def _get_tfidf_vectorizer():
+    """
+    Lazy-load TfidfVectorizer from sklearn on first use.
+    
+    Returns:
+        The TfidfVectorizer class if available, None otherwise.
+    """
+    global _TfidfVectorizer
+    
+    if _TfidfVectorizer is not None:
+        return _TfidfVectorizer
+    
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        _TfidfVectorizer = TfidfVectorizer
+        logger.debug("TfidfVectorizer lazy-loaded successfully")
+    except ImportError:
+        _TfidfVectorizer = None
+        logger.warning("sklearn not available - TF-IDF features will be disabled")
+    
+    return _TfidfVectorizer
+
+
+# Helper property for backward compatibility
+def _has_nltk():
+    """Check if NLTK is available (triggers lazy load)."""
+    return _get_nltk() is not None
+
+
+# For backward compatibility with existing code that checks HAS_NLTK
+# This is now a function call that triggers lazy loading
+HAS_NLTK = property(lambda self: _has_nltk())
+
+
+def _nltk_word_tokenize(text):
+    """Safe NLTK word tokenization with fallback."""
+    nltk = _get_nltk()
+    if nltk and text:
+        try:
+            return nltk.word_tokenize(text)
+        except Exception:
+            pass
+    return text.split() if text else []
+
+
+def _nltk_sent_tokenize(text):
+    """Safe NLTK sentence tokenization with fallback."""
+    nltk = _get_nltk()
+    if nltk and text:
+        try:
+            return nltk.sent_tokenize(text)
+        except Exception:
+            pass
+    return text.split(".") if text else []
+
+
+def _nltk_pos_tag(tokens):
+    """Safe NLTK POS tagging with fallback."""
+    nltk = _get_nltk()
+    if nltk and tokens:
+        try:
+            return nltk.pos_tag(tokens)
+        except Exception:
+            pass
+    return []
 
 
 class FeatureTier(Enum):
@@ -90,7 +199,7 @@ class ProblemStructure:
 
     text: Optional[str] = None
     tokens: Optional[List[str]] = None
-    graph: Optional[nx.Graph] = None
+    graph: Optional[Any] = None  # nx.Graph when networkx is available
     rules: Optional[List[str]] = None
     data: Optional[np.ndarray] = None
     modalities: Optional[List[str]] = None
@@ -147,15 +256,8 @@ class SyntacticFeatureExtractor(FeatureExtractor):
         # Basic length features
         features.append(len(text))
 
-        # Tokenization
-        if HAS_NLTK and text:
-            try:
-                tokens = nltk.word_tokenize(text.lower())
-            except Exception as e:  # Fallback to simple tokenization if NLTK fails
-                tokens = text.lower().split()
-        else:
-            # Fallback to simple tokenization
-            tokens = text.lower().split() if text else []
+        # Tokenization - using lazy-loaded NLTK
+        tokens = _nltk_word_tokenize(text.lower()) if text else []
 
         features.append(len(tokens))
         features.append(len(set(tokens)))
@@ -233,8 +335,17 @@ class StructuralFeatureExtractor(FeatureExtractor):
 
     def __init__(self):
         self.feature_names = []
-        self.tfidf = TfidfVectorizer(max_features=50, stop_words="english")
+        self._tfidf = None  # Lazy-loaded TfidfVectorizer
         self.pos_tagger = None
+
+    @property
+    def tfidf(self):
+        """Lazy-load TfidfVectorizer on first access."""
+        if self._tfidf is None:
+            TfidfVectorizerClass = _get_tfidf_vectorizer()
+            if TfidfVectorizerClass is not None:
+                self._tfidf = TfidfVectorizerClass(max_features=50, stop_words="english")
+        return self._tfidf
 
     def extract(self, problem: Any) -> np.ndarray:
         """Extract structural features"""
@@ -259,8 +370,8 @@ class StructuralFeatureExtractor(FeatureExtractor):
         else:
             features.extend([0.0] * 10)  # Placeholder for graph features
 
-        # TF-IDF features
-        if structure.text:
+        # TF-IDF features - with lazy loading check
+        if structure.text and self.tfidf is not None:
             try:
                 tfidf_features = self.tfidf.fit_transform([structure.text]).toarray()[0]
                 features.extend(tfidf_features[:20])  # Top 20 TF-IDF features
@@ -278,13 +389,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
 
         if isinstance(problem, str):
             structure.text = problem
-            if HAS_NLTK and problem:
-                try:
-                    structure.tokens = nltk.word_tokenize(problem)
-                except Exception:
-                    structure.tokens = problem.split()
-            else:
-                structure.tokens = problem.split() if problem else []
+            structure.tokens = _nltk_word_tokenize(problem)
         elif isinstance(problem, dict):
             structure.text = json.dumps(problem)
             structure.metadata = problem
@@ -298,13 +403,7 @@ class StructuralFeatureExtractor(FeatureExtractor):
                 structure.data = np.array(problem["data"])
         else:
             structure.text = str(problem) if problem is not None else ""
-            if HAS_NLTK and structure.text:
-                try:
-                    structure.tokens = nltk.word_tokenize(structure.text)
-                except Exception:
-                    structure.tokens = structure.text.split()
-            else:
-                structure.tokens = structure.text.split() if structure.text else []
+            structure.tokens = _nltk_word_tokenize(structure.text)
 
         return structure
 
@@ -316,15 +415,8 @@ class StructuralFeatureExtractor(FeatureExtractor):
         features = []
 
         if structure.text:
-            # Sentence complexity
-            if HAS_NLTK:
-                try:
-                    sentences = nltk.sent_tokenize(structure.text)
-                except Exception as e:  # Fallback: split on periods
-                    sentences = structure.text.split(".")
-            else:
-                # Fallback: split on periods
-                sentences = structure.text.split(".")
+            # Sentence complexity - using lazy-loaded NLTK
+            sentences = _nltk_sent_tokenize(structure.text)
 
             features.append(float(len(sentences)))
             features.append(
@@ -395,15 +487,8 @@ class StructuralFeatureExtractor(FeatureExtractor):
 
         # FIXED: Added check for empty pos_tags to prevent division by zero
         if structure.tokens:
-            # POS tag distribution
-            if HAS_NLTK:
-                try:
-                    pos_tags = nltk.pos_tag(structure.tokens)
-                except Exception as e:  # Fallback: no POS tagging
-                    pos_tags = []
-            else:
-                # Fallback: no POS tagging
-                pos_tags = []
+            # POS tag distribution - using lazy-loaded NLTK
+            pos_tags = _nltk_pos_tag(structure.tokens)
 
             if pos_tags:
                 pos_counts = Counter(tag for _, tag in pos_tags)
@@ -432,10 +517,15 @@ class StructuralFeatureExtractor(FeatureExtractor):
 
         return features
 
-    def _extract_graph_features(self, graph: nx.Graph) -> List[float]:
-        """Extract graph-based features"""
-
+    def _extract_graph_features(self, graph) -> List[float]:
+        """Extract graph-based features using lazy-loaded NetworkX"""
+        
+        nx = _get_networkx()
         features = []
+
+        if nx is None:
+            # NetworkX not available, return placeholder
+            return [0.0] * 10
 
         # Basic graph statistics
         features.append(graph.number_of_nodes())
@@ -469,8 +559,12 @@ class StructuralFeatureExtractor(FeatureExtractor):
 
         return features
 
-    def _dict_to_graph(self, graph_dict: Dict) -> nx.Graph:
-        """Convert dictionary to NetworkX graph"""
+    def _dict_to_graph(self, graph_dict: Dict):
+        """Convert dictionary to NetworkX graph (lazy-loaded)"""
+        
+        nx = _get_networkx()
+        if nx is None:
+            return None
 
         G = nx.Graph()
 
@@ -559,25 +653,13 @@ class SemanticFeatureExtractor(FeatureExtractor):
 
         if isinstance(problem, str):
             structure.text = problem
-            if HAS_NLTK and problem:
-                try:
-                    structure.tokens = nltk.word_tokenize(problem)
-                except Exception:
-                    structure.tokens = problem.split()
-            else:
-                structure.tokens = problem.split() if problem else []
+            structure.tokens = _nltk_word_tokenize(problem)
         elif isinstance(problem, dict):
             structure.text = json.dumps(problem)
             structure.metadata = problem
         else:
             structure.text = str(problem) if problem is not None else ""
-            if HAS_NLTK and structure.text:
-                try:
-                    structure.tokens = nltk.word_tokenize(structure.text)
-                except Exception:
-                    structure.tokens = structure.text.split()
-            else:
-                structure.tokens = structure.text.split() if structure.text else []
+            structure.tokens = _nltk_word_tokenize(structure.text)
 
         return structure
 
@@ -859,9 +941,14 @@ class MultimodalFeatureExtractor(FeatureExtractor):
         return [0.0] * 50  # Default features
 
     def _extract_graph_features(self, problem: Any) -> List[float]:
-        """Extract advanced graph features"""
-
+        """Extract advanced graph features using lazy-loaded NetworkX"""
+        
+        nx = _get_networkx()
         features = []
+
+        if nx is None:
+            # NetworkX not available, return placeholder
+            return [0.0] * 50
 
         if isinstance(problem, dict) and "graph" in problem:
             graph_data = problem["graph"]
