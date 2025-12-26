@@ -78,14 +78,14 @@ def _ensure_torch_loaded():
             import torch.optim as optim
             import torch.nn.utils
             
-            torch.set_num_threads(1)
-            if hasattr(torch, "set_num_interop_threads"):
-                torch.set_num_interop_threads(1)
+            # NOTE: Removed torch.set_num_threads() and torch.set_num_interop_threads() calls
+            # These cause "cannot set number of interop threads after parallel work has started"
+            # errors. Thread limiting is handled via environment variables at module top.
             
             _torch = torch
             _torch_optim = optim
             _torch_nn_utils = torch.nn.utils
-            _init_logger.debug("Torch lazy-loaded and threads limited to 1.")
+            _init_logger.debug("Torch lazy-loaded successfully.")
         except ImportError as e:
             _init_logger.debug(f"Torch not available: {e}")
             _torch = None

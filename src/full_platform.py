@@ -34,12 +34,10 @@ os.environ["OPENBLAS_NUM_THREADS"] = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-try:
-    import torch
-    torch.set_num_threads(4)
-    torch.set_num_interop_threads(2)
-except ImportError:
-    pass  # torch not available, skip thread configuration
+# NOTE: Removed torch.set_num_threads() and torch.set_num_interop_threads() calls
+# These cause "cannot set number of interop threads after parallel work has started"
+# errors when torch is already imported elsewhere. The environment variables above
+# are sufficient to limit thread count.
 # =============================================================================
 
 # Now proceed with all imports
