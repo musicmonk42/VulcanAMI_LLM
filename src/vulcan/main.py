@@ -8,14 +8,19 @@
 # ============================================================================
 
 # ====================================================================
-# PRIORITY 2 FIX: RESTRICT CPU THREADS - MUST BE FIRST
-# Prevents PyTorch from eating 40 cores and causing resource starvation
-# These environment variables MUST be set before any torch/numpy imports
+# PRIORITY 1 FIX: RESTRICT CPU THREADS - MUST BE ABSOLUTE FIRST
+# Prevents PyTorch/NumPy/OpenBLAS from spawning 40+ threads and causing
+# "Thread Thrashing" which locks the CPU for 60-100+ seconds on complex queries.
+# Setting to "1" allows 10 agents to run in parallel without resource starvation.
+# These environment variables MUST be set before ANY torch/numpy imports.
 # ====================================================================
 import os
-os.environ["OMP_NUM_THREADS"] = "4"
-os.environ["MKL_NUM_THREADS"] = "4"
-os.environ["TORCH_NUM_THREADS"] = "4"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["TORCH_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 # ====================================================================
 # PATH + SAFETY SETUP - MUST BE FIRST

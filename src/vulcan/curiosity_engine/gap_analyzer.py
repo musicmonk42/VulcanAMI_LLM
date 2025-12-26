@@ -3,6 +3,8 @@ gap_analyzer.py - Knowledge gap analysis for Curiosity Engine
 Part of the VULCAN-AGI system
 
 Refactored to follow EXAMINE → SELECT → APPLY → REMEMBER pattern
+PERFORMANCE OPTIMIZATION: Heavy libraries (scipy, sklearn) are lazy-loaded
+to reduce startup CPU spike and memory usage.
 """
 
 import hashlib
@@ -17,24 +19,71 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-# Optional imports with fallbacks
-try:
-    from scipy import stats
-    from scipy.stats import zscore
+# =============================================================================
+# LAZY LOADING: Heavy libraries (scipy, sklearn) are loaded on first use
+# to reduce startup latency and prevent CPU spike during initialization.
+# =============================================================================
 
-    SCIPY_AVAILABLE = True
-except ImportError:
-    SCIPY_AVAILABLE = False
-    warnings.warn("scipy not available, some statistical features disabled")
+# Lazy-loaded module references with sentinel pattern
+_UNINITIALIZED = object()
+_scipy_stats = _UNINITIALIZED
+_sklearn_isolation_forest = _UNINITIALIZED
+_sklearn_scaler = _UNINITIALIZED
 
-try:
-    from sklearn.ensemble import IsolationForest
-    from sklearn.preprocessing import StandardScaler
 
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
-    warnings.warn("sklearn not available, anomaly detection features limited")
+def _get_scipy_stats():
+    """Lazy-load scipy.stats on first use."""
+    global _scipy_stats
+    if _scipy_stats is not _UNINITIALIZED:
+        return _scipy_stats
+    try:
+        from scipy import stats
+        _scipy_stats = stats
+        logging.getLogger(__name__).debug("scipy.stats lazy-loaded successfully")
+    except ImportError:
+        _scipy_stats = None
+        warnings.warn("scipy not available, some statistical features disabled")
+    return _scipy_stats
+
+
+def _get_isolation_forest():
+    """Lazy-load sklearn IsolationForest on first use."""
+    global _sklearn_isolation_forest
+    if _sklearn_isolation_forest is not _UNINITIALIZED:
+        return _sklearn_isolation_forest
+    try:
+        from sklearn.ensemble import IsolationForest
+        _sklearn_isolation_forest = IsolationForest
+        logging.getLogger(__name__).debug("sklearn.IsolationForest lazy-loaded successfully")
+    except ImportError:
+        _sklearn_isolation_forest = None
+        warnings.warn("sklearn not available, anomaly detection features limited")
+    return _sklearn_isolation_forest
+
+
+def _get_standard_scaler():
+    """Lazy-load sklearn StandardScaler on first use."""
+    global _sklearn_scaler
+    if _sklearn_scaler is not _UNINITIALIZED:
+        return _sklearn_scaler
+    try:
+        from sklearn.preprocessing import StandardScaler
+        _sklearn_scaler = StandardScaler
+        logging.getLogger(__name__).debug("sklearn.StandardScaler lazy-loaded successfully")
+    except ImportError:
+        _sklearn_scaler = None
+    return _sklearn_scaler
+
+
+def _is_scipy_available():
+    """Check if scipy is available (triggers lazy load)."""
+    return _get_scipy_stats() is not None
+
+
+def _is_sklearn_available():
+    """Check if sklearn is available (triggers lazy load)."""
+    return _get_isolation_forest() is not None
+
 
 logger = logging.getLogger(__name__)
 
@@ -857,15 +906,34 @@ class AnomalyAnalyzer:
 
     def __init__(self, anomaly_threshold: float = 0.2):
         self.anomaly_threshold = anomaly_threshold
+        self.anomaly_detector = None
+        self.scaler = None
+        self._sklearn_initialized = False
 
-        if SKLEARN_AVAILABLE:
-            self.anomaly_detector = None
-            self.scaler = StandardScaler()
-        else:
+    def _ensure_sklearn_initialized(self, threshold: float):
+        """Lazy-initialize sklearn components on first use."""
+        if self._sklearn_initialized:
+            return
+        
+        if _is_sklearn_available():
+            IsolationForest = _get_isolation_forest()
+            StandardScaler = _get_standard_scaler()
+            
+            if IsolationForest:
+                self.anomaly_detector = IsolationForest(
+                    contamination=threshold, random_state=42
+                )
+            if StandardScaler:
+                self.scaler = StandardScaler()
+        
+        # Fallback to simple detector if sklearn not available or failed
+        if self.anomaly_detector is None:
             self.anomaly_detector = SimpleAnomalyDetector(
-                contamination=anomaly_threshold
+                contamination=threshold
             )
-            self.scaler = None
+        
+        # Mark as initialized only after setup completes
+        self._sklearn_initialized = True
 
     def detect_anomalies(
         self, predictions: List[Dict[str, Any]], threshold: Optional[float] = None
@@ -882,6 +950,9 @@ class AnomalyAnalyzer:
 
             if threshold is None:
                 threshold = self.anomaly_threshold
+
+            # Lazy-initialize sklearn components
+            self._ensure_sklearn_initialized(threshold)
 
             anomalies = []
 
@@ -905,29 +976,16 @@ class AnomalyAnalyzer:
 
             features = np.array(features)
 
-            if SKLEARN_AVAILABLE:
+            if _is_sklearn_available() and self.scaler is not None:
                 # Use sklearn if available
-                if self.anomaly_detector is None:
-                    self.anomaly_detector = IsolationForest(
-                        contamination=threshold, random_state=42
-                    )
-
                 # Scale features if scaler available
-                if self.scaler:
-                    features_scaled = self.scaler.fit_transform(features)
-                else:
-                    features_scaled = features
+                features_scaled = self.scaler.fit_transform(features)
 
                 self.anomaly_detector.fit(features_scaled)
                 anomaly_labels = self.anomaly_detector.predict(features_scaled)
                 anomaly_scores = self.anomaly_detector.score_samples(features_scaled)
             else:
                 # Use simple detector
-                if self.anomaly_detector is None:
-                    self.anomaly_detector = SimpleAnomalyDetector(
-                        contamination=threshold
-                    )
-
                 self.anomaly_detector.fit(features)
                 anomaly_labels = self.anomaly_detector.predict(features)
                 anomaly_scores = self.anomaly_detector.score_samples(features)
