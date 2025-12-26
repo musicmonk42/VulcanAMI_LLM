@@ -701,8 +701,8 @@ class CuriosityDriver:
                     continue
 
                 # APPLY: Run learning cycle
-                logger.info(
-                    "Running learning cycle (budget=%.2f, cycle=%d)",
+                logger.debug(
+                    "Starting learning cycle (budget=%.2f, cycle=%d)",
                     available_budget,
                     self._cycle_count + 1,
                 )
@@ -791,16 +791,24 @@ class CuriosityDriver:
             # Invalidate stats cache
             self._stats_cache = None
 
-            # Log result
+            # Log result - only INFO if something meaningful happened (success_rate > 0 or experiments > 0)
             if outcome == CycleOutcome.SUCCESS:
-                logger.info(
-                    "Learning cycle %d completed: experiments=%d, "
-                    "success_rate=%.2f, time=%.2fs",
-                    self._cycle_count,
-                    cycle_result.experiments_run,
-                    cycle_result.success_rate,
-                    cycle_result.execution_time,
-                )
+                if cycle_result.success_rate > 0 or cycle_result.experiments_run > 0:
+                    logger.info(
+                        "Learning cycle %d completed: experiments=%d, "
+                        "success_rate=%.2f, time=%.2fs",
+                        self._cycle_count,
+                        cycle_result.experiments_run,
+                        cycle_result.success_rate,
+                        cycle_result.execution_time,
+                    )
+                else:
+                    # Stay silent at INFO level if nothing happened (0 gaps)
+                    logger.debug(
+                        "Learning cycle %d completed: no experiments (0 gaps), time=%.2fs",
+                        self._cycle_count,
+                        cycle_result.execution_time,
+                    )
             elif outcome == CycleOutcome.FAILED:
                 logger.error(
                     "Learning cycle %d failed: %s",
