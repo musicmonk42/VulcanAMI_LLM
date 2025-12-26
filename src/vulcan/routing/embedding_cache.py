@@ -67,7 +67,6 @@ class EmbeddingCache:
             max_size: Maximum number of embeddings to cache (default: 10000)
         """
         self._cache: OrderedDict[str, List[float]] = OrderedDict()
-        self._access_order: List[str] = []
         self._max_size = max_size
         self._lock = threading.RLock()
         self._hits = 0
@@ -80,16 +79,16 @@ class EmbeddingCache:
         """
         Create cache key from text using SHA-256.
 
-        Uses SHA-256 truncated to 32 chars (128-bit space) for
-        collision resistance while keeping keys compact.
+        Uses full SHA-256 hash (64 chars) for collision resistance.
+        SHA-256 provides ~128 bits of collision resistance.
 
         Args:
             text: Text to hash
 
         Returns:
-            32-character hexadecimal hash string
+            64-character hexadecimal hash string
         """
-        return hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
+        return hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()
 
     def get(self, text: str) -> Optional[List[float]]:
         """
@@ -360,6 +359,11 @@ SIMPLE_QUESTION_STARTERS: Tuple[str, ...] = (
     "help",
 )
 
+# Configuration constants for simple query detection
+SIMPLE_QUERY_MAX_LENGTH = 15  # Maximum characters for very short query fast-path
+SIMPLE_QUERY_MAX_WORDS = 2  # Maximum words for word count fast-path
+SHORT_QUESTION_MAX_WORDS = 5  # Maximum words for short question fast-path
+
 
 def is_simple_query(query: str) -> bool:
     """
@@ -369,7 +373,7 @@ def is_simple_query(query: str) -> bool:
     semantic embeddings, significantly reducing latency.
 
     Criteria:
-        - Very short queries (<20 chars)
+        - Very short queries (<SIMPLE_QUERY_MAX_LENGTH chars)
         - Matches simple greeting patterns
         - Single word queries
         - Common question starters with short follow-up
@@ -383,7 +387,7 @@ def is_simple_query(query: str) -> bool:
     query_lower = query.lower().strip()
 
     # Very short queries
-    if len(query_lower) < 15:
+    if len(query_lower) < SIMPLE_QUERY_MAX_LENGTH:
         return True
 
     # Matches simple greeting patterns
@@ -396,11 +400,11 @@ def is_simple_query(query: str) -> bool:
 
     # Single or two word queries
     words = query_lower.split()
-    if len(words) <= 2:
+    if len(words) <= SIMPLE_QUERY_MAX_WORDS:
         return True
 
     # Short questions (<=5 words starting with question word)
-    if len(words) <= 5:
+    if len(words) <= SHORT_QUESTION_MAX_WORDS:
         for starter in SIMPLE_QUESTION_STARTERS:
             if query_lower.startswith(starter):
                 return True

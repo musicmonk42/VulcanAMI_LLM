@@ -40,7 +40,9 @@ Usage:
 """
 
 import logging
+import os
 import sqlite3
+import tempfile
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -50,8 +52,14 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-# Default database path - uses /tmp for cross-process access
-DEFAULT_DB_PATH = Path("/tmp/vulcan_query_outcomes.db")
+# Default database path - uses tempdir for cross-platform compatibility
+# Can be overridden via VULCAN_OUTCOME_DB_PATH environment variable
+DEFAULT_DB_PATH = Path(
+    os.environ.get(
+        "VULCAN_OUTCOME_DB_PATH",
+        os.path.join(tempfile.gettempdir(), "vulcan_query_outcomes.db")
+    )
+)
 
 # Thread-local storage for database connections
 _local = threading.local()
@@ -341,12 +349,20 @@ def mark_outcomes_processed(
     if not outcome_ids:
         return True
 
+    # Validate all IDs are integers to prevent injection
+    try:
+        validated_ids = [int(id_) for id_ in outcome_ids]
+    except (ValueError, TypeError):
+        logger.warning("[OutcomeBridge] Invalid outcome IDs provided")
+        return False
+
     try:
         with _get_db(db_path) as conn:
-            placeholders = ",".join("?" * len(outcome_ids))
+            # Use parameterized placeholders - count is derived from validated list
+            placeholders = ",".join("?" for _ in validated_ids)
             conn.execute(
                 f"UPDATE query_outcomes SET processed = 1 WHERE id IN ({placeholders})",
-                outcome_ids,
+                validated_ids,
             )
             conn.commit()
 

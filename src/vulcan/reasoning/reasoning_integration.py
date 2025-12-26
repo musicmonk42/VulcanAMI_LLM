@@ -40,6 +40,12 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Configuration constants
+DEFAULT_MAX_WORKERS = 4  # Default number of workers for PortfolioExecutor
+DEFAULT_TIME_BUDGET_MS = 5000  # Default time budget in milliseconds
+DEFAULT_ENERGY_BUDGET_MJ = 1000  # Default energy budget in millijoules
+DEFAULT_MIN_CONFIDENCE = 0.5  # Default minimum confidence threshold
+
 
 @dataclass
 class ReasoningResult:
@@ -128,7 +134,10 @@ class ReasoningIntegration:
                 )
 
                 # Create with empty tools dict - will use mock tools
-                self._portfolio_executor = PortfolioExecutor(tools={}, max_workers=4)
+                self._portfolio_executor = PortfolioExecutor(
+                    tools={},
+                    max_workers=DEFAULT_MAX_WORKERS
+                )
                 logger.info("[ReasoningIntegration] PortfolioExecutor initialized")
             except ImportError as e:
                 logger.warning(
@@ -205,9 +214,9 @@ class ReasoningIntegration:
                 request = SelectionRequest(
                     problem=query,
                     constraints={
-                        "time_budget_ms": 5000,
-                        "energy_budget_mj": 1000,
-                        "min_confidence": 0.5,
+                        "time_budget_ms": DEFAULT_TIME_BUDGET_MS,
+                        "energy_budget_mj": DEFAULT_ENERGY_BUDGET_MJ,
+                        "min_confidence": DEFAULT_MIN_CONFIDENCE,
                     },
                     mode=mode,
                     context=context or {},
@@ -334,9 +343,9 @@ class ReasoningIntegration:
 
             # Create monitor
             monitor = ExecutionMonitor(
-                time_budget_ms=5000,
-                energy_budget_mj=1000,
-                min_confidence=0.5,
+                time_budget_ms=DEFAULT_TIME_BUDGET_MS,
+                energy_budget_mj=DEFAULT_ENERGY_BUDGET_MJ,
+                min_confidence=DEFAULT_MIN_CONFIDENCE,
             )
 
             # Execute
@@ -345,9 +354,9 @@ class ReasoningIntegration:
                 tool_names=tools,
                 problem=query,
                 constraints={
-                    "time_budget_ms": 5000,
-                    "energy_budget_mj": 1000,
-                    "min_confidence": 0.5,
+                    "time_budget_ms": DEFAULT_TIME_BUDGET_MS,
+                    "energy_budget_mj": DEFAULT_ENERGY_BUDGET_MJ,
+                    "min_confidence": DEFAULT_MIN_CONFIDENCE,
                 },
                 monitor=monitor,
             )
