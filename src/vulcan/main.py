@@ -2008,6 +2008,9 @@ async def chat(request: ChatRequest):
     # ================================================================
     # STEP 0: INPUT GATEKEEPER - Validate query before processing
     # ================================================================
+    # TIMING: Capture start time to identify gaps between steps
+    _step0_start_time = time.perf_counter()
+    
     try:
         # Use LLM validators to detect nonsense queries and potential issues
         from vulcan.safety.llm_validators import (
@@ -2401,6 +2404,21 @@ async def chat(request: ChatRequest):
 
     except Exception as e:
         logger.warning(f"[VULCAN] Agent pool routing failed: {e}", exc_info=True)
+
+    # ================================================================
+    # TIMING: Track gap between agent pool submission and parallel execution
+    # Based on logs showing 21-second gap between job assignment and parallel execution
+    # ================================================================
+    _post_agent_pool_time = time.perf_counter()
+    _agent_pool_total_time = _post_agent_pool_time - _step0_start_time
+    if _agent_pool_total_time > 5.0:
+        logger.warning(
+            f"[TIMING] SLOW WAIT: {_agent_pool_total_time*1000:.0f}ms from request start to post-agent-pool"
+        )
+    else:
+        logger.info(
+            f"[TIMING] Agent pool phase took {_agent_pool_total_time*1000:.0f}ms"
+        )
 
     # ================================================================
     # TIMING: Initialize timing instrumentation for bottleneck diagnosis
