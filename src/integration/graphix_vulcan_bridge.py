@@ -1079,16 +1079,17 @@ class GraphixVulcanBridge:
         """
         stats_before = self.get_memory_stats()
         
-        # Run lightweight garbage collection
-        gc.collect(generation=0)  # Only collect youngest generation for speed
+        # Run garbage collection on generations 0 and 1 for effective cleanup
+        # without the overhead of a full collection
+        gc.collect(1)
         
         # Clear expired cache entries in memory
         if hasattr(self, 'memory') and self.memory is not None:
             if hasattr(self.memory, '_cleanup_expired_cache'):
                 self.memory._cleanup_expired_cache()
         
-        # Clear CUDA cache if needed (lightweight check)
-        if torch.cuda.is_available() and torch.cuda.memory_allocated() > 0:
+        # Clear CUDA cache if available
+        if torch.cuda.is_available():
             torch.cuda.empty_cache()
         
         stats_after = self.get_memory_stats()

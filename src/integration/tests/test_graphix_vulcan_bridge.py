@@ -346,7 +346,7 @@ class TestPerformanceFixes:
         bridge = GraphixVulcanBridge()
         
         async def slow_function():
-            await asyncio.sleep(10)  # Longer than fast_op_timeout
+            await asyncio.sleep(1)  # Longer than fast_op_timeout (0.5s)
             return "should_not_reach"
         
         # Fast path should timeout quickly and return default
@@ -362,21 +362,26 @@ class TestPerformanceFixes:
     @pytest.mark.asyncio
     async def test_periodic_cleanup_triggered(self):
         """Verify that periodic cleanup is triggered after N operations."""
-        config = BridgeConfig(resource_cleanup_interval=5)
-        bridge = GraphixVulcanBridge.__new__(GraphixVulcanBridge)
-        bridge._initialized = False
-        bridge.__init__(config)
+        # Use the singleton bridge instance
+        bridge = GraphixVulcanBridge()
         
-        # Reset operation count
-        bridge._operation_count = 0
+        # Store original config value and set test value
+        original_interval = bridge.config.resource_cleanup_interval
+        bridge.config.resource_cleanup_interval = 5
         
-        # Perform operations
-        for i in range(6):
-            await bridge.after_execution({"tokens": f"token_{i}"})
+        # Reset operation count for this test
+        initial_count = bridge._operation_count
         
-        # Operation count should be 6
-        assert bridge._operation_count == 6
-        # At least one cleanup should have been triggered (at op 5)
+        try:
+            # Perform operations
+            for i in range(6):
+                await bridge.after_execution({"tokens": f"token_{i}"})
+            
+            # Operation count should have increased by 6
+            assert bridge._operation_count == initial_count + 6
+        finally:
+            # Restore original config
+            bridge.config.resource_cleanup_interval = original_interval
     
     def test_cleanup_resources_method(self):
         """Verify that cleanup_resources method works correctly."""
