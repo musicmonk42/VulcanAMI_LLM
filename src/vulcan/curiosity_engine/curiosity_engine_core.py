@@ -1226,6 +1226,12 @@ class CuriosityEngine:
         # BUG #3 FIX: Track if any data has been ingested
         self._queries_ingested = 0
         self._failures_ingested = 0
+        
+        # External gap injection (for OutcomeBridge connection)
+        # This allows gaps detected by external systems (e.g., OutcomeBridge)
+        # to be included in the learning cycle
+        self._external_gaps: List[KnowledgeGap] = []
+        self._external_gaps_lock = threading.RLock()
 
         # Thread safety
         self.lock = threading.RLock()
@@ -1319,6 +1325,64 @@ class CuriosityEngine:
                     if self._queries_ingested > 0 else 0.0
                 ),
             }
+    
+    # ========== External Gap Injection (OutcomeBridge Connection) ==========
+    
+    def add_external_gap(self, gap: KnowledgeGap) -> None:
+        """
+        Add a gap from an external source (e.g., OutcomeBridge).
+        
+        This method allows external systems to inject gaps directly into the
+        learning cycle. Gaps added this way will be included in the next call
+        to identify_knowledge_gaps().
+        
+        Args:
+            gap: KnowledgeGap to add to the external gaps queue
+        """
+        with self._external_gaps_lock:
+            self._external_gaps.append(gap)
+            logger.info(
+                f"[CuriosityEngine] Added external gap: type={gap.type}, "
+                f"domain={gap.domain}, priority={gap.priority:.2f}"
+            )
+    
+    def add_external_gaps(self, gaps: List[KnowledgeGap]) -> None:
+        """
+        Add multiple gaps from an external source.
+        
+        Args:
+            gaps: List of KnowledgeGaps to add
+        """
+        with self._external_gaps_lock:
+            for gap in gaps:
+                self._external_gaps.append(gap)
+            if gaps:
+                logger.info(
+                    f"[CuriosityEngine] Added {len(gaps)} external gaps"
+                )
+    
+    def get_external_gaps_count(self) -> int:
+        """Get the number of pending external gaps."""
+        with self._external_gaps_lock:
+            return len(self._external_gaps)
+    
+    def _consume_external_gaps(self) -> List[KnowledgeGap]:
+        """
+        Consume and return all pending external gaps.
+        
+        This clears the external gaps queue after returning the gaps.
+        
+        Returns:
+            List of external gaps that were pending
+        """
+        with self._external_gaps_lock:
+            gaps = self._external_gaps.copy()
+            self._external_gaps = []
+            if gaps:
+                logger.info(
+                    f"[CuriosityEngine] Consumed {len(gaps)} external gaps"
+                )
+            return gaps
 
     def select_exploration_strategy(
         self, context: Optional[Dict[str, Any]] = None
@@ -1352,6 +1416,15 @@ class CuriosityEngine:
                 strategy = self.select_exploration_strategy()
 
             gaps = []
+            
+            # FIRST: Consume any external gaps (from OutcomeBridge, etc.)
+            # This ensures gaps from external systems are always included
+            external_gaps = self._consume_external_gaps()
+            if external_gaps:
+                gaps.extend(external_gaps)
+                logger.info(
+                    f"[CuriosityEngine] Including {len(external_gaps)} external gaps"
+                )
 
             # EXAMINE & SELECT: Route based on strategy
             if strategy in ["gap_driven", "comprehensive", "balanced"]:
@@ -1392,10 +1465,10 @@ class CuriosityEngine:
                     gaps.extend(outcome_gaps[:3])
             elif strategy == "minimal":
                 all_gaps = self.gap_analyzer.get_all_gaps()
-                gaps = all_gaps[:3]
+                gaps.extend(all_gaps[:3])
             elif strategy == "efficient":
                 all_gaps = self.gap_analyzer.get_all_gaps()
-                gaps = [g for g in all_gaps if g.estimated_cost < 20][:5]
+                gaps.extend([g for g in all_gaps if g.estimated_cost < 20][:5])
 
             # APPLY: Add to dependency graph
             for gap in gaps:
