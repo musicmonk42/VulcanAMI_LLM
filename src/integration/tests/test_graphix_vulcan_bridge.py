@@ -2,6 +2,7 @@
 Comprehensive tests for graphix_vulcan_bridge.py
 """
 
+import asyncio
 import sys
 import os
 
@@ -325,6 +326,83 @@ class TestPerformanceFixes:
         # New times (0.001s + 0.001s + 0.0005s + 0.001s) * 10 = 0.035s
         # Allow some margin for actual computation
         assert elapsed < 0.5, f"Operations too slow: {elapsed:.3f}s (expected < 0.5s)"
+    
+    def test_bridge_config_fast_op_timeout(self):
+        """Verify that fast_op_timeout is configurable."""
+        config = BridgeConfig(fast_op_timeout=0.3, fast_op_max_retries=0)
+        assert config.fast_op_timeout == 0.3
+        assert config.fast_op_max_retries == 0
+        
+        # Default values should be reasonable
+        default_config = BridgeConfig()
+        assert default_config.fast_op_timeout == 0.5
+        assert default_config.fast_op_max_retries == 1
+    
+    @pytest.mark.asyncio
+    async def test_safe_call_async_fast(self):
+        """Verify that _safe_call_async_fast uses shorter timeout."""
+        import time
+        
+        bridge = GraphixVulcanBridge()
+        
+        async def slow_function():
+            await asyncio.sleep(10)  # Longer than fast_op_timeout
+            return "should_not_reach"
+        
+        # Fast path should timeout quickly and return default
+        start = time.time()
+        result = await bridge._safe_call_async_fast(slow_function, (), "default_value")
+        elapsed = time.time() - start
+        
+        # Should have timed out with fast timeout (0.5s) + 1 retry
+        # Total max time: 0.5s + 0.05s backoff + 0.5s = ~1.05s
+        assert result == "default_value"
+        assert elapsed < 2.0, f"Fast path took too long: {elapsed:.2f}s"
+    
+    @pytest.mark.asyncio
+    async def test_periodic_cleanup_triggered(self):
+        """Verify that periodic cleanup is triggered after N operations."""
+        config = BridgeConfig(resource_cleanup_interval=5)
+        bridge = GraphixVulcanBridge.__new__(GraphixVulcanBridge)
+        bridge._initialized = False
+        bridge.__init__(config)
+        
+        # Reset operation count
+        bridge._operation_count = 0
+        
+        # Perform operations
+        for i in range(6):
+            await bridge.after_execution({"tokens": f"token_{i}"})
+        
+        # Operation count should be 6
+        assert bridge._operation_count == 6
+        # At least one cleanup should have been triggered (at op 5)
+    
+    def test_cleanup_resources_method(self):
+        """Verify that cleanup_resources method works correctly."""
+        bridge = GraphixVulcanBridge()
+        
+        # Add some data
+        bridge.world_model._concept_registry = {f"concept_{i}": i for i in range(100)}
+        
+        # Run lightweight cleanup
+        result = bridge.cleanup_resources()
+        
+        # Should return stats
+        assert "stats_before" in result
+        assert "stats_after" in result
+        assert "gc_collected" in result
+        assert result["gc_collected"] is True
+    
+    def test_operation_count_in_stats(self):
+        """Verify that operation count is included in memory stats."""
+        bridge = GraphixVulcanBridge()
+        bridge._operation_count = 42
+        
+        stats = bridge.get_memory_stats()
+        
+        assert "operation_count" in stats
+        assert stats["operation_count"] == 42
 
 
 if __name__ == "__main__":
