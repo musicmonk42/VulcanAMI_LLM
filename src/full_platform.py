@@ -3123,23 +3123,13 @@ async def vulcan_chat_proxy(request: Request):
             
             # Import and call the chat endpoint handler directly
             try:
-                from src.vulcan.main import ChatRequest
+                from src.vulcan.main import UnifiedChatRequest, unified_chat
                 
-                # Create ChatRequest from body
-                chat_request = ChatRequest(**body)
+                # Create UnifiedChatRequest from body
+                chat_request = UnifiedChatRequest(**body)
                 
-                # Find and call the chat endpoint
-                # The chat endpoint is defined in vulcan/main.py as handle_chat
-                for route in vulcan_app.routes:
-                    if hasattr(route, "path") and route.path == "/v1/chat":
-                        # Found the route, call its endpoint
-                        if hasattr(route, "endpoint"):
-                            result = await route.endpoint(chat_request)
-                            return result
-                
-                # If we get here, we didn't find the route - try calling the function directly
-                from src.vulcan.main import handle_chat
-                result = await handle_chat(chat_request)
+                # Call the chat endpoint function directly
+                result = await unified_chat(chat_request)
                 return result
                 
             except ImportError as e:
