@@ -227,6 +227,33 @@ except ImportError as e:
     ProcessPoolManager = None
     create_curiosity_driver = None
 
+# Query outcome and buffer for data flow to curiosity engine
+# BUG #3 FIX: Enable data flow from main process to curiosity engine
+try:
+    from .query_outcome import QueryOutcome, OutcomeStatus
+    from .outcome_queue import (
+        OutcomeBuffer,
+        get_outcome_buffer,
+        reset_outcome_buffer,
+        record_outcome,
+        get_pending_outcome_count,
+        get_outcome_statistics,
+        consume_outcomes,
+    )
+    OUTCOME_QUEUE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Outcome queue not available: {e}")
+    OUTCOME_QUEUE_AVAILABLE = False
+    QueryOutcome = None
+    OutcomeStatus = None
+    OutcomeBuffer = None
+    get_outcome_buffer = None
+    reset_outcome_buffer = None
+    record_outcome = None
+    get_pending_outcome_count = None
+    get_outcome_statistics = None
+    consume_outcomes = None
+
 __all__ = [
     # Core Engine
     "CuriosityEngine",
@@ -308,6 +335,16 @@ __all__ = [
     "DriverState",
     "ProcessPoolManager",
     "create_curiosity_driver",
+    # Query Outcome (BUG #3 FIX: Data flow to curiosity engine)
+    "QueryOutcome",
+    "OutcomeStatus",
+    "OutcomeBuffer",
+    "get_outcome_buffer",
+    "reset_outcome_buffer",
+    "record_outcome",
+    "get_pending_outcome_count",
+    "get_outcome_statistics",
+    "consume_outcomes",
     # Availability Flags
     "CURIOSITY_ENGINE_AVAILABLE",
     "GAP_ANALYZER_AVAILABLE",
@@ -315,6 +352,7 @@ __all__ = [
     "DEPENDENCY_GRAPH_AVAILABLE",
     "EXPLORATION_BUDGET_AVAILABLE",
     "CURIOSITY_DRIVER_AVAILABLE",
+    "OUTCOME_QUEUE_AVAILABLE",
 ]
 
 # Version info
