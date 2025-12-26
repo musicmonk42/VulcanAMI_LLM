@@ -562,9 +562,21 @@ class ReasoningIntegration:
                 # NOTE: SelectionResult has 'selected_tool' (singular) and 'all_results'
                 # We extract the list of tools from all_results keys or use selected_tool
                 selected_tools = self._extract_tools_from_result(result)
-                reasoning_strategy = result.strategy_used.value
-                confidence = result.calibrated_confidence
-                rationale = f"ToolSelector selected via {result.strategy_used.value} strategy"
+
+                # Safely extract strategy and confidence with fallbacks
+                if hasattr(result, "strategy_used") and result.strategy_used is not None:
+                    reasoning_strategy = result.strategy_used.value
+                    rationale = f"ToolSelector selected via {result.strategy_used.value} strategy"
+                else:
+                    reasoning_strategy = ReasoningStrategyType.DEFAULT.value
+                    rationale = "ToolSelector selection (strategy unknown)"
+
+                if hasattr(result, "calibrated_confidence"):
+                    confidence = result.calibrated_confidence
+                elif hasattr(result, "confidence"):
+                    confidence = result.confidence
+                else:
+                    confidence = 0.7  # Default confidence
 
                 # Track successful selection
                 with self._stats_lock:

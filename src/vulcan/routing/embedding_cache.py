@@ -45,8 +45,8 @@ Usage:
     from vulcan.routing.embedding_cache import is_simple_query
 
     if is_simple_query(query):
-        # Skip heavy embedding computation
-        use_fast_path_routing(query)
+        # Skip heavy embedding computation - use direct routing
+        pass  # Application-specific fast-path logic here
 
     # Monitor cache performance
     from vulcan.routing.embedding_cache import get_cache_stats
