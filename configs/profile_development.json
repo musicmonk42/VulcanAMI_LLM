@@ -184,6 +184,30 @@
     "enable_curriculum_learning": false,
     "enable_self_supervised_learning": true
   },
+  "distillation_config": {
+    "enabled": true,
+    "mode": "active",
+    "confidence_threshold": 0.85,
+    "student_model_path": "models/distilled_student_v1.onnx",
+    "enable_hybrid_routing": true,
+    "fast_path_latency_target_ms": 50,
+    "escalation_threshold": 0.4,
+    "teacher_timeout_seconds": 60,
+    "student_timeout_seconds": 5,
+    "capture_for_training": true,
+    "training_data_path": "data/distillation_examples.json",
+    "max_training_examples": 10000,
+    "auto_retrain_interval_hours": 24,
+    "query_type_classifier": {
+      "simple_greetings": 0.99,
+      "factual_lookup": 0.90,
+      "complex_reasoning": 0.30,
+      "code_generation": 0.40,
+      "creative_writing": 0.50
+    },
+    "fallback_to_teacher_on_error": true,
+    "log_routing_decisions": true
+  },
   "reasoning_config": {
     "max_reasoning_depth": 10,
     "min_confidence_threshold": 0.7,

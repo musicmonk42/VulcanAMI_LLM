@@ -15,14 +15,17 @@ FIXES APPLIED:
 - Comprehensive error handling
 - Statistics tracking
 - Schema migration for backward compatibility
+- Async-compatible logging with run_in_executor (Architectural Fix #4)
 """
 
+import asyncio
 import json
 import logging
 import os
 import sqlite3
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -137,6 +140,7 @@ class SecurityAuditEngine:
     - Statistics tracking
     - Automatic cleanup
     - Schema migration for backward compatibility
+    - Async-compatible logging with run_in_executor (Fix #4)
     """
 
     def __init__(self, db_path: str = "audit.db", max_connections: int = 5):
@@ -151,6 +155,11 @@ class SecurityAuditEngine:
 
         # Thread safety
         self.write_lock = threading.RLock()
+
+        # ThreadPoolExecutor for async DB operations (Architectural Fix #4)
+        # This allows SQLite writes to be decoupled from the async event loop,
+        # preventing the "distinct pause" seen when the audit log writes to the database.
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="audit_db_")
 
         # Statistics
         self.stats = {
@@ -442,6 +451,28 @@ class SecurityAuditEngine:
             self.logger.error(f"Failed to write to audit database: {e}")
             raise AuditEngineError(f"Failed to log event: {e}")
 
+    async def log_event_async(self, event_type: str, details: Dict, severity: str = "info"):
+        """
+        Async version of log_event using run_in_executor for non-blocking DB writes.
+        
+        This is the recommended method for async code paths (Architectural Fix #4).
+        SQLite is synchronous and file-locked, so we decouple the write operation
+        from the async event loop to prevent blocking.
+
+        Args:
+            event_type: The type of event (e.g., 'graph_submitted', 'integrity_failure').
+            details: A dictionary with event-specific information.
+            severity: Event severity ('info', 'warning', 'error', 'critical').
+        """
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self._executor,
+            self.log_event,
+            event_type,
+            details,
+            severity
+        )
+
     def _send_alert(
         self, event_type: str, details: Dict, timestamp: str, severity: str = "critical"
     ):
@@ -615,8 +646,13 @@ class SecurityAuditEngine:
             raise AuditEngineError(f"Failed to cleanup events: {e}")
 
     def close(self):
-        """Closes all database connections."""
+        """Closes all database connections and shuts down the executor."""
         try:
+            # Shut down the executor for async operations
+            if hasattr(self, '_executor') and self._executor is not None:
+                self._executor.shutdown(wait=True)
+                self.logger.debug("Audit executor shut down.")
+            
             self.pool.close_all()
             self.logger.info("Audit database connections closed.")
         except Exception as e:

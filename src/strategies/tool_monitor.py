@@ -930,6 +930,51 @@ class ToolMonitor:
             self.execution_history.clear()
             logger.info("Reset all metrics")
 
+    def reset_cost_predictions(self, tool_name: Optional[str] = None):
+        """
+        Reset the EMA-based cost predictions to default values.
+        
+        This is Fix #5 for "Cost Hallucination" - when the tool_monitor has learned
+        incorrect cost estimates (e.g., 259ms when reality is 54,000ms), calling this
+        method will clear the learned predictions and allow the router to re-evaluate
+        tools as "Unknown" and re-learn the "new normal".
+        
+        Args:
+            tool_name: If provided, reset only predictions for this tool.
+                      If None, reset all tool predictions to defaults.
+        """
+        default_predictions = {
+            "generator": 5000,    # Start at 5s
+            "evolver": 3000,
+            "optimizer": 2000,
+            "agent_pool": 500,
+        }
+        
+        if tool_name:
+            # Reset specific tool
+            if tool_name in self._predictions:
+                old_value = self._predictions[tool_name]
+                self._predictions[tool_name] = default_predictions.get(tool_name, 5000)
+                self._sample_counts[tool_name] = 0
+                logger.info(
+                    f"[CostModel] Reset prediction for {tool_name}: "
+                    f"{old_value:.0f}ms -> {self._predictions[tool_name]:.0f}ms"
+                )
+            else:
+                self._predictions[tool_name] = default_predictions.get(tool_name, 5000)
+                self._sample_counts[tool_name] = 0
+                logger.info(f"[CostModel] Initialized prediction for {tool_name}: {self._predictions[tool_name]:.0f}ms")
+        else:
+            # Reset all predictions to defaults
+            old_predictions = dict(self._predictions)
+            self._predictions = dict(default_predictions)
+            self._sample_counts.clear()
+            
+            logger.info("[CostModel] Reset ALL cost predictions to defaults:")
+            for tool, new_val in default_predictions.items():
+                old_val = old_predictions.get(tool, "N/A")
+                logger.info(f"  {tool}: {old_val}ms -> {new_val}ms")
+
     def shutdown(self):
         """Shutdown monitoring"""
 

@@ -402,6 +402,36 @@ db-reset: ## Reset database
 	rm -f *.db *.db-journal || true
 
 ################################################################################
+# Performance Optimization (Architectural Fixes)
+################################################################################
+
+.PHONY: reset-cost-model
+reset-cost-model: ## Reset the tool cost model predictions (Fix #5: Cost Hallucination)
+	@echo "$(GREEN)Resetting tool cost predictions...$(NC)"
+	@echo "This clears learned latency estimates to allow re-learning."
+	PYTHONPATH=src python -c "from strategies import StrategyOrchestrator; o = StrategyOrchestrator(); o.reset_cost_predictions(); print('Cost predictions reset successfully')" || \
+		echo "$(YELLOW)Note: Run manually if dependencies not installed$(NC)"
+
+.PHONY: enable-distillation
+enable-distillation: ## Enable Knowledge Distillation hybrid routing (Fix #6)
+	@echo "$(GREEN)Enabling Distillation hybrid routing...$(NC)"
+	@echo "Set DISTILLATION_ENABLED=true and DISTILLATION_MODE=active in your .env file"
+	@echo ""
+	@echo "DISTILLATION_ENABLED=true"
+	@echo "DISTILLATION_MODE=active"
+	@echo "DISTILLATION_CONFIDENCE_THRESHOLD=0.85"
+	@echo "DISTILLATION_ESCALATION_THRESHOLD=0.40"
+	@echo "DISTILLATION_HYBRID_ROUTING=true"
+
+.PHONY: enable-ray
+enable-ray: ## Enable Ray workers for distributed execution (Fix #3)
+	@echo "$(GREEN)Enabling Ray workers...$(NC)"
+	@echo "Set RAY_ENABLED=true in your .env file"
+	@echo ""
+	@echo "RAY_ENABLED=true"
+	@echo "RAY_ADDRESS=auto"
+
+################################################################################
 # Utilities
 ################################################################################
 

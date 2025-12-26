@@ -163,6 +163,34 @@ spec:
         - name: API_HOST
           value: {{ .Values.security.bindHost | default "0.0.0.0" | quote }}
         {{- end }}
+        {{- /* Distillation Configuration (Architectural Fix #6) */}}
+        {{- if .Values.distillation }}
+        - name: DISTILLATION_ENABLED
+          value: {{ .Values.distillation.enabled | quote }}
+        - name: DISTILLATION_MODE
+          value: {{ .Values.distillation.mode | quote }}
+        - name: DISTILLATION_CONFIDENCE_THRESHOLD
+          value: {{ .Values.distillation.confidenceThreshold | quote }}
+        - name: DISTILLATION_ESCALATION_THRESHOLD
+          value: {{ .Values.distillation.escalationThreshold | quote }}
+        - name: DISTILLATION_HYBRID_ROUTING
+          value: {{ .Values.distillation.hybridRouting | quote }}
+        {{- end }}
+        {{- /* Ray Configuration (Architectural Fix #3) */}}
+        {{- if .Values.ray }}
+        {{- if .Values.ray.enabled }}
+        - name: RAY_ENABLED
+          value: "true"
+        - name: RAY_ADDRESS
+          value: {{ .Values.ray.address | quote }}
+        - name: RAY_NUM_CPUS
+          value: {{ .Values.ray.numCpus | quote }}
+        - name: RAY_NUM_GPUS
+          value: {{ .Values.ray.numGpus | quote }}
+        - name: RAY_OBJECT_STORE_MEMORY
+          value: {{ .Values.ray.objectStoreMemory | quote }}
+        {{- end }}
+        {{- end }}
         {{- if .Values.memorySystem.enabled }}
         # Vulcan Memory System v46 AWS credentials
         {{- if .Values.secrets.awsAccessKeyId }}
