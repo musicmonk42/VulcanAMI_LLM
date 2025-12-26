@@ -125,6 +125,23 @@ except ImportError as e:
     BanditAction = None
 
 
+# Import outcome bridge for implicit feedback recording
+# This enables learning from tool selection outcomes
+try:
+    from ...curiosity_engine.outcome_bridge import record_query_outcome
+    OUTCOME_BRIDGE_AVAILABLE = True
+    logger.info("Outcome bridge imported for implicit feedback recording")
+except ImportError:
+    try:
+        from vulcan.curiosity_engine.outcome_bridge import record_query_outcome
+        OUTCOME_BRIDGE_AVAILABLE = True
+        logger.info("Outcome bridge imported for implicit feedback recording")
+    except ImportError:
+        record_query_outcome = None
+        OUTCOME_BRIDGE_AVAILABLE = False
+        logger.debug("Outcome bridge not available - implicit feedback disabled")
+
+
 # ==============================================================================
 # 1. Full Implementation for StochasticCostModel
 # ==============================================================================
@@ -1853,7 +1870,7 @@ class ToolSelector:
             logger.error(f"Result caching failed: {e}")
 
     def _update_statistics(self, result: SelectionResult):
-        """Update performance statistics"""
+        """Update performance statistics and record implicit feedback"""
 
         try:
             with self.stats_lock:
@@ -1886,8 +1903,86 @@ class ToolSelector:
                         "strategy": result.strategy_used.value,
                     }
                 )
+            
+            # Record implicit feedback to outcome bridge for learning system
+            # This enables CuriosityEngine to learn from tool selection outcomes
+            self._record_implicit_feedback(result)
+                
         except Exception as e:
             logger.error(f"Statistics update failed: {e}")
+
+    def _record_implicit_feedback(self, result: SelectionResult):
+        """
+        Record implicit feedback to the outcome bridge for learning.
+        
+        This enables the CuriosityEngine and UnifiedLearningSystem to learn from
+        tool selection outcomes. The feedback includes:
+        - Response latency (fast = good, slow = needs improvement)
+        - Confidence scores (high confidence = successful selection)
+        - Tool used (enables tool selection pattern analysis)
+        
+        Implicit signals captured:
+        1. Latency: < 5s = good, > 30s = needs improvement
+        2. Confidence: > 0.7 = success, < 0.3 = failure
+        3. Strategy: single tool = simple query, portfolio = complex query
+        """
+        if not OUTCOME_BRIDGE_AVAILABLE or record_query_outcome is None:
+            return
+        
+        try:
+            # Generate a unique query ID for this outcome
+            import uuid
+            query_id = f"tool_sel_{uuid.uuid4().hex[:12]}"
+            
+            # Determine success status based on confidence and latency
+            # Success criteria:
+            # - High confidence (> 0.5) indicates good tool selection
+            # - Reasonable latency (< 10s) indicates efficient execution
+            is_success = result.confidence > 0.5 and result.execution_time_ms < 10000
+            status = "success" if is_success else "error"
+            
+            # Determine error type if not successful
+            error_type = None
+            if not is_success:
+                if result.confidence <= 0.5:
+                    error_type = "low_confidence"
+                elif result.execution_time_ms >= 10000:
+                    error_type = "slow_execution"
+            
+            # Estimate complexity from the strategy used
+            # Single tool = simpler query, portfolio = complex query
+            complexity = 0.3  # Default
+            if hasattr(result, 'strategy_used'):
+                if result.strategy_used.value == "single":
+                    complexity = 0.2
+                elif result.strategy_used.value == "racing":
+                    complexity = 0.5
+                elif result.strategy_used.value == "parallel":
+                    complexity = 0.6
+                elif result.strategy_used.value == "sequential_fallback":
+                    complexity = 0.7
+            
+            # Record outcome to bridge
+            record_query_outcome(
+                query_id=query_id,
+                status=status,
+                routing_time_ms=0.0,  # Not applicable for tool selection
+                total_time_ms=result.execution_time_ms,
+                complexity=complexity,
+                query_type=f"reasoning_{result.selected_tool}",
+                tasks=1,
+                error_type=error_type,
+            )
+            
+            logger.debug(
+                f"[ImplicitFeedback] Recorded outcome: tool={result.selected_tool}, "
+                f"status={status}, confidence={result.confidence:.2f}, "
+                f"time={result.execution_time_ms:.0f}ms"
+            )
+            
+        except Exception as e:
+            # Don't fail the main flow if feedback recording fails
+            logger.debug(f"Implicit feedback recording failed (non-critical): {e}")
 
     def _handle_distribution_shift(self):
         """Handle detected distribution shift"""
