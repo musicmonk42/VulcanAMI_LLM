@@ -557,10 +557,10 @@ class AgentPoolManager:
         # Redis client for state persistence
         self.redis_client = redis_client
         
-        # PERFORMANCE: Use simple_mode defaults if not explicitly provided
-        # This reduces agent pool overhead when VULCAN_SIMPLE_MODE=true
-        self.max_agents = max_agents if max_agents is not None else SIMPLE_MODE_MAX_AGENTS
-        self.min_agents = min_agents if min_agents is not None else SIMPLE_MODE_MIN_AGENTS
+        # EMERGENCY STABILIZATION: Hardcode agent limits to reduce thread thrashing
+        # Original behavior used SIMPLE_MODE defaults, now forced to min=5, max=10
+        self.max_agents = 10
+        self.min_agents = 5
         self.task_timeout_seconds = task_timeout_seconds
 
         # Agent tracking
