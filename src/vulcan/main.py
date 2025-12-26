@@ -2047,10 +2047,23 @@ async def chat(request: ChatRequest):
     # ================================================================
     job_id = None
     submitted_jobs = []  # Track all submitted job IDs
+    tool_selector = None  # Priority 2: Tool selector for reasoning system integration
     try:
         # Import at the start to catch import errors
         from vulcan.orchestrator.agent_lifecycle import AgentCapability
         import uuid
+        
+        # Priority 2 FIX: Import and initialize tool selector from reasoning system
+        try:
+            from vulcan.reasoning.selection import create_tool_selector
+            tool_selector = create_tool_selector()
+            logger.info("[VULCAN] Tool selector initialized from reasoning system")
+        except ImportError as ts_err:
+            logger.debug(f"[VULCAN] Tool selector not available: {ts_err}")
+            tool_selector = None
+        except Exception as ts_err:
+            logger.warning(f"[VULCAN] Tool selector initialization failed: {ts_err}")
+            tool_selector = None
 
         if collective.agent_pool:
             pool_status = collective.agent_pool.get_pool_status()
@@ -2109,6 +2122,28 @@ async def chat(request: ChatRequest):
                     capability = capability_map.get(
                         agent_task.capability, AgentCapability.REASONING
                     )
+                    
+                    # Priority 2 FIX: Use tool selector before submitting to agent pool
+                    selected_tool = None
+                    if tool_selector is not None:
+                        try:
+                            from vulcan.reasoning.selection import SelectionRequest, SelectionMode
+                            # Create budget constraints from task parameters
+                            budget = {
+                                "time_budget_ms": (agent_task.timeout_seconds or timeout) * 1000,
+                                "energy_budget_mj": 1000,  # Default energy budget
+                            }
+                            selection_request = SelectionRequest(
+                                problem=agent_task.prompt,
+                                constraints=budget,
+                                mode=SelectionMode.BALANCED,
+                            )
+                            selection = tool_selector.select_and_execute(selection_request)
+                            selected_tool = selection.selected_tool
+                            logger.info(f"[ToolSelector] Selected: {selection.selected_tool}")
+                        except Exception as sel_err:
+                            logger.debug(f"[ToolSelector] Selection failed: {sel_err}")
+                            selected_tool = None
 
                     # Create task graph from routing plan task
                     task_graph = {
@@ -2157,6 +2192,7 @@ async def chat(request: ChatRequest):
                                     "is_primary": agent_task.parameters.get(
                                         "is_primary", True
                                     ),
+                                    "selected_tool": selected_tool,  # Priority 2: Pass selected tool
                                     **agent_task.parameters,
                                 },
                                 priority=agent_task.priority,
@@ -2308,6 +2344,27 @@ async def chat(request: ChatRequest):
                         {"from": "process", "to": "output"},
                     ],
                 }
+                
+                # Priority 2 FIX: Use tool selector before fallback submission
+                fallback_selected_tool = None
+                if tool_selector is not None:
+                    try:
+                        from vulcan.reasoning.selection import SelectionRequest, SelectionMode
+                        budget = {
+                            "time_budget_ms": agent_pool_timeout * 1000,
+                            "energy_budget_mj": 1000,
+                        }
+                        selection_request = SelectionRequest(
+                            problem=processed_prompt,
+                            constraints=budget,
+                            mode=SelectionMode.BALANCED,
+                        )
+                        selection = tool_selector.select_and_execute(selection_request)
+                        fallback_selected_tool = selection.selected_tool
+                        logger.info(f"[ToolSelector] Selected: {selection.selected_tool}")
+                    except Exception as sel_err:
+                        logger.debug(f"[ToolSelector] Selection failed: {sel_err}")
+                        fallback_selected_tool = None
 
                 # Submit to agent pool
                 logger.info(
@@ -2316,7 +2373,11 @@ async def chat(request: ChatRequest):
 
                 job_id = collective.agent_pool.submit_job(
                     graph=task_graph,
-                    parameters={"prompt": processed_prompt, "task_type": task_type},
+                    parameters={
+                        "prompt": processed_prompt,
+                        "task_type": task_type,
+                        "selected_tool": fallback_selected_tool,  # Priority 2: Pass selected tool
+                    },
                     priority=2,  # Higher priority for user-facing requests
                     capability_required=capability,
                     timeout_seconds=agent_pool_timeout,
@@ -3148,6 +3209,78 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
         pass  # Routing not available
     except Exception as e:
         logger.warning(f"[VULCAN] Telemetry recording failed: {e}", exc_info=True)
+
+    # ================================================================
+    # STEP 9.5: Record outcome for Curiosity Engine learning
+    # BUG #3 FIX: Feed query outcomes to curiosity engine for gap analysis
+    # ================================================================
+    try:
+        from vulcan.curiosity_engine import (
+            record_outcome as ce_record_outcome,
+            QueryOutcome,
+            OutcomeStatus,
+            OUTCOME_QUEUE_AVAILABLE,
+        )
+        
+        if OUTCOME_QUEUE_AVAILABLE:
+            # Get local variables for safe access
+            local_vars = locals()
+            
+            # Determine outcome status based on response quality
+            # MIN_MEANINGFUL_RESPONSE_LENGTH is defined at the start of this function
+            min_response_len = local_vars.get('MIN_MEANINGFUL_RESPONSE_LENGTH', 10)
+            if response_text and len(response_text) > min_response_len:
+                if gatekeeper_results.get("hallucination_warning"):
+                    outcome_status = OutcomeStatus.PARTIAL
+                else:
+                    outcome_status = OutcomeStatus.SUCCESS
+            elif "fallback_message" in systems_used:
+                outcome_status = OutcomeStatus.FAILURE
+            else:
+                outcome_status = OutcomeStatus.PARTIAL
+            
+            # Safely extract variables that may or may not be defined
+            _query_type = local_vars.get('query_type', 'general')
+            _complexity_score = local_vars.get('complexity_score', 0.0)
+            _uncertainty_score = local_vars.get('uncertainty_score', 0.0)
+            _timing_start = local_vars.get('_timing_start', time.perf_counter())
+            _quality_score = local_vars.get('quality_score', 0.0)
+            
+            # Build query outcome for curiosity engine
+            query_outcome = QueryOutcome(
+                query_id=query_id if query_id else f"unknown_{int(time.time()*1000)}",
+                query_text=processed_prompt[:500] if processed_prompt else "",
+                query_type=_query_type,
+                complexity=_complexity_score,
+                uncertainty=_uncertainty_score,
+                routing_time_ms=routing_stats.get("routing_time_ms", 0.0) if routing_stats else 0.0,
+                tasks_generated=len(routing_plan.agent_tasks) if routing_plan and routing_plan.agent_tasks else 0,
+                was_creative=routing_plan.is_creative if routing_plan and hasattr(routing_plan, 'is_creative') else False,
+                agents_used=[],  # Would need to track from agent pool
+                capabilities_used=[s.replace("agent_pool_", "") for s in systems_used if s.startswith("agent_pool_")],
+                execution_time_ms=(time.perf_counter() - _timing_start) * 1000,
+                status=outcome_status,
+                confidence=_quality_score,
+                error_type=None,
+            )
+            
+            # Compute feature vector for ML
+            query_outcome.compute_features()
+            
+            # Record for curiosity engine (non-blocking)
+            ce_record_outcome(query_outcome)
+            
+            logger.info(
+                f"[QueryOutcome] Recorded: {query_outcome.query_id}, "
+                f"status={outcome_status.value}, "
+                f"time={query_outcome.execution_time_ms:.0f}ms, "
+                f"complexity={query_outcome.complexity:.2f}"
+            )
+            
+    except ImportError as e:
+        logger.debug(f"[VULCAN] Curiosity engine outcome recording not available: {e}")
+    except Exception as e:
+        logger.warning(f"[VULCAN] Curiosity engine outcome recording failed: {e}")
 
     # ================================================================
     # STEP 10: Build comprehensive response with stats

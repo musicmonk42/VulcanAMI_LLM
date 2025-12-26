@@ -309,10 +309,18 @@ class MultiTierFeatureExtractor:
         return cls._shared_embedding_model
     
     @classmethod
+    def _compute_cache_key(cls, text: str) -> str:
+        """Compute cache key for text using SHA-256 truncated to 32 chars.
+        
+        Uses SHA-256 with 32 chars (128-bit space) to reduce collision risk in high-throughput.
+        This is a shared helper to ensure consistent key computation across cache operations.
+        """
+        return hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
+    
+    @classmethod
     def _get_cached_embedding(cls, text: str) -> Optional[np.ndarray]:
         """Get embedding from cache if available (LRU eviction)."""
-        # Use SHA-256 with 32 chars (128-bit space) to reduce collision risk in high-throughput
-        cache_key = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
+        cache_key = cls._compute_cache_key(text)
         
         with cls._embedding_cache_lock:
             if cache_key in cls._embedding_cache:
@@ -327,7 +335,7 @@ class MultiTierFeatureExtractor:
     @classmethod
     def _cache_embedding(cls, text: str, embedding: np.ndarray) -> None:
         """Cache embedding with batch LRU eviction for efficiency."""
-        cache_key = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:32]
+        cache_key = cls._compute_cache_key(text)
         
         with cls._embedding_cache_lock:
             # Batch eviction: remove 10% when at capacity to reduce lock contention
@@ -401,9 +409,17 @@ class MultiTierFeatureExtractor:
 
         problem_str = str(problem)
         
+        # Compute cache key for logging using shared helper method
+        cache_key = MultiTierFeatureExtractor._compute_cache_key(problem_str)
+        
         # PERFORMANCE FIX: Check cache first
+        start_time = time.perf_counter()
         cached_embedding = MultiTierFeatureExtractor._get_cached_embedding(problem_str)
         if cached_embedding is not None:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            # Priority 1 FIX: Add embedding cache logging
+            logger.info(f"Embedding cache: hit=True, key={cache_key[:16]}, time={elapsed_ms:.2f}ms")
+            
             # Resize cached embedding if necessary
             if cached_embedding.shape[0] != self.dim:
                 if cached_embedding.shape[0] > self.dim:
@@ -417,9 +433,13 @@ class MultiTierFeatureExtractor:
         try:
             # Get sentence embedding (expensive - 0.15s to 16s under load)
             embedding = self.semantic_model.encode(problem_str, show_progress_bar=False)
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
             
             # Cache the raw embedding before resizing
             MultiTierFeatureExtractor._cache_embedding(problem_str, embedding)
+            
+            # Priority 1 FIX: Add embedding cache logging for misses
+            logger.info(f"Embedding cache: hit=False, key={cache_key[:16]}, time={elapsed_ms:.2f}ms")
             
             # Resize to the required dimension if necessary
             if embedding.shape[0] != self.dim:
