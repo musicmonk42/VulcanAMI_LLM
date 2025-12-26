@@ -129,12 +129,7 @@ def _get_tfidf_vectorizer():
     return _TfidfVectorizer
 
 
-def _has_nltk():
-    """Check if NLTK is available (triggers lazy load)."""
-    return _get_nltk() is not None
-
-
-def _nltk_word_tokenize(text):
+def _nltk_word_tokenize(text: Optional[str]) -> List[str]:
     """Safe NLTK word tokenization with fallback."""
     nltk = _get_nltk()
     if nltk and text:
@@ -145,7 +140,7 @@ def _nltk_word_tokenize(text):
     return text.split() if text else []
 
 
-def _nltk_sent_tokenize(text):
+def _nltk_sent_tokenize(text: Optional[str]) -> List[str]:
     """Safe NLTK sentence tokenization with fallback."""
     nltk = _get_nltk()
     if nltk and text:
@@ -156,7 +151,7 @@ def _nltk_sent_tokenize(text):
     return text.split(".") if text else []
 
 
-def _nltk_pos_tag(tokens):
+def _nltk_pos_tag(tokens: Optional[List[str]]) -> List[tuple]:
     """Safe NLTK POS tagging with fallback."""
     nltk = _get_nltk()
     if nltk and tokens:
@@ -553,8 +548,13 @@ class StructuralFeatureExtractor(FeatureExtractor):
 
         return features
 
-    def _dict_to_graph(self, graph_dict: Dict):
-        """Convert dictionary to NetworkX graph (lazy-loaded)"""
+    def _dict_to_graph(self, graph_dict: Dict) -> Optional[Any]:
+        """
+        Convert dictionary to NetworkX graph (lazy-loaded).
+        
+        Returns:
+            A networkx.Graph object if networkx is available, None otherwise.
+        """
         
         nx = _get_networkx()
         if nx is None:
