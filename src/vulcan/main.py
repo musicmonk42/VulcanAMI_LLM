@@ -3984,12 +3984,31 @@ async def unified_chat(request: UnifiedChatRequest):
                 try:
                     logger.info(f"[VULCAN/v1/chat] Using UnifiedReasoner with ToolSelector for intelligent routing")
                     
-                    # Build context for tool selection
+                    # Build context for tool selection from routing_plan
+                    # Derive creative flag from query type and keywords
+                    creative_keywords = ['create', 'design', 'imagine', 'invent', 'brainstorm', 'generate']
+                    is_creative = any(kw in user_message.lower() for kw in creative_keywords)
+                    
+                    # Derive domain from query type and telemetry
+                    domain = "general"
+                    if routing_plan:
+                        query_type_val = routing_plan.query_type.value
+                        if query_type_val in ("reasoning", "causal"):
+                            domain = "analytical"
+                        elif query_type_val == "planning":
+                            domain = "strategic"
+                        elif query_type_val == "perception":
+                            domain = "observational"
+                        elif query_type_val == "learning":
+                            domain = "educational"
+                    
                     selection_context = {
                         "query_type": routing_plan.query_type.value if routing_plan else "general",
                         "complexity": routing_plan.complexity_score if routing_plan else 0.5,
-                        "creative": False,  # Could be derived from query analysis
-                        "domain": "general",
+                        "creative": is_creative,
+                        "domain": domain,
+                        "uncertainty": routing_plan.uncertainty_score if routing_plan else 0.0,
+                        "collaboration_needed": routing_plan.collaboration_needed if routing_plan else False,
                     }
                     
                     # Get reasoning result with automatic tool selection

@@ -1147,6 +1147,8 @@ class CuriosityEngine:
         """
         Safely truncate text to max_length, respecting unicode character boundaries.
         
+        Uses encode/decode to ensure we don't cut in the middle of multi-byte characters.
+        
         Args:
             text: The text to truncate
             max_length: Maximum length in characters
@@ -1156,12 +1158,26 @@ class CuriosityEngine:
         """
         if len(text) <= max_length:
             return text
-        # Encode to bytes and back to handle multi-byte characters properly
+        
+        # Simple approach: truncate and then encode/decode to fix any broken characters
+        # This handles surrogate pairs and multi-byte sequences correctly
         truncated = text[:max_length]
-        # If we're in the middle of a surrogate pair, back up
-        while truncated and truncated[-1] >= '\uD800' and truncated[-1] <= '\uDFFF':
-            truncated = truncated[:-1]
-        return truncated
+        
+        # Encode to UTF-8 bytes and decode with error handling to fix any broken sequences
+        try:
+            # This will fail if we cut in the middle of a surrogate pair
+            truncated.encode('utf-8')
+            return truncated
+        except UnicodeEncodeError:
+            # Back up character by character until we get valid UTF-8
+            while truncated:
+                truncated = truncated[:-1]
+                try:
+                    truncated.encode('utf-8')
+                    return truncated
+                except UnicodeEncodeError:
+                    continue
+            return ""
 
     def __init__(self, knowledge=None, decomposer=None, world_model=None):
         """

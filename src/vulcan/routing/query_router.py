@@ -660,22 +660,22 @@ class QueryAnalyzer:
             return refusal_response(plan.safety_reasons)
     """
     
+    # BUG #2 FIX: Trivial patterns for fast-path (class constant for maintainability)
+    # These are simple greetings/acknowledgments that don't need full analysis
+    # Note: 'help' is excluded because help requests need proper analysis
+    TRIVIAL_PATTERNS = (
+        'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 
+        'goodbye', 'ok', 'okay', 'yes', 'no', 'sure', 'yep',
+        'nope', 'good', 'great', 'nice', 'cool', 'awesome',
+        'please', 'sorry', "what's up", 'how are you',
+    )
+    
     def __init__(self, enable_safety_validation: bool = True):
         """Initialize the query analyzer with compiled patterns and optional safety validation.
         
         Args:
             enable_safety_validation: Whether to enable safety validation (default: True)
         """
-        # BUG #2 FIX: Trivial patterns for fast-path (class-level for maintainability)
-        # These are simple greetings/acknowledgments that don't need full analysis
-        # Note: 'help' is excluded because help requests need proper analysis
-        self.TRIVIAL_PATTERNS = (
-            'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 
-            'goodbye', 'ok', 'okay', 'yes', 'no', 'sure', 'yep',
-            'nope', 'good', 'great', 'nice', 'cool', 'awesome',
-            'please', 'sorry', "what's up", 'how are you',
-        )
-        
         # Compile regex patterns for performance
         self._pii_patterns = tuple(
             re.compile(p, re.IGNORECASE) for p in PII_PATTERNS
@@ -1212,11 +1212,20 @@ class QueryAnalyzer:
         """
         query_lower = query.lower().strip()
         
-        # Trivial if very short (under 30 chars) and matches a known greeting
-        # Uses self.TRIVIAL_PATTERNS defined in __init__ for maintainability
-        if len(query_lower) < 30:
-            if any(query_lower.startswith(p) for p in self.TRIVIAL_PATTERNS):
+        # Only consider very short queries (under 20 chars) as potentially trivial
+        # This prevents "hello, can you help me with complex calculations?" from being trivial
+        if len(query_lower) > 20:
+            return False
+        
+        # Check if query is exactly a trivial pattern or starts with pattern + punctuation/space
+        for pattern in self.TRIVIAL_PATTERNS:
+            if query_lower == pattern:
                 return True
+            # Allow pattern followed by punctuation (e.g., "hello!", "thanks.")
+            if query_lower.startswith(pattern) and len(query_lower) <= len(pattern) + 2:
+                suffix = query_lower[len(pattern):]
+                if not suffix or all(c in '!.?,;: ' for c in suffix):
+                    return True
         
         return False
     
