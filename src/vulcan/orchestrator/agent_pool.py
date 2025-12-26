@@ -25,6 +25,18 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Import numpy with fallback for environments without it
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    np = None
+    NUMPY_AVAILABLE = False
+    # Use DEBUG level to avoid cluttering logs on every import
+    logging.getLogger(__name__).debug(
+        "numpy not available, some advanced features will be disabled"
+    )
+
 # Import psutil with fallback for missing or broken installations
 try:
     import psutil
@@ -54,6 +66,17 @@ from src.vulcan.memory.specialized import WorkingMemory
 from src.vulcan.memory.hierarchical import HierarchicalMemory
 from src.vulcan.memory.base import MemoryConfig
 
+# Import TournamentManager for multi-agent selection
+try:
+    from src.tournament_manager import TournamentManager
+    TOURNAMENT_MANAGER_AVAILABLE = True
+except ImportError:
+    TournamentManager = None
+    TOURNAMENT_MANAGER_AVAILABLE = False
+    logging.getLogger(__name__).warning(
+        "TournamentManager not available, multi-agent tournament selection will be disabled"
+    )
+
 # ============================================================
 # CONSTANTS
 # ============================================================
@@ -65,6 +88,12 @@ DEFAULT_FALLBACK_STORAGE_GB = 100.0  # Conservative storage estimate
 # Redis keys for agent pool state persistence
 REDIS_KEY_AGENT_POOL_STATS = "vulcan:agent_pool:stats"
 REDIS_KEY_PROVENANCE_COUNT = "vulcan:agent_pool:provenance_records_count"
+
+# Tournament-based multi-agent selection configuration
+TOURNAMENT_QUERY_TYPES = ('reasoning', 'symbolic', 'analogical', 'causal')
+TOURNAMENT_MAX_CANDIDATES = 3  # Maximum agents to run in parallel for tournament
+TOURNAMENT_DIVERSITY_PENALTY = 0.3
+TOURNAMENT_WINNER_PERCENTAGE = 0.2
 
 # FIXED: Add cachetools import for LRU cache with TTL
 try:
@@ -670,6 +699,22 @@ class AgentPoolManager:
         # Initialize auto-scaling and recovery managers
         self.auto_scaler = AutoScaler(self)
         self.recovery_manager = RecoveryManager(self)
+        
+        # Initialize TournamentManager for multi-agent selection
+        self.tournament_manager = None
+        if TOURNAMENT_MANAGER_AVAILABLE and TournamentManager is not None:
+            try:
+                self.tournament_manager = TournamentManager(
+                    diversity_penalty=TOURNAMENT_DIVERSITY_PENALTY,
+                    winner_percentage=TOURNAMENT_WINNER_PERCENTAGE
+                )
+                logger.info(
+                    f"✓ TournamentManager initialized for multi-agent selection "
+                    f"(diversity_penalty={TOURNAMENT_DIVERSITY_PENALTY}, "
+                    f"winner_percentage={TOURNAMENT_WINNER_PERCENTAGE})"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to initialize TournamentManager: {e}")
 
         # Initialize minimum agents
         self._initialize_agent_pool()
@@ -1716,6 +1761,277 @@ class AgentPoolManager:
 
         return best_agent
 
+    def get_agents_by_capability(
+        self, 
+        capabilities: List[str],
+        max_agents: int = TOURNAMENT_MAX_CANDIDATES
+    ) -> List[str]:
+        """
+        Get available agents that can handle the specified capabilities.
+        
+        Args:
+            capabilities: List of capability names to filter by (e.g., ['reasoning', 'general'])
+            max_agents: Maximum number of agents to return
+            
+        Returns:
+            List of agent IDs that can handle the capabilities
+        """
+        with self.lock:
+            available_agents = []
+            for agent_id, metadata in self.agents.items():
+                if metadata.state.can_accept_work():
+                    # Check if agent capability matches any of the requested capabilities
+                    if metadata.capability.value in capabilities:
+                        available_agents.append(agent_id)
+            
+            # Sort by performance (lowest failure rate first)
+            available_agents.sort(
+                key=lambda aid: self.agents[aid].tasks_failed
+                / max(1, self.agents[aid].tasks_completed)
+            )
+            
+            return available_agents[:max_agents]
+
+    def _embed_result(self, result: Dict[str, Any]) -> Any:
+        """
+        Create an embedding vector for a job result.
+        
+        Used by TournamentManager to compute similarity between results.
+        
+        Args:
+            result: Job execution result dictionary
+            
+        Returns:
+            Numpy array representing the result embedding, or list if numpy not available
+        """
+        # Create a simple embedding based on result characteristics
+        # In a production system, this could use a neural encoder
+        features = []
+        
+        # Feature 1: Execution time (normalized)
+        exec_time = result.get('execution_time', 0.0)
+        features.append(min(exec_time / 10.0, 1.0))  # Normalize to 0-1
+        
+        # Feature 2: Success indicator
+        features.append(1.0 if result.get('status') == 'completed' else 0.0)
+        
+        # Feature 3: Confidence score if available
+        features.append(result.get('confidence', 0.5))
+        
+        # Feature 4: Nodes processed (normalized)
+        nodes = result.get('nodes_processed', 0)
+        features.append(min(nodes / 100.0, 1.0))
+        
+        # Pad to fixed size for consistent embeddings
+        while len(features) < 16:
+            features.append(0.0)
+        
+        if NUMPY_AVAILABLE and np is not None:
+            return np.array(features[:16], dtype=np.float32)
+        else:
+            return features[:16]
+
+    async def assign_job_with_tournament(
+        self,
+        job_id: str,
+        graph: Dict[str, Any],
+        parameters: Optional[Dict[str, Any]],
+        query_type: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Assign job using tournament-based multi-agent selection for complex queries.
+        
+        For reasoning queries (symbolic, analogical, causal), runs the job through
+        multiple agents in parallel and uses TournamentManager to select the best result.
+        
+        Args:
+            job_id: Job identifier
+            graph: Computation graph
+            parameters: Job parameters  
+            query_type: Type of query (e.g., 'reasoning', 'symbolic', 'analogical', 'causal')
+            
+        Returns:
+            Best result from tournament selection, or None if failed
+        """
+        # Check if tournament selection should be used
+        use_tournament = (
+            self.tournament_manager is not None and
+            query_type in TOURNAMENT_QUERY_TYPES
+        )
+        
+        if not use_tournament:
+            # Fall back to simple single-agent execution
+            logger.debug(f"[Tournament] Skipping tournament for query_type={query_type}")
+            return None
+        
+        logger.info(f"[Tournament] Using multi-agent tournament for job {job_id} (type={query_type})")
+        
+        # Get candidate agents with reasoning capability
+        candidate_capabilities = ['reasoning', 'general']
+        candidates = self.get_agents_by_capability(candidate_capabilities)
+        
+        if len(candidates) == 0:
+            logger.warning(f"[Tournament] No agents available for tournament")
+            return None
+        
+        if len(candidates) == 1:
+            # Only one agent available, no need for tournament
+            logger.debug(f"[Tournament] Only one agent available, skipping tournament")
+            return None
+        
+        # Limit to max candidates
+        candidates = candidates[:TOURNAMENT_MAX_CANDIDATES]
+        logger.info(f"[Tournament] Running job through {len(candidates)} agents: {candidates}")
+        
+        # Run job through each candidate agent in parallel
+        async def execute_on_agent(agent_id: str) -> Dict[str, Any]:
+            """Execute job on a specific agent and return result."""
+            metadata = None
+            try:
+                # Atomically check agent state and transition to WORKING
+                with self.lock:
+                    metadata = self.agents.get(agent_id)
+                    if not metadata:
+                        return {'status': 'failed', 'error': 'Agent not found', 'agent_id': agent_id}
+                    
+                    if not metadata.state.can_accept_work():
+                        return {'status': 'failed', 'error': 'Agent busy', 'agent_id': agent_id}
+                    
+                    # Transition to WORKING while holding lock
+                    metadata.transition_state(AgentState.WORKING, f"Tournament job {job_id}")
+                
+                # Execute task (outside lock to allow parallel execution)
+                task = {
+                    "task_id": f"{job_id}_tournament_{agent_id}",
+                    "graph": graph,
+                    "parameters": parameters or {},
+                    "provenance": None,
+                }
+                result = self._execute_agent_task(agent_id, task, metadata)
+                result['agent_id'] = agent_id
+                return result
+                        
+            except Exception as e:
+                logger.error(f"[Tournament] Agent {agent_id} failed: {e}")
+                return {
+                    'status': 'failed', 
+                    'error': str(e), 
+                    'agent_id': agent_id,
+                    'confidence': 0.0
+                }
+            finally:
+                # Always return agent to idle (if we successfully started working)
+                if metadata is not None:
+                    with self.lock:
+                        if metadata.state == AgentState.WORKING:
+                            metadata.transition_state(AgentState.IDLE, f"Tournament complete {job_id}")
+        
+        # Execute on all candidates in parallel
+        results = await asyncio.gather(*[
+            execute_on_agent(agent_id) for agent_id in candidates
+        ], return_exceptions=True)
+        
+        # Filter out exceptions and failed results
+        valid_results = []
+        for i, r in enumerate(results):
+            if isinstance(r, Exception):
+                logger.warning(f"[Tournament] Agent {candidates[i]} raised exception: {r}")
+            elif isinstance(r, dict) and r.get('status') == 'completed':
+                valid_results.append(r)
+        
+        if len(valid_results) == 0:
+            logger.warning(f"[Tournament] All agents failed for job {job_id}")
+            return None
+        
+        if len(valid_results) == 1:
+            logger.info(f"[Tournament] Only one valid result, skipping tournament selection")
+            return valid_results[0]
+        
+        # Use TournamentManager to select best result
+        try:
+            # Calculate fitness scores (higher = better)
+            fitness = []
+            for r in valid_results:
+                # Combine multiple factors into fitness score
+                confidence = r.get('confidence', 0.5)
+                exec_time = r.get('execution_time', 1.0)
+                time_penalty = max(0, 1.0 - exec_time / 10.0)  # Faster is better
+                fitness.append(confidence * 0.7 + time_penalty * 0.3)
+            
+            # Run tournament
+            meta = {}
+            winner_indices = self.tournament_manager.run_adaptive_tournament(
+                proposals=valid_results,
+                fitness=fitness,
+                embedding_func=self._embed_result,
+                meta=meta
+            )
+            
+            if winner_indices and len(winner_indices) > 0:
+                winner_idx = winner_indices[0]
+                winner_result = valid_results[winner_idx]
+                winner_result['tournament_meta'] = meta
+                winner_result['tournament_fitness'] = fitness[winner_idx]
+                
+                logger.info(
+                    f"[Tournament] Winner: agent {winner_result.get('agent_id')} "
+                    f"(fitness={fitness[winner_idx]:.3f}, "
+                    f"innovation={meta.get('innovation_score', 0):.3f})"
+                )
+                
+                # Update agent weights based on tournament outcome
+                self._update_agent_weights_from_tournament(valid_results, winner_idx, fitness)
+                
+                return winner_result
+            else:
+                logger.warning(f"[Tournament] No winners selected, returning first result")
+                return valid_results[0]
+                
+        except Exception as e:
+            logger.error(f"[Tournament] Tournament selection failed: {e}")
+            # Fall back to first result
+            return valid_results[0] if valid_results else None
+
+    def _update_agent_weights_from_tournament(
+        self,
+        results: List[Dict[str, Any]],
+        winner_idx: int,
+        fitness: List[float]
+    ) -> None:
+        """
+        Update agent weights based on tournament outcome.
+        
+        This provides feedback to improve agent selection over time.
+        
+        Args:
+            results: List of results from all tournament participants
+            winner_idx: Index of the winning result
+            fitness: Fitness scores for each result
+        """
+        try:
+            for i, result in enumerate(results):
+                agent_id = result.get('agent_id')
+                if agent_id and agent_id in self.agents:
+                    metadata = self.agents[agent_id]
+                    
+                    # Track tournament participation
+                    if not hasattr(metadata, 'tournament_stats'):
+                        metadata.tournament_stats = {
+                            'participations': 0,
+                            'wins': 0,
+                            'total_fitness': 0.0
+                        }
+                    
+                    metadata.tournament_stats['participations'] += 1
+                    metadata.tournament_stats['total_fitness'] += fitness[i]
+                    
+                    if i == winner_idx:
+                        metadata.tournament_stats['wins'] += 1
+                        logger.debug(f"[Tournament] Agent {agent_id} won (total wins: {metadata.tournament_stats['wins']})")
+                    
+        except Exception as e:
+            logger.debug(f"[Tournament] Failed to update agent weights: {e}")
+
     def _assign_job_to_agent(
         self,
         job_id: str,
@@ -2757,4 +3073,7 @@ __all__ = [
     "PriorityJobQueue",
     "CACHETOOLS_AVAILABLE",
     "TTLCache",
+    "TOURNAMENT_MANAGER_AVAILABLE",
+    "TOURNAMENT_QUERY_TYPES",
+    "TOURNAMENT_MAX_CANDIDATES",
 ]
