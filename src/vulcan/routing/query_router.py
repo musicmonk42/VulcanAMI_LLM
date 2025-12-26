@@ -1200,12 +1200,12 @@ class QueryAnalyzer:
         Returns:
             True if the query is trivial and should skip heavy analysis
         """
-        # Only simple greetings and acknowledgments - not generic questions
+        # Only simple greetings and acknowledgments - not requests for help
         trivial_patterns = (
             'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 
             'goodbye', 'ok', 'okay', 'yes', 'no', 'sure', 'yep',
             'nope', 'good', 'great', 'nice', 'cool', 'awesome',
-            'please', 'sorry', 'help', "what's up", 'how are you',
+            'please', 'sorry', "what's up", 'how are you',
         )
         query_lower = query.lower().strip()
         

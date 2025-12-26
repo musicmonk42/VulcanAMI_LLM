@@ -1016,6 +1016,20 @@ class AgentPoolManager:
 
     # ========== BUG #1 FIX: Agent Pool Death Spiral Prevention ==========
 
+    def _get_live_agent_count_unsafe(self) -> int:
+        """
+        Internal method to count live agents WITHOUT acquiring lock.
+        
+        MUST be called with self.lock already held!
+        
+        Returns:
+            Number of live (non-terminated, non-error) agents
+        """
+        return sum(
+            1 for a in self.agents.values()
+            if a.state not in (AgentState.TERMINATED, AgentState.ERROR)
+        )
+
     def get_live_agent_count(self) -> int:
         """
         Get count of agents that are not in terminated or error state.
@@ -1027,10 +1041,7 @@ class AgentPoolManager:
             Number of live (non-terminated, non-error) agents
         """
         with self.lock:
-            return sum(
-                1 for a in self.agents.values()
-                if a.state not in (AgentState.TERMINATED, AgentState.ERROR)
-            )
+            return self._get_live_agent_count_unsafe()
 
     def can_spawn_agent(self) -> bool:
         """
@@ -1143,10 +1154,7 @@ class AgentPoolManager:
         with self.lock:
             # BUG #1 FIX: Check capacity using LIVE agent count, not total count
             # This prevents the death spiral where terminated agents block new spawns
-            live_count = sum(
-                1 for a in self.agents.values()
-                if a.state not in (AgentState.TERMINATED, AgentState.ERROR)
-            )
+            live_count = self._get_live_agent_count_unsafe()
             if live_count >= self.max_agents:
                 logger.warning(f"Agent pool at maximum capacity ({self.max_agents} live agents)")
                 return None
@@ -1618,11 +1626,8 @@ class AgentPoolManager:
                 if agent_id:
                     return agent_id
 
-                # BUG #1 FIX: Check LIVE agent count, not total count
-                live_count = sum(
-                    1 for a in self.agents.values()
-                    if a.state not in (AgentState.TERMINATED, AgentState.ERROR)
-                )
+                # BUG #1 FIX: Check LIVE agent count using internal method (no re-locking)
+                live_count = self._get_live_agent_count_unsafe()
                 
                 # Try to spawn if under capacity (using live count)
                 if live_count < self.max_agents:

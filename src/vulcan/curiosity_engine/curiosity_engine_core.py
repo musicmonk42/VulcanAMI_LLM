@@ -1138,6 +1138,9 @@ class KnowledgeIntegrator:
 
 class CuriosityEngine:
     """Main curiosity-driven learning orchestrator - REFACTORED"""
+    
+    # BUG #3 FIX: Configuration constants for query ingestion
+    MAX_QUERY_TRUNCATE_LENGTH = 200  # Maximum length for query truncation in failure storage
 
     def __init__(self, knowledge=None, decomposer=None, world_model=None):
         """
@@ -1215,9 +1218,6 @@ class CuriosityEngine:
             domain: The domain/topic of the query
             query_type: The type of query (reasoning, perception, etc.)
         """
-        # BUG #3 FIX: Maximum length for query truncation in failure storage
-        MAX_QUERY_TRUNCATE_LENGTH = 200
-        
         with self.lock:
             self._queries_ingested += 1
             
@@ -1226,7 +1226,7 @@ class CuriosityEngine:
                 
                 # Record as a failure for gap analysis
                 failure_data = {
-                    "query": query[:MAX_QUERY_TRUNCATE_LENGTH],  # Truncate for storage
+                    "query": query[:self.MAX_QUERY_TRUNCATE_LENGTH],  # Truncate for storage
                     "domain": domain,
                     "query_type": query_type,
                     "error": result.get("error", "Unknown error"),
