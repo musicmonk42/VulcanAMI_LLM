@@ -1272,6 +1272,11 @@ class CuriosityEngine:
         # to be included in the learning cycle
         self._external_gaps: List[KnowledgeGap] = []
         self._external_gaps_lock = threading.RLock()
+        
+        # Callback to SelfImprovementDrive for gap-driven priority boosting
+        # When set, detected gaps will be sent to SelfImprovementDrive to
+        # boost relevant improvement objectives (e.g., slow_routing -> optimize_performance)
+        self._on_gaps_detected_callback: Optional[callable] = None
 
         # Thread safety
         self.lock = threading.RLock()
@@ -1406,6 +1411,77 @@ class CuriosityEngine:
         with self._external_gaps_lock:
             return len(self._external_gaps)
     
+    # ========== SelfImprovementDrive Connection ==========
+    
+    def set_on_gaps_detected_callback(self, callback: callable) -> None:
+        """
+        Set callback to be called when gaps are detected.
+        
+        This connects CuriosityEngine's gap detection to SelfImprovementDrive's
+        objective prioritization. When gaps are detected, the callback is called
+        with the list of gaps, allowing SelfImprovementDrive to boost the weights
+        of relevant improvement objectives.
+        
+        Usage:
+            # In deployment initialization:
+            curiosity_engine = CuriosityEngine()
+            self_improvement = SelfImprovementDrive()
+            
+            # Connect gap detection to priority boosting
+            curiosity_engine.set_on_gaps_detected_callback(
+                self_improvement.process_gaps_from_curiosity_engine
+            )
+        
+        Args:
+            callback: Function that accepts List[Dict[str, Any]] of gaps
+                     Typically: self_improvement.process_gaps_from_curiosity_engine
+        """
+        self._on_gaps_detected_callback = callback
+        logger.info(
+            "[CuriosityEngine] Gap detection callback set - "
+            "detected gaps will now boost SelfImprovementDrive objectives"
+        )
+    
+    def _notify_gaps_detected(self, gaps: List[KnowledgeGap]) -> None:
+        """
+        Notify callback when gaps are detected.
+        
+        Converts KnowledgeGap objects to dictionaries and calls the callback.
+        This enables SelfImprovementDrive to boost relevant objectives based
+        on the types of gaps detected.
+        
+        Args:
+            gaps: List of detected knowledge gaps
+        """
+        if not self._on_gaps_detected_callback or not gaps:
+            return
+        
+        try:
+            # Convert gaps to dictionary format for callback
+            gap_dicts = []
+            for gap in gaps:
+                gap_dict = {
+                    "type": gap.type,
+                    "priority": gap.priority,
+                    "domain": gap.domain,
+                    "estimated_cost": gap.estimated_cost,
+                    "metadata": gap.metadata if hasattr(gap, "metadata") else {},
+                }
+                gap_dicts.append(gap_dict)
+            
+            # Call the callback (typically SelfImprovementDrive.process_gaps_from_curiosity_engine)
+            result = self._on_gaps_detected_callback(gap_dicts)
+            
+            if result:
+                logger.info(
+                    f"[CuriosityEngine] Notified SelfImprovementDrive of {len(gaps)} gaps, "
+                    f"boosted objectives: {result}"
+                )
+        except Exception as e:
+            logger.warning(
+                f"[CuriosityEngine] Gap notification callback failed: {e}"
+            )
+    
     def _consume_external_gaps(self) -> List[KnowledgeGap]:
         """
         Consume and return all pending external gaps.
@@ -1524,6 +1600,11 @@ class CuriosityEngine:
             logger.info(
                 "Identified %d knowledge gaps using strategy: %s", len(gaps), strategy
             )
+            
+            # NOTIFY: Send gaps to SelfImprovementDrive for priority boosting
+            # This connects gap detection to improvement objective prioritization
+            if gaps:
+                self._notify_gaps_detected(gaps)
 
             return gaps
         except Exception as e:

@@ -1654,6 +1654,99 @@ class SelfImprovementDrive:
         logger.info(f"Selected: {selected.type} (weight: {weight:.2f})")
         return selected
 
+    # ---------- Gap-Driven Priority Boost ----------
+
+    # Mapping from gap types to objective types
+    GAP_TO_OBJECTIVE_MAPPING = {
+        "slow_routing": "optimize_performance",
+        "performance": "optimize_performance",
+        "latency": "optimize_performance",
+        "timeout": "optimize_performance",
+        "routing_variance": "optimize_performance",
+        "high_error_rate": "fix_known_bugs",
+        "tool_selection_failure": "enhance_safety_systems",
+        "complex_query_handling": "optimize_performance",
+        "decomposition": "fix_known_bugs",
+        "causal": "fix_known_bugs",
+        "semantic_bridge": "enhance_safety_systems",
+        "transfer": "enhance_safety_systems",
+    }
+
+    def register_gap(self, gap_type: str, severity: float) -> bool:
+        """
+        Register a detected gap from CuriosityEngine and boost relevant objective.
+        
+        This method connects the CuriosityEngine's gap detection to the
+        SelfImprovementDrive's objective prioritization, ensuring that
+        performance gaps trigger performance improvements (not unrelated objectives).
+        
+        Args:
+            gap_type: Type of gap detected (e.g., 'slow_routing', 'high_error_rate')
+            severity: Severity score (0.0 to 1.0), higher means more urgent
+            
+        Returns:
+            True if an objective was boosted, False otherwise
+        """
+        with self._lock:
+            # Map gap type to objective type
+            objective_type = self.GAP_TO_OBJECTIVE_MAPPING.get(
+                gap_type.lower(), "optimize_performance"
+            )
+            
+            # Find matching objective
+            for obj in self.objectives:
+                if obj.type == objective_type and not obj.completed:
+                    # Boost weight based on severity (max 0.3 boost)
+                    weight_boost = min(0.3, severity * 0.5)
+                    obj.weight = min(1.0, obj.weight + weight_boost)
+                    
+                    logger.info(
+                        f"[SelfImprovement] Gap '{gap_type}' (severity={severity:.2f}) "
+                        f"-> boosted '{objective_type}' weight by {weight_boost:.2f} "
+                        f"(new weight: {obj.weight:.2f})"
+                    )
+                    return True
+            
+            logger.debug(
+                f"[SelfImprovement] Gap '{gap_type}' has no matching objective"
+            )
+            return False
+
+    def process_gaps_from_curiosity_engine(
+        self, gaps: List[Dict[str, Any]]
+    ) -> Dict[str, int]:
+        """
+        Process a list of gaps from CuriosityEngine.
+        
+        This is the primary integration point for connecting CuriosityEngine's
+        gap detection to SelfImprovementDrive's objective prioritization.
+        
+        Args:
+            gaps: List of gap dictionaries with 'type' and 'priority' keys
+            
+        Returns:
+            Dictionary with count of boosted objectives by type
+        """
+        boost_counts: Dict[str, int] = {}
+        
+        for gap in gaps:
+            gap_type = gap.get("type", gap.get("gap_type", "unknown"))
+            severity = gap.get("priority", gap.get("severity", 0.5))
+            
+            if self.register_gap(gap_type, severity):
+                objective_type = self.GAP_TO_OBJECTIVE_MAPPING.get(
+                    gap_type.lower(), "optimize_performance"
+                )
+                boost_counts[objective_type] = boost_counts.get(objective_type, 0) + 1
+        
+        if boost_counts:
+            logger.info(
+                f"[SelfImprovement] Processed {len(gaps)} gaps, "
+                f"boosted objectives: {boost_counts}"
+            )
+        
+        return boost_counts
+
     # ---------- Action Planning ----------
 
     def generate_improvement_action(
