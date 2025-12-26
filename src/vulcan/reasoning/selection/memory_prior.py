@@ -426,6 +426,9 @@ class BayesianMemoryPrior:
                 prior = self._uniform_prior(available_tools)
 
         # Apply semantic boost based on query content
+        # DEBUG: Log semantic matcher availability and context
+        logger.debug(f"[SemanticBoost] semantic_matcher={self.semantic_matcher is not None}, context_type={type(context).__name__}, context_keys={list(context.keys()) if isinstance(context, dict) else 'N/A'}")
+        
         if self.semantic_matcher is not None and context:
             query_text = None
             if isinstance(context, dict):
@@ -438,6 +441,9 @@ class BayesianMemoryPrior:
                         query_text = problem.get('text') or problem.get('query') or str(problem)
             elif isinstance(context, str):
                 query_text = context
+            
+            # DEBUG: Log extracted query text details
+            logger.debug(f"[SemanticBoost] Extracted query_text: type={type(query_text).__name__}, length={len(query_text) if query_text else 0}, min_required={MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST}")
             
             if query_text and isinstance(query_text, str) and len(query_text) > MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST:
                 try:
