@@ -2410,16 +2410,15 @@ async def chat(request: ChatRequest):
     # Based on logs showing 21-second gap between job assignment and parallel execution
     # ================================================================
     _post_agent_pool_time = time.perf_counter()
-    if _step0_start_time:
-        _agent_pool_total_time = _post_agent_pool_time - _step0_start_time
-        if _agent_pool_total_time > 5.0:
-            logger.warning(
-                f"[TIMING] SLOW WAIT: {_agent_pool_total_time*1000:.0f}ms from request start to post-agent-pool"
-            )
-        else:
-            logger.info(
-                f"[TIMING] Agent pool phase took {_agent_pool_total_time*1000:.0f}ms"
-            )
+    _agent_pool_total_time = _post_agent_pool_time - _step0_start_time
+    if _agent_pool_total_time > 5.0:
+        logger.warning(
+            f"[TIMING] SLOW WAIT: {_agent_pool_total_time*1000:.0f}ms from request start to post-agent-pool"
+        )
+    else:
+        logger.info(
+            f"[TIMING] Agent pool phase took {_agent_pool_total_time*1000:.0f}ms"
+        )
 
     # ================================================================
     # TIMING: Initialize timing instrumentation for bottleneck diagnosis
