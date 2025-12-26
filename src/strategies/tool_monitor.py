@@ -325,12 +325,11 @@ class ToolMonitor:
         # Resource monitoring
         self.process = psutil.Process()
 
-        # Monitoring thread
-        self.monitoring = True
-        self.monitor_thread = threading.Thread(
-            target=self._monitoring_loop, daemon=True
-        )
-        self.monitor_thread.start()
+        # EMERGENCY STABILIZATION: Disable monitoring thread to reduce CPU overhead
+        # Set monitoring flag to False and skip thread creation entirely
+        self.monitoring = False
+        self.monitor_thread = None  # Thread not created - no zombie thread
+        logger.info("ToolMonitor monitoring thread disabled for emergency stabilization")
 
         # Alert thresholds
         self.thresholds = {
@@ -603,31 +602,10 @@ class ToolMonitor:
     def _monitoring_loop(self):
         """Background monitoring loop"""
 
-        while self.monitoring:
-            try:
-                # Update resource metrics
-                self._update_resource_metrics()
-
-                # Check system health
-                health = self.get_health_status()
-                if health == HealthStatus.CRITICAL:
-                    self._create_alert(
-                        AlertSeverity.CRITICAL,
-                        MetricType.RESOURCE_USAGE,
-                        "System health is critical",
-                    )
-                elif health == HealthStatus.UNHEALTHY:
-                    self._create_alert(
-                        AlertSeverity.ERROR,
-                        MetricType.RESOURCE_USAGE,
-                        "System health is unhealthy",
-                    )
-
-                time.sleep(self.monitoring_interval)
-
-            except Exception as e:
-                logger.error(f"Monitoring error: {e}")
-                time.sleep(5)
+        # EMERGENCY STABILIZATION: Disable polling to reduce CPU overhead
+        # This loop now exits immediately to stop resource monitoring
+        logger.info("ToolMonitor monitoring loop disabled for emergency stabilization")
+        return
 
     def _update_resource_metrics(self):
         """Update system resource metrics"""
@@ -982,7 +960,8 @@ class ToolMonitor:
 
         self.monitoring = False
 
-        if self.monitor_thread.is_alive():
+        # EMERGENCY STABILIZATION: monitor_thread may be None when disabled
+        if self.monitor_thread is not None and self.monitor_thread.is_alive():
             self.monitor_thread.join(timeout=2)
 
         # Export final metrics
