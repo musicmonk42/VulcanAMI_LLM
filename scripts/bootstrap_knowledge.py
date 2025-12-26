@@ -136,6 +136,9 @@ DEFAULT_DOMAIN = "general"
 MAX_CHUNK_SIZE = 10000
 MIN_CHUNK_SIZE = 50
 
+# Content truncation for action logs
+ACTION_CONTENT_TRUNCATE_LENGTH = 500
+
 # Sentence delimiters for intelligent chunking
 SENTENCE_DELIMITERS = (". ", ".\n", "! ", "? ", "\n\n", ";\n")
 
@@ -655,10 +658,8 @@ class KnowledgeBootstrapper:
             total: Total number of chunks
         """
         try:
-            # Generate trace ID
-            chunk_hash = hashlib.md5(
-                chunk.encode(), usedforsecurity=False
-            ).hexdigest()[:8]
+            # Generate trace ID using SHA256 for better practice
+            chunk_hash = hashlib.sha256(chunk.encode()).hexdigest()[:8]
             trace_id = f"bootstrap_{index}_{chunk_hash}"
 
             # Create execution trace
@@ -723,7 +724,7 @@ class KnowledgeBootstrapper:
             actions=[
                 {
                     "type": "text_ingestion",
-                    "content": text[:500],  # Truncate for action log
+                    "content": text[:ACTION_CONTENT_TRUNCATE_LENGTH],
                     "full_length": len(text),
                 }
             ],

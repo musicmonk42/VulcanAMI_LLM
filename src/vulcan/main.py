@@ -3060,7 +3060,7 @@ Based on your analysis through memory retrieval, multi-modal reasoning, causal m
                     "query_type": query_type,
                     "complexity_score": complexity_score,
                     "uncertainty_score": uncertainty_score,
-                    "systems_used": systems_used.copy(),
+                    "systems_used": systems_used,  # List is captured at this point, no modification after
                     "vulcan_systems_active": len(vulcan_systems),
                     "response_quality_score": quality_score,
                     "jobs_submitted": len(submitted_jobs) if submitted_jobs else 0,
@@ -3837,7 +3837,8 @@ async def unified_chat(request: UnifiedChatRequest):
         if use_lightweight_safety:
             # Fast path: lightweight keyword-based safety check for short inputs
             message_lower = user_message.lower().strip()
-            message_words = set(re.split(r'\W+', message_lower))
+            # Use simple split for faster performance on short inputs
+            message_words = set(message_lower.split())
             blacklisted_words = message_words & LIGHTWEIGHT_BLACKLIST
             
             if blacklisted_words:
