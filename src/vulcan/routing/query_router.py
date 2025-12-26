@@ -299,6 +299,11 @@ COLLABORATION_TRIGGERS: Tuple[str, ...] = (
 # Arena provides valuable multi-agent collaboration, tournament evaluation,
 # and graph evolution capabilities that benefit complex/creative tasks.
 
+# FIX: ARENA_TRIGGER_THRESHOLD = 0.85 forces the system to only use Arena for
+# truly complex physics/coding tasks, not philosophy. This improves response
+# times for simpler queries (~5s instead of ~60s wait).
+ARENA_TRIGGER_THRESHOLD: float = 0.85  # Main complexity gate for arena activation
+
 ARENA_UNCERTAINTY_THRESHOLD: float = 0.35  # High uncertainty triggers arena (lowered from 0.4)
 ARENA_HIGH_COMPLEXITY_THRESHOLD: float = 0.5  # Very high complexity + uncertainty (lowered from 0.6)
 ARENA_COLLABORATION_COMPLEXITY_THRESHOLD: float = 0.35  # For collaborative scenarios (lowered from 0.4)
@@ -1329,6 +1334,21 @@ class QueryAnalyzer:
         arena_participation = False
         tournament_candidates = 0
         collaboration_agents = collaboration_agents or []
+        
+        # ================================================================
+        # FIX: MAIN GATE - ARENA_TRIGGER_THRESHOLD (0.85)
+        # This gate ensures Arena is only used for truly complex physics/coding
+        # tasks. Simpler queries (philosophy, general Q&A) bypass Arena,
+        # reducing response times from ~60s to ~5s.
+        # ================================================================
+        combined_score = (complexity_score + uncertainty_score) / 2
+        if combined_score < ARENA_TRIGGER_THRESHOLD:
+            # Quick bypass for simple queries - don't use Arena
+            logger.debug(
+                f"[Arena] Query bypassed arena (combined_score={combined_score:.2f} < "
+                f"threshold={ARENA_TRIGGER_THRESHOLD})"
+            )
+            return False, 0
         
         # ================================================================
         # ARENA ACTIVATION CONDITIONS
