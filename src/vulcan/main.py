@@ -4680,6 +4680,41 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
         except Exception as e:
             logger.debug(f"[VULCAN/v1/chat] Telemetry recording failed: {e}")
 
+        # ================================================================
+        # STEP 10: Record Query Outcome for Curiosity Engine
+        # FIX: Records outcome to SQLite bridge for cross-process analysis.
+        # This enables the CuriosityEngine subprocess to access query outcomes.
+        # ================================================================
+        try:
+            from vulcan.curiosity_engine.outcome_bridge import record_query_outcome
+            
+            # Calculate routing time from timing breakdown
+            routing_time_ms = 0.0
+            if "query_routing" in timing_breakdown.get("phases", {}):
+                routing_time_ms = timing_breakdown["phases"]["query_routing"].get("duration_ms", 0.0)
+            
+            # Record as background task to avoid blocking response
+            async def _record_outcome_background():
+                try:
+                    record_query_outcome(
+                        query_id=routing_stats.get("query_id", f"q_{int(time.time())}"),
+                        status="success",
+                        routing_time_ms=routing_time_ms,
+                        total_time_ms=float(latency_ms),
+                        complexity=routing_stats.get("complexity_score", 0.0),
+                        query_type=routing_stats.get("query_type", "general"),
+                        tasks=routing_stats.get("agent_tasks_planned", 1),
+                    )
+                    logger.debug(f"[VULCAN/v1/chat] Query outcome recorded to bridge")
+                except Exception as bg_err:
+                    logger.debug(f"[VULCAN/v1/chat] Outcome recording failed: {bg_err}")
+            
+            asyncio.create_task(_record_outcome_background())
+        except ImportError:
+            pass  # Outcome bridge not available
+        except Exception as e:
+            logger.debug(f"[VULCAN/v1/chat] Outcome recording setup failed: {e}")
+
         return {
             "response": response_text,
             "metadata": metadata,
@@ -4698,6 +4733,33 @@ Provide a helpful, accurate, and comprehensive response to the user's query. Be 
     except Exception as e:
         logger.error(f"Unified chat failed: {e}", exc_info=True)
         error_counter.labels(error_type="unified_chat").inc()
+        
+        # FIX: Record error outcome for Curiosity Engine analysis
+        try:
+            from vulcan.curiosity_engine.outcome_bridge import record_query_outcome
+            
+            # Calculate elapsed time
+            error_latency_ms = (time.time() - start_time) * 1000
+            
+            # Get routing time if available
+            routing_time_ms = 0.0
+            if timing_breakdown and "query_routing" in timing_breakdown.get("phases", {}):
+                routing_time_ms = timing_breakdown["phases"]["query_routing"].get("duration_ms", 0.0)
+            
+            record_query_outcome(
+                query_id=routing_stats.get("query_id", f"q_err_{int(time.time())}") if routing_stats else f"q_err_{int(time.time())}",
+                status="error",
+                routing_time_ms=routing_time_ms,
+                total_time_ms=error_latency_ms,
+                complexity=routing_stats.get("complexity_score", 0.0) if routing_stats else 0.0,
+                query_type=routing_stats.get("query_type", "unknown") if routing_stats else "unknown",
+                tasks=0,
+                error_type=type(e).__name__,
+            )
+            logger.debug(f"[VULCAN/v1/chat] Error outcome recorded to bridge")
+        except Exception:
+            pass  # Don't let outcome recording failure mask the original error
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 

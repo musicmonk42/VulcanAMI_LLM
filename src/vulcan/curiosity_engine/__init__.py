@@ -254,6 +254,31 @@ except ImportError as e:
     get_outcome_statistics = None
     consume_outcomes = None
 
+# SQLite outcome bridge for cross-process data sharing (Subprocess Isolation Fix)
+try:
+    from .outcome_bridge import (
+        record_query_outcome,
+        get_recent_outcomes,
+        get_unprocessed_outcomes,
+        mark_outcomes_processed,
+        get_outcome_statistics as get_bridge_outcome_statistics,
+        analyze_outcomes_for_gaps,
+        cleanup_old_outcomes,
+        OutcomeStatistics,
+    )
+    OUTCOME_BRIDGE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Outcome bridge not available: {e}")
+    OUTCOME_BRIDGE_AVAILABLE = False
+    record_query_outcome = None
+    get_recent_outcomes = None
+    get_unprocessed_outcomes = None
+    mark_outcomes_processed = None
+    get_bridge_outcome_statistics = None
+    analyze_outcomes_for_gaps = None
+    cleanup_old_outcomes = None
+    OutcomeStatistics = None
+
 __all__ = [
     # Core Engine
     "CuriosityEngine",
@@ -345,6 +370,16 @@ __all__ = [
     "get_pending_outcome_count",
     "get_outcome_statistics",
     "consume_outcomes",
+    # Outcome Bridge (Subprocess Isolation Fix)
+    "record_query_outcome",
+    "get_recent_outcomes",
+    "get_unprocessed_outcomes",
+    "mark_outcomes_processed",
+    "get_bridge_outcome_statistics",
+    "analyze_outcomes_for_gaps",
+    "cleanup_old_outcomes",
+    "OutcomeStatistics",
+    "OUTCOME_BRIDGE_AVAILABLE",
     # Availability Flags
     "CURIOSITY_ENGINE_AVAILABLE",
     "GAP_ANALYZER_AVAILABLE",
