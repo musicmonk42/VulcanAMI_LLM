@@ -32,7 +32,8 @@ try:
 except ImportError:
     np = None
     NUMPY_AVAILABLE = False
-    logging.getLogger(__name__).warning(
+    # Use DEBUG level to avoid cluttering logs on every import
+    logging.getLogger(__name__).debug(
         "numpy not available, some advanced features will be disabled"
     )
 
@@ -1885,33 +1886,30 @@ class AgentPoolManager:
         # Run job through each candidate agent in parallel
         async def execute_on_agent(agent_id: str) -> Dict[str, Any]:
             """Execute job on a specific agent and return result."""
+            metadata = None
             try:
-                # Create task for agent
-                metadata = self.agents.get(agent_id)
-                if not metadata:
-                    return {'status': 'failed', 'error': 'Agent not found', 'agent_id': agent_id}
-                
-                # Mark agent as working
+                # Atomically check agent state and transition to WORKING
                 with self.lock:
+                    metadata = self.agents.get(agent_id)
+                    if not metadata:
+                        return {'status': 'failed', 'error': 'Agent not found', 'agent_id': agent_id}
+                    
                     if not metadata.state.can_accept_work():
                         return {'status': 'failed', 'error': 'Agent busy', 'agent_id': agent_id}
+                    
+                    # Transition to WORKING while holding lock
                     metadata.transition_state(AgentState.WORKING, f"Tournament job {job_id}")
                 
-                try:
-                    # Execute task
-                    task = {
-                        "task_id": f"{job_id}_tournament_{agent_id}",
-                        "graph": graph,
-                        "parameters": parameters or {},
-                        "provenance": None,
-                    }
-                    result = self._execute_agent_task(agent_id, task, metadata)
-                    result['agent_id'] = agent_id
-                    return result
-                finally:
-                    # Return agent to idle
-                    with self.lock:
-                        metadata.transition_state(AgentState.IDLE, f"Tournament complete {job_id}")
+                # Execute task (outside lock to allow parallel execution)
+                task = {
+                    "task_id": f"{job_id}_tournament_{agent_id}",
+                    "graph": graph,
+                    "parameters": parameters or {},
+                    "provenance": None,
+                }
+                result = self._execute_agent_task(agent_id, task, metadata)
+                result['agent_id'] = agent_id
+                return result
                         
             except Exception as e:
                 logger.error(f"[Tournament] Agent {agent_id} failed: {e}")
@@ -1921,6 +1919,12 @@ class AgentPoolManager:
                     'agent_id': agent_id,
                     'confidence': 0.0
                 }
+            finally:
+                # Always return agent to idle (if we successfully started working)
+                if metadata is not None:
+                    with self.lock:
+                        if metadata.state == AgentState.WORKING:
+                            metadata.transition_state(AgentState.IDLE, f"Tournament complete {job_id}")
         
         # Execute on all candidates in parallel
         results = await asyncio.gather(*[

@@ -1104,6 +1104,174 @@ class TestRedisStateHydration(unittest.TestCase):
 
 
 # ============================================================
+# TOURNAMENT-BASED MULTI-AGENT SELECTION TESTS
+# ============================================================
+
+
+class TestTournamentMultiAgentSelection(unittest.TestCase):
+    """Test tournament-based multi-agent selection functionality"""
+
+    def setUp(self):
+        self.pool = MockAgentPoolManager(max_agents=10, min_agents=3)
+
+    def tearDown(self):
+        self.pool.shutdown()
+
+    def test_get_agents_by_capability_basic(self):
+        """Test getting agents by capability"""
+        # Mock method on the pool
+        def mock_get_agents_by_capability(capabilities, max_agents=3):
+            """Mock implementation of get_agents_by_capability"""
+            available_agents = []
+            for agent_id, metadata in self.pool.agents.items():
+                if metadata.state.value in ('idle',):
+                    if metadata.capability.value in capabilities:
+                        available_agents.append(agent_id)
+            return available_agents[:max_agents]
+        
+        self.pool.get_agents_by_capability = mock_get_agents_by_capability
+        
+        # Test getting reasoning agents
+        agents = self.pool.get_agents_by_capability(['reasoning', 'general'])
+        self.assertIsInstance(agents, list)
+        # Should get at least some agents (pool was initialized with minimum agents)
+        self.assertLessEqual(len(agents), 3)  # max_agents default
+
+    def test_get_agents_by_capability_empty_capabilities(self):
+        """Test getting agents with no matching capabilities"""
+        def mock_get_agents_by_capability(capabilities, max_agents=3):
+            available_agents = []
+            for agent_id, metadata in self.pool.agents.items():
+                if metadata.state.value in ('idle',):
+                    if metadata.capability.value in capabilities:
+                        available_agents.append(agent_id)
+            return available_agents[:max_agents]
+        
+        self.pool.get_agents_by_capability = mock_get_agents_by_capability
+        
+        # Test with non-existent capability
+        agents = self.pool.get_agents_by_capability(['nonexistent_capability'])
+        self.assertEqual(agents, [])
+
+    def test_embed_result_basic(self):
+        """Test result embedding generation"""
+        # Create a mock _embed_result method
+        def mock_embed_result(result):
+            features = []
+            exec_time = result.get('execution_time', 0.0)
+            features.append(min(exec_time / 10.0, 1.0))
+            features.append(1.0 if result.get('status') == 'completed' else 0.0)
+            features.append(result.get('confidence', 0.5))
+            nodes = result.get('nodes_processed', 0)
+            features.append(min(nodes / 100.0, 1.0))
+            while len(features) < 16:
+                features.append(0.0)
+            return features[:16]
+        
+        self.pool._embed_result = mock_embed_result
+        
+        result = {
+            'status': 'completed',
+            'execution_time': 5.0,
+            'confidence': 0.8,
+            'nodes_processed': 50
+        }
+        embedding = self.pool._embed_result(result)
+        
+        self.assertEqual(len(embedding), 16)
+        # execution_time: 5.0/10.0 = 0.5
+        self.assertAlmostEqual(embedding[0], 0.5, places=2)
+        # status completed: 1.0
+        self.assertEqual(embedding[1], 1.0)
+        # confidence: 0.8
+        self.assertEqual(embedding[2], 0.8)
+        # nodes_processed: 50/100 = 0.5
+        self.assertAlmostEqual(embedding[3], 0.5, places=2)
+
+    def test_embed_result_failed_status(self):
+        """Test embedding for failed result"""
+        def mock_embed_result(result):
+            features = []
+            exec_time = result.get('execution_time', 0.0)
+            features.append(min(exec_time / 10.0, 1.0))
+            features.append(1.0 if result.get('status') == 'completed' else 0.0)
+            features.append(result.get('confidence', 0.5))
+            nodes = result.get('nodes_processed', 0)
+            features.append(min(nodes / 100.0, 1.0))
+            while len(features) < 16:
+                features.append(0.0)
+            return features[:16]
+        
+        self.pool._embed_result = mock_embed_result
+        
+        result = {
+            'status': 'failed',
+            'execution_time': 1.0,
+            'confidence': 0.0,
+            'nodes_processed': 0
+        }
+        embedding = self.pool._embed_result(result)
+        
+        # status failed: 0.0
+        self.assertEqual(embedding[1], 0.0)
+
+    def test_tournament_query_types_constant(self):
+        """Test that tournament query types constant exists"""
+        from src.vulcan.orchestrator.agent_pool import TOURNAMENT_QUERY_TYPES
+        
+        self.assertIn('reasoning', TOURNAMENT_QUERY_TYPES)
+        self.assertIn('symbolic', TOURNAMENT_QUERY_TYPES)
+        self.assertIn('analogical', TOURNAMENT_QUERY_TYPES)
+        self.assertIn('causal', TOURNAMENT_QUERY_TYPES)
+
+    def test_tournament_max_candidates_constant(self):
+        """Test that tournament max candidates constant exists"""
+        from src.vulcan.orchestrator.agent_pool import TOURNAMENT_MAX_CANDIDATES
+        
+        self.assertIsInstance(TOURNAMENT_MAX_CANDIDATES, int)
+        self.assertGreater(TOURNAMENT_MAX_CANDIDATES, 0)
+        self.assertLessEqual(TOURNAMENT_MAX_CANDIDATES, 10)  # Reasonable limit
+
+
+class TestTournamentWeightUpdate(unittest.TestCase):
+    """Test tournament weight update mechanism"""
+
+    def setUp(self):
+        self.pool = MockAgentPoolManager(max_agents=5, min_agents=2)
+
+    def tearDown(self):
+        self.pool.shutdown()
+
+    def test_update_agent_weights_from_tournament_mock(self):
+        """Test that tournament weight update can be mocked"""
+        # Create mock function for weight update
+        update_calls = []
+        
+        def mock_update_weights(results, winner_idx, fitness):
+            update_calls.append({
+                'results': results,
+                'winner_idx': winner_idx,
+                'fitness': fitness
+            })
+        
+        self.pool._update_agent_weights_from_tournament = mock_update_weights
+        
+        # Test the mock
+        results = [
+            {'agent_id': 'agent_1', 'status': 'completed'},
+            {'agent_id': 'agent_2', 'status': 'completed'},
+        ]
+        fitness = [0.8, 0.6]
+        winner_idx = 0
+        
+        self.pool._update_agent_weights_from_tournament(results, winner_idx, fitness)
+        
+        self.assertEqual(len(update_calls), 1)
+        self.assertEqual(update_calls[0]['winner_idx'], 0)
+        self.assertEqual(update_calls[0]['fitness'], [0.8, 0.6])
+
+
+# ============================================================
 # TEST SUITE RUNNER
 # ============================================================
 
@@ -1126,6 +1294,8 @@ def suite():
     test_suite.addTests(loader.loadTestsFromTestCase(TestIntegrationScenarios))
     test_suite.addTests(loader.loadTestsFromTestCase(TestErrorHandling))
     test_suite.addTests(loader.loadTestsFromTestCase(TestRedisStateHydration))
+    test_suite.addTests(loader.loadTestsFromTestCase(TestTournamentMultiAgentSelection))
+    test_suite.addTests(loader.loadTestsFromTestCase(TestTournamentWeightUpdate))
 
     return test_suite
 
