@@ -29,6 +29,10 @@
 # Without this, embedding operations can take 10x longer due to excessive parallelism.
 # Based on production logs, embedding batch times went from 1.3s to 13.8s due to 
 # thread thrashing when PyTorch uses all CPU cores.
+#
+# NOTE: We use print() here instead of logger because logging isn't configured yet.
+# These messages appear during module initialization before FastAPI lifespan runs.
+# =============================================================================
 import os
 import sys
 
@@ -45,24 +49,24 @@ try:
     from threadpoolctl import threadpool_limits
     threadpool_limits(limits=4, user_api='blas')
     threadpool_limits(limits=4, user_api='openmp')
-    print("[THREAD_LIMIT] threadpoolctl limits applied: blas=4, openmp=4")
+    print("[THREAD_LIMIT] threadpoolctl limits applied: blas=4, openmp=4")  # noqa: T201
 except ImportError:
-    print("[THREAD_LIMIT] threadpoolctl not available, using env vars only")
+    print("[THREAD_LIMIT] threadpoolctl not available, using env vars only")  # noqa: T201
 
 # Import torch early and set thread limits
 # This must be done before other modules import torch
 try:
     import torch
     current_threads = torch.get_num_threads()
-    print(f"[THREAD_LIMIT] torch.get_num_threads() = {current_threads}")
+    print(f"[THREAD_LIMIT] torch.get_num_threads() = {current_threads}")  # noqa: T201
     if current_threads > 4:
         torch.set_num_threads(4)
-        print(f"[THREAD_LIMIT] Reduced torch threads to {torch.get_num_threads()}")
+        print(f"[THREAD_LIMIT] Reduced torch threads to {torch.get_num_threads()}")  # noqa: T201
 except ImportError:
-    print("[THREAD_LIMIT] torch not available, skipping torch thread limits")
+    print("[THREAD_LIMIT] torch not available, skipping torch thread limits")  # noqa: T201
 except RuntimeError as e:
     # "cannot set number of interop threads after parallel work has started"
-    print(f"[THREAD_LIMIT] Could not set torch threads (already started): {e}")
+    print(f"[THREAD_LIMIT] Could not set torch threads (already started): {e}")  # noqa: T201
 # =============================================================================
 
 # Now proceed with all imports

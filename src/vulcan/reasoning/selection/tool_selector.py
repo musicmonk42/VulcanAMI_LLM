@@ -1368,10 +1368,14 @@ class ToolSelector:
             
             if query_text:
                 prior_context['query'] = str(query_text)
-                logger.info(f"[ToolSelector] Found query for semantic matching: {str(query_text)[:50]}...")
+                # Log only query length to avoid exposing sensitive user data
+                logger.info(f"[ToolSelector] Found query for semantic matching (length={len(str(query_text))} chars)")
             else:
                 logger.warning("[ToolSelector] NO QUERY TEXT found - semantic matching will use features only")
-                logger.debug(f"[ToolSelector] Request attributes: {[attr for attr in dir(request) if not attr.startswith('_')]}")
+                # Log only safe attributes (type names) to avoid exposing sensitive data
+                safe_attrs = ['problem', 'context', 'query', 'constraints', 'mode', 'available_tools']
+                available_attrs = [attr for attr in safe_attrs if hasattr(request, attr)]
+                logger.debug(f"[ToolSelector] Request has attributes: {available_attrs}")
             
             # DEBUG: Log what we're passing to compute_prior
             logger.info(f"[ToolSelector] Calling compute_prior with context keys: {list(prior_context.keys())}")
