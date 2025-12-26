@@ -1022,6 +1022,11 @@ class AgentPoolManager:
         
         MUST be called with self.lock already held!
         
+        Note: For very large agent pools (100+ agents), consider maintaining
+        a cached live_count that gets updated when agent states change,
+        rather than recalculating on every call. Current implementation is
+        O(n) but acceptable for typical pool sizes (< 50 agents).
+        
         Returns:
             Number of live (non-terminated, non-error) agents
         """
@@ -1612,7 +1617,8 @@ class AgentPoolManager:
         max_retry_delay = 0.2  # FIXED: Reduced from 1.0 to 0.2 seconds
         max_retries = 10  # FIXED: Maximum number of retries to prevent infinite loops
         retry_count = 0
-        cleanup_attempted = False  # BUG #1 FIX: Track if cleanup was attempted
+        last_cleanup_time = 0.0  # Track when last cleanup was attempted
+        cleanup_cooldown = 1.0  # Minimum seconds between cleanup attempts
 
         while time.time() - start_time < timeout_seconds and retry_count < max_retries:
             # FIXED: Check shutdown event
@@ -1640,22 +1646,24 @@ class AgentPoolManager:
                         if agent_id:
                             return agent_id
                 else:
-                    # BUG #1 FIX: At max live capacity - try cleanup if not already attempted
-                    if not cleanup_attempted:
+                    # BUG #1 FIX: At max live capacity - try cleanup with cooldown
+                    current_time = time.time()
+                    if current_time - last_cleanup_time >= cleanup_cooldown:
                         logger.info(
                             f"At max live capacity ({self.max_agents}) with no available agents "
                             f"for capability {capability.value}. Attempting cleanup..."
                         )
             
-            # BUG #1 FIX: Attempt cleanup outside lock to avoid deadlock
-            if not cleanup_attempted:
-                cleanup_attempted = True
+            # BUG #1 FIX: Attempt cleanup outside lock to avoid deadlock (with cooldown)
+            current_time = time.time()
+            if current_time - last_cleanup_time >= cleanup_cooldown:
+                last_cleanup_time = current_time
                 cleaned = self.cleanup_terminated_agents()
                 if cleaned > 0:
                     logger.info(f"Cleaned up {cleaned} terminated agents, retrying assignment")
                     continue  # Retry immediately after cleanup
-                else:
-                    # No terminated agents to clean up - truly at capacity
+                elif retry_count == 0:
+                    # First attempt with no terminated agents - truly at capacity
                     logger.warning(
                         f"At max capacity ({self.max_agents}) with no available agents "
                         f"for capability {capability.value}"

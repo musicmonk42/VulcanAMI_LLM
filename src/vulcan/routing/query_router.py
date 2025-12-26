@@ -666,6 +666,16 @@ class QueryAnalyzer:
         Args:
             enable_safety_validation: Whether to enable safety validation (default: True)
         """
+        # BUG #2 FIX: Trivial patterns for fast-path (class-level for maintainability)
+        # These are simple greetings/acknowledgments that don't need full analysis
+        # Note: 'help' is excluded because help requests need proper analysis
+        self.TRIVIAL_PATTERNS = (
+            'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 
+            'goodbye', 'ok', 'okay', 'yes', 'no', 'sure', 'yep',
+            'nope', 'good', 'great', 'nice', 'cool', 'awesome',
+            'please', 'sorry', "what's up", 'how are you',
+        )
+        
         # Compile regex patterns for performance
         self._pii_patterns = tuple(
             re.compile(p, re.IGNORECASE) for p in PII_PATTERNS
@@ -1200,18 +1210,12 @@ class QueryAnalyzer:
         Returns:
             True if the query is trivial and should skip heavy analysis
         """
-        # Only simple greetings and acknowledgments - not requests for help
-        trivial_patterns = (
-            'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 
-            'goodbye', 'ok', 'okay', 'yes', 'no', 'sure', 'yep',
-            'nope', 'good', 'great', 'nice', 'cool', 'awesome',
-            'please', 'sorry', "what's up", 'how are you',
-        )
         query_lower = query.lower().strip()
         
         # Trivial if very short (under 30 chars) and matches a known greeting
+        # Uses self.TRIVIAL_PATTERNS defined in __init__ for maintainability
         if len(query_lower) < 30:
-            if any(query_lower.startswith(p) for p in trivial_patterns):
+            if any(query_lower.startswith(p) for p in self.TRIVIAL_PATTERNS):
                 return True
         
         return False

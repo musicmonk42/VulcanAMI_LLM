@@ -1142,6 +1142,27 @@ class CuriosityEngine:
     # BUG #3 FIX: Configuration constants for query ingestion
     MAX_QUERY_TRUNCATE_LENGTH = 200  # Maximum length for query truncation in failure storage
 
+    @staticmethod
+    def _safe_truncate(text: str, max_length: int) -> str:
+        """
+        Safely truncate text to max_length, respecting unicode character boundaries.
+        
+        Args:
+            text: The text to truncate
+            max_length: Maximum length in characters
+            
+        Returns:
+            Truncated text that doesn't cut in the middle of a unicode character
+        """
+        if len(text) <= max_length:
+            return text
+        # Encode to bytes and back to handle multi-byte characters properly
+        truncated = text[:max_length]
+        # If we're in the middle of a surrogate pair, back up
+        while truncated and truncated[-1] >= '\uD800' and truncated[-1] <= '\uDFFF':
+            truncated = truncated[:-1]
+        return truncated
+
     def __init__(self, knowledge=None, decomposer=None, world_model=None):
         """
         Initialize curiosity engine
@@ -1225,8 +1246,9 @@ class CuriosityEngine:
                 self._failures_ingested += 1
                 
                 # Record as a failure for gap analysis
+                # Use safe truncation to handle unicode characters properly
                 failure_data = {
-                    "query": query[:self.MAX_QUERY_TRUNCATE_LENGTH],  # Truncate for storage
+                    "query": self._safe_truncate(query, self.MAX_QUERY_TRUNCATE_LENGTH),
                     "domain": domain,
                     "query_type": query_type,
                     "error": result.get("error", "Unknown error"),

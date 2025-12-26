@@ -4028,11 +4028,14 @@ async def unified_chat(request: UnifiedChatRequest):
                         
                 except Exception as e:
                     logger.warning(f"[VULCAN/v1/chat] UnifiedReasoner failed, falling back to parallel: {e}")
-                    # Fall through to parallel execution
+                    # Fall through to parallel execution below
 
             # FALLBACK: Run individual reasoners in parallel (original behavior)
-            # This is used when UnifiedReasoner is not available
-            logger.debug(f"[VULCAN/v1/chat] Using parallel reasoning (no UnifiedReasoner)")
+            # This is used when:
+            # 1. UnifiedReasoner is not available (deps.unified_reasoner is None)
+            # 2. UnifiedReasoner execution failed (exception caught above)
+            # The parallel execution runs all reasoning types and aggregates results
+            logger.debug(f"[VULCAN/v1/chat] Using parallel reasoning fallback")
             
             # Create subtasks for each reasoning type to run in parallel
             reasoning_subtasks = []
