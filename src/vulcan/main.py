@@ -38,13 +38,10 @@ import uvicorn
 import numpy as np
 import msgpack
 
-# Also set PyTorch threads programmatically after import
-try:
-    import torch
-    torch.set_num_threads(4)
-    torch.set_num_interop_threads(2)
-except ImportError:
-    pass  # PyTorch not installed
+# NOTE: Removed torch.set_num_threads() and torch.set_num_interop_threads() calls
+# These cause "cannot set number of interop threads after parallel work has started"
+# errors when torch is already imported elsewhere. The environment variables at
+# the top of this file are sufficient to limit thread count.
 
 from unittest.mock import MagicMock
 from typing import Any, Dict, List, Optional, Tuple
@@ -108,14 +105,9 @@ project_root = src_root.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# Limit torch threads early if torch is present
-try:
-    import torch
-    torch.set_num_threads(1)
-    if hasattr(torch, "set_num_interop_threads"):
-        torch.set_num_interop_threads(1)
-except Exception as e:
-    logging.getLogger(__name__).debug(f"Failed to configure torch threading: {e}")
+# NOTE: Removed torch thread limiting code here to avoid
+# "cannot set number of interop threads after parallel work has started" errors.
+# Thread limiting is handled via environment variables at the top of the file.
 
 # ============================================================
 # IMPORTS - Ordered to prevent circular dependencies
