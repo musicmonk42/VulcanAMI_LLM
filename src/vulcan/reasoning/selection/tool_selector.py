@@ -1949,8 +1949,11 @@ class ToolSelector:
         try:
             from vulcan.learning import TaskInfo
             
+            # Use hashlib for consistent, collision-resistant task IDs
+            task_hash = hashlib.sha256(query.encode()).hexdigest()[:8]
+            
             task_info = TaskInfo(
-                task_id=f"tool_selection_{hash(query) % 10000}",
+                task_id=f"tool_selection_{task_hash}",
                 task_type="tool_selection",
                 difficulty=0.5,
                 samples_seen=1,

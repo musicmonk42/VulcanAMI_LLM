@@ -444,7 +444,7 @@ class SemanticToolMatcher:
                 boosted[tool_name] = original_prob
         
         # Meta-learning boost: Use learned task patterns if available
-        if hasattr(self, 'learning_system') and self.learning_system:
+        if self.learning_system:
             try:
                 if self.learning_system.continual_learner:
                     # Get task embedding for this query

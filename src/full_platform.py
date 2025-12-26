@@ -1351,6 +1351,8 @@ async def lifespan(app: FastAPI):
                         learning_rate=0.001,
                         ewc_lambda=100.0,
                         meta_lr=0.001,
+                        # TODO: Enable RLHF when system is stable and has sufficient feedback data
+                        # Criteria: (1) >1000 successful queries, (2) feedback API tested, (3) PPO stable
                         rlhf_enabled=False,  # Start with RLHF disabled until stable
                         checkpoint_frequency=1000,
                     )
