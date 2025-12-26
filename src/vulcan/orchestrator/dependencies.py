@@ -330,6 +330,10 @@ class EnhancedCollectiveDeps:
 
     cross_modal: Any = None
     """CrossModalReasoner - Cross-modal pattern recognition"""
+    
+    # INTEGRATION FIX: Add UnifiedReasoner as the main reasoning orchestrator
+    unified_reasoner: Any = None
+    """UnifiedReasoner - Main reasoning orchestrator with tool selection"""
 
     # ========================================
     # LEARNING SYSTEMS

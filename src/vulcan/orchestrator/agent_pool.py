@@ -1076,8 +1076,8 @@ class AgentPoolManager:
                             logger.debug(f"Error terminating process for {agent_id}: {e}")
                     try:
                         process.close()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error closing process for {agent_id}: {e}")
                     del self.agent_processes[agent_id]
                 
                 # Clean up specialized agents tracking

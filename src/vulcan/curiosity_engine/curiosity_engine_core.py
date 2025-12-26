@@ -1215,6 +1215,9 @@ class CuriosityEngine:
             domain: The domain/topic of the query
             query_type: The type of query (reasoning, perception, etc.)
         """
+        # BUG #3 FIX: Maximum length for query truncation in failure storage
+        MAX_QUERY_TRUNCATE_LENGTH = 200
+        
         with self.lock:
             self._queries_ingested += 1
             
@@ -1223,7 +1226,7 @@ class CuriosityEngine:
                 
                 # Record as a failure for gap analysis
                 failure_data = {
-                    "query": query[:200],  # Truncate for storage
+                    "query": query[:MAX_QUERY_TRUNCATE_LENGTH],  # Truncate for storage
                     "domain": domain,
                     "query_type": query_type,
                     "error": result.get("error", "Unknown error"),

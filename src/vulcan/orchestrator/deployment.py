@@ -339,6 +339,46 @@ class ProductionDeployment:
         except (ImportError, Exception) as e:
             logger.warning(f"Failed to load CrossModalReasoner: {e}")
 
+        # --- INTEGRATION FIX: Load UnifiedReasoner with ToolSelector ---
+        # This is the main reasoning orchestrator that intelligently selects the best
+        # reasoning tool for each query, rather than running all in parallel blindly.
+        try:
+            from vulcan.reasoning import create_unified_reasoner, UNIFIED_AVAILABLE
+            
+            if UNIFIED_AVAILABLE:
+                # Create UnifiedReasoner with tool selector config
+                unified_config = {
+                    "tool_selector_config": {
+                        "available_tools": ["symbolic", "probabilistic", "causal", "analogical", "multimodal"],
+                        "default_strategy": "adaptive_mix",
+                        "min_confidence": 0.5,
+                        "time_budget_ms": 10000,
+                        "energy_budget_mj": 500,
+                        "exploration_strategy": "EPSILON_GREEDY",
+                        "cache_ttl": 300,
+                    },
+                    "enable_learning": True,
+                    "enable_safety": True,
+                }
+                
+                # Pass existing reasoners to UnifiedReasoner
+                components["unified_reasoner"] = create_unified_reasoner(
+                    config=unified_config,
+                    enable_learning=True,
+                    enable_safety=True,
+                )
+                
+                if components["unified_reasoner"]:
+                    logger.info("UnifiedReasoner with ToolSelector loaded successfully")
+                else:
+                    logger.warning("UnifiedReasoner creation returned None")
+            else:
+                logger.warning("UnifiedReasoner not available - reasoning will use direct calls")
+                components["unified_reasoner"] = None
+        except (ImportError, Exception) as e:
+            logger.warning(f"Failed to load UnifiedReasoner: {e}")
+            components["unified_reasoner"] = None
+
     def _import_components(self) -> Dict[str, Any]:
         """
         Import all required components with error handling

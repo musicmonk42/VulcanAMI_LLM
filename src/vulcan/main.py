@@ -3966,7 +3966,12 @@ async def unified_chat(request: UnifiedChatRequest):
             return _mem_context, _systems
 
         async def _reasoning_task():
-            """STEP 3: Reasoning Engine Selection and Execution"""
+            """STEP 3: Reasoning Engine Selection and Execution
+            
+            INTEGRATION FIX: Use UnifiedReasoner with ToolSelector when available
+            to intelligently select the best reasoning tool for each query,
+            rather than running all reasoners in parallel blindly.
+            """
             _task_start = time.perf_counter()
             _reasoning = {}
             _systems = []
@@ -3974,6 +3979,61 @@ async def unified_chat(request: UnifiedChatRequest):
             if not request.enable_reasoning:
                 return _reasoning, _systems, _meta
 
+            # INTEGRATION FIX: Try UnifiedReasoner first for intelligent tool selection
+            if hasattr(deps, "unified_reasoner") and deps.unified_reasoner:
+                try:
+                    logger.info(f"[VULCAN/v1/chat] Using UnifiedReasoner with ToolSelector for intelligent routing")
+                    
+                    # Build context for tool selection
+                    selection_context = {
+                        "query_type": routing_plan.query_type.value if routing_plan else "general",
+                        "complexity": routing_plan.complexity_score if routing_plan else 0.5,
+                        "creative": False,  # Could be derived from query analysis
+                        "domain": "general",
+                    }
+                    
+                    # Get reasoning result with automatic tool selection
+                    unified_result = await loop.run_in_executor(
+                        None,
+                        deps.unified_reasoner.reason,
+                        user_message,
+                        selection_context,
+                    )
+                    
+                    if unified_result:
+                        # Extract reasoning results
+                        if hasattr(unified_result, 'result') and unified_result.result:
+                            _reasoning["unified"] = unified_result.result
+                        elif isinstance(unified_result, dict):
+                            _reasoning["unified"] = unified_result
+                        else:
+                            _reasoning["unified"] = str(unified_result)
+                        
+                        # Track which tool was used
+                        tool_used = getattr(unified_result, 'selected_tool', 'adaptive')
+                        _systems.append(f"unified_reasoning_{tool_used}")
+                        
+                        # Track confidence and strategy
+                        _meta["reasoning_confidence"] = getattr(unified_result, 'confidence', 0.0)
+                        _meta["reasoning_strategy"] = getattr(unified_result, 'strategy_used', 'single')
+                        _meta["tool_selected"] = tool_used
+                        
+                        logger.info(
+                            f"[VULCAN/v1/chat] UnifiedReasoner completed: "
+                            f"tool={tool_used}, confidence={_meta.get('reasoning_confidence', 0):.2f}"
+                        )
+                        
+                        logger.debug(f"[TIMING] UnifiedReasoner took {time.perf_counter() - _task_start:.2f}s")
+                        return _reasoning, _systems, _meta
+                        
+                except Exception as e:
+                    logger.warning(f"[VULCAN/v1/chat] UnifiedReasoner failed, falling back to parallel: {e}")
+                    # Fall through to parallel execution
+
+            # FALLBACK: Run individual reasoners in parallel (original behavior)
+            # This is used when UnifiedReasoner is not available
+            logger.debug(f"[VULCAN/v1/chat] Using parallel reasoning (no UnifiedReasoner)")
+            
             # Create subtasks for each reasoning type to run in parallel
             reasoning_subtasks = []
 

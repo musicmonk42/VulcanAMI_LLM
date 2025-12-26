@@ -1200,21 +1200,18 @@ class QueryAnalyzer:
         Returns:
             True if the query is trivial and should skip heavy analysis
         """
+        # Only simple greetings and acknowledgments - not generic questions
         trivial_patterns = (
             'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 
             'goodbye', 'ok', 'okay', 'yes', 'no', 'sure', 'yep',
             'nope', 'good', 'great', 'nice', 'cool', 'awesome',
-            'please', 'sorry', 'help', 'what', 'who', 'when',
-            'where', 'how are you', 'how do you', "what's up",
+            'please', 'sorry', 'help', "what's up", 'how are you',
         )
         query_lower = query.lower().strip()
         
-        # Trivial if very short and matches a pattern
-        if len(query_lower) < 50:
+        # Trivial if very short (under 30 chars) and matches a known greeting
+        if len(query_lower) < 30:
             if any(query_lower.startswith(p) for p in trivial_patterns):
-                return True
-            # Also trivial if it's just a single word or two
-            if len(query_lower.split()) <= 2 and len(query_lower) < 20:
                 return True
         
         return False
