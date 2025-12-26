@@ -430,11 +430,18 @@ class SafetyGovernor:
         self.cache_lock = threading.RLock()
 
     def _initialize_default_contracts(self):
-        """Initialize default tool contracts"""
-
+        """Initialize default tool contracts.
+        
+        Tool contracts define resource limits, confidence requirements, and safety
+        levels for each reasoning tool. The `required_inputs` sets are kept empty
+        because the tool selector determines tool appropriateness - users don't
+        need to include specific keywords in their queries.
+        
+        `forbidden_inputs` are retained as safety measures against problematic content.
+        """
         self.contracts["symbolic"] = ToolContract(
             tool_name="symbolic",
-            required_inputs={"logic", "rules"},
+            required_inputs=set(),
             forbidden_inputs={"undefined", "infinite"},
             max_execution_time_ms=5000,
             max_energy_mj=500,
@@ -460,7 +467,7 @@ class SafetyGovernor:
 
         self.contracts["causal"] = ToolContract(
             tool_name="causal",
-            required_inputs={"graph", "data"},
+            required_inputs=set(),
             forbidden_inputs={"cyclic"},
             max_execution_time_ms=10000,
             max_energy_mj=1000,
@@ -473,12 +480,12 @@ class SafetyGovernor:
 
         self.contracts["analogical"] = ToolContract(
             tool_name="analogical",
-            required_inputs={"source", "target"},
+            required_inputs=set(),
             forbidden_inputs=set(),
             max_execution_time_ms=2000,
             max_energy_mj=200,
             min_confidence=0.4,
-            required_safety_level=SafetyLevel.LOW,
+            required_safety_level=SafetyLevel.MEDIUM,  # Align with default MEDIUM context
             allowed_operations={"map", "transfer", "adapt"},
             forbidden_operations=set(),
             output_validators=[lambda x: x is not None],
@@ -486,7 +493,7 @@ class SafetyGovernor:
 
         self.contracts["multimodal"] = ToolContract(
             tool_name="multimodal",
-            required_inputs={"modalities"},
+            required_inputs=set(),
             forbidden_inputs={"corrupted"},
             max_execution_time_ms=15000,
             max_energy_mj=1500,

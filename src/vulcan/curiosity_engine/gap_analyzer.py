@@ -102,6 +102,14 @@ class GapType(Enum):
     CORRELATION = "correlation"
     DOMAIN_BRIDGE = "domain_bridge"
     EXPLORATION = "exploration"
+    # Performance-related gap types (from OutcomeBridge)
+    PERFORMANCE = "performance"
+    SLOW_ROUTING = "slow_routing"
+    LATENCY = "latency"
+    TIMEOUT = "timeout"
+    ROUTING_VARIANCE = "routing_variance"
+    HIGH_ERROR_RATE = "high_error_rate"
+    COMPLEX_QUERY_HANDLING = "complex_query_handling"
 
 
 @dataclass

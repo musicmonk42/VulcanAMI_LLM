@@ -948,6 +948,12 @@ class ExperimentGenerator:
 
                 # SELECT: Route to appropriate generator
                 experiments = []
+                
+                # Performance-related gap types (from OutcomeBridge)
+                performance_gap_types = {
+                    "slow_routing", "performance", "latency", "timeout",
+                    "routing_variance", "high_error_rate", "complex_query_handling"
+                }
 
                 if gap.type == "decomposition":
                     experiments.extend(
@@ -961,6 +967,9 @@ class ExperimentGenerator:
                     experiments.extend(self.generate_latent_experiment(gap))
                 elif gap.type == "semantic":
                     experiments.extend(self.generate_semantic_experiment(gap))
+                elif gap.type in performance_gap_types:
+                    # Route performance gaps to specialized generator
+                    experiments.extend(self.generate_performance_experiment(gap))
                 else:
                     experiments.append(self._generate_exploratory_experiment(gap))
 
@@ -1182,6 +1191,162 @@ class ExperimentGenerator:
         except Exception as e:
             logger.error("Error getting statistics: %s", e)
             return {}
+
+    def generate_performance_experiment(self, gap: KnowledgeGap) -> List[Experiment]:
+        """
+        Generate experiments for performance-related gaps.
+        
+        Handles gap types: slow_routing, performance, latency, timeout,
+        routing_variance, high_error_rate, complex_query_handling
+        
+        Args:
+            gap: A performance-related knowledge gap from OutcomeBridge
+            
+        Returns:
+            List of experiments targeting performance improvements
+        """
+        experiments = []
+        
+        try:
+            # Get baseline metrics from gap metadata
+            baseline_routing_ms = gap.metadata.get("avg_routing", 0)
+            baseline_error_rate = gap.metadata.get("error_rate", 0)
+            slow_count = gap.metadata.get("slow_count", 0)
+            
+            # Define performance optimization strategies
+            strategies = [
+                {
+                    "name": "caching",
+                    "params": {
+                        "strategy": "caching",
+                        "enable_cache": True,
+                        "cache_ttl": 300,
+                        "cache_type": "lru",
+                        "max_cache_size": 1000,
+                    },
+                    "complexity": 0.4,
+                    "target_improvement": 0.8,  # 80% latency reduction
+                },
+                {
+                    "name": "batching",
+                    "params": {
+                        "strategy": "batching",
+                        "batch_size": 10,
+                        "batch_timeout_ms": 100,
+                        "max_queue_size": 100,
+                    },
+                    "complexity": 0.5,
+                    "target_improvement": 0.6,
+                },
+                {
+                    "name": "parallel",
+                    "params": {
+                        "strategy": "parallel",
+                        "num_workers": 4,
+                        "async_mode": True,
+                        "thread_pool": True,
+                    },
+                    "complexity": 0.6,
+                    "target_improvement": 0.5,
+                },
+                {
+                    "name": "optimization",
+                    "params": {
+                        "strategy": "optimization",
+                        "reduce_dimensions": True,
+                        "target_dim": 256,
+                        "early_exit": True,
+                        "pruning": True,
+                    },
+                    "complexity": 0.7,
+                    "target_improvement": 0.4,
+                },
+            ]
+            
+            # Add error-rate specific strategies for high_error_rate gaps
+            if gap.type in ["high_error_rate", "complex_query_handling"]:
+                strategies.append({
+                    "name": "retry_with_backoff",
+                    "params": {
+                        "strategy": "retry",
+                        "max_retries": 3,
+                        "backoff_factor": 1.5,
+                        "initial_delay_ms": 100,
+                    },
+                    "complexity": 0.3,
+                    "target_improvement": 0.5,
+                })
+                strategies.append({
+                    "name": "fallback_routing",
+                    "params": {
+                        "strategy": "fallback",
+                        "enable_fallback": True,
+                        "fallback_timeout_ms": 5000,
+                        "simplify_on_failure": True,
+                    },
+                    "complexity": 0.4,
+                    "target_improvement": 0.6,
+                })
+            
+            for strategy in strategies:
+                experiment = Experiment(
+                    gap=gap,
+                    complexity=strategy["complexity"],
+                    timeout=60.0,
+                    success_criteria={
+                        "latency_reduction": strategy["target_improvement"],
+                        "p99_latency_ms": max(500, baseline_routing_ms * 0.2),
+                        "success_rate": 0.99,
+                        "correctness_maintained": True,
+                    },
+                    safety_constraints=[
+                        Constraint(
+                            "memory_limit",
+                            "memory",
+                            1024 * 1024 * 1024,  # 1GB
+                            action="abort"
+                        ),
+                        Constraint(
+                            "correctness",
+                            "output",
+                            True,
+                            action="abort"
+                        ),
+                        Constraint(
+                            "timeout",
+                            "time",
+                            60.0,
+                            action="abort"
+                        ),
+                    ],
+                    experiment_type=ExperimentType.VALIDATION,
+                    parameters={
+                        **strategy["params"],
+                        "baseline_routing_ms": baseline_routing_ms,
+                        "baseline_error_rate": baseline_error_rate,
+                        "slow_query_count": slow_count,
+                        "optimization_target": "latency",
+                    },
+                    metadata={
+                        "gap_source": "outcome_bridge",
+                        "gap_type": gap.type,
+                        "strategy_name": strategy["name"],
+                        "target_improvement": strategy["target_improvement"],
+                        "performance_experiment": True,
+                    },
+                )
+                experiments.append(experiment)
+            
+            logger.info(
+                f"[ExperimentGenerator] Generated {len(experiments)} performance "
+                f"experiments for gap type '{gap.type}'"
+            )
+            
+            return experiments
+            
+        except Exception as e:
+            logger.error(f"Error generating performance experiments: {e}")
+            return []
 
     def _generate_exploratory_experiment(self, gap: KnowledgeGap) -> Experiment:
         """Generate generic exploratory experiment"""
