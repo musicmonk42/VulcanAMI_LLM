@@ -1104,6 +1104,9 @@ class ToolSelector:
 
         # Learning component
         self.bandit = ToolSelectionBandit(config.get("bandit_config", {}))
+        
+        # Learning system integration (set externally)
+        self.learning_system: Optional[Any] = None
 
         # Execution statistics
         self.execution_history = deque(maxlen=1000)
@@ -1335,19 +1338,25 @@ class ToolSelector:
                 request.features = features
 
             # Step 6: Compute prior probabilities
-            # Include query text in context for semantic tool matching
-            prior_context = request.context.copy() if request.context else {}
-            if 'query' not in prior_context and request.problem is not None:
-                if isinstance(request.problem, str):
-                    prior_context['query'] = request.problem
-                elif isinstance(request.problem, dict):
-                    prior_context['query'] = (
-                        request.problem.get('text') or 
-                        request.problem.get('query') or 
-                        str(request.problem)
-                    )
-                else:
-                    prior_context['query'] = str(request.problem)
+            # CRITICAL: Include query text for semantic tool matching
+            prior_context = {}
+            if hasattr(request, 'context') and request.context:
+                prior_context = request.context.copy() if isinstance(request.context, dict) else {}
+            
+            # Extract query text from problem for semantic matching
+            if 'query' not in prior_context:
+                if hasattr(request, 'problem') and request.problem is not None:
+                    if isinstance(request.problem, str):
+                        prior_context['query'] = request.problem
+                    elif isinstance(request.problem, dict):
+                        prior_context['query'] = (
+                            request.problem.get('text') or 
+                            request.problem.get('query') or 
+                            request.problem.get('content') or
+                            str(request.problem)
+                        )
+                    else:
+                        prior_context['query'] = str(request.problem)
             
             prior_dist = self.memory_prior.compute_prior(
                 features, safe_candidates, prior_context
@@ -1920,6 +1929,50 @@ class ToolSelector:
             all_results={},
             metadata={"execution_failed": True},
         )
+
+    def record_selection_outcome(self, query: str, selected_tools: List[str], 
+                                 success: bool, latency_ms: float):
+        """Record tool selection outcome for learning
+        
+        This method allows the learning system to track tool selection outcomes
+        and improve future selections based on historical performance.
+        
+        Args:
+            query: The query text that triggered tool selection
+            selected_tools: List of tool names that were selected
+            success: Whether the tool selection was successful
+            latency_ms: Time taken for tool selection in milliseconds
+        """
+        if self.learning_system is None:
+            return
+            
+        try:
+            from vulcan.learning import TaskInfo
+            
+            # Use hashlib for consistent, collision-resistant task IDs
+            task_hash = hashlib.sha256(query.encode()).hexdigest()[:8]
+            
+            task_info = TaskInfo(
+                task_id=f"tool_selection_{task_hash}",
+                task_type="tool_selection",
+                difficulty=0.5,
+                samples_seen=1,
+                performance=1.0 if success else 0.0,
+                metadata={
+                    'query': query[:200],  # Truncate long queries
+                    'tools': selected_tools,
+                    'latency_ms': latency_ms,
+                }
+            )
+            
+            if hasattr(self.learning_system, 'curriculum_learner') and self.learning_system.curriculum_learner:
+                self.learning_system.curriculum_learner.record_task_outcome(
+                    task_info, success
+                )
+        except ImportError:
+            logger.debug("TaskInfo not available for outcome recording")
+        except Exception as e:
+            logger.debug(f"Failed to record selection outcome: {e}")
 
     def get_statistics(self) -> Dict[str, Any]:
         """Get comprehensive system statistics"""
