@@ -1178,8 +1178,87 @@ class GapAnalyzer:
 
         # Thread safety
         self._lock = threading.RLock()
+        
+        # FIX: Track last outcome bridge load count for change detection
+        self._last_outcome_count = 0
 
         logger.info("GapAnalyzer initialized (refactored)")
+
+    def analyze_from_outcome_bridge(self, minutes: int = 60) -> List[KnowledgeGap]:
+        """
+        Analyze gaps from the SQLite outcome bridge.
+        
+        FIX: This method bridges the subprocess isolation gap by reading
+        query outcomes from shared SQLite storage instead of relying on
+        in-process data that's lost when the subprocess reinitializes.
+        
+        Args:
+            minutes: Look back window in minutes (default: 60)
+            
+        Returns:
+            List of KnowledgeGap objects detected from outcomes
+        """
+        gaps = []
+        
+        try:
+            # Import outcome bridge (lazy to avoid circular imports)
+            from .outcome_bridge import (
+                get_recent_outcomes,
+                get_outcome_statistics,
+                analyze_outcomes_for_gaps,
+            )
+            
+            # Load outcomes from shared storage
+            outcomes = get_recent_outcomes(minutes=minutes, limit=500)
+            
+            if not outcomes:
+                logger.debug(
+                    "[GapAnalyzer] No outcomes from bridge (empty database or no recent queries)"
+                )
+                return gaps
+            
+            # Get statistics for logging
+            stats = get_outcome_statistics()
+            logger.info(
+                f"[GapAnalyzer] Loaded {len(outcomes)} outcomes from bridge, "
+                f"avg_routing={stats.avg_routing_ms:.0f}ms, "
+                f"slow_count={stats.slow_routing_count}, "
+                f"success_rate={stats.success_rate:.1%}"
+            )
+            
+            # Track if we have new data
+            self._last_outcome_count = len(outcomes)
+            
+            # Analyze outcomes for gaps
+            raw_gaps = analyze_outcomes_for_gaps(outcomes)
+            
+            # Convert raw gap dicts to KnowledgeGap objects
+            for raw in raw_gaps:
+                gap = KnowledgeGap(
+                    type=raw.get("gap_type", "unknown"),
+                    domain="query_processing",
+                    priority=raw.get("severity", 0.5),
+                    estimated_cost=20.0,  # Default cost
+                    missing_capability=raw.get("suggested_action", "unknown"),
+                    metadata={
+                        "description": raw.get("description", ""),
+                        "evidence": raw.get("evidence", []),
+                        "from_outcome_bridge": True,
+                    },
+                )
+                gaps.append(gap)
+                self.gap_registry.register_gap(gap)
+            
+            logger.info(
+                f"[GapAnalyzer] Identified {len(gaps)} gaps from outcome bridge"
+            )
+            
+        except ImportError as e:
+            logger.debug(f"[GapAnalyzer] Outcome bridge not available: {e}")
+        except Exception as e:
+            logger.warning(f"[GapAnalyzer] Outcome bridge analysis failed: {e}")
+        
+        return gaps
 
     def analyze_decomposition_failures(self) -> List[KnowledgeGap]:
         """Analyze failures in problem decomposition - DELEGATED"""
@@ -1291,6 +1370,10 @@ class GapAnalyzer:
                 all_gaps.extend(self.analyze_prediction_errors())
                 all_gaps.extend(self.analyze_transfer_failures())
                 all_gaps.extend(self.detect_latent_gaps())
+                
+                # FIX: Also analyze from outcome bridge (cross-process data)
+                # This enables the subprocess to access query outcomes from main process
+                all_gaps.extend(self.analyze_from_outcome_bridge(minutes=60))
 
                 # Sort by priority
                 all_gaps.sort(key=lambda g: g.priority, reverse=True)

@@ -314,6 +314,15 @@ __all__ = [
     "BanditContext",
     "BanditFeedback",
     "BanditAction",
+    # ===== Reasoning Integration (Query Flow Fix) =====
+    "ReasoningIntegration",
+    "IntegrationReasoningResult",
+    "apply_reasoning",
+    "run_portfolio_reasoning",
+    "get_reasoning_integration",
+    "get_reasoning_statistics",
+    "shutdown_reasoning",
+    "INTEGRATION_AVAILABLE",
     # ===== Availability Flags =====
     "PROBABILISTIC_AVAILABLE",
     "CAUSAL_AVAILABLE",
@@ -420,6 +429,33 @@ available_reasoners = sum(
 logger.info(
     f"Vulcan Reasoning Module initialized: {available_reasoners}/5 reasoners available"
 )
+
+# ============================================================================
+# Reasoning Integration - Query Flow Integration (FIX: Wire into Query Flow)
+# ============================================================================
+try:
+    from .reasoning_integration import (
+        ReasoningIntegration,
+        ReasoningResult as IntegrationReasoningResult,
+        apply_reasoning,
+        run_portfolio_reasoning,
+        get_reasoning_integration,
+        get_reasoning_statistics,
+        shutdown_reasoning,
+    )
+
+    INTEGRATION_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Reasoning integration import failed: {e}")
+    ReasoningIntegration = None
+    IntegrationReasoningResult = None
+    apply_reasoning = None
+    run_portfolio_reasoning = None
+    get_reasoning_integration = None
+    get_reasoning_statistics = None
+    shutdown_reasoning = None
+    INTEGRATION_AVAILABLE = False
+
 
 # ============================================================================
 # Version Info

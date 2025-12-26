@@ -1021,6 +1021,36 @@ class QueryAnalyzer:
             # This ensures unsafe queries never reach the agent pool
             return plan
         
+        # ================================================================
+        # FIX: Apply reasoning integration to select tools and strategy
+        # This wires the ToolSelector and reasoning strategies into the flow
+        # ================================================================
+        reasoning_result = None
+        try:
+            from vulcan.reasoning.reasoning_integration import apply_reasoning
+            
+            reasoning_result = apply_reasoning(
+                query=query,
+                query_type=query_type.value,
+                complexity=complexity_score,
+                context={"session_id": session_id} if session_id else None,
+            )
+            
+            logger.info(
+                f"[QueryRouter] Reasoning applied: strategy={reasoning_result.reasoning_strategy}, "
+                f"tools={reasoning_result.selected_tools}, confidence={reasoning_result.confidence:.2f}"
+            )
+            
+            # Store reasoning info in plan's telemetry_data for downstream use
+            plan.telemetry_data["reasoning_strategy"] = reasoning_result.reasoning_strategy
+            plan.telemetry_data["selected_tools"] = reasoning_result.selected_tools
+            plan.telemetry_data["reasoning_confidence"] = reasoning_result.confidence
+            
+        except ImportError:
+            logger.debug("[QueryRouter] Reasoning integration not available")
+        except Exception as e:
+            logger.warning(f"[QueryRouter] Reasoning integration failed: {e}")
+        
         # Decompose into agent tasks (only if safety passed)
         plan.agent_tasks = self._decompose_to_tasks(query, query_type, source, plan)
         

@@ -208,6 +208,26 @@ except ImportError as e:
     get_experiment_trigger = None
     generate_experiments_from_interactions = None
 
+# Embedding Cache (Performance Fix for Slow Query Routing)
+try:
+    from .embedding_cache import (
+        get_embedding_cached,
+        get_embeddings_batch_cached,
+        is_simple_query,
+        get_cache_stats as get_embedding_cache_stats,
+        clear_cache as clear_embedding_cache,
+    )
+
+    EMBEDDING_CACHE_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Embedding cache module not available: {e}")
+    EMBEDDING_CACHE_AVAILABLE = False
+    get_embedding_cached = None
+    get_embeddings_batch_cached = None
+    is_simple_query = None
+    get_embedding_cache_stats = None
+    clear_embedding_cache = None
+
 
 # ============================================================
 # MODULE INITIALIZATION
@@ -390,6 +410,13 @@ __all__ = [
     "should_run_experiment",
     "get_experiment_trigger",
     "generate_experiments_from_interactions",
+    # Embedding Cache (Performance Fix)
+    "get_embedding_cached",
+    "get_embeddings_batch_cached",
+    "is_simple_query",
+    "get_embedding_cache_stats",
+    "clear_embedding_cache",
+    "EMBEDDING_CACHE_AVAILABLE",
     # Module functions
     "initialize_routing_components",
     "get_routing_status",
