@@ -1344,19 +1344,37 @@ class ToolSelector:
                 prior_context = request.context.copy() if isinstance(request.context, dict) else {}
             
             # Extract query text from problem for semantic matching
-            if 'query' not in prior_context:
-                if hasattr(request, 'problem') and request.problem is not None:
-                    if isinstance(request.problem, str):
-                        prior_context['query'] = request.problem
-                    elif isinstance(request.problem, dict):
-                        prior_context['query'] = (
-                            request.problem.get('text') or 
-                            request.problem.get('query') or 
-                            request.problem.get('content') or
-                            str(request.problem)
-                        )
-                    else:
-                        prior_context['query'] = str(request.problem)
+            # Try multiple sources for query text
+            query_text = None
+            
+            # Source 1: request.context
+            if hasattr(request, 'context') and isinstance(request.context, dict):
+                query_text = request.context.get('query')
+            
+            # Source 2: request.problem (string)
+            if not query_text and hasattr(request, 'problem'):
+                if isinstance(request.problem, str):
+                    query_text = request.problem
+                elif isinstance(request.problem, dict):
+                    query_text = (
+                        request.problem.get('text') or 
+                        request.problem.get('query') or 
+                        request.problem.get('content')
+                    )
+            
+            # Source 3: request.query directly
+            if not query_text and hasattr(request, 'query'):
+                query_text = request.query
+            
+            if query_text:
+                prior_context['query'] = str(query_text)
+                logger.info(f"[ToolSelector] Found query for semantic matching: {str(query_text)[:50]}...")
+            else:
+                logger.warning("[ToolSelector] NO QUERY TEXT found - semantic matching will use features only")
+                logger.debug(f"[ToolSelector] Request attributes: {[attr for attr in dir(request) if not attr.startswith('_')]}")
+            
+            # DEBUG: Log what we're passing to compute_prior
+            logger.info(f"[ToolSelector] Calling compute_prior with context keys: {list(prior_context.keys())}")
             
             prior_dist = self.memory_prior.compute_prior(
                 features, safe_candidates, prior_context

@@ -27,17 +27,42 @@
 # =============================================================================
 # Set these environment variables BEFORE any imports to limit threading overhead.
 # Without this, embedding operations can take 10x longer due to excessive parallelism.
+# Based on production logs, embedding batch times went from 1.3s to 13.8s due to 
+# thread thrashing when PyTorch uses all CPU cores.
 import os
+import sys
+
+# Set BEFORE any other imports
 os.environ["OMP_NUM_THREADS"] = "4"
 os.environ["MKL_NUM_THREADS"] = "4"
 os.environ["OPENBLAS_NUM_THREADS"] = "4"
 os.environ["NUMEXPR_NUM_THREADS"] = "4"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# NOTE: Removed torch.set_num_threads() and torch.set_num_interop_threads() calls
-# These cause "cannot set number of interop threads after parallel work has started"
-# errors when torch is already imported elsewhere. The environment variables above
-# are sufficient to limit thread count.
+# Force threadpoolctl if available - this is more effective than env vars alone
+# because it sets limits at runtime after libraries are loaded
+try:
+    from threadpoolctl import threadpool_limits
+    threadpool_limits(limits=4, user_api='blas')
+    threadpool_limits(limits=4, user_api='openmp')
+    print("[THREAD_LIMIT] threadpoolctl limits applied: blas=4, openmp=4")
+except ImportError:
+    print("[THREAD_LIMIT] threadpoolctl not available, using env vars only")
+
+# Import torch early and set thread limits
+# This must be done before other modules import torch
+try:
+    import torch
+    current_threads = torch.get_num_threads()
+    print(f"[THREAD_LIMIT] torch.get_num_threads() = {current_threads}")
+    if current_threads > 4:
+        torch.set_num_threads(4)
+        print(f"[THREAD_LIMIT] Reduced torch threads to {torch.get_num_threads()}")
+except ImportError:
+    print("[THREAD_LIMIT] torch not available, skipping torch thread limits")
+except RuntimeError as e:
+    # "cannot set number of interop threads after parallel work has started"
+    print(f"[THREAD_LIMIT] Could not set torch threads (already started): {e}")
 # =============================================================================
 
 # Now proceed with all imports
