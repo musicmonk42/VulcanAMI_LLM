@@ -1489,6 +1489,89 @@ async def lifespan(app: FastAPI):
                             logger.error(
                                 f"Failed to initialize adversarial tester: {adv_err}"
                             )
+
+                        # ================================================================
+                        # CURIOSITY DRIVER INITIALIZATION
+                        # Start the active curiosity-driven learning heartbeat with
+                        # process isolation to avoid CPU overhead on the main thread
+                        # ================================================================
+                        try:
+                            from vulcan.curiosity_engine.curiosity_driver import (
+                                CuriosityDriver,
+                                CuriosityDriverConfig,
+                            )
+
+                            # Get the curiosity engine from deps if available
+                            curiosity_engine = getattr(
+                                vulcan_deployment.collective.deps, "curiosity", None
+                            )
+
+                            if curiosity_engine:
+                                # Configure driver with production settings
+                                driver_config = CuriosityDriverConfig(
+                                    heartbeat_interval=float(
+                                        os.getenv("CURIOSITY_HEARTBEAT_INTERVAL", "60.0")
+                                    ),
+                                    min_budget_threshold=float(
+                                        os.getenv("CURIOSITY_MIN_BUDGET", "10.0")
+                                    ),
+                                    max_experiments_per_cycle=int(
+                                        os.getenv("CURIOSITY_MAX_EXPERIMENTS", "5")
+                                    ),
+                                    low_budget_sleep=float(
+                                        os.getenv("CURIOSITY_LOW_BUDGET_SLEEP", "120.0")
+                                    ),
+                                    cycle_timeout=float(
+                                        os.getenv("CURIOSITY_CYCLE_TIMEOUT", "300.0")
+                                    ),
+                                )
+
+                                # Create driver
+                                curiosity_driver = CuriosityDriver(
+                                    curiosity_engine, driver_config
+                                )
+
+                                # Store reference in app state
+                                vulcan_module.app.state.curiosity_driver = curiosity_driver
+
+                                # Start the driver (async operation)
+                                # Use asyncio.create_task to start without blocking
+                                async def start_curiosity_driver():
+                                    try:
+                                        await curiosity_driver.start()
+                                        logger.info(
+                                            "🧠 CuriosityDriver heartbeat started "
+                                            "(interval=%.1fs, budget_threshold=%.1f)",
+                                            driver_config.heartbeat_interval,
+                                            driver_config.min_budget_threshold,
+                                        )
+                                    except Exception as e:
+                                        logger.error(
+                                            f"Failed to start CuriosityDriver: {e}"
+                                        )
+
+                                # Schedule async start
+                                asyncio.create_task(
+                                    start_curiosity_driver(),
+                                    name="curiosity_driver_start"
+                                )
+                                logger.info("✓ CuriosityDriver scheduled for startup")
+                            else:
+                                logger.warning(
+                                    "Curiosity engine not available in deps - "
+                                    "CuriosityDriver not started"
+                                )
+
+                        except ImportError as e:
+                            logger.warning(
+                                f"CuriosityDriver module not available: {e}"
+                            )
+                        except Exception as cd_err:
+                            logger.error(
+                                f"Failed to initialize CuriosityDriver: {cd_err}"
+                            )
+                        # ================================================================
+
                     else:
                         logger.info(
                             "⏭️  Skipping background task initialization - another process holds the lock (PID: %d)",
@@ -2212,6 +2295,23 @@ async def lifespan(app: FastAPI):
                 pass
             except Exception as adv_err:
                 logger.error(f"Error during adversarial tester shutdown: {adv_err}")
+
+            # Shutdown CuriosityDriver (only if we initialized it)
+            try:
+                # Get driver from vulcan module app state
+                vulcan_module = importlib.import_module("src.vulcan.main")
+                curiosity_driver = getattr(
+                    vulcan_module.app.state, "curiosity_driver", None
+                )
+
+                if curiosity_driver is not None:
+                    logger.info("Stopping CuriosityDriver...")
+                    await curiosity_driver.stop()
+                    logger.info("✓ CuriosityDriver shutdown complete")
+            except ImportError:
+                pass
+            except Exception as cd_err:
+                logger.error(f"Error during CuriosityDriver shutdown: {cd_err}")
             
             # Release the background task lock
             release_background_task_lock()
