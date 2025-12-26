@@ -77,36 +77,41 @@ class QueryTypeClassifier:
     This is the "Student" in the Master-Apprentice pattern.
     It doesn't understand the "why", but memorizes the "what" - 
     quickly guessing query types without heavy computation.
+    
+    Default patterns can be extended or overridden by passing custom patterns
+    in the config dictionary with keys: greeting_patterns, simple_factual_patterns,
+    complex_reasoning_patterns, code_patterns, creative_patterns.
     """
     
-    # Pattern-based classification (ultra-fast, regex-based)
-    GREETING_PATTERNS = [
+    # Default pattern-based classification (ultra-fast, regex-based)
+    # Can be overridden via config
+    DEFAULT_GREETING_PATTERNS = [
         r"^(hi|hello|hey|good morning|good afternoon|good evening|howdy|greetings)\b",
         r"^(how are you|how's it going|what's up)\??$",
         r"^(thanks|thank you|cheers|bye|goodbye|see you)\b",
     ]
     
-    SIMPLE_FACTUAL_PATTERNS = [
+    DEFAULT_SIMPLE_FACTUAL_PATTERNS = [
         r"^(what is|what's|who is|who's|when was|where is|where's)\s",
         r"^(define|meaning of|definition of)\s",
         r"^(how many|how much|how old|how tall|how far)\s",
     ]
     
-    COMPLEX_REASONING_PATTERNS = [
+    DEFAULT_COMPLEX_REASONING_PATTERNS = [
         r"\b(explain|analyze|compare|contrast|evaluate|discuss)\b",
         r"\b(why does|how does|what causes|what happens if)\b",
         r"\b(pros and cons|advantages|disadvantages)\b",
         r"\b(relationship between|difference between)\b",
     ]
     
-    CODE_PATTERNS = [
+    DEFAULT_CODE_PATTERNS = [
         r"\b(write|create|implement|code|function|class|script|program)\b.*\b(python|javascript|java|c\+\+|rust|go|sql)\b",
         r"\b(debug|fix|refactor|optimize)\b.*\b(code|function|method|class)\b",
         r"```",  # Code blocks
         r"\b(api|endpoint|database|query|algorithm)\b",
     ]
     
-    CREATIVE_PATTERNS = [
+    DEFAULT_CREATIVE_PATTERNS = [
         r"\b(write|create|compose|draft)\b.*\b(story|poem|essay|article|blog)\b",
         r"\b(creative|imaginative|fictional|narrative)\b",
         r"\b(brainstorm|ideas for|suggestions for)\b",
@@ -116,12 +121,19 @@ class QueryTypeClassifier:
         """Initialize the classifier with optional config."""
         config = config or {}
         
+        # Allow custom patterns via config, fallback to defaults
+        greeting_patterns = config.get("greeting_patterns", self.DEFAULT_GREETING_PATTERNS)
+        simple_patterns = config.get("simple_factual_patterns", self.DEFAULT_SIMPLE_FACTUAL_PATTERNS)
+        complex_patterns = config.get("complex_reasoning_patterns", self.DEFAULT_COMPLEX_REASONING_PATTERNS)
+        code_patterns = config.get("code_patterns", self.DEFAULT_CODE_PATTERNS)
+        creative_patterns = config.get("creative_patterns", self.DEFAULT_CREATIVE_PATTERNS)
+        
         # Compile patterns for speed
-        self._greeting_re = [re.compile(p, re.IGNORECASE) for p in self.GREETING_PATTERNS]
-        self._simple_re = [re.compile(p, re.IGNORECASE) for p in self.SIMPLE_FACTUAL_PATTERNS]
-        self._complex_re = [re.compile(p, re.IGNORECASE) for p in self.COMPLEX_REASONING_PATTERNS]
-        self._code_re = [re.compile(p, re.IGNORECASE) for p in self.CODE_PATTERNS]
-        self._creative_re = [re.compile(p, re.IGNORECASE) for p in self.CREATIVE_PATTERNS]
+        self._greeting_re = [re.compile(p, re.IGNORECASE) for p in greeting_patterns]
+        self._simple_re = [re.compile(p, re.IGNORECASE) for p in simple_patterns]
+        self._complex_re = [re.compile(p, re.IGNORECASE) for p in complex_patterns]
+        self._code_re = [re.compile(p, re.IGNORECASE) for p in code_patterns]
+        self._creative_re = [re.compile(p, re.IGNORECASE) for p in creative_patterns]
         
         # Configurable confidence thresholds
         self.confidence_thresholds = config.get("query_type_classifier", {
@@ -291,8 +303,8 @@ class StudentRouter:
         )
     
     def _get_cache_key(self, query: str) -> str:
-        """Generate cache key for query."""
-        return hashlib.md5(query.strip().lower().encode()).hexdigest()
+        """Generate cache key for query using SHA-256."""
+        return hashlib.sha256(query.strip().lower().encode()).hexdigest()
     
     def _check_cache(self, query: str) -> Optional[Dict[str, Any]]:
         """Check if query has a cached response."""

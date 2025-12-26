@@ -159,7 +159,10 @@ class SecurityAuditEngine:
         # ThreadPoolExecutor for async DB operations (Architectural Fix #4)
         # This allows SQLite writes to be decoupled from the async event loop,
         # preventing the "distinct pause" seen when the audit log writes to the database.
-        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="audit_db_")
+        # max_workers is configurable via environment variable
+        import os
+        audit_max_workers = int(os.getenv("AUDIT_DB_MAX_WORKERS", "2"))
+        self._executor = ThreadPoolExecutor(max_workers=audit_max_workers, thread_name_prefix="audit_db_")
 
         # Statistics
         self.stats = {
