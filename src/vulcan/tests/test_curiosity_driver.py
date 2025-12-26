@@ -14,7 +14,6 @@ Tests cover:
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 

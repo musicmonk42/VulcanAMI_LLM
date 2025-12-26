@@ -12,13 +12,18 @@ The driver uses ProcessPoolExecutor (not ThreadPoolExecutor) to bypass the GIL
 and ensure true parallel execution for the CPU-intensive run_learning_cycle method.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+if TYPE_CHECKING:
+    from vulcan.curiosity_engine.curiosity_engine_core import CuriosityEngine
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +179,7 @@ class CuriosityDriver:
 
     def __init__(
         self,
-        engine: "CuriosityEngine",  # noqa: F821 - forward reference
+        engine: CuriosityEngine,
         config: Optional[CuriosityDriverConfig] = None,
     ):
         """
@@ -468,7 +473,7 @@ class CuriosityDriver:
 
 
 def create_curiosity_driver(
-    engine: "CuriosityEngine",  # noqa: F821 - forward reference
+    engine: CuriosityEngine,
     heartbeat_interval: float = 30.0,
     min_budget_threshold: float = 10.0,
     max_experiments_per_cycle: int = 5,
