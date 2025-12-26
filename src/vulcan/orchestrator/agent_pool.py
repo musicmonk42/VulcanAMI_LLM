@@ -1014,6 +1014,115 @@ class AgentPoolManager:
             self.monitor_thread.start()
             logger.info("Agent pool monitor started")
 
+    # ========== BUG #1 FIX: Agent Pool Death Spiral Prevention ==========
+
+    def get_live_agent_count(self) -> int:
+        """
+        Get count of agents that are not in terminated or error state.
+        
+        BUG #1 FIX: This method counts only LIVE agents, excluding terminated
+        and error-state agents that should not count toward max_agents capacity.
+        
+        Returns:
+            Number of live (non-terminated, non-error) agents
+        """
+        with self.lock:
+            return sum(
+                1 for a in self.agents.values()
+                if a.state not in (AgentState.TERMINATED, AgentState.ERROR)
+            )
+
+    def can_spawn_agent(self) -> bool:
+        """
+        Check if a new agent can be spawned based on LIVE agent count.
+        
+        BUG #1 FIX: Uses live agent count instead of total agent count
+        to prevent the death spiral where terminated agents block new spawns.
+        
+        Returns:
+            True if a new agent can be spawned, False otherwise
+        """
+        return self.get_live_agent_count() < self.max_agents
+
+    def cleanup_terminated_agents(self) -> int:
+        """
+        Remove terminated agents from the pool and respawn to minimum.
+        
+        BUG #1 FIX: This method removes agents in TERMINATED state from
+        the agents dictionary to free up capacity for new agents.
+        
+        Returns:
+            Number of agents cleaned up
+        """
+        with self.lock:
+            before_count = len(self.agents)
+            
+            # Find terminated agents
+            terminated_ids = [
+                agent_id for agent_id, metadata in self.agents.items()
+                if metadata.state == AgentState.TERMINATED
+            ]
+            
+            # Remove terminated agents
+            for agent_id in terminated_ids:
+                # Clean up process reference if exists
+                if agent_id in self.agent_processes:
+                    process = self.agent_processes[agent_id]
+                    if process.is_alive():
+                        try:
+                            process.terminate()
+                            process.join(timeout=1)
+                        except Exception as e:
+                            logger.debug(f"Error terminating process for {agent_id}: {e}")
+                    try:
+                        process.close()
+                    except Exception:
+                        pass
+                    del self.agent_processes[agent_id]
+                
+                # Clean up specialized agents tracking
+                for spec_list in self.specialized_agents.values():
+                    if agent_id in spec_list:
+                        spec_list.remove(agent_id)
+                
+                # Remove from agents dictionary
+                del self.agents[agent_id]
+            
+            removed = before_count - len(self.agents)
+            
+            if removed > 0:
+                logger.info(f"Cleaned up {removed} terminated agents")
+        
+        # Ensure minimum agents outside the lock to avoid deadlock
+        self._ensure_minimum_agents()
+        
+        return removed
+
+    def _ensure_minimum_agents(self) -> int:
+        """
+        Ensure we have at least min_agents live agents.
+        
+        BUG #1 FIX: This method spawns new agents if the live count
+        drops below the minimum threshold.
+        
+        Returns:
+            Number of agents spawned
+        """
+        spawned = 0
+        live_count = self.get_live_agent_count()
+        
+        while live_count < self.min_agents:
+            agent_id = self.spawn_agent()
+            if agent_id:
+                spawned += 1
+                live_count += 1
+                logger.info(f"Spawned agent {agent_id} to meet minimum ({live_count}/{self.min_agents})")
+            else:
+                logger.warning("Failed to spawn agent to meet minimum")
+                break
+        
+        return spawned
+
     def spawn_agent(
         self,
         capability: AgentCapability = AgentCapability.GENERAL,
@@ -1032,9 +1141,14 @@ class AgentPoolManager:
             Agent ID if successful, None otherwise
         """
         with self.lock:
-            # Check capacity
-            if len(self.agents) >= self.max_agents:
-                logger.warning(f"Agent pool at maximum capacity ({self.max_agents})")
+            # BUG #1 FIX: Check capacity using LIVE agent count, not total count
+            # This prevents the death spiral where terminated agents block new spawns
+            live_count = sum(
+                1 for a in self.agents.values()
+                if a.state not in (AgentState.TERMINATED, AgentState.ERROR)
+            )
+            if live_count >= self.max_agents:
+                logger.warning(f"Agent pool at maximum capacity ({self.max_agents} live agents)")
                 return None
 
             # Generate unique agent ID
@@ -1476,6 +1590,7 @@ class AgentPoolManager:
         """
         Assign agent with timeout and proper locking to prevent race conditions
         FIXED: Won't hang if no agents available
+        BUG #1 FIX: Triggers cleanup and respawn if all agents are terminated
 
         Args:
             capability: Required capability
@@ -1489,6 +1604,7 @@ class AgentPoolManager:
         max_retry_delay = 0.2  # FIXED: Reduced from 1.0 to 0.2 seconds
         max_retries = 10  # FIXED: Maximum number of retries to prevent infinite loops
         retry_count = 0
+        cleanup_attempted = False  # BUG #1 FIX: Track if cleanup was attempted
 
         while time.time() - start_time < timeout_seconds and retry_count < max_retries:
             # FIXED: Check shutdown event
@@ -1502,8 +1618,14 @@ class AgentPoolManager:
                 if agent_id:
                     return agent_id
 
-                # Try to spawn if under capacity
-                if len(self.agents) < self.max_agents:
+                # BUG #1 FIX: Check LIVE agent count, not total count
+                live_count = sum(
+                    1 for a in self.agents.values()
+                    if a.state not in (AgentState.TERMINATED, AgentState.ERROR)
+                )
+                
+                # Try to spawn if under capacity (using live count)
+                if live_count < self.max_agents:
                     new_agent = self.spawn_agent(capability)
                     if new_agent:
                         # Give agent a moment to initialize
@@ -1513,7 +1635,22 @@ class AgentPoolManager:
                         if agent_id:
                             return agent_id
                 else:
-                    # FIXED: At max capacity and no agents available - fail fast
+                    # BUG #1 FIX: At max live capacity - try cleanup if not already attempted
+                    if not cleanup_attempted:
+                        logger.info(
+                            f"At max live capacity ({self.max_agents}) with no available agents "
+                            f"for capability {capability.value}. Attempting cleanup..."
+                        )
+            
+            # BUG #1 FIX: Attempt cleanup outside lock to avoid deadlock
+            if not cleanup_attempted:
+                cleanup_attempted = True
+                cleaned = self.cleanup_terminated_agents()
+                if cleaned > 0:
+                    logger.info(f"Cleaned up {cleaned} terminated agents, retrying assignment")
+                    continue  # Retry immediately after cleanup
+                else:
+                    # No terminated agents to clean up - truly at capacity
                     logger.warning(
                         f"At max capacity ({self.max_agents}) with no available agents "
                         f"for capability {capability.value}"
@@ -1959,9 +2096,28 @@ class AgentPoolManager:
                     self.retire_agent(agent_id)
                 
                 # PERFORMANCE FIX: Periodic statistics reset to prevent unbounded growth
+                # BUG #1 & #5 FIX: Also trigger cleanup and ensure minimum agents
                 if monitor_iterations % STATS_RESET_INTERVAL == 0:
                     logger.info(f"Performing periodic statistics reset (iteration {monitor_iterations})")
                     self.reset_statistics(preserve_totals=True)
+                    # BUG #1 FIX: Cleanup terminated agents and ensure minimum
+                    self.cleanup_terminated_agents()
+                
+                # BUG #1 FIX: Check for terminated agent cleanup every 3 iterations (~30 seconds)
+                # This ensures dead agents don't accumulate between stat resets
+                elif monitor_iterations % 3 == 0:
+                    live_count = self.get_live_agent_count()
+                    with self.lock:
+                        terminated_count = sum(
+                            1 for a in self.agents.values()
+                            if a.state == AgentState.TERMINATED
+                        )
+                    if terminated_count > 0:
+                        logger.info(
+                            f"Agent pool status: {live_count} live, {terminated_count} terminated. "
+                            f"Triggering cleanup..."
+                        )
+                        self.cleanup_terminated_agents()
                 
                 # THREAD POOL FIX: Log pending executions queue size for monitoring
                 with self._pending_executions_lock:
@@ -2013,7 +2169,10 @@ class AgentPoolManager:
             return False
 
     def get_pool_status(self) -> Dict[str, Any]:
-        """Get pool status with throttled status checks."""
+        """Get pool status with throttled status checks.
+        
+        BUG #1 FIX: Also reports live_agents count to distinguish from terminated.
+        """
         current_time = time.time()
         if current_time - self.last_status_check < self.status_check_interval:
             logger.debug(
@@ -2022,16 +2181,23 @@ class AgentPoolManager:
             return self._cached_status()
 
         self.last_status_check = current_time
+        
+        # BUG #1 FIX: Trigger cleanup when reporting status
+        self.cleanup_terminated_agents()
 
         with self.lock:
             # PERFORMANCE FIX: Combine into single loop to avoid double iteration
             state_counts = defaultdict(int)
             capability_counts = defaultdict(int)
             health_scores = []
+            live_count = 0
             for metadata in self.agents.values():
                 state_counts[metadata.state.value] += 1
                 capability_counts[metadata.capability.value] += 1
                 health_scores.append(metadata.get_health_score())
+                # BUG #1 FIX: Track live agents
+                if metadata.state not in (AgentState.TERMINATED, AgentState.ERROR):
+                    live_count += 1
 
             avg_health = (
                 sum(health_scores) / len(health_scores) if health_scores else 0.0
@@ -2060,6 +2226,7 @@ class AgentPoolManager:
 
             status = {
                 "total_agents": len(self.agents),
+                "live_agents": live_count,  # BUG #1 FIX: Report live count
                 "state_distribution": dict(state_counts),
                 "capability_distribution": dict(capability_counts),
                 "pending_tasks": len(self.task_assignments),
@@ -2153,6 +2320,8 @@ class AgentPoolManager:
         PERFORMANCE FIX: Called periodically to prevent statistics dictionaries
         from growing unboundedly over long-running sessions.
         
+        BUG #5 FIX: Also triggers agent pool recovery after reset.
+        
         Args:
             preserve_totals: If True, keeps cumulative totals but resets windows.
                            If False, resets everything to zero.
@@ -2178,7 +2347,15 @@ class AgentPoolManager:
         if hasattr(self, 'priority_queue'):
             self.priority_queue.reset_priority_distribution()
         
-        logger.debug(f"Statistics reset completed (preserve_totals={preserve_totals})")
+        # BUG #5 FIX: Trigger pool recovery after stats reset
+        # Clean up terminated agents and ensure minimum agent count
+        cleaned = self.cleanup_terminated_agents()
+        live_count = self.get_live_agent_count()
+        
+        logger.info(
+            f"Statistics reset completed (preserve_totals={preserve_totals}). "
+            f"Pool recovered: {live_count} live agents, {cleaned} agents cleaned up"
+        )
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """
