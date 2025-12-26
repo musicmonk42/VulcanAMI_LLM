@@ -338,6 +338,12 @@ ARENA_REASONING_COMPLEXITY_THRESHOLD: float = 0.3  # For multi-aspect reasoning 
 ARENA_EXECUTION_COMPLEXITY_THRESHOLD: float = 0.45  # For complex execution tasks (NEW)
 
 # ============================================================
+# CONSTANTS - Cache Stats Logging
+# ============================================================
+# Interval for logging embedding cache statistics (every N requests)
+CACHE_STATS_LOG_INTERVAL: int = 10
+
+# ============================================================
 # CONSTANTS - Security Patterns
 # ============================================================
 
@@ -1117,8 +1123,8 @@ class QueryAnalyzer:
             try:
                 stats = get_embedding_cache_stats()
                 total_requests = stats.get("hits", 0) + stats.get("misses", 0)
-                # Log every 10 requests to avoid excessive logging
-                if total_requests > 0 and total_requests % 10 == 0:
+                # Log every CACHE_STATS_LOG_INTERVAL requests to avoid excessive logging
+                if total_requests > 0 and total_requests % CACHE_STATS_LOG_INTERVAL == 0:
                     logger.info(
                         f"[QueryRouter] Embedding cache stats: "
                         f"hits={stats.get('hits', 0)}, misses={stats.get('misses', 0)}, "
