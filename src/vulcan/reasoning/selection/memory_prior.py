@@ -441,6 +441,7 @@ class BayesianMemoryPrior:
             
             if query_text and isinstance(query_text, str) and len(query_text) > MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST:
                 try:
+                    original_top = max(prior.tool_probs.items(), key=lambda x: x[1]) if prior.tool_probs else None
                     prior.tool_probs = self.semantic_matcher.boost_prior(
                         prior.tool_probs,
                         query_text,
@@ -452,6 +453,14 @@ class BayesianMemoryPrior:
                             key=lambda x: x[1]
                         )[0]
                     prior.metadata['semantic_boost_applied'] = True
+                    # Log semantic boost for debugging tool selection issues
+                    new_top = max(prior.tool_probs.items(), key=lambda x: x[1]) if prior.tool_probs else None
+                    if new_top:
+                        logger.info(
+                            f"[SemanticBoost] Applied to query ({len(query_text)} chars), "
+                            f"top tool: {new_top[0]} ({new_top[1]:.3f})"
+                            f"{f', changed from {original_top[0]}' if original_top and original_top[0] != new_top[0] else ''}"
+                        )
                 except Exception as e:
                     logger.warning(f"Semantic boost failed: {e}")
 
