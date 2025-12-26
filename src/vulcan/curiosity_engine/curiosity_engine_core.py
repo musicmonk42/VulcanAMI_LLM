@@ -1154,6 +1154,20 @@ class CuriosityEngine:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
         return cls._instance
+    
+    @classmethod
+    def _reset_singleton(cls):
+        """Reset singleton instance for testing purposes only.
+        
+        WARNING: This method is intended for unit testing only.
+        Do not use in production code as it defeats the purpose of the singleton.
+        """
+        with cls._instance_lock:
+            if cls._instance is not None:
+                # Clear initialized flag so __init__ runs again
+                if hasattr(cls._instance, '_initialized'):
+                    cls._instance._initialized = False
+            cls._instance = None
 
     @staticmethod
     def _safe_truncate(text: str, max_length: int) -> str:

@@ -68,6 +68,8 @@ def mock_experiment(mock_knowledge_gap):
 @pytest.fixture
 def curiosity_engine():
     """Create a CuriosityEngine instance"""
+    # Reset singleton to ensure each test gets a fresh instance
+    CuriosityEngine._reset_singleton()
     engine = CuriosityEngine()
     return engine
 
@@ -776,6 +778,7 @@ class TestIntegration:
 
     def test_complete_learning_cycle(self):
         """Test complete learning cycle from start to finish"""
+        CuriosityEngine._reset_singleton()
         engine = CuriosityEngine()
 
         # Run a full cycle
@@ -789,6 +792,7 @@ class TestIntegration:
 
     def test_multiple_cycles(self):
         """Test running multiple learning cycles"""
+        CuriosityEngine._reset_singleton()
         engine = CuriosityEngine()
 
         summaries = []
@@ -804,6 +808,7 @@ class TestIntegration:
 
     def test_resource_adaptation(self):
         """Test resource-based adaptation"""
+        CuriosityEngine._reset_singleton()
         engine = CuriosityEngine()
 
         # Run cycles and track resource usage
