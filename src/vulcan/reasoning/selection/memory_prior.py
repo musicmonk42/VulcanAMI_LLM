@@ -31,6 +31,11 @@ except ImportError:
     logger.warning("SemanticToolMatcher not available")
 
 
+# Configuration constants for semantic tool matching
+MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST = 10  # Minimum query text length to apply semantic boost
+MULTIMODAL_CONTENT_BOOST = 0.4  # Strong boost for explicit multimodal content
+
+
 class SimilarityMetric(Enum):
     """Similarity metrics for memory retrieval"""
 
@@ -434,7 +439,7 @@ class BayesianMemoryPrior:
             elif isinstance(context, str):
                 query_text = context
             
-            if query_text and isinstance(query_text, str) and len(query_text) > 10:
+            if query_text and isinstance(query_text, str) and len(query_text) > MIN_QUERY_LENGTH_FOR_SEMANTIC_BOOST:
                 try:
                     prior.tool_probs = self.semantic_matcher.boost_prior(
                         prior.tool_probs,
@@ -453,9 +458,8 @@ class BayesianMemoryPrior:
         # Additional boost for multimodal when multimodal content is detected
         if context and context.get('is_multimodal') and 'multimodal' in available_tools:
             try:
-                multimodal_boost = 0.4  # Strong boost for explicit multimodal content
                 original_multimodal_prob = prior.tool_probs.get('multimodal', 0)
-                prior.tool_probs['multimodal'] = original_multimodal_prob + multimodal_boost
+                prior.tool_probs['multimodal'] = original_multimodal_prob + MULTIMODAL_CONTENT_BOOST
                 
                 # Renormalize
                 total = sum(prior.tool_probs.values())

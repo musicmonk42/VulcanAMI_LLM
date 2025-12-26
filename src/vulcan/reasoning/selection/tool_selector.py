@@ -266,6 +266,10 @@ class StochasticCostModel:
 CLEANUP_CACHE_CAPACITY_THRESHOLD = 0.9  # Trigger cleanup at 90% cache capacity
 CLEANUP_MISS_INTERVAL = 100  # Trigger cleanup every N cache misses
 
+# Multimodal tool configuration
+MULTIMODAL_TIME_BUDGET_MULTIPLIER = 1.5  # Allow multimodal more time headroom
+
+
 class MultiTierFeatureExtractor:
     """
     Extracts features at different levels of complexity and cost.
@@ -1567,9 +1571,9 @@ class ToolSelector:
                 time_budget = request.constraints.get("time_budget_ms", float("inf"))
                 predicted_time = cost_dist["time"]["mean"]
                 
-                # Allow multimodal more time headroom (1.5x budget) since it handles complex inputs
+                # Allow multimodal more time headroom since it handles complex inputs
                 if tool_name == "multimodal":
-                    time_budget = time_budget * 1.5
+                    time_budget = time_budget * MULTIMODAL_TIME_BUDGET_MULTIPLIER
                 
                 if predicted_time > time_budget:
                     logger.debug(f"Tool {tool_name} filtered: predicted_time={predicted_time:.0f}ms > budget={time_budget:.0f}ms")
