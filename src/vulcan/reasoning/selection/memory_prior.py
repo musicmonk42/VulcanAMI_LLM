@@ -456,10 +456,12 @@ class BayesianMemoryPrior:
                     # Log semantic boost for debugging tool selection issues
                     new_top = max(prior.tool_probs.items(), key=lambda x: x[1]) if prior.tool_probs else None
                     if new_top:
+                        changed_msg = ''
+                        if original_top and original_top[0] != new_top[0]:
+                            changed_msg = f', changed from {original_top[0]}'
                         logger.info(
                             f"[SemanticBoost] Applied to query ({len(query_text)} chars), "
-                            f"top tool: {new_top[0]} ({new_top[1]:.3f})"
-                            f"{f', changed from {original_top[0]}' if original_top and original_top[0] != new_top[0] else ''}"
+                            f"top tool: {new_top[0]} ({new_top[1]:.3f}){changed_msg}"
                         )
                 except Exception as e:
                     logger.warning(f"Semantic boost failed: {e}")
