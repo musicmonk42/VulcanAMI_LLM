@@ -660,6 +660,16 @@ class QueryAnalyzer:
             return refusal_response(plan.safety_reasons)
     """
     
+    # BUG #2 FIX: Trivial patterns for fast-path (class constant for maintainability)
+    # These are simple greetings/acknowledgments that don't need full analysis
+    # Note: 'help' is excluded because help requests need proper analysis
+    TRIVIAL_PATTERNS = (
+        'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 
+        'goodbye', 'ok', 'okay', 'yes', 'no', 'sure', 'yep',
+        'nope', 'good', 'great', 'nice', 'cool', 'awesome',
+        'please', 'sorry', "what's up", 'how are you',
+    )
+    
     def __init__(self, enable_safety_validation: bool = True):
         """Initialize the query analyzer with compiled patterns and optional safety validation.
         
@@ -872,6 +882,62 @@ class QueryAnalyzer:
         
         query_id = f"q_{uuid.uuid4().hex[:12]}"
         query_lower = query.lower()
+        
+        # BUG #2 FIX: Fast-path for trivial queries to avoid 100-200s latency
+        if query and self._is_trivial_query(query):
+            logger.debug(f"[QueryRouter] {query_id}: Fast-path for trivial query")
+            
+            # Determine learning mode
+            if source == "user":
+                learning_mode = LearningMode.USER_INTERACTION
+                with self._lock:
+                    self._user_interaction_count += 1
+                telemetry_category = "user_query"
+            else:
+                learning_mode = LearningMode.AI_INTERACTION
+                with self._lock:
+                    self._ai_interaction_count += 1
+                telemetry_category = f"{source}_interaction"
+            
+            # Return minimal plan for trivial query
+            plan = ProcessingPlan(
+                query_id=query_id,
+                original_query=query,
+                source=source,
+                learning_mode=learning_mode,
+                query_type=QueryType.GENERAL,
+                complexity_score=0.0,
+                uncertainty_score=0.0,
+                collaboration_needed=False,
+                arena_participation=False,
+                telemetry_category=telemetry_category,
+                telemetry_data={
+                    "session_id": session_id,
+                    "query_length": len(query),
+                    "word_count": len(query.split()),
+                    "query_number": query_number,
+                    "source": source,
+                    "learning_mode": learning_mode.value,
+                    "fast_path": True,  # Mark as fast-path for telemetry
+                }
+            )
+            
+            # Create a single simple task for trivial queries
+            plan.agent_tasks = [AgentTask(
+                task_id=f"task_{uuid.uuid4().hex[:8]}_trivial",
+                task_type="general_task",
+                capability="reasoning",
+                prompt=query,
+                priority=1,
+                timeout_seconds=5.0,
+                parameters={"is_trivial": True, "skip_heavy_analysis": True}
+            )]
+            
+            logger.info(
+                f"[QueryRouter] {query_id}: FAST-PATH source={source}, "
+                f"tasks=1, complexity=0.00"
+            )
+            return plan
         
         # Determine learning mode based on source
         if source == "user":
@@ -1130,6 +1196,38 @@ class QueryAnalyzer:
         except Exception as e:
             logger.error(f"[Safety] Safety validation failed: {e}")
             plan.safety_validated = False
+    
+    def _is_trivial_query(self, query: str) -> bool:
+        """
+        Detect simple greetings/short queries that don't need full analysis.
+        
+        BUG #2 FIX: This method provides a fast-path for trivial queries
+        to avoid the 100-200 second latency for simple greetings.
+        
+        Args:
+            query: The query string (not lowercased)
+            
+        Returns:
+            True if the query is trivial and should skip heavy analysis
+        """
+        query_lower = query.lower().strip()
+        
+        # Only consider very short queries (under 20 chars) as potentially trivial
+        # This prevents "hello, can you help me with complex calculations?" from being trivial
+        if len(query_lower) > 20:
+            return False
+        
+        # Check if query is exactly a trivial pattern or starts with pattern + punctuation/space
+        for pattern in self.TRIVIAL_PATTERNS:
+            if query_lower == pattern:
+                return True
+            # Allow pattern followed by punctuation (e.g., "hello!", "thanks.")
+            if query_lower.startswith(pattern) and len(query_lower) <= len(pattern) + 2:
+                suffix = query_lower[len(pattern):]
+                if not suffix or all(c in '!.?,;: ' for c in suffix):
+                    return True
+        
+        return False
     
     def _classify_query_type(self, query_lower: str) -> QueryType:
         """
