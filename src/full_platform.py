@@ -3102,10 +3102,19 @@ async def vulcan_chat_proxy(request: Request):
     providing a reliable way to access the chat API even if the /vulcan
     mount has issues.
     """
+    # Parse request body first
     try:
-        # Get request body
         body = await request.json()
-        
+    except json.JSONDecodeError as e:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Invalid JSON",
+                "detail": str(e),
+            }
+        )
+    
+    try:
         # Try to import VULCAN's chat handler
         vulcan_module = importlib.import_module("src.vulcan.main")
         if hasattr(vulcan_module, "app"):
@@ -3124,14 +3133,6 @@ async def vulcan_chat_proxy(request: Request):
             # Import and call the chat endpoint handler directly
             try:
                 from src.vulcan.main import UnifiedChatRequest, unified_chat
-                
-                # Create UnifiedChatRequest from body
-                chat_request = UnifiedChatRequest(**body)
-                
-                # Call the chat endpoint function directly
-                result = await unified_chat(chat_request)
-                return result
-                
             except ImportError as e:
                 logger.error(f"Failed to import VULCAN chat handler: {e}")
                 return JSONResponse(
@@ -3141,6 +3142,23 @@ async def vulcan_chat_proxy(request: Request):
                         "detail": str(e),
                     }
                 )
+            
+            # Validate and create request object
+            try:
+                chat_request = UnifiedChatRequest(**body)
+            except Exception as e:
+                # Handle Pydantic validation errors
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": "Invalid request",
+                        "detail": str(e),
+                    }
+                )
+            
+            # Call the chat endpoint function directly
+            result = await unified_chat(chat_request)
+            return result
         else:
             return JSONResponse(
                 status_code=503,
@@ -3149,14 +3167,6 @@ async def vulcan_chat_proxy(request: Request):
                     "detail": "The VULCAN module could not be loaded.",
                 }
             )
-    except json.JSONDecodeError as e:
-        return JSONResponse(
-            status_code=400,
-            content={
-                "error": "Invalid JSON",
-                "detail": str(e),
-            }
-        )
     except Exception as e:
         logger.error(f"VULCAN chat proxy error: {e}", exc_info=True)
         return JSONResponse(
