@@ -126,21 +126,26 @@ TOOL_DESCRIPTIONS = {
     """,
     
     "multimodal": """
-        Multi-modal reasoning combining different types of information.
+        Multi-modal reasoning combining visual, textual, and other information types.
         
         USE THIS TOOL FOR:
-        - Image + text reasoning
-        - Audio + visual analysis
-        - Cross-modal inference
-        - Combining structured and unstructured data
-        - Multi-format document analysis
-        - Sensor fusion
-        - Video understanding
-        - Complex document with images and tables
+        - Image analysis and understanding
+        - Describing what is in a picture or photo
+        - Reading text from images (OCR)
+        - Analyzing charts, graphs, diagrams, and figures
+        - Understanding screenshots and visual documents
+        - Video frame analysis
+        - Audio transcription and analysis
+        - Combining information from images and text
+        - Document analysis with visual elements
+        - Any query that references an uploaded file or image
+        - Questions like "what is this?", "describe this image", "what do you see?"
+        - Analyzing PDFs with images or complex layouts
+        - Cross-modal reasoning between different data types
         
-        TRIGGER KEYWORDS: image, picture, photo, video, audio, sound, visual,
-        diagram, chart, graph, table, figure, multimedia, document, PDF, scan,
-        screenshot, display, show, look, see, hear, watch
+        TRIGGER KEYWORDS: image, picture, photo, video, audio, visual, diagram,
+        chart, graph, table, figure, document, PDF, screenshot, see, look,
+        describe, analyze, what is this, uploaded, attached, file, scan, read
     """
 }
 
@@ -207,15 +212,23 @@ TOOL_KEYWORDS = {
     ],
     
     "multimodal": [
-        "image", "images", "picture", "pictures",
-        "photo", "photograph",
-        "video", "videos",
-        "audio", "sound",
-        "visual", "visually",
-        "diagram", "chart", "graph", "table",
-        "figure", "figures",
-        "document", "pdf", "scan",
-        "screenshot",
+        # Image keywords
+        "image", "images", "picture", "pictures", "photo", "photograph", "photos",
+        "img", "jpeg", "jpg", "png", "gif", "bitmap", "pixel",
+        # Visual keywords  
+        "visual", "visually", "see", "look", "looking", "view", "viewing", "show", "display",
+        "appearance", "looks like", "what is this", "identify", "recognize",
+        # Document/diagram keywords
+        "diagram", "chart", "graph", "table", "figure", "figures", "plot",
+        "document", "pdf", "scan", "scanned", "screenshot", "screen",
+        # Video/audio keywords
+        "video", "videos", "clip", "footage", "frame", "frames",
+        "audio", "sound", "voice", "speech", "listen", "hear",
+        # Analysis keywords
+        "analyze this image", "describe this", "what do you see", "extract from",
+        "read this", "ocr", "text in image", "caption", "describe",
+        # File references
+        "attached", "uploaded", "this file", "the file", "this document",
     ]
 }
 

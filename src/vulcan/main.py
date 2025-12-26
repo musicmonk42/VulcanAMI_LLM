@@ -11,16 +11,17 @@
 # PRIORITY 1 FIX: RESTRICT CPU THREADS - MUST BE ABSOLUTE FIRST
 # Prevents PyTorch/NumPy/OpenBLAS from spawning 40+ threads and causing
 # "Thread Thrashing" which locks the CPU for 60-100+ seconds on complex queries.
-# Setting to "1" allows 10 agents to run in parallel without resource starvation.
+# Setting to "4" allows concurrent embedding while preventing CPU monopolization.
 # These environment variables MUST be set before ANY torch/numpy imports.
 # ====================================================================
 import os
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["TORCH_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["MKL_NUM_THREADS"] = "4"
+os.environ["TORCH_NUM_THREADS"] = "4"
+os.environ["OPENBLAS_NUM_THREADS"] = "4"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "4"
+os.environ["NUMEXPR_NUM_THREADS"] = "4"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer deadlocks
 
 # ====================================================================
 # PATH + SAFETY SETUP - MUST BE FIRST
@@ -36,6 +37,15 @@ from fastapi import FastAPI, HTTPException, Request, Response, status
 import uvicorn
 import numpy as np
 import msgpack
+
+# Also set PyTorch threads programmatically after import
+try:
+    import torch
+    torch.set_num_threads(4)
+    torch.set_num_interop_threads(2)
+except ImportError:
+    pass  # PyTorch not installed
+
 from unittest.mock import MagicMock
 from typing import Any, Dict, List, Optional, Tuple
 from threading import Thread

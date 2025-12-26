@@ -47,6 +47,12 @@ try:
 except ImportError:
     BANDIT_AVAILABLE = False
 
+try:
+    from .semantic_tool_matcher import SemanticToolMatcher, TOOL_DESCRIPTIONS, TOOL_KEYWORDS
+    SEMANTIC_MATCHER_AVAILABLE = True
+except ImportError:
+    SEMANTIC_MATCHER_AVAILABLE = False
+
 
 __all__ = [
     # Main Orchestrator
@@ -78,8 +84,12 @@ __all__ = [
     "WarmStartPool",
     # Availability Flags
     "BANDIT_AVAILABLE",
+    "SEMANTIC_MATCHER_AVAILABLE",
 ]
 
 # Add optional components to __all__ if they were imported successfully
 if BANDIT_AVAILABLE:
     __all__.extend(["AdaptiveBanditOrchestrator", "BanditContext"])
+
+if SEMANTIC_MATCHER_AVAILABLE:
+    __all__.extend(["SemanticToolMatcher", "TOOL_DESCRIPTIONS", "TOOL_KEYWORDS"])

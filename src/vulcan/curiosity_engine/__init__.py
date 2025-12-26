@@ -34,6 +34,7 @@ try:
         RegionManager,
         SafeExperimentExecutor,
         StrategySelector,
+        get_curiosity_engine,  # Factory function for singleton access
     )
 
     CURIOSITY_ENGINE_AVAILABLE = True
@@ -52,6 +53,7 @@ except ImportError as e:
     RegionManager = None
     SafeExperimentExecutor = None
     StrategySelector = None
+    get_curiosity_engine = None
 
 # Gap analyzer components
 try:
@@ -282,6 +284,7 @@ except ImportError as e:
 __all__ = [
     # Core Engine
     "CuriosityEngine",
+    "get_curiosity_engine",  # Factory function for singleton access
     "ExperimentManager",
     "ExperimentResult",
     "ExplorationFrontier",

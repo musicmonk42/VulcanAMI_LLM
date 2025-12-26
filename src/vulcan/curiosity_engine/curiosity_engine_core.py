@@ -1139,8 +1139,21 @@ class KnowledgeIntegrator:
 class CuriosityEngine:
     """Main curiosity-driven learning orchestrator - REFACTORED"""
     
+    # Singleton pattern to prevent dual instances (fixes resource waste from duplicate PIDs)
+    _instance = None
+    _instance_lock = threading.Lock()
+    
     # BUG #3 FIX: Configuration constants for query ingestion
     MAX_QUERY_TRUNCATE_LENGTH = 200  # Maximum length for query truncation in failure storage
+
+    def __new__(cls, *args, **kwargs):
+        """Ensure only one instance exists (singleton pattern)."""
+        if cls._instance is None:
+            with cls._instance_lock:
+                # Double-check locking pattern
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
 
     @staticmethod
     def _safe_truncate(text: str, max_length: int) -> str:
@@ -1188,6 +1201,19 @@ class CuriosityEngine:
             decomposer: Problem decomposer instance
             world_model: World model instance
         """
+        # Prevent re-initialization of singleton
+        if hasattr(self, '_initialized') and self._initialized:
+            # Allow updating dependencies if provided
+            if knowledge is not None:
+                self.knowledge = knowledge
+            if decomposer is not None:
+                self.decomposer = decomposer
+            if world_model is not None:
+                self.world_model = world_model
+            return
+        
+        self._initialized = True
+        
         self.knowledge = knowledge
         self.decomposer = decomposer
         self.world_model = world_model
@@ -1854,3 +1880,52 @@ class CuriosityEngine:
                 "total_experiments": 0,
                 "frontier_size": 0,
             }
+
+
+# =============================================================================
+# Factory function for CuriosityEngine singleton access
+# =============================================================================
+
+_curiosity_engine_instance = None
+_curiosity_engine_lock = threading.Lock()
+
+
+def get_curiosity_engine(
+    knowledge=None, decomposer=None, world_model=None
+) -> CuriosityEngine:
+    """
+    Factory function to get the singleton CuriosityEngine instance.
+    
+    This ensures only one CuriosityEngine exists application-wide,
+    preventing the dual instance issue (PIDs 247 and 215 in logs).
+    
+    Args:
+        knowledge: Optional knowledge crystallizer instance
+        decomposer: Optional problem decomposer instance  
+        world_model: Optional world model instance
+        
+    Returns:
+        The singleton CuriosityEngine instance
+    """
+    global _curiosity_engine_instance
+    
+    if _curiosity_engine_instance is None:
+        with _curiosity_engine_lock:
+            # Double-check locking pattern
+            if _curiosity_engine_instance is None:
+                _curiosity_engine_instance = CuriosityEngine(
+                    knowledge=knowledge,
+                    decomposer=decomposer, 
+                    world_model=world_model
+                )
+    elif knowledge is not None or decomposer is not None or world_model is not None:
+        # Update dependencies on existing instance
+        if knowledge is not None:
+            _curiosity_engine_instance.knowledge = knowledge
+        if decomposer is not None:
+            _curiosity_engine_instance.decomposer = decomposer
+        if world_model is not None:
+            _curiosity_engine_instance.world_model = world_model
+            
+    return _curiosity_engine_instance
+
